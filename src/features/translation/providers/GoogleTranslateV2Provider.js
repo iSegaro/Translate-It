@@ -76,7 +76,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   /**
    * Implement translation for a single chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const info = getBrowserInfoSync();
     const isStableClient = info.isFirefox || info.isMobile;
     
@@ -129,6 +129,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
     const body = new URLSearchParams();
     body.append("q", combinedText);
+    const originalCharCount = options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const responseObj = await this._executeApiCall({
       url: url.toString(),
@@ -166,7 +167,10 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         return { translatedText, candidateText: candidateText.trim() };
       },
       context: 'googlev2-translate-chunk',
-      abortController
+      abortController,
+      sessionId: options.sessionId,
+      charCount: this._calculateTraditionalCharCount(chunkTexts),
+      originalCharCount
     });
 
     // Use robust split logic from base class OUTSIDE extractResponse

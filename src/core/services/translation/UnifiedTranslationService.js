@@ -17,6 +17,7 @@ import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync } from '
 import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -90,7 +91,8 @@ export class UnifiedTranslationService {
       data.provider = await this._resolveEffectiveProvider(data, context);
     }
 
-    logger.info(`[UnifiedService] Processing translation request: ${messageId} (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
+    const estimatedChars = typeof data?.text === 'string' ? data.text.length : 0;
+    logger.info(`[UnifiedService] Processing translation request: ${messageId} (${estimatedChars.toLocaleString()} chars [est], mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
     // Service availability checked silently
 
     // Check if service is initialized
@@ -136,6 +138,7 @@ export class UnifiedTranslationService {
       const request = this.requestTracker.createRequest({
         messageId,
         data,
+        sessionId: data?.sessionId || messageId, // Store sessionId in the request record
         sender,
         timestamp: Date.now()
       });
@@ -166,6 +169,39 @@ export class UnifiedTranslationService {
         request,
         originalMessage: message
       });
+
+      // Log Session Summary
+      const mode = request.mode;
+      const isPageMode = mode === TranslationMode.Page;
+      const isSelectElementMode = mode === TranslationMode.Select_Element;
+      const sessionId = request.sessionId || request.data?.sessionId;
+      const isMultiBatch = !!(sessionId && sessionId !== messageId);
+      const summaryId = sessionId || messageId;
+      
+      // Safety: Clear session if a NEW translation starts on the same ID 
+      // but only for non-batch requests (as batch adds to existing session)
+      if (isSelectElementMode && !isMultiBatch) {
+        statsManager.clearSession(summaryId);
+      }
+
+      if (isPageMode) {
+        // For Page Translation: Print stats for THIS batch to provide real-time progress
+        const networkChars = result.actualCharCount || 0;
+        statsManager.printSummary(summaryId, { 
+          status: 'Batch', 
+          batchChars: networkChars,
+          batchOriginalChars: batchCharCount // Original sum of input segments
+        });
+      } else if (!isMultiBatch || (isSelectElementMode && !result.streaming)) {
+        // For Standalone OR Select Element (when not streaming): Print summary
+        statsManager.printSummary(summaryId, { 
+          status: 'Session', 
+          success: result.success, 
+          clear: !isSelectElementMode // Don't clear select-element yet, more elements might be coming in the same selection
+        });
+      }
+
+
 
       return result;
 
@@ -484,6 +520,7 @@ class TranslationModeCoordinator {
     const results = new Array(segments.length).fill(null);
     const errorMessages = [];
     let hasErrors = false;
+    let totalActualChars = 0;
 
     // Check if provider supports batch/chunk
     const isAIProvider = providerInstance?.constructor?.type === "ai" || typeof providerInstance?._translateBatch === 'function';
@@ -503,9 +540,21 @@ class TranslationModeCoordinator {
         }
 
         try {
+          const batchCharCount = batch.reduce((sum, text) => sum + (text?.length || 0), 0);
+          const sessionId = request.sessionId || data.sessionId || messageId;
+
+          // Track stats before call to calculate exact network delta
+          const statsBefore = statsManager.getSessionSummary(sessionId);
+          const charsBefore = statsBefore ? statsBefore.chars : 0;
+
+          // Attach sessionId to abortController carrier for session tracking
+          if (abortController) {
+            abortController.sessionId = sessionId;
+          }
+
           const batchResult = await rateLimitManager.executeWithRateLimit(
             provider || ProviderRegistryIds.GOOGLE_V2,
-            () => {
+            (opts) => {
               if (isAIProvider) {
                 return providerInstance._translateBatch(
                   batch,
@@ -515,7 +564,7 @@ class TranslationModeCoordinator {
                   abortController,
                   translationEngine,
                   messageId,
-                  data.sessionId || messageId,
+                  sessionId,
                   priority // Use detected priority (LOW)
                 );
               } else {
@@ -524,20 +573,35 @@ class TranslationModeCoordinator {
                   sourceLanguage || 'auto',
                   targetLanguage,
                   TranslationMode.Page,
-                  abortController
+                  abortController,
+                  0, // retryAttempt
+                  batch.length, // segmentCount
+                  i, // chunkIndex
+                  batches.length, // totalChunks
+                  opts // Pass opts containing sessionId
                 );
               }
             },
             `batch-${i + 1}/${batches.length}`,
-            priority // Use detected priority (LOW)
+            priority, // Use detected priority (LOW)
+            { 
+              sessionId
+            }
           );
 
+          // Calculate exact network characters used by this batch
+          const statsAfter = statsManager.getSessionSummary(sessionId);
+          const actualCharCount = statsAfter ? (statsAfter.chars - charsBefore) : batchCharCount;
+          totalActualChars += actualCharCount;
+
+          const chunkResults = Array.isArray(batchResult) ? batchResult : (batchResult?.results || []);
+
           // Apply results
-          if (Array.isArray(batchResult)) {
+          if (Array.isArray(chunkResults)) {
             for (let j = 0; j < batch.length; j++) {
               const segmentIndex = segments.indexOf(batch[j]);
               if (segmentIndex !== -1 && segmentIndex < results.length) {
-                results[segmentIndex] = batchResult[j] || batch[j];
+                results[segmentIndex] = chunkResults[j] || batch[j];
               }
             }
           }
@@ -565,13 +629,15 @@ class TranslationModeCoordinator {
         return {
           success: false,
           error: errorMessages.join(', ') || 'Batch translation failed',
-          partialResults: JSON.stringify(finalResults)
+          partialResults: JSON.stringify(finalResults),
+          actualCharCount: totalActualChars
         };
       }
 
       return {
         success: true,
-        translatedText: JSON.stringify(finalResults)
+        translatedText: JSON.stringify(finalResults),
+        actualCharCount: totalActualChars
       };
     } finally {
       translationEngine.activeTranslations.delete(messageId);

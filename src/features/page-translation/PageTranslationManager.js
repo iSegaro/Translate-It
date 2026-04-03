@@ -215,7 +215,8 @@ export class PageTranslationManager extends ResourceTracker {
         data: {
           ...data,
           url: this.currentUrl,
-          isAutoTranslating: this.isAutoTranslating
+          isAutoTranslating: this.isAutoTranslating,
+          sessionId: this.translationMessageId // Include sessionId for stats report
         }, 
         context: 'page-translation-complete-forward' 
       }, { silent: true }).catch(() => {});
@@ -444,7 +445,9 @@ export class PageTranslationManager extends ResourceTracker {
       
       if (this.abortController) {
         this.abortController.abort();
-        this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED);
+        this._broadcastEvent(MessageActions.PAGE_TRANSLATE_CANCELLED, {
+          sessionId: this.translationMessageId
+        });
       }
     } finally {
       this._isCancelling = false;

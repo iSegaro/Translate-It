@@ -103,7 +103,7 @@ export class RateLimitManager {
   /**
    * Execute task with rate limiting and priority
    */
-  async executeWithRateLimit(providerName, task, context = "", priority = TranslationPriority.NORMAL) {
+  async executeWithRateLimit(providerName, task, context = "", priority = TranslationPriority.NORMAL, options = {}) {
     // Resolve registry ID to name if necessary
     let name = providerName;
     try {
@@ -131,6 +131,7 @@ export class RateLimitManager {
         reject, 
         context, 
         priority, 
+        options, // Store metadata for stats
         enqueuedAt: startTime 
       };
       
@@ -182,7 +183,7 @@ export class RateLimitManager {
         state.performanceStats.totalWaitTime += waitTime;
         state.performanceStats.totalRequests++;
 
-        this._executeRequest(state, nextRequest, providerName);
+        this._executeRequest(state, nextRequest, providerName, nextRequest.options);
       }
     } finally {
       state.isProcessingQueue = false;
@@ -202,10 +203,10 @@ export class RateLimitManager {
     return null;
   }
 
-  async _executeRequest(state, request, providerName) {
+  async _executeRequest(state, request, providerName, options = {}) {
     const requestStartTime = Date.now();
     try {
-      const result = await request.task();
+      const result = await request.task(options);
       const duration = Date.now() - requestStartTime;
       
       // Success record

@@ -35,7 +35,7 @@ export class OpenRouterProvider extends BaseAIProvider {
   }
 
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
       getOpenRouterApiModelAsync(),
@@ -54,10 +54,13 @@ export class OpenRouterProvider extends BaseAIProvider {
     // Build base prompt using explicit isBatch flag
     const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
 
+    // Calculate original character count for stats tracking
+    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
+
     // Simple logging
     const isFirst = await this._isFirstTurn(sessionId);
     logger.info(`[OpenRouter] Model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[OpenRouter] Translating ${isBatch ? 'batch' : text.length + ' chars'}`);
+    logger.debug(`[OpenRouter] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
     // Get conversation history
     const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
@@ -82,9 +85,12 @@ export class OpenRouterProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url: CONFIG.OPENROUTER_API_URL,
       fetchOptions,
+      charCount: this._calculateAIPayloadChars(messages),
+      originalCharCount: finalOriginalCharCount,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
+      sessionId,
       updateApiKey: (newKey, options) => {
         options.headers.Authorization = `Bearer ${newKey}`;
       }

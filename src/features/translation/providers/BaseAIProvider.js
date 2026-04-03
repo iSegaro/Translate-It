@@ -107,6 +107,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     const startTime = Date.now();
+    const sessionId = messageId; // Standard session ID for streaming
     const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments (${totalChars} chars, mode: ${translateMode})`);
 
@@ -138,7 +139,7 @@ export class BaseAIProvider extends BaseProvider {
         const batchResults = await Promise.race([
           rateLimitManager.executeWithRateLimit(
             this.providerName,
-            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId),
+            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId),
             `streaming-batch-${batchIndex + 1}/${batches.length}`,
             translateMode
           ),
@@ -220,6 +221,7 @@ export class BaseAIProvider extends BaseProvider {
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
+    const sessionId = messageId; // Standard for traditional single translation
     
     for (let i = 0; i < texts.length; i++) {
       if (abortController && abortController.signal.aborted) {
@@ -236,7 +238,7 @@ export class BaseAIProvider extends BaseProvider {
       try {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController),
+          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController, false, sessionId),
           `segment-${i + 1}/${texts.length}`,
           translateMode
         );
@@ -542,7 +544,8 @@ export class BaseAIProvider extends BaseProvider {
     const batchStrategy = this.constructor.batchStrategy || 'single';
     
     if (batch.length === 1) {
-      return [await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController, sessionId)];
+      const originalChars = batch[0]?.length || 0;
+      return [await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController, false, sessionId, originalChars)];
     }
     
     try {
@@ -550,9 +553,10 @@ export class BaseAIProvider extends BaseProvider {
         // Prepare batch text once here
         const jsonInput = batch.map((t, i) => ({ id: i, text: t }));
         const batchText = JSON.stringify(jsonInput, null, 2);
+        const originalChars = batch.reduce((sum, text) => sum + (text?.length || 0), 0);
         
-        // Pass with explicit isBatch=true flag - no more guessing inside _translateSingle
-        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, sessionId, true);
+        // Pass with explicit isBatch=true flag and originalChars
+        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, true, sessionId, originalChars);
         
         const parsedResults = this._parseBatchResult(result, batch.length, batch);
         if (parsedResults.length === batch.length) return parsedResults;
@@ -578,7 +582,7 @@ export class BaseAIProvider extends BaseProvider {
       }
 
       logger.warn(`[${this.providerName}] Batch failed (likely structural), falling back to individual requests:`, error.message);
-      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId);
     }
   }
 
@@ -589,10 +593,11 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
-   * @param {string} sessionId - Session ID (optional)
    * @param {boolean} isBatch - Whether this is a batch request (optional)
+   * @param {string} sessionId - Session ID (optional)
+   * @param {number} originalCharCount - Original text character count (optional)
    */
-  async _translateSingle() {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
     throw new Error(`_translateSingle must be implemented by ${this.constructor.name}`);
   }
 
@@ -923,7 +928,7 @@ export class BaseAIProvider extends BaseProvider {
    * @param {AbortController} abortController - Cancellation controller
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId = null) {
     logger.debug(`[${this.providerName}] Starting fallback for ${batch.length} segments`);
     // const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
@@ -944,7 +949,7 @@ export class BaseAIProvider extends BaseProvider {
         }
         
         const result = await Promise.race([
-          this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController),
+          this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController, false, sessionId, batch[i]?.length || 0),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 8 seconds`)), 8000)
           )
@@ -1321,5 +1326,60 @@ export class BaseAIProvider extends BaseProvider {
     }
 
     return false;
+  }
+
+  /**
+   * Estimate original character count from a JSON batch string
+   * @param {string} jsonText - JSON string of segments
+   * @returns {number} - Sum of characters in all segments
+   * @protected
+   */
+  _estimateOriginalCharsFromJson(jsonText) {
+    if (!jsonText || typeof jsonText !== 'string') return 0;
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (Array.isArray(parsed)) {
+        return parsed.reduce((sum, item) => sum + (item.text?.length || 0), 0);
+      }
+      return jsonText.length;
+    } catch {
+      return jsonText.length;
+    }
+  }
+
+  /**
+   * Helper to accurately calculate the total character weight of an AI payload
+   * This includes the system prompt, conversation history, and the new user text
+   * @param {Array<Object>|string} messages - Array of message objects or raw string payload
+   * @returns {number} - Total character count
+   * @protected
+   */
+  _calculateAIPayloadChars(messages) {
+    if (!messages) return 0;
+    
+    if (typeof messages === 'string') {
+      return messages.length;
+    }
+    
+    if (Array.isArray(messages)) {
+      return messages.reduce((sum, msg) => {
+        // Handle standard {role, content} objects
+        if (msg && msg.content) {
+          return sum + (typeof msg.content === 'string' ? msg.content.length : JSON.stringify(msg.content).length);
+        }
+        // Handle Gemini format {role, parts: [{text}]}
+        if (msg && Array.isArray(msg.parts)) {
+          return sum + msg.parts.reduce((pSum, part) => pSum + (part.text?.length || 0), 0);
+        }
+        return sum;
+      }, 0);
+    }
+    
+    // Fallback for full JSON objects
+    try {
+      return JSON.stringify(messages).length;
+    } catch {
+      return 0;
+    }
   }
 }

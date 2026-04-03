@@ -44,9 +44,14 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Total number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
+   * @param {Object} options - Additional options (sessionId, originalCharCount)
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
     const isDictionaryEnabled = await getEnableDictionaryAsync();
 
@@ -79,6 +84,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
     const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
+    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const result = await this._executeRequest({
       url: `${apiUrl}?${queryParams.toString()}`,
@@ -112,6 +118,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       },
       context,
       abortController,
+      charCount: this._calculateTraditionalCharCount(chunkTexts),
+      sessionId: options.sessionId,
+      originalCharCount: options.originalCharCount || originalCharCount
     });
 
     // Use robust split logic from base class OUTSIDE extractResponse

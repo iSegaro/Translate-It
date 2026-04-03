@@ -6,11 +6,9 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-// import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-// import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
-// import browser from 'webextension-polyfill';
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
@@ -44,7 +42,7 @@ export class BaseTranslateProvider extends BaseProvider {
     } = typeof options === 'object' && options !== null ? options : { mode: options };
 
     const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
-    const sessionId = options.sessionId || null;
+    const sessionId = options?.sessionId || null;
 
     logger.debug(`[${this.providerName}] Traditional provider translate call - Mode: ${translateMode}, Session: ${sessionId}`);
 
@@ -233,7 +231,7 @@ export class BaseTranslateProvider extends BaseProvider {
       try {
         // Get sender info from engine if available
         const sender = engine.streamingSenders?.get(messageId) || null;
-        streamingManager.initializeStream(messageId, sender, this, texts);
+        streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
       } catch (error) {
         logger.error(`[${this.providerName}] Failed to initialize streaming session:`, error);
       }
@@ -257,31 +255,52 @@ export class BaseTranslateProvider extends BaseProvider {
       }
 
       const chunk = chunks[chunkIndex];
-      logger.debug(`[${this.providerName}] Processing streaming chunk ${chunkIndex + 1}/${chunks.length} (${chunk.texts.length} texts)`);
+      const chunkContext = `streaming-chunk-${chunkIndex + 1}/${chunks.length}`;
+      logger.debug(`[${this.providerName}] Processing ${chunkContext} (${chunk.texts.length} texts)`);
 
       try {
-        // Get rate limit manager
+        // Get rate limit manager and stats manager
         const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
+        const { statsManager } = await import("@/features/translation/core/TranslationStatsManager.js");
         
+        // Track stats before call to calculate exact delta
+        const statsBefore = sessionId ? statsManager.getSessionSummary(sessionId) : null;
+        const charsBefore = statsBefore ? statsBefore.chars : 0;
+
+        // Attach sessionId to abortController carrier for automatic tracking
+        if (abortController) {
+          abortController.sessionId = sessionId;
+        }
+
         // Translate this chunk using provider's original implementation
         const chunkResults = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, sessionId),
-          `streaming-chunk-${chunkIndex + 1}/${chunks.length}`,
-          priority
+          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0) }),
+          chunkContext,
+          priority,
+          { 
+            sessionId
+          }
         );
+
+        // Calculate exact network characters used by this chunk
+        const statsAfter = sessionId ? statsManager.getSessionSummary(sessionId) : null;
+        const actualChunkChars = statsAfter ? (statsAfter.chars - charsBefore) : this._calculateTraditionalCharCount(chunk.texts);
+        const originalChunkChars = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
         // Add results to collection
         allResults.push(...chunkResults);
 
-        // Stream results immediately to content script
+        // Stream results immediately to content script with accurate network count
         await this._streamChunkResults(
           chunkResults,
           chunk.texts,
           chunkIndex,
           messageId,
           sourceLang,
-          targetLang
+          targetLang,
+          actualChunkChars,
+          originalChunkChars
         );
 
         // Streamed chunk progress
@@ -326,6 +345,7 @@ export class BaseTranslateProvider extends BaseProvider {
    */
   _createChunks(texts) {
     const chunks = [];
+    const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
 
     if (this.constructor.chunkingStrategy === 'character_limit') {
       // Character-based chunking with segment limit (like Google Translate, DeepL)
@@ -333,9 +353,12 @@ export class BaseTranslateProvider extends BaseProvider {
       let currentCharCount = 0;
 
       for (const text of texts) {
+        // Calculate length including delimiter if not the first item in chunk
+        const effectiveLength = text.length + (currentChunk.length > 0 ? delimiterLength : 0);
+        
         // Check if adding this text would exceed character limit OR segment limit
         const wouldExceedCharLimit = currentChunk.length > 0 &&
-            currentCharCount + text.length > this.constructor.characterLimit;
+            currentCharCount + effectiveLength > this.constructor.characterLimit;
         const wouldExceedSegmentLimit = currentChunk.length >= this.constructor.maxChunksPerBatch;
 
         if (wouldExceedCharLimit || wouldExceedSegmentLimit) {
@@ -346,8 +369,11 @@ export class BaseTranslateProvider extends BaseProvider {
           currentChunk = [];
           currentCharCount = 0;
         }
+        
+        // Add text length (include delimiter if not first)
+        const addedLength = text.length + (currentChunk.length > 0 ? delimiterLength : 0);
         currentChunk.push(text);
-        currentCharCount += text.length;
+        currentCharCount += addedLength;
       }
 
       if (currentChunk.length > 0) {
@@ -360,9 +386,13 @@ export class BaseTranslateProvider extends BaseProvider {
       // Segment count-based chunking
       for (let i = 0; i < texts.length; i += this.constructor.maxChunksPerBatch) {
         const chunkTexts = texts.slice(i, i + this.constructor.maxChunksPerBatch);
+        // Calculate total length including delimiters between segments
+        const rawChars = chunkTexts.reduce((sum, text) => sum + text.length, 0);
+        const delimitersCount = Math.max(0, chunkTexts.length - 1);
+        
         chunks.push({
           texts: chunkTexts,
-          charCount: chunkTexts.reduce((sum, text) => sum + text.length, 0)
+          charCount: rawChars + (delimitersCount * delimiterLength)
         });
       }
     }
@@ -393,8 +423,10 @@ export class BaseTranslateProvider extends BaseProvider {
    * @param {string} messageId - Message ID
    * @param {string} sourceLanguage - Actual source language
    * @param {string} targetLanguage - Actual target language
+   * @param {number} charCount - Actual network character count of chunk
+   * @param {number} originalCharCount - Original text character count
    */
-  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId, sourceLanguage = null, targetLanguage = null) {
+  async _streamChunkResults(chunkResults, originalChunkTexts, chunkIndex, messageId, sourceLanguage = null, targetLanguage = null, charCount = null, originalCharCount = null) {
     try {
       // Stream the results
       await streamingManager.streamBatchResults(
@@ -403,7 +435,9 @@ export class BaseTranslateProvider extends BaseProvider {
         originalChunkTexts,
         chunkIndex,
         sourceLanguage,
-        targetLanguage
+        targetLanguage,
+        charCount,
+        originalCharCount
       );
       
       logger.debug(`[${this.providerName}] Successfully streamed chunk ${chunkIndex + 1} results`);
@@ -478,15 +512,28 @@ export class BaseTranslateProvider extends BaseProvider {
       const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
 
       try {
+        // Attach sessionId to abortController carrier
+        if (abortController) {
+          abortController.sessionId = sessionId;
+        }
+
+        // Calculate original chars for stats
+        const originalCharCount = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
+
         // Execute chunk translation with rate limiting
-        const result = await rateLimitManager.executeWithRateLimit(
+        const chunkResponse = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, sessionId),
+          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
           chunkContext,
-          priority
+          priority,
+          { 
+            sessionId
+          }
         );
 
-        allResults.push(...(result || chunk.texts.map(() => '')));
+        // Handle both old array return and new object return format
+        const chunkResults = Array.isArray(chunkResponse) ? chunkResponse : (chunkResponse?.results || []);
+        allResults.push(...(chunkResults || chunk.texts.map(() => '')));
       } catch (error) {
         logger.error(`[${this.providerName}] Chunk ${i + 1} failed:`, error);
         // Enhanced error handling - throw to be handled by system error management
@@ -495,5 +542,24 @@ export class BaseTranslateProvider extends BaseProvider {
     }
 
     return allResults;
+  }
+
+  /**
+   * Helper to accurately calculate network character count for traditional providers
+   * Accounts for the standard delimiters added during chunk combination
+   * @param {string[]} texts - Array of texts being translated
+   * @returns {number} - Total characters sent to network
+   */
+  _calculateTraditionalCharCount(texts) {
+    if (!texts || texts.length === 0) return 0;
+    
+    // Calculate raw string lengths
+    const rawChars = texts.reduce((sum, text) => sum + (text?.length || 0), 0);
+    
+    // Add the length of the delimiters that will be inserted between texts
+    const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
+    const delimitersCount = Math.max(0, texts.length - 1);
+    
+    return rawChars + (delimitersCount * delimiterLength);
   }
 }

@@ -86,14 +86,26 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         return token;
       },
       context: 'edge-auth',
-      abortController
+      abortController,
+      charCount: 0 // Explicitly set to 0 to avoid using carrier charCount
     });
   }
 
   /**
    * Implement translation for a single chunk
+   * @param {string[]} chunkTexts - Texts in this chunk
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
+   * @param {Object} options - Additional options (sessionId, originalCharCount)
+   * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const token = await this._getAuthToken(abortController);
     
     const sl = this._getLangCode(sourceLang);
@@ -108,6 +120,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
     // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
     const body = chunkTexts.map(text => ({ Text: text }));
+
+    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     return this._executeRequest({
       url: url.toString(),
@@ -126,7 +140,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         body: JSON.stringify(body)
       },
       extractResponse: (data) => {
-        if (!Array.isArray(data)) {
+        if (!data?.[0]?.translations) {
           logger.error('[Edge] Unexpected API response format:', data);
           return chunkTexts.map(() => "");
         }
@@ -138,7 +152,10 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         });
       },
       context: 'edge-translate-chunk',
-      abortController
+      abortController,
+      charCount: this._calculateTraditionalCharCount(chunkTexts),
+      sessionId: options.sessionId,
+      originalCharCount: options.originalCharCount || originalCharCount
     });
   }
 }

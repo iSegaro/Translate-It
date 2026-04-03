@@ -305,13 +305,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
    * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Total number of segments in this chunk
    * @param {number} chunkIndex - Current chunk index
    * @param {number} totalChunks - Total number of chunks
-   * @param {HTMLElement} blockContainer - Block container for context extraction
-   * @param {string} sessionId - Optional session identifier for history context
+   * @param {Object} options - Additional options (sessionId, originalCharCount)
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, chunkIndex = 0, totalChunks = 1, blockContainer = null, sessionId = null) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
+    // Recover sessionId and blockContainer from abortController if available
+    const sessionId = options.sessionId || abortController?.sessionId;
+    const blockContainer = options.blockContainer || abortController?.blockContainer;
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
     // Normalize language codes
@@ -515,6 +518,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       hasContext: blockContainer && this._extractTranslationContext(blockContainer) !== null
     });
 
+    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
+
     try {
       const result = await this._executeRequest({
         url: apiUrl,
@@ -608,6 +613,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
+        charCount: validTexts.join('').length, // Explicitly pass the accurate count
+        sessionId: options.sessionId,
+        originalCharCount: options.originalCharCount || originalCharCount
       });
 
       const finalResult = result || chunkTexts.map(() => '');
@@ -646,14 +654,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         let firstResult, secondResult;
 
         try {
-          firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks, blockContainer, sessionId);
+          firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options);
         } catch {
           logger.debug(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
           firstResult = firstHalf;
         }
 
         try {
-          secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, chunkIndex, totalChunks, blockContainer, sessionId);
+          secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options);
         } catch {
           logger.debug(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
           secondResult = secondHalf;
@@ -748,6 +756,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
               },
               context,
               abortController,
+              charCount: textWithMarkers.length, // Explicitly pass for fallback too
+              sessionId: options.sessionId,
+              originalCharCount: options.originalCharCount || text.length
             });
 
             results.push(result || text);

@@ -13,6 +13,8 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { ApiKeyManager } from "@/features/translation/providers/ApiKeyManager.js";
 import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 
+import { statsManager } from '../core/TranslationStatsManager.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
 /**
@@ -245,10 +247,13 @@ export class BaseProvider {
    * @param {string} params.context - Context for error reporting
    * @param {AbortController} [params.abortController] - For cancellation
    * @param {Function} [params.updateApiKey] - Callback to update key in options for failover
+   * @param {string} [params.sessionId] - Session ID for stats tracking
+   * @param {number} [params.charCount] - Network payload character count
+   * @param {number} [params.originalCharCount] - Original text character count
    * @param {boolean} [params.silent] - If true, don't show toast on error
    * @returns {Promise<any>}
    */
-  async _executeRequest({ url, fetchOptions, extractResponse, context, abortController, updateApiKey, silent = false }) {
+  async _executeRequest({ url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, silent = false }) {
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
     if (this.providerSettingKey && updateApiKey) {
@@ -272,7 +277,10 @@ export class BaseProvider {
           fetchOptions, 
           extractResponse, 
           context, 
-          abortController 
+          abortController,
+          sessionId: sessionId || null,
+          charCount: charCount !== undefined ? charCount : 0,
+          originalCharCount: originalCharCount || 0
         });
 
         // 3. Success! Promote the working key
@@ -331,9 +339,22 @@ export class BaseProvider {
    * Internal helper for _executeRequest.
    * @private
    */
-  async _executeApiCall({ url, fetchOptions, extractResponse, context, abortController }) {
-    logger.debug(`_executeApiCall starting for context: ${context}`);
-    // URL and fetchOptions logged at TRACE level to avoid exposing sensitive data
+  async _executeApiCall({ url, fetchOptions, extractResponse, context, abortController, sessionId, charCount, originalCharCount }) {
+    // Recover sessionId from abortController carrier if missing (still useful for session tracking)
+    const finalSessionId = sessionId || abortController?.sessionId || null;
+    
+    // Explicitly use the provided charCount, default to 0 if not provided
+    const finalCharCount = charCount || 0;
+    const finalOriginalCharCount = originalCharCount || 0;
+
+    // Record request in stats and get call IDs
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(this.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+    
+    // Enhanced log with call counters and session info
+    const sessionTag = finalSessionId ? ` [Session: ${finalSessionId}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
+    logger.debug(`[Call #${globalCallId}]${sessionTag} _executeApiCall starting for context: ${context} (${finalCharCount} chars)`);
+    
+    const startTime = Date.now();
 
     try {
       const finalFetchOptions = { ...fetchOptions };
@@ -351,13 +372,17 @@ export class BaseProvider {
 
       // Use proxy manager for the request
       const response = await proxyManager.fetch(url, finalFetchOptions);
-      logger.debug(`_executeApiCall response status: ${response.status} ${response.statusText}`);
+      const duration = Date.now() - startTime;
+      logger.debug(`[Call #${globalCallId}] _executeApiCall response status: ${response.status} (${duration}ms)`);
 
       if (!response.ok) {
+        // Record error in stats
+        statsManager.recordError(this.providerName, finalSessionId);
+        
         let body = {};
         try {
           body = await response.json();
-                } catch {
+        } catch {
           // Ignore if body is not JSON
         }
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;

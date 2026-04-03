@@ -35,7 +35,7 @@ export class GeminiProvider extends BaseAIProvider {
     this.providerSettingKey = 'GEMINI_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
@@ -124,14 +124,21 @@ export class GeminiProvider extends BaseAIProvider {
       body: JSON.stringify(requestBody),
     };
 
+    const charCount = this._calculateAIPayloadChars([...requestBody.contents, requestBody.systemInstruction]);
+
+    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
+
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
+        charCount,
+        originalCharCount: finalOriginalCharCount,
         extractResponse: (data) =>
           data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context,
         abortController,
+        sessionId,
         updateApiKey: (newKey, options) => {
           const urlObj = new URL(options.url);
           urlObj.searchParams.set('key', newKey);
@@ -164,10 +171,12 @@ export class GeminiProvider extends BaseAIProvider {
             ...fetchOptions,
             body: JSON.stringify(retryBody)
           },
+          charCount,
           extractResponse: (data) =>
             data?.candidates?.[0]?.content?.parts?.[0]?.text,
           context: `${context}-fallback`,
           abortController,
+          sessionId,
           updateApiKey: (newKey, options) => {
             const urlObj = new URL(options.url);
             urlObj.searchParams.set('key', newKey);
@@ -239,6 +248,7 @@ export class GeminiProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url,
       fetchOptions,
+      charCount: this._calculateAIPayloadChars(requestBody.contents),
       extractResponse: (data) =>
         data?.candidates?.[0]?.content?.parts?.[0]?.text,
       context: context,

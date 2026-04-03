@@ -66,9 +66,14 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
+   * @param {Object} options - Additional options (sessionId, originalCharCount)
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
     
     const sl = this._getLangCode(sourceLang);
@@ -90,6 +95,8 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     const url = new URL(apiUrl);
     url.searchParams.set("id", `${uuid}-0-0`);
     url.searchParams.set("srv", "android");
+
+    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t || '').length, 0);
 
     const result = await this._executeRequest({
       url: url.toString(),
@@ -113,6 +120,9 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
       },
       context,
       abortController,
+      charCount: originalCharCount,
+      sessionId: options.sessionId,
+      originalCharCount: options.originalCharCount || originalCharCount
     });
 
     const finalResult = result || chunkTexts.map(() => '');

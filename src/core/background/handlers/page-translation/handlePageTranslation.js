@@ -4,6 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'handlePageTranslation');
 
@@ -57,6 +58,42 @@ export async function handlePageTranslation(message, sender) {
     ];
 
     if (eventActions.includes(message.action)) {
+      // Log Page Session Summary on completion, cancellation or error
+      if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE || 
+          message.action === MessageActions.PAGE_TRANSLATE_CANCELLED ||
+          message.action === MessageActions.PAGE_TRANSLATE_ERROR ||
+          message.action === MessageActions.PAGE_RESTORE_COMPLETE) {
+        
+        // Find session ID in all possible locations - prioritization is key
+        const sessionId = message.data?.sessionId || 
+                         message.sessionId || 
+                         message.data?.messageId || 
+                         message.messageId;
+        
+        // Map action to status label
+        let status = 'Complete';
+        if (message.action === MessageActions.PAGE_TRANSLATE_CANCELLED) status = 'Stopped';
+        else if (message.action === MessageActions.PAGE_TRANSLATE_ERROR) status = 'Error';
+        else if (message.action === MessageActions.PAGE_RESTORE_COMPLETE) status = 'Page Restored';
+        
+        // Decide whether to clear based on the action type
+        // We only clear on Restore or Cancel, not on "Complete" because of Lazy Loading
+        const shouldClear = message.action === MessageActions.PAGE_RESTORE_COMPLETE || 
+                           message.action === MessageActions.PAGE_TRANSLATE_CANCELLED;
+        
+        statsManager.printSummary(sessionId, { 
+          status, 
+          success: message.action !== MessageActions.PAGE_TRANSLATE_ERROR,
+          clear: shouldClear 
+        });
+      }
+
+      // Special case: Clear session if a NEW translation starts on the same ID
+      if (message.action === MessageActions.PAGE_TRANSLATE_START) {
+        const sessionId = message.data?.sessionId || message.data?.messageId;
+        if (sessionId) statsManager.clearSession(sessionId);
+      }
+
       browser.runtime.sendMessage(message).catch(() => {});
       return { success: true };
     }

@@ -50,12 +50,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
    * @param {number} retryAttempt - Current retry attempt number (for recursive retries)
-   * @param {number} originalChunkSize - Original chunk size before retry splitting
+   * @param {number} segmentCount - Total number of segments in this chunk
    * @param {number} chunkIndex - Index of this chunk in the batch
    * @param {number} totalChunks - Total number of chunks in the batch
+   * @param {Object} options - Additional options (sessionId, originalCharCount)
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt = 0, originalChunkSize = chunkTexts.length) {
+   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
+
     const context = `${this.providerName.toLowerCase()}-translate-chunk${retryAttempt > 0 ? `-retry-${retryAttempt}` : ''}`;
     const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
     const providerConfig = getProviderConfiguration(this.providerName);
@@ -80,9 +82,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             translateMode,
             abortController,
             retryAttempt,
-            originalChunkSize,
+            segmentCount,
             Math.floor(i / this.constructor.maxChunksPerBatch),
-            Math.ceil(chunkTexts.length / this.constructor.maxChunksPerBatch)
+            Math.ceil(chunkTexts.length / this.constructor.maxChunksPerBatch),
+            options
           );
           results.push(...subResults);
         }
@@ -111,8 +114,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           const firstHalf = chunkTexts.slice(0, midPoint);
           const secondHalf = chunkTexts.slice(midPoint);
 
-          const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController);
-          const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController);
+          const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
+          const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
 
           return [...firstResults, ...secondResults];
         } 
@@ -125,7 +128,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
           const translatedParts = [];
           for (const part of parts) {
-            const res = await this._translateChunk([part], sourceLang, targetLang, translateMode, abortController);
+            const res = await this._translateChunk([part], sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
             translatedParts.push(res[0]);
           }
 
@@ -144,6 +147,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       url.searchParams.set("IG", tokenData.IG);
       url.searchParams.set("IID", tokenData.IID?.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
       url.searchParams.set("isVertical", "1");
+
+      const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
       // Enhanced API call with HTML response detection
       const result = await this._executeApiCall({
@@ -214,6 +219,9 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
+        charCount: this._calculateTraditionalCharCount(chunkTexts),
+        sessionId: options.sessionId,
+        originalCharCount: options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0)
       });
 
       const finalResult = result || chunkTexts.map(() => "");
@@ -270,9 +278,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
                 translateMode,
                 abortController,
                 retryAttempt + 1,
-                originalChunkSize,
+                segmentCount,
                 subChunkIndex,
-                subChunkCount
+                subChunkCount,
+                options
               );
 
               // Place results in correct position
@@ -306,7 +315,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         finalError.context = context;
         finalError.chunkSize = chunkTexts.length;
         finalError.retryAttempt = retryAttempt;
-        finalError.originalChunkSize = originalChunkSize;
+        finalError.segmentCount = segmentCount;
 
         throw finalError;
       }

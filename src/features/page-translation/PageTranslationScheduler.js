@@ -234,7 +234,7 @@ export class PageTranslationScheduler extends ResourceTracker {
             targetLanguage: config.targetLanguage,
             mode: TranslationMode.Page,
             options: { rawJsonPayload: true },
-            sessionId: this.translationSessionId
+            sessionId: this.translationSessionId // Already here, but ensuring it's in the data block
           },
           MessageContexts.CONTENT
         );

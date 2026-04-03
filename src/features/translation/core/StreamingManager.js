@@ -11,6 +11,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StreamingManager');
 
@@ -43,7 +44,7 @@ export class StreamingManager extends ResourceTracker {
    * @param {string[]} segments - Text segments to translate
    * @returns {object} - Stream session info
    */
-  initializeStream(messageId, sender, provider, segments) {
+  initializeStream(messageId, sender, provider, segments, sessionId = null) {
     if (this.activeStreams.has(messageId)) {
       logger.debug(`[StreamingManager] Stream already exists for messageId: ${messageId}`);
       return this.activeStreams.get(messageId);
@@ -51,6 +52,7 @@ export class StreamingManager extends ResourceTracker {
 
     const streamInfo = {
       messageId,
+      sessionId: sessionId || messageId,
       providerName: provider.providerName,
       totalSegments: segments.length,
       processedSegments: 0,
@@ -112,8 +114,10 @@ export class StreamingManager extends ResourceTracker {
    * @param {number} batchIndex - Index of this batch
    * @param {string} sourceLanguage - Actual source language
    * @param {string} targetLanguage - Actual target language
+   * @param {number} charCount - Actual network character count from provider
+   * @param {number} originalCharCount - Original text character count
    */
-  async streamBatchResults(messageId, batchResults, originalBatch, batchIndex, sourceLanguage = null, targetLanguage = null) {
+  async streamBatchResults(messageId, batchResults, originalBatch, batchIndex, sourceLanguage = null, targetLanguage = null, charCount = null, originalCharCount = null) {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
@@ -124,12 +128,7 @@ export class StreamingManager extends ResourceTracker {
 
     // Update stream info
     streamInfo.processedSegments += batchResults.length;
-    streamInfo.batches.push({
-      index: batchIndex,
-      size: batchResults.length,
-      timestamp: Date.now()
-    });
-
+    
     // Accumulate results
     const accumulatedResults = this.streamingResults.get(messageId) || [];
     accumulatedResults.push(...batchResults);
@@ -155,16 +154,19 @@ export class StreamingManager extends ResourceTracker {
         messageId
       );
 
-      logger.debug('[StreamingManager.streamStreamUpdate] Sending stream update:', {
-        messageId,
-        batchIndex,
-        batchResultsLength: batchResults?.length
-      });
-
       // Send to content script
       if (senderInfo.tab?.id) {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
-        logger.debug(`[StreamingManager] Streamed batch ${batchIndex} to tab ${senderInfo.tab.id}: ${batchResults.length} results`);
+        
+        // Log individual batch stats using both counts
+        const networkChars = charCount !== null ? charCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
+        const originalChars = originalCharCount !== null ? originalCharCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
+        
+        statsManager.printSummary(streamInfo.sessionId, {
+          status: 'Batch',
+          batchChars: networkChars,
+          batchOriginalChars: originalChars
+        });
       } else {
         logger.warn(`[StreamingManager] No tab ID for streaming messageId: ${messageId}`);
       }
@@ -228,22 +230,26 @@ export class StreamingManager extends ResourceTracker {
     const streamInfo = this.activeStreams.get(messageId);
     const senderInfo = this.senderInfo.get(messageId);
 
-    if (!streamInfo) {
-      logger.debug(`[StreamingManager] No active stream found for completion: ${messageId}`);
+    // CRITICAL: Ensure this only runs once
+    if (!streamInfo || streamInfo.status === 'completed' || streamInfo.status === 'error' || streamInfo.status === 'reported') {
       return;
     }
 
-    // Update stream info
+    const wasActive = streamInfo.status === 'active';
+    
+    // Update stream info state immediately to prevent re-entry
     streamInfo.status = success ? 'completed' : 'error';
     streamInfo.endTime = Date.now();
     streamInfo.duration = streamInfo.endTime - streamInfo.startTime;
 
     // Update statistics
-    this.stats.activeSessions--;
-    if (success) {
-      this.stats.completedSessions++;
-    } else {
-      this.stats.errorSessions++;
+    if (wasActive) {
+      this.stats.activeSessions--;
+      if (success) {
+        this.stats.completedSessions++;
+      } else {
+        this.stats.errorSessions++;
+      }
     }
 
     try {
@@ -266,13 +272,22 @@ export class StreamingManager extends ResourceTracker {
 
       if (senderInfo && senderInfo.tab?.id) {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamEndMessage);
-        logger.info(`[StreamingManager] Stream completed for ${messageId}: ${streamInfo.processedSegments}/${streamInfo.totalSegments} segments in ${streamInfo.duration}ms`);
+        
+        // Log Session Summary for streaming
+        statsManager.printSummary(streamInfo.sessionId, { 
+          status: 'Streaming', 
+          success, 
+          clear: true 
+        });
       }
     } catch (error) {
-      logger.error(`[StreamingManager] Failed to send stream end for ${messageId}:`, error);
+      logger.debug(`[StreamingManager] Failed to send stream end for ${messageId}:`, error.message);
     }
 
-    // Cleanup
+    // Mark as reported so even if streamInfo stays in Map for 30s, we don't log again
+    streamInfo.status = 'reported';
+
+    // Cleanup after delay
     this._cleanupStream(messageId);
   }
 
@@ -282,19 +297,19 @@ export class StreamingManager extends ResourceTracker {
    * @param {Error} error - Error that occurred
    */
   async handleStreamError(messageId, error) {
+    const streamInfo = this.activeStreams.get(messageId);
+    if (!streamInfo) return; // Already cleaned up
+
     // Log cancellation as debug instead of error using proper error management
     const errorType = matchErrorToType(error);
     if (errorType === ErrorTypes.USER_CANCELLED) {
-      logger.debug(`[StreamingManager] Stream cancelled for ${messageId}:`, error);
+      logger.debug(`[StreamingManager] Stream cancelled for ${messageId}`);
     } else {
-      logger.error(`[StreamingManager] Stream error for ${messageId}:`, error);
+      logger.error(`[StreamingManager] Stream error for ${messageId}:`, error.message);
     }
     
-    const streamInfo = this.activeStreams.get(messageId);
-    if (streamInfo) {
-      streamInfo.error = error.message;
-      streamInfo.status = 'error';
-    }
+    streamInfo.error = error.message;
+    streamInfo.status = 'error';
 
     // Complete stream with error
     await this.completeStream(messageId, false, {
@@ -304,9 +319,6 @@ export class StreamingManager extends ResourceTracker {
         timestamp: Date.now()
       }
     });
-
-    // Immediate cleanup for errors to prevent state corruption
-    this._immediateCleanup(messageId);
   }
 
   /**
@@ -316,9 +328,8 @@ export class StreamingManager extends ResourceTracker {
    */
   async cancelStream(messageId, reason = 'User cancelled') {
     const streamInfo = this.activeStreams.get(messageId);
-    if (!streamInfo) {
-      logger.debug(`[StreamingManager] No stream to cancel for messageId: ${messageId}`);
-      return;
+    if (!streamInfo || streamInfo.status !== 'active') {
+      return; // Already finished or not found
     }
 
     logger.debug(`[StreamingManager] Cancelling stream ${messageId}: ${reason}`);
@@ -330,9 +341,6 @@ export class StreamingManager extends ResourceTracker {
       cancelled: true,
       reason: reason
     });
-
-    // Immediate cleanup for cancellations to prevent state corruption
-    this._immediateCleanup(messageId);
   }
 
   /**

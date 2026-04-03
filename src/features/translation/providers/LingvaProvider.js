@@ -36,8 +36,18 @@ export class LingvaProvider extends BaseTranslateProvider {
   /**
    * Standard _translateChunk implementation.
    * Receives a chunk of texts, joins them, and executes a single request.
+   * @param {string[]} chunkTexts - Texts in this chunk
+   * @param {string} sourceLang - Source language
+   * @param {string} targetLang - Target language
+   * @param {string} translateMode - Translation mode
+   * @param {AbortController} abortController - Cancellation controller
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
+   * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks) {
     const apiPath = await this._getApiPath();
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
@@ -57,6 +67,8 @@ export class LingvaProvider extends BaseTranslateProvider {
 
     const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
       
+    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
+
     const result = await this._executeRequest({
       url,
       fetchOptions: {
@@ -67,7 +79,9 @@ export class LingvaProvider extends BaseTranslateProvider {
       },
       extractResponse: (data) => data?.translation,
       context: 'lingva-standard-chunk',
-      abortController
+      abortController,
+      charCount: textToTranslate.length, // Explicitly pass the actual count sent to the network
+      originalCharCount
     });
 
     if (!result) return chunkTexts;

@@ -33,14 +33,17 @@ export class WebAIProvider extends BaseAIProvider {
   }
 
   
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, sessionId = null, isBatch = false) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
     ]);
 
+    // Calculate original character count for stats tracking
+    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
+
     logger.info(`[WebAI] Using model: ${apiModel}`);
-    logger.info(`[WebAI] Starting translation: ${text.length} chars`);
+    logger.info(`[WebAI] Starting translation: ${finalOriginalCharCount} chars`);
 
     // Validate configuration
     this._validateConfig(
@@ -75,10 +78,12 @@ export class WebAIProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
+      originalCharCount: finalOriginalCharCount,
       extractResponse: (data) =>
         typeof data.response === "string" ? data.response : undefined,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
+      sessionId
     });
 
     logger.info(`[WebAI] Translation completed successfully`);
