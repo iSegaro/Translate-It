@@ -133,7 +133,7 @@ export const CONFIG = {
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-4o",
   OPENROUTER_MODELS: [
-// --- OpenAI ---
+    // --- OpenAI ---
     { value: "openai/o1", name: "OpenAI o1 (Reasoning)" },
     { value: "openai/o3-mini", name: "OpenAI o3-mini (Reasoning)" },
     { value: "openai/gpt-4.5-preview", name: "OpenAI GPT-4.5 Preview" },
@@ -375,9 +375,10 @@ $_{TEXT}
 /*--- End PROMPT_BASE_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_BATCH ---*/
-  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON array of texts from $_{SOURCE} to $_{TARGET}.
-  Your response MUST be a valid JSON array with the exact same number of items, each containing the translated text.
-  Maintain the original JSON structure.
+  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON data from $_{SOURCE} to $_{TARGET}.
+  Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+  Each item in the "translations" array must contain the "id" and the translated "text".
+  Maintain the original structure for each item.
 
 CRITICAL - Placeholder Preservation Instructions:
   If the text contains special placeholders in the format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]], etc.:
@@ -393,15 +394,15 @@ Examples:
   - Correct: "روی [[AIWC-0]] کلیک کنید تا بیشتر بدانید"
   - Wrong: "روی [0] کلیک کنید" or "روی [[AIWC-1]] کلیک کنید"
 
-Important: Return only the JSON array with translated texts, no additional text or explanations.
+Return ONLY the JSON object with the "translations" key, no additional text or explanations.
 
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
-  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON array from $_{SOURCE} to $_{TARGET} using the same JSON format and placeholder preservation rules as established in the first turn of this session.
-  Return only the JSON array with translated texts, no additional text.`,
+  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON data from $_{SOURCE} to $_{TARGET} using the same JSON format (Object with "translations" array) and placeholder preservation rules as established in the first turn of this session.
+  Return only the JSON object with translated texts, no additional text.`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 
