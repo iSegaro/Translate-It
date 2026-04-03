@@ -318,18 +318,8 @@ export class BaseProvider {
           }
         }
 
-        // 6. Final error handling via ErrorHandler (if no more keys or not a failover error)
-        const errorHandler = ErrorHandler.getInstance();
-        
+        // 6. Attach type if missing and re-throw
         if (!error.type) error.type = errorType;
-
-        await errorHandler.handle(error, {
-          context,
-          provider: this.providerName,
-          showToast: !silent,
-          isSilent: silent
-        });
-
         throw error;
       }
     }
@@ -374,9 +364,10 @@ export class BaseProvider {
 
         // For DeepL, HTTP 400 is a retryable error (too many segments), use debug level
         const isDeepL400 = this.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
-        // For server errors (502, 503, 524), use warn level instead of error - these are temporary server issues
+        // For client errors (402, 403, 429, etc.), use warn as they are expected to be handled by the UI
+        // For server errors (500, 502, 503, 524), use error level
         const isServerError = response.status >= 500 && response.status < 600;
-        const logLevel = isDeepL400 || isServerError ? 'warn' : 'error';
+        const logLevel = (isDeepL400 || !isServerError) ? 'warn' : 'error';
         // Sanitize URL for logging: remove API keys from query parameters
         let sanitizedUrl = url;
         try {

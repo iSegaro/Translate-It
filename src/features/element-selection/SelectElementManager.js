@@ -711,9 +711,7 @@ class SelectElementManager extends ResourceTracker {
           this.logger.debug('Translation completed:', status);
         },
         onError: async (errorData) => {
-          const error = errorData.error;
-          const errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown translation error');
-          this.logger.info(`Translation error: ${errorMsg}`);
+          // Error is already logged by Provider and handled by ErrorHandler in higher layers
         },
       });
 
@@ -741,8 +739,6 @@ class SelectElementManager extends ResourceTracker {
 
       if (isCancellation) {
         this.logger.debug('Translation cancelled by user, performing cleanup');
-      } else {
-        this.logger.error('Error during translation:', error);
       }
 
       // Ensure Revert button is shown if any partial translation happened

@@ -170,7 +170,7 @@ export class UnifiedTranslationService {
       return result;
 
     } catch (error) {
-      logger.error('[UnifiedService] Translation request failed:', error);
+      logger.debug('[UnifiedService] Translation request failed:', error.message);
 
       // Update request status
       this.requestTracker.updateRequest(messageId, {

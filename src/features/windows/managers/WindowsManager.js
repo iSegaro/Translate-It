@@ -927,7 +927,7 @@ export class WindowsManager extends ResourceTracker {
       this.logger.info('Window updated with translation result', { windowId });
       
     } catch (error) {
-      this.logger.error('Error during translation process:', error);
+      this.logger.debug('Translation process failed:', error.message);
       
       // Use ErrorHandler to get robust, user-friendly error message
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
@@ -971,17 +971,6 @@ export class WindowsManager extends ResourceTracker {
         return null;
       }
       
-      // Use ErrorHandler for better error categorization and logging
-      await this.errorHandler.handle(error, {
-        context: 'WindowsManager.translation',
-        showToast: false, // Don't show toast - window will display error
-        metadata: {
-          provider: this.state.provider || 'unknown',
-          sourceLang: this.state.sourceLanguage || 'unknown',
-          targetLang: this.state.targetLanguage || 'unknown',
-          textLength: this.state.originalText?.length || 0
-        }
-      });
       // Instead of returning null, throw the error so the caller can handle it properly
       throw error;
     }
