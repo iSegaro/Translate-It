@@ -72,8 +72,7 @@ export class DeepSeekProvider extends BaseAIProvider {
         messages: messages,
         stream: false,
         max_tokens: 4096, // Ensure enough space for large batches
-        // Enable JSON mode for batch translations
-        ...(isBatch && { response_format: { type: "json_object" } })
+        // JSON mode is handled by the prompt and our robust parser
       }),
     };
 

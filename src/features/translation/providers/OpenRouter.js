@@ -74,8 +74,7 @@ export class OpenRouterProvider extends BaseAIProvider {
         model: model || "openai/gpt-3.5-turbo",
         messages: messages,
         max_tokens: 4096, // Ensure enough tokens for batch responses
-        // Enable JSON mode for batch translations
-        ...(isBatch && { response_format: { type: "json_object" } })
+        // JSON mode is handled by the prompt and our robust parser
       }),
     };
 

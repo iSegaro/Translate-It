@@ -72,8 +72,8 @@ export class CustomProvider extends BaseAIProvider {
         model: model, // مدل باید توسط کاربر مشخص شود
         messages: messages,
         max_tokens: 4096, // Safe limit for most compatible APIs
-        // Enable JSON mode if requested for batch
-        ...(isBatch && { response_format: { type: "json_object" } })
+        // JSON mode is handled by the prompt and our robust parser
+        // removing strict response_format to support more compatible APIs (like Llama/Groq/Cerebras)
       }),
     };
 
