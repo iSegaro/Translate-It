@@ -128,7 +128,11 @@ export class ErrorHandler {
         // If it's a significant error (shown in UI or Toast), use error level. 
         // Otherwise use debug for background/silent errors.
         const logLevel = (enhancedMeta.showToast || enhancedMeta.showInUI) ? 'error' : 'debug';
-        logger[logLevel](`[${type}] ${sanitizedRaw}`, err);
+        
+        // If we have an Error object, the console will already show the message.
+        // Just provide the type tag to avoid redundancy.
+        const logPrefix = `[${type}]${enhancedMeta.context ? ` (${enhancedMeta.context})` : ''}`;
+        logger[logLevel](logPrefix, err);
       }
 
       if (isSilentError(type)) return err;
