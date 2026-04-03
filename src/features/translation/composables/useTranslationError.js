@@ -62,7 +62,7 @@ export function useTranslationError(context = 'unknown') {
       
       // Get error information
       const errorInfo = await getErrorForDisplay(error, context)
-      const errorTypeValue = matchErrorToType(error?.message || error)
+      const errorTypeValue = matchErrorToType(error)
       const strategy = getErrorDisplayStrategy(context, errorTypeValue)
       
       // Update error state

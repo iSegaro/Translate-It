@@ -149,8 +149,7 @@ export function useUnifiedTranslation(context = 'popup') {
   };
 
   const handleTranslationError = (error, messageId = null) => {
-    const errorMessage = error?.message || error?.type || error || "Translation failed";
-    errorManager.handleError(errorMessage);
+    errorManager.handleError(error);
     translatedText.value = "";
     lastTranslation.value = null;
     
@@ -158,7 +157,7 @@ export function useUnifiedTranslation(context = 'popup') {
       pendingRequests.value.delete(messageId);
     }
     
-    logger.info(`[${context}] Translation error:`, errorMessage);
+    logger.info(`[${context}] Translation error:`, error?.message || error);
   };
 
   const ensureMinimumLoadingDuration = async () => {

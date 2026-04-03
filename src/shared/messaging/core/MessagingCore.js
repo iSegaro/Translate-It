@@ -32,14 +32,37 @@ export const MessageFormat = {
 
   /**
    * Create a standard error response
-   * @param {Error|string} error - Error object or message
+   * @param {Error|Object|string} error - Error object or message
    * @param {string|null} messageId - Original message ID
+   * @param {Object} options - Additional context/data to include
    * @returns {Object} Error response object
    */
-  createErrorResponse(error, messageId = null) {
+  createErrorResponse(error, messageId = null, options = {}) {
+    let errorData;
+    
+    if (error instanceof Error) {
+      errorData = {
+        message: error.message,
+        type: error.type,
+        statusCode: error.statusCode,
+        ...options
+      };
+    } else if (error && typeof error === 'object') {
+      errorData = {
+        message: error.message || error.error || 'Unknown error',
+        ...error,
+        ...options
+      };
+    } else {
+      errorData = {
+        message: String(error),
+        ...options
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : error,
+      error: errorData,
       messageId,
       timestamp: Date.now()
     };

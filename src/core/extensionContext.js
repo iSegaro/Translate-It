@@ -81,7 +81,7 @@ export class ExtensionContextManager {
    * @returns {boolean} True if error is context-related
    */
   static isContextError(error) {
-    const errorType = matchErrorToType(error?.message || error);
+    const errorType = matchErrorToType(error);
     return errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED || 
            errorType === ErrorTypes.CONTEXT;
   }

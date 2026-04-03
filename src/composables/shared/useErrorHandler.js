@@ -38,7 +38,7 @@ export function useErrorHandler() {
       const errorHandler = ErrorHandler.getInstance()
       
       // Determine error type
-      const errorType = matchErrorToType(error?.message || error)
+      const errorType = matchErrorToType(error)
       
       // Handle the error with proper metadata
       await errorHandler.handle(error, {
@@ -138,7 +138,7 @@ export function useErrorHandler() {
    * @returns {boolean} True if error should be silent
    */
   const isSilentError = (error) => {
-    const errorType = matchErrorToType(error?.message || error)
+    const errorType = matchErrorToType(error)
     const silentErrors = [
       ErrorTypes.CONTEXT,
       ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
@@ -153,7 +153,7 @@ export function useErrorHandler() {
    * @returns {boolean} True if error can be retried
    */
   const isRetryableError = (error) => {
-    const errorType = matchErrorToType(error?.message || error)
+    const errorType = matchErrorToType(error)
     const retryableErrors = [
       ErrorTypes.NETWORK_ERROR,
       ErrorTypes.HTTP_ERROR,
@@ -188,7 +188,7 @@ export function setupGlobalErrorHandler(app, appName = 'vue-app') {
   app.config.errorHandler = async (error, instance, info) => {
     try {
       const componentName = instance?.$options?.name || 'UnknownComponent'
-      const errorType = matchErrorToType(error?.message || error)
+      const errorType = matchErrorToType(error)
       
       await errorHandler.handle(error, {
         type: errorType,
