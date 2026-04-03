@@ -275,7 +275,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         }
       }
     } catch (error) {
-      this.logger.debug('Critical error in scheduler flush loop:', error);
+      this.logger.debug('Critical error in scheduler flush loop:', error.message);
       // Ensure the error is reported to the Manager so UI can update
       // currentBatch might be empty here if the error happened before splicing, 
       // but _handleBatchError handles it safely.
