@@ -39,7 +39,8 @@ export default class NotificationManager extends ResourceTracker {
       actions: options.actions || []
     };
 
-    this.logger.info(`[Notification] Showing ${type} notification: ${message}`);
+    const logLevel = type === 'error' ? 'error' : 'info';
+    this.logger[logLevel](`[Notification] Showing ${type} notification: ${message}`);
     this.logger.debug('Notification details', {
       id: toastId,
       type,

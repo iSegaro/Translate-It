@@ -52,27 +52,10 @@ export class UnifiedTranslationCoordinator {
         return await this._coordinateRegularTranslation(message, options);
       }
     } catch (error) {
-      // Final catch-all for any unhandled errors in coordination
-      // Don't log user cancellations as errors
       const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED) {
-        logger.info(`Translation coordination cancelled by user: ${message.messageId}`, error);
-      } else {
-        logger.info(`Translation coordination failed: ${message.messageId}`, error);
+      if (errorType !== ErrorTypes.USER_CANCELLED) {
+        logger.warn(`Translation coordination failed for ${message.messageId}: ${error.message}`);
       }
-
-      // Use centralized error handling for coordination errors
-      try {
-        await ErrorHandler.getInstance().handle(error, {
-          context: 'translation-coordination-top-level',
-          messageId: message.messageId,
-          action: action,
-          showToast: false
-        });
-      } catch (handlerError) {
-        logger.warn('Top-level ErrorHandler failed:', handlerError);
-      }
-
       throw error;
     }
   }
@@ -101,26 +84,9 @@ export class UnifiedTranslationCoordinator {
       // Use regular messaging (bypass coordinator to avoid recursion)
       const result = await sendRegularMessage(message, options);
 
-      logger.debug(`Regular translation completed: ${messageId}`);
       return result;
 
     } catch (error) {
-      // Use centralized error handling with better context (no direct logger.error needed)
-      try {
-        await ErrorHandler.getInstance().handle(error, {
-          context: 'regular-translation-coordination',
-          messageId: messageId,
-          showToast: false, // Regular translation errors are handled by callers
-          metadata: {
-            messageId: messageId,
-            coordinatorAction: 'regular-translation',
-            timestamp: Date.now()
-          }
-        });
-      } catch (handlerError) {
-        logger.warn('ErrorHandler failed to handle regular translation error:', handlerError);
-      }
-
       throw error;
     } finally {
       this.activeTranslations.delete(messageId);
@@ -204,23 +170,8 @@ export class UnifiedTranslationCoordinator {
     } catch (error) {
       // Log cancellation as info instead of error using proper error management
       const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED) {
-        logger.info(`Streaming translation coordination cancelled: ${messageId}`, error);
-      } else {
-        logger.info(`Streaming translation coordination failed: ${messageId}`, error);
-      }
-
-      // Use centralized error handling for non-cancellation errors
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        try {
-          await ErrorHandler.getInstance().handle(error, {
-            context: 'streaming-translation-coordination',
-            messageId: messageId,
-            showToast: false // Streaming errors are handled by the streaming system
-          });
-        } catch (handlerError) {
-          logger.warn('ErrorHandler failed to handle streaming error:', handlerError);
-        }
+        logger.warn(`Streaming translation coordination failed for ${messageId}: ${error.message}`);
       }
 
       // Cancel streaming if it was registered

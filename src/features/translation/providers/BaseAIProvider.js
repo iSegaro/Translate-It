@@ -247,7 +247,7 @@ export class BaseAIProvider extends BaseProvider {
         if (errorType === ErrorTypes.USER_CANCELLED) {
           logger.debug(`[${this.providerName}] Segment ${i + 1} cancelled:`, error);
         } else {
-          logger.warn(`[${this.providerName}] Segment ${i + 1} failed:`, error);
+          logger.debug(`[${this.providerName}] Segment ${i + 1} failed:`, error.message);
         }
         // Instead of returning original text, throw the error to be handled properly
         throw error;
