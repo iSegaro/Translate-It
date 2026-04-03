@@ -134,12 +134,12 @@ export async function sendMessage(message, options = {}) {
     } catch (error) {
       // Check if this is a user cancellation or non-retryable error - if so, don't attempt fallback
       if (isFatalError(error)) {
-        logger.debug('Translation failed with non-retryable error, not attempting fallback:', error);
+        logger.debug('Translation failed with non-retryable error, not attempting fallback:', error.message);
         throw error; // Re-throw error without fallback
       }
 
       // If coordination fails, fall back to regular messaging
-      logger.debug('Translation coordination failed, falling back to regular messaging:', error);
+      logger.debug('Translation coordination failed, falling back to regular messaging:', error.message);
 
       // Check if this is a streaming timeout and translation might already be complete
       const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');

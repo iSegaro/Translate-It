@@ -157,7 +157,7 @@ export function useUnifiedTranslation(context = 'popup') {
       pendingRequests.value.delete(messageId);
     }
     
-    logger.info(`[${context}] Translation error:`, error?.message || error);
+    logger.debug(`[${context}] Translation error:`, error?.message || error);
   };
 
   const ensureMinimumLoadingDuration = async () => {
@@ -227,7 +227,7 @@ export function useUnifiedTranslation(context = 'popup') {
       }
 
     } catch (error) {
-      logger.error(`[${context}] Failed to send/process translation request:`, error);
+      logger.debug(`[${context}] Failed to send/process translation request:`, error.message);
       handleTranslationError(error);
       isTranslating.value = false;
       await ensureMinimumLoadingDuration();

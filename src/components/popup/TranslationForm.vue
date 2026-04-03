@@ -180,19 +180,19 @@ const handleTranslate = async () => {
   logger.debug("Translation button clicked");
   
   if (!canTranslate.value) {
-    logger.warn("⚠️ Translation blocked - canTranslate is false");
+    logger.warn("Translation blocked - canTranslate is false");
     return;
   }
   
   try {
     logger.info("🗳️ Starting translation process...");
-    logger.debug("📝 Source text:", sourceText.value?.substring(0, 100) + "...");
+    logger.debug("Source text:", sourceText.value?.substring(0, 100) + "...");
     
     // Get current language values from props
     const sourceLanguage = props.sourceLanguage;
     const targetLanguage = props.targetLanguage;
     
-    logger.debug("🌍 Languages:", sourceLanguage, "→", targetLanguage);
+    logger.debug("Languages:", sourceLanguage, "→", targetLanguage);
     
     // Store last translation for revert functionality
     lastTranslation.value = {
@@ -203,12 +203,17 @@ const handleTranslate = async () => {
     }
     
     // Use composable translation function with current language values
-    logger.debug("📡 Triggering translation...", { provider: props.provider });
-    await triggerTranslation(sourceLanguage, targetLanguage, props.provider)    
-    logger.info("✅ Translation completed successfully");
+    logger.debug("Triggering translation...", { provider: props.provider });
+    const success = await triggerTranslation(sourceLanguage, targetLanguage, props.provider)    
+    
+    if (success) {
+      logger.info("Translation completed successfully");
+    } else {
+      logger.debug("Translation failed (handled internally)");
+    }
 
   } catch (error) {
-    logger.error("❌ Translation failed:", error);
+    logger.error("Translation failed:", error);
     await handleError(error, 'popup-translation')
   }
 }

@@ -54,7 +54,7 @@ export class UnifiedTranslationCoordinator {
     } catch (error) {
       const errorType = matchErrorToType(error);
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        logger.warn(`Translation coordination failed for ${message.messageId}: ${error.message}`);
+        logger.debug(`Translation coordination failed for ${message.messageId}: ${error.message}`);
       }
       throw error;
     }

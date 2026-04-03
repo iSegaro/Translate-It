@@ -62,7 +62,7 @@ export class ProxyManager {
     if (config?.enabled) {
       this.logger.info(`[Proxy] Enabled: ${config.type}://${config.host}:${config.port}`);
     } else {
-      this.logger.info('[Proxy] Disabled');
+      this.logger.debug('[Proxy] Disabled');
     }
   }
 
