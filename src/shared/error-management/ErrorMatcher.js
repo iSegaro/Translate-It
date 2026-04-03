@@ -313,10 +313,12 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("extension context invalidated") || 
       (msg.includes("extension context") && msg.includes("invalidated")) ||
-      msg.includes("extension context invalid before operation")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+      msg.includes("extension context invalid before operation") ||
+      msg.includes("receiving end does not exist")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+  
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 
-  if (msg.includes("listener indicated an asynchronous response") || msg.includes("message channel closed") || msg.includes("receiving end does not exist")) return ErrorTypes.USER_CANCELLED;
+  if (msg.includes("listener indicated an asynchronous response") || msg.includes("message channel closed")) return ErrorTypes.USER_CANCELLED;
   if (msg.includes("context") || msg.includes("message port closed") || msg.includes("page-moved-to-cache")) return ErrorTypes.CONTEXT;
 
   return ErrorTypes.UNKNOWN;
