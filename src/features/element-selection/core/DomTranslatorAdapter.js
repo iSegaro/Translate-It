@@ -233,8 +233,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         this.logger.debug('Response is direct (non-streaming), handling immediately');
         result = await this._handleDirectResponse(response);
       } else {
-        this.logger.error('Initial translation request failed', response?.error);
-        throw new Error(response?.error || 'Translation failed');
+        this.logger.debug('Initial translation request failed', response?.error?.message || response?.error);
+        throw new Error(response?.error?.message || response?.error || 'Translation failed');
       }
 
       return await this._finalizeTranslation({
@@ -242,7 +242,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
     } catch (error) {
-      this.logger.info('Element translation failed', error);
+      this.logger.debug('Element translation failed', error.message);
 
       // Use centralized error handling if not already handled
       if (!error.alreadyHandled) {
