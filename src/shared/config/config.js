@@ -132,7 +132,7 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-4o",
-  OPENROUTER_MODELS: [
+    OPENROUTER_MODELS: [
     // --- OpenAI ---
     { value: "openai/o1", name: "OpenAI o1 (Reasoning)" },
     { value: "openai/o3-mini", name: "OpenAI o3-mini (Reasoning)" },
@@ -144,7 +144,7 @@ export const CONFIG = {
     { value: "anthropic/claude-3.7-sonnet", name: "Claude 3.7 Sonnet" },
     { value: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku" },
 
-    // --- DeepSeek (NEW - Highly Recommended) ---
+    // --- DeepSeek ---
     { value: "deepseek/deepseek-r1", name: "DeepSeek R1 (Reasoning)" },
     { value: "deepseek/deepseek-chat", name: "DeepSeek V3 (Chat)" },
 
@@ -157,7 +157,17 @@ export const CONFIG = {
     // --- Meta & Mistral ---
     { value: "meta-llama/llama-3.3-70b-instruct", name: "Meta Llama 3.3 70B" },
     { value: "mistralai/mistral-large", name: "Mistral Large" },
-    
+
+    // --- Free Models (Zero Cost / Rate Limited) ---
+    { value: "openrouter/free", name: "OpenRouter Auto-Free" }, // انتخاب خودکار بهترین مدل رایگان
+    { value: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nvidia Nemotron 120B (Free)" }, // قدرتمند و عمومی
+    { value: "openai/gpt-oss-120b:free", name: "OpenAI OSS 120B (Free)" }, // استدلال و توابع
+    { value: "mistralai/devstral-2-2512:free", name: "Mistral Devstral (Free Coding)" }, // تخصصی کدنویسی
+    { value: "xiaomi/mimo-v2-flash:free", name: "Xiaomi Mimo V2 (Free Coding)" }, // تخصصی کدنویسی و سریع
+    { value: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B (Free)" }, // عمومی و محبوب
+    { value: "liquidai/lfm-2.5-1.2b-thinking:free", name: "Liquid LFM 2.5 Thinking (Free)" }, // استدلالی و بسیار سریع
+
+    // --- Custom ---
     { value: "custom", name: "Custom Model" }
   ],
   DEEPSEEK_API_KEY: "",
