@@ -242,8 +242,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
     } catch (error) {
-      this.logger.debug('Element translation failed', error.message);
-
       // Use centralized error handling if not already handled
       if (!error.alreadyHandled) {
         await this.errorHandler.handle(error, {

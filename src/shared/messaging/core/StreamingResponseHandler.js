@@ -64,8 +64,6 @@ export class StreamingResponseHandler {
   handleMessage(message) {
     const { action, messageId } = message;
 
-    logger.debug('[StreamingResponseHandler] handleMessage called:', action, messageId);
-
     if (!messageId) {
       return false;
     }
@@ -74,21 +72,18 @@ export class StreamingResponseHandler {
     const handler = this.activeHandlers.get(messageId);
 
     if (!handler) {
-      logger.debug('[StreamingResponseHandler] No handler found for:', messageId, '- buffering message');
       // Buffer the message in case handler is registered later
       this._bufferMessage(messageId, message);
       return false;
     }
 
     if (handler.isCompleted) {
-      logger.debug('[StreamingResponseHandler] Handler already completed for:', messageId);
       return false;
     }
 
     try {
       switch (action) {
         case MessageActions.TRANSLATION_STREAM_UPDATE:
-          logger.debug('[StreamingResponseHandler] Handling STREAM_UPDATE for:', messageId);
           return this._handleStreamUpdate(handler, message);
 
         case MessageActions.TRANSLATION_STREAM_END:
@@ -96,7 +91,6 @@ export class StreamingResponseHandler {
           return this._handleStreamEnd(handler, message);
 
         case MessageActions.TRANSLATION_RESULT_UPDATE:
-          logger.debug('[StreamingResponseHandler] Handling RESULT_UPDATE for:', messageId);
           return this._handleTranslationResult(handler, message);
 
         default:
@@ -119,11 +113,6 @@ export class StreamingResponseHandler {
 
     handler.updateCount++;
 
-    logger.debug('[StreamingResponseHandler._handleStreamUpdate] Processing stream update:', {
-      messageId,
-      updateCount: handler.updateCount
-    });
-
     // Report progress to coordinator
     this.coordinator.reportStreamingProgress(messageId, {
       type: 'stream_update',
@@ -135,7 +124,6 @@ export class StreamingResponseHandler {
     // Call handler callback
     try {
       handler.onStreamUpdate(data);
-      logger.debug('[StreamingResponseHandler._handleStreamUpdate] Callback completed successfully');
     } catch (error) {
       logger.warn(`Error in stream update callback for ${messageId}:`, error.message);
     }
@@ -188,7 +176,6 @@ export class StreamingResponseHandler {
 
     // If this is just a streaming acknowledgement, don't complete or cleanup
     if (data?.streaming) {
-      logger.debug('[StreamingResponseHandler._handleTranslationResult] Streaming acknowledgement received, keeping handler active');
       try {
         handler.onTranslationResult(data);
       } catch (error) {
