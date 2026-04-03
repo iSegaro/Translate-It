@@ -71,7 +71,8 @@ export async function mountContentApp(rootElement) {
     const { i18nPlugin } = await utilsFactory.getI18nUtils();
     app.use(i18nPlugin);
   } catch (error) {
-    console.warn('Failed to load i18n plugin in content app:', error);
+    const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'mountContentApp');
+    logger.warn('Failed to load i18n plugin in content app:', error.message);
   }
 
   app.mount(rootElement);

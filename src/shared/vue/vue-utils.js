@@ -152,7 +152,7 @@ export function configureVueForCSP(app) {
         msg.includes('runtime compiler')) {
       return;
     }
-    console.warn('[Vue warn]:', msg, trace);
+    logger.warn('[Vue warn]:', { msg, trace });
   };
 
   logger.debug('Vue app configured for CSP compatibility');

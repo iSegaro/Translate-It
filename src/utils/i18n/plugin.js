@@ -8,6 +8,8 @@ import { CONFIG } from '../../shared/config/config.js';
 import rawEn from '../../../_locales/en/messages.json';
 import rawFa from '../../../_locales/fa/messages.json';
 
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n-plugin');
+
 function convertWebExtensionMessages(raw) {
   const result = {};
   for (const key in raw) {
@@ -42,8 +44,7 @@ export async function loadLocaleMessages(locale) {
       return messages[locale];
     }
   } catch (error) {
-    const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n-plugin');
-    logger.warn(`Failed to load locale ${locale}:`, error);
+    logger.warn(`Failed to load locale ${locale}:`, error.message);
   }
   
   return messages.en; // fallback to English
@@ -86,9 +87,7 @@ export async function setI18nLocale(localeCode) {
     await setI18nLocale(langCode);
   } catch {
     // Fail silently in non-extension environments (like tests)
-    if (typeof console !== 'undefined') {
-      console.debug('[i18n-plugin] Storage initialization skipped or failed');
-    }
+    logger.debug('Storage initialization skipped or failed');
   }
 })();
 

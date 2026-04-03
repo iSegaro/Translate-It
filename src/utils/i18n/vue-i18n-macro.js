@@ -1,7 +1,10 @@
-// src/utils/i18n/vue-i18n-macro.js
 // Helper macro to load i18n plugin async in Vue apps
 
 import { loadI18nPlugin } from './plugin-async-loader.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'vue-i18n-macro');
 
 /**
  * Create Vue app with async i18n plugin loading for optimal performance
@@ -20,7 +23,7 @@ export async function createAppWithI18n(rootComponent) {
     const i18n = await loadI18nPlugin();
     app.use(i18n);
   } catch (error) {
-    console.warn('Failed to load i18n plugin, continuing without it:', error);
+    logger.warn('Failed to load i18n plugin, continuing without it:', error.message);
   }
 
   return app;
