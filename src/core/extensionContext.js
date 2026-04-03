@@ -105,6 +105,18 @@ export class ExtensionContextManager {
   }
 
   /**
+   * Get a human-readable message for a context error
+   * @param {string} type - The error type
+   * @returns {string} Human-readable error message
+   */
+  static getContextErrorMessage(type) {
+    if (type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+      return 'Extension was reloaded or updated. Please refresh the page.';
+    }
+    return 'The extension context is currently unavailable. This often happens after an update or if the page was idle for a long time.';
+  }
+
+  /**
    * Handle context errors with appropriate logging and response
    * @param {Error|string} error - The context error
    * @param {string} context - Context where error occurred
