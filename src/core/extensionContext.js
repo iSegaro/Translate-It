@@ -208,7 +208,7 @@ export class ExtensionContextManager {
           const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
           return await sendMessage(msg);
         } catch (err) {
-          logger.debug('UnifiedMessaging failed in safeSendMessage:', err);
+          logger.debug('UnifiedMessaging failed in safeSendMessage:', err.message);
           throw err;
         }
       },

@@ -447,7 +447,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         return;
       } else if (messageResult && messageResult.success === false) {
         // Handle error response
-        logger.error('Translation failed', { error: messageResult.error });
+        logger.debug('Translation failed response received', { error: messageResult.error?.message || messageResult.error });
 
         // Dismiss notification on error
         pageEventBus.emit('dismiss_notification', { id: newToastId });
@@ -456,8 +456,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         // Show error message if available
         if (messageResult.error) {
           const handler = ErrorHandler.getInstance();
-          await handler.handle(new Error(messageResult.error), {
-            type: ErrorTypes.TRANSLATION_FAILED,
+          // Use the structured error object from the message result
+          await handler.handle(messageResult.error, {
             context: 'text-field-response',
             showToast: true
           });
@@ -465,7 +465,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         return;
       }
     } catch (responseError) {
-      logger.error('Error handling translation response', responseError);
+      logger.debug('Error handling translation response', responseError.message);
 
       // Dismiss notification on error
       pageEventBus.emit('dismiss_notification', { id: newToastId });
@@ -473,10 +473,9 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     }
     
   } catch (err) {
-    logger.error('Text field translation request failed:', err);
+    logger.debug('Text field translation request failed:', err.message);
     const handler = ErrorHandler.getInstance();
     await handler.handle(err, {
-      type: ErrorTypes.TRANSLATION_FAILED,
       context: 'text-field-request',
       showToast: true
     });
