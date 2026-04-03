@@ -16,7 +16,7 @@ The system is built upon **Unified Provider Discovery**:
 
 ---
 
-## 🚀 Workflow: Adding a New Provider (Quick Start)
+## Workflow: Adding a New Provider (Quick Start)
 
 To add a new provider, simply follow these 4 steps:
 
@@ -26,7 +26,9 @@ Add the constant ID and Name:
 - `ProviderRegistryIds.YOUR_ID`: The registry ID (e.g., `'yourid'`)
 
 ### 2. Implement the Provider Class (`providers/YourProvider.js`)
-Create a new class inheriting from `BaseTranslateProvider` or `BaseAIProvider` and implement the essential methods (`_getLangCode` and `_translateChunk`/`_translateSingle`).
+Create a new class inheriting from `BaseTranslateProvider` or `BaseAIProvider` and implement the essential methods:
+- **Traditional**: `_translateChunk(chunkTexts, ..., options = {})`
+- **AI**: `_translateSingle(text, ..., originalCharCount = 0)`
 
 ### 3. Register in the Manifest (`providers/ProviderManifest.js`)
 Add the provider information to the `PROVIDER_MANIFEST` array. This **automatically** handles the following:
@@ -61,7 +63,7 @@ Add the provider information to the `PROVIDER_MANIFEST` array. This **automatica
 
 ---
 
-## ✅ Provider Implementation Rules
+## Provider Implementation Rules
 
 ### 1. MANDATORY: Inherit from BaseProvider
 
@@ -79,7 +81,40 @@ Always use `ProviderNames` constants in the class constructor:
 constructor() {
   super(ProviderNames.YOUR_PROVIDER);
 }
+```
 
+### 4. MANDATORY: Accurate Character Reporting
+
+Every provider is responsible for reporting its exact network consumption. You must calculate and pass both metrics to `_executeRequest` or `_executeApiCall`:
+- **charCount**: The total network payload weight (including prompts, history, delimiters).
+- **originalCharCount**: The raw length of the input text being translated.
+
+---
+
+## Statistics & Accurate Reporting
+
+Since the system uses an **Explicit Self-Reporting** architecture, each provider must calculate and pass its own metrics to maintain accurate API usage logs.
+
+### 1. Calculation Helpers
+The base classes provide specialized helpers to simplify this:
+- **Traditional Providers**: Use `this._calculateTraditionalCharCount(chunkTexts)` to calculate the exact network weight (including standard delimiters).
+- **AI Providers**: Use `this._calculateAIPayloadChars(messages)` to sum up the entire weight of messages (System Instructions + History + User Text).
+
+### 2. Reporting Example
+When calling the final execution method, ensure both `charCount` (Network) and `originalCharCount` (Raw) are passed:
+
+```javascript
+const originalChars = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
+const networkChars = this._calculateTraditionalCharCount(chunkTexts);
+
+await this._executeRequest({
+  url,
+  fetchOptions,
+  charCount: networkChars,          // Accurate network payload weight
+  originalCharCount: originalChars, // Accurate raw content length
+  sessionId: options.sessionId,     // Essential for session aggregation
+  // ...
+});
 ```
 
 ---
