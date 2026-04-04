@@ -623,20 +623,29 @@ const getEffectiveProviderId = (type) => {
 
 // Methods
 const getProviderIcon = (iconPath) => {
-  const fallback = 'icons/providers/google.svg';
-  
-  if (!iconPath) return ExtensionContextManager.safeGetURL(fallback);
-  
-  if (iconPath.startsWith('@/assets/')) {
-    const cleanPath = iconPath.replace('@/assets/', 'icons/')
-    return ExtensionContextManager.safeGetURL(cleanPath, fallback)
+  try {
+    const fallback = 'icons/providers/google.svg';
+    
+    if (!iconPath) return ExtensionContextManager.safeGetURL(fallback);
+    
+    let path = iconPath;
+    if (iconPath.startsWith('@/assets/')) {
+      path = iconPath.replace('@/assets/', 'icons/')
+    } else if (!iconPath.includes('/')) {
+      path = `icons/providers/${iconPath}`;
+    } else if (!iconPath.startsWith('icons/')) {
+      path = `icons/${iconPath}`;
+    }
+    
+    return ExtensionContextManager.safeGetURL(path, fallback);
+  } catch (error) {
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'ProviderSelector:getProviderIcon');
+    } else {
+      logger.error('[getProviderIcon] Failed to resolve icon URL:', error);
+    }
+    return ExtensionContextManager.GENERIC_FALLBACK_ICON;
   }
-  
-  if (iconPath.includes('/')) {
-    return ExtensionContextManager.safeGetURL(`icons/${iconPath}`, fallback)
-  }
-  
-  return ExtensionContextManager.safeGetURL(`icons/providers/${iconPath}`, fallback)
 }
 
 const getEffectiveIcon = (type) => {

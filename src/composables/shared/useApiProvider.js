@@ -22,14 +22,23 @@ export function useApiProvider() {
 
   const currentProviderData = computed(() => getProviderById(currentProvider.value));
   const currentProviderIcon = computed(() => {
-    const fallback = 'icons/providers/google.svg';
-    if (!currentProviderData.value) return ExtensionContextManager.safeGetURL(fallback)
-    const iconPath = currentProviderData.value.icon
-    if (!iconPath) return ExtensionContextManager.safeGetURL(fallback)
-    if (iconPath.includes('/')) {
-      return ExtensionContextManager.safeGetURL(`icons/${iconPath}`, fallback)
+    try {
+      const fallback = 'icons/providers/google.svg';
+      if (!currentProviderData.value) return ExtensionContextManager.safeGetURL(fallback)
+      const iconPath = currentProviderData.value.icon
+      if (!iconPath) return ExtensionContextManager.safeGetURL(fallback)
+      if (iconPath.includes('/')) {
+        return ExtensionContextManager.safeGetURL(`icons/${iconPath}`, fallback)
+      }
+      return ExtensionContextManager.safeGetURL(`icons/providers/${iconPath}`, fallback)
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'useApiProvider:currentProviderIcon');
+      } else {
+        logger.error('[currentProviderIcon] Failed to get provider icon:', error);
+      }
+      return ExtensionContextManager.GENERIC_FALLBACK_ICON;
     }
-    return ExtensionContextManager.safeGetURL(`icons/providers/${iconPath}`, fallback)
   });
   const currentProviderName = computed(() => currentProviderData.value?.name || "Translation Provider");
 
@@ -101,7 +110,16 @@ export function useApiProvider() {
   };
 
   const getProviderIconUrl = (iconPath) => {
-    return ExtensionContextManager.safeGetURL(iconPath, 'icons/providers/google.svg');
+    try {
+      return ExtensionContextManager.safeGetURL(iconPath, 'icons/providers/google.svg');
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'useApiProvider:getProviderIconUrl');
+      } else {
+        logger.error('[getProviderIconUrl] Failed to get icon URL:', error);
+      }
+      return ExtensionContextManager.GENERIC_FALLBACK_ICON;
+    }
   }
 
   const createProviderItems = async () => {

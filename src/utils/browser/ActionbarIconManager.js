@@ -107,8 +107,13 @@ export class ActionbarIconManager {
    */
   async loadImageData(iconPath) {
     try {
-      // Get full URL for the icon
-      const fullUrl = browser.runtime.getURL(iconPath);
+      // Get full URL for the icon safely
+      const fullUrl = ExtensionContextManager.safeGetURL(iconPath);
+      
+      if (!fullUrl || fullUrl.startsWith('data:')) {
+        logger.warn(`Skipping loadImageData for non-extension URL or fallback: ${fullUrl}`);
+        return null;
+      }
 
       // Fetch the image
       const response = await fetch(fullUrl);
@@ -136,7 +141,11 @@ export class ActionbarIconManager {
 
       return imageData;
     } catch (error) {
-      logger.error('Error in loadImageData:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'actionbar:loadImageData');
+      } else {
+        logger.error('Error in loadImageData:', error);
+      }
       return null;
     }
   }
@@ -191,8 +200,8 @@ export class ActionbarIconManager {
       }
 
       // Cleanup
-      mainIconBitmap.close();
-      providerIconBitmap.close();
+      if (mainIconBitmap) mainIconBitmap.close();
+      if (providerIconBitmap) providerIconBitmap.close();
 
       return compositeImageData;
     } catch (error) {
@@ -206,8 +215,12 @@ export class ActionbarIconManager {
    */
   async loadImageBitmap(iconPath) {
     try {
-      // Get full URL for the icon
-      const fullUrl = browser.runtime.getURL(iconPath);
+      // Get full URL for the icon safely
+      const fullUrl = ExtensionContextManager.safeGetURL(iconPath);
+      
+      if (!fullUrl || fullUrl.startsWith('data:')) {
+        return null;
+      }
 
       // Simple fetch with basic error handling
       const response = await fetch(fullUrl);
@@ -219,7 +232,11 @@ export class ActionbarIconManager {
       // Create bitmap from image
       return await createImageBitmap(await response.blob());
     } catch (error) {
-      logger.warn(`Error in loadImageBitmap for ${iconPath}:`, error.message);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'actionbar:loadImageBitmap');
+      } else {
+        logger.warn(`Error in loadImageBitmap for ${iconPath}:`, error.message);
+      }
       return null;
     }
   }
