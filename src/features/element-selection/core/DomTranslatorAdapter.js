@@ -242,12 +242,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
     } catch (error) {
-      // Use centralized error handling if not already handled
-      if (!error.alreadyHandled) {
+      const type = matchErrorToType(error);
+      const isCancellation = type === ErrorTypes.USER_CANCELLED || 
+                             type === ErrorTypes.TRANSLATION_CANCELLED;
+
+      // Use centralized error handling if not already handled and not a cancellation
+      // Cancellations should be handled silently without triggering the ErrorHandler
+      if (!error.alreadyHandled && !isCancellation) {
         await this.errorHandler.handle(error, {
           context: 'select-element-translation',
-          component: 'DomTranslatorAdapter',
-          showToast: true
+          component: 'DomTranslatorAdapter'
         });
       }
 
@@ -412,6 +416,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Stop waiting for stream
       if (this.currentStreamEndReject) {
         const cancelError = new Error(ErrorTypes.USER_CANCELLED);
+        cancelError.type = ErrorTypes.USER_CANCELLED;
         if (silent) {
           cancelError.showToast = false;
         }

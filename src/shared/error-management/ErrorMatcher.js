@@ -18,6 +18,8 @@ export const SILENT_ERRORS = new Set([
   ErrorTypes.TAB_NOT_ACCESSIBLE,
   ErrorTypes.NODE_ALREADY_TRANSLATED,
   ErrorTypes.USER_CANCELLED,
+  ErrorTypes.TRANSLATION_CANCELLED,
+  ErrorTypes.PAGE_TRANSLATION_STOPPED,
 ]);
 
 /**
@@ -244,6 +246,13 @@ export function matchErrorToType(rawOrError = "") {
                    (typeof rawOrError === 'string' ? rawOrError : 
                    (typeof rawOrError.message === 'string' ? rawOrError.message : 
                    (rawOrError.code || rawOrError.status || ""))));
+    
+    // اولویت 2.5: بررسی انطباق دقیق پیام خطا با مقادیر ErrorTypes (قبل از حروف کوچک کردن)
+    const trimmedRaw = String(rawMsg || "").trim();
+    if (trimmedRaw && Object.values(ErrorTypes).includes(trimmedRaw)) {
+      return trimmedRaw;
+    }
+
     msg = String(rawMsg || "").toLowerCase().trim();
   } catch {
     msg = "unknown error";

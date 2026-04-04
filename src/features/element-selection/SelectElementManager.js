@@ -734,6 +734,8 @@ class SelectElementManager extends ResourceTracker {
     } catch (error) {
       const errorType = matchErrorToType(error);
       const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 
+                             errorType === ErrorTypes.TRANSLATION_CANCELLED ||
+                             errorType === ErrorTypes.PAGE_TRANSLATION_STOPPED ||
                              error.message === 'Handler cancelled' || 
                              error.type === 'HANDLER_CANCELLED';
 
