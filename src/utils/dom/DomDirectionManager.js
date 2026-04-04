@@ -45,20 +45,16 @@ export function detectDirectionFromContent(text = '') {
   const trimmedText = text.trim();
   if (trimmedText.length === 0) return 'ltr';
 
-  // Count RTL and LTR STRONG characters (ignore neutral/weak characters)
+  // Count RTL and LTR STRONG characters
   let rtlStrongCount = 0;
   let ltrStrongCount = 0;
-
-  // Track first strong character position
   let firstRTLIndex = -1;
   let firstLTRIndex = -1;
 
   for (let i = 0; i < trimmedText.length; i++) {
     const code = trimmedText.codePointAt(i);
-    // Skip next surrogate if it's a high surrogate
     if (code > 0xFFFF) i++;
 
-    // RTL Strong characters: Arabic, Hebrew, Syriac, Thaana, etc.
     const isRTLStrong = (
       (code >= 0x0590 && code <= 0x05FF) ||  // Hebrew
       (code >= 0x0600 && code <= 0x06FF) ||  // Arabic
@@ -73,7 +69,6 @@ export function detectDirectionFromContent(text = '') {
       (code === 0x200F)                      // Right-to-Left Mark
     );
 
-    // LTR Strong characters: Latin, Greek, Cyrillic, etc.
     const isLTRStrong = (
       (code >= 0x0041 && code <= 0x005A) ||  // Basic Latin uppercase
       (code >= 0x0061 && code <= 0x007A) ||  // Basic Latin lowercase
@@ -99,17 +94,20 @@ export function detectDirectionFromContent(text = '') {
     }
   }
 
+  // If no strong directional characters, default to LTR
   if (rtlStrongCount === 0 && ltrStrongCount === 0) return 'ltr';
+  
+  // If there are ANY RTL characters, and they appear reasonably early 
+  // or the LTR count isn't overwhelmingly dominant (more than 4 to 1), 
+  // we treat it as RTL. This handles mixed technical Farsi text like "WebAI به API".
+  if (rtlStrongCount > 0) {
+    if (ltrStrongCount === 0) return 'rtl';
+    const ltrRatio = ltrStrongCount / (rtlStrongCount + ltrStrongCount);
+    // Only force LTR if more than 85% of characters are LTR
+    return ltrRatio > 0.85 ? 'ltr' : 'rtl';
+  }
 
-  const totalStrong = rtlStrongCount + ltrStrongCount;
-  const rtlRatio = rtlStrongCount / totalStrong;
-
-  // Use majority with threshold
-  if (rtlRatio >= 0.6) return 'rtl';
-  if (rtlRatio <= 0.4) return 'ltr';
-
-  // Balanced content - Follow first strong character
-  return (firstRTLIndex !== -1 && (firstLTRIndex === -1 || firstRTLIndex < firstLTRIndex)) ? 'rtl' : 'ltr';
+  return 'ltr';
 }
 
 /**
