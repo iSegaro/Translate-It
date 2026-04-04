@@ -368,14 +368,6 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, mergedSettings);
 
-      // Normalize possible empty regex placeholders
-      if (typeof settings.value.RTL_REGEX === 'object' && settings.value.RTL_REGEX !== null && Object.keys(settings.value.RTL_REGEX).length === 0) {
-        settings.value.RTL_REGEX = CONFIG.RTL_REGEX;
-      }
-      if (typeof settings.value.PERSIAN_REGEX === 'object' && settings.value.PERSIAN_REGEX !== null && Object.keys(settings.value.PERSIAN_REGEX).length === 0) {
-        settings.value.PERSIAN_REGEX = CONFIG.PERSIAN_REGEX;
-      }
-
       await saveAllSettings();
 
       // Re-setup storage listener after import is complete
