@@ -2,7 +2,16 @@
  * DomDirectionManager - Shared logic for RTL/LTR direction management.
  */
 
-import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS, LAYOUT_DISPLAY_MODES, INTERACTIVE_TAGS } from './DomTranslatorConstants.js';
+import { 
+  RTL_LANGUAGES, 
+  BLOCK_TAGS, 
+  LAYOUT_TAGS, 
+  FORMATTING_TAGS, 
+  LAYOUT_DISPLAY_MODES, 
+  INTERACTIVE_TAGS,
+  isRTLStrongCharacter,
+  isLTRStrongCharacter
+} from './DomTranslatorConstants.js';
 
 // --- 1. Core Utilities (Shared) ---
 
@@ -48,57 +57,25 @@ export function detectDirectionFromContent(text = '') {
   // Count RTL and LTR STRONG characters
   let rtlStrongCount = 0;
   let ltrStrongCount = 0;
-  let firstRTLIndex = -1;
-  let firstLTRIndex = -1;
 
   for (let i = 0; i < trimmedText.length; i++) {
     const code = trimmedText.codePointAt(i);
+    // If the character is outside the BMP (Basic Multilingual Plane), 
+    // it's represented as a surrogate pair (occupies 2 units in string length).
+    // codePointAt returns the full code, so we skip the next surrogate unit.
     if (code > 0xFFFF) i++;
 
-    const isRTLStrong = (
-      (code >= 0x0590 && code <= 0x05FF) ||  // Hebrew
-      (code >= 0x0600 && code <= 0x06FF) ||  // Arabic
-      (code >= 0x0700 && code <= 0x074F) ||  // Syriac
-      (code >= 0x0750 && code <= 0x077F) ||  // Arabic Supplement
-      (code >= 0x0780 && code <= 0x07BF) ||  // Thaana
-      (code >= 0x07C0 && code <= 0x07FF) ||  // NKo
-      (code >= 0x08A0 && code <= 0x08FF) ||  // Arabic Extended
-      (code >= 0xFB1D && code <= 0xFB4F) ||  // Hebrew Presentation Forms
-      (code >= 0xFB50 && code <= 0xFDFF) ||  // Arabic Presentation Forms
-      (code >= 0xFE70 && code <= 0xFEFF) ||  // Arabic Presentation Forms-B
-      (code === 0x200F)                      // Right-to-Left Mark
-    );
-
-    const isLTRStrong = (
-      (code >= 0x0041 && code <= 0x005A) ||  // Basic Latin uppercase
-      (code >= 0x0061 && code <= 0x007A) ||  // Basic Latin lowercase
-      (code >= 0x00C0 && code <= 0x00D6) ||  // Latin-1 Supplement letters
-      (code >= 0x00D8 && code <= 0x00F6) ||  // Latin-1 Supplement letters
-      (code >= 0x00F8 && code <= 0x00FF) ||  // Latin-1 Supplement letters
-      (code >= 0x0100 && code <= 0x017F) ||  // Latin Extended-A
-      (code >= 0x0180 && code <= 0x024F) ||  // Latin Extended-B
-      (code >= 0x0250 && code <= 0x02AF) ||  // IPA Extensions
-      (code >= 0x0370 && code <= 0x03FF) ||  // Greek and Coptic
-      (code >= 0x0400 && code <= 0x04FF) ||  // Cyrillic
-      (code >= 0x0500 && code <= 0x052F) ||  // Cyrillic Supplement
-      (code >= 0x1E00 && code <= 0x1EFF) ||  // Latin Extended Additional
-      (code === 0x200E)                      // Left-to-Right Mark
-    );
-
-    if (isRTLStrong) {
+    if (isRTLStrongCharacter(code)) {
       rtlStrongCount++;
-      if (firstRTLIndex === -1) firstRTLIndex = i;
-    } else if (isLTRStrong) {
+    } else if (isLTRStrongCharacter(code)) {
       ltrStrongCount++;
-      if (firstLTRIndex === -1) firstLTRIndex = i;
     }
   }
 
   // If no strong directional characters, default to LTR
   if (rtlStrongCount === 0 && ltrStrongCount === 0) return 'ltr';
   
-  // If there are ANY RTL characters, and they appear reasonably early 
-  // or the LTR count isn't overwhelmingly dominant (more than 4 to 1), 
+  // If there are ANY RTL characters, and the LTR count isn't overwhelmingly dominant
   // we treat it as RTL. This handles mixed technical Farsi text like "WebAI به API".
   if (rtlStrongCount > 0) {
     if (ltrStrongCount === 0) return 'rtl';
