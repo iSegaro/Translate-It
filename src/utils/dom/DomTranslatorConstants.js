@@ -18,6 +18,13 @@ export const LAYOUT_TAGS = new Set([
 ]);
 
 /**
+ * CSS display values that indicate a layout engine is active (flex, grid)
+ */
+export const LAYOUT_DISPLAY_MODES = new Set([
+  'flex', 'grid', 'inline-flex', 'inline-grid'
+]);
+
+/**
  * Tags that are safe to apply RTL direction without breaking layout
  */
 export const TEXT_TAGS = new Set([

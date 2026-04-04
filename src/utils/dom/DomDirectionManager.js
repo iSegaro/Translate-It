@@ -2,7 +2,7 @@
  * DomDirectionManager - Shared logic for RTL/LTR direction management.
  */
 
-import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS } from './DomTranslatorConstants.js';
+import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS, LAYOUT_DISPLAY_MODES } from './DomTranslatorConstants.js';
 
 // --- 1. Core Utilities (Shared) ---
 
@@ -133,10 +133,21 @@ function isLayoutContainer(el, rootElement = null) {
   if (LAYOUT_TAGS.has(el.tagName)) return true;
 
   const style = window.getComputedStyle(el);
-  const isLayoutDisplay = style.display === 'flex' || style.display === 'grid';
   
   // If it's a layout engine (flex/grid) with multiple children, don't flip it
-  if (isLayoutDisplay && el.children.length > 1) return true;
+  if (LAYOUT_DISPLAY_MODES.has(style.display) && el.children.length > 1) return true;
+
+  // NEW: If an element has multiple children and they act as "items" (not just simple inline text)
+  // we treat it as a layout container to avoid flipping the order of those items.
+  if (el.children.length > 1) {
+    const hasLayoutChildren = Array.from(el.children).some(child => {
+      const childStyle = window.getComputedStyle(child);
+      // Anything that is not purely 'inline' acts as a layout item (inline-block, block, flex, etc.)
+      return childStyle.display !== 'inline';
+    });
+    
+    if (hasLayoutChildren) return true;
+  }
 
   // If it has explicit width or height, it might be a rigid layout part
   if (el.style.width || el.style.height || style.width.includes('px') || style.maxWidth !== 'none') {
