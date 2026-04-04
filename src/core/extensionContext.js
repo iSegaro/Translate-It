@@ -6,6 +6,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
 
@@ -271,21 +272,16 @@ export class ExtensionContextManager {
         ExtensionContextManager._contextNotificationShown = false;
       }, 5000);
 
-      // Use dynamic import to avoid circular dependencies with PageEventBus
-      import('@/core/PageEventBus.js').then(({ pageEventBus }) => {
-        if (pageEventBus && typeof pageEventBus.emit === 'function') {
-          pageEventBus.emit('show-notification', {
-            type: 'warning',
-            title: 'Extension Update',
-            message: ExtensionContextManager.getContextErrorMessage(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED),
-            duration: 5000,
-            showIcon: true
-          });
-        }
-      }).catch(err => {
-        // If event bus is unreachable, just log it quietly
-        logger.debug('Could not show context error notification: EventBus unavailable');
-      });
+      // Use the statically imported pageEventBus
+      if (pageEventBus && typeof pageEventBus.emit === 'function') {
+        pageEventBus.emit('show-notification', {
+          type: 'warning',
+          title: 'Extension Update',
+          message: ExtensionContextManager.getContextErrorMessage(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED),
+          duration: 5000,
+          showIcon: true
+        });
+      }
     }
 
     // If we are in BACKGROUND context, use system notifications (browser.notifications)

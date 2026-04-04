@@ -6,6 +6,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
 import { INPUT_TYPES, NOTIFICATION_TIME } from '@/shared/config/constants.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -512,17 +513,14 @@ export class ShortcutHandler extends ResourceTracker {
 
   showShortcutHint() {
     try {
-      // Import page event bus to show notification
-      import('@/core/PageEventBus.js').then(({ pageEventBus }) => {
+      // Use the statically imported pageEventBus
+      if (pageEventBus && typeof pageEventBus.emit === 'function') {
         pageEventBus.emit('show-notification', {
           message: `Press ${this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl'}+/ in a text field or with selected text to translate`,
           type: 'info',
           duration: NOTIFICATION_TIME.HINT
         });
-      }).catch(() => {
-        // Error handled silently
-      });
-      
+      }
     } catch {
       // Error handled silently
     }

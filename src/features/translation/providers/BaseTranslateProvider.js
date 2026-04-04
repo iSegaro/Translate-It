@@ -131,7 +131,6 @@ export class BaseTranslateProvider extends BaseProvider {
     if (expectedCount <= 1) return [translatedText];
     
     const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-    const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
     
     // Use the advanced mapper to recover segments
     let segments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
