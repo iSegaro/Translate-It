@@ -146,27 +146,39 @@ function isLayoutContainer(el) {
 }
 
 /**
- * Checks if we should apply text-align: start to an element.
- * Respects existing 'center' or 'justify' alignments.
+ * Determines the best text alignment to preserve the original layout intent.
+ * If the element was originally left-aligned, it should stay left-aligned even in RTL.
+ * @param {HTMLElement} element 
+ * @returns {string|null} The alignment value to apply, or null if no change needed.
  */
-function shouldApplyStartAlignment(element) {
-  if (!BLOCK_TAGS.has(element.tagName.toUpperCase())) return false;
-  
-  // Check for legacy align attribute which might not be reflected in computedStyle immediately
-  const alignAttr = element.getAttribute('align');
-  if (alignAttr === 'center' || alignAttr === 'justify') return false;
+function getPreservedAlignment(element) {
+  if (!BLOCK_TAGS.has(element.tagName.toUpperCase())) return null;
 
   const computedStyle = window.getComputedStyle(element);
   const textAlign = computedStyle.textAlign;
+  const currentDir = computedStyle.direction; // 'ltr' or 'rtl'
   
-  // If the element is already centered or justified, keep it that way.
-  // We also check for vendor-specific center values.
-  return (
-    textAlign !== 'center' && 
-    textAlign !== 'justify' && 
-    textAlign !== '-webkit-center' && 
-    textAlign !== '-moz-center'
-  );
+  // If the element is centered or justified, definitely keep it that way.
+  if (textAlign === 'center' || textAlign === 'justify' || 
+      textAlign === '-webkit-center' || textAlign === '-moz-center') {
+    return textAlign;
+  }
+
+  // Check for legacy align attribute
+  const alignAttr = element.getAttribute('align');
+  if (alignAttr === 'center' || alignAttr === 'justify') return alignAttr;
+
+  // Resolve logical 'start'/'end' to physical 'left'/'right' 
+  // based on the current direction BEFORE we change it.
+  if (textAlign === 'start') {
+    return currentDir === 'rtl' ? 'right' : 'left';
+  }
+  if (textAlign === 'end') {
+    return currentDir === 'rtl' ? 'left' : 'right';
+  }
+
+  // For other cases (already left or right), return the value as is
+  return textAlign;
 }
 
 // --- 2. State Management (Internal) ---
@@ -230,11 +242,14 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
 
   if (lastSafeContainer) {
     if (lastSafeContainer.style.direction !== targetDir) {
+      // Capture alignment BEFORE changing direction
+      const preservedAlign = getPreservedAlignment(lastSafeContainer);
+      
       saveOriginalStyles(lastSafeContainer);
       lastSafeContainer.style.direction = targetDir;
       
-      if (shouldApplyStartAlignment(lastSafeContainer)) {
-        lastSafeContainer.style.textAlign = 'start';
+      if (preservedAlign) {
+        lastSafeContainer.style.textAlign = preservedAlign;
       }
       
       lastSafeContainer.setAttribute('data-translate-dir', targetDir);
@@ -261,12 +276,17 @@ export function applyElementDirection(element, targetLanguage) {
     ? detectedDir
     : fallbackDir;
 
+  // Capture alignment BEFORE changing direction
+  const preservedAlign = getPreservedAlignment(element);
+
   saveOriginalStyles(element);
 
   element.style.direction = directionAttr;
-  if (shouldApplyStartAlignment(element)) {
-    element.style.textAlign = 'start';
+  
+  if (preservedAlign) {
+    element.style.textAlign = preservedAlign;
   }
+  
   element.setAttribute('data-translate-dir', directionAttr);
 }
 
