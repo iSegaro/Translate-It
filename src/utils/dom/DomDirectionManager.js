@@ -137,6 +137,14 @@ function isLayoutContainer(el, rootElement = null) {
   // If it's a layout engine (flex/grid) with multiple children, don't flip it
   if (LAYOUT_DISPLAY_MODES.has(style.display) && el.children.length > 1) return true;
 
+  // NEW: Detect Mixed Content (Text + Elements). 
+  // If an element contains direct text nodes AND other elements, it's a UI component.
+  // Flipping its direction will swap the relative position of text and icons.
+  const hasDirectText = Array.from(el.childNodes).some(node => 
+    node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
+  );
+  if (hasDirectText && el.children.length > 0) return true;
+
   // NEW: If an element has multiple children and they act as "items" (not just simple inline text)
   // we treat it as a layout container to avoid flipping the order of those items.
   if (el.children.length > 1) {
