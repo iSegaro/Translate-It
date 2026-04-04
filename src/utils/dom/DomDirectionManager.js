@@ -231,7 +231,18 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     if (isLayoutContainer(container)) break;
     
     lastSafeContainer = container;
-    if (rootElement && container === rootElement) break;
+
+    // If we reached the root element selected by the user:
+    // 1. If it's a block-level element, we stop here (as intended).
+    // 2. If it's a formatting/inline element (like <a> or <span>), we try to go one level higher
+    //    to its parent to ensure proper block-level RTL alignment, unless the parent is a layout barrier.
+    if (rootElement && container === rootElement) {
+      if (BLOCK_TAGS.has(container.tagName.toUpperCase())) {
+        break;
+      }
+      // If it's inline, we don't break yet, allowing the loop to check the parent in the next iteration.
+    }
+    
     container = container.parentElement;
   }
 
