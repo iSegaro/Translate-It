@@ -153,7 +153,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   // Apply translation while preserving full whitespace structure
                   const detectedDir = DirectionManager.detectDirectionFromContent(translatedText);
                   const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
-                  textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
+                  
+                  // SUCCESS: Wrap the text with bidiMark on BOTH sides to 'seal' its directionality.
+                  textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + bidiMark + trailingWhitespace;
 
                   // Apply native auto-direction to parent only once per node
                   // Pass 'element' as the root to ensure the container direction is set early
@@ -338,7 +340,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
           // Apply translation while preserving full whitespace structure
           const detectedDir = DirectionManager.detectDirectionFromContent(translatedText);
           const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
-          textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
+          
+          // SUCCESS: Wrap the text with bidiMark on BOTH sides to 'seal' its directionality.
+          textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + bidiMark + trailingWhitespace;
           
           DirectionManager.applyNodeDirection(textNode, finalTarget, element);
         }
