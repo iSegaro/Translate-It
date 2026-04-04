@@ -213,8 +213,15 @@ function saveOriginalStyles(element) {
  * Commonly used by both Select Element and Page Translation.
  */
 export function applyNodeDirection(textNode, targetLanguage, rootElement = null) {
+  // Priority 1: Detect direction from the actual translated text content
+  // Priority 2: Fallback to the target language's default direction
+  const detectedDir = detectDirectionFromContent(textNode.textContent);
   const isTargetRTL = isRTL(targetLanguage);
-  const targetDir = isTargetRTL ? 'rtl' : 'ltr';
+  const fallbackDir = isTargetRTL ? 'rtl' : 'ltr';
+  
+  const targetDir = (textNode.textContent && textNode.textContent.trim().length > 0) 
+    ? detectedDir 
+    : fallbackDir;
   
   let container = textNode.parentElement;
   let lastSafeContainer = null;
@@ -252,8 +259,14 @@ export function applyElementDirection(element, targetLanguage) {
   // Always check for layout container without bypass.
   if (isLayoutContainer(element)) return;
 
+  // Detect direction from the text content of the element
+  const detectedDir = detectDirectionFromContent(element.textContent);
   const isTargetRTL = isRTL(targetLanguage);
-  const directionAttr = isTargetRTL ? 'rtl' : 'ltr';
+  const fallbackDir = isTargetRTL ? 'rtl' : 'ltr';
+
+  const directionAttr = (element.textContent && element.textContent.trim().length > 0)
+    ? detectedDir
+    : fallbackDir;
 
   saveOriginalStyles(element);
 

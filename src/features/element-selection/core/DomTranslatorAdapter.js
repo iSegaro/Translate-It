@@ -151,8 +151,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
 
                   // Apply translation while preserving full whitespace structure
-                  const isRTL = DirectionManager.isRTL(effectiveTargetLanguage);
-                  const bidiMark = isRTL ? DirectionManager.BIDI_MARKS.RLM : '';
+                  const detectedDir = DirectionManager.detectDirectionFromContent(translatedText);
+                  const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
                   textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
 
                   // Apply native auto-direction to parent only once per node
@@ -336,8 +336,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
           const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
 
           // Apply translation while preserving full whitespace structure
-          const isRTL = DirectionManager.isRTL(finalTarget);
-          const bidiMark = isRTL ? DirectionManager.BIDI_MARKS.RLM : '';
+          const detectedDir = DirectionManager.detectDirectionFromContent(translatedText);
+          const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
           textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
           
           DirectionManager.applyNodeDirection(textNode, finalTarget, element);
