@@ -111,10 +111,14 @@ function isLayoutContainer(el) {
     // Non-textual tags (SVG, IMG, CANVAS, etc.)
     if (!FORMATTING_TAGS.has(tag) && !BLOCK_TAGS.has(tag)) return true;
     
-    // Interactive tags that shouldn't be flipped as part of a text block
+    // Interactive tags
     if (INTERACTIVE_TAGS.has(tag)) return true;
     
-    // Recursive check for formatting tags (SPAN, A) to see if they contain icons
+    // NEW: If a formatting element has multiple element children, it's likely a complex 
+    // UI component (like a header bar or metadata row) where item order must be preserved.
+    if (FORMATTING_TAGS.has(tag) && node.children.length > 1) return true;
+
+    // Recursive check for formatting tags to see if they contain icons
     if (FORMATTING_TAGS.has(tag)) {
       return Array.from(node.children).some(isUIElement);
     }
@@ -123,10 +127,9 @@ function isLayoutContainer(el) {
   };
 
   // 3. Mixed Content or UI Components
-  // If ANY child is a UI element (SVG, IMG, etc.), this is a protected UI component.
-  if (el.children.length > 0) {
-    if (Array.from(el.children).some(isUIElement)) return true;
-  }
+  // If the element itself is a UI component or contains any, it's a layout barrier.
+  if (isUIElement(el)) return true;
+  if (el.children.length > 0 && Array.from(el.children).some(isUIElement)) return true;
 
   // 4. Formatting tags (span, strong, a, etc.) are NOT layout containers 
   if (FORMATTING_TAGS.has(el.tagName.toUpperCase())) return false;
@@ -218,42 +221,39 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     : fallbackDir;
   
   let container = textNode.parentElement;
-  let lastSafeContainer = null;
 
+  // Apply direction to the entire safe ancestry chain
   while (container && container !== document.body) {
     // We respect isLayoutContainer strictly to ensure we don't flip layouts by accident.
     if (isLayoutContainer(container)) break;
     
-    lastSafeContainer = container;
-
-    // If we reached the root element selected by the user:
-    // 1. If it's a block-level element, we stop here (as intended).
-    // 2. If it's a formatting/inline element (like <a> or <span>), we try to go one level higher
-    //    to its parent to ensure proper block-level RTL alignment, unless the parent is a layout barrier.
-    if (rootElement && container === rootElement) {
-      if (BLOCK_TAGS.has(container.tagName.toUpperCase())) {
-        break;
+    // RTL Dominance Rule: In mixed-direction content, we prioritize RTL for the container
+    // to ensure correct punctuation and BiDi flow for translated Persian/Arabic text.
+    // If we've already set this container to RTL, don't let a subsequent LTR node override it.
+    const currentAppliedDir = container.getAttribute('data-translate-dir');
+    if (!(targetDir === 'ltr' && currentAppliedDir === 'rtl')) {
+      
+      // Only apply if different to avoid redundant DOM operations
+      if (container.style.direction !== targetDir) {
+        // Capture alignment BEFORE changing direction
+        const preservedAlign = getPreservedAlignment(container);
+        
+        saveOriginalStyles(container);
+        container.style.direction = targetDir;
+        
+        if (preservedAlign) {
+          container.style.textAlign = preservedAlign;
+        }
+        
+        container.setAttribute('data-translate-dir', targetDir);
       }
-      // If it's inline, we don't break yet, allowing the loop to check the parent in the next iteration.
     }
+
+    // SURGICAL STOP: In Select Element mode, we NEVER apply direction above the 
+    // element explicitly selected by the user. This preserves the page's overall layout.
+    if (rootElement && container === rootElement) break;
     
     container = container.parentElement;
-  }
-
-  if (lastSafeContainer) {
-    if (lastSafeContainer.style.direction !== targetDir) {
-      // Capture alignment BEFORE changing direction
-      const preservedAlign = getPreservedAlignment(lastSafeContainer);
-      
-      saveOriginalStyles(lastSafeContainer);
-      lastSafeContainer.style.direction = targetDir;
-      
-      if (preservedAlign) {
-        lastSafeContainer.style.textAlign = preservedAlign;
-      }
-      
-      lastSafeContainer.setAttribute('data-translate-dir', targetDir);
-    }
   }
 }
 
