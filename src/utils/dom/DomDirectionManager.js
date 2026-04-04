@@ -178,6 +178,13 @@ function saveOriginalStyles(element) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE || element.hasAttribute('data-dir-original-saved')) return;
   element.setAttribute('data-original-direction', element.style.direction || '');
   element.setAttribute('data-original-text-align', element.style.textAlign || '');
+  
+  // Also save original dir attribute if it exists
+  const originalDir = element.getAttribute('dir');
+  if (originalDir !== null) {
+    element.setAttribute('data-original-dir', originalDir);
+  }
+  
   element.setAttribute('data-dir-original-saved', 'true');
 }
 
@@ -270,22 +277,38 @@ export function applyElementDirection(element, targetLanguage) {
  * Primarily used by Page Translation to restore the whole page state.
  */
 export function restoreElementDirection(element) {
-  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
-  const restore = (el) => {
-    if (el.hasAttribute('data-dir-original-saved')) {
-      el.style.direction = el.getAttribute('data-original-direction') || '';
-      el.style.textAlign = el.getAttribute('data-original-text-align') || '';
-      
-      el.removeAttribute('data-original-direction');
-      el.removeAttribute('data-original-text-align');
-      el.removeAttribute('data-dir-original-saved');
-      el.removeAttribute('data-translate-dir');
-      el.removeAttribute('data-page-translated');
-      el.removeAttribute('data-has-original');
-    }
-  };
+   const restore = (el) => {
+     if (el.hasAttribute('data-dir-original-saved')) {
+       // Restore from saved attributes
+       const origDir = el.getAttribute('data-original-direction');
+       const origAlign = el.getAttribute('data-original-text-align');
 
-  restore(element);
-  element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+       if (origDir) el.style.direction = origDir;
+       else el.style.removeProperty('direction');
+
+       if (origAlign) el.style.textAlign = origAlign;
+       else el.style.removeProperty('text-align');
+
+       // Restore dir attribute if we saved it
+       if (el.hasAttribute('data-original-dir')) {
+         el.setAttribute('dir', el.getAttribute('data-original-dir'));
+       } else {
+         el.removeAttribute('dir');
+       }
+
+       // Remove all our tracking attributes
+       el.removeAttribute('data-original-direction');
+       el.removeAttribute('data-original-text-align');
+       el.removeAttribute('data-original-dir');
+       el.removeAttribute('data-dir-original-saved');
+       el.removeAttribute('data-translate-dir');
+       el.removeAttribute('data-page-translated');
+       el.removeAttribute('data-has-original');
+     }
+   };
+
+   restore(element);
+   element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
 }

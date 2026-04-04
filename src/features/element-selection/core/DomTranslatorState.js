@@ -6,6 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import DOMPurify from 'dompurify';
+import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
 
 export const globalSelectElementState = {
   translationHistory: [], // Store all translations for proper revert
@@ -46,11 +47,7 @@ export async function revertSelectElementTranslation() {
       const { 
         element, 
         originalHTML, 
-        originalTextNodesData, 
-        originalDir, 
-        originalStyleDirection,
-        originalTextAlign, 
-        originalDataDir 
+        originalTextNodesData
       } = translation;
 
       // Skip if element no longer exists in DOM
@@ -78,30 +75,20 @@ export async function revertSelectElementTranslation() {
         revertedCount++;
       }
 
-      // 2. Restore root element's own direction and styles
+      // 2. Restore direction and styles for the element AND its ancestors.
+      // This is necessary because applyNodeDirection might have modified parent containers.
       if (element) {
-        // Restore dir attribute
-        if (originalDir !== null && originalDir !== undefined) {
-          element.setAttribute('dir', originalDir);
-        } else {
-          element.removeAttribute('dir');
+        // Clean up the element and its descendants
+        restoreElementDirection(element);
+
+        // Clean up any ancestors that were modified (they will have our data attributes)
+        let parent = element.parentElement;
+        while (parent && parent !== document.body) {
+          if (parent.hasAttribute('data-dir-original-saved')) {
+            restoreElementDirection(parent);
+          }
+          parent = parent.parentElement;
         }
-
-        // Restore CSS direction
-        element.style.direction = originalStyleDirection || '';
-
-        // Restore data-translate-dir
-        if (originalDataDir !== null && originalDataDir !== undefined) {
-          element.setAttribute('data-translate-dir', originalDataDir);
-        } else {
-          element.removeAttribute('data-translate-dir');
-        }
-
-        // Restore text alignment
-        element.style.textAlign = originalTextAlign || '';
-
-        // NOTE: We no longer need to manually clean up children's dir/textAlign
-        // because restoring element.innerHTML already replaced them with their original state.
 
         pageEventBus.emit('hide-translation', { element });
       }
