@@ -25,6 +25,13 @@ export const LAYOUT_DISPLAY_MODES = new Set([
 ]);
 
 /**
+ * Interactive UI elements that should not be flipped as part of a text block
+ */
+export const INTERACTIVE_TAGS = new Set([
+  'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'
+]);
+
+/**
  * Tags that are safe to apply RTL direction without breaking layout
  */
 export const TEXT_TAGS = new Set([

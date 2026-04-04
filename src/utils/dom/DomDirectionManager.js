@@ -2,7 +2,7 @@
  * DomDirectionManager - Shared logic for RTL/LTR direction management.
  */
 
-import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS, LAYOUT_DISPLAY_MODES } from './DomTranslatorConstants.js';
+import { RTL_LANGUAGES, BLOCK_TAGS, LAYOUT_TAGS, FORMATTING_TAGS, LAYOUT_DISPLAY_MODES, INTERACTIVE_TAGS } from './DomTranslatorConstants.js';
 
 // --- 1. Core Utilities (Shared) ---
 
@@ -137,7 +137,7 @@ function isLayoutContainer(el) {
     if (!FORMATTING_TAGS.has(tag) && !BLOCK_TAGS.has(tag)) return true;
     
     // Interactive tags that shouldn't be flipped as part of a text block
-    if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    if (INTERACTIVE_TAGS.has(tag)) return true;
     
     // Recursive check for formatting tags (SPAN, A) to see if they contain icons
     if (FORMATTING_TAGS.has(tag)) {
