@@ -115,57 +115,56 @@ export function detectDirectionFromContent(text = '') {
 /**
  * Identifies structural layout walls (should not be flipped)
  * @param {HTMLElement} el - Element to check
- * @param {HTMLElement} rootElement - Optional root element that should always be allowed
  */
-function isLayoutContainer(el, rootElement = null) {
+function isLayoutContainer(el) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
   
-  // If this is the root element explicitly chosen for translation, 
-  // it should NEVER be considered a layout container that blocks direction application.
-  if (rootElement && el === rootElement) return false;
-
-  // Formatting tags (span, strong, a, etc.) should never be considered 
-  // structural layout containers that block direction application for text.
-  if (FORMATTING_TAGS.has(el.tagName)) return false;
-  
-  // NEVER flip direction for structural elements (defined in LAYOUT_TAGS) 
-  // as it often causes horizontal scroll/overflow or UI disruption.
-  if (LAYOUT_TAGS.has(el.tagName)) return true;
+  // 1. Structural tags (Body, Main, Article) are always layout containers
+  if (LAYOUT_TAGS.has(el.tagName.toUpperCase())) return true;
 
   const style = window.getComputedStyle(el);
   
-  // If it's a layout engine (flex/grid) with multiple children, don't flip it
+  // 2. Any element with a layout-engine display (flex, grid) and multiple children
+  // MUST be treated as a layout container to prevent physical swapping of its items.
   if (LAYOUT_DISPLAY_MODES.has(style.display) && el.children.length > 1) return true;
 
-  // NEW: Detect Mixed Content (Text + Elements). 
-  // If an element contains direct text nodes AND other elements, it's a UI component.
-  // Flipping its direction will swap the relative position of text and icons.
-  const hasDirectText = Array.from(el.childNodes).some(node => 
-    node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
-  );
-  if (hasDirectText && el.children.length > 0) return true;
-
-  // NEW: If an element has multiple children and they act as "items" (not just simple inline text)
-  // we treat it as a layout container to avoid flipping the order of those items.
-  if (el.children.length > 1) {
-    const hasLayoutChildren = Array.from(el.children).some(child => {
-      const childStyle = window.getComputedStyle(child);
-      // Anything that is not purely 'inline' acts as a layout item (inline-block, block, flex, etc.)
-      return childStyle.display !== 'inline';
-    });
+  // Helper to check if a node is a UI/Layout element (non-textual or interactive)
+  const isUIElement = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const tag = node.tagName.toUpperCase();
     
-    if (hasLayoutChildren) return true;
+    // Non-textual tags (SVG, IMG, CANVAS, etc.)
+    if (!FORMATTING_TAGS.has(tag) && !BLOCK_TAGS.has(tag)) return true;
+    
+    // Interactive tags that shouldn't be flipped as part of a text block
+    if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    
+    // Recursive check for formatting tags (SPAN, A) to see if they contain icons
+    if (FORMATTING_TAGS.has(tag)) {
+      return Array.from(node.children).some(isUIElement);
+    }
+    
+    return false;
+  };
+
+  // 3. Mixed Content or UI Components
+  // If ANY child is a UI element (SVG, IMG, etc.), this is a protected UI component.
+  if (el.children.length > 0) {
+    if (Array.from(el.children).some(isUIElement)) return true;
   }
 
-  // If it has explicit width or height, it might be a rigid layout part
+  // 4. Formatting tags (span, strong, a, etc.) are NOT layout containers 
+  if (FORMATTING_TAGS.has(el.tagName.toUpperCase())) return false;
+
+  // 5. Rigid layout parts with explicit dimensions
   if (el.style.width || el.style.height || style.width.includes('px') || style.maxWidth !== 'none') {
-    // Only allow if it's a very small text-centric tag
-    if (!BLOCK_TAGS.has(el.tagName)) return true;
+    if (!BLOCK_TAGS.has(el.tagName.toUpperCase())) return true;
   }
 
   const hasBlockChildren = Array.from(el.children).some(child => {
     const childStyle = window.getComputedStyle(child);
-    return !FORMATTING_TAGS.has(child.tagName) || childStyle.display === 'block' || childStyle.display === 'flex';
+    const tag = child.tagName.toUpperCase();
+    return !FORMATTING_TAGS.has(tag) || childStyle.display === 'block' || childStyle.display === 'flex';
   });
   
   return hasBlockChildren;
@@ -176,7 +175,7 @@ function isLayoutContainer(el, rootElement = null) {
  * Respects existing 'center' or 'justify' alignments.
  */
 function shouldApplyStartAlignment(element) {
-  if (!BLOCK_TAGS.has(element.tagName)) return false;
+  if (!BLOCK_TAGS.has(element.tagName.toUpperCase())) return false;
   
   // Check for legacy align attribute which might not be reflected in computedStyle immediately
   const alignAttr = element.getAttribute('align');
@@ -201,7 +200,7 @@ function shouldApplyStartAlignment(element) {
  * Saves original styles to data-attributes before modification
  */
 function saveOriginalStyles(element) {
-  if (!element || element.hasAttribute('data-dir-original-saved')) return;
+  if (!element || element.nodeType !== Node.ELEMENT_NODE || element.hasAttribute('data-dir-original-saved')) return;
   element.setAttribute('data-original-direction', element.style.direction || '');
   element.setAttribute('data-original-text-align', element.style.textAlign || '');
   element.setAttribute('data-dir-original-saved', 'true');
@@ -221,9 +220,8 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
   let lastSafeContainer = null;
 
   while (container && container !== document.body) {
-    // Pass rootElement to isLayoutContainer to allow bypassing the layout check
-    // IF this container is exactly what the user selected.
-    if (isLayoutContainer(container, rootElement)) break;
+    // We respect isLayoutContainer strictly to ensure we don't flip layouts by accident.
+    if (isLayoutContainer(container)) break;
     
     lastSafeContainer = container;
     if (rootElement && container === rootElement) break;
@@ -251,9 +249,7 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
 export function applyElementDirection(element, targetLanguage) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
-  // IMPORTANT: For the top-level element, we call isLayoutContainer WITHOUT the bypass.
-  // This ensures we don't flip the direction of a large layout/frame even if selected.
-  // The individual text nodes will still be handled by applyNodeDirection above.
+  // Always check for layout container without bypass.
   if (isLayoutContainer(element)) return;
 
   const isTargetRTL = isRTL(targetLanguage);
