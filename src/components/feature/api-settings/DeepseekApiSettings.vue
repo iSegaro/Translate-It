@@ -98,11 +98,13 @@ const deepseekCustomModel = computed({
   }
 })
 
-const deepseekApiModelOptions = ref([
-  { value: 'deepseek-chat', label: 'DeepSeek Chat (V3)' },
-  { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner (R1)' },
-  { value: 'custom', label: 'Custom Model' }
-])
+const deepseekApiModelOptions = computed(() => {
+  const models = settingsStore.settings?.DEEPSEEK_MODELS || CONFIG.DEEPSEEK_MODELS || []
+  return models.map(model => ({
+    value: model.value,
+    label: model.name || model.value
+  }))
+})
 
 // Test keys functionality
 const testingKeys = ref(false)

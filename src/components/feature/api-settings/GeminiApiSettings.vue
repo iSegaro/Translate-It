@@ -115,19 +115,14 @@ const geminiThinking = computed({
   set: (value) => settingsStore.updateSettingLocally('GEMINI_THINKING_ENABLED', value)
 })
 
-// Get model options from CONFIG to maintain consistency
-const geminiModelOptions = ref(
-  CONFIG.GEMINI_MODELS?.map(model => ({
+// Get model options from settingsStore to maintain consistency with migrations
+const geminiModelOptions = computed(() => {
+  const models = settingsStore.settings?.GEMINI_MODELS || CONFIG.GEMINI_MODELS || []
+  return models.map(model => ({
     value: model.value,
-    label: model.name
-  })) || [
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-    { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite' },
-    { value: 'custom', label: 'Custom Model' }
-  ]
-)
+    label: model.name || model.value
+  }))
+})
 
 // Track thinking mode properties for current model
 const isThinkingSupported = ref(false)

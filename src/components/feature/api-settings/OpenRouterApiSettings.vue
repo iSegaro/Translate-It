@@ -98,22 +98,13 @@ const openrouterCustomModel = computed({
   }
 })
 
-const openrouterApiModelOptions = ref([
-  { value: 'openai/gpt-5', label: 'GPT-5' },
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
-  { value: 'openai/gpt-5-nano', label: 'GPT-5 Nano' },
-  { value: 'openai/gpt-4o', label: 'OpenAI GPT-4o' },
-  { value: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o Mini' },
-  { value: 'openai/gpt-4.1', label: 'OpenAI GPT-4.1' },
-  { value: 'openai/gpt-4.1-mini', label: 'OpenAI GPT-4.1 Mini' },
-  { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
-  { value: 'anthropic/claude-3.5-haiku', label: 'Claude 3.5 Haiku' },
-  { value: 'google/gemini-2.5-pro', label: 'Google Gemini 2.5 Pro' },
-  { value: 'google/gemini-2.5-flash', label: 'Google Gemini 2.5 Flash' },
-  { value: 'meta-llama/llama-3.3-70b-instruct', label: 'Meta Llama 3.3 70B' },
-  { value: 'mistralai/mistral-large', label: 'Mistral Large' },
-  { value: 'custom', label: 'Custom Model' }
-])
+const openrouterApiModelOptions = computed(() => {
+  const models = settingsStore.settings?.OPENROUTER_MODELS || CONFIG.OPENROUTER_MODELS || []
+  return models.map(model => ({
+    value: model.value,
+    label: model.name || model.value
+  }))
+})
 
 // Test keys functionality
 const testingKeys = ref(false)
