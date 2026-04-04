@@ -50,66 +50,14 @@ try {
       });
     }
 
-    // When the active tab changes, deactivate select mode for the previously active tab
+    // When the active tab changes, update the last active tab ID
     if (browser.tabs.onActivated) {
-      browser.tabs.onActivated.addListener(async (activeInfo) => {
-        try {
-          const newTabId = activeInfo.tabId;
-          // If previous tab had active select mode, deactivate it
-          if (_lastActiveTabId && _lastActiveTabId !== newTabId) {
-            const prevState = selectElementStateByTab.get(_lastActiveTabId);
-            if (prevState && prevState.active) {
-              // notify content script in that tab to deactivate
-              try {
-                const message = MessageFormat.create(
-                  MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                  {},
-                  MessagingContexts.BACKGROUND
-                );
-                await browser.tabs.sendMessage(_lastActiveTabId, message);
-              } catch {
-                // ignore if sendMessage fails
-              }
-              // clear in-memory state
-              setStateForTab(_lastActiveTabId, false);
-            }
-          }
-        } catch {
-          // ignore
-        } finally {
-          _lastActiveTabId = activeInfo.tabId;
-        }
+      browser.tabs.onActivated.addListener((activeInfo) => {
+        _lastActiveTabId = activeInfo.tabId;
       });
     }
 
-    // When window focus changes, only clear active selections when the window truly lost focus
-    // (windowId === -1) to avoid deactivating when the user interacts with extension UI
-    if (browser.windows && browser.windows.onFocusChanged) {
-      browser.windows.onFocusChanged.addListener(async (windowId) => {
-        try {
-          // Only deactivate when there is no focused window (user switched away from browser)
-          if (windowId === -1) {
-            for (const [tabId, state] of selectElementStateByTab.entries()) {
-              if (state && state.active) {
-                try {
-                  const message = MessageFormat.create(
-                    MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                    {},
-                    MessagingContexts.BACKGROUND
-                  );
-                  await browser.tabs.sendMessage(Number(tabId), message);
-                } catch {
-                  // ignore
-                }
-                setStateForTab(Number(tabId), false);
-              }
-            }
-          }
-        } catch {
-          // ignore
-        }
-      });
-    }
+    // Window focus changes no longer deactivate Select Element mode
   }
 } catch {
   // ignore in environments without tabs/windows
