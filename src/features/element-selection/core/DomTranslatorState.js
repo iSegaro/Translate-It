@@ -75,20 +75,10 @@ export async function revertSelectElementTranslation() {
         revertedCount++;
       }
 
-      // 2. Restore direction and styles for the element AND its ancestors.
-      // This is necessary because applyNodeDirection might have modified parent containers.
+      // 2. Restore direction and styles for the element, its descendants, and its ancestors.
       if (element) {
-        // Clean up the element and its descendants
+        // This function now recursively cleans ancestors up to the body
         restoreElementDirection(element);
-
-        // Clean up any ancestors that were modified (they will have our data attributes)
-        let parent = element.parentElement;
-        while (parent && parent !== document.body) {
-          if (parent.hasAttribute('data-dir-original-saved')) {
-            restoreElementDirection(parent);
-          }
-          parent = parent.parentElement;
-        }
 
         pageEventBus.emit('hide-translation', { element });
       }

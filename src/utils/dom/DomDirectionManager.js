@@ -297,38 +297,45 @@ export function applyElementDirection(element, targetLanguage) {
  * Primarily used by Page Translation to restore the whole page state.
  */
 export function restoreElementDirection(element) {
-   if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
 
-   const restore = (el) => {
-     if (el.hasAttribute('data-dir-original-saved')) {
-       // Restore from saved attributes
-       const origDir = el.getAttribute('data-original-direction');
-       const origAlign = el.getAttribute('data-original-text-align');
+  const restore = (el) => {
+    if (el.hasAttribute('data-dir-original-saved')) {
+      const origDir = el.getAttribute('data-original-direction');
+      const origAlign = el.getAttribute('data-original-text-align');
 
-       if (origDir) el.style.direction = origDir;
-       else el.style.removeProperty('direction');
+      if (origDir) el.style.direction = origDir;
+      else el.style.removeProperty('direction');
 
-       if (origAlign) el.style.textAlign = origAlign;
-       else el.style.removeProperty('text-align');
+      if (origAlign) el.style.textAlign = origAlign;
+      else el.style.removeProperty('text-align');
 
-       // Restore dir attribute if we saved it
-       if (el.hasAttribute('data-original-dir')) {
-         el.setAttribute('dir', el.getAttribute('data-original-dir'));
-       } else {
-         el.removeAttribute('dir');
-       }
+      if (el.hasAttribute('data-original-dir')) {
+        el.setAttribute('dir', el.getAttribute('data-original-dir'));
+      } else {
+        el.removeAttribute('dir');
+      }
 
-       // Remove all our tracking attributes
-       el.removeAttribute('data-original-direction');
-       el.removeAttribute('data-original-text-align');
-       el.removeAttribute('data-original-dir');
-       el.removeAttribute('data-dir-original-saved');
-       el.removeAttribute('data-translate-dir');
-       el.removeAttribute('data-page-translated');
-       el.removeAttribute('data-has-original');
-     }
-   };
+      el.removeAttribute('data-original-direction');
+      el.removeAttribute('data-original-text-align');
+      el.removeAttribute('data-original-dir');
+      el.removeAttribute('data-dir-original-saved');
+      el.removeAttribute('data-translate-dir');
+      el.removeAttribute('data-page-translated');
+      el.removeAttribute('data-has-original');
+    }
+  };
 
-   restore(element);
-   element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  // 1. Clean the element itself
+  restore(element);
+  
+  // 2. Clean all its descendants
+  element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
+  
+  // 3. Clean all its ancestors up to the body
+  let parent = element.parentElement;
+  while (parent && parent !== document.body) {
+    restore(parent);
+    parent = parent.parentElement;
+  }
 }
