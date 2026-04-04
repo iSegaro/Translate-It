@@ -151,7 +151,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
 
                   // Apply translation while preserving full whitespace structure
-                  textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
+                  const isRTL = DirectionManager.isRTL(effectiveTargetLanguage);
+                  const bidiMark = isRTL ? DirectionManager.BIDI_MARKS.RLM : '';
+                  textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
 
                   // Apply native auto-direction to parent only once per node
                   // Pass 'element' as the root to ensure the container direction is set early
@@ -334,13 +336,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
           const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
 
           // Apply translation while preserving full whitespace structure
-          textNode.nodeValue = leadingWhitespace + translatedText + trailingWhitespace;
+          const isRTL = DirectionManager.isRTL(finalTarget);
+          const bidiMark = isRTL ? DirectionManager.BIDI_MARKS.RLM : '';
+          textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + trailingWhitespace;
           
           DirectionManager.applyNodeDirection(textNode, finalTarget, element);
         }
       });
     }
 
+    // Apply overall direction only if it doesn't break layout
     DirectionManager.applyElementDirection(element, finalTarget);
 
     // Update target language and mark as no longer partial

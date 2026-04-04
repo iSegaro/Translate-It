@@ -114,15 +114,22 @@ export function detectDirectionFromContent(text = '') {
 
 /**
  * Identifies structural layout walls (should not be flipped)
+ * @param {HTMLElement} el - Element to check
+ * @param {HTMLElement} rootElement - Optional root element that should always be allowed
  */
-function isLayoutContainer(el) {
+function isLayoutContainer(el, rootElement = null) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
   
-  // NEVER flip direction for the root structural elements as it often causes horizontal scroll/overflow
-  if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN' || el.tagName === 'ARTICLE' || el.tagName === 'SECTION') {
-    return true;
-  }
+  // If this is the root element explicitly chosen for translation, 
+  // it should NEVER be considered a layout container that blocks direction application.
+  if (rootElement && el === rootElement) return false;
+
+  // Formatting tags (span, strong, a, etc.) should never be considered 
+  // structural layout containers that block direction application for text.
+  if (FORMATTING_TAGS.has(el.tagName)) return false;
   
+  // NEVER flip direction for structural elements (defined in LAYOUT_TAGS) 
+  // as it often causes horizontal scroll/overflow or UI disruption.
   if (LAYOUT_TAGS.has(el.tagName)) return true;
 
   const style = window.getComputedStyle(el);
@@ -152,12 +159,21 @@ function isLayoutContainer(el) {
 function shouldApplyStartAlignment(element) {
   if (!BLOCK_TAGS.has(element.tagName)) return false;
   
+  // Check for legacy align attribute which might not be reflected in computedStyle immediately
+  const alignAttr = element.getAttribute('align');
+  if (alignAttr === 'center' || alignAttr === 'justify') return false;
+
   const computedStyle = window.getComputedStyle(element);
   const textAlign = computedStyle.textAlign;
   
   // If the element is already centered or justified, keep it that way.
-  // These are positional intents that should persist across languages.
-  return textAlign !== 'center' && textAlign !== 'justify';
+  // We also check for vendor-specific center values.
+  return (
+    textAlign !== 'center' && 
+    textAlign !== 'justify' && 
+    textAlign !== '-webkit-center' && 
+    textAlign !== '-moz-center'
+  );
 }
 
 // --- 2. State Management (Internal) ---
@@ -186,9 +202,12 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
   let lastSafeContainer = null;
 
   while (container && container !== document.body) {
-    if (isLayoutContainer(container)) break;
+    // Pass rootElement to isLayoutContainer to allow bypassing the layout check
+    // IF this container is exactly what the user selected.
+    if (isLayoutContainer(container, rootElement)) break;
+    
     lastSafeContainer = container;
-    if (container === rootElement) break;
+    if (rootElement && container === rootElement) break;
     container = container.parentElement;
   }
 
@@ -211,7 +230,12 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
  * Primarily used by Select Element for high-level container management.
  */
 export function applyElementDirection(element, targetLanguage) {
-  if (!element || element.nodeType !== Node.ELEMENT_NODE || isLayoutContainer(element)) return;
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+
+  // IMPORTANT: For the top-level element, we call isLayoutContainer WITHOUT the bypass.
+  // This ensures we don't flip the direction of a large layout/frame even if selected.
+  // The individual text nodes will still be handled by applyNodeDirection above.
+  if (isLayoutContainer(element)) return;
 
   const isTargetRTL = isRTL(targetLanguage);
   const directionAttr = isTargetRTL ? 'rtl' : 'ltr';

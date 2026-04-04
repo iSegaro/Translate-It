@@ -14,7 +14,7 @@ export const RTL_LANGUAGES = new Set([
  * to avoid flipping the entire page UI (like sidebars, avatars, etc.)
  */
 export const LAYOUT_TAGS = new Set([
-  'ARTICLE', 'SECTION', 'NAV', 'ASIDE', 'MAIN', 'HEADER', 'FOOTER', 'FORM', 'TABLE', 'UL', 'OL', 'DETAILS'
+  'HTML', 'BODY', 'ARTICLE', 'SECTION', 'NAV', 'ASIDE', 'MAIN', 'HEADER', 'FOOTER', 'FORM', 'TABLE', 'UL', 'OL', 'DETAILS'
 ]);
 
 /**
