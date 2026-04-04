@@ -229,6 +229,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import useSettingsStore from '@/features/settings/stores/settings.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -379,7 +380,11 @@ const menuItems = computed(() => {
       try {
         await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
       } catch (err) {
-        logger.error('Failed to trigger select element from FAB:', err);
+        if (ExtensionContextManager.isContextError(err)) {
+          ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
+        } else {
+          logger.error('Failed to trigger select element from FAB:', err);
+        }
       }
     }
   });
@@ -585,7 +590,11 @@ const handleOpenSettings = async () => {
     await sendMessage({ action: MessageActions.OPEN_OPTIONS_PAGE });
     isMenuOpen.value = false;
   } catch (err) {
-    logger.error('Failed to open settings from FAB:', err);
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'desktop-fab:open-settings');
+    } else {
+      logger.error('Failed to open settings from FAB:', err);
+    }
   }
 };
 
@@ -595,7 +604,11 @@ const handleRevert = async () => {
     mobileStore.setHasElementTranslations(false);
     await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
   } catch (err) {
-    logger.error('Failed to revert translations from FAB:', err);
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'desktop-fab:revert');
+    } else {
+      logger.error('Failed to revert translations from FAB:', err);
+    }
   }
 };
 

@@ -14,7 +14,7 @@ To prevent "Log Storms" and redundant red logs, the system follows a strict prop
 
 *   **Error Identity Preservation**: Never throw raw strings. Always throw `new Error()` or structured objects. Preserve `originalError`, `type`, and `statusCode`.
 *   **Single Red Log Policy**: Only `ErrorHandler.handle()` should produce a red log. All intermediate layers must use `warn` or `debug`.
-*   **Context Awareness**: Use `ExtensionContextManager` to silence noise from reloaded/invalidated tabs.
+*   **Context Awareness**: Use `ExtensionContextManager` to silence noise from reloaded/invalidated tabs and handle cross-platform differences.
 
 ---
 
@@ -38,14 +38,32 @@ try {
 ```
 
 ### 2. ExtensionContextManager
-Before performing cross-context operations, validate the context. If an error occurs, use the manager to get human-readable reasons.
+The `ExtensionContextManager` provides automatic protection against "Extension Context Invalidated" errors and ensures the UI remains stable after an update.
+
+#### A. Environment Auto-Detection
+The system identifies the current context via `getActiveEnvironment()`:
+- Supports `BACKGROUND`, `CONTENT`, `POPUP`, `SIDEPANEL`, `OPTIONS`, `OFFSCREEN`.
+- Automatically handles protocol differences for **Chrome, Firefox, Safari, and Edge**.
+
+#### B. Safe Asset Loading
+**Mandatory**: Use `safeGetURL(path)` instead of `browser.runtime.getURL(path)`.
+- **Problem**: Calling the native API after an update returns "invalid" or causes "Denying load" red errors.
+- **Solution**: `safeGetURL` detects context death and returns a **Base64 Fallback Icon** to prevent broken images and 404 network errors.
+
+#### C. Automated User Notifications
+`handleContextError(error, context)` automatically notifies the user based on the environment:
+- **In Content**: Shows a localized Toast Notification.
+- **In Background**: Shows a native System Notification (using `browser.notifications`).
+- **Deduplication**: Implements a 7.5s cooldown to prevent spamming the user if multiple components fail at once.
 
 ```javascript
 if (ExtensionContextManager.isContextError(error)) {
-  const userFriendlyMsg = ExtensionContextManager.getContextErrorMessage(error.type);
-  // "Extension was reloaded. Please refresh the page."
+  // This will log as DEBUG and show appropriate UI/System feedback
+  ExtensionContextManager.handleContextError(error, 'module:action');
 }
 ```
+
+---
 
 ## Maintenance & Extension (How-to)
 
@@ -68,12 +86,12 @@ To add a new error pattern (e.g., from a new Provider like Anthropic):
 
 | File | Responsibility |
 | --- | --- |
-| `ErrorTypes.js` | Constants (e.g., `INSUFFICIENT_BALANCE`, `QUOTA_EXCEEDED`). |
+| `ErrorTypes.js` | Global error constants (e.g., `QUOTA_EXCEEDED`). |
 | `ErrorMatcher.js` | **SSOT** for mapping raw errors to Types and classifying them (Fatal, Silent). |
 | `ErrorDisplayStrategies.js` | Decides: Toast vs UI? Severity level? Retry allowed? |
 | `ErrorMessages.js` | **Localization (i18n)**. Repository for multi-language error messages. |
-| `ErrorHandler.js` | **Logic Controller**. Coordinates Matcher, Strategy, and Messages to deliver final UI output (Toasts, Alerts, Logs). |
-| `ExtensionContextManager.js` | Logic for handling `extension context invalidated` and `message channel closed`. |
+| `ErrorHandler.js` | **Logic Controller**. Coordinates Matcher, Strategy, and Messages to deliver final UI output. |
+| `ExtensionContextManager.js` | **Context Shield**. Handles reloads, environment detection, and asset safety. |
 
 ---
 
@@ -93,4 +111,3 @@ setup() {
 ```
 
 **Last Updated**: April 2026
-

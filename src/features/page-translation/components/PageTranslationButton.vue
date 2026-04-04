@@ -51,7 +51,7 @@
           />
           <img
             v-if="compact"
-            :src="browser.runtime.getURL('icons/ui/whole-page.png')"
+            :src="ExtensionContextManager.safeGetURL('icons/ui/whole-page.png')"
             class="toolbar-icon"
             alt="Translate"
           >
@@ -107,7 +107,7 @@
 
         <img
           v-if="compact && !isTranslating && !isAutoTranslating"
-          :src="browser.runtime.getURL('icons/ui/whole-page.png')"
+          :src="ExtensionContextManager.safeGetURL('icons/ui/whole-page.png')"
           class="toolbar-icon"
           alt="Stop"
         >
@@ -154,7 +154,7 @@
             class="ti-btn-status-badge"
           />
           <img
-            :src="browser.runtime.getURL('icons/ui/restore.png')"
+            :src="ExtensionContextManager.safeGetURL('icons/ui/restore.png')"
             :class="compact ? 'toolbar-icon' : 'ti-btn__icon'"
             alt="Restore"
           >
@@ -182,6 +182,7 @@ import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import browser from 'webextension-polyfill';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const props = defineProps({
   compact: {

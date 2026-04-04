@@ -7,6 +7,7 @@ import { ref, reactive, onMounted, onUnmounted, watch } from "vue";
 import { storageCore } from "../core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'useStorage');
 
@@ -52,8 +53,12 @@ export function useStorage(keys = null, options = {}) {
 
       logger.debug(`[useStorage] Loaded ${Object.keys(result).length} key(s)`);
     } catch (err) {
-      error.value = err.message;
-      logger.error("[useStorage] Load failed:", err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, 'useStorage-load');
+      } else {
+        error.value = err.message;
+        logger.error("[useStorage] Load failed:", err);
+      }
     } finally {
       isLoading.value = false;
     }
@@ -82,8 +87,12 @@ export function useStorage(keys = null, options = {}) {
 
       logger.debug(`[useStorage] Saved ${Object.keys(dataToSave).length} key(s)`);
     } catch (err) {
-      error.value = err.message;
-      logger.error("[useStorage] Save failed:", err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, 'useStorage-save');
+      } else {
+        error.value = err.message;
+        logger.error("[useStorage] Save failed:", err);
+      }
       throw err;
     } finally {
       isLoading.value = false;
@@ -115,8 +124,12 @@ export function useStorage(keys = null, options = {}) {
 
       logger.debug(`[useStorage] Removed ${keyList.length} key(s)`);
     } catch (err) {
-      error.value = err.message;
-      logger.error("[useStorage] Remove failed:", err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, 'useStorage-remove');
+      } else {
+        error.value = err.message;
+        logger.error("[useStorage] Remove failed:", err);
+      }
       throw err;
     } finally {
       isLoading.value = false;
@@ -235,8 +248,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       const result = await storageCore.get({ [key]: defaultValue }, useCache);
       value.value = result[key];
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-load-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      }
     } finally {
       isLoading.value = false;
     }
@@ -253,8 +270,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       await storageCore.set({ [key]: newValue });
       value.value = newValue;
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-save-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      }
       throw err;
     } finally {
       isLoading.value = false;
@@ -272,8 +293,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
       await storageCore.remove(key);
       value.value = defaultValue;
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-remove-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      }
       throw err;
     } finally {
       isLoading.value = false;

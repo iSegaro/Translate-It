@@ -40,6 +40,7 @@
 <script setup>
 import { computed } from 'vue'
 import browser from 'webextension-polyfill'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Props
 const props = defineProps({
@@ -89,22 +90,14 @@ const iconSrc = computed(() => {
     return props.icon
   }
 
-  // Use runtime.getURL for extension icons
-  if (browser && browser.runtime && browser.runtime.getURL) {
-    if (props.icon.includes('/')) {
-      // Provider icons like "providers/google.svg"
-      return browser.runtime.getURL(`icons/${props.icon}`)
-    } else {
-      // UI icons like "side-panel.png"
-      return browser.runtime.getURL(`icons/ui/${props.icon}`)
-    }
-  }
-
-  // Fallback for when runtime API is not available
+  // Use ExtensionContextManager.safeGetURL for extension icons
+  // to avoid context invalidation errors during render
   if (props.icon.includes('/')) {
-    return `/assets/icons/${props.icon}`
+    // Provider icons like "providers/google.svg"
+    return ExtensionContextManager.safeGetURL(`icons/${props.icon}`, `/assets/icons/${props.icon}`)
   } else {
-    return `/assets/icons/ui/${props.icon}`
+    // UI icons like "side-panel.png"
+    return ExtensionContextManager.safeGetURL(`icons/ui/${props.icon}`, `/assets/icons/ui/${props.icon}`)
   }
 })
 

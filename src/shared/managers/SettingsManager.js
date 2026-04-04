@@ -9,6 +9,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import browser from 'webextension-polyfill'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
@@ -104,7 +105,11 @@ class SettingsManager {
           this._settings.value = { ...this._defaults, ...settings }
           logger.debug('Settings loaded from storage in fallback mode')
         } catch (error) {
-          logger.error('Failed to load settings from storage:', error)
+          if (ExtensionContextManager.isContextError(error)) {
+            ExtensionContextManager.handleContextError(error, 'settings-manager-fallback-load');
+          } else {
+            logger.error('Failed to load settings from storage:', error)
+          }
           this._settings.value = { ...this._defaults }
         }
 
@@ -130,7 +135,11 @@ class SettingsManager {
           const settings = await storageManager.get(Object.keys(this._defaults))
           this._settings.value = { ...this._defaults, ...settings }
         } catch (error) {
-          logger.error('Failed to load settings from storage:', error)
+          if (ExtensionContextManager.isContextError(error)) {
+            ExtensionContextManager.handleContextError(error, 'settings-manager-no-store-load');
+          } else {
+            logger.error('Failed to load settings from storage:', error)
+          }
           this._settings.value = { ...this._defaults }
         }
 
@@ -154,7 +163,11 @@ class SettingsManager {
 
       return this
     } catch (error) {
-      logger.error('Failed to initialize SettingsManager:', error)
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-manager-init');
+      } else {
+        logger.error('Failed to initialize SettingsManager:', error)
+      }
       // Use fallback mode on error
       this._fallbackMode = true
 
@@ -163,7 +176,11 @@ class SettingsManager {
         const settings = await storageManager.get(Object.keys(this._defaults))
         this._settings.value = { ...this._defaults, ...settings }
       } catch (storageError) {
-        logger.error('Failed to load settings from storage in fallback:', storageError)
+        if (ExtensionContextManager.isContextError(storageError)) {
+          ExtensionContextManager.handleContextError(storageError, 'settings-manager-fallback-init-load');
+        } else {
+          logger.error('Failed to load settings from storage in fallback:', storageError)
+        }
         this._settings.value = { ...this._defaults }
       }
 
@@ -186,7 +203,11 @@ class SettingsManager {
       logger.debug(`Cache warmed up with ${keys.length} keys`);
       return this;
     } catch (error) {
-      logger.error('Failed to warmup SettingsManager:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-manager-warmup');
+      } else {
+        logger.error('Failed to warmup SettingsManager:', error);
+      }
       return this;
     }
   }
@@ -264,7 +285,11 @@ class SettingsManager {
         logger.debug(`Setting updated (fallback mode): ${key} =`, value)
         return
       } catch (error) {
-        logger.error('Failed to update setting in fallback mode:', error)
+        if (ExtensionContextManager.isContextError(error)) {
+          ExtensionContextManager.handleContextError(error, `settings-manager-set-fallback-${key}`);
+        } else {
+          logger.error('Failed to update setting in fallback mode:', error)
+        }
         throw error
       }
     }
@@ -554,7 +579,11 @@ class SettingsManager {
 
       logger.debug('Settings refreshed manually')
     } catch (error) {
-      logger.error('Error manually refreshing settings:', error)
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-manager-refresh');
+      } else {
+        logger.error('Error manually refreshing settings:', error)
+      }
     }
   }
 
@@ -583,7 +612,11 @@ class SettingsManager {
             logger.error(`Invalid callback for ${key}:`, typeof listener.callback, listener)
           }
         } catch (error) {
-          logger.error(`Error in settings listener for ${key}:`, error)
+          if (ExtensionContextManager.isContextError(error)) {
+            ExtensionContextManager.handleContextError(error, `settings-manager-emit-${key}`);
+          } else {
+            logger.error(`Error in settings listener for ${key}:`, error)
+          }
         }
       }
     }

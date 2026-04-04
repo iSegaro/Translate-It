@@ -6,6 +6,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -168,7 +169,11 @@ export const useSettingsStore = defineStore('settings', () => {
         
         return current;
       } catch (error) {
-        logger.error('Failed to load settings:', error);
+        if (ExtensionContextManager.isContextError(error)) {
+          ExtensionContextManager.handleContextError(error, 'settings-store-load');
+        } else {
+          logger.error('Failed to load settings:', error);
+        }
         throw error;
       } finally {
         isLoading.value = false;
@@ -218,7 +223,11 @@ export const useSettingsStore = defineStore('settings', () => {
       await storageManager.set(settings.value);
       return true;
     } catch (error) {
-      logger.error('Failed to save all settings:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-save');
+      } else {
+        logger.error('Failed to save all settings:', error);
+      }
       throw error;
     } finally {
       isSaving.value = false;
@@ -237,7 +246,11 @@ export const useSettingsStore = defineStore('settings', () => {
       await storageManager.set({ [key]: value }) // Persist immediately
       return true
     } catch (error) {
-      logger.error(`Failed to update and persist setting ${key}:`, error)
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, `settings-store-update-${key}`);
+      } else {
+        logger.error(`Failed to update and persist setting ${key}:`, error);
+      }
       throw error
     }
   }
@@ -252,7 +265,11 @@ export const useSettingsStore = defineStore('settings', () => {
       
       return true
     } catch (error) {
-      logger.error('Failed to update multiple settings:', error)
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-update-multiple');
+      } else {
+        logger.error('Failed to update multiple settings:', error);
+      }
       throw error
     }
   }
@@ -267,7 +284,11 @@ export const useSettingsStore = defineStore('settings', () => {
       await saveAllSettings(true);
       return true;
     } catch (error) {
-      logger.error('Failed to reset settings:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-reset');
+      } else {
+        logger.error('Failed to reset settings:', error);
+      }
       throw error;
     }
   }
@@ -298,7 +319,11 @@ export const useSettingsStore = defineStore('settings', () => {
         _version: version
       };
     } catch (error) {
-      logger.error('Failed to export settings:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-export');
+      } else {
+        logger.error('Failed to export settings:', error);
+      }
       throw error;
     }
   }
@@ -363,7 +388,11 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       return true;
     } catch (error) {
-      logger.error('[Import] Failed:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-import');
+      } else {
+        logger.error('[Import] Failed:', error);
+      }
       // Re-setup storage listener on error
       await setupStorageListener();
       throw error;
@@ -474,7 +503,11 @@ export const useSettingsStore = defineStore('settings', () => {
       storageListener = null;
   if (settings.value.DEBUG_MODE) logger.info('[SettingsStore] Listener cleaned up');
     } catch (error) {
-      logger.error('[SettingsStore] Error cleaning up storage listener:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-store-cleanup');
+      } else {
+        logger.error('[SettingsStore] Error cleaning up storage listener:', error);
+      }
     }
   }
 

@@ -7,6 +7,7 @@ import { ref, watch, onMounted, onUnmounted } from "vue";
 import { storageCore } from "../core/StorageCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'useStorageItem');
 
@@ -57,8 +58,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
 
       logger.debug(`[useStorageItem] Loaded '${key}':`, result[key]);
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-load-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Load failed for key '${key}':`, err);
+      }
     } finally {
       isLoading.value = false;
     }
@@ -85,8 +90,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
 
       logger.debug(`[useStorageItem] Saved '${key}':`, newValue);
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-save-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Save failed for key '${key}':`, err);
+      }
       throw err;
     } finally {
       isSaving.value = false;
@@ -114,8 +123,12 @@ export function useStorageItem(key, defaultValue = null, options = {}) {
 
       logger.debug(`[useStorageItem] Removed '${key}'`);
     } catch (err) {
-      error.value = err.message;
-      logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      if (ExtensionContextManager.isContextError(err)) {
+        ExtensionContextManager.handleContextError(err, `useStorageItem-remove-${key}`);
+      } else {
+        error.value = err.message;
+        logger.error(`[useStorageItem] Remove failed for key '${key}':`, err);
+      }
       throw err;
     } finally {
       isSaving.value = false;

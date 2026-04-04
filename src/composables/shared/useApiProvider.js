@@ -6,6 +6,7 @@ import { ProviderRegistryIds } from "@/features/translation/providers/ProviderCo
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useApiProvider');
 
@@ -21,14 +22,14 @@ export function useApiProvider() {
 
   const currentProviderData = computed(() => getProviderById(currentProvider.value));
   const currentProviderIcon = computed(() => {
-    if (!browser || !browser.runtime || !browser.runtime.getURL) return ""
-    if (!currentProviderData.value) return browser.runtime.getURL('icons/providers/google.svg')
+    const fallback = 'icons/providers/google.svg';
+    if (!currentProviderData.value) return ExtensionContextManager.safeGetURL(fallback)
     const iconPath = currentProviderData.value.icon
-    if (!iconPath) return browser.runtime.getURL('icons/providers/google.svg')
+    if (!iconPath) return ExtensionContextManager.safeGetURL(fallback)
     if (iconPath.includes('/')) {
-      return browser.runtime.getURL(`icons/${iconPath}`)
+      return ExtensionContextManager.safeGetURL(`icons/${iconPath}`, fallback)
     }
-    return browser.runtime.getURL(`icons/providers/${iconPath}`)
+    return ExtensionContextManager.safeGetURL(`icons/providers/${iconPath}`, fallback)
   });
   const currentProviderName = computed(() => currentProviderData.value?.name || "Translation Provider");
 
@@ -87,7 +88,11 @@ export function useApiProvider() {
       isDropdownOpen.value = false;
       return true;
     } catch (error) {
-      logger.error('Failed to change provider:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'api-provider:select');
+      } else {
+        logger.error('Failed to change provider:', error);
+      }
       providerError.value = "Failed to change provider";
       return false;
     } finally {
@@ -96,8 +101,7 @@ export function useApiProvider() {
   };
 
   const getProviderIconUrl = (iconPath) => {
-      if (!browser || !browser.runtime || !browser.runtime.getURL) return "";
-      return browser.runtime.getURL(iconPath);
+    return ExtensionContextManager.safeGetURL(iconPath, 'icons/providers/google.svg');
   }
 
   const createProviderItems = async () => {

@@ -21,6 +21,7 @@ import {
 
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
@@ -185,6 +186,12 @@ export class PageTranslationManager extends ResourceTracker {
     bus.on('page-translation-internal-error', (data) => {
       if (data.isFatal) {
         // Fatal errors are already handled via 'page-translation-fatal-error' listener
+        return;
+      }
+
+      // Check if this error is related to extension context invalidation
+      if (ExtensionContextManager.isContextError(data.error)) {
+        // Context errors are handled by their origin or the fatal-error handler
         return;
       }
 
@@ -458,30 +465,54 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.isFatalErrorHandling) return;
     this.isFatalErrorHandling = true;
 
-    this.logger.warn('Fatal error. Stopping page translation.', error.message);
-    
+    const isContextError = ExtensionContextManager.isContextError(error);
+
+    // Use centralized context error detection to avoid orange/red logs
+    if (isContextError) {
+      ExtensionContextManager.handleContextError(error, 'page-translation-fatal');
+    } else {
+      this.logger.warn('Fatal error. Stopping page translation.', error.message);
+    }
+
+    // IMPORTANT: Even for context errors, we must force-reset internal flags 
+    // to ensure the UI (which lives in the same page) doesn't get stuck.
+    this.isTranslating = false;
+    this.isAutoTranslating = false;
+    this.isFatalErrorHandling = false;
+
     // Check if cancellation is already handled to avoid loop
     if (!this._isCancelling) {
       this.cancelTranslation();
     }
-    
+
     // Use centralized ErrorHandler to manage notification and logging
-    // It will automatically handle silent errors (like EXTENSION_CONTEXT_INVALIDATED)
     ErrorHandler.getInstance().handle(error, {
       type: errorType || ErrorTypes.TRANSLATION_FAILED,
       context: 'page-translation-fatal',
-      showToast: true // ErrorHandler will still respect SILENT_ERRORS from ErrorMatcher
+      showToast: !isContextError // Don't show toast for context errors
     }).catch(err => {
       this.logger.error('ErrorHandler failed in _handleFatalError:', err);
     });
 
-    this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, { 
-      error: localizedMessage || error.message || String(error), 
-      errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
-      isFatal: true 
-    });
+    // Don't broadcast UI error for context errors to keep it silent
+    if (!isContextError) {
+      this._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
+        error: localizedMessage || error.message || String(error),
+        errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
+        isFatal: true
+      });
+    } else {
+      // For context errors, we still need to broadcast a local state update 
+      // via PageEventBus to ensure local UI components (like FAB) exit the "Translating" state.
+      // This is crucial because sendMessage (inside _broadcastEvent) will fail.
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+        status: 'idle',
+        isTranslating: false,
+        percent: 0,
+        isInternal: true
+      });
+    }
   }
-
   async _loadSettings(options = {}) {
     // Load all settings in parallel to eliminate sequential await delays
     const [

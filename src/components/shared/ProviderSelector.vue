@@ -429,6 +429,7 @@ import { getProvidersForDropdown, getProviderById } from '@/core/provider-regist
 import IconButton from './IconButton.vue'
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
+import ExtensionContextManager from '@/core/extensionContext.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
@@ -622,18 +623,20 @@ const getEffectiveProviderId = (type) => {
 
 // Methods
 const getProviderIcon = (iconPath) => {
-  // Use runtime.getURL for extension icons
-  if (!browser || !browser.runtime || !browser.runtime.getURL) return '/icons/providers/google.svg'
-
-  if (!iconPath) return browser.runtime.getURL('icons/providers/google.svg')
+  const fallback = 'icons/providers/google.svg';
+  
+  if (!iconPath) return ExtensionContextManager.safeGetURL(fallback);
+  
   if (iconPath.startsWith('@/assets/')) {
     const cleanPath = iconPath.replace('@/assets/', 'icons/')
-    return browser.runtime.getURL(cleanPath)
+    return ExtensionContextManager.safeGetURL(cleanPath, fallback)
   }
+  
   if (iconPath.includes('/')) {
-    return browser.runtime.getURL(`icons/${iconPath}`)
+    return ExtensionContextManager.safeGetURL(`icons/${iconPath}`, fallback)
   }
-  return browser.runtime.getURL(`icons/providers/${iconPath}`)
+  
+  return ExtensionContextManager.safeGetURL(`icons/providers/${iconPath}`, fallback)
 }
 
 const getEffectiveIcon = (type) => {

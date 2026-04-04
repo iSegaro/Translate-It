@@ -250,7 +250,17 @@ export class PageTranslationScheduler extends ResourceTracker {
         }
 
         if (!result?.success) {
-          await this._handleBatchError(new Error(result?.error || 'Batch translation failed'), currentBatch);
+          // Check if failure is due to invalidated context to preserve original error
+          let batchError;
+          const rawErrorMessage = result?.error || '';
+          
+          if ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage)) {
+            batchError = new Error(rawErrorMessage || 'Extension context invalidated');
+          } else {
+            batchError = new Error(rawErrorMessage || 'Batch translation failed');
+          }
+
+          await this._handleBatchError(batchError, currentBatch);
           // Stop processing more batches after an error to prevent error cascading
           break;
         }

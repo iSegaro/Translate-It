@@ -1,6 +1,7 @@
 // src/config.js
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { storageManager } from '../storage/core/StorageCore.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
@@ -509,7 +510,11 @@ export const getSettingsAsync = async () => {
     // Combine fetched items with defaults to ensure all keys exist
     return { ...CONFIG, ...items };
   } catch (error) {
-    logger.error('config-getSettingsAsync error:', error);
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'config-getSettings');
+    } else {
+      logger.error('config-getSettingsAsync error:', error);
+    }
     return { ...CONFIG }; // Use defaults on error
   }
 };
@@ -540,7 +545,11 @@ export const initializeSettingsListener = async () => {
     
     return listener; // Return listener for cleanup if needed
   } catch (error) {
-    logger.error('[config.js] Failed to setup storage listener:', error);
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'config-initListener');
+    } else {
+      logger.error('[config.js] Failed to setup storage listener:', error);
+    }
     return null;
   }
 };
@@ -556,7 +565,11 @@ const getSettingValueAsync = async (key, defaultValue) => {
     // logger.debug(`[config] Retrieved value for ${key}:`, result[key] ? 'present' : 'not present');
     return result[key];
   } catch (error) {
-    logger.error(`config-getSettingValueAsync-${key} error:`, error);
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, `config-get-${key}`);
+    } else {
+      logger.error(`config-getSettingValueAsync-${key} error:`, error);
+    }
     return defaultValue;
   }
 };

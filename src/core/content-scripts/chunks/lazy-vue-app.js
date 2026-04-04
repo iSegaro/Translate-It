@@ -122,7 +122,7 @@ export async function loadVueApp(contentCore) {
 
     // Validate extension context
     if (!ExtensionContextManager.isValidSync()) {
-      logger.warn('Extension context invalid, skipping Vue app load');
+      ExtensionContextManager.handleContextError('Extension context invalid before Vue app load', 'LazyVueApp');
       return;
     }
 

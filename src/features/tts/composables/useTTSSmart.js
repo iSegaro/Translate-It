@@ -6,6 +6,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 // import { ERROR_TYPES, RECOVERY_STRATEGIES } from '@/constants/ttsErrorTypes.js'; // For future use
 
 // Logger for TTS features
@@ -136,7 +137,11 @@ export function useTTSSmart() {
 
       return true;
     } catch (error) {
-      logger.error("[useTTSSmart] TTS failed:", error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:speak');
+      } else {
+        logger.error("[useTTSSmart] TTS failed:", error);
+      }
       
       // Store text for potential manual retry
       lastText.value = text;
@@ -182,7 +187,11 @@ export function useTTSSmart() {
       // logger.debug("[useTTSSmart] TTS paused successfully");
       return true;
     } catch (error) {
-      logger.error("[useTTSSmart] Failed to pause TTS:", error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:pause');
+      } else {
+        logger.error("[useTTSSmart] Failed to pause TTS:", error);
+      }
       errorMessage.value = error.message || 'Pause failed';
       return false;
     }
@@ -215,7 +224,11 @@ export function useTTSSmart() {
       // logger.debug("[useTTSSmart] TTS resumed successfully");
       return true;
     } catch (error) {
-      logger.error("[useTTSSmart] Failed to resume TTS:", error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:resume');
+      } else {
+        logger.error("[useTTSSmart] Failed to resume TTS:", error);
+      }
       errorMessage.value = error.message || 'Resume failed';
       return false;
     }
@@ -258,13 +271,18 @@ export function useTTSSmart() {
       
       return true;
     } catch (error) {
-      // Handle TTS stop errors gracefully - these are usually expected
-      await ErrorHandler.getInstance().handle(error, {
-        type: ErrorTypes.TTS,
-        context: 'useTTSSmart-stop',
-        showToast: false, // Don't show toast for TTS stop errors
-        showInUI: false
-      });
+      // Check for context errors first
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:stop');
+      } else {
+        // Handle other TTS stop errors gracefully - these are usually expected
+        await ErrorHandler.getInstance().handle(error, {
+          type: ErrorTypes.TTS,
+          context: 'useTTSSmart-stop',
+          showToast: false, // Don't show toast for TTS stop errors
+          showInUI: false
+        });
+      }
       
       // Still reset state on error
       ttsState.value = 'idle';
@@ -306,13 +324,17 @@ export function useTTSSmart() {
       // logger.debug("[useTTSSmart] All TTS instances stopped");
       return true;
     } catch (error) {
-      // Handle TTS stop errors gracefully - these are usually expected
-      await ErrorHandler.getInstance().handle(error, {
-        type: ErrorTypes.TTS,
-        context: 'useTTSSmart-stopAll',
-        showToast: false, // Don't show toast for TTS stop errors
-        showInUI: false
-      });
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:stop-all');
+      } else {
+        // Handle TTS stop errors gracefully - these are usually expected
+        await ErrorHandler.getInstance().handle(error, {
+          type: ErrorTypes.TTS,
+          context: 'useTTSSmart-stopAll',
+          showToast: false, // Don't show toast for TTS stop errors
+          showInUI: false
+        });
+      }
       
       // Clear any completion timeout even on error
       if (completionTimeout) {
@@ -390,7 +412,11 @@ export function useTTSSmart() {
         synced: serverStatus === ttsState.value 
       };
     } catch (error) {
-      logger.error("[useTTSSmart] Failed to get TTS status:", error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'tts:get-status');
+      } else {
+        logger.error("[useTTSSmart] Failed to get TTS status:", error);
+      }
       return { local: ttsState.value, server: 'error', synced: false };
     }
   };

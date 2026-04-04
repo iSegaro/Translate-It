@@ -7,6 +7,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { setStateForTab } from './selectElementStateManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'handleActivateSelectElementMode');
@@ -104,7 +105,12 @@ export async function handleActivateSelectElementMode(message, sender) {
       response = await browser.tabs.sendMessage(targetTabId, contentMessage);
       logger.debug(`Message sent to tab ${targetTabId}, response:`, response);
     } catch (error) {
-      logger.error(`Failed to send message to tab ${targetTabId}:`, error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, `activate-select-element:tab-${targetTabId}`);
+      } else {
+        logger.error(`Failed to send message to tab ${targetTabId}:`, error);
+      }
+      
       return { 
         success: false, 
         message: 'Failed to communicate with tab - try refreshing the page',
@@ -215,12 +221,16 @@ export async function handleActivateSelectElementMode(message, sender) {
       response
     };
   } catch (error) {
-    logger.error('Exception in handleActivateSelectElementMode:', error);
-    errorHandler.handle(error, {
-      type: ErrorTypes.SELECT_ELEMENT,
-      context: "handleActivateSelectElementMode",
-      messageData: message
-    });
+    if (ExtensionContextManager.isContextError(error)) {
+      ExtensionContextManager.handleContextError(error, 'handleActivateSelectElementMode');
+    } else {
+      logger.error('Exception in handleActivateSelectElementMode:', error);
+      errorHandler.handle(error, {
+        type: ErrorTypes.SELECT_ELEMENT,
+        context: "handleActivateSelectElementMode",
+        messageData: message
+      });
+    }
     
     const response = { success: false, message: error.message || 'Element selection activation failed' };
     logger.debug('Returning error response:', response);

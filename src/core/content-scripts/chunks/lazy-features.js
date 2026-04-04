@@ -49,7 +49,7 @@ export async function loadFeature(featureName) {
 
   // Validate extension context
   if (!ExtensionContextManager.isValidSync()) {
-    logger.warn('Extension context invalid, skipping feature load');
+    ExtensionContextManager.handleContextError('Extension context invalid before feature load', `LazyFeatures:${featureName}`);
     return null;
   }
 

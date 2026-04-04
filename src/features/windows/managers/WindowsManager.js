@@ -812,11 +812,13 @@ export class WindowsManager extends ResourceTracker {
       });
       
     } catch (error) {
-      this.logger.error('Error during provider change translation:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'windows-manager:provider-change');
+      } else {
+        this.logger.error('Error during provider change translation:', error);
+      }
 
-      
-      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');
-      
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');      
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
         isError: true,

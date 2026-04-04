@@ -101,6 +101,9 @@ export const FATAL_ERRORS = new Set([
   ErrorTypes.TRANSLATION_FAILED,
   ErrorTypes.TRANSLATION_ERROR,
   ErrorTypes.USER_CANCELLED,
+  ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+  ErrorTypes.CONTEXT,
+  ErrorTypes.PAGE_MOVED_TO_CACHE,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
   ErrorTypes.API_RESPONSE_INVALID,
   ErrorTypes.SETTINGS_LOADING_TIMEOUT
@@ -314,12 +317,11 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("extension context invalidated") || 
       (msg.includes("extension context") && msg.includes("invalidated")) ||
       msg.includes("extension context invalid before operation") ||
-      msg.includes("receiving end does not exist")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+      msg.includes("receiving end does not exist") ||
+      msg.includes("message channel closed") ||
+      msg.includes("listener indicated an asynchronous response")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
-
-  if (msg.includes("listener indicated an asynchronous response") || msg.includes("message channel closed")) return ErrorTypes.USER_CANCELLED;
-  if (msg.includes("context") || msg.includes("message port closed") || msg.includes("page-moved-to-cache")) return ErrorTypes.CONTEXT;
 
   return ErrorTypes.UNKNOWN;
 }

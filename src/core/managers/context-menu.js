@@ -12,6 +12,7 @@ import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
@@ -628,7 +629,11 @@ export class ContextMenuManager extends ResourceTracker {
       const { handleActivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
       await handleActivateSelectElementModeLazy(message, sender);
     } catch (error) {
-      logger.error(`Could not activate select element mode for tab ${tab.id}:`, error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, `context-menu:activate-select-element:tab-${tab.id}`);
+      } else {
+        logger.error(`Could not activate select element mode for tab ${tab.id}:`, error);
+      }
     }
   }
 
@@ -726,12 +731,18 @@ export class ContextMenuManager extends ResourceTracker {
 
             await browser.tabs.create({ url });
           } catch (e) {
-            logger.error("Could not open shortcuts page:", e);
+            if (ExtensionContextManager.isContextError(e)) {
+              ExtensionContextManager.handleContextError(e, 'context-menu:open-shortcuts');
+            } else {
+              logger.error("Could not open shortcuts page:", e);
+            }
             // Final fallback - try to open options page instead
             try {
               await browser.tabs.create({ url: browser.runtime.getURL("html/options.html?tab=shortcuts") });
             } catch (fallbackError) {
-              logger.error("Failed to open fallback shortcuts page:", fallbackError);
+              if (!ExtensionContextManager.isContextError(fallbackError)) {
+                logger.error("Failed to open fallback shortcuts page:", fallbackError);
+              }
             }
           }
           break;
