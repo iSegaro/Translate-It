@@ -92,7 +92,7 @@ export const TEXT_TAGS = new Set([
  * Inline formatting tags that don't constitute a "complex layout"
  */
 export const FORMATTING_TAGS = new Set([
-  'SPAN', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'SMALL', 'BR', 'A', 'SUB', 'SUP', 'CODE', 'CITE', 'Q', 'TIME'
+  'SPAN', 'STRONG', 'EM', 'B', 'I', 'U', 'S', 'SMALL', 'BR', 'A', 'SUB', 'SUP', 'CODE', 'CITE', 'Q', 'TIME', 'IMG'
 ]);
 
 /**

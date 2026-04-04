@@ -98,51 +98,54 @@ function isLayoutContainer(el) {
   if (LAYOUT_TAGS.has(el.tagName.toUpperCase())) return true;
 
   const style = window.getComputedStyle(el);
-  
-  // 2. Any element with a layout-engine display (flex, grid) and multiple children
-  // MUST be treated as a layout container to prevent physical swapping of its items.
-  if (LAYOUT_DISPLAY_MODES.has(style.display) && el.children.length > 1) return true;
+  const isLayoutEngine = LAYOUT_DISPLAY_MODES.has(style.display) && el.children.length > 1;
 
   // Helper to check if a node is a UI/Layout element (non-textual or interactive)
   const isUIElement = (node) => {
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
     const tag = node.tagName.toUpperCase();
     
-    // Non-textual tags (SVG, IMG, CANVAS, etc.)
-    if (!FORMATTING_TAGS.has(tag) && !BLOCK_TAGS.has(tag)) return true;
+    // 1. Definite UI/Media tags (excluding IMG for article compatibility)
+    if (tag === 'SVG' || tag === 'CANVAS' || tag === 'VIDEO' || tag === 'AUDIO') return true;
     
-    // Interactive tags
+    // 2. Interactive tags
     if (INTERACTIVE_TAGS.has(tag)) return true;
     
-    // NEW: If a formatting element has multiple element children, it's likely a complex 
-    // UI component (like a header bar or metadata row) where item order must be preserved.
+    // 3. Complex formatting elements with multiple children are often UI components
+    // (like a header bar or metadata row) where item order must be preserved.
     if (FORMATTING_TAGS.has(tag) && node.children.length > 1) return true;
 
-    // Recursive check for formatting tags to see if they contain icons
-    if (FORMATTING_TAGS.has(tag)) {
+    // 4. Recursive check for any children that are UI elements
+    if (node.children.length > 0) {
       return Array.from(node.children).some(isUIElement);
     }
     
-    return false;
+    // 4. If it's a known text tag, it's not a barrier by itself
+    if (FORMATTING_TAGS.has(tag) || BLOCK_TAGS.has(tag)) return false;
+
+    // 5. Unknown tags (Web Components, custom elements) are barriers
+    return true;
   };
 
-  // 3. Mixed Content or UI Components
-  // If the element itself is a UI component or contains any, it's a layout barrier.
+  // 2. Strict barrier rules
+  if (isLayoutEngine) return true;
   if (isUIElement(el)) return true;
-  if (el.children.length > 0 && Array.from(el.children).some(isUIElement)) return true;
 
-  // 4. Formatting tags (span, strong, a, etc.) are NOT layout containers 
+  // 3. Formatting tags are NOT layout containers 
   if (FORMATTING_TAGS.has(el.tagName.toUpperCase())) return false;
 
-  // 5. Rigid layout parts with explicit dimensions
+  // 4. Rigid layout parts with explicit dimensions
   if (el.style.width || el.style.height || style.width.includes('px') || style.maxWidth !== 'none') {
     if (!BLOCK_TAGS.has(el.tagName.toUpperCase())) return true;
   }
 
+  // 5. Check for block-level children that indicate a structural container
   const hasBlockChildren = Array.from(el.children).some(child => {
-    const childStyle = window.getComputedStyle(child);
     const tag = child.tagName.toUpperCase();
-    return !FORMATTING_TAGS.has(tag) || childStyle.display === 'block' || childStyle.display === 'flex';
+    if (FORMATTING_TAGS.has(tag)) return false;
+    
+    const childStyle = window.getComputedStyle(child);
+    return childStyle.display === 'block' || childStyle.display === 'flex' || childStyle.display === 'grid';
   });
   
   return hasBlockChildren;
@@ -155,33 +158,44 @@ function isLayoutContainer(el) {
  * @returns {string|null} The alignment value to apply, or null if no change needed.
  */
 function getPreservedAlignment(element) {
-  if (!BLOCK_TAGS.has(element.tagName.toUpperCase())) return null;
+  const tag = element.tagName.toUpperCase();
+  if (!BLOCK_TAGS.has(tag)) return null;
 
   const computedStyle = window.getComputedStyle(element);
   const textAlign = computedStyle.textAlign;
   const currentDir = computedStyle.direction; // 'ltr' or 'rtl'
   
-  // If the element is centered or justified, definitely keep it that way.
-  if (textAlign === 'center' || textAlign === 'justify' || 
-      textAlign === '-webkit-center' || textAlign === '-moz-center') {
+  // 1. Always preserve explicit centering or browser-specific center values.
+  if (textAlign === 'center' || textAlign === '-webkit-center' || textAlign === '-moz-center') {
     return textAlign;
   }
 
   // Check for legacy align attribute
   const alignAttr = element.getAttribute('align');
-  if (alignAttr === 'center' || alignAttr === 'justify') return alignAttr;
+  if (alignAttr === 'center') return 'center';
 
-  // Resolve logical 'start'/'end' to physical 'left'/'right' 
-  // based on the current direction BEFORE we change it.
-  if (textAlign === 'start') {
-    return currentDir === 'rtl' ? 'right' : 'left';
-  }
-  if (textAlign === 'end') {
-    return currentDir === 'rtl' ? 'left' : 'right';
+  // 2. Structural elements (Table cells, List items)
+  // We MUST lock these to their physical side to prevent the UI layout from breaking.
+  if (tag === 'TD' || tag === 'TH' || tag === 'LI') {
+    if (textAlign === 'start' || textAlign === 'justify') {
+      return currentDir === 'rtl' ? 'right' : 'left';
+    }
+    if (textAlign === 'end') {
+      return currentDir === 'rtl' ? 'left' : 'right';
+    }
+    return textAlign;
   }
 
-  // For other cases (already left or right), return the value as is
-  return textAlign;
+  // 3. Content blocks (P, DIV, H1-H6)
+  // If they have an explicit physical alignment (left or right), keep it.
+  if (textAlign === 'left' || textAlign === 'right') {
+    return textAlign;
+  }
+
+  // For default alignments (start, justify, end) in standard blocks, 
+  // we return null to let them follow the new direction naturally.
+  // This allows Persian paragraphs to be right-aligned and English to be left-aligned.
+  return null;
 }
 
 // --- 2. State Management (Internal) ---
@@ -222,7 +236,7 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
   
   let container = textNode.parentElement;
 
-  // Apply direction to the entire safe ancestry chain
+  // Apply direction to the safe ancestry chain
   while (container && container !== document.body) {
     // We respect isLayoutContainer strictly to ensure we don't flip layouts by accident.
     if (isLayoutContainer(container)) break;
@@ -233,7 +247,6 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     const currentAppliedDir = container.getAttribute('data-translate-dir');
     if (!(targetDir === 'ltr' && currentAppliedDir === 'rtl')) {
       
-      // Only apply if different to avoid redundant DOM operations
       if (container.style.direction !== targetDir) {
         // Capture alignment BEFORE changing direction
         const preservedAlign = getPreservedAlignment(container);
@@ -249,9 +262,13 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
       }
     }
 
-    // SURGICAL STOP: In Select Element mode, we NEVER apply direction above the 
-    // element explicitly selected by the user. This preserves the page's overall layout.
-    if (rootElement && container === rootElement) break;
+    // SURGICAL STOP: In Select Element mode, we respect the user's selection boundary.
+    // We stop at the first block-level container encountered at or above the rootElement.
+    if (rootElement && (container === rootElement || container.contains(rootElement))) {
+      if (BLOCK_TAGS.has(container.tagName.toUpperCase())) {
+        break;
+      }
+    }
     
     container = container.parentElement;
   }
