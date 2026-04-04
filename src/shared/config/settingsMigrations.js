@@ -71,8 +71,7 @@ function runMainMigration(currentSettings) {
   // Migrate Mode Provider keys first to ensure new structure is used
   migrateModeProviderKeys(currentSettings, updates, migrationLog);
 
-  // List of settings that should NOT be auto-migrated
-  // Note: API_KEY is intentionally NOT in this list to allow migration to GEMINI_API_KEY
+  // 1. List of settings that should NOT be auto-migrated (User sensitive data)
   const DO_NOT_MIGRATE = [
     'translationHistory',    // User data
     'EXCLUDED_SITES',        // User's custom exclusions
@@ -86,45 +85,57 @@ function runMainMigration(currentSettings) {
     'PROXY_PASSWORD'
   ];
 
-  // List of model list settings that need special handling
-  const MODEL_LISTS = {
-    'GEMINI_MODELS': 'GEMINI_MODEL',
-    'OPENAI_MODELS': 'OPENAI_API_MODEL',
-    'OPENROUTER_MODELS': 'OPENROUTER_API_MODEL',
-    'DEEPSEEK_MODELS': 'DEEPSEEK_API_MODEL'
-  };
-
-  // 1. Check for missing settings and add them
-  Object.keys(CONFIG).forEach(key => {
-    // Skip internal and user-specific settings
-    if (DO_NOT_MIGRATE.includes(key)) return;
-
-    // Skip if setting already exists
-    if (key in currentSettings) return;
-
-    // Add missing setting
-    updates[key] = CONFIG[key];
-    migrationLog.push(`Added missing setting: ${key}`);
+  // 2. Dynamic Model Detection
+  // Automatically identifies all _MODELS lists and their corresponding selection keys
+  const modelListKeys = Object.keys(CONFIG).filter(key => key.endsWith('_MODELS'));
+  const MODEL_MAPPING = {};
+  
+  modelListKeys.forEach(listKey => {
+    const provider = listKey.replace('_MODELS', '');
+    // Preference: [PROVIDER]_API_MODEL, fallback: [PROVIDER]_MODEL
+    const modelKey = `${provider}_API_MODEL` in CONFIG ? `${provider}_API_MODEL` : `${provider}_MODEL`;
+    if (modelKey in CONFIG) {
+      MODEL_MAPPING[listKey] = modelKey;
+    }
   });
 
-  // 2. Handle model lists specially
-  Object.keys(MODEL_LISTS).forEach(modelListKey => {
-    if (!(modelListKey in CONFIG)) return;
+  // 3. Dynamic Prompt Detection
+  // Automatically identifies all prompt templates to ensure they stay updated
+  const PROMPT_TEMPLATES = Object.keys(CONFIG).filter(key => 
+    key.startsWith('PROMPT_BASE_') || key === 'PROMPT_TEMPLATE'
+  );
 
-    const currentModelKey = MODEL_LISTS[modelListKey];
+  // 4. Synchronized Option Lists (UI Options that should always match CONFIG)
+  const OPTION_LISTS = [
+    'FONT_SIZE_OPTIONS',
+    'DEEPL_API_TIER_OPTIONS',
+    'DEEPL_FORMALITY_OPTIONS'
+  ];
 
-    // Update model list if it exists in both places and is different
-    if (modelListKey in currentSettings &&
-        JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(CONFIG[modelListKey])) {
+  // --- Start Migration Process ---
 
+  // A. Check for missing settings and add them
+  Object.keys(CONFIG).forEach(key => {
+    if (DO_NOT_MIGRATE.includes(key)) return;
+    if (!(key in currentSettings)) {
+      updates[key] = CONFIG[key];
+      migrationLog.push(`Added missing setting: ${key}`);
+    }
+  });
+
+  // B. Handle model lists - Dynamic update & reset if model removed
+  Object.entries(MODEL_MAPPING).forEach(([modelListKey, currentModelKey]) => {
+    if (!(modelListKey in currentSettings)) return;
+
+    if (JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(CONFIG[modelListKey])) {
       const currentUserModel = currentSettings[currentModelKey];
       const newModels = CONFIG[modelListKey];
       const modelStillExists = newModels.some(model => model.value === currentUserModel);
 
       updates[modelListKey] = CONFIG[modelListKey];
-      migrationLog.push(`Updated ${modelListKey}`);
+      migrationLog.push(`Updated ${modelListKey} list`);
 
-      // Reset model if user's selection no longer exists
+      // Reset selection if user's current model no longer exists in the new list
       if (!modelStillExists && currentUserModel !== CONFIG[currentModelKey]) {
         updates[currentModelKey] = CONFIG[currentModelKey];
         migrationLog.push(`Reset ${currentModelKey} (previous model no longer available)`);
@@ -132,56 +143,35 @@ function runMainMigration(currentSettings) {
     }
   });
 
-  // 3. Handle prompt templates - update critical prompts
-  const PROMPT_TEMPLATES = [
-    'PROMPT_BASE_FIELD',
-    'PROMPT_BASE_SELECT',
-    'PROMPT_BASE_BATCH',
-    'PROMPT_BASE_DICTIONARY',
-    'PROMPT_BASE_POPUP_TRANSLATE',
-    'PROMPT_BASE_SCREEN_CAPTURE',
-    'PROMPT_TEMPLATE'
-  ];
-
-  // For debugging - log which prompts are different
+  // C. Handle prompt templates - update to latest version
   PROMPT_TEMPLATES.forEach(key => {
-    if (!(key in CONFIG) || !(key in currentSettings)) return;
+    if (!(key in currentSettings)) return;
 
     const userPrompt = currentSettings[key];
     const defaultPrompt = CONFIG[key];
 
-    // Update prompts that are different from current config
-    // This ensures users get the latest prompts even if they had old versions
     if (userPrompt !== defaultPrompt) {
-      // Always update prompts to ensure users get the latest improvements
       updates[key] = CONFIG[key];
-      migrationLog.push(`Updated ${key} to latest version`);
+      migrationLog.push(`Updated prompt template ${key} to latest version`);
     }
   });
 
-  // 4. Special handling for certain array/object settings
-  const ARRAY_SETTINGS = ['FONT_SIZE_OPTIONS'];
-  ARRAY_SETTINGS.forEach(key => {
+  // D. Synchronize Option Lists
+  OPTION_LISTS.forEach(key => {
     if (key in CONFIG && key in currentSettings) {
       if (JSON.stringify(currentSettings[key]) !== JSON.stringify(CONFIG[key])) {
         updates[key] = CONFIG[key];
-        migrationLog.push(`Updated ${key}`);
+        migrationLog.push(`Synchronized ${key}`);
       }
     }
   });
 
-  // 5. Handle legacy API_KEY migration to GEMINI_API_KEY
-  // This migrates single API_KEY to new GEMINI_API_KEY (multi-key support)
-  // Note: This is now handled by import-export during import, so this only runs
-  // for extension updates, not for file imports
+  // E. Handle legacy API_KEY migration to GEMINI_API_KEY
   if ('API_KEY' in currentSettings && currentSettings.API_KEY && currentSettings.API_KEY.trim() !== '') {
-    // Only migrate if GEMINI_API_KEY doesn't exist or is empty
     if (!currentSettings.GEMINI_API_KEY || currentSettings.GEMINI_API_KEY.trim() === '') {
       updates.GEMINI_API_KEY = currentSettings.API_KEY;
       migrationLog.push(`Migrated API_KEY to GEMINI_API_KEY (multi-key support)`);
     }
-
-    // Remove the old API_KEY setting
     updates.API_KEY = '';
     migrationLog.push(`Removed deprecated API_KEY setting`);
   }
