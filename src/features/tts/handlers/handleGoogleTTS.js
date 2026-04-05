@@ -1,5 +1,5 @@
-// Background Google TTS handler for content scripts
-// Avoids CSP issues by running Google TTS in background context
+// Background Google TTS handler
+// Optimized for new modular architecture and StateManager
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -31,19 +31,17 @@ const isLanguageSupported = (language) => {
  */
 export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = null) => {
   try {
-    logger.debug('Processing Google TTS request:', message);
-    
     const { text, language: originalLanguage } = message.data || {};
     const language = overrideLanguage || originalLanguage;
     
-    // Deduplication
+    // 1. Deduplication
     if (ttsStateManager.currentTTSRequest && 
         text === ttsStateManager.lastTTSText && 
         language === ttsStateManager.lastTTSLanguage) {
       return await ttsStateManager.currentTTSRequest;
     }
     
-    // Interrupt previous
+    // 2. Interrupt previous
     if (ttsStateManager.currentTTSRequest) {
       await ttsStateManager.notifyTTSEnded('interrupted');
       try { await ttsStateManager.currentTTSRequest; } catch (e) {}
@@ -53,10 +51,10 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       throw new Error('No valid text provided for Google TTS');
     }
     
-    // Validate language support
+    // 3. Validate language support
     const targetLanguage = language || DEFAULT_TTS_LANGUAGE;
     if (!isLanguageSupported(targetLanguage)) {
-      logger.warn('Unsupported language for TTS:', targetLanguage);
+      logger.warn(`[GoogleTTS] Unsupported language: ${targetLanguage}`);
       return {
         success: false,
         error: `Language '${targetLanguage}' is not supported by Google TTS`,
@@ -67,7 +65,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     const trimmedText = text.trim();
     let finalText = trimmedText;
 
-    // Smart Extraction (Dictionary/Header cleaning)
+    // Smart Extraction & Cleaning
     const lines = finalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length > 1 && (finalText.includes('**') || lines[0].includes(':'))) {
       finalText = lines[0];
@@ -76,7 +74,6 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       }
     }
     
-    // Clean text
     finalText = finalText
       .replace(/\*\*(.*?)\*\*/g, '$1')
       .replace(/\s+/g, ' ')
@@ -89,7 +86,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     
     const ttsUrl = getGoogleTTSUrl(finalText, targetLanguage);
     
-    // Set state
+    // 4. Set Shared State
     ttsStateManager.lastTTSText = text;
     ttsStateManager.lastTTSLanguage = targetLanguage;
     ttsStateManager.currentTTSId = message.data?.ttsId || null;
@@ -101,17 +98,23 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
         const browserAPI = await initializebrowserAPI();
 
         if (isChromiumBrowser) {
+          // Ensure Offscreen is ready via shared manager
           await ttsStateManager.ensureOffscreenDocument();
-          await browserAPI.runtime.sendMessage({
-            action: 'playOffscreenAudio',
+          
+          const response = await browserAPI.runtime.sendMessage({
+            action: MessageActions.PLAY_OFFSCREEN_AUDIO,
             url: ttsUrl,
             target: 'offscreen'
           });
+
+          if (response && response.success === false) {
+            throw new Error(response.error || 'Offscreen playback failed');
+          }
         } else {
           await playGoogleTTSAudio(ttsUrl);
         }
         
-        return { success: true, processedVia: 'background-google-tts' };
+        return { success: true, processedVia: 'google-tts' };
       } finally {
         ttsStateManager.resetSpeakState();
       }
@@ -120,14 +123,14 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     return await ttsStateManager.currentTTSRequest;
     
   } catch (error) {
-    logger.warn('Google TTS failed:', error);
+    logger.warn('[GoogleTTS] Request failed:', error);
     ttsStateManager.fullReset();
     return { success: false, error: error.message };
   }
 };
 
 /**
- * Handle TTS Stop All request
+ * Handle TTS Stop request
  */
 export const handleGoogleTTSStopAll = async (message) => {
   try {
@@ -149,20 +152,20 @@ export const handleGoogleTTSStopAll = async (message) => {
     
     return { success: true, action: 'stopped' };
   } catch (error) {
-    logger.error('TTS stop failed:', error);
+    logger.warn('[GoogleTTS] Stop failed:', error);
     return { success: false, error: error.message };
   }
 };
 
 /**
- * Handle TTS End notification
+ * Handle TTS End notification from Offscreen
  */
 export const handleGoogleTTSEnded = async () => {
   try {
     await ttsStateManager.notifyTTSEnded('completed');
     return { success: true, action: 'cleared' };
   } catch (error) {
-    logger.error('TTS end handling failed:', error);
+    logger.warn('[GoogleTTS] End handling failed:', error);
     return { success: false, error: error.message };
   }
 };
@@ -176,6 +179,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
       if (currentFirefoxAudio) {
         currentFirefoxAudio.pause();
         currentFirefoxAudio.src = '';
+        currentFirefoxAudio = null;
       }
       
       const audio = new Audio(ttsUrl);
@@ -189,7 +193,7 @@ const playGoogleTTSAudio = (ttsUrl) => {
       
       audio.onerror = (error) => {
         currentFirefoxAudio = null;
-        reject(new Error(`Firefox TTS failed: ${error.message}`));
+        reject(new Error(`Firefox Google TTS failed: ${error.message}`));
       };
       
       audio.play().then(() => resolve()).catch(reject);
