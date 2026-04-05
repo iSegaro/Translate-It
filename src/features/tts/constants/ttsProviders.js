@@ -1,6 +1,5 @@
 /**
  * TTS Providers Configuration - Centralized data for all TTS engines
- * This is the single source of truth for voices, supported languages, and engine settings.
  */
 import { TTS_ENGINES } from '@/shared/config/constants.js';
 
@@ -64,6 +63,8 @@ export const PROVIDER_CONFIGS = {
   [TTS_ENGINES.GOOGLE]: {
     name: 'Google TTS',
     baseUrl: 'https://translate.google.com/translate_tts',
+    clientParam: 'tw-ob',
+    encoding: 'UTF-8',
     offscreenPath: 'html/offscreen.html',
     maxTextLength: 200,
     defaultLanguage: 'en',
@@ -74,23 +75,10 @@ export const PROVIDER_CONFIGS = {
       'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
       'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',
       'hy', 'ne', 'si', 'my', 'km', 'lo', 'gu', 'ta', 'te', 'kn', 'ml', 'pa',
-      'bn', 'ur', 'am', 'om', 'so', 'sw', 'rw',
-      'ny', 'mg', 'st', 'zu', 'xh', 'af', 'sq', 'eu', 'ca', 'co', 'eo', 'fy',
-      'gl', 'haw', 'hmn', 'is', 'ig', 'jw', 'kk', 'ky', 'lb', 'mi', 'mn', 'sm',
-      'gd', 'sn', 'su', 'tg', 'tt', 'to', 'uz', 'yi', 'yo'
+      'bn', 'ur', 'am', 'om', 'so', 'sw', 'rw', 'ny', 'mg', 'st', 'zu', 'xh', 
+      'af', 'sq', 'eu', 'ca', 'co', 'eo', 'fy', 'gl', 'haw', 'hmn', 'is', 'ig', 
+      'jw', 'kk', 'ky', 'lb', 'mi', 'mn', 'sm', 'gd', 'sn', 'su', 'tg', 'tt', 
+      'to', 'uz', 'yi', 'yo'
     ])
   }
-};
-
-/**
- * Helper to generate Google TTS URL
- */
-export const getGoogleTTSUrl = (text, language) => {
-  const config = PROVIDER_CONFIGS[TTS_ENGINES.GOOGLE];
-  const url = new URL(config.baseUrl);
-  url.searchParams.append('ie', 'UTF-8');
-  url.searchParams.append('q', text);
-  url.searchParams.append('tl', language);
-  url.searchParams.append('client', 'tw-ob');
-  return url.toString();
 };

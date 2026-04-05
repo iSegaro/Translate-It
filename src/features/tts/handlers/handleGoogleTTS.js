@@ -8,9 +8,22 @@ import { isChromium } from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 import { TTS_ENGINES } from '@/shared/config/constants.js';
-import { PROVIDER_CONFIGS, getGoogleTTSUrl } from '@/features/tts/constants/ttsProviders.js';
+import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
+
+/**
+ * Internal helper to generate Google TTS URL from central config
+ */
+const buildGoogleTTSUrl = (text, language) => {
+  const config = PROVIDER_CONFIGS[TTS_ENGINES.GOOGLE];
+  const url = new URL(config.baseUrl);
+  url.searchParams.append('ie', config.encoding);
+  url.searchParams.append('q', text);
+  url.searchParams.append('tl', language);
+  url.searchParams.append('client', config.clientParam);
+  return url.toString();
+};
 
 /**
  * Handle Google TTS requests
@@ -64,7 +77,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       finalText = finalText.substring(0, config.maxTextLength - 3) + '...';
     }
     
-    const ttsUrl = getGoogleTTSUrl(finalText, targetLanguage);
+    const ttsUrl = buildGoogleTTSUrl(finalText, targetLanguage);
     
     // 5. Set Shared State
     ttsStateManager.lastTTSText = text;
