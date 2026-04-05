@@ -86,22 +86,27 @@ export class TTSDispatcher {
    */
   static async _detectLanguage(text) {
     if (!text || !text.trim()) return null;
-    
+
     const sample = text.trim();
 
-    // 1. Arabic Script Analysis (Highest priority for Persian/Arabic distinction)
+    // 1. Arabic Script Analysis (Persian vs Arabic Distinction)
     if (/[\u0600-\u06FF]/.test(sample)) {
-      // Discriminator: Persian Unique Letters (پ چ ژ گ) and Persian-style K/Y
-      const persianUnique = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
-      // Discriminator: Arabic Unique Letters (ة ث ذ ص ض ط ظ)
-      const arabicUnique = /[\u0629\u062B\u0630\u0635\u0636\u0637\u0638]/;
+      // PERSIAN Markers: Unique letters (پ چ ژ گ) and Persian-specific encodings for Y/K
+      const persianExclusive = /[\u067E\u0686\u0698\u06AF\u06CC\u06A9]/;
+      // ARABIC Markers: Teh Marbuta (ة), Arabic Y/K (ي ك), and common diacritics (Harakat)
+      const arabicExclusive = /[\u0629\u064A\u0643\u064B-\u065F]/;
 
-      if (persianUnique.test(sample)) return 'fa';
-      if (arabicUnique.test(sample)) return 'ar';
-      
-      // If none of unique letters found, use project's general Persian check
-      if (isPersianText(sample)) return 'fa';
-      return 'ar';
+      if (persianExclusive.test(sample)) {
+        logger.debug('[TTSDispatcher] Detection: Confirmed Persian via unique characters');
+        return 'fa';
+      }
+
+      if (arabicExclusive.test(sample)) {
+        logger.debug('[TTSDispatcher] Detection: Confirmed Arabic via unique characters');
+        return 'ar';
+      }
+
+      // If ambiguous (like "سلام"), we let the Native API decide later
     }
 
     // 2. East Asian Script Analysis
@@ -128,7 +133,16 @@ export class TTSDispatcher {
       if (result && result.languages && result.languages.length > 0) {
         const top = result.languages[0];
         if (result.isReliable || top.percentage > 15) {
-          return top.language.split('-')[0].toLowerCase();
+          const detectedLang = top.language.split('-')[0].toLowerCase();
+          
+          // Script Validation: Prevent obvious false positives for short strings
+          // If CJK is detected, ensure the text actually contains CJK characters
+          if (detectedLang === 'ko' && !/[\uAC00-\uD7AF]/.test(sample)) return 'en';
+          if (detectedLang === 'ja' && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(sample)) return 'en';
+          if (detectedLang === 'zh' && !/[\u4E00-\u9FFF]/.test(sample)) return 'en';
+          
+          logger.debug(`[TTSDispatcher] Browser API detected: ${detectedLang}`);
+          return detectedLang;
         }
       }
     } catch (e) {
