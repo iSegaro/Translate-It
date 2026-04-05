@@ -113,7 +113,17 @@ export class TTSDispatcher {
     if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
     if (/[\u4E00-\u9FFF]/.test(sample)) return 'zh';
 
-    // 3. Native Browser API with validation
+    // 3: Specific Latin Diacritics (Instant markers for short strings)
+    if (/[ß]/.test(sample)) return 'de'; // German unique
+    if (/[ñ]/.test(sample)) return 'es'; // Spanish unique
+    if (/[ç]/.test(sample)) {
+      if (/[ığşİ]/i.test(sample)) return 'tr'; // Turkish markers
+      return 'fr'; // Fallback to French for ç
+    }
+    if (/[åøæ]/.test(sample)) return 'no'; // Nordic languages
+
+
+    // 4. Native Browser API with validation
     try {
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       const result = await browserAPI.i18n.detectLanguage(sample);
