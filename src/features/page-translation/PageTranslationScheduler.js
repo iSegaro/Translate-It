@@ -231,106 +231,97 @@ export class PageTranslationScheduler extends ResourceTracker {
     
     const flushContext = this.sessionContext;
     this.activeFlushes++;
-    let currentBatch = [];
 
     try {
       // Process batches in a loop as long as there are items and we are still translating
       while (this.queue.length > 0 && this.isTranslated && flushContext === this.sessionContext) {
         const config = await this._getBatchConfig();
-        
+        let currentBatch = [];
+
+        // 1. SELECT BATCH: Use specialized filters based on the mode
         if (this.settings.translateAfterScrollStop) {
-          const { batchItems, remainingItems } = PageTranslationQueueFilter.process(this.queue, config.chunkSize);
-          
-          // 1. Set current batch
-          currentBatch = batchItems;
-          
-          // 2. Update queue with remaining items (including off-screen ones)
-          this.queue = remainingItems;
-
-          if (currentBatch.length === 0) {
-            this.logger.debug('No visible content in queue, stopping flush');
-            break;
-          }
+          const result = PageTranslationQueueFilter.process(this.queue, config.chunkSize);
+          currentBatch = result.batchItems;
+          this.queue = result.remainingItems;
         } else {
-          // MODULAR FLUID LOGIC
-          const { batchItems, remainingItems } = PageTranslationFluidFilter.process(this.queue, config);
-          
-          currentBatch = batchItems;
-          this.queue = remainingItems;
-
-          if (currentBatch.length === 0) {
-            this.logger.debug('No visible content in queue, stopping flush');
-            break;
-          }
+          const result = PageTranslationFluidFilter.process(this.queue, config);
+          currentBatch = result.batchItems;
+          this.queue = result.remainingItems;
         }
 
+        if (currentBatch.length === 0) {
+          this.logger.debug('No visible content in queue, stopping flush loop');
+          break;
+        }
+
+        // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;
-        const textsToTranslate = currentBatch.map(item => ({ text: item.text }));
-        
-        const batchMessage = MessageFormat.create(
-          MessageActions.PAGE_TRANSLATE_BATCH,
-          {
-            text: JSON.stringify(textsToTranslate),
-            provider: config.providerRegistryId,
-            sourceLanguage: AUTO_DETECT_VALUE, 
-            targetLanguage: config.targetLanguage,
-            mode: TranslationMode.Page,
-            options: { rawJsonPayload: true },
-            sessionId: this.translationSessionId 
-          },
-          MessageContexts.CONTENT
-        );
+        await this._executeBatchRequest(currentBatch, config, flushContext);
 
-        if (!this.isTranslated) throw new Error('Session stopped');
-
-        const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
-
-        if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
-          // Resolve items with original text if session stopped/changed
-          currentBatch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
-          break;
-        }
-
-        if (!result?.success) {
-          // Check if failure is due to invalidated context to preserve original error
-          let batchError;
-          const rawErrorMessage = result?.error || '';
-          
-          if ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage)) {
-            batchError = new Error(rawErrorMessage || 'Extension context invalidated');
-          } else {
-            batchError = new Error(rawErrorMessage || 'Batch translation failed');
-          }
-
-          await this._handleBatchError(batchError, currentBatch);
-          // Stop processing more batches after an error to prevent error cascading
-          break;
-        }
-
-        const translatedTexts = JSON.parse(result.translatedText);
-        
-        currentBatch.forEach((item, index) => {
-          item.resolve(translatedTexts[index]?.text || translatedTexts[index] || item.text);
-          this.translatedCount++;
-        });
-
-        this._reportProgress();
-
-        // Check if we are done with all current tasks
-        if (this.queue.length === 0 && this.activeFlushes === 1) {
-          this._checkCompletion();
-        }
-
-        // Yield to event loop between batches if there are many items
+        // 3. YIELD: Give event loop a breath if there's more work
         if (this.queue.length > 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
     } catch (error) {
       this.logger.debug('Critical error in scheduler flush loop:', error.message);
-      await this._handleBatchError(error, typeof currentBatch !== 'undefined' ? currentBatch : []);
     } finally {
       this.activeFlushes--;
+      this._checkCompletion();
+    }
+  }
+
+  /**
+   * Internal method to handle the actual translation request and resolution.
+   */
+  async _executeBatchRequest(batch, config, flushContext) {
+    const textsToTranslate = batch.map(item => ({ text: item.text }));
+    
+    const batchMessage = MessageFormat.create(
+      MessageActions.PAGE_TRANSLATE_BATCH,
+      {
+        text: JSON.stringify(textsToTranslate),
+        provider: config.providerRegistryId,
+        sourceLanguage: AUTO_DETECT_VALUE, 
+        targetLanguage: config.targetLanguage,
+        mode: TranslationMode.Page,
+        options: { rawJsonPayload: true },
+        sessionId: this.translationSessionId 
+      },
+      MessageContexts.CONTENT
+    );
+
+    try {
+      if (!this.isTranslated) throw new Error('Session stopped');
+
+      const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
+
+      // Validation after async call
+      if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
+        batch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
+        return;
+      }
+
+      if (!result?.success) {
+        const rawErrorMessage = result?.error || '';
+        const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
+          ? new Error(rawErrorMessage || 'Extension context invalidated')
+          : new Error(rawErrorMessage || 'Batch translation failed');
+
+        await this._handleBatchError(batchError, batch);
+        return;
+      }
+
+      // Resolve successfully translated items
+      const translatedTexts = JSON.parse(result.translatedText);
+      batch.forEach((item, index) => {
+        item.resolve(translatedTexts[index]?.text || translatedTexts[index] || item.text);
+        this.translatedCount++;
+      });
+
+      this._reportProgress();
+    } catch (error) {
+      await this._handleBatchError(error, batch);
     }
   }
 
