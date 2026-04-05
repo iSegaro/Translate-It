@@ -89,6 +89,7 @@ export function useTTSSmart() {
       
       lastText.value = text;
       lastLanguage.value = lang;
+      currentTTSId.value = null; // Clear ID on error
       
       ttsState.value = 'error';
       errorMessage.value = error.message || 'TTS failed';

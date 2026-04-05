@@ -119,7 +119,7 @@ export const handleGoogleTTSSpeak = async (message, sender) => {
     return await ttsStateManager.currentTTSRequest;
     
   } catch (error) {
-    logger.error('Google TTS failed:', error);
+    logger.warn('Google TTS failed:', error);
     ttsStateManager.fullReset();
     return { success: false, error: error.message };
   }

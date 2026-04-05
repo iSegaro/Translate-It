@@ -28,14 +28,14 @@ export class EdgeTTSClient {
    */
   static async synthesize(text, voiceName) {
     try {
-      logger.debug(`[EdgeTTSClient] Starting synthesis for voice: ${voiceName}`);
+      logger.debug(`Starting synthesis for voice: ${voiceName}`);
       
       const tokenInfo = await EdgeTTSClient._getEndpointToken();
       const synthesisUrl = `https://${tokenInfo.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
       const ssml = EdgeTTSClient._buildSSML(text, voiceName);
       
-      logger.debug(`[EdgeTTSClient] Sending synthesis request to ${tokenInfo.region} region`);
+      logger.debug(`Sending synthesis request to ${tokenInfo.region} region`);
 
       const response = await fetch(synthesisUrl, {
         method: "POST",
@@ -51,7 +51,7 @@ export class EdgeTTSClient {
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
         if (response.status === 401 || response.status === 403) {
-          logger.warn(`[EdgeTTSClient] Auth error (${response.status}), clearing token cache`);
+          logger.warn(`Auth error (${response.status}), clearing token cache`);
           tokenCache = null; 
         }
         throw new Error(`Edge TTS synthesis failed: ${response.status} ${errorText}`);
@@ -61,10 +61,11 @@ export class EdgeTTSClient {
       if (audioBlob.size === 0) {
         throw new Error('Edge TTS returned empty audio data');
       }
-      logger.info(`[EdgeTTSClient] Synthesis successful, received blob of size: ${audioBlob.size}`);
+      logger.info(`Synthesis successful, received blob of size: ${audioBlob.size}`);
       return audioBlob;
     } catch (err) {
-      logger.error('[EdgeTTSClient] Synthesis failed:', err);
+      // Use warn level for provider errors to follow the Golden Chain architecture
+      logger.warn('Synthesis failed:', err);
       throw err;
     }
   }
@@ -76,12 +77,12 @@ export class EdgeTTSClient {
   static async _getEndpointToken() {
     // Check cache (with 1 minute buffer)
     if (tokenCache && tokenCache.expiresAt > Date.now() + 60000) {
-      logger.debug('[EdgeTTSClient] Using cached token');
+      logger.debug('Using cached token');
       return tokenCache;
     }
 
     try {
-      logger.debug('[EdgeTTSClient] Fetching new endpoint token...');
+      logger.debug('Fetching new endpoint token...');
       const signature = await EdgeTTSClient._generateSignature(EDGE_TTS_ENDPOINT_URL);
       const traceId = crypto.randomUUID().replace(/-/g, "");
 
@@ -118,7 +119,7 @@ export class EdgeTTSClient {
           if (payload.exp) expiresAt = payload.exp * 1000;
         }
       } catch (e) {
-        logger.warn("[EdgeTTSClient] Failed to decode token expiry, using default", e);
+        logger.warn("Failed to decode token expiry, using default", e);
       }
 
       tokenCache = {
@@ -127,10 +128,11 @@ export class EdgeTTSClient {
         expiresAt: expiresAt
       };
 
-      logger.info(`[EdgeTTSClient] Token retrieved successfully for region: ${data.r}`);
+      logger.info(`Token retrieved successfully for region: ${data.r}`);
       return tokenCache;
     } catch (err) {
-      logger.error("[EdgeTTSClient] Token retrieval failed:", err);
+      // Use warn level for provider errors
+      logger.warn("Token retrieval failed:", err);
       throw err;
     }
   }

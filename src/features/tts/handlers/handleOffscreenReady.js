@@ -14,7 +14,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'OffscreenReadyHandler');
  */
 export const handleOffscreenReady = async () => {
   try {
-    logger.debug('[OffscreenReadyHandler] 📡 Offscreen document ready');
+    logger.debug('Offscreen document ready');
     
     return { 
       success: true, 
@@ -23,7 +23,7 @@ export const handleOffscreenReady = async () => {
     };
     
   } catch (error) {
-    logger.error('[OffscreenReadyHandler] Error handling offscreen ready:', error);
+    logger.error('Error handling offscreen ready:', error);
     return {
       success: false,
       error: error.message || 'Offscreen ready handler failed'

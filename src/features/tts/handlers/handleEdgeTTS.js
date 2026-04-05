@@ -83,7 +83,7 @@ export const handleEdgeTTSSpeak = async (message, sender) => {
     
     return await ttsStateManager.currentTTSRequest;
   } catch (error) {
-    logger.error('Edge TTS failed:', error);
+    logger.warn('Edge TTS failed:', error);
     ttsStateManager.fullReset();
     return {
       success: false,
