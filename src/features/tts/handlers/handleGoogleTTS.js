@@ -125,7 +125,15 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
   } catch (error) {
     logger.warn('[GoogleTTS] Request failed:', error);
     ttsStateManager.fullReset();
-    return { success: false, error: error.message };
+    
+    // Check if it's a 400 error (usually means unsupported language at server level)
+    const isUnsupported = error.message?.includes('400') || error.message?.includes('supported source');
+    
+    return { 
+      success: false, 
+      error: error.message,
+      unsupportedLanguage: isUnsupported
+    };
   }
 };
 
