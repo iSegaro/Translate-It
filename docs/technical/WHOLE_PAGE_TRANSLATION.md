@@ -51,14 +51,15 @@ Centralizes all external event listeners for the system.
 ### 4. PageTranslationScheduler
 The core engine for queue management and batch request dispatching.
 - **Memory Safety**: Inherits from `ResourceTracker`; automatically clears the queue on cleanup.
+- **Prioritization**: Forces immediate flush for high-priority items if capacity is reached (250 items).
 
 ### 5. PageTranslationFiltering Engines
 Specialized engines for batch selection:
-- **PageTranslationQueueFilter**: Used for "On-Stop" mode. Focuses on pure visibility.
+- **PageTranslationQueueFilter**: Used for "On-Stop" mode. Focuses on visibility and **memory-safe purging** (ejecting distant nodes during long scrolls).
 - **PageTranslationFluidFilter**: Used for "Fluid" mode. Focuses on visibility + element importance (Score).
 
 ### 6. PageTranslationScrollTracker
-Motion detection utility. Detects scroll start/stop events and signals the Scheduler.
+Activity and motion detection utility. Detects scroll events and **dynamic DOM changes** to signal the Scheduler when the page has "stabilized" for translation.
 
 ### 7. PageTranslationBridge
 The communication bridge between the extension and the `domtranslator` library. Intercepts nodes to provide visibility data.
@@ -83,8 +84,11 @@ Static utilities for DOM calculations and shared system values.
 ### Modular Event Management
 By isolating event handling into `PageTranslationEventManager`, the system prevents "Listener Leaks" and ensures that global signals (like conflict resolution with Select Element mode) are handled consistently.
 
-### Parallel Settings Resolution
-`PageTranslationSettingsLoader` performs parallel asynchronous fetches for configuration, reducing the "Time to First Translation" by avoiding sequential storage hits.
+### Memory-Safe Scrolling (Smart Purge)
+To prevent memory exhaustion during infinite scrolling, the `QueueFilter` implements a **Smart Purge** policy. Nodes that move significantly far from the viewport (e.g., > 3000px) are automatically ejected from the queue. These nodes remain eligible for translation if the user scrolls back to them, ensuring a balance between RAM usage and persistence.
+
+### Activity-Aware Scheduling
+The system treats both scrolling and significant DOM mutations as "activity." Translation is deferred until all activity ceases for the duration of the `SCROLL_STOP_DELAY`, preventing fragmented translation batches during heavy content loading.
 
 ### Dual-Mode Modular Filtering
 The system provides optimized behavior for different scrolling patterns (Fluid vs. On-Stop), ensuring the most efficient use of API requests.
@@ -97,7 +101,7 @@ The system is fully integrated with `ResourceTracker`. All queues, observers, an
 | Setting | Default | Description |
 | :--- | :--- | :--- |
 | `chunkSize` | 250 | Number of segments per API request |
-| `SCROLL_STOP_DELAY` | 500ms | User-configurable debounce time after scrolling stops |
+| `WHOLE_PAGE_SCROLL_STOP_DELAY` | 500ms | User-configurable debounce time after scrolling stops |
 | `VIEWPORT_BUFFER_PX` | 100px | Safety margin for batch-filling |
 | `rootMargin` | 150px | Recognition margin for node detection |
 
