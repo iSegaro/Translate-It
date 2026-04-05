@@ -29,11 +29,12 @@ const isLanguageSupported = (language) => {
 /**
  * Handle Google TTS requests
  */
-export const handleGoogleTTSSpeak = async (message, sender) => {
+export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = null) => {
   try {
     logger.debug('Processing Google TTS request:', message);
     
-    const { text, language } = message.data || {};
+    const { text, language: originalLanguage } = message.data || {};
+    const language = overrideLanguage || originalLanguage;
     
     // Deduplication
     if (ttsStateManager.currentTTSRequest && 

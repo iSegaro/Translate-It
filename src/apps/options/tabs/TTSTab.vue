@@ -56,6 +56,33 @@
         {{ t('tts_fallback_desc') || 'Automatically switch to a similar language (e.g., Arabic for Persian) if the selected TTS engine does not support the original language natively.' }}
       </div>
     </div>
+
+    <hr class="section-divider">
+
+    <!-- Auto Detect Toggle -->
+    <div class="setting-group">
+      <div class="setting-item">
+        <label for="tts-autodetect-toggle">
+          {{ t('tts_autodetect_label') || 'Smart Language Detection' }}
+        </label>
+        <div class="setting-control toggle-wrapper">
+          <input
+            id="tts-autodetect-toggle"
+            type="checkbox"
+            :checked="ttsAutoDetectEnabled"
+            class="toggle-input"
+            @change="updateSettingLocally('TTS_AUTO_DETECT_ENABLED', $event.target.checked)"
+          >
+          <label
+            for="tts-autodetect-toggle"
+            class="toggle-label"
+          />
+        </div>
+      </div>
+      <div class="setting-description">
+        {{ t('tts_autodetect_desc') || 'Automatically detect the actual language of the text. If the selected engine fails to pronounce the text, it will attempt to identify the correct language and try again.' }}
+      </div>
+    </div>
     
   </div>
 </template>
@@ -80,6 +107,11 @@ const ttsEngine = computed({
 const ttsFallbackEnabled = computed({
   get: () => settingsStore.settings.TTS_FALLBACK_ENABLED ?? true,
   set: (value) => updateSettingLocally('TTS_FALLBACK_ENABLED', value)
+})
+
+const ttsAutoDetectEnabled = computed({
+  get: () => settingsStore.settings.TTS_AUTO_DETECT_ENABLED ?? true,
+  set: (value) => updateSettingLocally('TTS_AUTO_DETECT_ENABLED', value)
 })
 
 const updateSettingLocally = (key, value) => {

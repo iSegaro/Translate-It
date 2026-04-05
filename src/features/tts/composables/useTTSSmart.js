@@ -48,8 +48,13 @@ export function useTTSSmart() {
       progress.value = 0;
       currentTTSId.value = generateTTSId();
       
-      const { getLanguageCodeForTTS } = await utilsFactory.getI18nUtils();
-      const language = await getLanguageCodeForTTS(lang) || "en";
+      // Only resolve language if it's not 'auto'. 
+      // We want to pass 'auto' directly to the background dispatcher.
+      let language = lang;
+      if (lang !== 'auto' && lang !== 'unknown') {
+        const { getLanguageCodeForTTS } = await utilsFactory.getI18nUtils();
+        language = await getLanguageCodeForTTS(lang) || "en";
+      }
       
       logger.info(`[useTTSSmart] Starting TTS: ${text.length} chars in ${language}`);
 

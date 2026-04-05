@@ -210,6 +210,7 @@ export const CONFIG = {
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
   TTS_ENGINE: "google", // موتور پیش‌فرض تلفظ صوتی (google یا edge)
   TTS_FALLBACK_ENABLED: true, // استفاده از صدای جایگزین (مثل عربی برای فارسی) در صورت عدم پشتیبانی موتور
+  TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   DESKTOP_FAB_POSITION: { 
     side: 'right', 

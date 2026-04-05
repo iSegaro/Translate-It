@@ -9,9 +9,10 @@ import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSHandler');
 
-export const handleEdgeTTSSpeak = async (message, sender) => {
+export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = null) => {
   try {
-    const { text, language } = message.data || {};
+    const { text, language: originalLanguage } = message.data || {};
+    const language = overrideLanguage || originalLanguage;
     
     // Deduplication
     if (ttsStateManager.currentTTSRequest && 
