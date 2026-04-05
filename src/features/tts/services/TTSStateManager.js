@@ -2,7 +2,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { OFFSCREEN_DOCUMENT_PATH } from '@/features/tts/constants/googleTTS.js';
+import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSStateManager');
 
@@ -89,7 +90,7 @@ class TTSStateManager {
       if (!this.offscreenDocumentPromise) {
         logger.debug('Creating new offscreen document...');
         this.offscreenDocumentPromise = browserAPI.offscreen.createDocument({
-          url: OFFSCREEN_DOCUMENT_PATH,
+          url: PROVIDER_CONFIGS[TTS_ENGINES.GOOGLE].offscreenPath,
           reasons: ['AUDIO_PLAYBACK'],
           justification: 'TTS Audio Playback'
         });

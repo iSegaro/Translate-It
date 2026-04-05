@@ -1,5 +1,5 @@
 // Background Google TTS handler
-// Optimized for new modular architecture and StateManager
+// Optimized for new modular architecture and centralized PROVIDER_CONFIGS
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -7,29 +7,17 @@ import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
-import { 
-  SUPPORTED_TTS_LANGUAGES, 
-  TTS_CLEANING_REGEX, 
-  MAX_TTS_TEXT_LENGTH, 
-  DEFAULT_TTS_LANGUAGE,
-  getGoogleTTSUrl
-} from '@/features/tts/constants/googleTTS.js';
+import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { PROVIDER_CONFIGS, getGoogleTTSUrl } from '@/features/tts/constants/ttsProviders.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
-
-/**
- * Validate if language is supported by Google TTS
- */
-const isLanguageSupported = (language) => {
-  if (!language) return false;
-  const cleanLang = language.toLowerCase().replace('_', '-');
-  return SUPPORTED_TTS_LANGUAGES.has(cleanLang) || SUPPORTED_TTS_LANGUAGES.has(cleanLang.split('-')[0]);
-};
 
 /**
  * Handle Google TTS requests
  */
 export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = null) => {
+  const config = PROVIDER_CONFIGS[TTS_ENGINES.GOOGLE];
+  
   try {
     const { text, language: originalLanguage } = message.data || {};
     const language = overrideLanguage || originalLanguage;
@@ -51,9 +39,12 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       throw new Error('No valid text provided for Google TTS');
     }
     
-    // 3. Validate language support
-    const targetLanguage = language || DEFAULT_TTS_LANGUAGE;
-    if (!isLanguageSupported(targetLanguage)) {
+    // 3. Validate language support via central config
+    const targetLanguage = language || config.defaultLanguage;
+    const isSupported = config.supportedLanguages.has(targetLanguage.split('-')[0].toLowerCase()) || 
+                        config.supportedLanguages.has(targetLanguage.toLowerCase());
+
+    if (!isSupported) {
       logger.warn(`[GoogleTTS] Unsupported language: ${targetLanguage}`);
       return {
         success: false,
@@ -62,31 +53,20 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       };
     }
     
-    const trimmedText = text.trim();
-    let finalText = trimmedText;
-
-    // Smart Extraction & Cleaning
-    const lines = finalText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length > 1 && (finalText.includes('**') || lines[0].includes(':'))) {
-      finalText = lines[0];
-      if (finalText.toLowerCase().includes('translation:') && lines.length > 1) {
-        finalText = lines[1];
-      }
-    }
-    
-    finalText = finalText
-      .replace(/\*\*(.*?)\*\*/g, '$1')
+    // 4. Text cleaning using central regex
+    let finalText = text.trim()
+      .replace(/\*\*(.*?)\*\*/g, '$1') // remove markdown bold
       .replace(/\s+/g, ' ')
-      .replace(TTS_CLEANING_REGEX, '')
+      .replace(config.cleaningRegex, '')
       .trim();
     
-    if (finalText.length > MAX_TTS_TEXT_LENGTH) {
-      finalText = finalText.substring(0, MAX_TTS_TEXT_LENGTH - 3) + '...';
+    if (finalText.length > config.maxTextLength) {
+      finalText = finalText.substring(0, config.maxTextLength - 3) + '...';
     }
     
     const ttsUrl = getGoogleTTSUrl(finalText, targetLanguage);
     
-    // 4. Set Shared State
+    // 5. Set Shared State
     ttsStateManager.lastTTSText = text;
     ttsStateManager.lastTTSLanguage = targetLanguage;
     ttsStateManager.currentTTSId = message.data?.ttsId || null;
@@ -98,7 +78,6 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
         const browserAPI = await initializebrowserAPI();
 
         if (isChromiumBrowser) {
-          // Ensure Offscreen is ready via shared manager
           await ttsStateManager.ensureOffscreenDocument();
           
           const response = await browserAPI.runtime.sendMessage({
@@ -126,7 +105,6 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     logger.warn('[GoogleTTS] Request failed:', error);
     ttsStateManager.fullReset();
     
-    // Check if it's a 400 error (usually means unsupported language at server level)
     const isUnsupported = error.message?.includes('400') || error.message?.includes('supported source');
     
     return { 
