@@ -1896,10 +1896,7 @@
     "message": "スクロール停止時に翻訳"
   },
   "whole_page_translate_after_scroll_stop_description": {
-    "message": "スクロールが停止したときのみ、翻訳を実行します。"
-  },
-  "whole_page_scroll_stop_delay_label": {
-    "message": "スクロール停止の遅延"
+    "message": "スクロールが停止したときのみ، 翻訳を実行します。"
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ミリ秒"

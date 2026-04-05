@@ -367,32 +367,30 @@
           <BaseCheckbox
             v-model="wholePageTranslateAfterScrollStop"
             :disabled="!extensionEnabled"
-            :label="t('whole_page_translate_after_scroll_stop_label') || 'Translate after scroll stop (API Saver)'"
-          />
-          <span class="setting-description">
-            {{ t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling. This significantly reduces API usage.' }}
-          </span>
-        </div>
-
-        <div 
-          v-if="wholePageTranslateAfterScrollStop"
-          class="setting-group sub-setting-group delay-sub-group"
-        >
-          <div class="setting-row">
-            <span class="setting-label-compact">{{ t('whole_page_scroll_stop_delay_label') || 'Scroll Stop Delay' }}:</span>
-            <div class="number-input-container">
-              <input
-                v-model.number="wholePageScrollStopDelay"
-                type="number"
-                min="100"
-                max="5000"
-                step="100"
-                class="base-number-input"
-                :disabled="!extensionEnabled"
-              />
-              <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+          >
+            <div class="inline-setting-content">
+              <span>{{ t('whole_page_translate_after_scroll_stop_label') || 'Translate on scroll stop' }}</span>
+              <div 
+                v-if="wholePageTranslateAfterScrollStop"
+                class="number-input-container inline-delay-input"
+              >
+                <input
+                  v-model.number="wholePageScrollStopDelay"
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="100"
+                  class="base-number-input compact-input"
+                  :disabled="!extensionEnabled"
+                  @click.stop
+                />
+                <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+              </div>
             </div>
-          </div>
+          </BaseCheckbox>
+          <span class="setting-description">
+            {{ t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.' }}
+          </span>
         </div>
       </div>
     </BaseFieldset>
@@ -605,12 +603,6 @@ const dictionaryProvider = computed({
     color: var(--color-text);
     min-width: 150px;
   }
-
-  .setting-label-compact {
-    font-weight: 500;
-    color: var(--color-text);
-    font-size: 0.95em;
-  }
 }
 
 .number-input-container {
@@ -638,12 +630,31 @@ const dictionaryProvider = computed({
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    &.compact-input {
+      width: 65px;
+      padding: 3px 6px;
+      height: 26px;
+      text-align: center;
+    }
   }
 
   .unit-label {
     font-size: 0.9em;
     color: var(--color-text-secondary);
   }
+
+  &.inline-delay-input {
+    margin-inline-start: $spacing-xs;
+  }
+}
+
+.inline-setting-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-xs;
+  color: var(--color-text);
 }
 
 .setting-row-with-provider {

@@ -1889,9 +1889,6 @@
   "whole_page_translate_after_scroll_stop_description": {
     "message": "فقط زمانی که اسکرول متوقف شود، ترجمه انجام می‌شود."
   },
-  "whole_page_scroll_stop_delay_label": {
-    "message": "تأخیر توقف اسکرول"
-  },
   "whole_page_scroll_stop_delay_unit": {
     "message": "میلی ثانیه"
   }
