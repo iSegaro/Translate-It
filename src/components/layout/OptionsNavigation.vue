@@ -47,6 +47,7 @@ const settingsStore = useSettingsStore()
 const navigationItems = ref([
   { name: 'languages', labelKey: 'languages_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
+  { name: 'tts', labelKey: 'tts_tab_title' },
   { name: 'prompt', labelKey: 'prompt_tab_title' },
   { name: 'appearance', labelKey: 'appearance_tab_title' },
   { name: 'advance', labelKey: 'advance_tab_title' },

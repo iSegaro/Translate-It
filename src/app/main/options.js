@@ -19,6 +19,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'options');
 const LanguagesTab = () => import('@/apps/options/tabs/LanguagesTab.vue')
 const AppearanceTab = () => import('@/apps/options/tabs/AppearanceTab.vue')
 const ActivationTab = () => import('@/apps/options/tabs/ActivationTab.vue')
+const TTSTab = () => import('@/apps/options/tabs/TTSTab.vue')
 const PromptTab = () => import('@/apps/options/tabs/PromptTab.vue')
 const ImportExportTab = () => import('@/apps/options/tabs/ImportExportTab.vue')
 const AdvanceTab = () => import('@/apps/options/tabs/AdvanceTab.vue')
@@ -88,7 +89,7 @@ async function initializeApp() {
           logger.debug(`Detected hash #${hash}, redirecting to help tab`);
         } else if (hash && hash !== '') {
           // Use the hash path if it's valid
-          const validRoutes = ['languages', 'appearance', 'activation', 'prompt', 'import-export', 'advance', 'about', 'help'];
+          const validRoutes = ['languages', 'appearance', 'activation', 'tts', 'prompt', 'import-export', 'advance', 'about', 'help'];
           if (validRoutes.includes(hash)) {
             initialRoute = `/${hash}`;
             logger.debug(`Detected hash #${hash}, redirecting to ${initialRoute} tab`);
@@ -113,7 +114,7 @@ async function initializeApp() {
             return initialRoute;
           }
           // If current hash matches a valid route, use it instead
-          const validRoutes = ['languages', 'appearance', 'activation', 'prompt', 'import-export', 'advance', 'about', 'help'];
+          const validRoutes = ['languages', 'appearance', 'activation', 'tts', 'prompt', 'import-export', 'advance', 'about', 'help'];
           if (validRoutes.includes(currentHash)) {
             logger.debug(`Root redirect: current hash #${currentHash} is valid, using it`);
             return `/${currentHash}`;
@@ -123,6 +124,7 @@ async function initializeApp() {
         }},
         { path: '/languages', component: LanguagesTab, name: 'languages' },
         { path: '/activation', component: ActivationTab, name: 'activation' },
+        { path: '/tts', component: TTSTab, name: 'tts' },
         { path: '/prompt', component: PromptTab, name: 'prompt' },
         { path: '/appearance', component: AppearanceTab, name: 'appearance' },
         { path: '/advance', component: AdvanceTab, name: 'advance' },

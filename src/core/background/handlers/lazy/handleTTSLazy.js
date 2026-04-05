@@ -34,10 +34,11 @@ async function loadTTSHandlers() {
 
   const loadingPromise = Promise.all([
     import('@/features/tts/handlers/handleGoogleTTS.js'),
-    import('@/features/tts/handlers/handleOffscreenReady.js')
-  ]).then(([googleTTS, offscreenReady]) => {
+    import('@/features/tts/handlers/handleOffscreenReady.js'),
+    import('@/features/tts/services/TTSDispatcher.js')
+  ]).then(([googleTTS, offscreenReady, dispatcher]) => {
     const handlers = {
-      handleGoogleTTSSpeak: googleTTS.handleGoogleTTSSpeak,
+      handleTTSSpeak: dispatcher.TTSDispatcher.dispatchTTSRequest,
       handleGoogleTTSStopAll: googleTTS.handleGoogleTTSStopAll,
       handleGoogleTTSEnded: googleTTS.handleGoogleTTSEnded,
       handleOffscreenReady: offscreenReady.handleOffscreenReady
@@ -65,11 +66,9 @@ export const handleTTSSpeakLazy = async (message, sender) => {
   try {
     logger.info('[TTSLazyHandler] TTS_SPEAK requested');
 
-    const { handleGoogleTTSSpeak } = await loadTTSHandlers();
+    const { handleTTSSpeak } = await loadTTSHandlers();
 
-    // Delegating to handleGoogleTTSSpeak - logged at TRACE level for detailed debugging
-    // logger.trace('[TTSLazyHandler] Delegating to handleGoogleTTSSpeak');
-    return await handleGoogleTTSSpeak(message, sender);
+    return await handleTTSSpeak(message, sender);
   } catch (error) {
     logger.error('[TTSLazyHandler] Failed to handle TTS_SPEAK:', error);
     return {

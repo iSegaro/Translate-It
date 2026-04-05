@@ -492,64 +492,6 @@ function handleTTSStop(sendResponse) {
   }
 }
 
-/**
- * Handle TTS pause
- */
-function handleTTSPause(sendResponse) {
-  try {
-    let paused = false;
-
-    // Pause speech synthesis
-    if (currentUtterance && speechSynthesis.speaking && !speechSynthesis.paused) {
-      speechSynthesis.pause();
-      paused = true;
-      console.log("[Offscreen] TTS speech paused");
-    }
-
-    // Pause audio playback
-    if (currentAudio && !currentAudio.paused) {
-      currentAudio.pause();
-      paused = true;
-      console.log("[Offscreen] TTS audio paused");
-    }
-
-    sendResponse({ success: true, paused });
-  } catch (error) {
-    console.error("[Offscreen] TTS pause failed:", error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
-
-/**
- * Handle TTS resume
- */
-function handleTTSResume(sendResponse) {
-  try {
-    let resumed = false;
-
-    // Resume speech synthesis
-    if (currentUtterance && speechSynthesis.paused) {
-      speechSynthesis.resume();
-      resumed = true;
-      console.log("[Offscreen] TTS speech resumed");
-    }
-
-    // Resume audio playback
-    if (currentAudio && currentAudio.paused) {
-      currentAudio.play().then(() => {
-        console.log("[Offscreen] TTS audio resumed");
-      }).catch((error) => {
-        console.error("[Offscreen] Failed to resume audio:", error);
-      });
-      resumed = true;
-    }
-
-    sendResponse({ success: true, resumed });
-  } catch (error) {
-    console.error("[Offscreen] TTS resume failed:", error);
-    sendResponse({ success: false, error: error.message });
-  }
-}
 
 /**
  * Handle TTS get status
@@ -1090,31 +1032,29 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
 
     // Create and setup audio element
     currentAudio = new Audio(audioUrl);
-    currentAudio.crossOrigin = "anonymous";
+    
+    // NO crossOrigin needed for local Blobs, can cause issues in some environments
+    // currentAudio.crossOrigin = "anonymous";
 
     resourceTracker.addEventListener(currentAudio, "ended", () => {
       console.log("[Offscreen] Cached audio playback ended");
       URL.revokeObjectURL(audioUrl); // Clean up memory
       currentAudio = null;
-      sendResponse({ success: true });
+      isPlaying = false; // Reset playing state
+      chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(() => {});
     });
 
     resourceTracker.addEventListener(currentAudio, "error", (e) => {
       console.error("[Offscreen] Cached audio playback error:", e);
       URL.revokeObjectURL(audioUrl); // Clean up memory
       currentAudio = null;
-      sendResponse({
-        success: false,
-        error: e.message || "Cached audio playback error",
-      });
+      isPlaying = false; // Reset playing state
+      // Send error response if not already sent
+      sendResponse({ success: false, error: "Audio playback failed" });
     });
 
     resourceTracker.addEventListener(currentAudio, "loadstart", () => {
       console.log("[Offscreen] Cached audio loading started");
-    });
-
-    resourceTracker.addEventListener(currentAudio, "canplaythrough", () => {
-      console.log("[Offscreen] Cached audio can play through");
     });
 
     // Start playback
@@ -1122,11 +1062,15 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
       .play()
       .then(() => {
         console.log("[Offscreen] Cached audio playback started successfully");
+        isPlaying = true;
+        // CRITICAL: Send success response immediately so background doesn't wait
+        sendResponse({ success: true, message: "Cached audio playback started" });
       })
       .catch((err) => {
         console.error("[Offscreen] Cached audio play failed:", err);
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
+        isPlaying = false;
         sendResponse({ success: false, error: err.message });
       });
       

@@ -258,8 +258,6 @@ watch(() => tts.ttsState.value, (newState, oldState) => {
     emit('state-changed', { 
       from: oldState, 
       to: newState,
-      canPause: tts.canPause.value,
-      canResume: tts.canResume.value,
       canStop: tts.canStop.value
     })
   }
