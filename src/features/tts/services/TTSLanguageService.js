@@ -7,18 +7,54 @@ import { SUPPORTED_TTS_LANGUAGES } from '@/features/tts/constants/googleTTS.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLanguageService');
 
-// Edge TTS native voices mapping (Standard high-quality voices)
+// Edge TTS native voices mapping (High-quality Neural voices)
 const EDGE_TTS_VOICES = {
+  // Middle East & Central Asia
   'fa': 'fa-IR-DilaraNeural', 
-  'en': 'en-US-AriaNeural',
   'ar': 'ar-SA-HamedNeural',
-  'ru': 'ru-RU-SvetlanaNeural',
+  'he': 'he-IL-HilaNeural',
   'tr': 'tr-TR-EmelNeural',
+  'uz': 'uz-UZ-MadinaNeural',
+
+  // Europe (West & Central)
+  'en': 'en-US-AriaNeural',
   'de': 'de-DE-KatjaNeural',
   'fr': 'fr-FR-DeniseNeural',
+  'es': 'es-ES-ElviraNeural',
+  'it': 'it-IT-ElsaNeural',
+  'nl': 'nl-NL-ColetteNeural',
+  'pt': 'pt-BR-FranciscaNeural',
+
+  // Europe (North)
+  'sv': 'sv-SE-SofieNeural',
+  'da': 'da-DK-ChristelNeural',
+  'no': 'nb-NO-PernilleNeural',
+  'fi': 'fi-FI-NooraNeural',
+
+  // Europe (East)
+  'ru': 'ru-RU-SvetlanaNeural',
+  'uk': 'uk-UA-PolinaNeural',
+  'pl': 'pl-PL-AgnieszkaNeural',
+  'ro': 'ro-RO-AlinaNeural',
+  'hu': 'hu-HU-NoemiNeural',
+  'cs': 'cs-CZ-VlastaNeural',
+  'sk': 'sk-SK-ViktoriaNeural',
+  'el': 'el-GR-AthinaNeural',
+
+  // Asia (East)
   'ja': 'ja-JP-NanamiNeural',
   'ko': 'ko-KR-SunHiNeural',
-  'zh': 'zh-CN-XiaoxiaoNeural'
+  'zh': 'zh-CN-XiaoxiaoNeural',
+
+  // Asia (South & Southeast)
+  'hi': 'hi-IN-SwaraNeural',
+  'bn': 'bn-IN-TanishaNeural',
+  'ta': 'ta-IN-PallaviNeural',
+  'te': 'te-IN-ShrutiNeural',
+  'th': 'th-TH-PremwadeeNeural',
+  'vi': 'vi-VN-HoaiMyNeural',
+  'id': 'id-ID-GadisNeural',
+  'ms': 'ms-MY-LatreeNeural'
 };
 
 export class TTSLanguageService {
