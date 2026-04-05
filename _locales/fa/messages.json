@@ -1882,5 +1882,11 @@
   },
   "whole_page_show_original_on_hover_description": {
     "message": "هنگام نگه داشتن موس روی متن ترجمه شده، متن اصلی را در یک کادر کوچک نمایش می‌دهد."
+  },
+  "whole_page_translate_after_scroll_stop_label": {
+    "message": "ترجمه با توقف اسکرول"
+  },
+  "whole_page_translate_after_scroll_stop_description": {
+    "message": "فقط زمانی که اسکرول پس از یک مکث کوتاه (۵۰۰ میلی‌ثانیه) متوقف شود، ترجمه انجام می‌شود."
   }
 }

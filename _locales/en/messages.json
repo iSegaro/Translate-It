@@ -1891,5 +1891,11 @@
   },
   "whole_page_show_original_on_hover_description": {
     "message": "Show the original text in a tooltip when hovering over translated content."
+  },
+  "whole_page_translate_after_scroll_stop_label": {
+    "message": "Translate on scroll stop"
+  },
+  "whole_page_translate_after_scroll_stop_description": {
+    "message": "Only trigger translation when you stop scrolling after a short delay (500ms)."
   }
 }

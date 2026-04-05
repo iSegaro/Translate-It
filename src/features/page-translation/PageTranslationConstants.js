@@ -68,5 +68,9 @@ export const PAGE_TRANSLATION_TIMING = {
   CONCURRENCY_RETRY_DELAY: 300,
   
   // DOM stability delays
-  DOM_STABILIZATION_DELAY: 50
+  DOM_STABILIZATION_DELAY: 50,
+  
+  // Scroll stop detection
+  SCROLL_STOP_DELAY: 500,
+  VIEWPORT_BUFFER_PX: 100
 };

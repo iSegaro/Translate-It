@@ -10,6 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
+import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
@@ -20,7 +21,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   constructor() {
     super('page-translation-scheduler');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Scheduler');
-    this.queue = []; // Tasks: { text, score, resolve, reject, context }
+    this.queue = []; // Tasks: { text, score, resolve, reject, context, node }
     this.batchTimer = null;
     this.translatedCount = 0;
     this.totalTasks = 0;
@@ -30,6 +31,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.isTranslated = false;
     this.translationSessionId = null;
     this.sessionContext = null;
+    this.isScrolling = false;
     
     this.settings = { 
       ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
@@ -41,6 +43,14 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._lastReportTime = 0;
     this._reportInterval = 300; // ms
     this._reportPending = false;
+
+    // Register queue for automatic memory management via ResourceTracker
+    this.trackResource('translation-queue', () => {
+      if (this.queue.length > 0) {
+        this.logger.debug('Cleaning up queue via ResourceTracker', this.queue.length);
+        this.queue = [];
+      }
+    });
   }
 
   setSettings(settings) {
@@ -109,8 +119,9 @@ export class PageTranslationScheduler extends ResourceTracker {
    * @param {string} text - Text to translate
    * @param {any} context - Session context validation
    * @param {number} score - Priority score from domtranslator (greater = more important)
+   * @param {Node} node - Associated DOM node for visibility check
    */
-  async enqueue(text, context = null, score = 0) {
+  async enqueue(text, context = null, score = 0, node = null) {
     // 1. Session & State Validation
     if (context && context !== this.sessionContext) return text;
     if (!this.isTranslated || this.fatalErrorOccurred || !text || !text.trim()) return text;
@@ -125,11 +136,33 @@ export class PageTranslationScheduler extends ResourceTracker {
         score: score || 0, 
         resolve, 
         reject, 
-        context 
+        context,
+        node
       });
 
       this._scheduleFlush(score);
     });
+  }
+
+  /**
+   * External signal that scrolling has stopped.
+   * Only used when WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP is enabled.
+   */
+  signalScrollStop() {
+    this.isScrolling = false;
+    if (this.settings.translateAfterScrollStop) {
+      this.logger.debug('Signal: Scroll Stop. Queue size:', this.queue.length);
+      this.flush();
+    }
+  }
+
+  /**
+   * External signal that scrolling has started.
+   */
+  signalScrollStart() {
+    this.isScrolling = true;
+    // If a timer was running (e.g. from dynamic content), we might want to cancel it 
+    // to strictly wait for scroll stop, but let's keep it fluid unless requested.
   }
 
   /**
@@ -138,6 +171,13 @@ export class PageTranslationScheduler extends ResourceTracker {
    */
   _scheduleFlush(score) {
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) return;
+
+    // IF in "On Stop" mode AND currently scrolling: DO NOT schedule automatic flushes
+    // EXCEPT for the very first batch to ensure initial Viewport is translated.
+    // IF NOT scrolling (e.g. user opened a menu): allow standard timers.
+    if (this.settings.translateAfterScrollStop && this.isScrolling && !this.isFirstBatch) {
+      return;
+    }
 
     const isHighPriority = score >= this.settings.priorityThreshold;
     
@@ -197,29 +237,45 @@ export class PageTranslationScheduler extends ResourceTracker {
       while (this.queue.length > 0 && this.isTranslated && flushContext === this.sessionContext) {
         const config = await this._getBatchConfig();
         
-        // 1. Sort queue by score (DESC) to ensure high priority items are picked first
-        this.queue.sort((a, b) => b.score - a.score);
-
-        // 2. Select items for this batch
-        let itemsToProcess = 0;
-        let currentChars = 0;
-        for (const item of this.queue) {
-          if (item.context && item.context !== flushContext) break;
-          const itemLen = item.text.length;
+        if (this.settings.translateAfterScrollStop) {
+          const { batchItems, remainingItems } = PageTranslationQueueFilter.process(this.queue, config.chunkSize);
           
-          // Respect chunk size and character limits
-          if (itemsToProcess >= config.chunkSize) break;
-          if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
+          // 1. Set current batch
+          currentBatch = batchItems;
           
-          currentChars += itemLen;
-          itemsToProcess++;
-        }
-        
-        currentBatch = this.queue.splice(0, itemsToProcess);
+          // 2. Update queue with remaining items (including off-screen ones)
+          this.queue = remainingItems;
 
-        if (currentBatch.length === 0) {
-          // If we couldn't pick any items (e.g. context mismatch), break to avoid infinite loop
-          break;
+          if (currentBatch.length === 0) {
+            this.logger.debug('No visible content in queue, stopping flush');
+            break;
+          }
+        } else {
+          // ORIGINAL "FLUID" LOGIC
+          // 1. Sort queue by score (DESC) to ensure high priority items are picked first
+          this.queue.sort((a, b) => b.score - a.score);
+
+          // 2. Select items for this batch
+          let itemsToProcess = 0;
+          let currentChars = 0;
+          for (const item of this.queue) {
+            if (item.context && item.context !== flushContext) break;
+            const itemLen = item.text.length;
+            
+            // Respect chunk size and character limits
+            if (itemsToProcess >= config.chunkSize) break;
+            if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
+            
+            currentChars += itemLen;
+            itemsToProcess++;
+          }
+          
+          currentBatch = this.queue.splice(0, itemsToProcess);
+
+          if (currentBatch.length === 0) {
+            // If we couldn't pick any items (e.g. context mismatch), break to avoid infinite loop
+            break;
+          }
         }
 
         this.isFirstBatch = false;
@@ -234,7 +290,7 @@ export class PageTranslationScheduler extends ResourceTracker {
             targetLanguage: config.targetLanguage,
             mode: TranslationMode.Page,
             options: { rawJsonPayload: true },
-            sessionId: this.translationSessionId // Already here, but ensuring it's in the data block
+            sessionId: this.translationSessionId 
           },
           MessageContexts.CONTENT
         );
@@ -286,9 +342,6 @@ export class PageTranslationScheduler extends ResourceTracker {
       }
     } catch (error) {
       this.logger.debug('Critical error in scheduler flush loop:', error.message);
-      // Ensure the error is reported to the Manager so UI can update
-      // currentBatch might be empty here if the error happened before splicing, 
-      // but _handleBatchError handles it safely.
       await this._handleBatchError(error, typeof currentBatch !== 'undefined' ? currentBatch : []);
     } finally {
       this.activeFlushes--;
@@ -297,7 +350,6 @@ export class PageTranslationScheduler extends ResourceTracker {
 
   async _getBatchConfig() {
     // Priority: this.settings (from Manager) -> defaults
-    // Store in settings to avoid re-fetching for every batch in the same session
     if (!this.settings.translationApi) {
       this.settings.translationApi = await getTranslationApiAsync();
     }
@@ -338,7 +390,6 @@ export class PageTranslationScheduler extends ResourceTracker {
     });
 
     // Emit internal event for the Manager to handle feedback and broadcasting
-    // We pass the raw error to preserve identity for the centralized handler
     pageEventBus.emit('page-translation-internal-error', { 
       error, 
       errorType, 
@@ -359,9 +410,6 @@ export class PageTranslationScheduler extends ResourceTracker {
     const now = Date.now();
     const timeSinceLastReport = now - this._lastReportTime;
 
-    // Final report (100%) or large jumps should probably be forced, but for now 
-    // simple interval throttling is enough.
-    
     if (force || timeSinceLastReport >= this._reportInterval) {
       this._lastReportTime = now;
       this._reportPending = false;

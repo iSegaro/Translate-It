@@ -47,10 +47,13 @@ export class PageTranslationBridge extends ResourceTracker {
     /**
      * Standard translator callback for domtranslator.
      * Note: In domtranslator 1.x, the constructor callback ONLY receives (text, score).
-     * The 'node' argument is NOT passed here. We handle direction in the wrapped methods below.
+     * We use a monkey-patch on nodesTranslator to capture the current node.
      */
     const translateWithContext = async (text, score) => {
       if (!text || !text.trim()) return text;
+
+      // Capture the node that was set during the monkey-patched translate/update call
+      const node = nodesTranslator.currentNode;
 
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
@@ -60,12 +63,12 @@ export class PageTranslationBridge extends ResourceTracker {
       const trimmedText = text.trim();
 
       // 2. Request translation for trimmed text
-      const translated = await onTranslateCallback(trimmedText, sessionContext, score);
+      // We pass the node as the 4th argument
+      const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
       
       // FIX: Only apply marks if the text was actually translated (different from original)
       if (translated && translated !== trimmedText) {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
-        // This provides immediate string-level direction correction even before CSS is applied.
         const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         
         return leadingWhitespace + mark + translated + trailingWhitespace;
@@ -75,6 +78,22 @@ export class PageTranslationBridge extends ResourceTracker {
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);
+
+    /**
+     * MONKEY-PATCH: Capture the node being processed by NodesTranslator.
+     * This allows us to pass the node to the scheduler for visibility checks.
+     */
+    const originalTranslate = nodesTranslator.translate;
+    nodesTranslator.translate = function(node, callback) {
+      this.currentNode = node;
+      return originalTranslate.call(this, node, callback);
+    };
+
+    const originalUpdate = nodesTranslator.update;
+    nodesTranslator.update = function(node, callback) {
+      this.currentNode = node;
+      return originalUpdate.call(this, node, callback);
+    };
 
     /**
      * FIX: Since domtranslator doesn't pass the node to the constructor's callback,

@@ -362,6 +362,17 @@
             {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
           </span>
         </div>
+
+        <div class="setting-group sub-setting-group">
+          <BaseCheckbox
+            v-model="wholePageTranslateAfterScrollStop"
+            :disabled="!extensionEnabled"
+            :label="t('whole_page_translate_after_scroll_stop_label') || 'Translate after scroll stop (API Saver)'"
+          />
+          <span class="setting-description">
+            {{ t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling. This significantly reduces API usage.' }}
+          </span>
+        </div>
       </div>
     </BaseFieldset>
   </section>
@@ -498,6 +509,11 @@ const wholePageAutoTranslate = computed({
 const wholePageShowOriginal = computed({
   get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
+})
+
+const wholePageTranslateAfterScrollStop = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP ?? false,
+  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', value)
 })
 
 import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'

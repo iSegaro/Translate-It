@@ -253,6 +253,7 @@ export const CONFIG = {
   WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
   WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover روی متن ترجمه شده
+  WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
 
   // --- Proxy Settings ---
   PROXY_ENABLED: false, // فعال بودن proxy
@@ -1072,5 +1073,12 @@ export const getWholePageShowOriginalOnHoverAsync = async () => {
   return getSettingValueAsync(
     "WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER",
     CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER
+  );
+};
+
+export const getWholePageTranslateAfterScrollStopAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP",
+    CONFIG.WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP
   );
 };

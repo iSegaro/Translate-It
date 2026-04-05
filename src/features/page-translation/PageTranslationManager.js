@@ -1,5 +1,4 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
-import browser from 'webextension-polyfill';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -13,6 +12,7 @@ import {
   getWholePageExcludedSelectorsAsync, 
   getWholePageAttributesToTranslateAsync, 
   getWholePageShowOriginalOnHoverAsync, 
+  getWholePageTranslateAfterScrollStopAsync,
   getTranslationApiAsync, 
   getTargetLanguageAsync,
   getModeProvidersAsync,
@@ -29,7 +29,6 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
-import { getErrorToastType } from '@/shared/error-management/ErrorDisplayStrategies.js';
 
 
 // Internal components
@@ -37,6 +36,7 @@ import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { PageTranslationBridge } from './PageTranslationBridge.js';
 import { PageTranslationHoverManager } from './PageTranslationHoverManager.js';
+import { PageTranslationScrollTracker } from './utils/PageTranslationScrollTracker.js';
 import { PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
@@ -62,6 +62,16 @@ export class PageTranslationManager extends ResourceTracker {
     this.scheduler = new PageTranslationScheduler();
     this.bridge = new PageTranslationBridge();
     this.hoverManager = new PageTranslationHoverManager();
+    this.scrollTracker = new PageTranslationScrollTracker(
+      () => {
+        this.logger.debug('Scroll stop detected, signaling scheduler');
+        this.scheduler.signalScrollStop();
+      },
+      () => {
+        this.logger.debug('Scroll start detected, signaling scheduler');
+        this.scheduler.signalScrollStart();
+      }
+    );
 
     this.settings = {};
     this._listenersInitialized = false;
@@ -310,6 +320,13 @@ export class PageTranslationManager extends ResourceTracker {
         this.hoverManager.destroy();
       }
 
+      // Start scroll tracker if enabled
+      if (this.settings.translateAfterScrollStop) {
+        this.scrollTracker.start();
+      } else {
+        this.scrollTracker.stop();
+      }
+
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === ProviderRegistryIds.LINGVA) {
         const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
@@ -332,7 +349,7 @@ export class PageTranslationManager extends ResourceTracker {
       // Initialize bridge with fresh context and standard callback
       await this.bridge.initialize(
         this.settings, 
-        (text, context, score) => this.scheduler.enqueue(text, context, score),
+        (text, context, score, node) => this.scheduler.enqueue(text, context, score, node),
         this.sessionContext
       );
       
@@ -365,6 +382,9 @@ export class PageTranslationManager extends ResourceTracker {
   async restorePage() {
     this._cleanupSession();
     try {
+      // 0. Stop scroll tracker
+      this.scrollTracker.stop();
+
       // 1. First stop batcher to prevent loop during library's restore
       this.scheduler.setTranslationState(false);
       this.isTranslated = false;
@@ -419,6 +439,7 @@ export class PageTranslationManager extends ResourceTracker {
     try {
       this.logger.info('Stopping page translation/persistence without restoring');
       
+      this.scrollTracker.stop();
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
       this.isTranslating = false;
@@ -514,7 +535,20 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
   async _loadSettings(options = {}) {
-    // Load all settings in parallel to eliminate sequential await delays
+    // Load all settings in parallel using an object-based approach to ensure data integrity
+    const settingsData = await Promise.all([
+      getWholePageRootMarginAsync(),
+      getModeProvidersAsync(),
+      getTranslationApiAsync(),
+      getTargetLanguageAsync(),
+      getWholePageLazyLoadingAsync(),
+      getWholePageAutoTranslateOnDOMChangesAsync(),
+      getWholePageExcludedSelectorsAsync(),
+      getWholePageAttributesToTranslateAsync(),
+      getWholePageShowOriginalOnHoverAsync(),
+      getWholePageTranslateAfterScrollStopAsync()
+    ]);
+
     const [
       rawRootMargin,
       modeProviders,
@@ -524,18 +558,9 @@ export class PageTranslationManager extends ResourceTracker {
       autoTranslateOnDOMChanges,
       excludedSelectors,
       attributesToTranslate,
-      showOriginalOnHover
-    ] = await Promise.all([
-      getWholePageRootMarginAsync(),
-      getModeProvidersAsync(),
-      getTranslationApiAsync(),
-      getTargetLanguageAsync(),
-      getWholePageLazyLoadingAsync(),
-      getWholePageAutoTranslateOnDOMChangesAsync(),
-      getWholePageExcludedSelectorsAsync(),
-      getWholePageAttributesToTranslateAsync(),
-      getWholePageShowOriginalOnHoverAsync()
-    ]);
+      showOriginalOnHover,
+      translateAfterScrollStop
+    ] = settingsData;
 
     const formattedRootMargin = rawRootMargin ? (String(rawRootMargin).match(/px|%|em|rem|vh|vw$/) ? String(rawRootMargin) : `${rawRootMargin}px`) : '10px';
 
@@ -548,13 +573,20 @@ export class PageTranslationManager extends ResourceTracker {
     this.settings = {
       translationApi: effectiveProvider,
       targetLanguage: options.targetLanguage || targetLanguage,
-      lazyLoading: lazyLoading,
+      lazyLoading: !!lazyLoading,
       rootMargin: formattedRootMargin,
-      autoTranslateOnDOMChanges: autoTranslateOnDOMChanges,
+      autoTranslateOnDOMChanges: !!autoTranslateOnDOMChanges,
       excludedSelectors: excludedSelectors,
       attributesToTranslate: attributesToTranslate,
-      showOriginalOnHover: showOriginalOnHover
+      showOriginalOnHover: !!showOriginalOnHover,
+      translateAfterScrollStop: !!translateAfterScrollStop
     };
+
+    this.logger.debug('Page Translation Settings Loaded:', {
+      provider: this.settings.translationApi,
+      onStop: this.settings.translateAfterScrollStop,
+      lazy: this.settings.lazyLoading
+    });
 
     const { CONFIG } = await import('@/shared/config/config.js');
     Object.assign(this.settings, {
@@ -604,6 +636,7 @@ export class PageTranslationManager extends ResourceTracker {
     this.cancelTranslation();
     if (this.isTranslated) await this.restorePage();
     this.isAutoTranslating = false;
+    this.scrollTracker.destroy();
     this.bridge.cleanup();
     this.scheduler.reset();
     if (this.hoverManager) {
