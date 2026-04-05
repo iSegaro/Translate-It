@@ -1,20 +1,29 @@
 /**
- * Edge TTS Client - Communicates with Microsoft Edge's Read Aloud endpoint via HTTP
+ * Edge TTS Client - Communicates with Microsoft Edge's Neural TTS endpoint
+ * Optimized for stability and accurate browser/app emulation.
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSClient');
 
-// Constants for Edge TTS (Strictly matching read-frog for authentication success)
+// Constants for Edge TTS (Emulating Microsoft Translator App protocol)
 const EDGE_TTS_SIGNATURE_SECRET_BASE64 = "oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==";
 const EDGE_TTS_SIGNATURE_APP_ID = "MSTranslatorAndroidApp";
 const EDGE_TTS_ENDPOINT_URL = "https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0";
-const EDGE_TTS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0";
+
+// Modern User Agent (Edge on Windows)
+const EDGE_TTS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
 const EDGE_TTS_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
 const EDGE_TTS_CLIENT_VERSION = "4.0.530a 5fe1dc6c";
-const EDGE_TTS_USER_ID = "0f04d16a175c411e";
-const EDGE_TTS_HOME_REGION = "zh-Hans-CN";
+
+// Generate a unique session-based User ID to avoid global fingerprinting
+const EDGE_TTS_USER_ID = (() => {
+  const hex = "0123456789abcdef";
+  let output = "";
+  for (let i = 0; i < 16; i++) output += hex[Math.floor(Math.random() * 16)];
+  return output;
+})();
 
 // Token caching
 let tokenCache = null;
@@ -24,9 +33,10 @@ export class EdgeTTSClient {
    * Synthesize text to audio using Edge TTS HTTP API
    * @param {string} text - Text to synthesize
    * @param {string} voiceName - Name of the voice to use
+   * @param {boolean} isRetry - Whether this is a retry attempt
    * @returns {Promise<Blob>} - Resolves with an audio blob
    */
-  static async synthesize(text, voiceName) {
+  static async synthesize(text, voiceName, isRetry = false) {
     try {
       logger.debug(`Starting synthesis for voice: ${voiceName}`);
       
@@ -35,8 +45,6 @@ export class EdgeTTSClient {
 
       const ssml = EdgeTTSClient._buildSSML(text, voiceName);
       
-      logger.debug(`Sending synthesis request to ${tokenInfo.region} region`);
-
       const response = await fetch(synthesisUrl, {
         method: "POST",
         headers: {
@@ -49,11 +57,12 @@ export class EdgeTTSClient {
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        if (response.status === 401 || response.status === 403) {
-          logger.warn(`Auth error (${response.status}), clearing token cache`);
+        if ((response.status === 401 || response.status === 403) && !isRetry) {
+          logger.warn(`Auth error (${response.status}), refreshing token and retrying once...`);
           tokenCache = null; 
+          return await EdgeTTSClient.synthesize(text, voiceName, true);
         }
+        const errorText = await response.text().catch(() => "");
         throw new Error(`Edge TTS synthesis failed: ${response.status} ${errorText}`);
       }
 
@@ -61,10 +70,9 @@ export class EdgeTTSClient {
       if (audioBlob.size === 0) {
         throw new Error('Edge TTS returned empty audio data');
       }
-      logger.info(`Synthesis successful, received blob of size: ${audioBlob.size}`);
+      
       return audioBlob;
     } catch (err) {
-      // Use warn level for provider errors to follow the Golden Chain architecture
       logger.warn('Synthesis failed:', err);
       throw err;
     }
@@ -75,28 +83,26 @@ export class EdgeTTSClient {
    * @private
    */
   static async _getEndpointToken() {
-    // Check cache (with 1 minute buffer)
+    // Check cache (with 1 minute safety buffer)
     if (tokenCache && tokenCache.expiresAt > Date.now() + 60000) {
-      logger.debug('Using cached token');
       return tokenCache;
     }
 
     try {
-      logger.debug('Fetching new endpoint token...');
+      logger.debug('Fetching new endpoint token from Microsoft...');
       const signature = await EdgeTTSClient._generateSignature(EDGE_TTS_ENDPOINT_URL);
       const traceId = crypto.randomUUID().replace(/-/g, "");
 
       const response = await fetch(EDGE_TTS_ENDPOINT_URL, {
         method: "POST",
         headers: {
-          "Accept-Language": "zh-Hans",
+          "Accept-Language": "en-US",
           "X-ClientVersion": EDGE_TTS_CLIENT_VERSION,
           "X-UserId": EDGE_TTS_USER_ID,
-          "X-HomeGeographicRegion": EDGE_TTS_HOME_REGION,
           "X-ClientTraceId": traceId,
           "X-MT-Signature": signature,
           "User-Agent": EDGE_TTS_USER_AGENT,
-          "Content-Type": "application/json; charset=utf-8",
+          "Content-Type": "application/json",
         },
         body: "",
       });
@@ -107,19 +113,19 @@ export class EdgeTTSClient {
 
       const data = await response.json();
       if (!data.t || !data.r) {
-        throw new Error("Invalid token response format from Microsoft");
+        throw new Error("Invalid token response format");
       }
 
-      // JWT expiry decoding
-      let expiresAt = Date.now() + 10 * 60 * 1000; // Default fallback 10 mins
+      // Try to decode JWT expiry for better cache management
+      let expiresAt = Date.now() + 10 * 60 * 1000; // Default 10 min
       try {
-        const parts = data.t.split('.');
-        if (parts.length > 1) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const payloadBase64 = data.t.split('.')[1];
+        if (payloadBase64) {
+          const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
           if (payload.exp) expiresAt = payload.exp * 1000;
         }
       } catch (e) {
-        logger.warn("Failed to decode token expiry, using default", e);
+        logger.debug("Using default token expiry");
       }
 
       tokenCache = {
@@ -128,24 +134,24 @@ export class EdgeTTSClient {
         expiresAt: expiresAt
       };
 
-      logger.info(`Token retrieved successfully for region: ${data.r}`);
+      logger.info(`Edge TTS token acquired for region: ${data.r}`);
       return tokenCache;
     } catch (err) {
-      // Use warn level for provider errors
       logger.warn("Token retrieval failed:", err);
       throw err;
     }
   }
 
   /**
-   * Generate required MT-Signature header using HMAC-SHA256
+   * Generate required HMAC-SHA256 signature for authentication
    * @private
    */
   static async _generateSignature(url) {
     const encodedUrl = encodeURIComponent(url.split("://")[1] || "");
     const requestId = crypto.randomUUID().replace(/-/g, "");
     const date = new Date();
-    // Format date string exactly as expected: "day, dd mon year hh:mm:ss gmt"
+    
+    // Format: "day, dd mon year hh:mm:ss gmt" (required by MS server)
     const formattedDate = `${date.toUTCString().replace(/GMT/g, "").trim().toLowerCase()} gmt`;
 
     const payload = `${EDGE_TTS_SIGNATURE_APP_ID}${encodedUrl}${formattedDate}${requestId}`.toLowerCase();
