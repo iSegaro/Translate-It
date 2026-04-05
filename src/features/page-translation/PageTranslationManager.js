@@ -166,7 +166,13 @@ export class PageTranslationManager extends ResourceTracker {
       // Initialize bridge with fresh context and standard callback
       await this.bridge.initialize(
         this.settings, 
-        (text, context, score, node) => this.scheduler.enqueue(text, context, score, node),
+        (text, context, score, node) => {
+          // If we are in "On Stop" mode, notify activity to reset the timer
+          if (this.settings.translateAfterScrollStop) {
+            this.scrollTracker.notifyActivity();
+          }
+          return this.scheduler.enqueue(text, context, score, node);
+        },
         this.sessionContext
       );
       

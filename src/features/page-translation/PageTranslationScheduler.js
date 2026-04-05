@@ -33,6 +33,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.translationSessionId = null;
     this.sessionContext = null;
     this.isScrolling = false;
+    this.highPriorityCount = 0;
     
     this.settings = { 
       ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
@@ -71,6 +72,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.stop();
     this.translatedCount = 0;
     this.totalTasks = 0;
+    this.highPriorityCount = 0;
     this.fatalErrorOccurred = false;
     this.translationSessionId = null;
     this.sessionContext = null;
@@ -83,6 +85,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.isTranslated = false;
     this.sessionContext = null;
     this._reportPending = false;
+    this.isScrolling = false;
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
@@ -105,6 +108,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     if (this.queue.length > 0) {
       const itemsToReject = [...this.queue];
       this.queue = [];
+      this.highPriorityCount = 0;
       itemsToReject.forEach(item => {
         try { item.resolve(item.text); } catch {
           // Ignore resolution errors
@@ -131,15 +135,22 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.totalTasks++;
     this._reportProgress();
 
+    const isHighPriority = score >= this.settings.priorityThreshold;
+
     return new Promise((resolve, reject) => {
       this.queue.push({ 
         text: text.trim(), 
         score: score || 0, 
+        isHighPriority,
         resolve, 
         reject, 
         context,
         node
       });
+
+      if (isHighPriority) {
+        this.highPriorityCount++;
+      }
 
       this._scheduleFlush(score);
     });
@@ -162,8 +173,13 @@ export class PageTranslationScheduler extends ResourceTracker {
    */
   signalScrollStart() {
     this.isScrolling = true;
-    // If a timer was running (e.g. from dynamic content), we might want to cancel it 
-    // to strictly wait for scroll stop, but let's keep it fluid unless requested.
+    
+    // If we are waiting for a scroll stop, clear any pending automatic timers
+    // to ensure we strictly wait for the next stop.
+    if (this.settings.translateAfterScrollStop && this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
   }
 
   /**
@@ -173,17 +189,39 @@ export class PageTranslationScheduler extends ResourceTracker {
   _scheduleFlush(score) {
     if (this.activeFlushes >= (this.settings.maxConcurrentFlushes || 1)) return;
 
-    // IF in "On Stop" mode AND currently scrolling: DO NOT schedule automatic flushes
-    // EXCEPT for the very first batch to ensure initial Viewport is translated.
-    // IF NOT scrolling (e.g. user opened a menu): allow standard timers.
+    // 1. EMERGENCY FLUSH (Memory Safety)
+    // If total queue is massive (e.g. 1000+), flush regardless of state to prevent memory issues.
+    if (this.queue.length >= 1000) {
+      this.logger.debug('Queue reached emergency limit (1000). Forcing flush.');
+      this.flush();
+      return;
+    }
+
+    // 2. CAPACITY FLUSH (Efficiency)
+    // If we have enough HIGH PRIORITY items to fill a full API request (chunkSize),
+    // we flush immediately UNLESS we are currently scrolling/active and in "On Stop" mode.
+    // Exception: Always allow the very first batch to flush when full to ensure initial visibility.
+    if (this.highPriorityCount >= (this.settings.chunkSize || 250)) {
+      const shouldWait = this.settings.translateAfterScrollStop && this.isScrolling && !this.isFirstBatch;
+      
+      if (!shouldWait) {
+        this.logger.debug('High-priority items reached capacity. Forcing immediate flush.');
+        this.flush();
+        return;
+      }
+    }
+
+    // 3. ON-STOP MODE CONTROL
+    // IF in "On Stop" mode AND currently busy (scrolling or dynamic activity): 
+    // DO NOT schedule automatic timed flushes EXCEPT for the very first batch.
     if (this.settings.translateAfterScrollStop && this.isScrolling && !this.isFirstBatch) {
       return;
     }
 
     const isHighPriority = score >= this.settings.priorityThreshold;
     
-    // If we have a full chunk, flush immediately
-    if (this.queue.length >= this.settings.chunkSize) {
+    // If we have a full chunk, flush immediately (for non-scroll-stop mode)
+    if (!this.settings.translateAfterScrollStop && this.queue.length >= this.settings.chunkSize) {
       this.flush();
       return;
     }
@@ -243,6 +281,17 @@ export class PageTranslationScheduler extends ResourceTracker {
           const result = PageTranslationQueueFilter.process(this.queue, config.chunkSize);
           currentBatch = result.batchItems;
           this.queue = result.remainingItems;
+
+          // HANDLE EJECTED ITEMS: These were too far, so we remove them from the 
+          // scheduler's responsibility by resolving them with original text.
+          if (result.purgedCount > 0) {
+            result.ejectedItems.forEach(item => {
+              if (item.isHighPriority) {
+                this.highPriorityCount = Math.max(0, this.highPriorityCount - 1);
+              }
+              try { item.resolve(item.text); } catch { /* ignore */ }
+            });
+          }
         } else {
           const result = PageTranslationFluidFilter.process(this.queue, config);
           currentBatch = result.batchItems;
@@ -253,6 +302,10 @@ export class PageTranslationScheduler extends ResourceTracker {
           this.logger.debug('No visible content in queue, stopping flush loop');
           break;
         }
+
+        // Update high priority count based on removed items
+        const removedHighPriority = currentBatch.filter(item => item.isHighPriority).length;
+        this.highPriorityCount = Math.max(0, this.highPriorityCount - removedHighPriority);
 
         // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;

@@ -12,7 +12,7 @@ export class PageTranslationQueueFilter {
    * Filter and prioritize items in the queue.
    * @param {Array} queue - Current scheduler queue
    * @param {number} chunkSize - Maximum batch size
-   * @returns {Object} { batchItems, remainingItems, itemsToPurge }
+   * @returns {Object} { batchItems, remainingItems }
    */
   static process(queue, chunkSize) {
     const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'QueueFilter');
@@ -37,6 +37,18 @@ export class PageTranslationQueueFilter {
     // RULE: If no items in viewport, we don't start a batch just for buffer
     // (Except potentially for isFirstBatch, but that's handled by viewport logic anyway)
     if (viewportItems.length === 0) {
+      // SMART PURGE: If the total queue is getting too large (e.g. > 1000) 
+      // but nothing is visible, we should drop very far away items
+      // to avoid continuous processing of thousands of off-screen nodes.
+      if (queue.length > 1000) {
+        const MAX_DISTANCE_PX = 3000;
+        const purgeResult = this._purgeDistantItems(otherItems, MAX_DISTANCE_PX);
+        
+        if (purgeResult.purgedCount > 0) {
+          logger.debug(`Purged ${purgeResult.purgedCount} items that were too far (> ${MAX_DISTANCE_PX}px)`);
+          return { batchItems: [], remainingItems: [...bufferItems, ...purgeResult.remaining] };
+        }
+      }
       return { batchItems: [], remainingItems: queue };
     }
 
@@ -75,5 +87,30 @@ export class PageTranslationQueueFilter {
 
     return { batchItems, remainingItems };
   }
-  }
 
+  /**
+   * Internal helper to filter out items that are physically far from the viewport.
+   * Marks them as "ejected" so the scheduler can handle them specially.
+   */
+  static _purgeDistantItems(items, maxDistance) {
+    const remaining = [];
+    let purgedCount = 0;
+
+    for (const item of items) {
+      const targetNode = item.node || item.textNode || item;
+      
+      // If we can't determine distance or it's within range, keep it
+      if (!targetNode || PageTranslationHelper.isInViewportWithMargin(targetNode, maxDistance)) {
+        remaining.push(item);
+      } else {
+        // MARK FOR RETRY: Instead of final resolution, mark it as ejected.
+        // The scheduler will resolve it with the original text but in a way 
+        // that allows domtranslator to potentially try again later if it becomes visible.
+        item.isEjected = true;
+        purgedCount++;
+      }
+    }
+
+    return { remaining, purgedCount, ejectedItems: items.filter(i => i.isEjected) };
+  }
+}

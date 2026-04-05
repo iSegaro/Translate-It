@@ -17,6 +17,7 @@ export class PageTranslationScrollTracker {
     this._handleScrollEnd = this._handleScrollEnd.bind(this);
     this._isActive = false;
     this._isScrolling = false;
+    this._lastActivityNotify = 0;
   }
 
   /**
@@ -64,6 +65,33 @@ export class PageTranslationScrollTracker {
     window.removeEventListener('scroll', this._handleScroll);
   }
 
+  /**
+   * Notify that an activity (like DOM change) occurred.
+   * This resets the stop timer even if not scrolling.
+   */
+  notifyActivity() {
+    if (!this._isActive) return;
+
+    // Throttle activity notifications to once every 50ms 
+    // to avoid resetting the timer thousands of times during initial bridge pass
+    const now = Date.now();
+    if (this._lastActivityNotify && (now - this._lastActivityNotify < 50)) {
+      return;
+    }
+    this._lastActivityNotify = now;
+
+    // If we're not currently "scrolling", we still want to treat 
+    // dynamic content as an activity that needs a pause before translating.
+    if (!this._isScrolling) {
+      this._isScrolling = true;
+      if (this.onScrollStartCallback) {
+        this.onScrollStartCallback();
+      }
+    }
+
+    this._resetTimer();
+  }
+
   _handleScroll() {
     if (!this._isScrolling) {
       this._isScrolling = true;
@@ -72,6 +100,10 @@ export class PageTranslationScrollTracker {
       }
     }
 
+    this._resetTimer();
+  }
+
+  _resetTimer() {
     if (this.scrollTimer) {
       clearTimeout(this.scrollTimer);
     }
