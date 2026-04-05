@@ -317,38 +317,6 @@ function handleTTSSpeak(data, sendResponse) {
     
     // Attempt Google TTS with fallback
     handleAudioPlaybackWithFallback(googleTTSUrl, data, sendResponse);
-    
-    /*
-    if ("speechSynthesis" in window) {
-      currentUtterance = new SpeechSynthesisUtterance(data.text);
-
-      // Set voice options
-      if (data.lang) currentUtterance.lang = data.lang;
-      if (data.rate) currentUtterance.rate = data.rate;
-      if (data.pitch) currentUtterance.pitch = data.pitch;
-      if (data.volume) currentUtterance.volume = data.volume;
-
-      currentUtterance.onend = () => {
-        console.log("TTS speech ended");
-        currentUtterance = null;
-        sendResponse({ success: true });
-      };
-
-      currentUtterance.onerror = (error) => {
-        console.error("TTS speech error:", error);
-        currentUtterance = null;
-        // Fallback to Google TTS on speech synthesis error
-        const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(data.text)}&client=gtx`;
-        handleAudioPlayback(googleTTSUrl, sendResponse);
-      };
-
-      currentUtterance.onstart = () => {
-        console.log("TTS speech started");
-      };
-
-      speechSynthesis.speak(currentUtterance);
-    }
-    */
   } catch (error) {
     console.error("[Offscreen] TTS speak failed:", error);
     sendResponse({ success: false, error: error.message });
@@ -725,8 +693,6 @@ function handleWebSpeechFallback(data, sendResponse) {
           isPlaying = false; // Reset playing state
           
           if (!responseAlreadySent) {
-            responseAlreadySent = true;
-            
             // Try to recover from common errors
             if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
               console.debug("[Offscreen] Attempting Web Speech recovery...");
@@ -755,7 +721,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                     isPlaying = false; // Reset playing state
                     if (!responseAlreadySent) {
                       responseAlreadySent = true;
-                      sendResponse({ success: false, error: `Web Speech API failed: ${error.error}, retry failed: ${retryError.error}` });
+                      sendResponse({ success: false, error: `Web Speech retry failed: ${retryError.error}` });
                     }
                   };
                   
@@ -763,6 +729,7 @@ function handleWebSpeechFallback(data, sendResponse) {
                 }
               }, 500);
             } else {
+              responseAlreadySent = true;
               isPlaying = false; // Reset playing state
               sendResponse({ success: false, error: `Web Speech API failed: ${error.error}` });
             }

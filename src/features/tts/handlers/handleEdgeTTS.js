@@ -53,11 +53,15 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
           await ttsStateManager.ensureOffscreenDocument();
 
           // Play via offscreen document
-          await browserAPI.runtime.sendMessage({
+          const response = await browserAPI.runtime.sendMessage({
             action: 'playCachedAudio',
             audioData: audioData,
             target: 'offscreen'
           });
+
+          if (response && response.success === false) {
+            throw new Error(response.error || 'Offscreen cached playback failed');
+          }
         } else {
           // Play directly in Firefox
           const audioUrl = URL.createObjectURL(audioBlob);
