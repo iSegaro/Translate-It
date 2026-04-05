@@ -16,10 +16,10 @@
             class="theme-select"
             @change="updateSettingLocally('TTS_ENGINE', $event.target.value)"
           >
-            <option value="google">
+            <option :value="TTS_ENGINES.GOOGLE">
               {{ t('tts_engine_google') || 'Google TTS (Standard)' }}
             </option>
-            <option value="edge">
+            <option :value="TTS_ENGINES.EDGE">
               {{ t('tts_engine_edge') || 'Microsoft Edge TTS (Neural)' }}
             </option>
           </select>
@@ -93,6 +93,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { TTS_ENGINES } from '@/shared/config/constants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSTab')
 
@@ -100,7 +101,7 @@ const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 
 const ttsEngine = computed({
-  get: () => settingsStore.settings.TTS_ENGINE || 'google',
+  get: () => settingsStore.settings.TTS_ENGINE || TTS_ENGINES.GOOGLE,
   set: (value) => updateSettingLocally('TTS_ENGINE', value)
 })
 

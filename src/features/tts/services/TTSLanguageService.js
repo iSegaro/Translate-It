@@ -4,6 +4,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { SUPPORTED_TTS_LANGUAGES } from '@/features/tts/constants/googleTTS.js';
+import { TTS_ENGINES } from '@/shared/config/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLanguageService');
 
@@ -68,11 +69,11 @@ export class TTSLanguageService {
     if (!language) return false;
     const baseLang = language.split('-')[0].toLowerCase();
 
-    if (engine === 'google') {
+    if (engine === TTS_ENGINES.GOOGLE) {
       return SUPPORTED_TTS_LANGUAGES.has(baseLang) || SUPPORTED_TTS_LANGUAGES.has(language.toLowerCase());
     }
     
-    if (engine === 'edge') {
+    if (engine === TTS_ENGINES.EDGE) {
       // Edge supports a vast range, we check our mapped high-quality voices first, 
       // but generally assume it supports standard ISO codes.
       return true; 
@@ -88,7 +89,7 @@ export class TTSLanguageService {
    * @param {boolean} fallbackEnabled - Whether switching engines is allowed
    * @returns {Object} { engine, language }
    */
-  static resolveTTSSettings(language, preferredEngine = 'google', fallbackEnabled = true) {
+  static resolveTTSSettings(language, preferredEngine = TTS_ENGINES.GOOGLE, fallbackEnabled = true) {
     // If the preferred engine supports the language, use it. No questions asked.
     if (TTSLanguageService.supportsLanguage(preferredEngine, language)) {
       return { engine: preferredEngine, language };
@@ -96,7 +97,7 @@ export class TTSLanguageService {
 
     // If preferred doesn't support, but fallback is enabled, try the other engine
     if (fallbackEnabled) {
-      const otherEngine = preferredEngine === 'google' ? 'edge' : 'google';
+      const otherEngine = preferredEngine === TTS_ENGINES.GOOGLE ? TTS_ENGINES.EDGE : TTS_ENGINES.GOOGLE;
       if (TTSLanguageService.supportsLanguage(otherEngine, language)) {
         logger.debug(`[TTSLanguageService] Switching engine to ${otherEngine} for language ${language} (fallback enabled)`);
         return { engine: otherEngine, language };

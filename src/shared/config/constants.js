@@ -237,6 +237,12 @@ export const TRANSLATION_STATUS = {
   ERROR: 'error'
 };
 
+// ===== TTS SYSTEM CONSTANTS =====
+export const TTS_ENGINES = {
+  GOOGLE: 'google',
+  EDGE: 'edge'
+};
+
 // ===== GLOBAL REPOSITORY URLS =====
 export const REPO_URLS = {
   GITHUB_MAIN: 'https://github.com/iSegaro/Translate-It',

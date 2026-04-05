@@ -5,7 +5,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
-import { TRANSLATION_HTML, MOBILE_CONSTANTS } from './constants.js';
+import { TRANSLATION_HTML, MOBILE_CONSTANTS, TTS_ENGINES } from './constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
 logger.info('Config module initialized');
@@ -208,7 +208,7 @@ export const CONFIG = {
 
   // --- Translation Activation Settings ---
   EXTENSION_ENABLED: true, // فعال بودن افزونه (کلی)
-  TTS_ENGINE: "google", // موتور پیش‌فرض تلفظ صوتی (google یا edge)
+  TTS_ENGINE: TTS_ENGINES.GOOGLE, // موتور پیش‌فرض تلفظ صوتی (google یا edge)
   TTS_FALLBACK_ENABLED: true, // استفاده از صدای جایگزین (مثل عربی برای فارسی) در صورت عدم پشتیبانی موتور
   TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
