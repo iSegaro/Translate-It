@@ -41,11 +41,15 @@ export function useTTSSmart() {
 
     try {
       isProcessing.value = true;
+      
+      // Reset state to ensure failure is seen as "new" even for the same text
+      lastText.value = '';
+      errorMessage.value = '';
+      progress.value = 0;
+      
       await stopAll();
 
       ttsState.value = 'loading';
-      errorMessage.value = '';
-      progress.value = 0;
       currentTTSId.value = generateTTSId();
       
       // Only resolve language if it's not 'auto'. 
