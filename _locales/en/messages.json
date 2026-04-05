@@ -221,6 +221,36 @@
   "advance_tab_title": {
     "message": "Advance"
   },
+  "tts_tab_title": {
+    "message": "Text-to-Speech"
+  },
+  "tts_tab_desc": {
+    "message": "Configure voice settings and pronunciation engines."
+  },
+  "tts_engine_label": {
+    "message": "TTS Engine"
+  },
+  "tts_engine_google": {
+    "message": "Google TTS (Standard)"
+  },
+  "tts_engine_edge": {
+    "message": "Microsoft Edge TTS (Neural)"
+  },
+  "tts_engine_desc": {
+    "message": "Choose the default engine for text pronunciation. Edge TTS provides higher quality neural voices."
+  },
+  "tts_fallback_label": {
+    "message": "Enable Language Fallback"
+  },
+  "tts_fallback_desc": {
+    "message": "Automatically switch to an alternative engine or similar language if the primary selection is unsupported."
+  },
+  "tts_autodetect_label": {
+    "message": "Smart Language Detection"
+  },
+  "tts_autodetect_desc": {
+    "message": "Automatically identify the text language before pronunciation to ensure the correct voice is used."
+  },
   "import_success": {
     "message": "Settings imported successfully."
   },

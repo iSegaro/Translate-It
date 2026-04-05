@@ -221,6 +221,36 @@
   "advance_tab_title": {
     "message": "詳細"
   },
+  "tts_tab_title": {
+    "message": "テキスト読み上げ"
+  },
+  "tts_tab_desc": {
+    "message": "音声設定と読み上げエンジンを構成します。"
+  },
+  "tts_engine_label": {
+    "message": "TTSエンジン"
+  },
+  "tts_engine_google": {
+    "message": "Google 翻訳 (標準)"
+  },
+  "tts_engine_edge": {
+    "message": "Microsoft Edge TTS (ニューラル)"
+  },
+  "tts_engine_desc": {
+    "message": "既定の読み上げエンジンを選択します。Edge TTSは、より高品質で自然な音声を提供します。"
+  },
+  "tts_fallback_label": {
+    "message": "フォールバックを有効にする"
+  },
+  "tts_fallback_desc": {
+    "message": "選択したエンジンが言語をサポートしていない場合、自動的に代替エンジンまたは類似の言語に切り替えます。"
+  },
+  "tts_autodetect_label": {
+    "message": "スマート言語検出"
+  },
+  "tts_autodetect_desc": {
+    "message": "正しい音声が使用されるように、読み上げの前にテキストの言語を自動的に識別します。"
+  },
   "import_success": {
     "message": "設定のインポートが完了しました。"
   },
