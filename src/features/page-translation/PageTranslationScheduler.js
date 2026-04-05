@@ -9,8 +9,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
+import { PageTranslationConstants, DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
+import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 
 /**
@@ -251,29 +252,14 @@ export class PageTranslationScheduler extends ResourceTracker {
             break;
           }
         } else {
-          // ORIGINAL "FLUID" LOGIC
-          // 1. Sort queue by score (DESC) to ensure high priority items are picked first
-          this.queue.sort((a, b) => b.score - a.score);
-
-          // 2. Select items for this batch
-          let itemsToProcess = 0;
-          let currentChars = 0;
-          for (const item of this.queue) {
-            if (item.context && item.context !== flushContext) break;
-            const itemLen = item.text.length;
-            
-            // Respect chunk size and character limits
-            if (itemsToProcess >= config.chunkSize) break;
-            if (currentChars + itemLen > config.maxChars && itemsToProcess > 0) break;
-            
-            currentChars += itemLen;
-            itemsToProcess++;
-          }
+          // MODULAR FLUID LOGIC
+          const { batchItems, remainingItems } = PageTranslationFluidFilter.process(this.queue, config);
           
-          currentBatch = this.queue.splice(0, itemsToProcess);
+          currentBatch = batchItems;
+          this.queue = remainingItems;
 
           if (currentBatch.length === 0) {
-            // If we couldn't pick any items (e.g. context mismatch), break to avoid infinite loop
+            this.logger.debug('No visible content in queue, stopping flush');
             break;
           }
         }

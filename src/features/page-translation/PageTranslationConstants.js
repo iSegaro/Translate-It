@@ -47,9 +47,8 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   chunkSize: 250,
   maxConcurrentFlushes: 1,
   lazyLoading: true,
-  rootMargin: '10px',
-  priorityThreshold: 1,
-  poolDelay: 200
+  rootMargin: '150px',
+  priorityThreshold: 1
 };
 
 /**
