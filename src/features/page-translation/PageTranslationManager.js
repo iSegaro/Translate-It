@@ -139,7 +139,7 @@ export class PageTranslationManager extends ResourceTracker {
 
       // Start scroll tracker if enabled
       if (this.settings.translateAfterScrollStop) {
-        this.scrollTracker.start();
+        this.scrollTracker.start(this.settings.scrollStopDelay);
       } else {
         this.scrollTracker.stop();
       }

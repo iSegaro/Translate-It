@@ -1896,6 +1896,12 @@
     "message": "Translate on scroll stop"
   },
   "whole_page_translate_after_scroll_stop_description": {
-    "message": "Only trigger translation when you stop scrolling after a short delay (500ms)."
+    "message": "Only trigger translation when you stop scrolling."
+  },
+  "whole_page_scroll_stop_delay_label": {
+    "message": "Scroll Stop Delay"
+  },
+  "whole_page_scroll_stop_delay_unit": {
+    "message": "ms"
   }
 }

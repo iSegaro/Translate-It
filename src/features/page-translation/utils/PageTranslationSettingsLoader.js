@@ -6,6 +6,7 @@ import {
   getWholePageAttributesToTranslateAsync, 
   getWholePageShowOriginalOnHoverAsync, 
   getWholePageTranslateAfterScrollStopAsync,
+  getWholePageScrollStopDelayAsync,
   getTranslationApiAsync, 
   getTargetLanguageAsync,
   getModeProvidersAsync,
@@ -38,7 +39,8 @@ export class PageTranslationSettingsLoader {
       getWholePageExcludedSelectorsAsync(),
       getWholePageAttributesToTranslateAsync(),
       getWholePageShowOriginalOnHoverAsync(),
-      getWholePageTranslateAfterScrollStopAsync()
+      getWholePageTranslateAfterScrollStopAsync(),
+      getWholePageScrollStopDelayAsync()
     ]);
 
     const [
@@ -51,7 +53,8 @@ export class PageTranslationSettingsLoader {
       excludedSelectors,
       attributesToTranslate,
       showOriginalOnHover,
-      translateAfterScrollStop
+      translateAfterScrollStop,
+      scrollStopDelay
     ] = settingsData;
 
     // Formatting: Ensure rootMargin has unit
@@ -77,6 +80,7 @@ export class PageTranslationSettingsLoader {
       attributesToTranslate: attributesToTranslate,
       showOriginalOnHover: !!showOriginalOnHover,
       translateAfterScrollStop: !!translateAfterScrollStop,
+      scrollStopDelay: Number(scrollStopDelay) || 500,
       chunkSize: CONFIG.WHOLE_PAGE_CHUNK_SIZE,
       maxConcurrentFlushes: CONFIG.WHOLE_PAGE_MAX_CONCURRENT_REQUESTS
     };

@@ -12,6 +12,7 @@ export class PageTranslationScrollTracker {
     this.onScrollStopCallback = onScrollStopCallback;
     this.onScrollStartCallback = onScrollStartCallback;
     this.scrollTimer = null;
+    this.scrollStopDelay = 500;
     this._handleScroll = this._handleScroll.bind(this);
     this._handleScrollEnd = this._handleScrollEnd.bind(this);
     this._isActive = false;
@@ -21,15 +22,30 @@ export class PageTranslationScrollTracker {
   /**
    * Start listening for scroll events
    */
-  start() {
-    if (this._isActive) return;
+  start(delay = 500) {
+    if (this._isActive) {
+      this.updateDelay(delay);
+      return;
+    }
     this._isActive = true;
-    const delay = PAGE_TRANSLATION_TIMING.SCROLL_STOP_DELAY || 500;
-    this.logger.debug('Starting scroll tracker with delay:', delay);
+    this.scrollStopDelay = Number(delay) || 500;
+    this.logger.debug('Starting scroll tracker with delay:', this.scrollStopDelay);
     
     // Always use manual debounce for custom delays
     // Native 'scrollend' doesn't support custom wait times
     window.addEventListener('scroll', this._handleScroll, { passive: true });
+  }
+
+  /**
+   * Update the scroll stop delay dynamically
+   * @param {number} delay - New delay in ms
+   */
+  updateDelay(delay) {
+    const newDelay = Number(delay) || 500;
+    if (this.scrollStopDelay !== newDelay) {
+      this.logger.debug('Updating scroll stop delay to:', newDelay);
+      this.scrollStopDelay = newDelay;
+    }
   }
 
   /**
@@ -60,13 +76,11 @@ export class PageTranslationScrollTracker {
       clearTimeout(this.scrollTimer);
     }
     
-    const delay = PAGE_TRANSLATION_TIMING.SCROLL_STOP_DELAY || 500;
-    
     this.scrollTimer = setTimeout(() => {
       if (this._isActive && this._isScrolling) {
         this._handleScrollEnd();
       }
-    }, delay);
+    }, this.scrollStopDelay);
   }
 
   _handleScrollEnd() {

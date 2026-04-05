@@ -70,6 +70,5 @@ export const PAGE_TRANSLATION_TIMING = {
   DOM_STABILIZATION_DELAY: 50,
   
   // Scroll stop detection
-  SCROLL_STOP_DELAY: 500,
   VIEWPORT_BUFFER_PX: 100
 };

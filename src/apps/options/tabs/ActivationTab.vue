@@ -373,6 +373,27 @@
             {{ t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling. This significantly reduces API usage.' }}
           </span>
         </div>
+
+        <div 
+          v-if="wholePageTranslateAfterScrollStop"
+          class="setting-group sub-setting-group delay-sub-group"
+        >
+          <div class="setting-row">
+            <span class="setting-label-compact">{{ t('whole_page_scroll_stop_delay_label') || 'Scroll Stop Delay' }}:</span>
+            <div class="number-input-container">
+              <input
+                v-model.number="wholePageScrollStopDelay"
+                type="number"
+                min="100"
+                max="5000"
+                step="100"
+                class="base-number-input"
+                :disabled="!extensionEnabled"
+              />
+              <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </BaseFieldset>
   </section>
@@ -516,6 +537,14 @@ const wholePageTranslateAfterScrollStop = computed({
   set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', value)
 })
 
+const wholePageScrollStopDelay = computed({
+  get: () => settingsStore.settings?.WHOLE_PAGE_SCROLL_STOP_DELAY ?? 500,
+  set: (value) => {
+    logger.debug('📝 Whole Page Scroll Stop Delay changed:', value)
+    settingsStore.updateSettingLocally('WHOLE_PAGE_SCROLL_STOP_DELAY', value)
+  }
+})
+
 import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
@@ -575,6 +604,45 @@ const dictionaryProvider = computed({
     font-weight: 600;
     color: var(--color-text);
     min-width: 150px;
+  }
+
+  .setting-label-compact {
+    font-weight: 500;
+    color: var(--color-text);
+    font-size: 0.95em;
+  }
+}
+
+.number-input-container {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  .base-number-input {
+    width: 80px;
+    padding: 6px 10px;
+    border-radius: $border-radius-sm;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.95em;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  .unit-label {
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
   }
 }
 

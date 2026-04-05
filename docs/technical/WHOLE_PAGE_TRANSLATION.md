@@ -97,7 +97,7 @@ The system is fully integrated with `ResourceTracker`. All queues, observers, an
 | Setting | Default | Description |
 | :--- | :--- | :--- |
 | `chunkSize` | 250 | Number of segments per API request |
-| `SCROLL_STOP_DELAY` | 500ms | Debounce time after scrolling stops |
+| `SCROLL_STOP_DELAY` | 500ms | User-configurable debounce time after scrolling stops |
 | `VIEWPORT_BUFFER_PX` | 100px | Safety margin for batch-filling |
 | `rootMargin` | 150px | Recognition margin for node detection |
 

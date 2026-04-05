@@ -45,6 +45,19 @@ export class PageTranslationEventManager {
         this.manager.resetError();
       }
     });
+
+    // Listen for scroll stop delay changes
+    storageManager.on('change:WHOLE_PAGE_SCROLL_STOP_DELAY', ({ newValue }) => {
+      this.logger.debug('WHOLE_PAGE_SCROLL_STOP_DELAY changed in storage:', newValue);
+      if (this.manager.settings) {
+        this.manager.settings.scrollStopDelay = Number(newValue) || 500;
+        
+        // Update scroll tracker if it's active
+        if (this.manager.scrollTracker) {
+          this.manager.scrollTracker.updateDelay(newValue);
+        }
+      }
+    });
   }
 
   _setupPageEventBusListeners() {
