@@ -8,8 +8,12 @@ export const PROVIDER_CONFIGS = {
   // --- Microsoft Edge Neural TTS Data ---
   [TTS_ENGINES.EDGE]: {
     name: 'Microsoft Edge TTS',
-    authUrl: 'https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0',
+    endpointUrl: 'https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0',
     outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+    clientVersion: '4.0.530a 5fe1dc6c',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+    signatureSecret: 'oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==',
+    appId: 'MSTranslatorAndroidApp',
     // High-quality Neural voices mapping
     voices: {
       // Middle East & Central Asia
@@ -63,9 +67,7 @@ export const PROVIDER_CONFIGS = {
     offscreenPath: 'html/offscreen.html',
     maxTextLength: 200,
     defaultLanguage: 'en',
-    // Regex for cleaning text (Centralized for Google API safety)
     cleaningRegex: /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\uFF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g,
-    // Officially supported language codes for Google's client=tw-ob API
     supportedLanguages: new Set([
       'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw',
       'ar', 'hi', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',

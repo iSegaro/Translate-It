@@ -1,21 +1,16 @@
 /**
  * Edge TTS Client - Communicates with Microsoft Edge's Neural TTS endpoint
- * Optimized for stability and accurate browser/app emulation.
+ * Logic-only worker that fetches all technical data from PROVIDER_CONFIGS.
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSClient');
 
-// Constants for Edge TTS (Emulating Microsoft Translator App protocol)
-const EDGE_TTS_SIGNATURE_SECRET_BASE64 = "oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==";
-const EDGE_TTS_SIGNATURE_APP_ID = "MSTranslatorAndroidApp";
-const EDGE_TTS_ENDPOINT_URL = "https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0";
-
-// Modern User Agent (Edge on Windows)
-const EDGE_TTS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
-const EDGE_TTS_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
-const EDGE_TTS_CLIENT_VERSION = "4.0.530a 5fe1dc6c";
+// Shared config reference
+const config = PROVIDER_CONFIGS[TTS_ENGINES.EDGE];
 
 // Generate a unique session-based User ID to avoid global fingerprinting
 const EDGE_TTS_USER_ID = (() => {
@@ -50,15 +45,15 @@ export class EdgeTTSClient {
         headers: {
           "Authorization": tokenInfo.token,
           "Content-Type": "application/ssml+xml",
-          "User-Agent": EDGE_TTS_USER_AGENT,
-          "X-Microsoft-OutputFormat": EDGE_TTS_OUTPUT_FORMAT,
+          "User-Agent": config.userAgent,
+          "X-Microsoft-OutputFormat": config.outputFormat,
         },
         body: ssml,
       });
 
       if (!response.ok) {
         if ((response.status === 401 || response.status === 403) && !isRetry) {
-          logger.warn(`Auth error (${response.status}), refreshing token and retrying once...`);
+          logger.warn(`Auth error (${response.status}), refreshing token...`);
           tokenCache = null; 
           return await EdgeTTSClient.synthesize(text, voiceName, true);
         }
@@ -83,25 +78,24 @@ export class EdgeTTSClient {
    * @private
    */
   static async _getEndpointToken() {
-    // Check cache (with 1 minute safety buffer)
     if (tokenCache && tokenCache.expiresAt > Date.now() + 60000) {
       return tokenCache;
     }
 
     try {
-      logger.debug('Fetching new endpoint token from Microsoft...');
-      const signature = await EdgeTTSClient._generateSignature(EDGE_TTS_ENDPOINT_URL);
+      logger.debug('Fetching new endpoint token...');
+      const signature = await EdgeTTSClient._generateSignature(config.endpointUrl);
       const traceId = crypto.randomUUID().replace(/-/g, "");
 
-      const response = await fetch(EDGE_TTS_ENDPOINT_URL, {
+      const response = await fetch(config.endpointUrl, {
         method: "POST",
         headers: {
           "Accept-Language": "en-US",
-          "X-ClientVersion": EDGE_TTS_CLIENT_VERSION,
+          "X-ClientVersion": config.clientVersion,
           "X-UserId": EDGE_TTS_USER_ID,
           "X-ClientTraceId": traceId,
           "X-MT-Signature": signature,
-          "User-Agent": EDGE_TTS_USER_AGENT,
+          "User-Agent": config.userAgent,
           "Content-Type": "application/json",
         },
         body: "",
@@ -116,8 +110,8 @@ export class EdgeTTSClient {
         throw new Error("Invalid token response format");
       }
 
-      // Try to decode JWT expiry for better cache management
-      let expiresAt = Date.now() + 10 * 60 * 1000; // Default 10 min
+      // JWT expiry decoding
+      let expiresAt = Date.now() + 10 * 60 * 1000;
       try {
         const payloadBase64 = data.t.split('.')[1];
         if (payloadBase64) {
@@ -125,7 +119,7 @@ export class EdgeTTSClient {
           if (payload.exp) expiresAt = payload.exp * 1000;
         }
       } catch (e) {
-        logger.debug("Using default token expiry");
+        // use default
       }
 
       tokenCache = {
@@ -134,7 +128,6 @@ export class EdgeTTSClient {
         expiresAt: expiresAt
       };
 
-      logger.info(`Edge TTS token acquired for region: ${data.r}`);
       return tokenCache;
     } catch (err) {
       logger.warn("Token retrieval failed:", err);
@@ -150,13 +143,11 @@ export class EdgeTTSClient {
     const encodedUrl = encodeURIComponent(url.split("://")[1] || "");
     const requestId = crypto.randomUUID().replace(/-/g, "");
     const date = new Date();
-    
-    // Format: "day, dd mon year hh:mm:ss gmt" (required by MS server)
     const formattedDate = `${date.toUTCString().replace(/GMT/g, "").trim().toLowerCase()} gmt`;
 
-    const payload = `${EDGE_TTS_SIGNATURE_APP_ID}${encodedUrl}${formattedDate}${requestId}`.toLowerCase();
+    const payload = `${config.appId}${encodedUrl}${formattedDate}${requestId}`.toLowerCase();
     
-    const keyBytes = EdgeTTSClient._base64ToBytes(EDGE_TTS_SIGNATURE_SECRET_BASE64);
+    const keyBytes = EdgeTTSClient._base64ToBytes(config.signatureSecret);
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
       keyBytes,
@@ -173,7 +164,7 @@ export class EdgeTTSClient {
     
     const signatureBase64 = EdgeTTSClient._bytesToBase64(new Uint8Array(signatureBuffer));
 
-    return `${EDGE_TTS_SIGNATURE_APP_ID}::${signatureBase64}::${formattedDate}::${requestId}`;
+    return `${config.appId}::${signatureBase64}::${formattedDate}::${requestId}`;
   }
 
   static _base64ToBytes(base64) {
