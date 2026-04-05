@@ -51,7 +51,7 @@ export const SUPPORTED_TTS_LANGUAGES = new Set([
   'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
   'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',
   'hy', 'ne', 'si', 'my', 'km', 'lo', 'gu', 'ta', 'te', 'kn', 'ml', 'pa',
-  'bn', 'ur', 'fa', 'ps', 'sd', 'ckb', 'ku', 'am', 'om', 'so', 'sw', 'rw',
+  'bn', 'ur', 'am', 'om', 'so', 'sw', 'rw',
   'ny', 'mg', 'st', 'zu', 'xh', 'af', 'sq', 'eu', 'ca', 'co', 'eo', 'fy',
   'gl', 'haw', 'hmn', 'is', 'ig', 'jw', 'kk', 'ky', 'lb', 'mi', 'mn', 'sm',
   'gd', 'sn', 'su', 'tg', 'tt', 'to', 'uz', 'yi', 'yo'

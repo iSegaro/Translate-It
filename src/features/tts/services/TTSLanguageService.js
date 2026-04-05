@@ -1,29 +1,13 @@
 /**
- * TTS Language Service - Manages language support and fallbacks for different TTS engines
+ * TTS Language Service - Manages language support and engine capabilities
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { SUPPORTED_TTS_LANGUAGES } from '@/features/tts/constants/googleTTS.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLanguageService');
 
-// Fallback mapping for languages with limited Google TTS support
-const GOOGLE_TTS_FALLBACKS = {
-  'fa': 'ar', // Persian → Arabic (similar script and phonetics)
-  'ps': 'ar', // Pashto → Arabic
-  'ku': 'ar', // Kurdish → Arabic  
-  'ur': 'ar', // Urdu → Arabic
-  'yi': 'he', // Yiddish → Hebrew
-  'mt': 'ar', // Maltese → Arabic
-  'hy': 'ru', // Armenian → Russian
-  'ka': 'ru', // Georgian → Russian
-  'az': 'tr', // Azerbaijani → Turkish
-  'kk': 'ru', // Kazakh → Russian
-  'ky': 'ru', // Kyrgyz → Russian
-  'uz': 'ru', // Uzbek → Russian
-  'tg': 'ru', // Tajik → Russian
-};
-
-// Edge TTS native voices mapping for special languages
+// Edge TTS native voices mapping (Standard high-quality voices)
 const EDGE_TTS_VOICES = {
   'fa': 'fa-IR-DilaraNeural', 
   'en': 'en-US-AriaNeural',
@@ -39,48 +23,56 @@ const EDGE_TTS_VOICES = {
 
 export class TTSLanguageService {
   /**
-   * Determine the best language code and engine to use based on settings and support
-   * @param {string} originalLanguage - The requested language code
-   * @param {string} preferredEngine - The user's preferred TTS engine ('google' or 'edge')
-   * @param {boolean} fallbackEnabled - Whether fallback to another language/engine is allowed
-   * @returns {Object} { engine, language }
+   * Check if an engine supports a specific language
+   * @param {string} engine - 'google' or 'edge'
+   * @param {string} language - language code (e.g., 'fa')
+   * @returns {boolean}
    */
-  static resolveTTSSettings(originalLanguage, preferredEngine = 'google', fallbackEnabled = true) {
-    let finalLanguage = originalLanguage;
-    let finalEngine = preferredEngine;
+  static supportsLanguage(engine, language) {
+    if (!language) return false;
+    const baseLang = language.split('-')[0].toLowerCase();
 
-    // Remove dialect suffixes for checking (e.g., en-US -> en)
-    const baseLanguage = originalLanguage.split('-')[0].toLowerCase();
-
-    if (preferredEngine === 'google') {
-      // Check if Google needs a fallback for this language
-      if (GOOGLE_TTS_FALLBACKS[baseLanguage]) {
-        if (fallbackEnabled) {
-          finalLanguage = GOOGLE_TTS_FALLBACKS[baseLanguage];
-          logger.debug(`[TTSLanguageService] Applied Google TTS fallback: ${baseLanguage} -> ${finalLanguage}`);
-        } else {
-          // If fallback is disabled, we keep the original language, but Google TTS might fail or skip it.
-          // Alternatively, we could switch to Edge TTS if fallback means "engine fallback".
-          // The prompt requested: "اگه موتور Google انتخاب شده و Fallback فعال نیست؛ سیستم باید با ظرافت خطا دهد یا متوقف شود"
-          // We will return the original language and let Google TTS handle/fail.
-          logger.debug(`[TTSLanguageService] Fallback disabled. Keeping original language for Google TTS: ${baseLanguage}`);
-        }
-      }
-    } else if (preferredEngine === 'edge') {
-      // Edge supports almost everything natively, especially Persian.
-      logger.debug(`[TTSLanguageService] Using Edge TTS natively for language: ${originalLanguage}`);
+    if (engine === 'google') {
+      return SUPPORTED_TTS_LANGUAGES.has(baseLang) || SUPPORTED_TTS_LANGUAGES.has(language.toLowerCase());
+    }
+    
+    if (engine === 'edge') {
+      // Edge supports a vast range, we check our mapped high-quality voices first, 
+      // but generally assume it supports standard ISO codes.
+      return true; 
     }
 
-    return {
-      engine: finalEngine,
-      language: finalLanguage
-    };
+    return false;
   }
 
   /**
-   * Gets the specific Edge TTS voice for a language if mapped
-   * @param {string} language - The language code
-   * @returns {string|null} - Voice name or null to use auto-detection
+   * Determine the best engine to use based on support and settings
+   * @param {string} language - The requested language code
+   * @param {string} preferredEngine - User's preferred engine
+   * @param {boolean} fallbackEnabled - Whether switching engines is allowed
+   * @returns {Object} { engine, language }
+   */
+  static resolveTTSSettings(language, preferredEngine = 'google', fallbackEnabled = true) {
+    // If the preferred engine supports the language, use it. No questions asked.
+    if (TTSLanguageService.supportsLanguage(preferredEngine, language)) {
+      return { engine: preferredEngine, language };
+    }
+
+    // If preferred doesn't support, but fallback is enabled, try the other engine
+    if (fallbackEnabled) {
+      const otherEngine = preferredEngine === 'google' ? 'edge' : 'google';
+      if (TTSLanguageService.supportsLanguage(otherEngine, language)) {
+        logger.debug(`[TTSLanguageService] Switching engine to ${otherEngine} for language ${language} (fallback enabled)`);
+        return { engine: otherEngine, language };
+      }
+    }
+
+    // No support found or fallback disabled
+    return { engine: preferredEngine, language };
+  }
+
+  /**
+   * Gets the specific Edge TTS voice for a language
    */
   static getEdgeVoiceForLanguage(language) {
     const baseLanguage = language.split('-')[0].toLowerCase();
