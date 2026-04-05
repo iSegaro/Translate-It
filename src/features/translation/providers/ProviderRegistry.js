@@ -85,7 +85,7 @@ class ProviderRegistry {
       }
 
       this.providers.set(id, ProviderClass);
-      logger.info(`Provider '${id}' loaded successfully`);
+      logger.debug(`Provider '${id}' loaded successfully`);
     } catch (error) {
       logger.error(`Failed to load provider '${id}':`, error);
       throw new Error(`Failed to load provider '${id}': ${error.message}`);
