@@ -75,8 +75,18 @@ async function initializeLogger() {
   }
 }
 
+import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
+
+// Minimal early check for exclusion removed in favor of shared utility
+// Check is now handled via checkUrlExclusionAsync() below
+
 // Initialize the content script with ultra-minimal footprint
 (async () => {
+  // FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
+  if (await checkUrlExclusionAsync()) {
+    return;
+  }
+
   try {
     // Initialize logger first
     const scriptLogger = await initializeLogger();

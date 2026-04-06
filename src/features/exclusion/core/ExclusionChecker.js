@@ -1,5 +1,6 @@
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { checkUrlExclusionAsync } from '../utils/exclusion-utils.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
@@ -301,8 +302,11 @@ export class ExclusionChecker {
 
   // Static method to check if feature should be considered for a URL
   static async shouldConsiderFeature(featureName, url) {
-    // Quick pre-check without full initialization
-    // Useful for avoiding unnecessary content script loading
+    // 1. First, check global URL exclusion via background for speed/safety
+    const isExcluded = await checkUrlExclusionAsync(url);
+    if (isExcluded) return false;
+
+    // 2. Feature-specific pre-checks
     try {
       const { isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
       if (featureName === 'textFieldIcon') {
