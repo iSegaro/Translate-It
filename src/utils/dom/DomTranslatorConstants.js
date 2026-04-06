@@ -96,6 +96,15 @@ export const FORMATTING_TAGS = new Set([
 ]);
 
 /**
+ * Block-level tags used specifically for the "Select Element" feature
+ * to create logical grouping boundaries for context-aware batching.
+ */
+export const SELECT_ELEMENT_BLOCK_TAGS = new Set([
+  'ARTICLE', 'SECTION', 'DIV', 'P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
+  'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'TD', 'TH'
+]);
+
+/**
  * Block-level tags that should have text-align: start applied
  */
 export const BLOCK_TAGS = new Set([

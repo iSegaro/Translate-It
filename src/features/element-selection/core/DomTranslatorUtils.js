@@ -1,29 +1,23 @@
 /**
  * Utility functions for DOM analysis and manipulation
+ * Specifically for the "Select Element" feature
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
 
 /**
- * Block-level tags for logical grouping
- */
-const BLOCK_TAGS = new Set([
-  'ARTICLE', 'SECTION', 'DIV', 'P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
-  'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'TD', 'TH'
-]);
-
-/**
- * Finds the closest block-level parent for a node
- * @param {Node} node - The node to check
- * @returns {HTMLElement} - The block-level parent
+ * Finds the closest block-level parent for a node based on context boundaries
+ * @param {Node} node - The DOM node to check
+ * @returns {HTMLElement} - The block-level ancestor or document.body
  */
 function findClosestBlockParent(node) {
   let parent = node.parentElement;
   while (parent) {
-    if (BLOCK_TAGS.has(parent.tagName)) {
+    if (SELECT_ELEMENT_BLOCK_TAGS.has(parent.tagName)) {
       return parent;
     }
     parent = parent.parentElement;
@@ -32,9 +26,9 @@ function findClosestBlockParent(node) {
 }
 
 /**
- * Extracts page and heading context for an element
+ * Extracts page and heading context to enrich translation requests (especially for AI)
  * @param {HTMLElement} element - The selected element
- * @returns {Object} - Context metadata
+ * @returns {Object} - Metadata including page title, heading context and element role
  */
 export function extractContextMetadata(element) {
   const metadata = {
@@ -43,11 +37,10 @@ export function extractContextMetadata(element) {
     role: element.tagName.toLowerCase()
   };
 
-  // Find the nearest preceding heading
+  // Find the nearest preceding heading to provide semantic context
   try {
     const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
     if (headings.length > 0) {
-      // Find the heading that is physically closest above the element
       const elementRect = element.getBoundingClientRect();
       let closestHeading = null;
       let minDistance = Infinity;
@@ -74,8 +67,8 @@ export function extractContextMetadata(element) {
 }
 
 /**
- * Collect all visible text nodes within an element with structural metadata
- * @param {HTMLElement} element - Root element
+ * Collect all visible text nodes with unique structural IDs for accurate batch mapping
+ * @param {HTMLElement} element - Root element to crawl
  * @returns {Object[]} Array of objects { node, text, uid, blockId, role }
  */
 export function collectTextNodes(element) {
@@ -85,23 +78,22 @@ export function collectTextNodes(element) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
 
-      // Skip certain element types
+      // Skip elements that shouldn't be translated (scripts, styles, invisible)
       const tagName = parent.tagName;
       if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
         return NodeFilter.FILTER_REJECT;
       }
 
-      // Check visibility
       try {
         const style = window.getComputedStyle(parent);
         if (style.display === 'none' || style.visibility === 'hidden') {
           return NodeFilter.FILTER_REJECT;
         }
       } catch {
-        // If getComputedStyle fails, accept the node
+        // Fallback to acceptance if style checking fails
       }
 
-      // Accept nodes with non-whitespace content
+      // Filter out empty or whitespace-only nodes early
       return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }
   });
@@ -110,7 +102,7 @@ export function collectTextNodes(element) {
   while ((node = walker.nextNode())) {
     const blockParent = findClosestBlockParent(node);
     
-    // Generate a blockId based on the block parent
+    // Ensure blockId persists for mapping back to the DOM
     if (!blockParent.dataset.blockId) {
       blockParent.dataset.blockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     }
@@ -129,7 +121,7 @@ export function collectTextNodes(element) {
 }
 
 /**
- * Generate unique element ID
+ * Generates a unique ID for element tracking during translation sessions
  * @returns {string} Unique ID
  */
 export function generateElementId() {
