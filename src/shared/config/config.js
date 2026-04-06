@@ -233,7 +233,10 @@ export const CONFIG = {
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
-  // --- Whole Page Translation Settings (NEW) ---
+  // --- Versioning ---
+  PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching)
+
+  // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
   WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه

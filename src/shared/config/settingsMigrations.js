@@ -144,17 +144,34 @@ function runMainMigration(currentSettings) {
   });
 
   // C. Handle prompt templates - update to latest version
+  // We only force update if the PROMPTS_VERSION has increased.
+  // This allows us to push critical prompt updates (like logical batching) 
+  // while preserving user customizations during minor version updates.
+  const currentPromptsVersion = currentSettings.PROMPTS_VERSION || 1;
+  const targetPromptsVersion = CONFIG.PROMPTS_VERSION || 1;
+  const forceUpdatePrompts = targetPromptsVersion > currentPromptsVersion;
+
   PROMPT_TEMPLATES.forEach(key => {
     if (!(key in currentSettings)) return;
 
     const userPrompt = currentSettings[key];
     const defaultPrompt = CONFIG[key];
 
-    if (userPrompt !== defaultPrompt) {
-      updates[key] = CONFIG[key];
-      migrationLog.push(`Updated prompt template ${key} to latest version`);
+    // Only update if versions differ OR if user somehow has a missing/invalid prompt
+    if (forceUpdatePrompts || userPrompt !== defaultPrompt) {
+      // If forceUpdatePrompts is false but prompts differ, it means the user 
+      // likely customized it, so we SHOULD NOT overwrite unless forceUpdatePrompts is true.
+      if (forceUpdatePrompts || !userPrompt) {
+        updates[key] = defaultPrompt;
+        migrationLog.push(`Updated prompt template ${key} to version ${targetPromptsVersion}`);
+      }
     }
   });
+
+  // Ensure PROMPTS_VERSION is updated in storage
+  if (forceUpdatePrompts) {
+    updates.PROMPTS_VERSION = targetPromptsVersion;
+  }
 
   // D. Synchronize Option Lists
   OPTION_LISTS.forEach(key => {
