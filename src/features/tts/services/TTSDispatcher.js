@@ -6,6 +6,7 @@ import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { detectTextLanguage } from '@/shared/utils/language/languageUtils.js';
 import { isPersianText } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
+import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSDispatcher');
 
@@ -48,9 +49,27 @@ export class TTSDispatcher {
         }
       }
 
-      // 3. Resolve BEST ENGINE for this language
-      // This is where we handle switching from Google to Edge for Persian, etc.
+      // 3. Resolve BEST ENGINE with Circuit Breaker awareness
       let resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled);
+      
+      // Check if the resolved engine is actually allowed (not blocked)
+      const isEngineAllowed = await ttsCircuitBreaker.isAllowed(resolution.engine);
+      
+      if (!isEngineAllowed && fallbackEnabled) {
+        const otherEngine = resolution.engine === TTS_ENGINES.GOOGLE ? TTS_ENGINES.EDGE : TTS_ENGINES.GOOGLE;
+        logger.info(`[TTSDispatcher] Engine ${resolution.engine} is BLOCKED. Trying fallback to ${otherEngine}.`);
+        
+        if (await ttsCircuitBreaker.isAllowed(otherEngine)) {
+          resolution.engine = otherEngine;
+        } else {
+          // Both engines blocked!
+          return { success: false, error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+        }
+      } else if (!isEngineAllowed) {
+        // Primary engine blocked and fallback is disabled
+        return { success: false, error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+      }
+
       logger.info(`[TTSDispatcher] Final dispatch: engine=${resolution.engine}, lang=${resolution.language}`);
 
       // 4. Execution Attempt
@@ -61,14 +80,16 @@ export class TTSDispatcher {
         // 5. Smart Recovery (If Edge returns empty audio)
         if (!response.success && fallbackEnabled && response.error?.includes('empty audio data')) {
           logger.info('[TTSDispatcher] Edge failed. Fallback is ENABLED, attempting recovery...');
-          const redetected = await TTSDispatcher._detectLanguage(text);
           
-          if (redetected && redetected !== resolution.language) {
-            const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
-            response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
-          } else {
-            // Ultimate fallback to Google
-            response = await handleGoogleTTSSpeak(message, sender, resolution.language);
+          // Check if Google is at least allowed before trying recovery
+          if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.GOOGLE)) {
+            const redetected = await TTSDispatcher._detectLanguage(text);
+            if (redetected && redetected !== resolution.language) {
+              const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
+              response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
+            } else {
+              response = await handleGoogleTTSSpeak(message, sender, resolution.language);
+            }
           }
         }
       } else {
@@ -77,8 +98,11 @@ export class TTSDispatcher {
         
         // If Google fails (e.g. Unsupported language) AND fallback is allowed
         if (!response.success && fallbackEnabled && response.unsupportedLanguage) {
-          logger.info(`[TTSDispatcher] Google doesn't support ${resolution.language}. Falling back to ${TTS_ENGINES.EDGE}.`);
-          response = await handleEdgeTTSSpeak(message, sender, resolution.language);
+          // Check if Edge is allowed
+          if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.EDGE)) {
+            logger.info(`[TTSDispatcher] Google doesn't support ${resolution.language}. Falling back to ${TTS_ENGINES.EDGE}.`);
+            response = await handleEdgeTTSSpeak(message, sender, resolution.language);
+          }
         }
       }
 

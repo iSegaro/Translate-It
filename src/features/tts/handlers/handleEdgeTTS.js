@@ -92,7 +92,8 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
     ttsStateManager.fullReset();
     return {
       success: false,
-      error: error.message || 'Background Edge TTS failed'
+      error: error.message || 'Background Edge TTS failed',
+      errorType: error.errorType
     };
   }
 };

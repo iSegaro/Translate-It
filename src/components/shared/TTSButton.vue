@@ -187,7 +187,13 @@ const buttonTitle = computed(() => {
     case 'playing':
       return t('action_stop_speaking')
     case 'error':
-      return `Error: ${tts.errorMessage.value || 'Click to retry'}`
+      // Try to get localized message from errorType key
+      if (tts.errorType.value) {
+        const key = tts.errorType.value.startsWith('ERRORS_') ? tts.errorType.value : `ERRORS_${tts.errorType.value}`;
+        const translated = t(key);
+        if (translated && translated !== key) return translated;
+      }
+      return tts.errorMessage.value || t('ERRORS_UNKNOWN')
     default:
       return 'Text to speech'
   }

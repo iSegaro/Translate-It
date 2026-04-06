@@ -27,7 +27,9 @@ export class EdgeTTSClient {
   static async synthesize(text, voiceName, isRetry = false) {
     // 1. Circuit Breaker Check
     if (!(await ttsCircuitBreaker.isAllowed(TTS_ENGINES.EDGE))) {
-      throw new Error('Edge TTS is temporarily disabled (Circuit Breaker OPEN)');
+      const error = new Error('Edge TTS is temporarily disabled');
+      error.errorType = 'ERRORS_CIRCUIT_BREAKER_OPEN';
+      throw error;
     }
 
     try {

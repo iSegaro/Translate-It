@@ -80,8 +80,10 @@ export function useTTSSmart() {
         throw new Error('No response from background service');
       }
 
-      if (!response.success && response.error) {
-        throw new Error(response.error);
+      if (!response.success) {
+        const err = new Error(response.error || 'TTS failed');
+        if (response.errorType) err.errorType = response.errorType;
+        throw err;
       }
 
       ttsState.value = 'playing';
@@ -102,6 +104,7 @@ export function useTTSSmart() {
       
       ttsState.value = 'error';
       errorMessage.value = error.message || 'TTS failed';
+      errorType.value = error.errorType || '';
       progress.value = 0;
       
       return false;
