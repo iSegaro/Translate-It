@@ -26,9 +26,13 @@ The system uses a layered approach to separate UI interaction, logic routing, an
 [ TTSDispatcher.js ] ◄─┐ (The Brain: Proactive Detection & Engine Selection)
        │               │
        ├─► [ TTSLanguageService.js ] (Checks engine support via PROVIDER_CONFIGS)
+       │               │
+       │               └─► [ TTSVoiceService.js ] (Dynamic list & Dialect matching)
        │
        ├─► [ handleEdgeTTS.js ] ──► [ EdgeTTSClient.js ] (Logic-only synthesize)
-       │            │
+       │            │                      │
+       │            └──────────────────────┼──► [ TTSCircuitBreaker.js ]
+       │                                   │    (Failure monitoring)
        └─► [ handleGoogleTTS.js ] ──► [ Google TTS API ]
                     │
                     ▼
@@ -42,53 +46,70 @@ The system uses a layered approach to separate UI interaction, logic routing, an
 
 ### 1. `ttsProviders.js` (The Data Vault)
 The **Single Source of Truth** for the entire TTS module. It contains:
-- **`PROVIDER_CONFIGS`**: Centralized object containing URLs, voice mappings, supported languages, and technical parameters (User-Agents, versions, cleaning Regex) for all engines.
-- **Engine IDs**: Uses the global `TTS_ENGINES` constant to prevent magic strings.
+- **`PROVIDER_CONFIGS`**: Centralized object containing URLs, trusted tokens, supported languages, and technical parameters (User-Agents, App IDs, cleaning Regex).
+- **Circuit Breaker Settings**: Defines failure thresholds and recovery windows for each engine.
 
 ### 2. `TTSDispatcher.js` (The Router)
 The central intelligence of the system. It intercepts all speech requests and performs:
-- **Proactive Detection**: If `auto` is requested or "Smart Detection" is ON, it identifies the language before the first attempt.
-- **Engine Resolution**: Decides whether to use Google or Edge based on user preference and language support.
-- **Smart Recovery**: If Edge fails (e.g., 0-byte audio), it triggers re-detection and falls back to the alternative engine if "Fallback" is enabled.
+- **Proactive Detection**: Identifies the language before the first attempt if "Smart Detection" is enabled.
+- **Engine Resolution**: Decides between Google or Edge based on user preference and native language support.
+- **Smart Recovery**: Handles Edge failures (e.g., 0-byte audio) by triggering re-detection and falling back to the alternative engine.
 
 ### 3. `TTSStateManager.js` (Unified State)
 Manages the shared state across all handlers:
 - **Offscreen Persistence**: Controls the lifecycle of the Offscreen document. Uses `stopAudioOnly()` instead of closing the document to eliminate latency.
-- **Sender Tracking**: Ensures `GOOGLE_TTS_ENDED` events are routed back to the correct requester.
+- **Sender Tracking**: Ensures completion events are routed back to the correct requester.
 
 ### 4. `EdgeTTSClient.js` (Neural Worker)
 A **logic-only** client for Microsoft Edge TTS:
-- **Emulation**: Uses dynamic session-based User IDs and modern User-Agents to mimic real browser/app traffic.
-- **Authenticity**: Implements HMAC-SHA256 signatures and JWT token expiry management.
-- **Auto-Refresh**: Automatically refreshes expired tokens and retries failed requests once.
+- **Mobile Emulation**: Uses fixed Mobile App IDs and modern User-Agents to ensure authenticity.
+- **Security**: Implements HMAC-SHA256 signatures and JWT token expiry management.
+- **Resilience**: Integrated with the Circuit Breaker to prevent IP blocking on server failures.
 
 ### 5. `TTSLanguageService.js` (Capability Manager)
 Acts as a validator for engine capabilities:
-- **Logic Separation**: Decoupled from data; it fetches all support matrices from `ttsProviders.js`.
-- **Engine Fallback**: Coordinates with the Dispatcher to switch engines (e.g., Google to Edge for Persian) when the primary engine lacks support.
+- **Logic Separation**: Decoupled from data; fetches support matrices from `ttsProviders.js`.
+- **Async Resolution**: Coordinates with `TTSVoiceService` to find the best available neural voice name.
+
+### 6. `TTSCircuitBreaker.js` (Protection Layer)
+Prevents overwhelming failing services and protects user IP reputation:
+- **State Persistence**: Stores "Open/Closed" states in `storage.local` to survive worker suspensions.
+- **Thresholds**: Automatically blocks requests to an engine if it fails 5 times within a 10-minute window.
+- **Cooldown**: Enforces a 15-minute reset period before allowing new attempts.
+
+### 7. `TTSVoiceService.js` (Voice Management)
+Handles the dynamic aspects of Microsoft Edge voices:
+- **Dynamic Fetching**: Downloads the live voice list from Microsoft using a trusted client token.
+- **Caching**: Implements a 24-hour cache in `storage.local` to avoid redundant network requests.
+- **Dialect Prioritization**: Implements a "Preferred Region" logic (e.g., prioritizing `en-US` over `en-AU` for English) to ensure natural sounding defaults.
 
 ---
 
-## Smart Language Detection
+## Smart Language Detection & Voice Selection
 
-The system uses a multi-tiered strategy (`_detectLanguage`) to identify text language:
+### Multi-tiered Detection
+The system uses a tiered strategy (`_detectLanguage`) for language identification:
+1.  **Script Markers**: Unambiguous detection for languages like Persian (`پ چ ژ گ`), Arabic (`ة`), or Japanese (`Hiragana`).
+2.  **Encoding Check**: Differentiates between identical looking characters (e.g., Persian `ی` vs Arabic `ي`).
+3.  **Script Validation**: Cross-checks Browser API results against character sets to prevent false positives on short strings.
 
-1.  **Script Markers (100% Accuracy)**: Identifies unique characters like `پ چ ژ گ` (Persian) vs `ة` (Arabic), or Hiragana/Katakana (Japanese).
-2.  **Encoding Check**: Differentiates between Persian `ی/ک` and Arabic `ي/ك` encodings.
-3.  **Script Validation**: Prevents browser API false positives (e.g., stops short English words from being detected as Korean).
-4.  **Instant Markers**: Detects specific Latin diacritics (like `ß` for German or `ñ` for Spanish) for ultra-fast identification.
+### Dialect Matching Logic
+When searching for a voice, the system follows this priority:
+1.  **Strict Locale Match**: Matches the requested language + preferred dialect (e.g., `en-US`).
+2.  **Neural Family Match**: Finds any available Neural voice in the same language group.
+3.  **Static Fallback**: Uses the hardcoded mapping in `ttsProviders.js` as a last resort.
 
 ---
 
 ## Lifecycle & State Management
 
 ### Optimized UI Reactivity
-- **Error Reset**: The `useTTSSmart.js` composable explicitly clears previous error states at the beginning of each `speak()` call, ensuring the UI always reacts to retries even for identical text.
-- **State Machine**: Simplified to `idle` | `loading` | `playing` | `error`. Pause/Resume logic was removed for MV3 stability.
+- **Instant Feedback**: The `useTTSSmart.js` composable clears previous error states at the start of each call, ensuring the UI always reacts to retries.
+- **Background Initialization**: `LifecycleManager.js` triggers a background voice list update on startup if the 24-hour cache has expired.
 
 ### Reliable Messaging
-- **Response Validation**: Background handlers now explicitly check the `success` field returned by the Offscreen document instead of assuming success on message delivery.
-- **Failure Propagation**: Errors in the Offscreen layer (like `synthesis-failed`) are forwarded through the handler and dispatcher to immediately update the UI button state.
+- **Response Validation**: Handlers verify the `success` field from the Offscreen document.
+- **Failure Propagation**: Technical failures (like `synthesis-failed` or `Circuit Breaker OPEN`) are bubbled up to the UI button immediately.
 
 ---
 
@@ -114,16 +135,16 @@ Users can control the system through the **TTS Tab** in Options:
 
 ## Troubleshooting for Developers
 
-### Audio doesn't play, but UI shows "Playing"
-- **Check Offscreen Console**: Look for `net::ERR_CONTENT_DECODING_FAILED`. This usually means the Edge binary data was corrupted or the Signature format is slightly off.
-- **Token Cache**: Force clear `tokenCache` in `EdgeTTSClient` to re-authenticate.
+### Audio plays but UI stays in "Loading"
+- **Cause**: The Offscreen document encountered an error and didn't call `sendResponse`.
+- **Fix**: Check `offscreen.js` for missing `sendResponse` calls in `catch` blocks or retry handlers.
 
-### TTS Button hangs in "Loading"
-- **Cause**: A failure occurred in `offscreen.js` without calling `sendResponse`.
-- **Fix**: Ensure all error paths in `handleWebSpeechFallback` and `playCachedAudio` call `sendResponse({ success: false })`.
+### "Circuit Breaker OPEN" Error
+- **Cause**: The engine has failed too many times recently.
+- **Resolution**: Check internet connection or server status. Wait 15 minutes or manually clear `TTS_CIRCUIT_STATE` in `storage.local` for testing.
 
-### "Google doesn't support language"
-- **Resolution**: Check `src/features/tts/constants/ttsProviders.js`. If a language is in the list but fails with HTTP 400, it should be removed from the `supportedLanguages` Set to force an Edge fallback.
+### English sounds like a different accent (e.g., Australian)
+- **Resolution**: Verify `dialectPriorities` in `TTSVoiceService.js`. If the preferred dialect (e.g., `en-us`) is not in the live voice list, the system falls back to the first alphabetical match.
 
 ---
 **Last Updated**: April 6, 2026
