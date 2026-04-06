@@ -1,5 +1,4 @@
 // SelectElementManager - Simplified Manager using domtranslator
-// Reduced from ~1,265 lines to ~300 lines by using domtranslator library
 // Single responsibility: Manage Select Element mode lifecycle and interactions
 
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -16,14 +15,13 @@ import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { useMobileStore } from '@/store/modules/mobile.js';
 
 // Import new simplified services
 import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
 import { extractTextFromElement, isValidTextElement } from './utils/elementHelpers.js';
 
-// Import notification manager (keeping as-is)
+// Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
 
 /**
@@ -62,7 +60,6 @@ class SelectElementManager extends ResourceTracker {
       }
     }, { isCritical: true });
 
-    // Notification manager
     this.notificationManager = null;
 
     // Event handlers (bound)
@@ -359,7 +356,6 @@ class SelectElementManager extends ResourceTracker {
     } catch (error) {
       this.logger.error('Error handling element click:', error);
     } finally {
-      if (this.domTranslatorAdapter?.hasTranslation()) useMobileStore().setHasElementTranslations(true);
       this.isProcessingClick = false;
     }
   }
@@ -373,35 +369,31 @@ class SelectElementManager extends ResourceTracker {
         ...this.currentOptions,
         ...options,
         onProgress: async () => {
-          useMobileStore().setHasElementTranslations(true);
           pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE);
         }
       });
 
-      if (result.success) {
-        useMobileStore().setHasElementTranslations(true);
+      if (result && result.success) {
         pageEventBus.emit('hide-translation', { element: targetElement });
         this.performPostTranslationCleanup({ reason: 'success' });
-      } else if (result.cancelled) {
+      } else if (result && result.cancelled) {
         this.deactivate({ reason: 'cancel', silent: true });
+      } else {
+        this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
       }
     } catch (error) {
+      this.logger.error('Select Element translation failed:', error); // CRITICAL: Log the actual error
+      
       const errorType = matchErrorToType(error);
       const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 
                              errorType === ErrorTypes.TRANSLATION_CANCELLED ||
                              error.message === 'Handler cancelled';
 
-      if (this.domTranslatorAdapter?.hasTranslation()) useMobileStore().setHasElementTranslations(true);
-
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'element-selection');
       }
 
-      // ARCHITECTURAL FIX: Check if the error is fatal. 
-      // If it is, we MUST NOT call performPostTranslationCleanup immediately
-      // because it will squash the error Toast.
       if (isFatalError(error) && !isCancellation) {
-        this.logger.warn('Fatal translation error, keeping Toast visible');
         this.deactivate({ preserveTranslations: true, reason: 'error' });
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
@@ -425,7 +417,6 @@ class SelectElementManager extends ResourceTracker {
   async revertTranslations() {
     window.isTranslationInProgress = false;
     const revertedCount = await this.domTranslatorAdapter.revertTranslation();
-    useMobileStore().setHasElementTranslations(false);
     pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_CLEARED);
     return revertedCount;
   }

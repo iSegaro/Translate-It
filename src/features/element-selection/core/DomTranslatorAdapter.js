@@ -71,9 +71,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalHTML = element.innerHTML;
       const elementId = generateElementId();
       
-      // Get logical text nodes
+      // 1. Collect all valid text nodes
       const textNodesData = collectTextNodes(element);
       if (textNodesData.length === 0) throw new Error('No translatable text found');
+
+      // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
+      const textsToTranslate = textNodesData.map(data => ({ 
+        text: data.text.trim(),
+        uid: data.uid,
+        blockId: data.blockId,
+        role: data.role
+      }));
 
       const nodeMap = new Map();
       textNodesData.forEach(data => nodeMap.set(data.uid, data));
@@ -81,13 +89,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Context
       const contextMetadata = extractContextMetadata(element);
       const isSmartContextEnabled = await getSmartContextTranslationEnabledAsync();
-
-      const textsToTranslate = textNodesData.map(data => ({ 
-        text: data.text.trim(),
-        uid: data.uid,
-        blockId: data.blockId,
-        role: data.role
-      })).filter(item => item.text);
 
       const [provider, targetLanguage] = await Promise.all([
         options.provider || getTranslationApiAsync(),
@@ -109,38 +110,57 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const messageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       this.currentMessageId = messageId;
       let effectiveTargetLanguage = targetLanguage;
-      let allResultsCount = 0; // IMPORTANT: Initialize before promise to avoid scope issues
+      
+      // Tracking processed nodes to avoid multi-batch conflicts
+      const processedUids = new Set();
+      let lastProcessedIndex = 0;
 
       const streamEndPromise = new Promise((resolve, reject) => {
         this.currentStreamEndReject = reject;
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
-            if (data.success === false || data.error) {
-              if (isFatalError(data.error)) {
-                const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-                const error = new Error(errObj.message || 'Fatal error');
-                Object.assign(error, errObj);
-                error.alreadyReported = true; 
-                return reject(error);
-              }
-              return;
-            }
-
-            if (!options.targetLanguage && data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
-              effectiveTargetLanguage = data.targetLanguage;
-            }
-
-            if (data.data && Array.isArray(data.data)) {
-              data.data.forEach((translatedItem, index) => {
-                const uid = translatedItem?.uid || (data.originalData && data.originalData[index]?.uid);
-                
-                // For traditional providers, we use the sequential index fallback
-                const nodeData = uid ? nodeMap.get(uid) : textNodesData[allResultsCount++];
-                
-                if (nodeData) {
-                  this._applyTranslationToNode(nodeData.node, translatedItem?.text || translatedItem, effectiveTargetLanguage, element);
+            try {
+              if (data.success === false || data.error) {
+                if (isFatalError(data.error)) {
+                  const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
+                  const error = new Error(errObj.message || 'Fatal error');
+                  Object.assign(error, errObj);
+                  error.alreadyReported = true; 
+                  return reject(error);
                 }
-              });
+                return;
+              }
+
+              if (!options.targetLanguage && data.targetLanguage && data.targetLanguage !== effectiveTargetLanguage) {
+                effectiveTargetLanguage = data.targetLanguage;
+              }
+
+              if (data.data && Array.isArray(data.data)) {
+                data.data.forEach((translatedItem, index) => {
+                  const uid = translatedItem?.uid || (data.originalData && data.originalData[index]?.uid);
+                  
+                  let nodeData = null;
+                  if (uid) {
+                    nodeData = nodeMap.get(uid);
+                  } 
+                  
+                  // Fallback to sequential index ONLY if UID mapping fails or is missing
+                  if (!nodeData) {
+                    nodeData = textNodesData[lastProcessedIndex++];
+                  } else {
+                    // If we found by UID, update our sequential pointer if possible
+                    const currentIdx = textNodesData.findIndex(d => d.uid === uid);
+                    if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
+                  }
+                  
+                  if (nodeData && !processedUids.has(nodeData.uid)) {
+                    this._applyTranslationToNode(nodeData.node, translatedItem?.text || translatedItem, effectiveTargetLanguage, element);
+                    processedUids.add(nodeData.uid);
+                  }
+                });
+              }
+            } catch (err) {
+              this.logger.error('Error during onStreamUpdate processing:', err);
             }
           },
           onStreamEnd: (data) => {
@@ -184,7 +204,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (response?.streaming) {
         result = await streamEndPromise;
       } else if (response?.success) {
-        result = await this._handleDirectResponse(response);
+        result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
       } else {
         throw new Error(response?.error?.message || response?.error || 'Translation failed');
       }
@@ -217,22 +237,43 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
     if (!textNode || !translatedText) return;
+    
+    // Safety check: extract string content
+    let finalTranslation = '';
+    if (typeof translatedText === 'string') {
+      finalTranslation = translatedText;
+    } else if (typeof translatedText === 'object' && translatedText !== null) {
+      finalTranslation = translatedText.text || translatedText.translation || '';
+    }
+    
+    if (!finalTranslation || finalTranslation.trim() === '') return;
+
     const originalText = textNode.textContent;
     const leadingMatch = originalText.match(/^(\s*)/);
     const trailingMatch = originalText.match(/(\s*)$/);
     const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
     const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
-    const detectedDir = DirectionManager.detectDirectionFromContent(translatedText);
+    
+    const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
     const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
-    textNode.nodeValue = leadingWhitespace + bidiMark + translatedText + bidiMark + trailingWhitespace;
+    
+    textNode.nodeValue = leadingWhitespace + bidiMark + finalTranslation + bidiMark + trailingWhitespace;
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
-  async _handleDirectResponse(response) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element) {
     try {
       const parsed = JSON.parse(response.translatedText);
       const results = Array.isArray(parsed) ? parsed : [parsed];
-      if (this.currentMessageId) contentScriptIntegration.streamingHandler.unregisterHandler(this.currentMessageId);
+      
+      results.forEach((item, i) => {
+        const uid = item?.uid;
+        const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
+        if (nodeData) {
+          this._applyTranslationToNode(nodeData.node, item?.text || item, targetLanguage, element);
+        }
+      });
+
       return { success: true, isNonStreaming: true, translatedResults: results };
     } catch {
       throw new Error('Invalid translation format');
@@ -246,14 +287,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     const finalTarget = result.targetLanguage || targetLanguage;
-    if (result.isNonStreaming) {
-      result.translatedResults.forEach((item, i) => {
-        const uid = item?.uid;
-        const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
-        if (nodeData) this._applyTranslationToNode(nodeData.node, item?.text || item, finalTarget, element);
-      });
-    }
-
+    
+    // Non-streaming fallback already applied translations in _handleDirectResponse
+    
     DirectionManager.applyElementDirection(element, finalTarget);
     if (globalSelectElementState.currentTranslation) {
       globalSelectElementState.currentTranslation.targetLanguage = finalTarget;
@@ -267,21 +303,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   _storeTranslationState(data) {
     const { element } = data;
-    globalSelectElementState.translationHistory.push({ 
+    const stateEntry = { 
       ...data, 
       originalDir: element.getAttribute('dir'),
       originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,
       timestamp: Date.now() 
-    });
+    };
+    
+    globalSelectElementState.translationHistory.push(stateEntry);
+    globalSelectElementState.currentTranslation = stateEntry; // IMPORTANT: Set current translation pointer
   }
 
   _cleanupCurrentSession(isSuccess = false) {
     this.isTranslating = false;
     const messageId = this.currentMessageId;
     if (messageId) {
-      if (isSuccess) contentScriptIntegration.streamingHandler.unregisterHandler(messageId); 
-      else contentScriptIntegration.streamingHandler.cancelHandler(messageId);
+      // Use the correct API from contentScriptIntegration
+      if (!isSuccess) {
+        contentScriptIntegration.streamingHandler.cancelHandler(messageId);
+      }
+      // Note: streamingHandler automatically cleans up on stream end or cancel
       this.currentMessageId = null;
     }
     this.currentStreamEndReject = null;
@@ -292,10 +334,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const messageId = this.currentMessageId;
     if (messageId) {
       try {
-        await sendRegularMessage({
-          action: MessageActions.CANCEL_TRANSLATION,
-          data: { messageId, reason: ActionReasons.USER_CANCELLED, context: MessageContexts.SELECT_ELEMENT }
-        });
+        // Use the proper centralized cancellation method
+        contentScriptIntegration.cancelTranslationRequest(messageId, ActionReasons.USER_CANCELLED);
       } catch (e) { /* ignore */ }
     }
 
