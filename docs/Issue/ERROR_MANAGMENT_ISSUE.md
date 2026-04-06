@@ -1,61 +1,84 @@
 # Architectural Issue: Error Propagation & Masking
 
 ## The Core Problem
-The extension currently suffers from **"Error Information Loss"** and **"Layer Leakage"** in its error handling flow. Instead of a clean, traceable chain of errors from the source to the UI, errors are often intercepted, renamed, or converted into generic strings, making it impossible for the centralized `ErrorHandler` to make intelligent decisions (like silencing a context error).
+The extension suffers from **"Error Information Loss"** and **"Layer Leakage"**. Errors are often converted into generic strings in middle layers, killing their identity (`type`, `statusCode`), which makes it impossible for the centralized `ErrorHandler` to show localized messages or "Retry/Settings" buttons. 
 
-### 1. Error Masking (Information Loss)
-In mid-layers (like `PageTranslationScheduler.js`), low-level system errors (e.g., `EXTENSION_CONTEXT_INVALIDATED`) are caught and re-thrown as generic business errors (e.g., `new Error("Batch translation failed")`).
-*   **Result**: The original identity (`type`, `code`, `stack`) is killed.
-*   **Impact**: The UI shows a "Translation failed" toast for a system reload, which should have been silent.
-
-### 2. Layer Leakage (Violation of SRP)
-The `ErrorHandler` (which is a **Presentation/Orchestration** layer component) is being imported and used in **low-level logic/core** layers (e.g., `BaseProvider.js`, `FeatureManager.js`).
-*   **Violation**: Low-level logic should only care about *executing* a task and *throwing* an error if it fails. It should NOT know how to "handle" or "display" that error to a user.
-*   **Impact**: Created circular dependencies (e.g., `Storage -> ErrorHandler -> Notification -> Storage`) that required emergency dynamic imports to fix.
+Additionally, redundant logging across multiple layers (Provider, Coordinator, Manager, UI) creates a "Log Storm" in the console, making debugging difficult.
 
 ---
 
-## Case Study: Page Translation Chain
-1.  **Browser API**: Throws `Extension context invalidated`.
-2.  **Messaging Layer**: Detects it, but can only return a result.
-3.  **Scheduler Layer**: Receives `{success: false, error: "..."}`.
-    *   *Current Buggy Logic*: `throw new Error("Batch translation failed")`. **<-- IDENTITY LOST HERE**
-4.  **Manager Layer**: Catches the generic error.
-5.  **ErrorHandler**: Receives "Batch translation failed", looks up `ErrorMatcher`, finds no match for "Context", and displays a visible Toast.
+## The Standardized Solution (The "Golden Chain")
 
----
+To keep the project clean and professional, every error must follow this lifecycle:
 
-## 🛠️ Proposed Solution (Refactoring Roadmap)
-
-### Phase 1: Preserve Error Identity (Immediate Requirement)
-**Never throw raw strings.** Always preserve the original error or use a structured Error object.
+### 1. Low-Level Layer (Providers / Core Logic)
+*   **Responsibility**: Execute the task.
+*   **Action**: Catch technical error, attach metadata (`type`, `statusCode`), and **Throw**.
+*   **Logging**: Use `logger.warn` for technical details (e.g., HTTP 402/429). **Never** call `ErrorHandler` here.
 ```javascript
-// ❌ BAD
-catch (err) { throw new Error("Something failed"); }
+// ✅ GOOD: Technical Warn + Structured Throw
+const errorType = matchErrorToType(response);
+logger.warn(`[Provider] API error (${response.status})`, { msg: body.message });
+const err = new Error(body.message);
+err.type = errorType;
+err.statusCode = response.status;
+throw err;
+```
 
-// ✅ GOOD (Preserve metadata)
-catch (err) { 
-  const newErr = new Error("Context-aware message");
-  newErr.originalError = err;
-  newErr.type = err.type || ErrorTypes.UNKNOWN;
-  throw newErr;
+### 2. Middle Layer (Orchestrators / Adapters / Messaging)
+*   **Responsibility**: Route and coordinate.
+*   **Action**: Pass the error object upward. Do **not** wrap it in a new generic `Error` unless you preserve the `originalError`.
+*   **Logging**: Demote logs to `logger.debug`. Avoid stacktraces at this level.
+```javascript
+// ✅ GOOD: Transparent Propagation
+try {
+  return await service.doWork();
+} catch (error) {
+  logger.debug("Coordination failed:", error.message);
+  throw error; // Just propagate
 }
 ```
 
-### Phase 2: Decouple Logic from Presentation
-Remove `ErrorHandler.handle()` calls from core logic files.
-*   **Providers/Core Logic**: Should only `throw` structured errors.
-*   **Composables/App Entry Points**: These are the "Controllers". Only *they* should call `ErrorHandler.handle()`.
-
-### Phase 3: Implement "Global Error Boundary"
-Instead of each file calling `ErrorHandler`, use the existing `pageEventBus` or a native `bubble` mechanism to let errors flow up to a single orchestrator that handles the UI feedback.
+### 3. High-Level Layer (Controllers / Composables / UI)
+*   **Responsibility**: Manage User Experience.
+*   **Action**: The **ONLY** layer that calls `ErrorHandler.handle()`.
+*   **Logging**: The `ErrorHandler` will issue the final `logger.error` (Red Log) to signify the operation has failed and the user has been notified.
 
 ---
 
-## Guidance for Future
-When you start refactoring:
-1.  Look for `ErrorHandler.getInstance()` calls. If they are in a folder like `core/` or `shared/storage/`, they are candidates for removal.
-2.  Ensure every `catch` block that re-throws an error attaches the `originalError`.
-3.  Standardize the `result` object of messaging to always include an `errorType` field derived from `ErrorMatcher`.
+## Logging Level Conventions
 
-**Current Status**: A "Safety Net" was added to `ErrorHandler.js` to check `isValidSync()` globally, but this is a temporary guard. The root cause (Error Masking) still exists in many catch blocks.
+| Level | Color | When to use? | Example |
+| :--- | :--- | :--- | :--- |
+| **Error** | Red | Final failure, System Crash, or 5xx Server errors. | Final handled error in UI, DB connection fail. |
+| **Warn** | Orange | Expected technical issues or Business limits. | **HTTP 402 (Balance)**, 429 (Rate Limit), Fallbacks. |
+| **Info** | Blue/White | High-level milestones. | "Translation Started", "Feature Loaded". |
+| **Debug** | Grey | Internal tracing & step-by-step logic. | "Segment 1/5 processed", "Proxy Disabled". |
+
+---
+
+## Refactoring Roadmap
+
+### Phase 1: Preserve Identity (Done for Messaging)
+*   Update `MessagingCore.js` to preserve full error objects in responses.
+*   Update `matchErrorToType` to accept full error objects.
+
+### Phase 2: Decouple Logic (In Progress)
+*   **Task**: Remove `ErrorHandler.handle()` from all files in `src/features/*/providers/`.
+*   **Task**: Ensure all `catch` blocks in `core/` folders only use `debug` or `warn` levels.
+
+### Phase 3: Global Error Boundary
+*   Implement a mechanism where UI components subscribe to an error stream instead of calling the handler manually.
+
+---
+
+## Guidance for Developers
+1.  **Never throw raw strings**: `throw "Error"` is forbidden. Use `new Error()`.
+2.  **Preserve metadata**: If you must re-throw, attach the original error: `newErr.originalError = err`.
+3.  **Check the console**: If you see more than one Red (Error) log for a single failure, you are violating the SRP (Single Responsibility Principle).
+4.  **Use ErrorMatcher**: Always use `matchErrorToType(error)` to determine the error type instead of hardcoding strings.
+
+**Current Status**: 
+*   `Translation System`: **Fully Compliant** (Providers, Coordinator, and UI follow the Golden Chain).
+*   `Select Element`: **Compliant** (Redundant logs removed).
+*   `Storage/Settings`: Needs Refactoring.
