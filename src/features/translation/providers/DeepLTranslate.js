@@ -97,113 +97,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Extract contextual metadata to improve DeepL translation quality
-   * Provides domain, semantic, and historical information to help disambiguate terms
-   * @param {HTMLElement} blockContainer - The block container being translated
-   * @param {string} sessionId - Optional session identifier for history context
-   * @returns {Promise<string|null>} Context string or null if not available
-   */
-  async _extractTranslationContext(blockContainer, sessionId = null) {
-    const contextParts = [];
-
-    // 1. ADD HISTORY CONTEXT
-    // For DeepL, we only send the previous original source texts (User role)
-    // because DeepL recommends context in the same language as the source text.
-    if (sessionId) {
-      try {
-        const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
-        const session = translationSessionManager.sessions.get(sessionId);
-        if (session && session.history && session.history.length > 0) {
-          // Extract only 'user' messages (original source texts)
-          const sourceHistory = session.history
-            .filter(msg => msg.role === 'user')
-            .map(msg => msg.content)
-            .join(' ');
-          
-          if (sourceHistory) {
-            contextParts.push(`Previous Text: ${sourceHistory}`);
-          }
-        }
-      } catch (e) {
-        logger.debug('[DeepL] Failed to extract history context:', e.message);
-      }
-    }
-
-    // 2. Extract page title (source domain context)
-    if (typeof document !== 'undefined' && document.title) {
-      const title = document.title.trim();
-      if (title) {
-        contextParts.push(`Source Page: ${title}`);
-      }
-    }
-
-    // 3. Extract block container type (structural context)
-    if (blockContainer) {
-      const tagName = blockContainer.tagName;
-      if (tagName) {
-        // Map common tag names to semantic descriptions
-        const semanticNames = {
-          'P': 'paragraph',
-          'H1': 'main heading',
-          'H2': 'subheading',
-          'H3': 'section heading',
-          'LI': 'list item',
-          'DIV': 'content section',
-          'ARTICLE': 'article',
-          'SECTION': 'section',
-          'BLOCKQUOTE': 'blockquote',
-          'TD': 'table cell',
-          'TH': 'table header',
-          'CAPTION': 'caption',
-          'FIGCAPTION': 'figure caption'
-        };
-
-        const semanticName = semanticNames[tagName] || tagName.toLowerCase();
-        contextParts.push(`Content Area: ${semanticName}`);
-      }
-
-      // 4. Add parent context for better disambiguation
-      const parent = blockContainer.parentElement;
-      if (parent) {
-        const parentTag = parent.tagName;
-        const parentSemantic = {
-          'NAV': 'navigation',
-          'ARTICLE': 'article',
-          'SECTION': 'section',
-          'ASIDE': 'sidebar',
-          'HEADER': 'header',
-          'FOOTER': 'footer',
-          'MAIN': 'main content'
-        }[parentTag];
-
-        if (parentSemantic) {
-          contextParts.push(`Location: ${parentSemantic}`);
-        }
-      }
-    }
-
-    if (contextParts.length === 0) return null;
-
-    // Combine with separator, limit to 2000 characters (DeepL context is generous)
-    let context = contextParts.join(' | ');
-
-    // Sanitize: Remove any XML tags or @@@ markers
-    context = context
-      .replace(/<[^>]+>/g, '')  // Remove XML tags
-      .replace(/@@@/g, '')       // Remove newline markers
-      .replace(/\s+/g, ' ')      // Normalize whitespace
-      .trim();
-
-    // Limit length to avoid request overhead (though DeepL body limit is 128KB)
-    const MAX_CONTEXT_LENGTH = 2000;
-    if (context.length > MAX_CONTEXT_LENGTH) {
-      context = context.substring(0, MAX_CONTEXT_LENGTH - 3) + '...';
-    }
-
-    return context;
-  }
-
-  /**
    * Validate XML placeholder integrity in DeepL response
    * @param {string} requestText - Original text sent to DeepL
    * @param {string} responseText - Translated text received from DeepL
@@ -491,9 +384,35 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     });
 
     // CRITICAL: Add contextual metadata for better translation quality
-    // Prioritize passed contextSummary, fallback to internal extraction
-    const translationContext = options.contextSummary || await this._extractTranslationContext(blockContainer, sessionId);
-    if (translationContext) {
+    // DeepL context is limited to 1000 characters and works best in the source language
+    const contextParts = [];
+
+    // 1. Add history context (previous original texts) if sessionId is available
+    if (sessionId) {
+      try {
+        const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
+        const session = translationSessionManager.sessions.get(sessionId);
+        if (session?.history?.length > 0) {
+          const sourceHistory = session.history
+            .filter(msg => msg.role === 'user')
+            .map(msg => msg.content)
+            .join(' ')
+            .substring(0, 500); // Limit history part to keep room for structural context
+          
+          if (sourceHistory) contextParts.push(`History: ${sourceHistory}`);
+        }
+      } catch (e) {
+        logger.debug('[DeepL] Failed to extract history context:', e.message);
+      }
+    }
+
+    // 2. Add structural context summary (Page, Section, Role, Parent)
+    if (options.contextSummary) {
+      contextParts.push(options.contextSummary);
+    }
+
+    if (contextParts.length > 0) {
+      const translationContext = contextParts.join(' | ').substring(0, 1000);
       requestBody.append('context', translationContext);
 
       logger.debug('[DeepL] Context parameter added', {
@@ -515,7 +434,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       betaLanguages: betaLanguagesEnabled,
       formality: betaLanguagesEnabled ? 'N/A (beta)' : (await getDeeplFormalityAsync() || 'default'),
       hasXMLPlaceholders,
-      hasContext: blockContainer && this._extractTranslationContext(blockContainer) !== null
+      hasContext: contextParts.length > 0
     });
 
     const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
