@@ -526,9 +526,8 @@ class TranslationModeCoordinator {
     // Check if provider supports batch/chunk
     const isAIProvider = providerInstance?.constructor?.type === "ai" || typeof providerInstance?._translateBatch === 'function';
     
-    // Create abort controller
-    const abortController = new AbortController();
-    translationEngine.activeTranslations.set(messageId, abortController);
+    // Register request and get abort controller
+    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
 
     try {
       for (let i = 0; i < batches.length; i++) {
@@ -643,7 +642,7 @@ class TranslationModeCoordinator {
         originalCharCount: totalOriginalChars
       };
     } finally {
-      translationEngine.activeTranslations.delete(messageId);
+      translationEngine.lifecycleRegistry.unregisterRequest(messageId);
     }
   }
 

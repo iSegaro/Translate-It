@@ -35,7 +35,7 @@ export class BaseTranslateProvider extends BaseProvider {
     const { mode: translateMode, originalSourceLang, originalTargetLang, messageId, engine, priority } = 
       typeof options === 'object' && options !== null ? options : { mode: options };
 
-    const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
+    const abortController = (messageId && engine) ? engine.getAbortController(messageId) : null;
     const sessionId = options?.sessionId || null;
 
     if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) sourceLang = AUTO_DETECT_VALUE;

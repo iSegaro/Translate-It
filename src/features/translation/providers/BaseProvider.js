@@ -65,7 +65,7 @@ export class BaseProvider {
       engine,
     } = typeof options === 'object' && options !== null ? options : { mode: options };
 
-    const abortController = (messageId && engine) ? engine.activeTranslations.get(messageId) : null;
+    const abortController = (messageId && engine) ? engine.getAbortController(messageId) : null;
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
