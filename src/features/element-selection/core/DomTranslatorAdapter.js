@@ -221,7 +221,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       if (!isCancellation && !error.alreadyHandled) {
         await this.errorHandler.handle(error, {
-          context: 'select-element-translation',
+          context: 'select-element',
           component: 'DomTranslatorAdapter',
           showToast: true 
         });
