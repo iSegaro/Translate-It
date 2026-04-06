@@ -75,6 +75,16 @@ export const ErrorDisplayStrategies = {
     supportSettings: true
   },
 
+  // Select Element translation specific context
+  'select-element-translation': {
+    showToast: true,
+    showInUI: false,
+    errorLevel: 'detailed',
+    defaultDuration: NOTIFICATION_TIME.ERROR,
+    supportRetry: true,
+    supportSettings: true
+  },
+
   // Background/service context - toast notifications
   background: {
     showToast: true,

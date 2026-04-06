@@ -18,50 +18,37 @@ export class DeepSeekProvider extends BaseAIProvider {
   static reliableJsonMode = false;
   static supportsDictionary = true;
 
-  // AI Provider capabilities - Conservative settings for DeepSeek
-  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
+  static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
   static supportsImageTranslation = false;
 
-  // Batch processing strategy
-  static batchStrategy = 'json'; // Uses JSON format for batch translation
+  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.DEEPSEEK);
     this.providerSettingKey = 'DEEPSEEK_API_KEY';
   }
 
-
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     const [apiKeys, model] = await Promise.all([
       getDeepSeekApiKeysAsync(),
       getDeepSeekApiModelAsync(),
     ]);
 
-    // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    // Validate configuration
-    this._validateConfig(
-      { apiKey },
-      ["apiKey"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
+    this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    // Build base prompt using explicit isBatch flag
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
 
-    // Calculate original character count for stats tracking
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
-    // Simple logging
     const isFirst = await this._isFirstTurn(sessionId);
     logger.info(`[DeepSeek] Model: ${model || 'deepseek-chat'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
     logger.debug(`[DeepSeek] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    // Get messages with conversation history
     const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     const fetchOptions = {
@@ -74,12 +61,10 @@ export class DeepSeekProvider extends BaseAIProvider {
         model: model || "deepseek-chat",
         messages: messages,
         stream: false,
-        max_tokens: 4096, // Ensure enough space for large batches
-        // JSON mode is handled by the prompt and our robust parser
+        max_tokens: 4096,
       }),
     };
 
-    // Use unified API request handler
     const result = await this._executeRequest({
       url: CONFIG.DEEPSEEK_API_URL,
       fetchOptions,
@@ -94,21 +79,14 @@ export class DeepSeekProvider extends BaseAIProvider {
       }
     });
 
-    // Update session history
     if (sessionId && result) {
       await this._updateSessionHistory(sessionId, userText, result);
     }
 
     logger.info(`[DeepSeek] Translation completed successfully`);
-    
-    // Batch translations should return raw text to let the specialized parser handle it.
-    // Individual translations use _cleanAIResponse to remove markdown blocks.
     return isBatch ? result : this._cleanAIResponse(result);
   }
 
-  /**
-   * AI-specific validation for DeepSeek
-   */
   _validateConfig(config, requiredFields, context) {
     super._validateConfig(config, requiredFields, context);
   }

@@ -19,51 +19,38 @@ export class OpenAIProvider extends BaseAIProvider {
   static reliableJsonMode = true;
   static supportsDictionary = true;
 
-  // AI Provider capabilities - Conservative settings for OpenAI
-  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
+  static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
   static supportsImageTranslation = true;
 
-  // Batch processing strategy
-  static batchStrategy = 'json'; // Uses JSON format for batch translation
+  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.OPENAI);
     this.providerSettingKey = 'OPENAI_API_KEY';
   }
 
-
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     const [apiKeys, apiUrl, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
       getOpenAIModelAsync(),
     ]);
 
-    // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    // Validate configuration
-    this._validateConfig(
-      { apiKey },
-      ["apiKey"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
+    this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    // Build base prompt using explicit isBatch flag
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
 
-    // Calculate original character count for stats tracking
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
-    // Simple logging
     const isFirst = await this._isFirstTurn(sessionId);
     logger.info(`[OpenAI] Model: ${model || 'gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
     logger.debug(`[OpenAI] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    // Get messages with conversation history
     const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     const fetchOptions = {
@@ -75,13 +62,11 @@ export class OpenAIProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "gpt-3.5-turbo",
         messages: messages,
-        max_tokens: 4096, // Prevent truncation
-        // Enable JSON mode for batch translations
+        max_tokens: 4096,
         ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
-    // Use unified API request handler
     const result = await this._executeRequest({
       url: apiUrl || "https://api.openai.com/v1/chat/completions",
       fetchOptions,
@@ -96,33 +81,18 @@ export class OpenAIProvider extends BaseAIProvider {
       }
     });
 
-    // Update session history
     if (sessionId && result) {
       await this._updateSessionHistory(sessionId, userText, result);
     }
 
     logger.info(`[OpenAI] Translation completed successfully`);
-    
-    // Batch translations should return raw text to let the specialized parser handle it.
-    // Individual translations use _cleanAIResponse to remove markdown blocks.
     return isBatch ? result : this._cleanAIResponse(result);
   }
 
-  /**
-   * AI-specific validation for OpenAI
-   */
   _validateConfig(config, requiredFields, context) {
     super._validateConfig(config, requiredFields, context);
   }
 
-  /**
-   * Handle image translation for OpenAI
-   * @param {string} base64Image - Base64 encoded image
-   * @param {string} sourceLang - Source language
-   * @param {string} targetLang - Target language
-   * @param {string} translateMode - Translation mode
-   * @returns {Promise<string>} Translated text
-   */
   async translateImage(base64Image, _sourceLang, targetLang) {
     const [apiKeys, apiUrl, model, promptBase] = await Promise.all([
       getOpenAIApiKeysAsync(),
@@ -134,7 +104,6 @@ export class OpenAIProvider extends BaseAIProvider {
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
     const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
 
-    // OpenAI uses specific message format for vision models
     const messages = [
       {
         role: "user",
@@ -142,9 +111,7 @@ export class OpenAIProvider extends BaseAIProvider {
           { type: "text", text: systemPrompt },
           {
             type: "image_url",
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
-            }
+            image_url: { url: `data:image/png;base64,${base64Image}` }
           }
         ]
       }
@@ -163,20 +130,15 @@ export class OpenAIProvider extends BaseAIProvider {
       }),
     };
 
-    const context = `${this.providerName.toLowerCase()}-image-translation`;
-
-    const result = await this._executeRequest({
+    return await this._executeRequest({
       url: apiUrl,
       fetchOptions,
       charCount: this._calculateAIPayloadChars(messages),
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
-      context: context,
+      context: `${this.providerName.toLowerCase()}-image-translation`,
       updateApiKey: (newKey, options) => {
         options.headers.Authorization = `Bearer ${newKey}`;
       }
     });
-
-    logger.info(`[OpenAI] Image translation completed successfully`);
-    return result;
   }
 }

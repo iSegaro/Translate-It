@@ -63,16 +63,17 @@ export class BaseAIProvider extends BaseProvider {
    * @param {object} engine - Translation engine instance
    * @param {string} messageId - Message ID for streaming
    * @param {AbortController} abortController - Cancellation controller
+   * @param {object} contextMetadata - Contextual metadata for better translation
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
     // Check if streaming is supported and beneficial
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata);
     }
 
     // Fall back to traditional batch processing
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata);
   }
 
   /**
@@ -103,12 +104,13 @@ export class BaseAIProvider extends BaseProvider {
    * @param {object} engine - Translation engine instance
    * @param {string} messageId - Message ID for streaming
    * @param {AbortController} abortController - Cancellation controller
+   * @param {object} contextMetadata - Contextual metadata
    * @returns {Promise<string[]>} - All translated texts
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
     const startTime = Date.now();
     const sessionId = messageId; // Standard session ID for streaming
-    const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+    const totalChars = texts.reduce((sum, text) => sum + (typeof text === 'object' ? text.text?.length || 0 : text?.length || 0), 0);
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments (${totalChars} chars, mode: ${translateMode})`);
 
     // Create optimal batches based on provider strategy and mode
@@ -139,7 +141,7 @@ export class BaseAIProvider extends BaseProvider {
         const batchResults = await Promise.race([
           rateLimitManager.executeWithRateLimit(
             this.providerName,
-            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId),
+            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata),
             `streaming-batch-${batchIndex + 1}/${batches.length}`,
             translateMode
           ),
@@ -216,9 +218,10 @@ export class BaseAIProvider extends BaseProvider {
    * @param {object} engine - Translation engine instance
    * @param {string} messageId - Message ID
    * @param {AbortController} abortController - Cancellation controller
+   * @param {object} contextMetadata - Contextual metadata
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
     const sessionId = messageId; // Standard for traditional single translation
@@ -238,7 +241,7 @@ export class BaseAIProvider extends BaseProvider {
       try {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController, false, sessionId),
+          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController, false, sessionId, (typeof texts[i] === 'object' ? texts[i].text?.length : texts[i]?.length) || 0, contextMetadata),
           `segment-${i + 1}/${texts.length}`,
           translateMode
         );
@@ -303,7 +306,10 @@ export class BaseAIProvider extends BaseProvider {
    */
   _hasPlaceholders(texts) {
     const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/;
-    return texts.some(text => PLACEHOLDER_PATTERN.test(text));
+    return texts.some(text => {
+      const content = typeof text === 'object' ? text.text : text;
+      return content && PLACEHOLDER_PATTERN.test(content);
+    });
   }
 
   /**
@@ -329,7 +335,8 @@ export class BaseAIProvider extends BaseProvider {
     let currentComplexity = 0;
     
     for (const text of texts) {
-      const textComplexity = this._calculateTextComplexity(text);
+      const content = typeof text === 'object' ? text.text : text;
+      const textComplexity = this._calculateTextComplexity(content);
       
       if (currentBatch.length >= optimalSize || 
           (currentComplexity + textComplexity > maxComplexity && currentBatch.length > 0)) {
@@ -371,7 +378,10 @@ export class BaseAIProvider extends BaseProvider {
    * @returns {number} - Total complexity score
    */
   _getTotalComplexity(texts) {
-    return texts.reduce((sum, text) => sum + this._calculateTextComplexity(text), 0);
+    return texts.reduce((sum, text) => {
+      const content = typeof text === 'object' ? text.text : text;
+      return sum + this._calculateTextComplexity(content);
+    }, 0);
   }
 
   /**
@@ -538,30 +548,39 @@ export class BaseAIProvider extends BaseProvider {
    * @param {object} engine - Translation engine instance (optional)
    * @param {string} messageId - Message ID (optional)
    * @param {string} sessionId - Session ID for maintaining context (optional)
+   * @param {object} contextMetadata - Contextual metadata
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null, sessionId = null) {
+  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null, sessionId = null, contextMetadata = null) {
     const batchStrategy = this.constructor.batchStrategy || 'single';
     
-    if (batch.length === 1) {
-      const originalChars = batch[0]?.length || 0;
-      return [await this._translateSingle(batch[0], sourceLang, targetLang, translateMode, abortController, false, sessionId, originalChars)];
-    }
-    
+    // Always use JSON strategy if defined, even for 1 item, to ensure consistent parsing
+    // especially for Select Element mode which expects structured responses.
     try {
       if (batchStrategy === 'json') {
-        // Prepare batch text once here
-        const jsonInput = batch.map((t, i) => ({ id: i, text: t }));
+        const jsonInput = batch.map((item, i) => {
+          if (typeof item === 'object') {
+            return { id: item.uid || i, text: item.text, role: item.role };
+          }
+          return { id: i, text: item };
+        });
         const batchText = JSON.stringify(jsonInput, null, 2);
-        const originalChars = batch.reduce((sum, text) => sum + (text?.length || 0), 0);
+        const originalChars = batch.reduce((sum, item) => sum + ((typeof item === 'object' ? item.text?.length : item?.length) || 0), 0);
         
-        // Pass with explicit isBatch=true flag and originalChars
-        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, true, sessionId, originalChars);
+        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, true, sessionId, originalChars, contextMetadata);
         
         const parsedResults = this._parseBatchResult(result, batch.length, batch);
         if (parsedResults.length === batch.length) return parsedResults;
         throw new Error('JSON batch result count mismatch');
       }
+      
+      // Fallback for single item if no JSON strategy
+      if (batch.length === 1) {
+        const content = typeof batch[0] === 'object' ? batch[0].text : batch[0];
+        const originalChars = content?.length || 0;
+        return [await this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, originalChars, contextMetadata)];
+      }
+
       throw new Error(`Unsupported batch strategy: ${batchStrategy}`);
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
@@ -582,7 +601,7 @@ export class BaseAIProvider extends BaseProvider {
       }
 
       logger.warn(`[${this.providerName}] Batch failed (likely structural), falling back to individual requests:`, error.message);
-      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId);
+      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId, contextMetadata);
     }
   }
 
@@ -596,8 +615,9 @@ export class BaseAIProvider extends BaseProvider {
    * @param {boolean} isBatch - Whether this is a batch request (optional)
    * @param {string} sessionId - Session ID (optional)
    * @param {number} originalCharCount - Original text character count (optional)
+   * @param {object} contextMetadata - Contextual metadata
    */
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     throw new Error(`_translateSingle must be implemented by ${this.constructor.name}`);
   }
 
@@ -668,10 +688,11 @@ export class BaseAIProvider extends BaseProvider {
    * @param {string} translateMode - Translation mode
    * @param {string} sessionId - Session identifier
    * @param {boolean} isBatch - Whether this is a batch request
+   * @param {object} contextMetadata - Contextual metadata
    * @returns {Promise<object>} - { systemPrompt, userText }
    * @protected
    */
-  async _preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId = null, isBatch = false) {
+  async _preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId = null, isBatch = false, contextMetadata = null) {
     const isFirstTurn = await this._isFirstTurn(sessionId);
     let systemPrompt;
 
@@ -690,6 +711,17 @@ export class BaseAIProvider extends BaseProvider {
       }
     } else {
       systemPrompt = await buildPrompt("", sourceLang, targetLang, translateMode, this.constructor.type);
+    }
+
+    // Append context metadata if available and feature enabled
+    if (contextMetadata) {
+      const { getSmartContextTranslationEnabledAsync } = await import('@/shared/config/config.js');
+      const isSmartContextEnabled = await getSmartContextTranslationEnabledAsync();
+      
+      if (isSmartContextEnabled) {
+        const contextStr = `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}". Use this context to ensure consistent terminology and tone.`;
+        systemPrompt += contextStr;
+      }
     }
 
     return { systemPrompt, userText: text };
@@ -781,27 +813,45 @@ export class BaseAIProvider extends BaseProvider {
     let processedResult = result;
     let jsonString = null;
 
-    // 1. Try to find JSON array in markdown code blocks
-    const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+    // 1. Try to find JSON in markdown code blocks
+    const markdownMatch = result.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (markdownMatch) {
       jsonString = markdownMatch[1].trim();
     } else {
-      // 2. Try to find direct JSON array (without markdown)
-      const directMatch = result.match(/^\s*\[([\s\S]*)\]\s*$/);
-      if (directMatch) {
-        jsonString = `[${directMatch[1]}]`;
+      // 2. Try to find direct JSON structure
+      const bracketIndex = result.indexOf('[');
+      const braceIndex = result.indexOf('{');
+      const start = (bracketIndex !== -1 && (braceIndex === -1 || bracketIndex < braceIndex)) ? bracketIndex : braceIndex;
+      
+      if (start !== -1) {
+        const lastBracket = result.lastIndexOf(']');
+        const lastBrace = result.lastIndexOf('}');
+        const end = Math.max(lastBracket, lastBrace);
+        
+        if (end > start) {
+          jsonString = result.substring(start, end + 1);
+        }
       }
     }
 
     if (jsonString) {
       try {
         const parsed = JSON.parse(jsonString);
+        
+        // Handle single segment JSON array: ["text"]
         if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'string') {
-          logger.debug(`[${this.providerName}] Single segment JSON array detected and extracted`);
           processedResult = parsed[0];
+        } 
+        // Handle Select Element JSON format: {"translations": [{"text": "..."}]} or [{"text": "..."}]
+        else if (typeof parsed === 'object' && parsed !== null) {
+          let items = Array.isArray(parsed) ? parsed : (parsed.translations || Object.values(parsed));
+          if (Array.isArray(items) && items.length === 1) {
+            const first = items[0];
+            processedResult = typeof first === 'object' ? (first.text || first.translation || processedResult) : first;
+          }
         }
       } catch {
-        // Not a valid JSON or not a single-segment array, keep original result
+        // Not valid JSON, keep original
       }
     }
 
@@ -824,23 +874,35 @@ export class BaseAIProvider extends BaseProvider {
 
       // 1. Multi-stage JSON Extraction
       try {
+        // Handle raw JSON (common for large responses where AI skips markers)
         parsed = JSON.parse(jsonString);
       } catch {
+        // Handle Markdown blocks
         const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         if (codeBlockMatch) {
-          try { parsed = JSON.parse(codeBlockMatch[1]); } catch { /* next */ }
+          try { 
+            const cleaned = codeBlockMatch[1].replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            parsed = JSON.parse(cleaned); 
+          } catch { /* next */ }
         }
+        
         if (!parsed) {
+          // Manual boundary search
           const firstBracket = jsonString.indexOf('[');
-          const lastBracket = jsonString.lastIndexOf(']');
           const firstBrace = jsonString.indexOf('{');
-          const lastBrace = jsonString.lastIndexOf('}');
-          
           const start = (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) ? firstBracket : firstBrace;
-          const end = (lastBracket !== -1 && (lastBrace === -1 || lastBracket > lastBrace)) ? lastBracket : lastBrace;
           
-          if (start !== -1 && end !== -1 && end > start) {
-            try { parsed = JSON.parse(jsonString.substring(start, end + 1)); } catch { /* fail */ }
+          if (start !== -1) {
+            const lastBracket = jsonString.lastIndexOf(']');
+            const lastBrace = jsonString.lastIndexOf('}');
+            const end = Math.max(lastBracket, lastBrace);
+            
+            if (end > start) {
+              try { 
+                const candidate = jsonString.substring(start, end + 1).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+                parsed = JSON.parse(candidate); 
+              } catch { /* fail */ }
+            }
           }
         }
       }
@@ -862,10 +924,19 @@ export class BaseAIProvider extends BaseProvider {
 
       rawItems.forEach((item) => {
         const text = typeof item === 'object' && item !== null ? (item.text || item.translation || '') : String(item);
-        const id = (typeof item === 'object' && item !== null && item.id !== undefined) ? parseInt(item.id, 10) : null;
+        const id = (typeof item === 'object' && item !== null && item.id !== undefined) ? item.id : null;
 
-        if (id !== null && id >= 0 && id < expectedCount) {
-          results[id] = text;
+        if (id !== null) {
+          // If id is UID (string), find its index in original batch
+          const idx = typeof id === 'string' 
+            ? originalBatch.findIndex(ob => (typeof ob === 'object' ? ob.uid : null) === id)
+            : parseInt(id, 10);
+            
+          if (idx !== -1 && idx >= 0 && idx < expectedCount) {
+            results[idx] = text;
+          } else {
+            unmappedTexts.push(text);
+          }
         } else {
           unmappedTexts.push(text);
         }
@@ -875,7 +946,7 @@ export class BaseAIProvider extends BaseProvider {
       let unmappedIdx = 0;
       for (let i = 0; i < expectedCount; i++) {
         if (results[i] === null) {
-          results[i] = unmappedTexts[unmappedIdx] || originalBatch[i] || '';
+          results[i] = unmappedTexts[unmappedIdx] || (typeof originalBatch[i] === 'object' ? originalBatch[i].text : originalBatch[i]) || '';
           unmappedIdx++;
         }
       }
@@ -914,7 +985,7 @@ export class BaseAIProvider extends BaseProvider {
     }
     
     // If all else fails, return the original texts for this batch
-    return originalBatch;
+    return originalBatch.map(item => typeof item === 'object' ? item.text : item);
   }
 
   /**
@@ -926,9 +997,11 @@ export class BaseAIProvider extends BaseProvider {
    * @param {object} engine - Translation engine instance
    * @param {string} messageId - Message ID
    * @param {AbortController} abortController - Cancellation controller
+   * @param {string} sessionId - Session ID
+   * @param {object} contextMetadata - Contextual metadata
    * @returns {Promise<string[]>} - Translated texts
    */
-  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId = null) {
+  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId = null, contextMetadata = null) {
     logger.debug(`[${this.providerName}] Starting fallback for ${batch.length} segments`);
     // const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const results = [];
@@ -941,7 +1014,8 @@ export class BaseAIProvider extends BaseProvider {
       }
       
       try {
-        logger.debug(`[${this.providerName}] Fallback processing segment ${i + 1}/${batch.length}: "${batch[i]}"`);
+        const content = typeof batch[i] === 'object' ? batch[i].text : batch[i];
+        logger.debug(`[${this.providerName}] Fallback processing segment ${i + 1}/${batch.length}: "${content?.substring(0, 50)}..."`);
         
         // Manual delay for fallback to prevent overload
         if (i > 0) {
@@ -949,14 +1023,14 @@ export class BaseAIProvider extends BaseProvider {
         }
         
         const result = await Promise.race([
-          this._translateSingle(batch[i], sourceLang, targetLang, translateMode, abortController, false, sessionId, batch[i]?.length || 0),
+          this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, content?.length || 0, contextMetadata),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error(`Fallback segment ${i + 1} timeout after 8 seconds`)), 8000)
           )
         ]);
         
         logger.debug(`[${this.providerName}] Fallback segment ${i + 1} completed`);
-        const translatedResult = result || batch[i];
+        const translatedResult = result || content;
         results.push(translatedResult);
         
         // Stream the result immediately for this segment
@@ -1091,7 +1165,10 @@ export class BaseAIProvider extends BaseProvider {
    * @private
    */
   _createCharacterBasedBatches(texts, maxCharsPerBatch, balancedBatching = false) {
-    const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+    const totalChars = texts.reduce((sum, text) => {
+      const content = typeof text === 'object' ? text.text : text;
+      return sum + (content?.length || 0);
+    }, 0);
 
     // If total content fits in one batch, return early to avoid unnecessary splitting
     if (totalChars <= maxCharsPerBatch) {
@@ -1108,7 +1185,8 @@ export class BaseAIProvider extends BaseProvider {
     const targetBatchChars = balancedBatching ? Math.min(balancedBatchSize, maxCharsPerBatch) : maxCharsPerBatch;
 
     for (const text of texts) {
-      const textLength = text.length;
+      const content = typeof text === 'object' ? text.text : text;
+      const textLength = content?.length || 0;
 
       // If adding this text would exceed the limit and we have items in the batch, create new batch
       if (currentChars + textLength > targetBatchChars && currentBatch.length > 0) {

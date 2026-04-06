@@ -18,47 +18,39 @@ export class WebAIProvider extends BaseAIProvider {
   static reliableJsonMode = false;
   static supportsDictionary = true;
   
-  // AI Provider capabilities - Standard API service settings
-  static supportsStreaming = true; // Enable streaming for segment-based real-time translation
+  static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 25; // Moderate batch size for external API
+  static optimalBatchSize = 25; 
   static maxComplexity = 400;
-  static supportsImageTranslation = false; // Depends on model
+  static supportsImageTranslation = false; 
   
-  // Batch processing strategy
-  static batchStrategy = 'json'; // Uses JSON format for batch translation
+  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.WEBAI);
   }
 
-  
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
     ]);
 
-    // Calculate original character count for stats tracking
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
     logger.info(`[WebAI] Using model: ${apiModel}`);
     logger.info(`[WebAI] Starting translation: ${finalOriginalCharCount} chars`);
 
-    // Validate configuration
-    this._validateConfig(
-      { apiUrl, apiModel },
-      ["apiUrl", "apiModel"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
+    this._validateConfig({ apiUrl, apiModel }, ["apiUrl", "apiModel"], `${this.providerName.toLowerCase()}-translation`);
 
-    const prompt = await buildPrompt(
-      text,
-      sourceLang,
-      targetLang,
-      translateMode,
-      this.constructor.type
-    );
+    let prompt;
+    if (isBatch) {
+      const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
+      prompt = `${systemPrompt}\n\nJSON data to translate:\n${userText}`;
+    } else {
+      prompt = await buildPrompt(text, sourceLang, targetLang, translateMode, this.constructor.type);
+      // Manually add context metadata for non-batch WebAI if needed, but buildPrompt doesn't support it yet
+    }
 
     const fetchOptions = {
       method: "POST",
@@ -67,20 +59,17 @@ export class WebAIProvider extends BaseAIProvider {
         message: prompt,
         model: apiModel,
         images: [],
-        max_tokens: 4096, // Ensure enough tokens for batch responses
+        max_tokens: 4096,
         reset_session: this.shouldResetSession(),
-        // Enable JSON mode for batch translations
         ...(isBatch && { response_format: { type: "json_object" } })
       }),
     };
 
-    // Use unified API request handler
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
       originalCharCount: finalOriginalCharCount,
-      extractResponse: (data) =>
-        typeof data.response === "string" ? data.response : undefined,
+      extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId
@@ -89,7 +78,6 @@ export class WebAIProvider extends BaseAIProvider {
     logger.info(`[WebAI] Translation completed successfully`);
     this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
     
-    // Batch translations should return raw text to let the specialized parser handle it.
     return isBatch ? result : this._cleanAIResponse(result);
   }
 }

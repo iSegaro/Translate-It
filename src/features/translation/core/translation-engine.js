@@ -71,132 +71,51 @@ export class TranslationEngine {
     let context = request.context || "unknown";
     let data = request.data;
 
-    // Handle legacy or direct data format
+    if (!data && request.text) {
+      // Compatibility for older message format
+      data = {
+        text: request.text,
+        provider: request.provider,
+        sourceLanguage: request.sourceLanguage,
+        targetLanguage: request.targetLanguage,
+        mode: request.mode,
+        options: request.options,
+      };
+    }
+
     if (!data) {
-      if (request.text && request.provider) {
-        data = {
-          text: request.text,
-          provider: request.provider,
-          sourceLanguage: request.sourceLanguage || "auto",
-          targetLanguage: request.targetLanguage || "fa",
-          mode: request.mode || "simple",
-          options: request.options || {},
-          messageId: request.messageId
-        };
-      } else {
-        throw new Error(`Missing required fields: data or text/provider. Got: ${JSON.stringify(request)}`);
+      throw new Error("Invalid request: missing translation data");
+    }
+
+    const messageId = request.messageId || data.messageId || `msg-${Date.now()}`;
+    data.messageId = messageId;
+
+    // Detect duplicate requests (brief window)
+    const requestId = `${messageId}:${data.text?.substring(0, 50)}`;
+    if (this.recentRequests.has(requestId)) {
+      const existing = this.recentRequests.get(requestId);
+      if (Date.now() - existing.time < 1000) {
+        // Debounce duplicate request
+        return existing.promise;
       }
     }
 
-    // CRITICAL: Extract and preserve sessionId for tracking and stats
-    const sessionId = data.sessionId || request.sessionId || data.messageId || request.messageId;
-    data.sessionId = sessionId;
-    if (!request.sessionId) request.sessionId = sessionId;
-
-    // Track this translation for cancellation
-    const messageId = data.messageId || request.messageId;
-    if (messageId) {
-      // Check if this messageId is already being processed
-      if (this.activeTranslations.has(messageId)) {
-        logger.warn(`[TranslationEngine] Translation already in progress for messageId: ${messageId}. Ignoring duplicate request.`);
-        throw new Error(`Translation already in progress for messageId: ${messageId}`);
-      }
-      
-      const abortController = new AbortController();
-      this.activeTranslations.set(messageId, abortController);
-      // Tracking translation
-    }
-
-    // Validate data structure
-    if (!data || typeof data !== "object") {
-      throw new Error(`Invalid data: expected object, got ${typeof data}`);
-    }
-
-    if (
-      !data.text ||
-      typeof data.text !== "string" ||
-      data.text.trim().length === 0
-    ) {
-      throw new Error(
-        `Invalid text: expected non-empty string, got "${data.text}"`,
-      );
-    }
-
-    if (!data.provider || typeof data.provider !== "string") {
-      throw new Error(
-        `Invalid provider: expected string, got "${data.provider}"`,
-      );
-    }
-
-    // Data normalized successfully
-    // Store messageId in data for later retrieval
-    if (messageId) {
-      data.messageId = messageId;
-      
-      // Check for duplicate requests within the last 5 seconds
-      const now = Date.now();
-      const requestKey = `${messageId}_${data.provider}_${data.text.slice(0, 50)}`;
-      const lastRequest = this.recentRequests.get(requestKey);
-      
-      if (lastRequest && (now - lastRequest) < 5000) {
-        // Duplicate request detected, ignoring
-        return { success: true, streaming: true, messageId: messageId, duplicate: true };
-      }
-      
-      this.recentRequests.set(requestKey, now);
-      
-      // Cleanup old entries (older than 10 seconds)
-      for (const [key, timestamp] of this.recentRequests) {
-        if (now - timestamp > 10000) {
-          this.recentRequests.delete(key);
-        }
-      }
-    }
+    // Track active translation
+    const abortController = new AbortController();
+    this.activeTranslations.set(messageId, abortController);
+    this.cancelledRequests.delete(messageId);
 
     try {
-      let result;
-      // Check cache first for non-SelectElement contexts to improve performance
-      const cacheKey = this.generateCacheKey(data);
-      const isSelectElementMode = data.mode === TranslationMode.Select_Element;
+      // Execute translation
+      const result = await this.executeTranslation(data, sender);
 
-      if (this.cache.has(cacheKey) && !isSelectElementMode) {
-        const cached = this.cache.get(cacheKey);
-        // Cache hit
-        result = {
-          ...cached,
-          fromCache: true,
-        };
-      } else {
-        // Context-specific optimizations (but all will include history except SelectElement)
-        if (context === "popup") {
-          result = await this.translateWithPriority(data, sender);
-        } else if (context === "selection") {
-          result = await this.translateWithCache(data, sender);
-        } else {
-          result = await this.executeTranslation(data, sender);
-        }
-
-        // Cache the result for future requests (but not for SelectElement mode)
-        if (!isSelectElementMode) {
-          this.cacheResult(cacheKey, result);
-        }
-      }
-
-      // Centralized history addition for all modes except SelectElement
-      if (result.success && data.mode !== TranslationMode.Select_Element) {
-        await this.addToHistory(data, result);
-      }
-
-      // Result logging is handled by handleTranslate
-
-      // Validate result format
       if (!result || typeof result !== "object") {
         throw new Error(
-          `Invalid translation result: expected object, got ${typeof result}`,
+          `Translation failed: invalid result format (${typeof result})`,
         );
       }
 
-      if (!Object.prototype.hasOwnProperty.call(result, "success")) {
+      if (result.success === undefined) {
         throw new Error(
           `Translation result missing 'success' property: ${JSON.stringify(result)}`,
         );
@@ -397,7 +316,7 @@ export class TranslationEngine {
    * Optimized JSON translation for unreliable providers
    */
   async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, messageId = null, tabId = null) {
-    const { text, provider, sourceLanguage, targetLanguage, mode } = data;
+    const { text, provider, sourceLanguage, targetLanguage, mode, contextMetadata } = data;
     
     let originalJson;
     try {
@@ -413,18 +332,20 @@ export class TranslationEngine {
     // Handle both single string arrays and object arrays with text field
     const segments = originalJson.length === 1 && typeof originalJson[0] === 'string'
       ? originalJson
-      : originalJson.map(item => item.text);
+      : originalJson; // Keep full objects (text, uid, blockId, role)
+
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     
     // Force reload configurations to ensure latest rate limiting settings
     rateLimitManager.reloadConfigurations();
-    const OPTIMAL_BATCH_SIZE = 25; // Increased from 10 for better efficiency
+    const OPTIMAL_BATCH_SIZE = 25; 
     const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
-    // Use LanguageSwappingService to handle potential language flipping (e.g. translating Farsi to English if target is Farsi)
+    // Use LanguageSwappingService to handle potential language flipping
+    const firstText = typeof segments[0] === 'object' ? segments[0].text : (segments[0] || '');
     const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
     const [actualSource, actualTarget] = await LanguageSwappingService.applyLanguageSwapping(
-      segments[0] || '', sourceLanguage, targetLanguage, data.originalSourceLang || sourceLanguage, data.originalTargetLang || targetLanguage,
+      firstText, sourceLanguage, targetLanguage, data.originalSourceLang || sourceLanguage, data.originalTargetLang || targetLanguage,
       { providerName: provider }
     );
 
@@ -433,7 +354,7 @@ export class TranslationEngine {
     const effectiveTarget = actualTarget;
 
     const abortController = messageId ? this.activeTranslations.get(messageId) : null;
-    const sessionId = data.sessionId || messageId; // Use provided sessionId or fallback to messageId (for whole page)
+    const sessionId = data.sessionId || messageId; 
     let hasErrors = false;
     let lastError = null;
 
@@ -452,7 +373,7 @@ export class TranslationEngine {
                 const batch = batches[i];
                 const batchSize = batch.length;
                 const batchComplexity = this.calculateBatchComplexity(batch);
-                const batchCharCount = batch.reduce((sum, text) => sum + (text?.length || 0), 0);
+                const batchCharCount = batch.reduce((sum, item) => sum + ((typeof item === 'object' ? item.text?.length : item?.length) || 0), 0);
                 
                 // Attach sessionId to abortController carrier
                 if (abortController) {
@@ -461,13 +382,13 @@ export class TranslationEngine {
 
                 // Apply intelligent delay based on batch properties and previous failures
                 if (i > 0) {
-                    const baseDelay = Math.min(2000 + (batchSize * 150), 5000); // Increased base delay
+                    const baseDelay = Math.min(2000 + (batchSize * 150), 5000); 
                     const complexityMultiplier = batchComplexity > 50 ? 1.5 : 1.0;
                     const failureMultiplier = Math.pow(2, consecutiveFailures);
                     
                     adaptiveDelay = Math.min(
                         baseDelay * complexityMultiplier * failureMultiplier + adaptiveDelay * 0.3,
-                        20000 // Maximum 20 seconds delay (increased from 15)
+                        20000 
                     );
                     
                     logger.debug(`[TranslationEngine] Applying intelligent delay: ${Math.round(adaptiveDelay)}ms (batch: ${i + 1}/${batches.length}, size: ${batchSize}, complexity: ${batchComplexity}, failures: ${consecutiveFailures})`);
@@ -483,10 +404,7 @@ export class TranslationEngine {
                     const batchResult = await rateLimitManager.executeWithRateLimit(
                         provider,
                         () => {
-                            // Check provider type to determine which method to call
                             const providerClass = providerInstance?.constructor;
-
-                            // Check if provider is AI provider (has type "ai" or has _translateBatch method)
                             const isAIProvider = providerClass?.type === "ai" ||
                                                typeof providerInstance?._translateBatch === 'function';
 
@@ -500,13 +418,14 @@ export class TranslationEngine {
                                   abortController,
                                   this,
                                   messageId,
-                                  sessionId // Pass sessionId for context maintenance
+                                  sessionId,
+                                  contextMetadata // Pass context metadata to AI provider
                                 );
                             } else if (typeof providerInstance?._translateChunk === 'function') {
-                                // Traditional providers use _translateChunk method for SelectElement mode
-                                // Pass all arguments to match new signature: (chunkTexts, sl, tl, mode, abort, retry, chunkIdx, totalChunks, blockContainer, sessionId)
+                                // Traditional providers use _translateChunk method
+                                const chunkTexts = batch.map(item => typeof item === 'object' ? item.text : item);
                                 return providerInstance._translateChunk(
-                                    batch, 
+                                    chunkTexts, 
                                     effectiveSource, 
                                     effectiveTarget, 
                                     mode, 
@@ -514,34 +433,11 @@ export class TranslationEngine {
                                     0,              // retryAttempt
                                     batch.length,   // chunkIndex (actually segment count in some signatures)
                                     1,              // totalChunks
-                                    null,           // blockContainer (will be extracted inside if needed)
-                                    sessionId       // sessionId for history context
+                                    null,           // blockContainer
+                                    sessionId       
                                 );
                             } else {
-                                // Fallback: gather detailed information about the provider issue
-                                const providerInfo = {
-                                    providerName: provider,
-                                    hasTranslateBatch: typeof providerInstance?._translateBatch === 'function',
-                                    hasTranslateChunk: typeof providerInstance?._translateChunk === 'function',
-                                    providerType: providerClass?.type,
-                                    constructorName: providerInstance?.constructor?.name,
-                                    availableMethods: Object.getOwnPropertyNames(providerInstance)
-                                        .filter(method => method.startsWith('_translate'))
-                                };
-
-                                logger.error(`[TranslationEngine] Provider method detection failed:`, providerInfo);
-
-                                // Create a more informative error that helps with debugging
-                                const errorDetails = [
-                                    `Provider: ${providerInfo.providerName}`,
-                                    `Type: ${providerInfo.providerType || 'unknown'}`,
-                                    `Constructor: ${providerInfo.constructorName || 'unknown'}`,
-                                    `Has _translateBatch: ${providerInfo.hasTranslateBatch}`,
-                                    `Has _translateChunk: ${providerInfo.hasTranslateChunk}`,
-                                    `Available _translate methods: ${providerInfo.availableMethods.join(', ') || 'none'}`
-                                ].join(' | ');
-
-                                throw new Error(`Translation provider method not available: ${errorDetails}`);
+                                throw new Error(`Translation provider method not available for ${provider}`);
                             }
                         },
                         `batch-${i + 1}/${batches.length}`,
@@ -552,13 +448,13 @@ export class TranslationEngine {
                     consecutiveFailures = 0;
                     adaptiveDelay = Math.max(adaptiveDelay * 0.8, 0);
 
-                    // Log Batch Progress using accurate network delta from StatsManager
+                    // Log Batch Progress
                     const statsAfter = statsManager.getSessionSummary(sessionId);
                     const batchNetworkChars = statsAfter ? (statsAfter.chars - charsBefore) : batchCharCount;
                     statsManager.printSummary(sessionId, {
                         status: 'Batch',
                         batchChars: batchNetworkChars,
-                        batchOriginalChars: batchCharCount // Original sum of input segments
+                        batchOriginalChars: batchCharCount 
                     });
 
                     // All providers now return arrays directly
@@ -570,11 +466,19 @@ export class TranslationEngine {
                         finalBatchResult = [String(finalBatchResult)];
                     }
 
+                    // Map results back to objects if batch items were objects
+                    const mappedResults = finalBatchResult.map((text, idx) => {
+                      if (typeof batch[idx] === 'object') {
+                        return { ...batch[idx], text: text?.text || text };
+                      }
+                      return text;
+                    });
+
                     const streamUpdateMessage = MessageFormat.create(
                         MessageActions.TRANSLATION_STREAM_UPDATE,
                         {
                           success: true,
-                          data: finalBatchResult,
+                          data: mappedResults,
                           originalData: batch,
                           batchIndex: i,
                           provider: provider,
@@ -587,33 +491,23 @@ export class TranslationEngine {
                         messageId
                       );
                       if (tabId) {
-                        browser.tabs.sendMessage(tabId, streamUpdateMessage).then(response => {
-                          logger.debug(`[TranslationEngine] TRANSLATION_STREAM_UPDATE sent successfully to tab ${tabId}, response:`, response);
-                        }).catch(error => {
-                          logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_UPDATE message to tab ${tabId}:`, error);
+                        browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(error => {
+                          logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_UPDATE to tab ${tabId}:`, error);
                         });
-                      } else {
-                        logger.error(`[TranslationEngine] No tabId available for sending TRANSLATION_STREAM_UPDATE`);
                       }
 
                 } catch (error) {
                     consecutiveFailures++;
                     hasErrors = true;
                     lastError = error;
-                    // Log cancellation as debug instead of warn using proper error management
-                    const errorType = matchErrorToType(error);
-                    if (errorType === ErrorTypes.USER_CANCELLED) {
-                      logger.debug(`[TranslationEngine] Batch ${i + 1} cancelled (consecutive failures: ${consecutiveFailures}):`, error);
-                    } else {
-                      // Use ErrorHandler for consistent error handling and user-friendly messages
+                    const errorType = error.type || matchErrorToType(error);
+                    const isFatal = isFatalError(error);
+
+                    if (errorType !== ErrorTypes.USER_CANCELLED) {
                       await ErrorHandler.getInstance().handle(error, {
                         context: 'TranslationEngine.batch',
-                        showToast: false, // Don't show toast for batch errors
-                        metadata: {
-                          batchIndex: i + 1,
-                          consecutiveFailures,
-                          providerName: error.providerName || 'unknown'
-                        }
+                        showToast: false,
+                        metadata: { batchIndex: i + 1, consecutiveFailures, providerName: provider }
                       });
                     }
                     
@@ -621,30 +515,17 @@ export class TranslationEngine {
                         MessageActions.TRANSLATION_STREAM_UPDATE,
                         {
                           success: false,
-                          error: { 
-                            message: error.message, 
-                            type: error.type || matchErrorToType(error) 
-                          },
+                          error: { message: error.message, type: errorType },
                           batchIndex: i,
                           originalData: batch,
                         },
                         'background-stream',
                         messageId
                     );
-                    if (tabId) {
-                        browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(err => {
-                          logger.error(`[TranslationEngine] Failed to send error stream update to tab ${tabId}:`, err);
-                        });
-                    }
+                    if (tabId) browser.tabs.sendMessage(tabId, streamUpdateMessage).catch(() => {});
                     
-                    // Stop on quota exceeded or too many consecutive failures
-                    if (errorType === 'QUOTA_EXCEEDED' || errorType === 'CIRCUIT_BREAKER_OPEN') {
-                        logger.error(`[TranslationEngine] Critical error (${errorType}), stopping translation.`);
-                        break;
-                    }
-                    
-                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                        logger.error(`[TranslationEngine] Too many consecutive failures (${consecutiveFailures}), stopping translation.`);
+                    if (isFatal || errorType === 'CIRCUIT_BREAKER_OPEN' || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        logger.error(`[TranslationEngine] Stopping translation due to fatal error: ${errorType}`);
                         break;
                     }
                 }
@@ -652,17 +533,10 @@ export class TranslationEngine {
         } catch (error) {
             logger.error(`[TranslationEngine] Unhandled error during streaming:`, error);
         } finally {
-            // Log Session Summary for Optimized JSON Mode (Select Element)
             try {
               const { statsManager } = await import('@/features/translation/core/TranslationStatsManager.js');
-              statsManager.printSummary(sessionId, { 
-                status: 'Streaming', 
-                success: !hasErrors, 
-                clear: true 
-              });
-            } catch (e) {
-              logger.debug('[TranslationEngine] Failed to print summary:', e.message);
-            }
+              statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
+            } catch (e) { /* ignore */ }
 
             const streamEndMessage = MessageFormat.create(
                 MessageActions.TRANSLATION_STREAM_END,
@@ -677,18 +551,11 @@ export class TranslationEngine {
                 'background-stream',
                 messageId
               );
-              if (tabId) {
-                browser.tabs.sendMessage(tabId, streamEndMessage).catch(error => {
-                  logger.error(`[TranslationEngine] Failed to send TRANSLATION_STREAM_END message to tab ${tabId}:`, error);
-                });
-              }
+              if (tabId) browser.tabs.sendMessage(tabId, streamEndMessage).catch(() => {});
         }
     })();
 
-    return {
-        success: true,
-        streaming: true,
-    };
+    return { success: true, streaming: true };
   }
 
   /**
@@ -705,39 +572,35 @@ export class TranslationEngine {
   /**
    * Split a very long text into smaller chunks at sentence boundaries if possible
    */
-  _splitOversizedSegment(text, maxChars) {
-    if (!text || text.length <= maxChars) return [text];
+  _splitOversizedSegment(segment, maxChars) {
+    const isObject = typeof segment === 'object';
+    const text = isObject ? segment.text : (segment || '');
+    if (!text || text.length <= maxChars) return [segment];
     
     const chunks = [];
     let remaining = text;
+    let partIndex = 0;
     
     while (remaining.length > maxChars) {
-      // Try to find a good breaking point (sentence end, then space)
       let breakPoint = -1;
-      const lookback = Math.floor(maxChars * 0.2); // Look back 20% for a break point
+      const lookback = Math.floor(maxChars * 0.2); 
       const searchRegion = remaining.substring(maxChars - lookback, maxChars);
       
-      // Try sentence endings: . ! ?
       const sentenceEnd = searchRegion.search(/[.!?]\s/);
       if (sentenceEnd !== -1) {
         breakPoint = maxChars - lookback + sentenceEnd + 1;
       } else {
-        // Try space
         const space = searchRegion.lastIndexOf(' ');
-        if (space !== -1) {
-          breakPoint = maxChars - lookback + space;
-        } else {
-          // Hard break
-          breakPoint = maxChars;
-        }
+        breakPoint = space !== -1 ? maxChars - lookback + space : maxChars;
       }
       
-      chunks.push(remaining.substring(0, breakPoint).trim());
+      const partText = remaining.substring(0, breakPoint).trim();
+      chunks.push(isObject ? { ...segment, text: partText, isSplit: true, partIndex: partIndex++ } : partText);
       remaining = remaining.substring(breakPoint).trim();
     }
     
     if (remaining.length > 0) {
-      chunks.push(remaining);
+      chunks.push(isObject ? { ...segment, text: remaining, isSplit: true, partIndex: partIndex } : remaining);
     }
     
     return chunks;
@@ -750,33 +613,38 @@ export class TranslationEngine {
     // First, flatten segments by splitting any single segment that's too long
     const flattenedSegments = [];
     for (const seg of segments) {
-      const text = seg || '';
-      if (text.length > maxCharsPerBatch) {
-        flattenedSegments.push(...this._splitOversizedSegment(text, maxCharsPerBatch));
-      } else {
-        flattenedSegments.push(text);
-      }
+      flattenedSegments.push(...this._splitOversizedSegment(seg, maxCharsPerBatch));
     }
 
     const batches = [];
     let currentBatch = [];
     let currentBatchComplexity = 0;
     let currentBatchChars = 0;
+    let lastBlockId = null;
     
     for (let i = 0; i < flattenedSegments.length; i++) {
       const segment = flattenedSegments[i];
-      const segmentComplexity = this.calculateTextComplexity(segment);
-      const segmentChars = segment.length;
+      const isObject = typeof segment === 'object';
+      const text = isObject ? segment.text : segment;
+      const segmentComplexity = this.calculateTextComplexity(text);
+      const segmentChars = text.length;
+      const blockId = isObject ? segment.blockId : null;
       
-      // Calculate optimal batch size based on segment complexity
       const adjustedBatchSize = this.getAdjustedBatchSize(segmentComplexity, baseBatchSize);
       
-      // Check if adding this segment would exceed batch limits
+      // LOGICAL GROUPING: Try to keep items from the same block together
+      // If we are about to break a block and we have space, keep going
+      // If we are at a block boundary and batch is reasonably full, flush
+      const isBlockBoundary = lastBlockId && blockId && lastBlockId !== blockId;
+      
       const wouldExceedSize = currentBatch.length >= adjustedBatchSize;
-      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 1000; // Increased from 400
+      const wouldExceedComplexity = currentBatchComplexity + segmentComplexity > 1000; 
       const wouldExceedChars = currentBatchChars + segmentChars > maxCharsPerBatch;
       
-      if (wouldExceedSize || wouldExceedComplexity || wouldExceedChars) {
+      // Flush if limits reached OR if we are at a logical boundary and batch is > 70% full
+      const shouldFlushBoundary = isBlockBoundary && currentBatch.length > (adjustedBatchSize * 0.7);
+
+      if (wouldExceedSize || wouldExceedComplexity || wouldExceedChars || shouldFlushBoundary) {
         if (currentBatch.length > 0) {
           batches.push([...currentBatch]);
           currentBatch = [];
@@ -788,6 +656,7 @@ export class TranslationEngine {
       currentBatch.push(segment);
       currentBatchComplexity += segmentComplexity;
       currentBatchChars += segmentChars;
+      lastBlockId = blockId;
     }
     
     if (currentBatch.length > 0) {
@@ -802,25 +671,17 @@ export class TranslationEngine {
    * Calculate complexity for a single text segment
    */
   calculateTextComplexity(text) {
+    if (!text) return 0;
     let complexity = 0;
-    
-    // Length factor
     complexity += Math.min(text.length / 20, 50);
-    
-    // Special characters (punctuation, symbols) - excluding non-Latin word characters
     const specialChars = (text.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
     complexity += specialChars;
-    
-    // Technical content
     if (text.match(/https?:\/\/|www\./)) complexity += 15;
     if (text.match(/[{}[\]<>]/)) complexity += 8;
     if (text.match(/\d+\.\d+|\w+\.\w+/)) complexity += 5;
-    
-    // Mixed scripts
     const hasLatin = /[a-zA-Z]/.test(text);
-    const hasNonLatin = /[^\u0000-\u007F]/.test(text); // eslint-disable-line no-control-regex
+    const hasNonLatin = /[^\u0000-\u007F]/.test(text); 
     if (hasLatin && hasNonLatin) complexity += 10;
-    
     return Math.round(complexity);
   }
 
@@ -839,33 +700,21 @@ export class TranslationEngine {
    */
   calculateBatchComplexity(batch) {
     if (!Array.isArray(batch) || batch.length === 0) return 0;
-    
     let totalComplexity = 0;
-    
-    for (const text of batch) {
+    for (const item of batch) {
+      const text = typeof item === 'object' ? item.text : item;
       let textComplexity = 0;
-      
-      // Length factor (longer texts are more complex)
-      textComplexity += Math.min(text.length / 10, 30);
-      
-      // Special characters and formatting - excluding non-Latin word characters
-      const specialChars = (text.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
+      textComplexity += Math.min((text?.length || 0) / 10, 30);
+      const specialChars = (text?.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
       textComplexity += specialChars * 0.5;
-      
-      // Technical terms (URLs, code, etc.)
-      if (text.match(/https?:\/\/|www\./)) textComplexity += 10;
-      if (text.match(/[{}[\]<>]/)) textComplexity += 5;
-      if (text.match(/\d+\.\d+|\w+\.\w+/)) textComplexity += 3;
-      
-      // Mixed languages or scripts
+      if (text?.match(/https?:\/\/|www\./)) textComplexity += 10;
+      if (text?.match(/[{}[\]<>]/)) textComplexity += 5;
+      if (text?.match(/\d+\.\d+|\w+\.\w+/)) textComplexity += 3;
       const hasLatin = /[a-zA-Z]/.test(text);
-      const hasNonLatin = /[^\u0000-\u007F]/.test(text); // eslint-disable-line no-control-regex
+      const hasNonLatin = /[^\u0000-\u007F]/.test(text); 
       if (hasLatin && hasNonLatin) textComplexity += 8;
-      
       totalComplexity += textComplexity;
     }
-    
-    // Average complexity per text in batch
     return Math.round(totalComplexity / batch.length);
   }
 
@@ -875,205 +724,72 @@ export class TranslationEngine {
   async processBatch(batch, segments, results, translationStatus, providerInstance, config, errorMessages = [], sharedState = null, abortController = null) {
     const { provider, sourceLanguage, targetLanguage, mode, originalSourceLang, originalTargetLang } = config;
     const DELIMITER = "\n\n---\n\n";
-    
-    // Check if we should stop due to language pair error before starting
-    if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
-      logger.debug('[TranslationEngine] Batch stopped due to language pair error in another batch');
-      return;
-    }
-
-    // Check if translation was cancelled before starting batch (both AbortController and shared state)
+    if (sharedState && (sharedState.shouldStopDueToLanguagePairError || sharedState.isCancelled)) return;
     if (abortController && abortController.signal.aborted) {
-      logger.debug('[TranslationEngine] Batch cancelled before starting (AbortController)');
       if (sharedState) sharedState.isCancelled = true;
       return;
     }
     
-    if (sharedState && sharedState.isCancelled) {
-      logger.debug('[TranslationEngine] Batch cancelled before starting (shared state)');
-      return;
-    }
+    if (provider === ProviderNames.BING_TRANSLATE) await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Add request throttling for Bing provider
-    if (provider === ProviderNames.BING_TRANSLATE) {
-      await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between requests
-    }
-    
-    // Try batch translation first (most efficient)
     try {
-      const batchText = batch.map(idx => segments[idx]).join(DELIMITER);
+      const batchText = batch.map(idx => typeof segments[idx] === 'object' ? segments[idx].text : segments[idx]).join(DELIMITER);
       const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, { 
-        mode, 
-        originalSourceLang, 
-        originalTargetLang, 
-        abortController,
-        sessionId: data.sessionId || messageId,
-        charCount: batchText.length
+        mode, originalSourceLang, originalTargetLang, abortController,
+        sessionId: config.sessionId, charCount: batchText.length
       });
       
       if (typeof batchResult === 'string') {
         const parts = batchResult.split(DELIMITER);
-        
         if (parts.length === batch.length) {
-          // Successful batch translation
           for (let i = 0; i < batch.length; i++) {
             const idx = batch[i];
-            const translatedText = parts[i]?.trim() || segments[idx];
-            // For same-language translations or when content doesn't change, still consider it successful
-            const isActuallyTranslated = translatedText !== segments[idx] || 
-                                       sourceLanguage === targetLanguage ||
-                                       sourceLanguage === 'auto'; // Auto-detect may result in same language
-            
+            const originalText = typeof segments[idx] === 'object' ? segments[idx].text : segments[idx];
+            const translatedText = parts[i]?.trim() || originalText;
             results[idx] = translatedText;
-            translationStatus[idx] = isActuallyTranslated;
-            
-            // Cache individual result
-            const cacheKey = this.generateCacheKey({
-              text: segments[idx], provider, sourceLanguage, targetLanguage, mode
-            });
-            // Always cache the result if the API call was successful
+            translationStatus[idx] = true;
+            const cacheKey = this.generateCacheKey({ text: originalText, provider, sourceLanguage, targetLanguage, mode });
             this.cache.set(cacheKey, { translatedText: translatedText, cachedAt: Date.now() });
           }
           return;
         }
       }
     } catch (batchError) {
-      logger.debug(`[TranslationEngine] Batch translation failed, using individual fallback:`, batchError.message);
-      
-      // Track batch failures for early exit
-      if (sharedState) {
-        sharedState.batchFailureCount++;
-      }
-      
-      // Capture specific error message
-      const errorMessage = batchError instanceof Error ? batchError.message : String(batchError);
-      if (errorMessage && !errorMessages.includes(errorMessage)) {
-        errorMessages.push(errorMessage);
-      }
-
-      // If fatal error (cancellation, language pair, API key, etc.), stop all processing
-      if (isFatalError(batchError)) {
-        const errorType = batchError.type || matchErrorToType(batchError);
-        
-        // Handle specific fatal errors that require shared state updates
-        if (errorType === ErrorTypes.USER_CANCELLED) {
-          logger.debug('[TranslationEngine] User cancellation detected - stopping all batches');
-          if (sharedState) sharedState.isCancelled = true;
-        } else if (errorType === ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED) {
-          if (sharedState) {
-            sharedState.shouldStopDueToLanguagePairError = true;
-            sharedState.languagePairError = batchError;
-            logger.debug('[TranslationEngine] Language pair error detected - stopping all batches');
-          }
-        } else {
-          logger.debug(`[TranslationEngine] Fatal error detected (${errorType}) - stopping all batches`);
-        }
-        throw batchError; // Re-throw to stop translation completely
-      }
+      if (sharedState) sharedState.batchFailureCount++;
+      const errorMessage = batchError.message || String(batchError);
+      if (!errorMessages.includes(errorMessage)) errorMessages.push(errorMessage);
+      if (isFatalError(batchError)) throw batchError;
     }
     
-    // Fallback to individual translations (with minimal retry)
-    const INDIVIDUAL_RETRY = 2;
+    // Fallback to individual
     const individualPromises = batch.map(async (idx) => {
-      // Check if we should stop due to language pair error or cancellation before starting individual translation
-      if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
-        logger.debug('[TranslationEngine] Individual translation stopped due to language pair error');
-        return { idx, result: segments[idx], success: false };
-      }
-
-      // If no abort controller is provided or it's already aborted, skip individual translation
-      if (!abortController || abortController.signal.aborted) {
-        logger.debug('[TranslationEngine] Individual translation cancelled - no valid abort controller');
-        return { idx, result: segments[idx], success: false };
-      }
+      if (sharedState && sharedState.shouldStopDueToLanguagePairError) return { idx, result: segments[idx], success: false };
+      if (!abortController || abortController.signal.aborted) return { idx, result: segments[idx], success: false };
       
       let attempt = 0;
-      while (attempt < INDIVIDUAL_RETRY) {
-        // Check again inside the retry loop
-        if (sharedState && sharedState.shouldStopDueToLanguagePairError) {
-          logger.debug('[TranslationEngine] Individual translation retry stopped due to language pair error');
-          return { idx, result: segments[idx], success: false };
-        }
-
-        // If abort controller is missing or aborted, stop retry loop
-        if (!abortController || abortController.signal.aborted) {
-          logger.debug('[TranslationEngine] Individual translation retry cancelled - no valid abort controller');
-          return { idx, result: segments[idx], success: false };
-        }
-        
+      const originalText = typeof segments[idx] === 'object' ? segments[idx].text : segments[idx];
+      while (attempt < 2) {
         try {
-          // Add throttling for Bing individual requests as well
-          if (config.provider === ProviderNames.BING_TRANSLATE && attempt > 0) {
-            await new Promise(resolve => setTimeout(resolve, 300 * attempt)); // Increasing delay for retries
-          }
-
-          const result = await providerInstance.translate(segments[idx], sourceLanguage, targetLanguage, { 
-            mode, 
-            originalSourceLang, 
-            originalTargetLang, 
-            abortController,
-            sessionId: data.sessionId || messageId,
-            charCount: segments[idx].length
+          const result = await providerInstance.translate(originalText, sourceLanguage, targetLanguage, { 
+            mode, originalSourceLang, originalTargetLang, abortController,
+            sessionId: config.sessionId, charCount: originalText.length
           });
-          const translatedText = typeof result === 'string' ? result.trim() : segments[idx];          // For same-language translations or when content doesn't change, still consider it successful
-          const isActuallyTranslated = translatedText !== segments[idx] || 
-                                       sourceLanguage === targetLanguage ||
-                                       sourceLanguage === 'auto'; // Auto-detect may result in same language
-          
-          // Cache result
-          const cacheKey = this.generateCacheKey({
-            text: segments[idx], provider, sourceLanguage, targetLanguage, mode
-          });
-          // Always cache the result if the API call was successful
+          const translatedText = typeof result === 'string' ? result.trim() : originalText;
+          const cacheKey = this.generateCacheKey({ text: originalText, provider, sourceLanguage, targetLanguage, mode });
           this.cache.set(cacheKey, { translatedText: translatedText, cachedAt: Date.now() });
-
-          logger.debug(`isActuallyTranslated: ${isActuallyTranslated}`);
-          return { idx, result: translatedText, success: true }; // API call succeeded
-        } catch (individualError) {
-          // Capture specific error message
-          const errorMessage = individualError instanceof Error ? individualError.message : String(individualError);
-          if (errorMessage && !errorMessages.includes(errorMessage)) {
-            errorMessages.push(errorMessage);
-          }
-          
-          // If fatal error (cancellation, language pair, API key, etc.), stop processing
-          if (isFatalError(individualError)) {
-            const errorType = individualError.type || matchErrorToType(individualError);
-            
-            // Handle specific fatal errors that require shared state updates
-            if (errorType === ErrorTypes.USER_CANCELLED) {
-              logger.debug('[TranslationEngine] User cancellation detected in individual translation');
-              return { idx, result: segments[idx], success: false };
-            } else if (errorType === ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED) {
-              if (sharedState) {
-                sharedState.shouldStopDueToLanguagePairError = true;
-                sharedState.languagePairError = individualError;
-                logger.debug('[TranslationEngine] Language pair error detected in individual translation - stopping all batches');
-              }
-              throw individualError;
-            } else {
-              // Other fatal errors (e.g. Quota Exceeded) - stop retries
-              logger.debug(`[TranslationEngine] Fatal error detected in individual translation (${errorType}) - skipping retries`);
-              return { idx, result: segments[idx], success: false };
-            }
-          }
-          
+          return { idx, result: translatedText, success: true };
+        } catch (e) {
+          if (isFatalError(e)) throw e;
           attempt++;
-          if (attempt < INDIVIDUAL_RETRY) {
-            await new Promise(resolve => setTimeout(resolve, 100 * attempt));
-          }
+          if (attempt < 2) await new Promise(r => setTimeout(r, 100 * attempt));
         }
       }
-      
-      // Final fallback to original text (mark as failed)
       return { idx, result: segments[idx], success: false };
     });
     
-    // Process individual translations sequentially instead of Promise.all()
-    for (const individualPromise of individualPromises) {
-      const { idx, result, success } = await individualPromise;
+    for (const p of individualPromises) {
+      const { idx, result, success } = await p;
       results[idx] = result;
-      // Mark as successful if API call succeeded, regardless of text change
       translationStatus[idx] = success;
     }
   }
@@ -1083,379 +799,119 @@ export class TranslationEngine {
    */
   async getProvider(providerId) {
     try {
-      logger.debug(`[TranslationEngine] Getting provider '${providerId}'`);
       const provider = await this.factory.getProvider(providerId);
-
-      if (provider) {
-        logger.debug(`[TranslationEngine] Provider '${providerId}' loaded successfully`);
-        return provider;
-      }
+      return provider;
     } catch (error) {
-      logger.error(
-        `[TranslationEngine] Failed to get provider '${providerId}':`,
-        error,
-      );
+      logger.error(`[TranslationEngine] Failed to get provider '${providerId}':`, error);
     }
-
     return null;
   }
 
-  /**
-   * Generate cache key for translation request
-   */
   generateCacheKey(data) {
     const { text, provider, sourceLanguage, targetLanguage, mode } = data;
-    return `${provider}:${sourceLanguage}:${targetLanguage}:${mode}:${text.slice(0, 100)}`;
+    return `${provider}:${sourceLanguage}:${targetLanguage}:${mode}:${text?.slice(0, 100)}`;
   }
 
-  /**
-   * Cache translation result
-   */
   cacheResult(cacheKey, result) {
-    // Limit cache size to prevent memory issues
-    if (this.cache.size >= 100) {
-      // Remove oldest entries
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-    }
-
-    this.cache.set(cacheKey, {
-      ...result,
-      cachedAt: Date.now(),
-    });
+    if (this.cache.size >= 100) this.cache.delete(this.cache.keys().next().value);
+    this.cache.set(cacheKey, { ...result, cachedAt: Date.now() });
   }
 
-  /**
-   * Add translation to history
-   */
   async addToHistory(data, result) {
     try {
-      const historyItem = {
-        sourceText: data.text,
-        translatedText: result.translatedText,
-        sourceLanguage: data.sourceLanguage,
-        targetLanguage: data.targetLanguage,
-        timestamp: Date.now(),
-      };
-
-      // Load current history from storage (same key as useHistory composable)
+      const historyItem = { sourceText: data.text, translatedText: result.translatedText, sourceLanguage: data.sourceLanguage, targetLanguage: data.targetLanguage, timestamp: Date.now() };
       const currentData = await storageManager.get(['translationHistory']);
-      const currentHistory = currentData.translationHistory || [];
-      
-      // Add new item to the beginning and limit size
-      const newHistory = [historyItem, ...currentHistory].slice(0, 100);
-      
-      // Save back to storage using the same key as useHistory
-      await storageManager.set({
-        translationHistory: newHistory,
-      });
-      
-      // Update local cache
+      const newHistory = [historyItem, ...(currentData.translationHistory || [])].slice(0, 100);
+      await storageManager.set({ translationHistory: newHistory });
       this.history = newHistory;
-      
-      logger.debug("[TranslationEngine] Added to history:", data.text.substring(0, 50) + "...");
-    } catch (error) {
-      logger.error("[TranslationEngine] Failed to save history:", error);
-    }
+    } catch (error) { logger.error("[TranslationEngine] Failed to save history:", error); }
   }
 
-  /**
-   * Save history to browser storage
-   */
   async saveHistoryToStorage() {
-    try {
-      await storageManager.set({
-        translationHistory: this.history,
-      });
-    } catch (error) {
-      logger.error("[TranslationEngine] Failed to save history:", error);
-    }
+    try { await storageManager.set({ translationHistory: this.history }); } 
+    catch (error) { logger.error("[TranslationEngine] Failed to save history:", error); }
   }
 
-  /**
-   * Load history from browser storage
-   */
   async loadHistoryFromStorage() {
     try {
       const data = await storageManager.get(["translationHistory"]);
-      if (Array.isArray(data.translationHistory)) {
-        this.history = data.translationHistory;
-      } else {
-        this.history = []; // Ensure it's always an array
-      }
+      this.history = Array.isArray(data.translationHistory) ? data.translationHistory : [];
     } catch (error) {
-      // Use centralized context error detection
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'translation-engine-history', {
-          fallbackAction: () => { this.history = []; }
-        });
-      } else {
-        logger.error("[TranslationEngine] Failed to load history:", error);
-      }
+      if (ExtensionContextManager.isContextError(error)) ExtensionContextManager.handleContextError(error, 'translation-engine-history', { fallbackAction: () => { this.history = []; } });
+      else logger.error("[TranslationEngine] Failed to load history:", error);
     }
   }
 
-  /**
-   * Format error response
-   */
   formatError(error, context) {
-    // Extract error type using matcher if not explicitly provided
     const errorType = error.type || matchErrorToType(error);
-    
-    return {
-      success: false,
-      error: {
-        type: errorType,
-        message: error.message || "Translation failed",
-        context: context || "unknown",
-        timestamp: Date.now(),
-      },
-    };
+    return { success: false, error: { type: errorType, message: error.message || "Translation failed", context: context || "unknown", timestamp: Date.now() } };
   }
 
-  /**
-   * Get available providers list
-   */
   async getAvailableProviders() {
     try {
-      // Use the provider handler to get consistent provider list
       const { getAvailableProviders } = await import("../../../handlers/provider-handler.js");
       return await getAvailableProviders();
-    } catch (error) {
-      logger.error("[TranslationEngine] Failed to get providers:", error);
-      return [];
-    }
+    } catch (error) { logger.error("[TranslationEngine] Failed to get providers:", error); return []; }
   }
 
-  /**
-   * Clear cache
-   */
-  clearCache() {
-    this.cache.clear();
-  }
+  clearCache() { this.cache.clear(); }
+  clearHistory() { this.history = []; this.saveHistoryToStorage(); }
+  getCacheStats() { return { size: this.cache.size, providers: this.factory.providers?.size || 0 }; }
 
-  /**
-   * Clear history
-   */
-  clearHistory() {
-    this.history = [];
-    this.saveHistoryToStorage();
-  }
-
-  /**
-   * Get cache stats
-   */
-  getCacheStats() {
-    return {
-      size: this.cache.size,
-      providers: this.providers.size,
-    };
-  }
-
-  /**
-   * Cancel active translation by message ID
-   */
   async cancelTranslation(messageId) {
     if (messageId) {
-      logger.debug(`[TranslationEngine] Marking translation as cancelled: ${messageId}`);
       this.cancelledRequests.add(messageId);
-
-      if (this.activeTranslations.has(messageId)) {
-        const abortController = this.activeTranslations.get(messageId);
-        abortController.abort();
-        logger.debug(`[TranslationEngine] Aborted translation for messageId: ${messageId}`);
-      }
-
-      // Cancel streaming session if active
+      if (this.activeTranslations.has(messageId)) this.activeTranslations.get(messageId).abort();
       try {
         const { streamingManager } = await import("./StreamingManager.js");
         await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
-      } catch (error) {
-        logger.debug(`[TranslationEngine] StreamingManager cancel failed (might not be streaming): ${error.message}`);
-      }
-
+      } catch (error) { /* ignore */ }
       return true;
     }
     return false;
   }
 
-  /**
-   * Cancel all active translations
-   */
   async cancelAllTranslations() {
-    logger.debug(`[TranslationEngine] Cancelling all active translations`, {
-      activeCount: this.activeTranslations.size
-    });
-    
     let cancelledCount = 0;
-    
-    // Cancel all active translations
     for (const [messageId, abortController] of this.activeTranslations) {
-      try {
-        this.cancelledRequests.add(messageId);
-        abortController.abort();
-        cancelledCount++;
-        logger.debug(`[TranslationEngine] Cancelled translation: ${messageId}`);
-      } catch (error) {
-        logger.warn(`[TranslationEngine] Error cancelling translation ${messageId}:`, error);
-      }
+      try { this.cancelledRequests.add(messageId); abortController.abort(); cancelledCount++; } catch (error) { /* ignore */ }
     }
-    
-    // Cancel all streaming sessions
     try {
       const { streamingManager } = await import("./StreamingManager.js");
       await streamingManager.cancelAllStreams('All translations cancelled by user');
-    } catch (error) {
-      logger.debug(`[TranslationEngine] StreamingManager cancelAll failed: ${error.message}`);
-    }
-    
-    logger.debug(`[TranslationEngine] Cancelled ${cancelledCount} active translations`);
+    } catch (error) { /* ignore */ }
     return cancelledCount;
   }
 
-  /**
-   * Check if provider should use streaming for this request
-   * @param {object} providerInstance - Provider instance
-   * @param {string} text - Text to translate
-   * @param {string} messageId - Message ID
-   * @param {string} mode - Translation mode
-   * @returns {boolean} - Whether to use streaming
-   */
   _shouldUseStreamingForProvider(providerInstance, text, messageId, mode) {
-    // Must have messageId for streaming coordination
-    if (!messageId) {
-      return false;
-    }
-
-    const providerType = providerInstance.constructor.type; // "ai" or "translate"
-    const providerName = providerInstance.providerName || providerInstance.constructor.name;
-
-    // Special case: only Select_Element mode should use streaming for very long texts
+    if (!messageId) return false;
+    const providerType = providerInstance.constructor.type;
     const isSelectElementMode = mode === TranslationMode.Select_Element;
-
-    if (providerType === "ai") {
-      // AI providers: stream for longer texts, but mainly for Select Element mode
-      if (isSelectElementMode) {
-        return text.length > 500; // Enable streaming for Select Element with long texts
-      } else {
-        // For other modes (sidepanel, popup, etc.), limit text length to prevent streaming issues
-        if (text.length > 10000) {
-          logger.warn(`[TranslationEngine] Text too long for non-SelectElement mode: ${text.length} characters. Consider using Select Element mode for long texts.`);
-          return false; // Don't stream, will be handled by standard translation with chunking
-        }
-        return false; // No streaming for regular translation modes
-      }
-    } else {
-      // Traditional providers: Only for Select Element mode and very long texts
-      if (isSelectElementMode && text.length > 2000) {
-        // Check if provider actually supports streaming
-        const providerSupportsStreaming = providerInstance.constructor.supportsStreaming !== false;
-        if (!providerSupportsStreaming) {
-          logger.debug(`[TranslationEngine] Provider ${providerName} doesn't support streaming, using standard translation`);
-          return false;
-        }
-        return true;
-      }
-      
-      // For non-SelectElement modes, never use streaming for traditional providers
-      return false;
-    }
+    if (providerType === "ai") return isSelectElementMode ? text.length > 500 : false;
+    else return (isSelectElementMode && text.length > 2000 && providerInstance.constructor.supportsStreaming !== false);
   }
 
-  /**
-   * Execute streaming translation for AI providers
-   * @param {object} data - Translation data
-   * @param {object} providerInstance - Provider instance  
-   * @param {object} sender - Message sender
-   * @param {string} originalSourceLang - Original source language
-   * @param {string} originalTargetLang - Original target language
-   * @returns {Promise<object>} - Streaming result
-   */
   async executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang) {
     const { text, provider, sourceLanguage, targetLanguage, mode, messageId } = data;
-
-    // Initialize streaming session
     const { streamingManager } = await import("./StreamingManager.js");
-    const segments = [text]; // For simple text, treat as single segment
+    const segments = [text];
     const sessionId = data.sessionId || messageId;
-    
     streamingManager.initializeStream(messageId, sender, providerInstance, segments, sessionId);
-
-    // Store sender info for streaming callbacks
     this.streamingSenders = this.streamingSenders || new Map();
     this.streamingSenders.set(messageId, sender);
-
-    // Start streaming translation
     try {
-      
-      await providerInstance.translate(
-        text,
-        sourceLanguage,
-        targetLanguage,
-        {
-          mode: mode,
-          originalSourceLang: originalSourceLang,
-          originalTargetLang: originalTargetLang,
-          messageId: messageId,
-          sessionId: data.sessionId || messageId,
-          charCount: text.length,
-          engine: this
-        }
-      );
-
-      // For streaming providers, they handle their own streaming
-      // Just return streaming indicator
-      return {
-        success: true,
-        streaming: true,
-        messageId: messageId,
-        provider: provider,
-        timestamp: Date.now()
-      };
-
+      await providerInstance.translate(text, sourceLanguage, targetLanguage, { mode, originalSourceLang, originalTargetLang, messageId, sessionId, charCount: text.length, engine: this });
+      return { success: true, streaming: true, messageId, provider, timestamp: Date.now() };
     } catch (error) {
-      // Handle streaming error - streaming manager already sent error to UI
       await streamingManager.handleStreamError(messageId, error);
-      
-      // For streaming translations, don't throw - streaming manager handles the error
-      // Return a success indicator since streaming was initiated (even if it failed)
-      return {
-        success: true,
-        streaming: true,
-        messageId: messageId,
-        provider: provider,
-        timestamp: Date.now()
-      };
-    } finally {
-      // Cleanup
-      if (this.streamingSenders) {
-        this.streamingSenders.delete(messageId);
-      }
-    }
+      return { success: true, streaming: true, messageId, provider, timestamp: Date.now() };
+    } finally { if (this.streamingSenders) this.streamingSenders.delete(messageId); }
   }
 
-  /**
-   * Get sender information for streaming messages
-   * @param {string} messageId - Message ID
-   * @returns {object|null} - Sender information
-   */
-  getStreamingSender(messageId) {
-    return this.streamingSenders?.get(messageId) || null;
-  }
-
-  isCancelled(messageId) {
-    return this.cancelledRequests.has(messageId);
-  }
-
-  /**
-   * Initialize engine (call from background script)
-   */
+  getStreamingSender(messageId) { return this.streamingSenders?.get(messageId) || null; }
+  isCancelled(messageId) { return this.cancelledRequests.has(messageId); }
   async initialize() {
-    try {
-      await this.loadHistoryFromStorage();
-      logger.debug("[TranslationEngine] Initialized successfully");
-    } catch (error) {
-      logger.error("[TranslationEngine] Initialization failed:", error);
-    }
+    try { await this.loadHistoryFromStorage(); logger.debug("[TranslationEngine] Initialized successfully"); } 
+    catch (error) { logger.error("[TranslationEngine] Initialization failed:", error); }
   }
 }

@@ -19,50 +19,37 @@ export class OpenRouterProvider extends BaseAIProvider {
   static reliableJsonMode = true;
   static supportsDictionary = true;
 
-  // AI Provider capabilities - Flexible settings for multi-model support
   static supportsStreaming = true;
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
-  static supportsImageTranslation = true; // Depends on selected model
+  static supportsImageTranslation = true;
 
-  // Batch processing strategy
-  static batchStrategy = 'json'; // Uses JSON format for batch translation
+  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.OPENROUTER);
     this.providerSettingKey = 'OPENROUTER_API_KEY';
   }
 
-
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
       getOpenRouterApiModelAsync(),
     ]);
 
-    // Get first available key
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    // Validate configuration
-    this._validateConfig(
-      { apiKey },
-      ["apiKey"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
+    this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    // Build base prompt using explicit isBatch flag
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
 
-    // Calculate original character count for stats tracking
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
-    // Simple logging
     const isFirst = await this._isFirstTurn(sessionId);
     logger.info(`[OpenRouter] Model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
     logger.debug(`[OpenRouter] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    // Get conversation history
     const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     const fetchOptions = {
@@ -76,12 +63,10 @@ export class OpenRouterProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "openai/gpt-3.5-turbo",
         messages: messages,
-        max_tokens: 4096, // Ensure enough tokens for batch responses
-        // JSON mode is handled by the prompt and our robust parser
+        max_tokens: 4096,
       }),
     };
 
-    // Use unified API request handler
     const result = await this._executeRequest({
       url: CONFIG.OPENROUTER_API_URL,
       fetchOptions,
@@ -96,21 +81,14 @@ export class OpenRouterProvider extends BaseAIProvider {
       }
     });
 
-    // Update session history
     if (sessionId && result) {
       await this._updateSessionHistory(sessionId, userText, result);
     }
 
     logger.info(`[OpenRouter] Translation completed successfully`);
-    
-    // Batch translations should return raw text to let the specialized parser handle it.
-    // Individual translations use _cleanAIResponse to remove markdown blocks.
     return isBatch ? result : this._cleanAIResponse(result);
   }
 
-  /**
-   * AI-specific validation for OpenRouter
-   */
   _validateConfig(config, requiredFields, context) {
     super._validateConfig(config, requiredFields, context);
   }

@@ -35,7 +35,7 @@ export class GeminiProvider extends BaseAIProvider {
     this.providerSettingKey = 'GEMINI_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0) {
+  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
@@ -51,7 +51,7 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch);
+    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
 
     const isFirst = await this._isFirstTurn(sessionId);
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
@@ -66,8 +66,7 @@ export class GeminiProvider extends BaseAIProvider {
       },
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192, // Increased from 2048 to prevent truncation on large batches
-        // Force JSON response for batch translations to prevent parsing errors
+        maxOutputTokens: 8192, 
         ...(isBatch && { response_mime_type: "application/json" })
       }
     };
@@ -91,11 +90,7 @@ export class GeminiProvider extends BaseAIProvider {
       };
     }
 
-    // CRITICAL FIX: Determine the correct API URL based on the selected model
     let apiUrl = rawApiUrl;
-    
-    // Only auto-correct the URL if it's a standard Google endpoint or empty.
-    // This allows users to use custom proxy URLs by changing the API URL field.
     const isStandardGoogleUrl = !rawApiUrl || 
                                 rawApiUrl.includes('generativelanguage.googleapis.com') || 
                                 rawApiUrl === CONFIG.GEMINI_API_URL;
@@ -106,8 +101,6 @@ export class GeminiProvider extends BaseAIProvider {
         apiUrl = modelConfig.url;
         logger.debug(`[Gemini] Using specific Google endpoint for model ${model}`);
       }
-    } else if (!isStandardGoogleUrl) {
-      logger.debug(`[Gemini] Using custom/proxy endpoint: ${rawApiUrl}`);
     }
 
     let url = apiUrl || CONFIG.GEMINI_API_URL;
@@ -125,7 +118,6 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     const charCount = this._calculateAIPayloadChars([...requestBody.contents, requestBody.systemInstruction]);
-
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
     try {
@@ -134,8 +126,7 @@ export class GeminiProvider extends BaseAIProvider {
         fetchOptions,
         charCount,
         originalCharCount: finalOriginalCharCount,
-        extractResponse: (data) =>
-          data?.candidates?.[0]?.content?.parts?.[0]?.text,
+        extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context,
         abortController,
         sessionId,
@@ -151,29 +142,16 @@ export class GeminiProvider extends BaseAIProvider {
       }
 
       logger.info(`[Gemini] Translation completed successfully`);
-      
-      // Batch translations should return raw text to let the specialized parser handle it.
-      // Individual translations use _cleanAIResponse to remove markdown blocks.
       return isBatch ? result : this._cleanAIResponse(result);
     } catch (error) {
-      if (
-        thinkingEnabled &&
-        model?.includes('thinking') &&
-        (error.message?.includes('thinking_config') || error.message?.includes('400'))
-      ) {
-        logger.debug('[Gemini] Thinking parameter not supported, retrying without thinking config...');
+      if (thinkingEnabled && model?.includes('thinking') && (error.message?.includes('thinking_config') || error.message?.includes('400'))) {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
-        
         return await this._executeRequest({
           url,
-          fetchOptions: {
-            ...fetchOptions,
-            body: JSON.stringify(retryBody)
-          },
+          fetchOptions: { ...fetchOptions, body: JSON.stringify(retryBody) },
           charCount,
-          extractResponse: (data) =>
-            data?.candidates?.[0]?.content?.parts?.[0]?.text,
+          extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
           context: `${context}-fallback`,
           abortController,
           sessionId,
@@ -184,13 +162,12 @@ export class GeminiProvider extends BaseAIProvider {
           }
         });
       }
-
       throw error;
     }
   }
 
   async translateImage(base64Image, _sourceLang, targetLang) {
-    const [apiKeys, , rawApiUrl, promptBase] = await Promise.all([
+    const [apiKeys, model, rawApiUrl, promptBase] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
       getGeminiApiUrlAsync(),
@@ -200,67 +177,39 @@ export class GeminiProvider extends BaseAIProvider {
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
     const systemPrompt = promptBase.replace("{targetLanguage}", targetLang);
 
-    // CRITICAL FIX: Determine the correct API URL based on the selected model
     let apiUrl = rawApiUrl;
-    const isStandardGoogleUrl = !rawApiUrl || 
-                                rawApiUrl.includes('generativelanguage.googleapis.com') || 
-                                rawApiUrl === CONFIG.GEMINI_API_URL;
+    const isStandardGoogleUrl = !rawApiUrl || rawApiUrl.includes('generativelanguage.googleapis.com') || rawApiUrl === CONFIG.GEMINI_API_URL;
 
     if (isStandardGoogleUrl && model && CONFIG.GEMINI_MODELS) {
       const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
-      if (modelConfig?.url) {
-        apiUrl = modelConfig.url;
-      }
+      if (modelConfig?.url) apiUrl = modelConfig.url;
     }
 
     const requestBody = {
       contents: [{
-        parts: [
-          { text: systemPrompt },
-          {
-            inline_data: {
-              mime_type: "image/png",
-              data: base64Image
-            }
-          }
-        ]
+        parts: [{ text: systemPrompt }, { inline_data: { mime_type: "image/png", data: base64Image } }]
       }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 2048
-      }
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
     };
 
     let url = apiUrl || CONFIG.GEMINI_API_URL;
-    if (!url.includes(':generateContent')) {
-      url = `${url}:generateContent`;
-    }
+    if (!url.includes(':generateContent')) url = `${url}:generateContent`;
     url = `${url}?key=${apiKey}`;
 
-    const fetchOptions = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    };
+    const fetchOptions = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) };
 
-    const context = `${this.providerName.toLowerCase()}-image-translation`;
-
-    const result = await this._executeRequest({
+    return await this._executeRequest({
       url,
       fetchOptions,
       charCount: this._calculateAIPayloadChars(requestBody.contents),
-      extractResponse: (data) =>
-        data?.candidates?.[0]?.content?.parts?.[0]?.text,
-      context: context,
+      extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
+      context: `${this.providerName.toLowerCase()}-image-translation`,
       updateApiKey: (newKey, options) => {
         const urlObj = new URL(options.url);
         urlObj.searchParams.set('key', newKey);
         options.url = urlObj.toString();
       }
     });
-
-    logger.info(`[Gemini] Image translation completed successfully`);
-    return result;
   }
 
   _createError(type, message) {

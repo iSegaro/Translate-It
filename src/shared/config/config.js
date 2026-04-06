@@ -234,6 +234,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Whole Page Translation Settings (NEW) ---
+  SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
   WHOLE_PAGE_LAZY_LOADING: true, // فقط translate کردن قسمت‌های visible صفحه
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
@@ -1003,6 +1004,13 @@ export const getCustomApiKeysAsync = async () => {
 };
 
 // --- Whole Page Translation Settings Getters (NEW) ---
+export const getSmartContextTranslationEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "SMART_CONTEXT_TRANSLATION_ENABLED",
+    CONFIG.SMART_CONTEXT_TRANSLATION_ENABLED
+  );
+};
+
 export const getWholePageTranslationEnabledAsync = async () => {
   return getSettingValueAsync(
     "WHOLE_PAGE_TRANSLATION_ENABLED",

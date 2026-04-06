@@ -566,7 +566,7 @@ class TranslationModeCoordinator {
                   translationEngine,
                   messageId,
                   sessionId,
-                  priority // Use detected priority (LOW)
+                  null // contextMetadata (not yet available for Page mode)
                 );
               } else {
                 return providerInstance._translateChunk(
