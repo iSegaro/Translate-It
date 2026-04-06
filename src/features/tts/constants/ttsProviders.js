@@ -8,54 +8,35 @@ export const PROVIDER_CONFIGS = {
   [TTS_ENGINES.EDGE]: {
     name: 'Microsoft Edge TTS',
     endpointUrl: 'https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0',
+    voicesUrl: 'https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list',
+    trustedClientToken: '6A5AA1D4EAFF4E9FB37E23D68491D6F4',
     outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
     clientVersion: '4.0.530a 5fe1dc6c',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
     signatureSecret: 'oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==',
     appId: 'MSTranslatorAndroidApp',
-    // High-quality Neural voices mapping
+    userId: '0f04d16a175c411e',
+    homeRegion: 'en-US',
+    // Circuit Breaker Settings
+    circuitBreaker: {
+      failureThreshold: 5,
+      resetTimeoutMs: 15 * 60 * 1000, // 15 minutes
+      windowMs: 10 * 60 * 1000        // 10 minutes
+    },
+    // Static fallback voices (used if dynamic list is unavailable)
     voices: {
-      // Middle East & Central Asia
-      'fa': 'fa-IR-DilaraNeural', 
-      'ar': 'ar-SA-HamedNeural',
-      'he': 'he-IL-HilaNeural',
-      'tr': 'tr-TR-EmelNeural',
-      'uz': 'uz-UZ-MadinaNeural',
-      // Europe (West & Central)
-      'en': 'en-US-AriaNeural',
-      'de': 'de-DE-KatjaNeural',
-      'fr': 'fr-FR-DeniseNeural',
-      'es': 'es-ES-ElviraNeural',
-      'it': 'it-IT-ElsaNeural',
-      'nl': 'nl-NL-ColetteNeural',
-      'pt': 'pt-BR-FranciscaNeural',
-      // Europe (North)
-      'sv': 'sv-SE-SofieNeural',
-      'da': 'da-DK-ChristelNeural',
-      'no': 'nb-NO-PernilleNeural',
-      'fi': 'fi-FI-NooraNeural',
-      // Europe (East)
-      'ru': 'ru-RU-SvetlanaNeural',
-      'uk': 'uk-UA-PolinaNeural',
-      'pl': 'pl-PL-AgnieszkaNeural',
-      'ro': 'ro-RO-AlinaNeural',
-      'hu': 'hu-HU-NoemiNeural',
-      'cs': 'cs-CZ-VlastaNeural',
-      'sk': 'sk-SK-ViktoriaNeural',
-      'el': 'el-GR-AthinaNeural',
-      // Asia (East)
-      'ja': 'ja-JP-NanamiNeural',
-      'ko': 'ko-KR-SunHiNeural',
-      'zh': 'zh-CN-XiaoxiaoNeural',
-      // Asia (South & Southeast)
-      'hi': 'hi-IN-SwaraNeural',
-      'bn': 'bn-IN-TanishaNeural',
-      'ta': 'ta-IN-PallaviNeural',
-      'te': 'te-IN-ShrutiNeural',
-      'th': 'th-TH-PremwadeeNeural',
-      'vi': 'vi-VN-HoaiMyNeural',
-      'id': 'id-ID-GadisNeural',
-      'ms': 'ms-MY-LatreeNeural'
+      'fa': 'fa-IR-DilaraNeural', 'ar': 'ar-SA-HamedNeural', 'he': 'he-IL-HilaNeural',
+      'tr': 'tr-TR-EmelNeural', 'uz': 'uz-UZ-MadinaNeural', 'en': 'en-US-AriaNeural',
+      'de': 'de-DE-KatjaNeural', 'fr': 'fr-FR-DeniseNeural', 'es': 'es-ES-ElviraNeural',
+      'it': 'it-IT-ElsaNeural', 'nl': 'nl-NL-ColetteNeural', 'pt': 'pt-BR-FranciscaNeural',
+      'sv': 'sv-SE-SofieNeural', 'da': 'da-DK-ChristelNeural', 'no': 'nb-NO-PernilleNeural',
+      'fi': 'fi-FI-NooraNeural', 'ru': 'ru-RU-SvetlanaNeural', 'uk': 'uk-UA-PolinaNeural',
+      'pl': 'pl-PL-AgnieszkaNeural', 'ro': 'ro-RO-AlinaNeural', 'hu': 'hu-HU-NoemiNeural',
+      'cs': 'cs-CZ-VlastaNeural', 'sk': 'sk-SK-ViktoriaNeural', 'el': 'el-GR-AthinaNeural',
+      'ja': 'ja-JP-NanamiNeural', 'ko': 'ko-KR-SunHiNeural', 'zh': 'zh-CN-XiaoxiaoNeural',
+      'hi': 'hi-IN-SwaraNeural', 'bn': 'bn-IN-TanishaNeural', 'ta': 'ta-IN-PallaviNeural',
+      'te': 'te-IN-ShrutiNeural', 'th': 'th-TH-PremwadeeNeural', 'vi': 'vi-VN-HoaiMyNeural',
+      'id': 'id-ID-GadisNeural', 'ms': 'ms-MY-LatreeNeural'
     }
   },
 

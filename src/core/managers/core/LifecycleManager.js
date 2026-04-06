@@ -49,8 +49,27 @@ class LifecycleManager {
 
     await this.refreshContextMenus();
 
+    // Initialize TTS voice cache in background
+    this.initializeTTSVoiceCache();
+
     this.initialized = true;
     logger.info("[LifecycleManager] Background service initialized successfully");
+  }
+
+  /**
+   * Initialize TTS voice list cache in background
+   * @private
+   */
+  async initializeTTSVoiceCache() {
+    try {
+      // Lazy load to keep startup light
+      const { ttsVoiceService } = await import("@/features/tts/services/TTSVoiceService.js");
+      // This will trigger a fetch only if the 24h cache is expired
+      ttsVoiceService.getVoices();
+      logger.debug("[LifecycleManager] TTS Voice cache initialization triggered");
+    } catch (e) {
+      logger.debug("[LifecycleManager] TTS Voice cache initialization skipped:", e.message);
+    }
   }
 
   /**

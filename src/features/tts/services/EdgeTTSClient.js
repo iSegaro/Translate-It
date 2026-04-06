@@ -1,24 +1,17 @@
 /**
  * Edge TTS Client - Communicates with Microsoft Edge's Neural TTS endpoint
- * Logic-only worker that fetches all technical data from PROVIDER_CONFIGS.
+ * Refactored with industrial patterns from read-frog (Circuit Breaker, advanced JWT).
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTS_ENGINES } from '@/shared/config/constants.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSClient');
 
 // Shared config reference
 const config = PROVIDER_CONFIGS[TTS_ENGINES.EDGE];
-
-// Generate a unique session-based User ID to avoid global fingerprinting
-const EDGE_TTS_USER_ID = (() => {
-  const hex = "0123456789abcdef";
-  let output = "";
-  for (let i = 0; i < 16; i++) output += hex[Math.floor(Math.random() * 16)];
-  return output;
-})();
 
 // Token caching
 let tokenCache = null;
@@ -32,6 +25,11 @@ export class EdgeTTSClient {
    * @returns {Promise<Blob>} - Resolves with an audio blob
    */
   static async synthesize(text, voiceName, isRetry = false) {
+    // 1. Circuit Breaker Check
+    if (!(await ttsCircuitBreaker.isAllowed(TTS_ENGINES.EDGE))) {
+      throw new Error('Edge TTS is temporarily disabled (Circuit Breaker OPEN)');
+    }
+
     try {
       logger.debug(`Starting synthesis for voice: ${voiceName}`);
       
@@ -52,6 +50,9 @@ export class EdgeTTSClient {
       });
 
       if (!response.ok) {
+        // Record failure for circuit breaker
+        await ttsCircuitBreaker.recordFailure(TTS_ENGINES.EDGE);
+
         if ((response.status === 401 || response.status === 403) && !isRetry) {
           logger.warn(`Auth error (${response.status}), refreshing token...`);
           tokenCache = null; 
@@ -66,8 +67,14 @@ export class EdgeTTSClient {
         throw new Error('Edge TTS returned empty audio data');
       }
       
+      // Success! Record success for circuit breaker
+      await ttsCircuitBreaker.recordSuccess(TTS_ENGINES.EDGE);
       return audioBlob;
     } catch (err) {
+      // Record failure for non-auth errors too
+      if (err.message && !err.message.includes('Circuit Breaker')) {
+        await ttsCircuitBreaker.recordFailure(TTS_ENGINES.EDGE);
+      }
       logger.warn('Synthesis failed:', err);
       throw err;
     }
@@ -92,7 +99,8 @@ export class EdgeTTSClient {
         headers: {
           "Accept-Language": "en-US",
           "X-ClientVersion": config.clientVersion,
-          "X-UserId": EDGE_TTS_USER_ID,
+          "X-UserId": config.userId,
+          "X-HomeGeographicRegion": config.homeRegion,
           "X-ClientTraceId": traceId,
           "X-MT-Signature": signature,
           "User-Agent": config.userAgent,
@@ -110,28 +118,39 @@ export class EdgeTTSClient {
         throw new Error("Invalid token response format");
       }
 
-      // JWT expiry decoding
-      let expiresAt = Date.now() + 10 * 60 * 1000;
-      try {
-        const payloadBase64 = data.t.split('.')[1];
-        if (payloadBase64) {
-          const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
-          if (payload.exp) expiresAt = payload.exp * 1000;
-        }
-      } catch (e) {
-        // use default
-      }
+      // Industrial JWT expiry decoding (safe base64 + padding)
+      const expiry = EdgeTTSClient._decodeJwtExpiry(data.t) || (Date.now() + 10 * 60 * 1000);
 
       tokenCache = {
         token: data.t,
         region: data.r,
-        expiresAt: expiresAt
+        expiresAt: expiry
       };
 
       return tokenCache;
     } catch (err) {
       logger.warn("Token retrieval failed:", err);
       throw err;
+    }
+  }
+
+  /**
+   * Safe JWT expiry decoding
+   * @private
+   */
+  static _decodeJwtExpiry(token) {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+
+      // Normalize URL-safe base64 and add padding
+      let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) base64 += '=';
+
+      const payload = JSON.parse(atob(base64));
+      return payload.exp ? payload.exp * 1000 : null;
+    } catch (e) {
+      return null;
     }
   }
 

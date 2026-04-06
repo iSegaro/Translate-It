@@ -5,15 +5,13 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTS_ENGINES } from '@/shared/config/constants.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsVoiceService } from '@/features/tts/services/TTSVoiceService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLanguageService');
 
 export class TTSLanguageService {
   /**
    * Check if an engine supports a specific language
-   * @param {string} engine - provider ID from TTS_ENGINES
-   * @param {string} language - language code (e.g., 'fa')
-   * @returns {boolean}
    */
   static supportsLanguage(engine, language) {
     if (!language) return false;
@@ -54,9 +52,19 @@ export class TTSLanguageService {
   }
 
   /**
-   * Gets the specific Edge TTS voice for a language from central config
+   * Gets the specific Edge TTS voice for a language
+   * Now attempts dynamic resolution with static fallback.
    */
-  static getEdgeVoiceForLanguage(language) {
+  static async getEdgeVoiceForLanguage(language) {
+    // 1. Try dynamic service (live list)
+    try {
+      const dynamicVoice = await ttsVoiceService.getBestVoice(language);
+      if (dynamicVoice) return dynamicVoice;
+    } catch (e) {
+      logger.debug('Dynamic voice resolution failed, using static fallback');
+    }
+
+    // 2. Static fallback from config
     const baseLanguage = language.split('-')[0].toLowerCase();
     return PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[baseLanguage] || null;
   }
