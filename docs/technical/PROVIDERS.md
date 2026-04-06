@@ -7,18 +7,36 @@ This document provides a comprehensive guide for implementing translation provid
 ## Architecture Overview
 
 The system is built upon **Unified Provider Discovery**:
-- **ProviderManifest**: **The heart of the system.** A single file containing all identities, display settings, and provider loading logic.
-- **BaseProvider**: The base class for translation coordination logic and error handling.
+- **ProviderManifest**: The heart of the system. A single file containing all identities, display settings, and provider loading logic.
+- **BaseProvider / BaseAIProvider**: Base classes that coordinate translation logic, now modularized for better maintainability.
+- **Provider Utilities**: Specialized modules in `providers/utils/` that handle heavy lifting like API execution, parsing, and text processing.
 - **ProviderConstants**: Name and ID constants to prevent typos.
 - **ProviderConfigurations**: Precise technical settings (Rate Limit, Batching, Features).
 - **RateLimitManager**: Manages request rate limits (automatically populated from technical settings).
-- **ProviderRegistry**: Handles dynamic provider management in the UI (automatically populated from the manifest).
+
+---
+
+## Modularized Utilities (`providers/utils/`)
+
+To prevent file bloat, core logic is delegated to these specialized helpers:
+
+### 1. Request & Execution
+- **ProviderRequestEngine**: Centralizes API call execution, header preparation, proxy handling, and multi-key failover logic.
+- **TraditionalBatchProcessor**: Manages sequential batch processing and rate-limited execution for traditional providers.
+
+### 2. AI & Context Logic
+- **AIConversationHelper**: Handles session history, turn management, and context-enriched prompt preparation.
+- **AITextProcessor**: Manages smart batching based on complexity, placeholder protection, and sentence splitting (`Intl.Segmenter`).
+- **AIResponseParser**: Cleans AI artifacts and robustly parses JSON results from Markdown blocks.
+- **AIStreamManager**: Orchestrates real-time streaming of results for AI providers.
+
+### 3. Traditional Provider Helpers
+- **TraditionalTextProcessor**: Handles character-limit chunking and network weight calculation for traditional services.
+- **TraditionalStreamManager**: Manages streaming lifecycle for chunk-based traditional translations.
 
 ---
 
 ## Workflow: Adding a New Provider (Quick Start)
-
-To add a new provider, simply follow these 4 steps:
 
 ### 1. Define Constants (`ProviderConstants.js`)
 Add the constant ID and Name:
@@ -26,57 +44,25 @@ Add the constant ID and Name:
 - `ProviderRegistryIds.YOUR_ID`: The registry ID (e.g., `'yourid'`)
 
 ### 2. Implement the Provider Class (`providers/YourProvider.js`)
-Create a new class inheriting from `BaseTranslateProvider` or `BaseAIProvider` and implement the essential methods:
-- **Traditional**: `_translateChunk(chunkTexts, ..., options = {})`
-- **AI**: `_translateSingle(text, ..., originalCharCount = 0)`
+Create a new class inheriting from `BaseTranslateProvider` or `BaseAIProvider`:
+- **Traditional**: Implement `_translateChunk(chunkTexts, ..., options = {})`.
+- **AI**: Implement `_translateSingle(text, ..., originalCharCount = 0)`.
 
-### 3. Register in the Manifest (`providers/ProviderManifest.js`)
-Add the provider information to the `PROVIDER_MANIFEST` array. This **automatically** handles the following:
-- Registration for Lazy Loading
-- Display in UI dropdowns
-- Toolbar icon configuration
-- Validation in the context menu
-- Description management in the settings page
-
-```javascript
-{
-  id: ProviderRegistryIds.YOUR_ID,
-  name: ProviderNames.YOUR_PROVIDER,
-  displayName: "Your Provider Name",
-  type: ProviderTypes.TRANSLATE,
-  category: ProviderCategories.FREE,
-  icon: "your-icon.png", // Place in icons/providers/
-  descriptionKey: "your_description_key",
-  titleKey: "your_title_key",
-  importFunction: () => import("./YourProvider.js").then(m => ({ default: m.YourProvider })),
-  features: ["text", "autoDetect"],
-  needsApiKey: false,
-  supported: true,
-}
-
-```
-
-### 4. Define Technical Details and i18n
-
-* **Technical Settings**: Enter Rate Limit settings and capabilities in `core/ProviderConfigurations.js`.
-* **Translation**: Define `descriptionKey` and `titleKey` in `_locales/*/messages.json`.
+### 3. Register in the Manifest (`ProviderManifest.js`)
+Add the provider to `PROVIDER_MANIFEST`. This automatically handles UI registration, icons, and lazy loading.
 
 ---
 
 ## Provider Implementation Rules
 
 ### 1. MANDATORY: Inherit from BaseProvider
-
 All providers must inherit from `BaseProvider` or its specialized children (`BaseTranslateProvider` / `BaseAIProvider`).
 
 ### 2. DO NOT Override translate() Method
-
-Never override the `translate()` method. This method handles critical coordination (Language Swapping, JSON mode, Rate Limiting). Only implement the internal `_translateChunk` or `_translateSingle` methods.
+Never override the `translate()` method. It handles critical coordination (Language Swapping, JSON mode, Rate Limiting). Implement only the internal `_translateChunk` or `_translateSingle` methods.
 
 ### 3. MANDATORY: Use ProviderNames constant
-
 Always use `ProviderNames` constants in the class constructor:
-
 ```javascript
 constructor() {
   super(ProviderNames.YOUR_PROVIDER);
@@ -84,79 +70,47 @@ constructor() {
 ```
 
 ### 4. MANDATORY: Accurate Character Reporting
-
-Every provider is responsible for reporting its exact network consumption. You must calculate and pass both metrics to `_executeRequest` or `_executeApiCall`:
-- **charCount**: The total network payload weight (including prompts, history, delimiters).
-- **originalCharCount**: The raw length of the input text being translated.
+Every provider must report exact network consumption. Use the delegated helpers to calculate and pass:
+- **charCount**: Total network payload (including prompts, history, delimiters).
+- **originalCharCount**: Raw length of the input text.
 
 ---
 
 ## Statistics & Accurate Reporting
 
-Since the system uses an **Explicit Self-Reporting** architecture, each provider must calculate and pass its own metrics to maintain accurate API usage logs.
+The system uses **Explicit Self-Reporting**. Base classes provide helpers (via Utilities) to simplify this:
 
 ### 1. Calculation Helpers
-The base classes provide specialized helpers to simplify this:
-- **Traditional Providers**: Use `this._calculateTraditionalCharCount(chunkTexts)` to calculate the exact network weight (including standard delimiters).
-- **AI Providers**: Use `this._calculateAIPayloadChars(messages)` to sum up the entire weight of messages (System Instructions + History + User Text).
+- **Traditional**: Internal methods use `TraditionalTextProcessor.calculateTraditionalCharCount(texts)`.
+- **AI**: Internal methods use `_calculateAIPayloadChars(messages)` to sum system instructions, history, and user text.
 
 ### 2. Reporting Example
-When calling the final execution method, ensure both `charCount` (Network) and `originalCharCount` (Raw) are passed:
+When executing a request, ensure metrics are passed to the engine:
 
 ```javascript
-const originalChars = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
-const networkChars = this._calculateTraditionalCharCount(chunkTexts);
-
 await this._executeRequest({
   url,
   fetchOptions,
-  charCount: networkChars,          // Accurate network payload weight
-  originalCharCount: originalChars, // Accurate raw content length
-  sessionId: options.sessionId,     // Essential for session aggregation
+  charCount: networkChars,          // From specialized processor
+  originalCharCount: originalChars, // Raw input length
+  sessionId: options.sessionId,
   // ...
 });
 ```
 
 ---
 
-## Provider Manifest System (The "Source of Truth")
+## Rate Limiting & Multi-API Key Failover
 
-The manifest (`ProviderManifest.js`) allows the system to automatically adapt to a new provider:
-
-* **UI Registry**: The `src/core/provider-registry.js` file is dynamically generated from the manifest.
-* **Actionbar Icons**: `ActionbarIconManager` locates icons based on the `icon` field in the manifest.
-* **Context Menu**: The `knownProviderIds` list is automatically updated from manifest IDs.
-* **Options UI**: The `LanguagesTab.vue` page intelligently reads each provider's description from the manifest.
-
----
-
-## Rate Limiting & Configurations
-
-Technical settings are centralized in `ProviderConfigurations.js`. Upon startup, the `RateLimitManager` reads all these settings and assigns a dedicated Queue and Circuit Breaker to each provider.
-
-### Key Config Sections:
-
-* **rateLimit**: Number of concurrent requests and delays.
-* **batching**: Text segmentation strategy (Character limit or Smart AI batching).
-* **streaming**: Enabling/disabling streaming capabilities.
-* **features**: Capabilities such as Image Translation or Dictionary.
-
----
-
-## Multi-API Key Failover System
-
-If your provider requires an API Key, the system automatically supports **Multi-Key Failover**:
-
-1. Set the field `needsApiKey: true` in the manifest.
-2. Use `ApiKeyManager` to manage keys.
-3. Call the `_executeApiCallWithFailover` method within the provider class so the system can automatically switch to the next key in case of errors (e.g., 429 or invalid key).
-
----
+- **Configuration**: Technical settings are centralized in `ProviderConfigurations.js`.
+- **Failover**: If `needsApiKey: true` is set in the manifest, the `ProviderRequestEngine` automatically switches to the next available key upon retryable errors (e.g., 429).
 
 ## Summary of Optimization
 
-With the new architecture, system complexity has been significantly reduced:
+- **Maintainability**: Large classes are split into focused utility modules.
+- **Consistency**: Centralized parsing and request handling ensure uniform error management.
+- **Scalability**: New features (like Context Summary) can be added to utility modules without bloating the provider classes.
 
-* **Elimination of Redundant Code**: Provider metadata is defined in only one place (the Manifest).
-* **Reduced Error Probability**: Due to the use of constants and dynamic list generation, the risk of forgetting steps or making typos in auxiliary files is eliminated.
-* **Easy Maintenance**: To change a provider's icon or name, you only need to edit the manifest.
+---
+
+**Last Updated**: April 2026
