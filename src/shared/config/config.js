@@ -312,31 +312,22 @@ $_{TEXT}
 /*--- End PROMPT_BASE_FIELD ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
-  PROMPT_BASE_SELECT: `Act as a fluent and natural JSON translation service. The input is a JSON array where each object contains a "text" property.
+  PROMPT_BASE_SELECT: `Act as a JSON translation service. The input is a JSON array of objects with a "text" property.
 
 Your task:
-  1. Translate each "text" value according to the following user rules: $_{USER_RULES}
-  2. Preserve all fields. **Do not omit, modify, or skip any entries.**
-  3. If translation is unnecessary (e.g., for numbers, hashtags, URLs), **return the original value unchanged.**
-  4. Retain exact formatting, structure, and line breaks.
-  5. Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
-  6. Prioritize meaning and readability over strict word-for-word translation.
+  1. Translate "text" according to rules: $_{USER_RULES}
+  2. Return a valid JSON array. Do not omit any entries.
+  3. Ensure translations are natural and idiomatic.
+
+Example:
+Input: [{"text": "Hello", "uid": "t1"}]
+Output: [{"text": "سلام", "uid": "t1"}]
 
 CRITICAL - Placeholder Preservation Instructions:
-  If the text contains special placeholders in the format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]], etc.:
-  1. These placeholders represent inline elements (links, emphasis, code) that MUST be preserved exactly
-  2. Copy these placeholders to your translation WITHOUT any changes
-  3. DO NOT translate the numbers inside the placeholders
-  4. DO NOT renumber, modify, or reformat the placeholders
-  5. DO NOT add spaces inside or around the placeholders
-  6. Ensure each placeholder appears exactly once in your translation
+  1. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
+  2. DO NOT translate placeholders or renumber them.
 
-Examples:
-  - Input: "Click [[AIWC-0]] to learn more"
-  - Correct: "روی [[AIWC-0]] کلیک کنید تا بیشتر بدانید"
-  - Wrong: "روی [0] کلیک کنید" or "روی [[AIWC-1]] کلیک کنید"
-
-Return **only** the translated JSON array. Do not include explanations, markdown, or any extra content.
+Return **only** the translated JSON array. No explanations or markdown.
 
 $_{TEXT}
 `,
@@ -390,34 +381,33 @@ $_{TEXT}
 /*--- End PROMPT_BASE_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_BATCH ---*/
-  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical. Translate the following JSON data from $_{SOURCE} to $_{TARGET}.
-  Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
-  Each item in the "translations" array must contain the "id" and the translated "text".
-  Maintain the original structure for each item.
+  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic. Translate the following JSON data from $_{SOURCE} to $_{TARGET}.
+
+Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Each item MUST contain the "id" and the translated "text".
+
+Example:
+Input: {"translations": [{"id": "t1", "text": "Hello", "role": "p"}]}
+Output: {"translations": [{"id": "t1", "text": "سلام", "role": "p"}]}
 
 CRITICAL - Placeholder Preservation Instructions:
-  If the text contains special placeholders in the format [[AIWC-0]], [[AIWC-1]], [[AIWC-2]], etc.:
-  1. These placeholders represent inline elements (links, emphasis, code) that MUST be preserved exactly
-  2. Copy these placeholders to your translation WITHOUT any changes
-  3. DO NOT translate the numbers inside the placeholders
-  4. DO NOT renumber, modify, or reformat the placeholders
-  5. DO NOT add spaces inside or around the placeholders
-  6. Ensure each placeholder appears exactly once in your translation
+  If the text contains special placeholders like [[AIWC-0]]:
+  1. Copy these placeholders to your translation WITHOUT any changes.
+  2. Ensure each placeholder appears exactly once.
 
-Examples:
-  - Input: "Click [[AIWC-0]] to learn more"
-  - Correct: "روی [[AIWC-0]] کلیک کنید تا بیشتر بدانید"
-  - Wrong: "روی [0] کلیک کنید" or "روی [[AIWC-1]] کلیک کنید"
-
-Return ONLY the JSON object with the "translations" key, no additional text or explanations.
+Return ONLY the JSON object with the "translations" key, no additional text or markdown.
 
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
-  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON data from $_{SOURCE} to $_{TARGET} using the same JSON format (Object with "translations" array) and placeholder preservation rules as established in the first turn of this session.
-  Return only the JSON object with translated texts, no additional text.`,
+  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
+  Maintain the exact same JSON structure (Object with "translations" array) as shown in the previous turn.
+  
+  Example format: {"translations": [{"id": "...", "text": "..."}]}
+  
+  Return only the JSON object, no additional text.`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 
