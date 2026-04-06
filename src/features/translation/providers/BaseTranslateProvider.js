@@ -14,6 +14,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -206,14 +207,12 @@ export class BaseTranslateProvider extends BaseProvider {
   }
 
   _calculateTraditionalCharCount(texts) { return TraditionalTextProcessor.calculateTraditionalCharCount(texts); }
-  
   async _robustSplit(translatedText, originalSegments) {
     const expectedCount = originalSegments.length;
     if (expectedCount <= 1) return [translatedText];
     const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-    const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
     let segments = TranslationSegmentMapper.mapTranslationToOriginalSegments(translatedText, originalSegments, TRANSLATION_CONSTANTS.TEXT_DELIMITER, this.providerName);
-    
+
     if (segments.length !== expectedCount) {
       if (segments.length > expectedCount) segments = segments.slice(0, expectedCount);
       else while (segments.length < expectedCount) segments.push("");
