@@ -7,12 +7,12 @@ The Select Element system provides an intuitive way for users to translate conte
 ## Architecture
 
 ```
-User Click → SelectElementManager (~890 lines)
+User Click → SelectElementManager
      ↓
      ├─→ ElementSelector (highlighting & target detection)
-     ├─→ DomTranslatorAdapter (translation orchestration)
+     ├─→ DomTranslatorAdapter (translation orchestration & structural extraction)
      │       ↓
-     │   Streaming/Non-Streaming Translation
+     │   Optimized JSON Handler (Batching & Mapping)
      │       ↓
      │   Translation via UnifiedMessaging → Provider System
      └─→ SelectElementNotificationManager (toast notification & actions)
@@ -68,14 +68,14 @@ Handles element selection and highlighting.
 | `isOurElement(element)` | Detects extension UI elements |
 
 ### 3. DomTranslatorAdapter.js
-Orchestrates translation between background services and DOM manipulation.
+Orchestrates translation between background services and DOM manipulation using a token-optimized protocol.
 
-**Responsibilities:**
-- Translation Function: bridges with extension's provider system
-- Direction Handling: applies RTL/LTR attributes based on target language
-- State Tracking: manages translation state for revert functionality
-- Progress Callbacks: optional callbacks for translation progress
-- Streaming Support: handles both streaming and non-streaming responses
+**Optimization Strategy:**
+Uses abbreviated JSON keys to reduce token overhead by ~75%:
+- `t`: Text content
+- `i`: Unique node ID (shortened e.g., `n1`)
+- `b`: Logical block ID (shortened e.g., `b123`)
+- `r`: Element role (tagName)
 
 **Key Methods:**
 | Method | Description |
@@ -85,7 +85,16 @@ Orchestrates translation between background services and DOM manipulation.
 | `hasTranslation()` | Check if translation exists |
 | `cancelTranslation()` | Cancel ongoing translation |
 
-### 4. DomDirectionManager.js (Shared Utility)
+### 4. Background: OptimizedJsonHandler.js
+Specialized strategy in the background that manages the Select Element pipeline.
+
+**Responsibilities:**
+- **Intelligent Batching**: Splits large elements into optimal chunks (~25 nodes).
+- **Adaptive Delays**: Dynamically adjusts timing between batches to avoid rate limits.
+- **Polymorphic Mapping**: Supports both abbreviated (`t`) and legacy (`text`) keys.
+- **Result Streaming**: Streams translated segments back to the tab in real-time.
+
+### 5. DomDirectionManager.js (Shared Utility)
 Manages RTL/LTR direction and text alignment. This is a **shared core utility** located in `@/utils/dom/`, used by both Select Element and Whole Page Translation systems to ensure consistent DOM behavior.
 
 **Functions:**
@@ -126,6 +135,20 @@ Manages toast notifications for Select Element mode.
 - pageEventBus integration for communication
 - Actionable buttons: Cancel and Revert
 - Cross-context support: works in all contexts and iframes
+
+## Advanced Translation Logic
+
+### 1. Smart Context Awareness
+To improve translation accuracy (especially for DeepL and LLMs), the system generates a `contextSummary` before translation:
+- **Scope**: Page Title + Nearest Heading + Element Role + Parent Tag.
+- **DeepL Integration**: Sent as a native `context` parameter (no token cost).
+- **AI Integration**: Included in the prompt metadata to improve disambiguation.
+
+### 2. Token-Optimized Payload
+Every Select Element request passes through an "Armor-plated" pipeline:
+- **Short IDs**: `n1`, `n2` instead of long timestamps.
+- **Key Mapping**: Automatic translation of internal `t` keys back to visible DOM updates.
+- **Resilient Error Handling**: Safely extracts error messages from complex objects to prevent crashes on non-string errors.
 
 ## Usage
 
