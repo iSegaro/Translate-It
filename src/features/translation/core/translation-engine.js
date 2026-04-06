@@ -247,9 +247,10 @@ export class TranslationEngine {
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     const providerReliableJson = providerClass?.reliableJsonMode !== undefined ? providerClass.reliableJsonMode : true;
 
-    // For Select Element JSON mode, use optimized streaming strategy (only for AI providers with reliable JSON mode)
-    if (isSelectJson && providerReliableJson) {
-      logger.debug('[TranslationEngine] Using optimized JSON strategy for provider:', provider);
+    // For Select Element JSON mode, use optimized strategy for ALL providers.
+    // This ensures logical block batching and text extraction works for both AI and traditional providers.
+    if (isSelectJson) {
+      logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
       const tabId = sender?.tab?.id;
       return await this.executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
     }
@@ -329,10 +330,9 @@ export class TranslationEngine {
       throw new Error('SelectElement JSON must be an array');
     }
 
-    // Handle both single string arrays and object arrays with text field
     const segments = originalJson.length === 1 && typeof originalJson[0] === 'string'
       ? originalJson
-      : originalJson; // Keep full objects (text, uid, blockId, role)
+      : originalJson; // Keep full objects (t, i, b, r)
 
     const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     
@@ -342,7 +342,8 @@ export class TranslationEngine {
     const batches = this.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
 
     // Use LanguageSwappingService to handle potential language flipping
-    const firstText = typeof segments[0] === 'object' ? segments[0].text : (segments[0] || '');
+    const firstItem = segments[0];
+    const firstText = typeof firstItem === 'object' ? (firstItem.t || firstItem.text || '') : (firstItem || '');
     const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
     const [actualSource, actualTarget] = await LanguageSwappingService.applyLanguageSwapping(
       firstText, sourceLanguage, targetLanguage, data.originalSourceLang || sourceLanguage, data.originalTargetLang || targetLanguage,
@@ -373,7 +374,10 @@ export class TranslationEngine {
                 const batch = batches[i];
                 const batchSize = batch.length;
                 const batchComplexity = this.calculateBatchComplexity(batch);
-                const batchCharCount = batch.reduce((sum, item) => sum + ((typeof item === 'object' ? item.text?.length : item?.length) || 0), 0);
+                const batchCharCount = batch.reduce((sum, item) => {
+                  const text = typeof item === 'object' ? (item.t || item.text || '') : (item || '');
+                  return sum + (text?.length || 0);
+                }, 0);
                 
                 // Attach sessionId to abortController carrier
                 if (abortController) {
@@ -423,7 +427,7 @@ export class TranslationEngine {
                                 );
                             } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method
-                                const chunkTexts = batch.map(item => typeof item === 'object' ? item.text : item);
+                                const chunkTexts = batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''));
                                 return providerInstance._translateChunk(
                                     chunkTexts, 
                                     effectiveSource, 
@@ -468,10 +472,12 @@ export class TranslationEngine {
 
                     // Map results back to objects if batch items were objects
                     const mappedResults = finalBatchResult.map((text, idx) => {
+                      const translatedContent = text?.text || text;
                       if (typeof batch[idx] === 'object') {
-                        return { ...batch[idx], text: text?.text || text };
+                        // Crucial: update 't' key with translated content, keeping other metadata (i, b, r)
+                        return { ...batch[idx], t: translatedContent, text: translatedContent };
                       }
-                      return text;
+                      return translatedContent;
                     });
 
                     const streamUpdateMessage = MessageFormat.create(
@@ -574,7 +580,7 @@ export class TranslationEngine {
    */
   _splitOversizedSegment(segment, maxChars) {
     const isObject = typeof segment === 'object';
-    const text = isObject ? segment.text : (segment || '');
+    const text = isObject ? (segment.t || segment.text || '') : (segment || '');
     if (!text || text.length <= maxChars) return [segment];
     
     const chunks = [];
@@ -625,7 +631,7 @@ export class TranslationEngine {
     for (let i = 0; i < flattenedSegments.length; i++) {
       const segment = flattenedSegments[i];
       const isObject = typeof segment === 'object';
-      const text = isObject ? segment.text : segment;
+      const text = isObject ? (segment.t || segment.text || '') : (segment || '');
       const segmentComplexity = this.calculateTextComplexity(text);
       const segmentChars = text.length;
       const blockId = isObject ? segment.blockId : null;
@@ -702,7 +708,7 @@ export class TranslationEngine {
     if (!Array.isArray(batch) || batch.length === 0) return 0;
     let totalComplexity = 0;
     for (const item of batch) {
-      const text = typeof item === 'object' ? item.text : item;
+      const text = typeof item === 'object' ? (item.t || item.text || '') : (item || '');
       let textComplexity = 0;
       textComplexity += Math.min((text?.length || 0) / 10, 30);
       const specialChars = (text?.match(/[^\w\s\u0080-\uFFFF]/g) || []).length;
@@ -733,7 +739,7 @@ export class TranslationEngine {
     if (provider === ProviderNames.BING_TRANSLATE) await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
-      const batchText = batch.map(idx => typeof segments[idx] === 'object' ? segments[idx].text : segments[idx]).join(DELIMITER);
+      const batchText = batch.map(idx => (typeof segments[idx] === 'object' ? (segments[idx].t || segments[idx].text || '') : (segments[idx] || ''))).join(DELIMITER);
       const batchResult = await providerInstance.translate(batchText, sourceLanguage, targetLanguage, { 
         mode, originalSourceLang, originalTargetLang, abortController,
         sessionId: config.sessionId, charCount: batchText.length
@@ -744,7 +750,7 @@ export class TranslationEngine {
         if (parts.length === batch.length) {
           for (let i = 0; i < batch.length; i++) {
             const idx = batch[i];
-            const originalText = typeof segments[idx] === 'object' ? segments[idx].text : segments[idx];
+            const originalText = (typeof segments[idx] === 'object' ? (segments[idx].t || segments[idx].text || '') : (segments[idx] || ''));
             const translatedText = parts[i]?.trim() || originalText;
             results[idx] = translatedText;
             translationStatus[idx] = true;
@@ -767,7 +773,7 @@ export class TranslationEngine {
       if (!abortController || abortController.signal.aborted) return { idx, result: segments[idx], success: false };
       
       let attempt = 0;
-      const originalText = typeof segments[idx] === 'object' ? segments[idx].text : segments[idx];
+      const originalText = (typeof segments[idx] === 'object' ? (segments[idx].t || segments[idx].text || '') : (segments[idx] || ''));
       while (attempt < 2) {
         try {
           const result = await providerInstance.translate(originalText, sourceLanguage, targetLanguage, { 

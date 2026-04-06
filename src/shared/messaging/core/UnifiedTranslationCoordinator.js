@@ -32,9 +32,11 @@ export class UnifiedTranslationCoordinator {
    * @returns {Promise} - Translation result
    */
   async coordinateTranslation(message, options = {}) {
+    if (!message) throw new Error('Message is undefined in coordinateTranslation');
     const { action, data } = message;
+    const textLength = (data?.text?.length) || 0;
 
-    logger.debug(`Coordinating ${action} request (${data?.text?.length || 0} chars, mode: ${data?.mode || 'unknown'})`);
+    logger.debug(`Coordinating ${action} request (${textLength} chars, mode: ${data?.mode || 'unknown'})`);
 
     try {
       // Early check if operation was cancelled before any processing
@@ -151,7 +153,7 @@ export class UnifiedTranslationCoordinator {
       });
 
       // If initial response indicates streaming started, wait for streaming completion
-      if (initialResponse.streaming) {
+      if (initialResponse && initialResponse.streaming) {
         logger.debug(`Streaming initiated successfully: ${messageId}`);
         const streamingResult = await streamingPromise;
 
@@ -163,7 +165,7 @@ export class UnifiedTranslationCoordinator {
         return streamingResult;
       } else {
         // Not streaming, return regular response
-        streamingTimeoutManager.completeStreaming(messageId, initialResponse);
+        if (messageId) streamingTimeoutManager.completeStreaming(messageId, initialResponse || {});
         return initialResponse;
       }
 
@@ -175,7 +177,7 @@ export class UnifiedTranslationCoordinator {
       }
 
       // Cancel streaming if it was registered
-      if (this.streamingOperations.has(messageId)) {
+      if (messageId && this.streamingOperations.has(messageId)) {
         const cancelReason = errorType === ErrorTypes.USER_CANCELLED
           ? `User cancelled: ${error.message}`
           : `Coordination error: ${error.message}`;
@@ -190,8 +192,10 @@ export class UnifiedTranslationCoordinator {
 
       throw error;
     } finally {
-      this.activeTranslations.delete(messageId);
-      this.streamingOperations.delete(messageId);
+      if (messageId) {
+        this.activeTranslations.delete(messageId);
+        this.streamingOperations.delete(messageId);
+      }
     }
   }
 
@@ -201,7 +205,7 @@ export class UnifiedTranslationCoordinator {
    * @param {object} progressData - Progress information
    */
   reportStreamingProgress(messageId, progressData) {
-    if (this.streamingOperations.has(messageId)) {
+    if (messageId && this.streamingOperations.has(messageId)) {
       streamingTimeoutManager.reportProgress(messageId, progressData);
     }
   }
@@ -212,7 +216,7 @@ export class UnifiedTranslationCoordinator {
    * @param {object} result - Final result
    */
   completeStreamingOperation(messageId, result) {
-    if (this.streamingOperations.has(messageId)) {
+    if (messageId && this.streamingOperations.has(messageId)) {
       streamingTimeoutManager.completeStreaming(messageId, result);
     }
   }
@@ -223,7 +227,7 @@ export class UnifiedTranslationCoordinator {
    * @param {Error} error - Error object
    */
   handleStreamingError(messageId, error) {
-    if (this.streamingOperations.has(messageId)) {
+    if (messageId && this.streamingOperations.has(messageId)) {
       streamingTimeoutManager.errorStreaming(messageId, error);
     }
   }
@@ -234,6 +238,7 @@ export class UnifiedTranslationCoordinator {
    * @param {string} reason - Cancellation reason
    */
   cancelTranslation(messageId, reason = 'User cancelled') {
+    if (!messageId) return false;
     const translation = this.activeTranslations.get(messageId);
     if (!translation) {
       return false;
@@ -256,19 +261,24 @@ export class UnifiedTranslationCoordinator {
    * @private
    */
   _shouldUseStreaming(message) {
+    if (!message) return false;
     const { data, context } = message;
 
     // For Select Element mode, check text length
-    if (context === 'select-element') {
-      const textLength = data?.text?.length || 0;
-      return textLength > 500;
+    if (context === 'select-element' || data?.mode === 'select-element') {
+      const textLength = (data?.text?.length) || 0;
+      // Also check if text is a JSON string with abbreviated keys
+      if (typeof data?.text === 'string' && data.text.startsWith('[') && data.text.includes('"t":')) {
+        return true; // Always stream for JSON payloads in select-element mode
+      }
+      return textLength > 200;
     }
 
     // For other contexts with JSON payload (multiple segments)
-    if (data?.options?.rawJsonPayload) {
+    if (data?.options?.rawJsonPayload && typeof data?.text === 'string') {
       try {
         const jsonData = JSON.parse(data.text);
-        if (Array.isArray(jsonData) && jsonData.length > 5) {
+        if (Array.isArray(jsonData) && (jsonData.length || 0) > 5) {
           return true; // Multiple segments warrant streaming
         }
       } catch {
@@ -277,7 +287,7 @@ export class UnifiedTranslationCoordinator {
     }
 
     // For other contexts with long text
-    const textLength = data?.text?.length || 0;
+    const textLength = (data?.text?.length) || 0;
     return textLength > 2000;
   }
 
@@ -286,17 +296,20 @@ export class UnifiedTranslationCoordinator {
    * @private
    */
   _calculateStreamingTimeouts(data, customTimeout) {
-    let textLength = data?.text?.length || 0;
+    let textLength = (data?.text?.length) || 0;
     let segmentCount = 1;
 
     // Estimate segment count for JSON payload
-    if (data?.options?.rawJsonPayload) {
+    if (data?.options?.rawJsonPayload && typeof data?.text === 'string') {
       try {
         const jsonData = JSON.parse(data.text);
         if (Array.isArray(jsonData)) {
-          segmentCount = jsonData.length;
-          // Calculate actual text length from JSON
-          textLength = jsonData.reduce((sum, item) => sum + (item.text || '').length, 0);
+          segmentCount = (jsonData.length) || 1;
+          // Calculate actual text length from JSON (support both 't' and 'text' keys)
+          textLength = jsonData.reduce((sum, item) => {
+            const text = item?.t || item?.text || '';
+            return sum + (text?.length || 0);
+          }, 0);
         }
       } catch {
         // Fallback to text length estimation
@@ -308,7 +321,7 @@ export class UnifiedTranslationCoordinator {
     }
 
     // Enhanced timeouts for Select Element mode - allow longer processing times
-    const isSelectElementMode = data?.mode === 'select_element' || data?.options?.mode === 'select_element';
+    const isSelectElementMode = data?.mode === 'select_element' || data?.mode === 'select-element' || data?.options?.mode === 'select_element';
 
     let baseTimeout, initialTimeout, progressTimeout, gracePeriod;
 
@@ -339,6 +352,7 @@ export class UnifiedTranslationCoordinator {
    * @private
    */
   _handleStreamingTimeout(messageId) {
+    if (!messageId) return;
     logger.warn(`Handling streaming timeout for: ${messageId}`);
 
     const translation = this.activeTranslations.get(messageId);
@@ -355,11 +369,11 @@ export class UnifiedTranslationCoordinator {
    */
   getStatus() {
     const activeOperations = Array.from(this.activeTranslations.values()).map(translation => ({
-      messageId: translation.message.messageId,
+      messageId: translation.message?.messageId,
       type: translation.type,
-      context: translation.message.context,
+      context: translation.message?.context,
       duration: Date.now() - translation.startTime,
-      textLength: translation.message.data?.text?.length
+      textLength: (translation.message?.data?.text?.length) || 0
     }));
 
     return {

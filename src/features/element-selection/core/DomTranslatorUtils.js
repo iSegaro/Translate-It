@@ -112,7 +112,7 @@ export function collectTextNodes(element) {
     nodeCounter++;
     textNodesData.push({
       node,
-      text: node.textContent,
+      text: node.textContent || '',
       // Short UID: e.g., "n1", "n2" etc. to drastically reduce token usage
       uid: `n${nodeCounter}`,
       blockId: blockParent.dataset.blockId,

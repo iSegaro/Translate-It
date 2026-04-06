@@ -110,7 +110,7 @@ export class BaseAIProvider extends BaseProvider {
   async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
     const startTime = Date.now();
     const sessionId = messageId; // Standard session ID for streaming
-    const totalChars = texts.reduce((sum, text) => sum + (typeof text === 'object' ? text.text?.length || 0 : text?.length || 0), 0);
+    const totalChars = texts.reduce((sum, text) => sum + (typeof text === 'object' ? (text.t || text.text || '').length : text?.length || 0), 0);
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments (${totalChars} chars, mode: ${translateMode})`);
 
     // Create optimal batches based on provider strategy and mode
@@ -241,7 +241,7 @@ export class BaseAIProvider extends BaseProvider {
       try {
         const result = await rateLimitManager.executeWithRateLimit(
           this.providerName,
-          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController, false, sessionId, (typeof texts[i] === 'object' ? texts[i].text?.length : texts[i]?.length) || 0, contextMetadata),
+          () => this._translateSingle(texts[i], sourceLang, targetLang, translateMode, abortController, false, sessionId, (typeof texts[i] === 'object' ? (texts[i].t || texts[i].text || '').length : texts[i]?.length || 0), contextMetadata),
           `segment-${i + 1}/${texts.length}`,
           translateMode
         );
@@ -307,7 +307,7 @@ export class BaseAIProvider extends BaseProvider {
   _hasPlaceholders(texts) {
     const PLACEHOLDER_PATTERN = /\[\[AIWC-\d+\]\]/;
     return texts.some(text => {
-      const content = typeof text === 'object' ? text.text : text;
+      const content = typeof text === 'object' ? (text.t || text.text || '') : text;
       return content && PLACEHOLDER_PATTERN.test(content);
     });
   }
@@ -335,7 +335,7 @@ export class BaseAIProvider extends BaseProvider {
     let currentComplexity = 0;
     
     for (const text of texts) {
-      const content = typeof text === 'object' ? text.text : text;
+      const content = typeof text === 'object' ? (text.t || text.text || '') : text;
       const textComplexity = this._calculateTextComplexity(content);
       
       if (currentBatch.length >= optimalSize || 
@@ -379,7 +379,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   _getTotalComplexity(texts) {
     return texts.reduce((sum, text) => {
-      const content = typeof text === 'object' ? text.text : text;
+      const content = typeof text === 'object' ? (text.t || text.text || '') : text;
       return sum + this._calculateTextComplexity(content);
     }, 0);
   }
@@ -560,12 +560,12 @@ export class BaseAIProvider extends BaseProvider {
       if (batchStrategy === 'json') {
         const jsonInput = batch.map((item, i) => {
           if (typeof item === 'object') {
-            return { id: item.uid || i, text: item.text, role: item.role };
+            return { id: item.i || item.uid || i, text: item.t || item.text, role: item.r || item.role };
           }
           return { id: i, text: item };
         });
         const batchText = JSON.stringify(jsonInput, null, 2);
-        const originalChars = batch.reduce((sum, item) => sum + ((typeof item === 'object' ? item.text?.length : item?.length) || 0), 0);
+        const originalChars = batch.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
         
         const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, true, sessionId, originalChars, contextMetadata);
         
@@ -576,7 +576,7 @@ export class BaseAIProvider extends BaseProvider {
       
       // Fallback for single item if no JSON strategy
       if (batch.length === 1) {
-        const content = typeof batch[0] === 'object' ? batch[0].text : batch[0];
+        const content = typeof batch[0] === 'object' ? (batch[0].t || batch[0].text || '') : batch[0];
         const originalChars = content?.length || 0;
         return [await this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, originalChars, contextMetadata)];
       }
@@ -847,7 +847,7 @@ export class BaseAIProvider extends BaseProvider {
           let items = Array.isArray(parsed) ? parsed : (parsed.translations || Object.values(parsed));
           if (Array.isArray(items) && items.length === 1) {
             const first = items[0];
-            processedResult = typeof first === 'object' ? (first.text || first.translation || processedResult) : first;
+            processedResult = typeof first === 'object' ? (first.t || first.text || first.translation || processedResult) : first;
           }
         }
       } catch {
@@ -923,13 +923,13 @@ export class BaseAIProvider extends BaseProvider {
       const unmappedTexts = [];
 
       rawItems.forEach((item) => {
-        const text = typeof item === 'object' && item !== null ? (item.text || item.translation || '') : String(item);
-        const id = (typeof item === 'object' && item !== null && item.id !== undefined) ? item.id : null;
+        const text = typeof item === 'object' && item !== null ? (item.t || item.text || item.translation || '') : String(item);
+        const id = (typeof item === 'object' && item !== null && (item.i !== undefined || item.id !== undefined)) ? (item.i || item.id) : null;
 
         if (id !== null) {
           // If id is UID (string), find its index in original batch
           const idx = typeof id === 'string' 
-            ? originalBatch.findIndex(ob => (typeof ob === 'object' ? ob.uid : null) === id)
+            ? originalBatch.findIndex(ob => (typeof ob === 'object' ? (ob.i || ob.uid) : null) === id)
             : parseInt(id, 10);
             
           if (idx !== -1 && idx >= 0 && idx < expectedCount) {
@@ -946,7 +946,7 @@ export class BaseAIProvider extends BaseProvider {
       let unmappedIdx = 0;
       for (let i = 0; i < expectedCount; i++) {
         if (results[i] === null) {
-          results[i] = unmappedTexts[unmappedIdx] || (typeof originalBatch[i] === 'object' ? originalBatch[i].text : originalBatch[i]) || '';
+          results[i] = unmappedTexts[unmappedIdx] || (typeof originalBatch[i] === 'object' ? (originalBatch[i].t || originalBatch[i].text) : originalBatch[i]) || '';
           unmappedIdx++;
         }
       }
@@ -985,7 +985,7 @@ export class BaseAIProvider extends BaseProvider {
     }
     
     // If all else fails, return the original texts for this batch
-    return originalBatch.map(item => typeof item === 'object' ? item.text : item);
+    return originalBatch.map(item => typeof item === 'object' ? (item.t || item.text) : item);
   }
 
   /**
@@ -1014,7 +1014,7 @@ export class BaseAIProvider extends BaseProvider {
       }
       
       try {
-        const content = typeof batch[i] === 'object' ? batch[i].text : batch[i];
+        const content = typeof batch[i] === 'object' ? (batch[i].t || batch[i].text || '') : batch[i];
         logger.debug(`[${this.providerName}] Fallback processing segment ${i + 1}/${batch.length}: "${content?.substring(0, 50)}..."`);
         
         // Manual delay for fallback to prevent overload
@@ -1166,7 +1166,7 @@ export class BaseAIProvider extends BaseProvider {
    */
   _createCharacterBasedBatches(texts, maxCharsPerBatch, balancedBatching = false) {
     const totalChars = texts.reduce((sum, text) => {
-      const content = typeof text === 'object' ? text.text : text;
+      const content = typeof text === 'object' ? (text.t || text.text || '') : text;
       return sum + (content?.length || 0);
     }, 0);
 
@@ -1185,7 +1185,7 @@ export class BaseAIProvider extends BaseProvider {
     const targetBatchChars = balancedBatching ? Math.min(balancedBatchSize, maxCharsPerBatch) : maxCharsPerBatch;
 
     for (const text of texts) {
-      const content = typeof text === 'object' ? text.text : text;
+      const content = typeof text === 'object' ? (text.t || text.text || '') : text;
       const textLength = content?.length || 0;
 
       // If adding this text would exceed the limit and we have items in the batch, create new batch
@@ -1417,7 +1417,7 @@ export class BaseAIProvider extends BaseProvider {
     try {
       const parsed = JSON.parse(jsonText);
       if (Array.isArray(parsed)) {
-        return parsed.reduce((sum, item) => sum + (item.text?.length || 0), 0);
+        return parsed.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
       }
       return jsonText.length;
     } catch {

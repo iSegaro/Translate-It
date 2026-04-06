@@ -5,16 +5,15 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
-// Operation timeout mapping remains the same
+// Operation timeout mapping
 const OPERATION_TIMEOUTS = {
-  // Fast operations (UI, settings, status)
   'GET_SETTINGS': 3000,
   'SET_SETTINGS': 3000,
   'GET_SELECT_ELEMENT_STATE': 2000,
@@ -34,8 +33,6 @@ const OPERATION_TIMEOUTS = {
   'DEACTIVATE_SELECT_ELEMENT_MODE': 2000,
   'GET_SELECTED_TEXT': 2000,
   'CANCEL_TRANSLATION': 2000,
-  
-  // Medium operations (translation, processing)
   'TRANSLATE': 20000,
   'TRANSLATE_SELECTION': 15000,
   'TRANSLATE_PAGE': 20000,
@@ -47,8 +44,6 @@ const OPERATION_TIMEOUTS = {
   'TEST_PROVIDER': 8000,
   'TEST_PROVIDER_CONNECTION': 8000,
   'VALIDATE_API_KEY': 6000,
-  
-  // Long operations (media, capture, TTS)
   'GOOGLE_TTS_SPEAK': 20000,
   'TTS_SPEAK': 20000,
   'GOOGLE_TTS_PAUSE': 3000,
@@ -66,42 +61,29 @@ const OPERATION_TIMEOUTS = {
   'PROCESS_SCREEN_CAPTURE': 20000,
   'START_AREA_CAPTURE': 15000,
   'START_SCREEN_AREA_SELECTION': 10000,
-  
-  // Default timeout
   'DEFAULT': 8000
 };
 
 function getTimeoutForAction(action, context = null) {
-  // Enhanced timeout for Select Element mode TRANSLATE actions
-  if (action === 'TRANSLATE' && (context === 'select-element' || context?.mode === 'select_element')) {
-    return 300000; // 5 minutes for Select Element mode
+  if (action === 'TRANSLATE' && (context === 'select-element' || (typeof context === 'object' && context !== null && context.mode === 'select_element'))) {
+    return 300000; 
   }
-  return OPERATION_TIMEOUTS[action] || OPERATION_TIMEOUTS.DEFAULT || 8000;
+  return (action && OPERATION_TIMEOUTS[action]) || OPERATION_TIMEOUTS.DEFAULT || 8000;
 }
 
-/**
- * Creates a promise that rejects after a specified timeout and a function to clear it.
- * @param {number} ms - Timeout in milliseconds.
- * @param {string} action - The action name for the error message.
- * @returns {{promise: Promise<never>, clear: function}} An object with the timeout promise and a clear function.
- */
 function createTimeout(ms, action) {
   let timeoutId;
   const promise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
-      const timeoutError = new Error(`Operation '${action}' timed out after ${ms}ms`);
+      const timeoutError = new Error(`Operation '${action || 'unknown'}' timed out after ${ms}ms`);
       timeoutError.type = 'OPERATION_TIMEOUT';
 
-      // Handle through ErrorHandler for proper error management (silent for messaging timeouts)
       if (ExtensionContextManager.isValidSync()) {
         ErrorHandler.getInstance().handle(timeoutError, {
           context: 'unified-messaging-timeout',
           action: action,
-          showToast: false, // Caller will handle UI feedback
-          metadata: { timeoutMs: ms }
-        }).catch(handlerError => {
-          logger.warn('ErrorHandler failed to handle timeout:', handlerError);
-        });
+          showToast: false
+        }).catch(() => {});
       }
 
       reject(timeoutError);
@@ -114,128 +96,47 @@ function createTimeout(ms, action) {
   };
 }
 
-/**
- * Unified messaging system with streaming support
- * Coordinates between regular messages and streaming operations
- */
 export async function sendMessage(message, options = {}) {
   const { forceRegular = false } = options;
+  if (!message) return null;
 
-  // Check if this should be handled as a streaming operation
   if (!forceRegular && isTranslationAction(message.action)) {
-    logger.debug('Routing translation message through coordinator:', {
-      action: message.action,
-      messageId: message.messageId,
-      context: message.context
-    });
-
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
-      // Check if this is a user cancellation or non-retryable error - if so, don't attempt fallback
-      if (isFatalError(error)) {
-        logger.debug('Translation failed with non-retryable error, not attempting fallback:', error.message);
-        throw error; // Re-throw error without fallback
-      }
-
-      // If coordination fails, fall back to regular messaging
-      logger.debug('Translation coordination failed, falling back to regular messaging:', error.message);
-
-      // Check if this is a streaming timeout and translation might already be complete
-      const isStreamingTimeout = error.message && error.message.includes('timed out - no progress for too long');
-
-      if (isStreamingTimeout && message.messageId && !message.messageId.startsWith('fallback-')) {
-        // For streaming timeouts, check if the translation was already completed
-        // by looking for any translation results in the content script
+      if (isFatalError(error)) throw error;
+      
+      const isStreamingTimeout = error.message && typeof error.message === 'string' && error.message.includes('timed out');
+      if (isStreamingTimeout && message.messageId && !String(message.messageId).startsWith('fallback-')) {
         try {
-          // Send a simple check message to see if translation results are available
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',
             messageId: message.messageId
           });
-
-          if (checkResponse && checkResponse.completed) {
-            logger.info('Streaming timeout detected but translation already completed, skipping fallback');
-            return checkResponse.results;
-          }
-        } catch (checkError) {
-          logger.debug('Could not check translation status, proceeding with fallback:', checkError);
-        }
+          if (checkResponse && checkResponse.completed) return checkResponse.results;
+        } catch (e) {}
       }
 
-      // Check if the original operation was cancelled before attempting fallback
       if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-        logger.debug('Original operation was cancelled, skipping fallback message');
         throw new Error('Translation cancelled by user');
       }
 
-      // Additional check: if the error is a timeout for streaming translation, don't fallback
-      if (error.type === 'OPERATION_TIMEOUT' || (error.message && error.message.includes('timed out'))) {
-        // For streaming timeouts, we should not fallback as the user likely cancelled
-        if (message.context === 'select-element' || (message.data && message.data.mode === 'select_element')) {
-          logger.debug('Streaming timeout detected for select element, not attempting fallback');
-          const timeoutError = new Error('Streaming translation timed out - user likely cancelled');
-
-          // Handle through ErrorHandler before throwing
-          if (ExtensionContextManager.isValidSync()) {
-            ErrorHandler.getInstance().handle(timeoutError, {
-              context: 'unified-messaging-streaming-timeout',
-              messageId: message.messageId,
-              showToast: false
-            }).catch(handlerError => {
-              logger.warn('ErrorHandler failed to handle streaming timeout:', handlerError);
-            });
-          }
-
-          throw timeoutError;
-        }
-
-        logger.debug('Timeout detected, not attempting fallback as operation is likely cancelled');
-        const timeoutError = new Error('Translation timed out - operation cancelled');
-
-        // Handle through ErrorHandler before throwing
-        if (ExtensionContextManager.isValidSync()) {
-          ErrorHandler.getInstance().handle(timeoutError, {
-            context: 'unified-messaging-timeout-fallback',
-            messageId: message.messageId,
-            showToast: false
-          }).catch(handlerError => {
-            logger.warn('ErrorHandler failed to handle timeout:', handlerError);
-          });
-        }
-
-        throw timeoutError;
-      }
-
-      // Create a new message with a fresh messageId to avoid duplicate detection
       const fallbackMessage = {
         ...message,
-        messageId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        messageId: `fb-${Math.random().toString(36).substr(2, 6)}`
       };
-
-      logger.info('Using fallback message with new ID:', {
-        originalId: message.messageId,
-        fallbackId: fallbackMessage.messageId
-      });
 
       return await sendRegularMessage(fallbackMessage, options);
     }
   }
 
-  // Regular messaging path
   return await sendRegularMessage(message, options);
 }
 
-/**
- * Send regular (non-streaming) message
- */
 export async function sendRegularMessage(message, options = {}) {
+  if (!message) return null;
   const { timeout: customTimeout, silent = false } = options;
   const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
-
-  if (!silent) {
-    logger.debug(`Sending ${message.action} to background (${actionTimeout}ms timeout)`);
-  }
 
   try {
     if (!ExtensionContextManager.isValidSync()) {
@@ -244,91 +145,61 @@ export async function sendRegularMessage(message, options = {}) {
       throw contextError;
     }
 
-    // Check if streaming operation was cancelled before sending the message
     if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-      if (!silent) {
-        logger.debug('Streaming operation was cancelled, not sending message');
-      }
       const cancelError = new Error(ErrorTypes.USER_CANCELLED);
       cancelError.type = ErrorTypes.USER_CANCELLED;
       throw cancelError;
     }
 
     const sendPromise = browser.runtime.sendMessage(message);
-
-    // Create a timeout promise and clear function
     const { promise: timeoutPromise, clear: clearTimeoutTimer } = createTimeout(actionTimeout, message.action);
 
-    // Create a cancellation promise for this messageId
     let cancellationInterval;
     const cancellationPromise = new Promise((_, reject) => {
-      const checkCancellation = () => {
-        // Check streaming timeout manager first
+      cancellationInterval = setInterval(() => {
         if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error(ErrorTypes.USER_CANCELLED);
           cancelError.type = ErrorTypes.USER_CANCELLED;
           reject(cancelError);
-          return;
-        }
-
-        // Also check for global ESC flag (faster response to user ESC)
-        if (window.selectElementHandlingESC === true) {
+        } else if (window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
-          if (!silent) {
-            logger.debug('ESC flag detected, cancelling message immediately');
-          }
           const cancelError = new Error('Translation cancelled by user ESC');
           cancelError.type = 'USER_CANCELLED';
           reject(cancelError);
-          return;
         }
-      };
-
-      // Start cancellation checking immediately for faster response to ESC
-      cancellationInterval = setInterval(checkCancellation, 50);
+      }, 50);
     });
 
     let response;
     try {
-      response = await Promise.race([
-        sendPromise,
-        cancellationPromise,
-        timeoutPromise,
-      ]);
+      response = await Promise.race([sendPromise, cancellationPromise, timeoutPromise]);
     } finally {
-      // CRITICAL: Clear timeout and cancellation interval once the race is settled
       clearTimeoutTimer();
       if (cancellationInterval) clearInterval(cancellationInterval);
     }
 
     if (!response) {
-      throw new Error(`No response received for ${message.action}`);
+      throw new Error(`No response for ${message.action || 'unknown'}`);
     }
 
-    if (response.success === false) {
-      // Simplified logging to avoid console noise from large partialResults
-      if (!silent) {
-        logger.debug(`Response with success=false received for ${message.action}:`, {
-          error: response.error?.message || response.error || 'Unknown error',
-          hasPartialResults: !!response.partialResults
-        });
-      }
-
-      // Check if this is a restricted page error - if so, return the response instead of throwing
+    if (response && response.success === false) {
       if (response.isRestrictedPage || (response.tabUrl && isRestrictedUrl(response.tabUrl))) {
-        if (!silent) {
-          logger.debug('Restricted page detected, returning response without throwing error');
-        }
         return response;
       }
 
-      // Re-create the error object from the response for a proper stack trace
-      const errorMessage = response.error?.message || response.message || response.error || 'An unknown error occurred';
-      const error = new Error(errorMessage);
+      // Safe error extraction
+      let errorMessage = 'An unknown error occurred';
+      if (response.error) {
+        if (typeof response.error === 'string') errorMessage = response.error;
+        else if (typeof response.error === 'object') errorMessage = response.error.message || response.message || 'Object error';
+      } else if (response.message) {
+        errorMessage = response.message;
+      }
+      
+      const error = new Error(String(errorMessage));
 
-      // Copy essential response properties to error object for error matching
-      // Avoid copying large objects like partialResults directly if possible
+      // Safe property copy
       if (response.error && typeof response.error === 'object') {
         Object.keys(response.error).forEach(key => {
           if (key !== 'partialResults') error[key] = response.error[key];
@@ -341,79 +212,34 @@ export async function sendRegularMessage(message, options = {}) {
       throw error;
     }
 
-    if (!silent) {
-      logger.debug(`Regular message response received: ${message.action}`);
-    }
-
     return response;
   } catch (error) {
     const errorType = matchErrorToType(error);
 
-    // Simplified debug log
-    logger.debug(`Error type detected: ${errorType} for message: ${message.action}`, {
-      errorMessage: error.message
-    });
-
-    // Handle different error types with appropriate logging levels
-    if (message.action && (message.action.includes('TTS_STOP') || message.action.includes('GOOGLE_TTS_STOP')) &&
-        (errorType === ErrorTypes.TTS_NO_RESPONSE ||
-         errorType === ErrorTypes.TTS_OFFSCREEN_CLOSED ||
-         errorType === ErrorTypes.CONTEXT ||
-         errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED)) {
-      // TTS stop errors are expected when offscreen document is closed
-      logger.debug(`TTS stop failed (expected): ${message.action} - ${error.message}`);
-    } else if (errorType === ErrorTypes.TAB_BROWSER_INTERNAL ||
-               errorType === ErrorTypes.TAB_EXTENSION_PAGE ||
-               errorType === ErrorTypes.TAB_LOCAL_FILE ||
-               errorType === ErrorTypes.TAB_NOT_ACCESSIBLE ||
-               errorType === ErrorTypes.TAB_RESTRICTED) {
-      // Tab accessibility errors should be debug level
-      logger.debug(`Message failed for ${message.action} (restricted page):`, error.message || error);
-    } else if (errorType === ErrorTypes.USER_CANCELLED) {
-      // User cancellation should be debug level, not error
-      logger.debug(`Message cancelled for ${message.action}:`, {
-        message: error.message || error,
-        errorType: errorType,
-        fullError: error
-      });
-    } else {
-      // Use ErrorHandler for consistent error handling and categorization
-      await ErrorHandler.getInstance().handle(error, {
-        context: 'UnifiedMessaging',
-        action: message.action,
-        showToast: false, // Messaging errors are handled by callers
-        metadata: {
-          messageAction: message.action,
-          errorType: errorType
-        }
+    if (!silent) {
+      logger.debug(`Message error: ${message.action} (${errorType})`, { 
+        msg: (error && typeof error.message === 'string') ? error.message : 'No message' 
       });
     }
 
-    // Extension context errors are handled automatically by ExtensionContextManager.isContextError
+    if (isSilentError(errorType)) throw error;
+
+    await ErrorHandler.getInstance().handle(error, {
+      context: 'UnifiedMessaging',
+      action: message.action,
+      showToast: false
+    }).catch(() => {});
+
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, `UnifiedMessaging.${message.action}`);
     }
 
-    // Re-throw the error to be handled by the caller
     throw error;
   }
 }
 
-/**
- * Check if action is a translation action that may benefit from streaming coordination
- * @param {string} action - Message action
- * @returns {boolean} - Whether action is translation-related
- */
 function isTranslationAction(action) {
-  const translationActions = [
-    'TRANSLATE',
-    'TRANSLATE_SELECTION',
-    'TRANSLATE_TEXT',
-    'TRANSLATE_PAGE',
-    'TRANSLATE_IMAGE'
-  ];
-
-  return translationActions.includes(action);
+  return ['TRANSLATE', 'TRANSLATE_SELECTION', 'TRANSLATE_TEXT', 'TRANSLATE_PAGE', 'TRANSLATE_IMAGE'].includes(action);
 }
 
 export default { sendMessage, sendRegularMessage };

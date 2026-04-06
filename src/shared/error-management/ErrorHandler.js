@@ -64,7 +64,7 @@ export class ErrorHandler {
       try {
         if (err instanceof Error) {
           raw = err.message || err.name || 'Error object';
-        } else if (typeof err === 'object' && err !== null) {
+        } else if (err && typeof err === 'object') {
           raw = typeof err.message === 'string' ? err.message : (err.type || err.code || 'Object error');
         } else {
           raw = String(err || 'Unknown error');
@@ -74,7 +74,6 @@ export class ErrorHandler {
       }
 
       // CRITICAL SECURITY FIX: Redact API keys from the raw error message before logging
-      // This prevents leaks when providers (like Gemini) include the URL with key in the error message.
       const redactKeys = (text) => {
         if (!text || typeof text !== 'string') return text;
         return text
@@ -100,14 +99,14 @@ export class ErrorHandler {
         // Decide whether to use raw message or localized generic message
         const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
         
-        if (!shouldUseGeneric && sanitizedRaw && sanitizedRaw.length > 5 && 
+        if (!shouldUseGeneric && typeof sanitizedRaw === 'string' && sanitizedRaw.length > 5 && 
             !sanitizedRaw.includes('[object Object]') && !sanitizedRaw.startsWith('Error:')) {
           msg = sanitizedRaw;
         } else {
           msg = genericMsg;
         }
       } catch {
-        msg = sanitizedRaw || 'An error occurred';
+        msg = (typeof sanitizedRaw === 'string' ? sanitizedRaw : '') || 'An error occurred';
       }
       
       const displayStrategy = getErrorDisplayStrategy(meta.context || 'unknown', type);
@@ -125,12 +124,7 @@ export class ErrorHandler {
       
       // Logging
       if (this.debugMode && !shouldSuppressConsole(type)) {
-        // If it's a significant error (shown in UI or Toast), use error level. 
-        // Otherwise use debug for background/silent errors.
         const logLevel = (enhancedMeta.showToast || enhancedMeta.showInUI) ? 'error' : 'debug';
-        
-        // If we have an Error object, the console will already show the message.
-        // Just provide the type tag to avoid redundancy.
         const logPrefix = `[${type}]${enhancedMeta.context ? ` (${enhancedMeta.context})` : ''}`;
         logger[logLevel](logPrefix, err);
       }
@@ -184,7 +178,15 @@ export class ErrorHandler {
         };
       }
 
-      const raw = err instanceof Error ? err.message : String(err);
+      let raw = 'Unknown Error';
+      if (err instanceof Error) {
+        raw = err.message || err.name || 'Error object';
+      } else if (err && typeof err === 'object') {
+        raw = typeof err.message === 'string' ? err.message : (err.type || err.code || 'Object error');
+      } else {
+        raw = String(err || 'Unknown error');
+      }
+
       const type = matchErrorToType(err);
       
       let msg;
@@ -192,13 +194,13 @@ export class ErrorHandler {
         const localizedMsg = await getErrorMessage(type);
         const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
 
-        if (!shouldUseGeneric && raw && raw.length > 5 && !raw.includes('[object Object]')) {
+        if (!shouldUseGeneric && typeof raw === 'string' && raw.length > 5 && !raw.includes('[object Object]')) {
           msg = raw;
         } else {
-          msg = localizedMsg || raw || 'An error occurred';
+          msg = localizedMsg || (typeof raw === 'string' ? raw : '') || 'An error occurred';
         }
       } catch {
-        msg = raw || 'An error occurred';
+        msg = (typeof raw === 'string' ? raw : '') || 'An error occurred';
       }
       
       return {
@@ -223,7 +225,7 @@ export class ErrorHandler {
   }
 
   _notifyUser(message, type, options = {}) {
-    if (this.displayedErrors.has(message)) return;
+    if (!message || typeof message !== 'string' || this.displayedErrors.has(message)) return;
 
     const toastType = getErrorToastType(type);
     

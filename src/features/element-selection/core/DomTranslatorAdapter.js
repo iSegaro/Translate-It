@@ -35,7 +35,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.currentStreamEndReject = null;
     
     // Persistent session ID for the duration of this adapter's life
-    this.sessionMessageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.sessionMessageId = `s${Math.random().toString(36).substr(2, 6)}`;
 
     // Cache for original settings
     this.originalSettings = null;
@@ -78,7 +78,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
       const textsToTranslate = textNodesData.map(data => ({ 
-        t: data.text.trim(),
+        t: (data.text || '').trim(),
         i: data.uid,
         b: data.blockId,
         r: data.role
@@ -108,7 +108,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         partial: true
       });
 
-      const messageId = `select-element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = `m${Math.random().toString(36).substr(2, 6)}`;
       this.currentMessageId = messageId;
       let effectiveTargetLanguage = targetLanguage;
       
