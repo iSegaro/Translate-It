@@ -234,7 +234,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching)
+  PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching & key abbreviation)
 
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
@@ -315,18 +315,19 @@ $_{TEXT}
 /*--- End PROMPT_BASE_FIELD ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
-  PROMPT_BASE_SELECT: `Act as a JSON translation service. The input is a JSON array of objects with a "text" property.
+  PROMPT_BASE_SELECT: `Act as a professional JSON translation service. The input is a JSON array of objects with abbreviated keys: "t" (text to translate), "i" (unique ID), "b" (block ID), and "r" (element role).
 
 Your task:
-  1. Translate "text" according to rules: $_{USER_RULES}
+  1. Translate the "t" (text) according to rules: $_{USER_RULES}
   2. Return a valid JSON array. Do not omit any entries.
   3. Ensure translations are natural and idiomatic.
+  4. KEEP "i", "b", and "r" keys and their values UNCHANGED.
 
 Example:
-Input: [{"text": "Hello", "uid": "t1"}]
-Output: [{"text": "سلام", "uid": "t1"}]
+Input: [{"t": "Hello", "i": "n1", "b": "b1", "r": "h1"}]
+Output: [{"t": "سلام", "i": "n1", "b": "b1", "r": "h1"}]
 
-CRITICAL - Placeholder Preservation Instructions:
+CRITICAL - Placeholder Preservation:
   1. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
   2. DO NOT translate placeholders or renumber them.
 

@@ -76,11 +76,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (textNodesData.length === 0) throw new Error('No translatable text found');
 
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
+      // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
       const textsToTranslate = textNodesData.map(data => ({ 
-        text: data.text.trim(),
-        uid: data.uid,
-        blockId: data.blockId,
-        role: data.role
+        t: data.text.trim(),
+        i: data.uid,
+        b: data.blockId,
+        r: data.role
       }));
 
       const nodeMap = new Map();
@@ -146,7 +147,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
               if (data.data && Array.isArray(data.data)) {
                 data.data.forEach((translatedItem, index) => {
-                  const uid = translatedItem?.uid || (data.originalData && data.originalData[index]?.uid);
+                  // Handle both abbreviated and full keys for backward compatibility
+                  const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
                   
                   let nodeData = null;
                   if (uid) {
@@ -163,7 +165,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   }
                   
                   if (nodeData && !processedUids.has(nodeData.uid)) {
-                    this._applyTranslationToNode(nodeData.node, translatedItem?.text || translatedItem, effectiveTargetLanguage, element);
+                    // Extract text from abbreviated key 't' or full key 'text'
+                    const text = translatedItem?.t || translatedItem?.text || translatedItem;
+                    this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                     processedUids.add(nodeData.uid);
                   }
                 });
@@ -285,10 +289,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const results = Array.isArray(parsed) ? parsed : [parsed];
       
       results.forEach((item, i) => {
-        const uid = item?.uid;
+        // Handle abbreviated key 'i' for UID
+        const uid = item?.i || item?.uid;
         const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
         if (nodeData) {
-          this._applyTranslationToNode(nodeData.node, item?.text || item, targetLanguage, element);
+          // Handle abbreviated key 't' for text
+          const text = item?.t || item?.text || item;
+          this._applyTranslationToNode(nodeData.node, text, targetLanguage, element);
         }
       });
 

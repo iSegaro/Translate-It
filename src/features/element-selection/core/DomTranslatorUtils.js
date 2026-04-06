@@ -99,18 +99,22 @@ export function collectTextNodes(element) {
   });
 
   let node;
+  let nodeCounter = 0;
   while ((node = walker.nextNode())) {
     const blockParent = findClosestBlockParent(node);
     
     // Ensure blockId persists for mapping back to the DOM
+    // Use a shorter random string for blockId (6 chars total including prefix)
     if (!blockParent.dataset.blockId) {
-      blockParent.dataset.blockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      blockParent.dataset.blockId = `b${Math.random().toString(36).substr(2, 4)}`;
     }
 
+    nodeCounter++;
     textNodesData.push({
       node,
       text: node.textContent,
-      uid: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      // Short UID: e.g., "n1", "n2" etc. to drastically reduce token usage
+      uid: `n${nodeCounter}`,
       blockId: blockParent.dataset.blockId,
       role: blockParent.tagName.toLowerCase()
     });
