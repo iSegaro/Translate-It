@@ -89,6 +89,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Context
       const contextMetadata = extractContextMetadata(element);
+      const contextSummary = contextMetadata.contextSummary; // Extract the summary
       const isSmartContextEnabled = await getSmartContextTranslationEnabledAsync();
 
       const [provider, targetLanguage] = await Promise.all([
@@ -208,6 +209,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           originalTargetLang: this.originalSettings.target,
           mode: TranslationMode.Select_Element,
           contextMetadata: isSmartContextEnabled ? contextMetadata : null,
+          contextSummary: contextSummary,
           options: { rawJsonPayload: true, enableDictionary: false, smartContext: isSmartContextEnabled },
           sessionId: this.sessionMessageId, 
         },

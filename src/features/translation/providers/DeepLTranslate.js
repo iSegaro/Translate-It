@@ -491,8 +491,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     });
 
     // CRITICAL: Add contextual metadata for better translation quality
-    // Extract context from block container if available
-    const translationContext = await this._extractTranslationContext(blockContainer, sessionId);
+    // Prioritize passed contextSummary, fallback to internal extraction
+    const translationContext = options.contextSummary || await this._extractTranslationContext(blockContainer, sessionId);
     if (translationContext) {
       requestBody.append('context', translationContext);
 

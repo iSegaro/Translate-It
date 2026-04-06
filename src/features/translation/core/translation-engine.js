@@ -317,7 +317,7 @@ export class TranslationEngine {
    * Optimized JSON translation for unreliable providers
    */
   async executeOptimizedJsonTranslation(data, providerInstance, originalSourceLang, originalTargetLang, messageId = null, tabId = null) {
-    const { text, provider, sourceLanguage, targetLanguage, mode, contextMetadata } = data;
+    const { text, provider, sourceLanguage, targetLanguage, mode, contextMetadata, contextSummary } = data;
     
     let originalJson;
     try {
@@ -423,7 +423,7 @@ export class TranslationEngine {
                                   this,
                                   messageId,
                                   sessionId,
-                                  contextMetadata // Pass context metadata to AI provider
+                                  { ...contextMetadata, contextSummary } // Enhanced context object
                                 );
                             } else if (typeof providerInstance?._translateChunk === 'function') {
                                 // Traditional providers use _translateChunk method
@@ -435,10 +435,10 @@ export class TranslationEngine {
                                     mode, 
                                     abortController,
                                     0,              // retryAttempt
-                                    batch.length,   // chunkIndex (actually segment count in some signatures)
+                                    batch.length,   // segmentCount
+                                    1,              // chunkIndex
                                     1,              // totalChunks
-                                    null,           // blockContainer
-                                    sessionId       
+                                    { sessionId, contextSummary } // Correct options object
                                 );
                             } else {
                                 throw new Error(`Translation provider method not available for ${provider}`);

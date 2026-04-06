@@ -34,7 +34,8 @@ export function extractContextMetadata(element) {
   const metadata = {
     pageTitle: document.title,
     heading: '',
-    role: element.tagName.toLowerCase()
+    role: element.tagName.toLowerCase(),
+    contextSummary: ''
   };
 
   // Find the nearest preceding heading to provide semantic context
@@ -59,6 +60,21 @@ export function extractContextMetadata(element) {
         metadata.heading = closestHeading.textContent.trim().substring(0, 100);
       }
     }
+
+    // Build context summary for providers like DeepL
+    const parts = [];
+    if (metadata.pageTitle) parts.push(`Page: ${metadata.pageTitle}`);
+    if (metadata.heading) parts.push(`Section: ${metadata.heading}`);
+    if (metadata.role) parts.push(`Role: ${metadata.role}`);
+    
+    // Add parent context if available
+    const parent = element.parentElement;
+    if (parent && parent.tagName !== 'BODY') {
+      parts.push(`Parent: ${parent.tagName.toLowerCase()}`);
+    }
+
+    metadata.contextSummary = parts.join(' | ').substring(0, 1000);
+
   } catch (e) {
     logger.debug('Failed to extract heading context', e);
   }
