@@ -78,7 +78,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
       const textsToTranslate = textNodesData.map(data => ({ 
-        t: (data.text || '').trim(),
+        t: data.text || '',
         i: data.uid,
         b: data.blockId,
         r: data.role

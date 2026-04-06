@@ -67,6 +67,10 @@ export function extractContextMetadata(element) {
     if (metadata.heading) parts.push(`Section: ${metadata.heading}`);
     if (metadata.role) parts.push(`Role: ${metadata.role}`);
     
+    // Add full text of the element for better phrase translation
+    const fullText = element.textContent.trim().substring(0, 300);
+    if (fullText) parts.push(`Full context: ${fullText}`);
+    
     // Add parent context if available
     const parent = element.parentElement;
     if (parent && parent.tagName !== 'BODY') {
