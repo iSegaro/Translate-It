@@ -115,18 +115,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const processedUids = new Set();
       let lastProcessedIndex = 0;
 
-      const streamEndPromise = new Promise((resolve, reject) => {
-        this.currentStreamEndReject = reject;
+      // ELIMINATE UNCAUGHT PROMISE ERRORS: Use resolve-only pattern for the stream promise
+      const streamEndPromise = new Promise((resolve) => {
+        let isSettled = false;
+
+        const safeResolve = (val) => {
+          if (isSettled) return;
+          isSettled = true;
+          resolve(val);
+        };
+
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
+            if (isSettled) return;
             try {
               if (data.success === false || data.error) {
                 if (isFatalError(data.error)) {
                   const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
                   const error = new Error(errObj.message || 'Fatal error');
                   Object.assign(error, errObj);
-                  error.alreadyReported = true; 
-                  return reject(error);
+                  error.isFatal = true;
+                  safeResolve({ success: false, error }); // Resolve with error data
                 }
                 return;
               }
@@ -164,18 +173,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
           },
           onStreamEnd: (data) => {
-            if (data.cancelled) return resolve({ success: false, cancelled: true });
+            if (isSettled) return;
+            if (data.cancelled) return safeResolve({ success: false, cancelled: true });
             if (data.success === false || data.error) {
               const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
               const error = new Error(errObj.message || 'Stream failed');
               Object.assign(error, errObj);
-              return reject(error);
+              return safeResolve({ success: false, error });
             }
-            resolve({ success: true, targetLanguage: effectiveTargetLanguage });
+            safeResolve({ success: true, targetLanguage: effectiveTargetLanguage });
           },
-          onError: async (error) => {
-            if (!this.currentMessageId || error.message === 'Handler cancelled') return;
-            reject(error);
+          onError: (error) => {
+            if (isSettled || !this.currentMessageId || error.message === 'Handler cancelled') return;
+            safeResolve({ success: false, error });
           }
         });
       });
@@ -209,6 +219,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error(response?.error?.message || response?.error || 'Translation failed');
       }
 
+      // If the result contains an error (from resolve-only pattern), throw it now
+      if (result && result.success === false && result.error) {
+        throw result.error;
+      }
+
       return await this._finalizeTranslation({
         result, element, elementId, textNodesData, nodeMap, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
       });
@@ -220,10 +235,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 
       if (!isCancellation && !error.alreadyHandled) {
+        this.logger.debug('Handling translation error and showing toast', error);
+        
         await this.errorHandler.handle(error, {
           context: 'select-element',
           component: 'DomTranslatorAdapter',
-          showToast: true 
+          showToast: true,
+          forceToast: true 
         });
         error.alreadyHandled = true; 
       }
@@ -326,7 +344,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Note: streamingHandler automatically cleans up on stream end or cancel
       this.currentMessageId = null;
     }
-    this.currentStreamEndReject = null;
   }
 
   async cancelTranslation(options = {}) {
@@ -339,11 +356,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } catch (e) { /* ignore */ }
     }
 
-    if (this.currentStreamEndReject) {
-      const cancelError = new Error(ErrorTypes.USER_CANCELLED);
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      this.currentStreamEndReject(cancelError);
-    }
     this._cleanupCurrentSession(false);
   }
 
