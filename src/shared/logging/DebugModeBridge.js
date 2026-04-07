@@ -329,11 +329,6 @@ class DebugModeBridge {
 // Create singleton instance
 const debugModeBridge = new DebugModeBridge();
 
-// Auto-initialize when module is imported
-debugModeBridge.initialize().catch((error) => {
-  logger.error('Auto-initialization failed:', error);
-});
-
 export { DebugModeBridge };
 export { debugModeBridge };
 export default debugModeBridge;

@@ -16,6 +16,12 @@ async function isPageExcluded(url) {
   try {
     const urlObj = new URL(url)
     
+    // Check if extension is enabled globally first
+    const mainSettings = await storageManager.get({ EXTENSION_ENABLED: true });
+    if (!mainSettings.EXTENSION_ENABLED) {
+      return true; // Exclude ALL pages if extension is OFF
+    }
+    
     // Always exclude extension pages
     if (urlObj.protocol === 'chrome-extension:' || urlObj.protocol === 'moz-extension:') {
       return true
