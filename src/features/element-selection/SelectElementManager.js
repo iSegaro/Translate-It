@@ -45,6 +45,9 @@ class SelectElementManager extends ResourceTracker {
     this.domTranslatorAdapter = new DomTranslatorAdapter();
     this.elementSelector = new ElementSelector();
 
+    // Store instance globally for cross-component detection
+    window.selectElementManagerInstance = this;
+
     // Track services
     this.trackResource('dom-translator-adapter', () => {
       if (this.domTranslatorAdapter) {
@@ -404,12 +407,15 @@ class SelectElementManager extends ResourceTracker {
         ...this.currentOptions,
         ...options,
         onProgress: async () => {
+          // Emit both for backward compatibility and Coordinator discovery
           pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE);
+          pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE');
         }
       });
 
       if (result && result.success) {
         pageEventBus.emit('hide-translation', { element: targetElement });
+        pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
         this.performPostTranslationCleanup({ reason: 'success' });
       } else if (result && result.cancelled) {
         this.deactivate({ reason: 'cancel', silent: true });

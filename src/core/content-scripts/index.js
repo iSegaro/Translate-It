@@ -9,7 +9,6 @@ setupTrustedTypesCompatibility();
 
 let contentScriptCore = null;
 let featureLoadPromises = new Map();
-let interactionDetected = false;
 
 // Smart loading configuration
 const LOAD_STRATEGIES = {
@@ -118,10 +117,16 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
     window.translateItContentCore = contentScriptCore;
 
     if (initialized) {
-      // Setup smart event listeners
-      setupSmartListeners();
+      // 1. Initialize Smart Interaction Coordinator
+      // This manages mouseup, keydown, and other listeners based on settings/exclusion
+      try {
+        const { interactionCoordinator } = await import('./InteractionCoordinator.js');
+        await interactionCoordinator.initialize();
+      } catch (coordError) {
+        scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
+      }
 
-      // Start intelligent loading sequence based on frame type
+      // 2. Start intelligent loading sequence based on frame type
       if (isMainFrame) {
         startIntelligentLoading();
       } else {
@@ -150,81 +155,6 @@ async function startLiteIframeLoading() {
   }
 }
 
-function setupSmartListeners() {
-  // Extension popup interaction
-  // Use cross-browser compatible approach
-  const browserAPI = typeof browser !== "undefined" ? browser : chrome;
-  if (browserAPI?.runtime) {
-    browserAPI.runtime.onMessage.addListener((message) => {
-      if (message.action === 'popupOpened') {
-        loadFeature('vue', 'INTERACTIVE');
-      }
-    });
-  }
-
-  // Text selection interaction
-  document.addEventListener('mouseup', handleTextSelection, { passive: true });
-
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', handleKeyboardInteraction);
-
-  // Focus on text fields
-  document.addEventListener('focusin', handleTextFieldFocus, { passive: true });
-
-  // Scroll detection (for preload)
-  let scrollTimer;
-  document.addEventListener('scroll', () => {
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => {
-      if (!interactionDetected) {
-        preloadEssentialFeatures();
-      }
-    }, 1000);
-  }, { passive: true });
-}
-
-async function handleTextSelection() {
-  const selection = window.getSelection();
-  if (selection && selection.toString().trim().length > 0) {
-    if (contentScriptCore) {
-      // Import activation utility
-      const { activateFeature } = await import('./chunks/lazy-features.js');
-      
-      // 1. Ensure detection logic is active
-      await activateFeature('textSelection');
-      
-      // 2. CRITICAL: Ensure UI infrastructure (windowsManager) is active
-      // This is required to actually show the icons/windows
-      await activateFeature('windowsManager');
-    }
-  }
-}
-
-function handleKeyboardInteraction(event) {
-  // Ctrl+/ for translation
-  if (event.ctrlKey && event.key === '/') {
-    event.preventDefault();
-    loadFeature('shortcut', 'INTERACTIVE');
-    loadFeature('windowsManager', 'INTERACTIVE');
-  }
-}
-
-function handleTextFieldFocus(event) {
-  if (isEditableElement(event.target)) {
-    loadFeature('textFieldIcon', 'INTERACTIVE');
-  }
-}
-
-function isEditableElement(element) {
-  return element && (
-    element.isContentEditable ||
-    element.tagName === 'TEXTAREA' ||
-    (element.tagName === 'INPUT' &&
-     ['text', 'search', 'email', 'url', 'tel'].includes(element.type))
-  );
-}
-
 async function startIntelligentLoading() {
   // Phase 1: Load critical features immediately
   await Promise.all(
@@ -242,11 +172,9 @@ async function startIntelligentLoading() {
     );
   }, LOAD_STRATEGIES.ESSENTIAL.delay);
 
-  // Phase 3: Preload remaining features if user is active
+  // Phase 3: Delayed operations (mostly handled by InteractionCoordinator)
   setTimeout(() => {
-    if (interactionDetected) {
-      preloadRemainingFeatures();
-    }
+    // Optional preload logic can be added here if needed
   }, LOAD_STRATEGIES.ON_DEMAND.delay);
 }
 
@@ -293,20 +221,6 @@ async function loadFeature(featureName, category) {
 
   featureLoadPromises.set(featureName, loadPromise);
   return loadPromise;
-}
-
-function preloadEssentialFeatures() {
-  interactionDetected = true;
-  FEATURE_CATEGORIES.ESSENTIAL.forEach(feature =>
-    loadFeature(feature, 'ESSENTIAL')
-  );
-}
-
-function preloadRemainingFeatures() {
-  interactionDetected = true;
-  [...FEATURE_CATEGORIES.INTERACTIVE, ...FEATURE_CATEGORIES.ON_DEMAND].forEach(feature =>
-    loadFeature(feature, 'ON_DEMAND')
-  );
 }
 
 // Export for debugging

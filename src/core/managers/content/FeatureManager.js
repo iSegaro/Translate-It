@@ -288,6 +288,14 @@ export class FeatureManager extends ResourceTracker {
       this.featureHandlers.delete(featureName);
       this.activeFeatures.delete(featureName);
 
+      // CRITICAL: Notify lazy-features cache to clear
+      try {
+        const { notifyFeatureDeactivated } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        notifyFeatureDeactivated(featureName);
+      } catch {
+        // Maybe in iframe or other context where lazy-features isn't used
+      }
+
       logger.info(`Feature ${featureName} deactivated successfully`);
 
     } catch (error) {

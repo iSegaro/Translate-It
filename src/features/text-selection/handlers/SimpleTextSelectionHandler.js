@@ -190,55 +190,26 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     try {
       logger.debug('Deactivating SimpleTextSelectionHandler');
 
-      // Clear any pending timeouts
-      if (this.selectionTimeout) {
-        clearTimeout(this.selectionTimeout);
-        this.selectionTimeout = null;
-      }
+      // 1. Remove DOM Listeners explicitly (with matching options)
+      this._removeDOMListeners();
 
-      // Clean up Shift+Click event listeners and timeouts
-      if (this._shiftKeyReleaseHandler) {
-        document.removeEventListener('keyup', this._shiftKeyReleaseHandler, { capture: true });
-        this._shiftKeyReleaseHandler = null;
-      }
+      // 2. Clear any pending timeouts and animation frames
+      this._clearAllTimers();
 
-      if (this._shiftKeyTimeout) {
-        clearTimeout(this._shiftKeyTimeout);
-        this._shiftKeyTimeout = null;
-      }
-
-      // Clean up mouse up timers and animation frames
-      if (this._mouseUpTimeout) {
-        clearTimeout(this._mouseUpTimeout);
-        this._mouseUpTimeout = null;
-      }
-
-      if (this._mouseUpAnimationFrame) {
-        cancelAnimationFrame(this._mouseUpAnimationFrame);
-        this._mouseUpAnimationFrame = null;
-      }
-
-      // Clean up typing detection
-      this.cleanupTypingDetection();
-
-      // Clean up settings listeners
+      // 3. Clean up settings listeners
       this._settingsListeners.forEach(unsubscribe => {
         if (unsubscribe) unsubscribe();
       });
       this._settingsListeners = [];
 
-      // Dismiss any active selection window
+      // 4. Dismiss and cleanup managers
       if (this.selectionManager) {
         this.selectionManager.dismissWindow();
+        this.selectionManager.cleanup();
       }
-
-      // Clean up our reference (SelectionManager cleans itself up)
       this.selectionManager = null;
 
-      // Manually clean up event listeners to be sure
-      // Clean up preservation system
-      this._clearPreservationTimer();
-
+      // 5. Final resource cleanup via parent
       this.cleanup();
 
       this.isActive = false;
@@ -247,17 +218,37 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
     } catch (error) {
       logger.error('Error deactivating SimpleTextSelectionHandler:', error);
-      try {
-        this.selectionManager = null;
-        this._settingsListeners = [];
-        this.cleanup();
-        this.isActive = false;
-        return true;
-      } catch (cleanupError) {
-        logger.error('Critical: SimpleTextSelectionHandler cleanup failed:', cleanupError);
-        return false;
-      }
+      this.isActive = false;
+      return true;
     }
+  }
+
+  /**
+   * Explicitly remove all registered DOM listeners
+   * @private
+   */
+  _removeDOMListeners() {
+    // Use exact same targets and options as setupEventListeners
+    document.removeEventListener('selectionchange', this.handleSelectionChange);
+    window.removeEventListener('mousedown', this.handleMouseDown, { critical: true });
+    window.removeEventListener('mouseup', this.handleMouseUp, { critical: true });
+    window.removeEventListener('mousemove', this.handleMouseMove, { critical: true });
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
+    document.removeEventListener('input', this.handleInput, { capture: true });
+  }
+
+  /**
+   * Clear all active timers and animation frames
+   * @private
+   */
+  _clearAllTimers() {
+    if (this.selectionTimeout) clearTimeout(this.selectionTimeout);
+    if (this._shiftKeyTimeout) clearTimeout(this._shiftKeyTimeout);
+    if (this._mouseUpTimeout) clearTimeout(this._mouseUpTimeout);
+    if (this._mouseUpAnimationFrame) cancelAnimationFrame(this._mouseUpAnimationFrame);
+    this._clearPreservationTimer();
+    this.cleanupTypingDetection();
   }
 
   setupEventListeners() {
@@ -485,6 +476,12 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Process the current text selection
    */
   async processSelection() {
+    // CRITICAL SAFETY: Check if active and manager exists
+    if (!this.isActive || !this.selectionManager) {
+      logger.debug('Skipping selection processing: Handler inactive or manager null');
+      return;
+    }
+
     try {
       const selection = window.getSelection();
       const selectedText = selection ? selection.toString().trim() : '';
@@ -846,7 +843,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.lastKeyEventTime = Date.now();
     if (event.ctrlKey || event.metaKey) {
       this.ctrlKeyPressed = true;
-      logger.debug('Ctrl key pressed down');
+      // logger.debug('Ctrl key pressed down');
     }
     if (event.shiftKey) {
       this.shiftKeyPressed = true;
@@ -918,7 +915,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.lastKeyEventTime = Date.now();
     if (!event.ctrlKey && !event.metaKey) {
       this.ctrlKeyPressed = false;
-      logger.debug('Ctrl key released');
+      // logger.debug('Ctrl key released');
     }
     if (!event.shiftKey && this.isInShiftClickOperation) {
       this.shiftKeyPressed = false;
