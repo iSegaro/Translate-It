@@ -95,6 +95,7 @@ class StorageCore extends ResourceTracker {
    * Setup storage change listener for cache invalidation
    */
   _setupChangeListener() {
+    this.logger.debug('Storage core: Setting up change listener...');
     if (!browser?.storage?.onChanged) {
       this.logger.warn('storage.onChanged not available');
       return;

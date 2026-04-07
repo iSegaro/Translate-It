@@ -291,9 +291,12 @@ const updateFullscreenState = () => {
 logger.debug('ContentApp script setup executed.');
 
 onMounted(async () => {
+  logger.info('ContentApp: onMounted started');
   // Ensure settings are loaded
   if (!settingsStore.isInitialized) {
+    logger.debug('ContentApp: Loading settings store...');
     await settingsStore.loadSettings();
+    logger.debug('ContentApp: Settings store loaded');
   }
 
 
@@ -301,40 +304,31 @@ onMounted(async () => {
   const executionMode = isInIframe ? 'iframe' : 'main-frame';
 
   logger.info(`ContentApp mounted in ${executionMode} mode`);
-  logger.info('Device Detection:', { 
-    isMobile: deviceDetector.isMobile(), 
-    shouldEnableUI: deviceDetector.shouldEnableMobileUI(),
-    innerWidth: window.innerWidth, 
-    touchPoints: navigator.maxTouchPoints,
-    userAgent: navigator.userAgent
-  });
-
-  // Setup global click listener for outside click detection
-  setupOutsideClickHandler();
-
+  
   // Initialize Toast Integration System
   let toastIntegration = null;
   try {
+    logger.debug('ContentApp: Initializing ToastIntegration...');
     toastIntegration = ToastIntegration.createSingleton(pageEventBus);
     toastIntegration.initialize();
-    // ToastIntegration initialized successfully
+    logger.debug('ContentApp: ToastIntegration initialized');
   } catch (error) {
     logger.warn('ToastIntegration initialization failed:', error);
-    // Continue without toast integration if it fails
   }
 
   // Initialize SelectElement Notification Manager
   try {
+    logger.debug('ContentApp: Initializing SelectElementNotificationManager...');
     const notificationManager = new NotificationManager();
     selectElementNotificationManager = await getSelectElementNotificationManager(notificationManager);
-    // SelectElementNotificationManager initialized successfully
+    logger.debug('ContentApp: SelectElementNotificationManager initialized');
   } catch (error) {
     logger.warn('Failed to initialize SelectElementNotificationManager:', error);
   }
 
   // CRITICAL: Initialize RTL for toasts
-  // 1. Initialize on mount
   await updateToastRTL();
+  logger.debug('ContentApp: RTL initialized');
 
   // Fullscreen listeners via tracker
   tracker.addEventListener(document, 'fullscreenchange', updateFullscreenState);
