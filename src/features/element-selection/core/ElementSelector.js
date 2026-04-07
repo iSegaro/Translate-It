@@ -1,10 +1,11 @@
-// ElementSelector - Handles element highlighting, selection, and navigation prevention
-// Simplified version that replaces ElementHighlighter with core selection logic
+// ElementSelector - Handles element highlighting and selection
+// Integrated with ContentScriptCore for global styles and navigation prevention
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { isValidTextElement } from '../utils/elementHelpers.js';
 
 /**
  * Element selection and highlighting functionality
@@ -41,9 +42,7 @@ export class ElementSelector extends ResourceTracker {
    */
   async initialize() {
     this.logger.debug('Initializing ElementSelector');
-
-    // Highlight styles will be injected on-demand during activate()
-    
+    // Global styles are now managed by ContentScriptCore.injectMainDOMStyles()
     this.logger.debug('ElementSelector initialized');
   }
 
@@ -52,10 +51,6 @@ export class ElementSelector extends ResourceTracker {
    */
   activate() {
     this.isActive = true;
-    
-    // Inject highlight styles if not already present (On-demand)
-    this._ensureHighlightStyles();
-    
     this.logger.debug('ElementSelector activated');
   }
 
@@ -69,55 +64,7 @@ export class ElementSelector extends ResourceTracker {
   }
 
   /**
-   * Ensure highlight styles are injected
-   * @private
-   */
-  _ensureHighlightStyles() {
-    this.logger.debug('Checking highlight styles injection...');
-    if (document.getElementById('translate-it-select-styles')) {
-      this.logger.debug('Highlight styles already present, skipping injection');
-      return; // Already injected
-    }
-
-    try {
-      const style = document.createElement('style');
-      style.id = 'translate-it-select-styles';
-      style.textContent = `
-        .translate-it-cursor-select, 
-        .translate-it-cursor-select * {
-          cursor: crosshair !important;
-          user-select: none !important;
-          -webkit-user-select: none !important;
-          touch-action: none !important; /* Critical for Scanner Mode: prevent browser scroll */
-        }
-        
-        .translate-it-element-highlighted {
-          outline: 2px solid #4a90d9 !important;
-          outline-offset: -2px !important;
-          box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.4) !important;
-          transition: outline 0.1s ease, box-shadow 0.1s ease;
-        }
-      `;
-      
-      const target = document.head || document.documentElement;
-      if (target) {
-        target.appendChild(style);
-        this.logger.debug('Highlight styles injected successfully');
-      }
-    } catch (error) {
-      this.logger.error('Failed to inject highlight styles:', error);
-    }
-  }
-
-  /**
-   * Check if element belongs to the extension (should be excluded)
-   * @param {HTMLElement} element - Element to check
-   * @returns {boolean} Whether element should be excluded
-   */
-  /**
-   * Check if element belongs to the extension's UI (should be excluded from blocking)
-   * This is critical: it must ONLY return true for our actual UI controls,
-   * NOT for elements of the site that we have highlighted.
+   * Check if element belongs to the extension's UI (should be excluded from selection)
    * @param {HTMLElement} element - Element to check
    * @returns {boolean} Whether element is our UI
    */
@@ -139,24 +86,22 @@ export class ElementSelector extends ResourceTracker {
     // 3. Check for specific extension IDs
     if (element.id && element.id.startsWith('translate-it-')) {
       // EXCEPTION: Don't count the highlighted element as "our UI" 
-      // even if it has our styles or ID prefix (if we used any there)
       if (element.classList.contains(this.HIGHLIGHT_CLASS)) {
         return false;
       }
       return true;
     }
 
-    // 4. Use the detector but specifically for extension UI, not highlighted items
-    // We traverse up to see if it's inside our UI host
+    // 4. Traverse up to see if it's inside our UI host or shadow root
     let current = element;
     while (current && current !== document.body) {
       if (current.id === UI_HOST_IDS.MAIN || current.id === UI_HOST_IDS.IFRAME) {
         return true;
       }
-      // If it's inside a toast/notification container
       if (current.classList && (current.classList.contains('translate-it-toast') || current.classList.contains('translate-it-notification'))) {
         return true;
       }
+      // Handle Shadow DOM boundaries
       current = current.parentElement || (current.parentNode instanceof ShadowRoot ? current.parentNode.host : null);
     }
 
@@ -168,17 +113,10 @@ export class ElementSelector extends ResourceTracker {
    * @param {HTMLElement} element - Element to highlight
    */
   handleMouseOver(element) {
-    if (!this.isActive) {
-      return;
-    }
+    if (!this.isActive) return;
 
     // Guard against invalid elements
-    if (!element || typeof element.hasAttribute !== 'function') {
-      return;
-    }
-
-    // Skip our own elements
-    if (this.isOurElement(element)) {
+    if (!element || typeof element.hasAttribute !== 'function' || this.isOurElement(element)) {
       return;
     }
 
@@ -248,25 +186,23 @@ export class ElementSelector extends ResourceTracker {
    */
   findBestTextElement(startElement) {
     let element = startElement;
-    let maxAncestors = 15; // Increased depth for modern deep DOMs
+    let maxAncestors = this.config.maxAncestors || 10;
 
     // We want the DEEPEST element that satisfies the minimum requirements.
-    // This makes the selection much more surgical and responsive.
     while (element && element !== document.body && element !== document.documentElement && maxAncestors-- > 0) {
-      if (this.isValidTextElement(element)) {
+      if (this.isSelectionCandidate(element)) {
         const area = element.offsetWidth * element.offsetHeight;
         const text = element.textContent?.trim() || '';
         const wordCount = text.split(/\s+/).length;
 
         // Check if this element is a good candidate
-        // We prioritize smaller, more specific elements by stopping at the first valid one we hit while going UP.
         if (
           area >= this.config.minArea &&
           area <= this.config.maxArea &&
           text.length >= this.config.minTextLength &&
           wordCount >= this.config.minWordCount
         ) {
-          return element; // Stop here! Don't climb to large parents.
+          return element;
         }
       }
 
@@ -274,7 +210,7 @@ export class ElementSelector extends ResourceTracker {
     }
 
     // Fallback: if no good candidate found via area, use startElement if it is a valid text element
-    if (startElement && this.isValidTextElement(startElement)) {
+    if (startElement && this.isSelectionCandidate(startElement)) {
       const text = startElement.textContent?.trim() || '';
       if (text.length >= this.config.minTextLength) {
         return startElement;
@@ -285,69 +221,20 @@ export class ElementSelector extends ResourceTracker {
   }
 
   /**
-   * Check if element is valid for text selection
-   * @param {HTMLElement} element - Element to validate
+   * Check if element is a valid candidate for text translation
+   * @param {HTMLElement} element - Element to check
    * @returns {boolean} Whether element is valid
    */
-  isValidTextElement(element) {
+  isSelectionCandidate(element) {
     if (!element) return false;
-
-    // Skip root and invalid tags
-    // Translating HTML/BODY destroys the extension's UI containers
-    const invalidTags = ['HTML', 'BODY', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
-    if (invalidTags.includes(element.tagName)) {
-      return false;
-    }
-
-    // Skip invisible elements
-    const style = window.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-      return false;
-    }
-
-    // Skip our own elements
+    
+    // 1. Skip our own elements (extension UI)
     if (this.isOurElement(element)) {
       return false;
     }
 
-    // Must have text content
-    const text = element.textContent?.trim() || '';
-    return text.length > 0;
-  }
-
-  /**
-   * Activate the selector (start listening to mouse events)
-   */
-  activate() {
-    this.isActive = true;
-    this._setCursor(true);
-
-    this.logger.debug('ElementSelector activated');
-  }
-
-  /**
-   * Deactivate the selector (stop listening to mouse events)
-   */
-  deactivate() {
-    this.isActive = false;
-    this.clearHighlight();
-    this._setCursor(false);
-
-    this.logger.debug('ElementSelector deactivated');
-  }
-
-  /**
-   * Set crosshair cursor on document
-   * @param {boolean} enabled - Whether to enable cursor
-   * @private
-   */
-  _setCursor(enabled) {
-    const root = document.documentElement;
-    if (enabled) {
-      root.classList.add('translate-it-cursor-select');
-    } else {
-      root.classList.remove('translate-it-cursor-select');
-    }
+    // 2. Use shared validation for general text elements
+    return isValidTextElement(element);
   }
 
   /**
@@ -391,12 +278,6 @@ export class ElementSelector extends ResourceTracker {
 
     // Clear state
     this.deactivate();
-
-    // Remove highlight styles
-    const styleEl = document.getElementById('translate-it-select-styles');
-    if (styleEl) {
-      styleEl.remove();
-    }
 
     // Use ResourceTracker cleanup
     super.cleanup();
