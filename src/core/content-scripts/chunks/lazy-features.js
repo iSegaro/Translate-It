@@ -444,23 +444,6 @@ async function initializeAndActivateFeatures() {
       logger.debug('Features already initialized, skipping activation');
     }
 
-    // Setup event listeners for smart feature loading
-    logger.debug('Setting up smart feature loading listeners...');
-
-    // Text selection interaction
-    document.addEventListener('mouseup', handleTextSelection, { passive: true });
-
-    // Right-click (context menu) - load select element feature on demand
-    document.addEventListener('contextmenu', () => {
-      logger.debug('Context menu detected, pre-loading selectElement feature...');
-      loadFeature('selectElement', 'INTERACTIVE');
-    }, { once: true });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', handleKeyboardInteraction, { passive: true });
-
-    logger.debug('Smart feature loading listeners setup complete');
-
   } catch (error) {
     logger.error('Failed to initialize and activate features:', error);
   }
