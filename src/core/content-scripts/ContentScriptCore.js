@@ -46,7 +46,41 @@ async function loadDependencies() {
   }
 
   // Define CSS directly as a string to avoid import issues
-  mainDomCss = `html[data-translate-it-select-mode="true"]{cursor:crosshair!important}html[data-translate-it-select-mode="true"] *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body{cursor:crosshair!important}html[data-translate-it-select-mode="true"] body *{cursor:crosshair!important}html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]){pointer-events:none!important;color:inherit!important;text-decoration:none!important}:root{--translate-highlight-color:#ff8800;--translate-highlight-width:3px;--translate-highlight-offset:2px;--translate-highlight-z-index:1040}html body [data-translate-highlighted="true"][data-translate-highlighted="true"],html body .translate-it-element-highlighted.translate-it-element-highlighted{outline:var(--translate-highlight-width) solid var(--translate-highlight-color)!important;outline-offset:var(--translate-highlight-offset)!important;z-index:var(--translate-highlight-z-index)!important;position:relative!important;box-shadow:0 0 0 var(--translate-highlight-width) var(--translate-highlight-color)!important}html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,html body .translate-it-element-highlighted.translate-it-element-highlighted *{outline:none!important}`;
+  mainDomCss = `
+    html[data-translate-it-select-mode="true"], 
+    html[data-translate-it-select-mode="true"] * {
+      cursor: crosshair !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      touch-action: none !important;
+    }
+    html[data-translate-it-select-mode="true"] a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
+    html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]) {
+      pointer-events: none !important;
+      color: inherit !important;
+      text-decoration: none !important;
+    }
+    :root {
+      --translate-highlight-color: #ff8800;
+      --translate-highlight-width: 3px;
+      --translate-highlight-offset: 2px;
+      --translate-highlight-z-index: 1040;
+    }
+    html body [data-translate-highlighted="true"],
+    html body .translate-it-element-highlighted {
+      outline: var(--translate-highlight-width) solid var(--translate-highlight-color) !important;
+      outline-offset: var(--translate-highlight-offset) !important;
+      z-index: var(--translate-highlight-z-index) !important;
+      position: relative !important;
+      box-shadow: 0 0 10px rgba(255, 136, 0, 0.5) !important;
+    }
+  `;
 
   logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptCore');
 }
