@@ -42,10 +42,30 @@ export class ElementSelector extends ResourceTracker {
   async initialize() {
     this.logger.debug('Initializing ElementSelector');
 
-    // Inject highlight styles if not already present
-    this._ensureHighlightStyles();
-
+    // Highlight styles will be injected on-demand during activate()
+    
     this.logger.debug('ElementSelector initialized');
+  }
+
+  /**
+   * Activate the selection mode
+   */
+  activate() {
+    this.isActive = true;
+    
+    // Inject highlight styles if not already present (On-demand)
+    this._ensureHighlightStyles();
+    
+    this.logger.debug('ElementSelector activated');
+  }
+
+  /**
+   * Deactivate the selection mode
+   */
+  deactivate() {
+    this.isActive = false;
+    this.clearHighlight();
+    this.logger.debug('ElementSelector deactivated');
   }
 
   /**
@@ -53,31 +73,40 @@ export class ElementSelector extends ResourceTracker {
    * @private
    */
   _ensureHighlightStyles() {
+    this.logger.debug('Checking highlight styles injection...');
     if (document.getElementById('translate-it-select-styles')) {
+      this.logger.debug('Highlight styles already present, skipping injection');
       return; // Already injected
     }
 
-    const style = document.createElement('style');
-    style.id = 'translate-it-select-styles';
-    style.textContent = `
-      .translate-it-cursor-select, 
-      .translate-it-cursor-select * {
-        cursor: crosshair !important;
-        user-select: none !important;
-        -webkit-user-select: none !important;
-        touch-action: none !important; /* Critical for Scanner Mode: prevent browser scroll */
-      }
+    try {
+      const style = document.createElement('style');
+      style.id = 'translate-it-select-styles';
+      style.textContent = `
+        .translate-it-cursor-select, 
+        .translate-it-cursor-select * {
+          cursor: crosshair !important;
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          touch-action: none !important; /* Critical for Scanner Mode: prevent browser scroll */
+        }
+        
+        .translate-it-element-highlighted {
+          outline: 2px solid #4a90d9 !important;
+          outline-offset: -2px !important;
+          box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.4) !important;
+          transition: outline 0.1s ease, box-shadow 0.1s ease;
+        }
+      `;
       
-      .translate-it-element-highlighted {
-        outline: 2px solid #4a90d9 !important;
-        outline-offset: -2px !important;
-        box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.4) !important;
-        transition: outline 0.1s ease, box-shadow 0.1s ease;
+      const target = document.head || document.documentElement;
+      if (target) {
+        target.appendChild(style);
+        this.logger.debug('Highlight styles injected successfully');
       }
-    `;
-    document.head.appendChild(style);
-
-    this.trackResource(style, 'highlight-styles', { isCritical: true });
+    } catch (error) {
+      this.logger.error('Failed to inject highlight styles:', error);
+    }
   }
 
   /**

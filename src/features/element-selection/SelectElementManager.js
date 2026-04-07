@@ -128,6 +128,9 @@ class SelectElementManager extends ResourceTracker {
     if (this.isActive) return { isActive: this.isActive, instanceId: this.instanceId };
 
     await this._ensureStylesInjected();
+    
+    // Add activation attribute for global CSS styles
+    document.documentElement.setAttribute('data-translate-it-select-mode', 'true');
 
     const activationOptions = { targetLanguage: options.targetLanguage || null, ...options };
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
@@ -192,6 +195,9 @@ class SelectElementManager extends ResourceTracker {
     try {
       this.isActive = false;
       this.activationTime = 0;
+      
+      // Remove activation attribute
+      document.documentElement.removeAttribute('data-translate-it-select-mode');
 
       // Only cancel if we are actually in the middle of a translation
       if (reason === 'cancel' || reason === 'manual') {
