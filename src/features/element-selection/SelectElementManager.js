@@ -61,6 +61,7 @@ class SelectElementManager extends ResourceTracker {
     }, { isCritical: true });
 
     this.notificationManager = null;
+    this.contextWatchdogInterval = null;
 
     // Event handlers (bound)
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -129,8 +130,9 @@ class SelectElementManager extends ResourceTracker {
 
     await this._ensureStylesInjected();
     
-    // Add activation attribute for global CSS styles
+    // Add activation attribute for global CSS styles (navigation prevention/cursor)
     document.documentElement.setAttribute('data-translate-it-select-mode', 'true');
+    this._startContextWatchdog();
 
     const activationOptions = { targetLanguage: options.targetLanguage || null, ...options };
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
@@ -173,6 +175,7 @@ class SelectElementManager extends ResourceTracker {
     } catch (error) {
       this.logger.error('Error activating SelectElementManager:', error);
       this.isActive = false;
+      this.emergencyCleanup();
       throw error;
     }
   }
@@ -196,7 +199,8 @@ class SelectElementManager extends ResourceTracker {
       this.isActive = false;
       this.activationTime = 0;
       
-      // Remove activation attribute
+      // STOP watchdog and REMOVE interaction-blocking attribute immediately (Safety first)
+      this._stopContextWatchdog();
       document.documentElement.removeAttribute('data-translate-it-select-mode');
 
       // Only cancel if we are actually in the middle of a translation
@@ -221,8 +225,10 @@ class SelectElementManager extends ResourceTracker {
 
     } catch (error) {
       this.logger.error('Error deactivating SelectElementManager:', error);
-      this.isActive = false;
-      this.forceCleanup();
+      this.emergencyCleanup();
+    } finally {
+      // Final guard for the UI lock
+      document.documentElement.removeAttribute('data-translate-it-select-mode');
     }
   }
 
@@ -481,6 +487,43 @@ class SelectElementManager extends ResourceTracker {
 
   async notifyBackgroundDeactivation() {
     try { await sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { active: false } }); } catch (err) { /* ignore */ }
+  }
+
+  /**
+   * Emergency cleanup for critical situations (e.g. extension context invalid)
+   * Restores page interaction immediately.
+   */
+  emergencyCleanup() {
+    this._stopContextWatchdog();
+    document.documentElement.removeAttribute('data-translate-it-select-mode');
+    this.isActive = false;
+    this.forceCleanup();
+  }
+
+  /**
+   * Monitor extension context to prevent stuck UI on extension reload/update
+   * Only runs while the mode is active.
+   * @private
+   */
+  _startContextWatchdog() {
+    this._stopContextWatchdog();
+    this.contextWatchdogInterval = setInterval(() => {
+      if (this.isActive && !ExtensionContextManager.isValidSync()) {
+        this.logger.warn('Extension context invalidated while in select mode. Performing emergency cleanup...');
+        this.emergencyCleanup();
+      }
+    }, 2000); // Check every 2 seconds - balanced for performance and safety
+  }
+
+  /**
+   * Stop the context watchdog interval
+   * @private
+   */
+  _stopContextWatchdog() {
+    if (this.contextWatchdogInterval) {
+      clearInterval(this.contextWatchdogInterval);
+      this.contextWatchdogInterval = null;
+    }
   }
 
   async _ensureServicesAvailable() {
