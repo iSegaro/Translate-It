@@ -20,20 +20,20 @@ let featuresInitialized = false;
 // This must be done immediately when FeatureManager is created
 window.featureManager = window.featureManager || null;
 
-// Core features that should be available
+// Core features that should be available immediately for basic detection and FAB
 const CORE_FEATURES = new Set([
   'contentMessageHandler',
-  'selectElement',
   'textSelection',
-  'windowsManager',
-  'shortcut',
-  'textFieldIcon',
-  'pageTranslation'
+  'vue' // Needed for FAB
 ]);
 
 // On-demand features
 const ON_DEMAND_FEATURES = new Set([
-  // All features are now core features
+  'windowsManager',
+  'selectElement',
+  'shortcut',
+  'textFieldIcon',
+  'pageTranslation'
 ]);
 
 export async function loadFeature(featureName) {
@@ -95,10 +95,15 @@ export async function loadFeature(featureName) {
     loadingPromises.set(featureName, loadingPromise);
     const featureInstance = await loadingPromise;
 
-    loadedFeatures.set(featureName, featureInstance);
+    // Only cache if loading was successful and feature is not null
+    if (featureInstance) {
+      loadedFeatures.set(featureName, featureInstance);
+      logger.debug(`Feature loaded and cached: ${featureName}`);
+    } else {
+      logger.debug(`Feature ${featureName} not cached (returned null)`);
+    }
+    
     loadingPromises.delete(featureName);
-
-    logger.debug(`Feature loaded successfully: ${featureName}`);
     return featureInstance;
 
   } catch (error) {
@@ -355,7 +360,7 @@ export async function loadCoreFeatures() {
     const handler = ErrorHandler.getInstance();
 
     const loadPromises = Array.from(CORE_FEATURES).map(feature =>
-      loadFeature(feature).catch(error => {
+      loadFeatureOnDemand(feature).catch(error => {
         const handledError = handler.handle(error, {
           type: 'FEATURE',
           context: `loadCoreFeatures-${feature}`
@@ -409,6 +414,11 @@ async function initializeAndActivateFeatures() {
       const skippedFeatures = [];
 
       for (const featureName of CORE_FEATURES) {
+        if (featureName === 'vue') {
+          activatedFeatures.push('vue'); // Already handled by loadVueApp
+          continue;
+        }
+        
         try {
           const shouldActivate = await featureManager.shouldActivateFeature(featureName);
 
@@ -508,12 +518,12 @@ export async function loadFeatureOnDemand(featureName) {
   }
 }
 
-// Feature categories (should match index.js)
+// Feature categories (synchronized with index.js for smart loading)
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'],
-  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'],
-  INTERACTIVE: ['pageTranslation'],
-  ON_DEMAND: ['shortcut', 'textFieldIcon']
+  ESSENTIAL: ['textSelection', 'contentMessageHandler', 'vue'], // Immediate UI (FAB) & Detection
+  INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation'], // On-demand heavy UI
+  ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 
 // Load multiple features by category

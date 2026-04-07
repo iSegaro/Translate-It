@@ -34,8 +34,8 @@ const LOAD_STRATEGIES = {
 // Feature categorization
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
-  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core UI and detection
-  INTERACTIVE: ['pageTranslation'], // Heavy interaction-only features
+  ESSENTIAL: ['textSelection', 'contentMessageHandler', 'vue'], // Immediate UI (FAB) & Detection
+  INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation'], // On-demand heavy UI
   ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 
@@ -184,10 +184,20 @@ function setupSmartListeners() {
   }, { passive: true });
 }
 
-function handleTextSelection() {
+async function handleTextSelection() {
   const selection = window.getSelection();
   if (selection && selection.toString().trim().length > 0) {
-    loadFeature('textSelection', 'ESSENTIAL');
+    if (contentScriptCore) {
+      // Import activation utility
+      const { activateFeature } = await import('./chunks/lazy-features.js');
+      
+      // 1. Ensure detection logic is active
+      await activateFeature('textSelection');
+      
+      // 2. CRITICAL: Ensure UI infrastructure (windowsManager) is active
+      // This is required to actually show the icons/windows
+      await activateFeature('windowsManager');
+    }
   }
 }
 
