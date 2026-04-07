@@ -5,6 +5,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
 
@@ -77,7 +78,7 @@ export async function loadFeature(featureName, force = false) {
       case 'windowsManager': loadingPromise = loadWindowsManagerFeature(force); break;
       case 'textFieldIcon': loadingPromise = loadTextFieldIconFeature(); break;
       case 'contentMessageHandler': loadingPromise = loadContentMessageHandlerFeature(); break;
-      case 'selectElement': loadingPromise = loadSelectElementFeature(); break;
+      case 'selectElement': loadingPromise = loadSelectElementFeature(force); break;
       case 'shortcut': loadingPromise = loadShortcutFeature(force); break;
       case 'pageTranslation': loadingPromise = loadPageTranslationFeature(); break;
       default: throw new Error(`Unknown feature: ${featureName}`);
@@ -108,8 +109,12 @@ async function loadShortcutFeature(force = false) {
     featureManager = FeatureManager.getInstance();
     window.featureManager = featureManager;
   }
-  const shouldActivate = force || await featureManager.shouldActivateFeature('shortcut');
-  if (shouldActivate) {
+  
+  // Use ExclusionChecker directly for robust validation
+  const exclusionChecker = ExclusionChecker.getInstance();
+  const isAllowed = force || await exclusionChecker.isFeatureAllowed('shortcut');
+
+  if (isAllowed) {
     await featureManager.activateFeature('shortcut');
   } else {
     logger.debug('Shortcut is blocked by exclusion, skipping activation');
@@ -123,8 +128,11 @@ async function loadWindowsManagerFeature(force = false) {
     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
     featureManager = FeatureManager.getInstance();
   }
-  const shouldActivate = force || await featureManager.shouldActivateFeature('windowsManager');
-  if (shouldActivate) {
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  const isAllowed = force || await exclusionChecker.isFeatureAllowed('windowsManager');
+
+  if (isAllowed) {
     await featureManager.activateFeature('windowsManager');
   } else {
     logger.debug('WindowsManager is blocked by exclusion, skipping activation');
@@ -139,7 +147,9 @@ async function loadTextSelectionFeature() {
     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
     featureManager = FeatureManager.getInstance();
   }
-  if (await featureManager.shouldActivateFeature('textSelection')) {
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  if (await exclusionChecker.isFeatureAllowed('textSelection')) {
     await featureManager.activateFeature('textSelection');
   } else {
     logger.debug('TextSelection is blocked by exclusion, skipping activation');
@@ -154,7 +164,9 @@ async function loadTextFieldIconFeature() {
     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
     featureManager = FeatureManager.getInstance();
   }
-  if (await featureManager.shouldActivateFeature('textFieldIcon')) {
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  if (await exclusionChecker.isFeatureAllowed('textFieldIcon')) {
     await featureManager.activateFeature('textFieldIcon');
   } else {
     logger.debug('TextFieldIcon is blocked by exclusion, skipping activation');
@@ -170,12 +182,16 @@ async function loadContentMessageHandlerFeature() {
   return contentMessageHandler;
 }
 
-async function loadSelectElementFeature() {
+async function loadSelectElementFeature(force = false) {
   if (!featureManager) {
     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
     featureManager = FeatureManager.getInstance();
   }
-  if (await featureManager.shouldActivateFeature('selectElement')) {
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  const isAllowed = force || await exclusionChecker.isFeatureAllowed('selectElement');
+
+  if (isAllowed) {
     await featureManager.activateFeature('selectElement');
   } else {
     logger.debug('SelectElement is blocked by exclusion, skipping activation');
@@ -186,7 +202,15 @@ async function loadSelectElementFeature() {
 
 async function loadPageTranslationFeature() {
   const { pageTranslationManager } = await import('@/features/page-translation/PageTranslationManager.js');
-  if (!pageTranslationManager.isActive) await pageTranslationManager.activate();
+  
+  const exclusionChecker = ExclusionChecker.getInstance();
+  if (await exclusionChecker.isFeatureAllowed('pageTranslation')) {
+    if (!pageTranslationManager.isActive) await pageTranslationManager.activate();
+  } else {
+    logger.debug('PageTranslation is blocked by exclusion, skipping activation');
+    return null;
+  }
+  
   return pageTranslationManager;
 }
 
@@ -210,10 +234,11 @@ async function initializeAndActivateFeatures() {
     window.featureManager = featureManager;
   }
   if (!featuresInitialized) {
+    const exclusionChecker = ExclusionChecker.getInstance();
     for (const featureName of CORE_FEATURES) {
       if (featureName === 'vue') continue;
       try {
-        if (await featureManager.shouldActivateFeature(featureName)) {
+        if (await exclusionChecker.isFeatureAllowed(featureName)) {
           await featureManager.activateFeature(featureName);
         }
       } catch (e) {}
@@ -249,7 +274,12 @@ export function areFeaturesLoaded() { return featuresInitialized; }
 
 export async function activateFeature(featureName) {
   if (!featureManager) await initializeAndActivateFeatures();
-  try { await featureManager.activateFeature(featureName); } catch (e) {}
+  try { 
+    const exclusionChecker = ExclusionChecker.getInstance();
+    if (await exclusionChecker.isFeatureAllowed(featureName)) {
+      await featureManager.activateFeature(featureName);
+    }
+  } catch (e) {}
 }
 
 export function cleanupFeatures() {

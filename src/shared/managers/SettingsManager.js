@@ -47,6 +47,7 @@ class SettingsManager {
       EXTENSION_ENABLED: true,
       TRANSLATE_ON_TEXT_FIELDS: false,
       TRANSLATE_ON_TEXT_SELECTION: true,
+      TRANSLATE_WITH_SELECT_ELEMENT: true,
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,

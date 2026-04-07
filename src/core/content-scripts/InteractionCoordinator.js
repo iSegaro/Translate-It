@@ -114,6 +114,9 @@ class InteractionCoordinator {
 
     // 5. Scroll Listener
     this._manageListener('scroll', 'scroll', this.handlers.scroll, isEnabled);
+
+    // Notify other components that listeners have been synchronized
+    pageEventBus.emit('sync-interaction-listeners');
   }
 
   /**
@@ -194,8 +197,11 @@ class InteractionCoordinator {
   }
 
   async _handleContextMenu() {
-    const { loadFeature } = await import('./chunks/lazy-features.js');
-    await loadFeature('selectElement');
+    // Double-check if allowed before loading
+    if (this.exclusionChecker.isFeatureEnabled('selectElement')) {
+      const { loadFeature } = await import('./chunks/lazy-features.js');
+      await loadFeature('selectElement');
+    }
   }
 
   _handleScroll() {}

@@ -262,11 +262,20 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleActivateSelectElementMode(message) {
-    // logger.trace(`[ContentMessageHandler] handleActivateSelectElementMode called for tab: ${message.data?.tabId || 'current'}`);
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
     try {
-      // If SelectElementManager is not available, try to load the feature on-demand
+      // 1. Explicitly check if allowed NOW (in case settings changed after load)
+      const { ExclusionChecker } = await import('@/features/exclusion/core/ExclusionChecker.js');
+      const exclusionChecker = ExclusionChecker.getInstance();
+      const isAllowed = await exclusionChecker.isFeatureAllowed('selectElement');
+      
+      if (!isAllowed) {
+        this.logger.debug('Select Element mode activation blocked by page exclusion or settings');
+        return { success: false, error: 'Feature blocked on this page' };
+      }
+
+      // 2. If SelectElementManager is not available, try to load the feature on-demand
       if (!this.selectElementManager) {
         try {
           // Import and load the selectElement feature directly
@@ -276,14 +285,15 @@ export class ContentMessageHandler extends ResourceTracker {
           if (selectElementHandler) {
             this.setSelectElementManager(selectElementHandler);
           } else {
-            throw new Error('selectElement feature failed to load');
+            // This happens if the feature is blocked by exclusion (returns null)
+            this.logger.debug('Select Element mode activation blocked by page exclusion or settings');
+            return { success: false, error: 'Feature blocked on this page' };
           }
         } catch (loadError) {
-          throw new Error(`SelectElementManager not available - FeatureManager dependency injection may have failed and on-demand loading also failed: ${loadError.message}`);
+          this.logger.info('Failed to load SelectElement feature on-demand:', loadError);
+          return { success: false, error: 'Feature failed to load' };
         }
       }
-
-      // logger.trace("ContentMessageHandler: Activating SelectElementManager directly");
 
       // Initialize if not already initialized
       if (!this.selectElementManager.isInitialized) {
@@ -292,30 +302,29 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Activate Select Element mode
       const result = await this.selectElementManager.activateSelectElementMode(message.data || {});
-      this.logger.info("SelectElementManager activated successfully");
+      this.logger.info("SelectElementManager activation process completed");
 
       // Return success result
-      return { success: true, activated: result.isActive, managerId: result.instanceId };
+      return { 
+        success: result !== false, 
+        activated: result?.isActive ?? (result !== false), 
+        managerId: result?.instanceId 
+      };
       
     } catch (error) {
-      this.logger.error("ContentMessageHandler: SelectElement activation failed:", error);
+      this.logger.warn("ContentMessageHandler: SelectElement activation failed:", error);
       
       // Use centralized error management to get classified error type and localized message
       const errorInfo = await this.errorHandler.getErrorForUI(error, "ContentMessageHandler-activateSelectElement");
 
-      // Log the error with proper context
-      await this.errorHandler.handle(error, {
-        type: errorInfo.type,
-        context: "ContentMessageHandler-activateSelectElement",
-        showToast: false // Don't show toast for background-triggered actions
-      });
+      // Log as debug for internal tracking (silence red log)
+      this.logger.debug("Error details for SelectElement activation:", { error, errorInfo });
       
       return { 
         success: false, 
         error: errorInfo.message, 
         activated: false,
-        errorType: errorInfo.type,
-        isCompatibilityIssue: true // Explicitly mark as compatibility issue, not restriction
+        errorType: errorInfo.type
       };
     }
   }
@@ -330,10 +339,6 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Only process deactivation if it's explicit or from non-background sources
       if (fromBackground && !isExplicitDeactivation) {
-        // logger.trace('Ignoring implicit deactivation from background', {
-        //   fromBackground,
-        //   isExplicitDeactivation
-        // });
         return { success: true, activated: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false };
       }
 
@@ -345,11 +350,10 @@ export class ContentMessageHandler extends ResourceTracker {
 
         return { success: true, activated: false };
       } catch (error) {
-        this.logger.error("ContentMessageHandler: selectElementManager deactivation failed:", error);
+        this.logger.warn("ContentMessageHandler: selectElementManager deactivation failed:", error);
         return { success: false, error: error.message };
       }
     } else {
-      // logger.trace("ContentMessageHandler: Deactivate request received but selectElementManager is null - this is normal if not activated");
       return { success: true, activated: false };
     }
   }

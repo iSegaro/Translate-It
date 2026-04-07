@@ -1,4 +1,4 @@
-// s../error-management/ErrorMatcher.js
+// src/shared/error-management/ErrorMatcher.js
 
 import { ErrorTypes } from "./ErrorTypes.js";
 import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
@@ -20,6 +20,7 @@ export const SILENT_ERRORS = new Set([
   ErrorTypes.USER_CANCELLED,
   ErrorTypes.TRANSLATION_CANCELLED,
   ErrorTypes.PAGE_TRANSLATION_STOPPED,
+  ErrorTypes.FEATURE_BLOCKED, // New: Intentionally blocked features
 ]);
 
 /**
@@ -86,7 +87,8 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
   ErrorTypes.INSUFFICIENT_BALANCE,
   ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN
+  ErrorTypes.CIRCUIT_BREAKER_OPEN,
+  ErrorTypes.SETTINGS_LOADING_TIMEOUT
 ]);
 
 /**
@@ -108,13 +110,25 @@ export const FATAL_ERRORS = new Set([
   ErrorTypes.PAGE_MOVED_TO_CACHE,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
   ErrorTypes.API_RESPONSE_INVALID,
-  ErrorTypes.SETTINGS_LOADING_TIMEOUT
+  ErrorTypes.SETTINGS_LOADING_TIMEOUT,
+  ErrorTypes.CONNECTION_LOST,
+  ErrorTypes.BROWSER_API_UNAVAILABLE
 ]);
 
 /**
+ * ErrorMatcher - Centralizes the logic for identifying and classifying errors
+ * based on their messages, codes, or types.
+ */
+export class ErrorMatcher {
+  static matchErrorToType(error) { return matchErrorToType(error); }
+  static isSilent(type) { return isSilentError(type); }
+  static isFatal(type) { return isFatalError(type); }
+  static needsSettings(type) { return needsSettings(type); }
+  static shouldSuppressConsole(type) { return shouldSuppressConsole(type); }
+}
+
+/**
  * Determines if an error is considered "fatal" (should stop translation process)
- * @param {string|Error|object} errorOrType - Error type string, Error object, or response object
- * @returns {boolean}
  */
 export function isFatalError(errorOrType) {
   if (!errorOrType) return false;
@@ -131,8 +145,6 @@ export function isFatalError(errorOrType) {
 
 /**
  * Determines if an error should trigger a retry or fallback
- * @param {string|Error|object} errorOrType - Error type string, Error object, or response object
- * @returns {boolean} True if the error is retryable
  */
 export function isRetryableError(errorOrType) {
   return !isFatalError(errorOrType);
@@ -140,8 +152,6 @@ export function isRetryableError(errorOrType) {
 
 /**
  * Determines if an error should be handled silently
- * @param {string|Error|object} errorOrType 
- * @returns {boolean}
  */
 export function isSilentError(errorOrType) {
   // If context is already invalidated, everything should be silent
@@ -149,33 +159,29 @@ export function isSilentError(errorOrType) {
     return true;
   }
 
-  const type = typeof errorOrType === 'string' ? errorOrType : matchErrorToType(errorOrType);
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType?.type || matchErrorToType(errorOrType));
   return SILENT_ERRORS.has(type);
 }
 
 /**
  * Determines if console logging should be suppressed for this error
- * @param {string|Error|object} errorOrType 
- * @returns {boolean}
  */
 export function shouldSuppressConsole(errorOrType) {
-  const type = typeof errorOrType === 'string' ? errorOrType : matchErrorToType(errorOrType);
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType?.type || matchErrorToType(errorOrType));
   return SUPPRESS_CONSOLE_ERRORS.has(type);
 }
 
 /**
  * Determines if the error requires user to check settings
- * @param {string|Error|object} errorOrType 
- * @returns {boolean}
  */
 export function needsSettings(errorOrType) {
-  const type = typeof errorOrType === 'string' ? errorOrType : matchErrorToType(errorOrType);
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType?.type || matchErrorToType(errorOrType));
   return SETTINGS_REQUIRED_ERRORS.has(type);
 }
 
 /**
  * Determines the error type for a given error object or message
- * @param {Error|string} rawOrError - The error object or message string.
+ * @param {Error|string|Object} rawOrError - The error object or message string.
  * @returns {string} One of the keys from ErrorTypes.
  */
 export function matchErrorToType(rawOrError = "") {
@@ -188,12 +194,8 @@ export function matchErrorToType(rawOrError = "") {
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     const type = rawOrError.type;
     
-    // Ensure API_RESPONSE_INVALID is properly recognized
-    if (type === ErrorTypes.API_RESPONSE_INVALID) {
-      return ErrorTypes.API_RESPONSE_INVALID;
-    }
+    if (type === ErrorTypes.API_RESPONSE_INVALID) return ErrorTypes.API_RESPONSE_INVALID;
     
-    // If it's a generic translation error or unknown type, we still want to check the message
     if (type !== ErrorTypes.TRANSLATION_ERROR && 
         type !== ErrorTypes.TRANSLATION_FAILED && 
         type !== ErrorTypes.UNKNOWN &&
@@ -207,7 +209,6 @@ export function matchErrorToType(rawOrError = "") {
   if (rawOrError && typeof rawOrError === "object" && rawOrError.statusCode) {
     const code = Number(rawOrError.statusCode);
     if (!isNaN(code) && code >= 400) {
-      // 1. Granular overrides for 400/422/404 based on message/context
       const errorMsg = String(rawOrError.message || "").toLowerCase();
       
       if (code === 400 || code === 422) {
@@ -223,17 +224,13 @@ export function matchErrorToType(rawOrError = "") {
         return ErrorTypes.API_URL_MISSING;
       }
 
-      // 2. Map other standard status codes
       if (code === 401) return ErrorTypes.API_KEY_INVALID;
       if (code === 402) return ErrorTypes.INSUFFICIENT_BALANCE;
       if (code === 403) return ErrorTypes.FORBIDDEN_ERROR;
       if (code === 429) return ErrorTypes.RATE_LIMIT_REACHED;
       if (code === 456) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
       
-      // 3. Catch ALL server-side errors (500-599)
       if (code >= 500 && code <= 599) return ErrorTypes.SERVER_ERROR;
-
-      // 4. Default for other 4xx errors
       return ErrorTypes.HTTP_ERROR;
     }
   }
@@ -247,7 +244,6 @@ export function matchErrorToType(rawOrError = "") {
                    (typeof rawOrError.message === 'string' ? rawOrError.message : 
                    (rawOrError.code || rawOrError.status || ""))));
     
-    // اولویت 2.5: بررسی انطباق دقیق پیام خطا با مقادیر ErrorTypes (قبل از حروف کوچک کردن)
     const trimmedRaw = String(rawMsg || "").trim();
     if (trimmedRaw && Object.values(ErrorTypes).includes(trimmedRaw)) {
       return trimmedRaw;
@@ -266,12 +262,12 @@ export function matchErrorToType(rawOrError = "") {
     }
   }
 
-  if (msg.includes("api response invalid") || msg.includes("invalid api response")) {
-    return ErrorTypes.API_RESPONSE_INVALID;
-  }
+  if (msg.includes("api response invalid") || msg.includes("invalid api response")) return ErrorTypes.API_RESPONSE_INVALID;
+  if (msg.includes("already been translated")) return ErrorTypes.NODE_ALREADY_TRANSLATED;
 
-  if (msg.includes("already been translated")) {
-    return ErrorTypes.NODE_ALREADY_TRANSLATED;
+  // Feature Blocked / Exclusion matching
+  if (msg.includes("feature blocked") || msg.includes("blocked on this page") || msg.includes("blocked by exclusion")) {
+    return ErrorTypes.FEATURE_BLOCKED;
   }
 
   // String-based matching fallback
@@ -334,3 +330,5 @@ export function matchErrorToType(rawOrError = "") {
 
   return ErrorTypes.UNKNOWN;
 }
+
+export default ErrorMatcher;

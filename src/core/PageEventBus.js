@@ -30,6 +30,9 @@ class EventBus {
     this.wrappedCallbacks.get(event).set(callback, wrappedCallback);
     
     this.bus.addEventListener(event, wrappedCallback);
+
+    // Return unsubscribe function
+    return () => this.off(event, callback);
   }
 
   off(event, callback) {

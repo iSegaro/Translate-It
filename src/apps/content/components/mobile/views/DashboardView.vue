@@ -6,6 +6,7 @@
     <div class="ti-m-dashboard-scroll-container">
       <!-- Translate Page Button -->
       <button
+        v-if="allowedFeatures.pageTranslation"
         class="ti-m-action-btn"
         @click="translatePage"
       >
@@ -21,6 +22,7 @@
 
       <!-- Select Element Button -->
       <button
+        v-if="allowedFeatures.selectElement"
         class="ti-m-action-btn"
         @click="activateSelectElement"
       >
@@ -135,6 +137,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
@@ -151,6 +154,21 @@ const { hasElementTranslations } = storeToRefs(mobileStore)
 const { t } = useI18n()
 const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
+const exclusionChecker = ExclusionChecker.getInstance();
+
+const allowedFeatures = ref({
+  selectElement: true,
+  pageTranslation: true
+});
+
+const updateAllowedFeatures = async () => {
+  const status = await exclusionChecker.getFeatureStatus();
+  if (status.initialized) {
+    allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
+    allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+    logger.debug('Mobile Dashboard allowed features updated', allowedFeatures.value);
+  }
+};
 
 const pendingSelection = ref({
   text: '',
@@ -239,13 +257,22 @@ onMounted(() => {
   if (pageEventBus) {
     pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleSelectionPending);
     pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, handleSelectionClear);
+    
+    // Listen for settings and exclusion changes
+    pageEventBus.on('FEATURE_STATUS_CHANGED', updateAllowedFeatures);
+    pageEventBus.on('sync-interaction-listeners', updateAllowedFeatures);
   }
+  
+  // Initial check
+  updateAllowedFeatures();
 });
 
 onUnmounted(() => {
   if (pageEventBus) {
     pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleSelectionPending);
     pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, handleSelectionClear);
+    pageEventBus.off('FEATURE_STATUS_CHANGED', updateAllowedFeatures);
+    pageEventBus.off('sync-interaction-listeners', updateAllowedFeatures);
   }
-  });
-  </script>
+});
+</script>

@@ -7,6 +7,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'ExclusionChecker');
 
@@ -17,8 +18,6 @@ export class ExclusionChecker {
   constructor() {
     // Enforce singleton pattern
     if (exclusionCheckerInstance) {
-      // Singleton exists - logged at TRACE level for detailed debugging
-      // logger.debug('ExclusionChecker singleton already exists, returning existing instance');
       return exclusionCheckerInstance;
     }
 
@@ -51,9 +50,6 @@ export class ExclusionChecker {
 
   async initialize() {
     try {
-      // Initializing for URL - logged at TRACE level for detailed debugging
-      // logger.debug('Initializing ExclusionChecker for URL:', this.currentUrl);
-
       // Initialize settings from SettingsManager
       await settingsManager.initialize();
 
@@ -64,9 +60,6 @@ export class ExclusionChecker {
       }
 
       this.initialized = true;
-      // ExclusionChecker initialized - logged at TRACE level for detailed debugging
-      // logger.debug('ExclusionChecker initialized');
-
     } catch (error) {
       const handler = ErrorHandler.getInstance();
       handler.handle(error, {
@@ -82,10 +75,7 @@ export class ExclusionChecker {
 
   async refreshSettings() {
     try {
-      // Just refresh settings without full reinitialization
       await settingsManager.initialize();
-      // Settings refreshed - logged at TRACE level for detailed debugging
-      // logger.debug('ExclusionChecker settings refreshed');
     } catch (error) {
       logger.error('Error refreshing ExclusionChecker settings:', error);
     }
@@ -93,8 +83,6 @@ export class ExclusionChecker {
 
   updateUrl(newUrl) {
     if (this.currentUrl !== newUrl) {
-      // URL changed - logged at TRACE level for detailed debugging
-      // logger.debug('URL changed from', this.currentUrl, 'to', newUrl);
       this.currentUrl = newUrl;
     }
   }
@@ -104,23 +92,20 @@ export class ExclusionChecker {
    */
   setupSettingsListeners() {
     try {
-      // Note: EXTENSION_ENABLED listener is handled by FeatureManager
-      // We don't need to duplicate it here as FeatureManager will trigger re-evaluation
-
       // Listen for feature-specific setting changes
       const featureSettings = [
         'TRANSLATE_WITH_SELECT_ELEMENT',
         'TRANSLATE_ON_TEXT_SELECTION',
         'TRANSLATE_ON_TEXT_FIELDS',
         'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-        'SHOW_DESKTOP_FAB'
+        'SHOW_DESKTOP_FAB',
+        'EXTENSION_ENABLED',
+        'WHOLE_PAGE_TRANSLATION_ENABLED'
       ];
 
       featureSettings.forEach(setting => {
         this.settingsListeners.push(
           settingsManager.onChange(setting, () => {
-            // Setting changed - logged at TRACE level for detailed debugging
-            // logger.debug(`${setting} changed, refreshing features:`, newValue);
             this.refreshFeaturesOnSettingsChange();
           }, 'exclusion-checker')
         );
@@ -129,8 +114,6 @@ export class ExclusionChecker {
       // Listen for EXCLUDED_SITES changes
       this.settingsListeners.push(
         settingsManager.onChange('EXCLUDED_SITES', () => {
-          // EXCLUDED_SITES changed - logged at TRACE level for detailed debugging
-          // logger.debug('EXCLUDED_SITES changed, refreshing features:', newValue);
           this.refreshFeaturesOnSettingsChange();
         }, 'exclusion-checker')
       );
@@ -142,13 +125,12 @@ export class ExclusionChecker {
 
   /**
    * Refresh features when settings change
-   * Note: FeatureManager handles its own re-evaluation through its settings listener
+   * Emits event for UI components to react
    */
   refreshFeaturesOnSettingsChange() {
-    // Just refresh internal settings cache - FeatureManager will handle re-evaluation
-    // Settings changed - logged at TRACE level for detailed debugging
-    // logger.debug('Settings changed, refreshing exclusion cache');
-    // No need to trigger FeatureManager - it has its own debounced evaluation system
+    // Notify system that feature status might have changed
+    pageEventBus.emit('FEATURE_STATUS_CHANGED');
+    logger.debug('Feature status change event emitted');
   }
 
   async isFeatureAllowed(featureName) {
@@ -190,7 +172,6 @@ export class ExclusionChecker {
         showToast: false
       });
 
-      // Default to blocked on error for safety
       return false;
     }
   }
@@ -213,10 +194,6 @@ export class ExclusionChecker {
     switch (featureName) {
       case 'textSelection':
       case 'windowsManager':
-        // These features are required if:
-        // 1. Automatic translation is on
-        // 2. OR the Desktop FAB is active
-        // 3. OR we are in Mobile mode (where FAB is always active for interaction)
         return isTextSelectionEnabled || isFabEnabled || isMobileUI;
 
       case 'selectElement':
@@ -239,31 +216,25 @@ export class ExclusionChecker {
   async isUrlExcludedForFeature(featureName) {
     try {
       const { isUrlExcluded, isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
-
-      // Get excluded sites list for all features
       const excludedSites = settingsManager.get('EXCLUDED_SITES', []);
 
-      // Feature-specific exclusion logic
       if (featureName === 'textFieldIcon') {
         return isUrlExcluded_TEXT_FIELDS_ICON(this.currentUrl, excludedSites);
       }
 
-      // General exclusion for other features
       return isUrlExcluded(this.currentUrl, excludedSites);
-
     } catch (error) {
       logger.error('Error checking URL exclusion:', error);
-      // Default to excluded on error for safety
       return true;
     }
   }
 
   async getFeatureStatus() {
     if (!this.initialized) {
-      return { initialized: false };
+      await this.initialize();
     }
 
-    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager'];
+    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation'];
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,
@@ -289,24 +260,18 @@ export class ExclusionChecker {
    * Cleanup resources
    */
   cleanup() {
-    // Remove all settings listeners
     this.settingsListeners.forEach(unsubscribe => {
       if (unsubscribe) unsubscribe();
     });
     this.settingsListeners = [];
     this.listenersSetup = false;
-
-    // Cleanup completed - logged at TRACE level for detailed debugging
-    // logger.debug('ExclusionChecker cleaned up');
   }
 
   // Static method to check if feature should be considered for a URL
   static async shouldConsiderFeature(featureName, url) {
-    // 1. First, check global URL exclusion via background for speed/safety
     const isExcluded = await checkUrlExclusionAsync(url);
     if (isExcluded) return false;
 
-    // 2. Feature-specific pre-checks
     try {
       const { isUrlExcluded_TEXT_FIELDS_ICON } = await utilsFactory.getUIUtils();
       if (featureName === 'textFieldIcon') {
@@ -314,11 +279,9 @@ export class ExclusionChecker {
       }
     } catch (error) {
       logger.error('Error in shouldConsiderFeature:', error);
-      return false; // On error, assume feature should not be considered
+      return false;
     }
 
-    // For other features, we need settings so return true
-    // and let the full check happen after initialization
     return true;
   }
 }

@@ -236,7 +236,9 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import useFabSelection from '@/apps/content/composables/useFabSelection.js';
+import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
@@ -254,8 +256,24 @@ const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
 const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
+const { handleError } = useErrorHandler();
 const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
+const exclusionChecker = ExclusionChecker.getInstance();
+
+const allowedFeatures = ref({
+  selectElement: true,
+  pageTranslation: true
+});
+
+const updateAllowedFeatures = async () => {
+  const status = await exclusionChecker.getFeatureStatus();
+  if (status.initialized) {
+    allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
+    allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+    logger.debug('FAB allowed features updated', allowedFeatures.value);
+  }
+};
 
 const ANIMATION_CONFIG = {
   MOVE_IN: '0.4s',
@@ -371,25 +389,31 @@ const menuItems = computed(() => {
     });
   }
 
-  items.push({
-    id: 'select_element',
-    label: t('desktop_fab_select_element_label'),
-    icon: IconSelectElement,
-    closeMenu: true,
-    action: async () => {
-      try {
-        await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
-      } catch (err) {
-        if (ExtensionContextManager.isContextError(err)) {
-          ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
-        } else {
-          logger.error('Failed to trigger select element from FAB:', err);
+  if (allowedFeatures.value.selectElement) {
+    items.push({
+      id: 'select_element',
+      label: t('desktop_fab_select_element_label'),
+      icon: IconSelectElement,
+      closeMenu: true,
+      action: async () => {
+        try {
+          await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+        } catch (err) {
+          if (ExtensionContextManager.isContextError(err)) {
+            ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
+          } else {
+            await handleError(err, { 
+              context: 'desktop-fab:select-element',
+              showToast: true 
+            });
+          }
         }
       }
-    }
-  });
+    });
+  }
 
   const status = pageTranslationStatus.value;
+  const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
   if (status.isTranslating || status.isAuto) {
     items.push({
@@ -409,7 +433,7 @@ const menuItems = computed(() => {
       closeMenu: true,
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
-  } else {
+  } else if (isPageTranslationAllowed) {
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
@@ -593,7 +617,10 @@ const handleOpenSettings = async () => {
     if (ExtensionContextManager.isContextError(err)) {
       ExtensionContextManager.handleContextError(err, 'desktop-fab:open-settings');
     } else {
-      logger.error('Failed to open settings from FAB:', err);
+      await handleError(err, { 
+        context: 'desktop-fab:open-settings',
+        showToast: true 
+      });
     }
   }
 };
@@ -607,7 +634,10 @@ const handleRevert = async () => {
     if (ExtensionContextManager.isContextError(err)) {
       ExtensionContextManager.handleContextError(err, 'desktop-fab:revert');
     } else {
-      logger.error('Failed to revert translations from FAB:', err);
+      await handleError(err, { 
+        context: 'desktop-fab:revert',
+        showToast: true 
+      });
     }
   }
 };
@@ -727,6 +757,13 @@ onMounted(async () => {
       if (position.side) side.value = position.side;
     }
     checkBounds();
+    
+    // Initial check for allowed features
+    await updateAllowedFeatures();
+    
+    // Listen for settings and exclusion changes to re-evaluate allowed features
+    tracker.trackResource('exclusion-sync', pageEventBus.on('FEATURE_STATUS_CHANGED', updateAllowedFeatures));
+    tracker.trackResource('exclusion-re-sync', pageEventBus.on('sync-interaction-listeners', updateAllowedFeatures));
   } catch (err) {
     logger.info('Failed to load FAB state:', err);
   }
