@@ -113,11 +113,6 @@ export function ContentScriptCore() {
       // Setup message handler
       await this.initializeMessaging();
 
-      // Inject critical CSS if in main frame
-      if (!this.isInIframe()) {
-        await this.injectMainDOMStyles();
-      }
-
       this.initialized = true;
       logger.info('ContentScriptCore initialized successfully');
       return true;

@@ -127,6 +127,8 @@ class SelectElementManager extends ResourceTracker {
   async activateSelectElementMode(options = {}) {
     if (this.isActive) return { isActive: this.isActive, instanceId: this.instanceId };
 
+    await this._ensureStylesInjected();
+
     const activationOptions = { targetLanguage: options.targetLanguage || null, ...options };
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
 
@@ -487,6 +489,20 @@ class SelectElementManager extends ResourceTracker {
       }
       return true;
     } catch (error) { return false; }
+  }
+
+  /**
+   * Ensure necessary CSS styles are injected for element selection
+   * Only runs in main frame and uses the content core singleton
+   * @private
+   */
+  async _ensureStylesInjected() {
+    if (this.isInIframe) return;
+
+    const contentCore = window.translateItContentCore;
+    if (contentCore && typeof contentCore.injectMainDOMStyles === 'function') {
+      await contentCore.injectMainDOMStyles();
+    }
   }
 
   isSelectElementActive() { return this.isActive; }
