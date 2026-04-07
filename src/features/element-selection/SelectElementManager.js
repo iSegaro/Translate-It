@@ -364,7 +364,16 @@ class SelectElementManager extends ResourceTracker {
 
       const text = extractTextFromElement(elementToTranslate);
       if (text && text.trim()) {
+        // 1. Stop highlighting logic
         this.elementSelector.deactivate();
+        
+        // 2. Restore page interaction immediately (Unlock cursor and links)
+        this._unlockPageInteraction();
+        
+        // 3. Notify background that selection phase is finished
+        await this.notifyBackgroundDeactivation();
+
+        // 4. Start the translation process
         await this.startTranslation(elementToTranslate, this.currentOptions);
       }
     } catch (error) {
@@ -372,6 +381,18 @@ class SelectElementManager extends ResourceTracker {
     } finally {
       this.isProcessingClick = false;
     }
+  }
+
+  /**
+   * Unlock page interaction immediately after selection
+   * Restores cursor, pointer events, and stops the safety watchdog
+   * @private
+   */
+  _unlockPageInteraction() {
+    this.logger.debug('Restoring page interaction after selection');
+    document.documentElement.removeAttribute('data-translate-it-select-mode');
+    this._stopContextWatchdog();
+    this.removeEventListeners();
   }
 
   async startTranslation(targetElement, options = {}) {
