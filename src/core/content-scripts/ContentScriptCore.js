@@ -40,10 +40,9 @@ async function loadDependencies() {
   createMessageHandler = messageHandlerModule.createMessageHandler;
   ErrorHandler = errorHandlerModule.ErrorHandler;
   
-  // Setup window-level error handlers for content script
-  if (windowErrorHandlersModule && windowErrorHandlersModule.setupWindowErrorHandlers) {
-    windowErrorHandlersModule.setupWindowErrorHandlers('content');
-  }
+  // Store reference to the module for later use in initializeCritical
+  // Use a global-scope variable instead of eventTarget here
+  window._translateItWindowErrorHandlersModule = windowErrorHandlersModule;
 
   // Define CSS directly as a string to avoid import issues
   mainDomCss = `
@@ -113,8 +112,15 @@ export function ContentScriptCore() {
       this.accessChecked = true;
 
       if (!this.access.isAccessible) {
-        logger.warn(`Content script execution stopped: ${this.access.errorMessage}`);
+        if (logger) logger.warn(`Content script execution stopped: ${this.access.errorMessage}`);
         return false;
+      }
+
+      // Initialize error handlers only AFTER accessibility is confirmed
+      // Using the temporary global reference from loadDependencies
+      const errorModule = window._translateItWindowErrorHandlersModule;
+      if (errorModule && typeof errorModule.setupWindowErrorHandlers === 'function') {
+        errorModule.setupWindowErrorHandlers('content');
       }
 
       // Prevent duplicate execution
@@ -139,19 +145,23 @@ export function ContentScriptCore() {
       try {
         const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
         await debugModeBridge.initialize();
-        logger.debug('[ContentScriptCore] DebugModeBridge initialized in content script');
+        if (logger) logger.debug('[ContentScriptCore] DebugModeBridge initialized in content script');
       } catch (error) {
-        logger.warn('[ContentScriptCore] Failed to initialize DebugModeBridge:', error);
+        if (logger) logger.warn('[ContentScriptCore] Failed to initialize DebugModeBridge:', error);
       }
 
       // Setup message handler
       await this.initializeMessaging();
 
       this.initialized = true;
-      logger.info('ContentScriptCore initialized successfully');
+      if (logger) logger.info('ContentScriptCore initialized successfully');
       return true;
     } catch (error) {
-      logger.error('Failed to initialize ContentScriptCore:', error);
+      if (logger) {
+        logger.error('Failed to initialize ContentScriptCore:', error);
+      } else {
+        console.error('Failed to initialize ContentScriptCore (logger not ready):', error);
+      }
       return false;
     }
   };
