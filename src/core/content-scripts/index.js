@@ -82,85 +82,76 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
 
 // Initialize the content script with ultra-minimal footprint
 (async () => {
-  // FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
+  // 1. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
   if (await checkUrlExclusionAsync()) {
+    return;
+  }
+
+  // 2. SELF-DETECTION: Never run content script inside our own UI frames
+  // This prevents infinite loops and massive memory overhead
+  const isExtensionFrame = window.location.href.startsWith('chrome-extension://') || 
+                           window.location.href.startsWith('moz-extension://') ||
+                           document.documentElement.classList.contains('translate-it-ui-frame');
+  
+  if (isExtensionFrame) {
     return;
   }
 
   try {
     // Initialize logger first
     const scriptLogger = await initializeLogger();
+    const isMainFrame = window === window.top;
 
-    // Create ContentScriptCore instance using static import (fixes Firefox class compilation)
-    try {
-      contentScriptCore = new ContentScriptCore();
-
-      if (process.env.NODE_ENV === 'development') {
-        scriptLogger.debug('ContentScriptCore instance created successfully');
-      }
-    } catch (error) {
-      scriptLogger.error('Failed to create ContentScriptCore instance:', {
-        error: error.message,
-        stack: error.stack,
-        userAgent: navigator.userAgent
-      });
-      throw new Error(`Failed to create ContentScriptCore: ${error.message}`);
+    if (process.env.NODE_ENV === 'development') {
+      scriptLogger.debug(`Initializing content script in ${isMainFrame ? 'Main Frame' : 'Iframe'} mode`);
     }
 
-    // Verify that contentScriptCore was loaded correctly
-    if (!contentScriptCore) {
-      throw new Error('Failed to load ContentScriptCore: instance not found');
+    // Create ContentScriptCore instance
+    try {
+      contentScriptCore = new ContentScriptCore();
+    } catch (error) {
+      scriptLogger.error('Failed to create ContentScriptCore instance:', error);
+      return;
     }
 
     // Initialize ContentScriptCore
-    let initialized = false;
-    if (typeof contentScriptCore.initializeCritical === 'function') {
-      initialized = await contentScriptCore.initializeCritical();
-    } else if (typeof contentScriptCore.initialize === 'function') {
-      initialized = await contentScriptCore.initialize();
-    } else {
-      throw new Error('ContentScriptCore instance missing initialization method');
-    }
+    const initialized = await contentScriptCore.initializeCritical();
 
-    // Expose globally for other modules (after potentially replacing instance)
+    // Expose globally
     window.translateItContentCore = contentScriptCore;
 
     if (initialized) {
       // Setup smart event listeners
       setupSmartListeners();
 
-      // Start intelligent loading sequence
-      startIntelligentLoading();
+      // Start intelligent loading sequence based on frame type
+      if (isMainFrame) {
+        startIntelligentLoading();
+      } else {
+        startLiteIframeLoading();
+      }
 
-      // Debug info
       if (process.env.NODE_ENV === 'development') {
-        scriptLogger.info('Ultra-optimized content script initialized', {
-          mode: 'smart-loading',
-          critical: true,
-          memory: 'minimal'
-        });
+        scriptLogger.info(`Content script initialized (${isMainFrame ? 'Full' : 'Lite'} mode)`);
       }
     }
   } catch (error) {
-    // Use ErrorHandler for critical initialization errors
-    if (ErrorHandler) {
-      const errorHandler = ErrorHandler.getInstance();
-      await errorHandler.handle(error, {
-        context: 'content-script-index-initialization',
-        isSilent: false,
-        showToast: true
-      });
-    }
-
-    // Try to get logger for proper error handling, fallback to console if not available
     const errorLogger = await initializeLogger();
-    errorLogger.error('Failed to initialize content script', {
-      error: error.message || error,
-      stack: error.stack,
-      url: window.location.href
-    });
+    errorLogger.error('Critical initialization error:', error);
   }
 })();
+
+/**
+ * Loading strategy for third-party iframes (Lite Mode)
+ * Only loads features required for text selection and messaging
+ */
+async function startLiteIframeLoading() {
+  const LITE_FEATURES = ['messaging', 'extensionContext', 'textSelection', 'contentMessageHandler'];
+  
+  for (const feature of LITE_FEATURES) {
+    await loadFeature(feature, 'CRITICAL');
+  }
+}
 
 function setupSmartListeners() {
   // Extension popup interaction
