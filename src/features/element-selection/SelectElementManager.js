@@ -110,7 +110,7 @@ class SelectElementManager extends ResourceTracker {
 
       this.isInitialized = true;
     } catch (error) {
-      this.logger.error('Error initializing SelectElementManager:', error);
+      this.logger.warn('Error initializing SelectElementManager:', error);
       throw error;
     }
   }
@@ -176,7 +176,7 @@ class SelectElementManager extends ResourceTracker {
 
       return { isActive: this.isActive, instanceId: this.instanceId };
     } catch (error) {
-      this.logger.error('Error activating SelectElementManager:', error);
+      this.logger.warn('Error activating SelectElementManager:', error);
       this.isActive = false;
       this.emergencyCleanup();
       throw error;
@@ -227,7 +227,7 @@ class SelectElementManager extends ResourceTracker {
       pageEventBus.emit('select-mode-deactivated');
 
     } catch (error) {
-      this.logger.error('Error deactivating SelectElementManager:', error);
+      this.logger.warn('Error deactivating SelectElementManager:', error);
       this.emergencyCleanup();
     } finally {
       // Final guard for the UI lock
@@ -380,7 +380,7 @@ class SelectElementManager extends ResourceTracker {
         await this.startTranslation(elementToTranslate, this.currentOptions);
       }
     } catch (error) {
-      this.logger.error('Error handling element click:', error);
+      this.logger.warn('Error handling element click:', error);
     } finally {
       this.isProcessingClick = false;
     }
@@ -423,7 +423,8 @@ class SelectElementManager extends ResourceTracker {
         this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
       }
     } catch (error) {
-      this.logger.error('Select Element translation failed:', error); // CRITICAL: Log the actual error
+      this.logger.warn('Select Element translation failed:', error);
+      // CRITICAL: Log the actual error
       
       const errorType = matchErrorToType(error);
       const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 

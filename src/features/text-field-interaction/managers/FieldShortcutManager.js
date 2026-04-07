@@ -186,7 +186,7 @@ export class FieldShortcutManager {
           target: activeElement.tagName
         };
       } else {
-        this.logger.error('Translation failed:', response.error);
+        this.logger.warn('Translation failed:', response.error);
         return {
           success: false,
           error: response.error || 'Translation failed',
@@ -195,7 +195,7 @@ export class FieldShortcutManager {
       }
 
     } catch (error) {
-      this.logger.error('Error in Ctrl+/ handler:', error);
+      this.logger.warn('Error in Ctrl+/ handler:', error);
 
       // Use centralized error handling
       const errorHandler = ErrorHandler.getInstance();

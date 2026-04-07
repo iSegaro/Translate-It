@@ -156,13 +156,13 @@ export class OptimizedJsonHandler {
             this._sendStreamError(tabId, messageId, error, i, batch);
             
             if (isFatalError(error) || errorType === 'CIRCUIT_BREAKER_OPEN' || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-              logger.error(`[JsonHandler] Stopping due to fatal error or failure threshold: ${errorType}`);
+              logger.warn(`[JsonHandler] Stopping due to fatal error or failure threshold: ${errorType}`);
               break;
             }
           }
         }
       } catch (error) {
-        logger.error(`[JsonHandler] Critical error in processing loop:`, error);
+        logger.warn(`[JsonHandler] Critical error in processing loop:`, error);
       } finally {
         // E. Cleanup and Finalize session
         this._finalizeSession(sessionId, messageId, tabId, hasErrors, lastError, effectiveTarget);
