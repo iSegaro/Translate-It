@@ -87,7 +87,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
 
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

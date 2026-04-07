@@ -67,7 +67,7 @@ export async function tryPasteInsertion(element, text, hasSelection) {
     clipboardData.clearData();
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

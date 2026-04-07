@@ -71,7 +71,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
     await smartDelay(50);
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

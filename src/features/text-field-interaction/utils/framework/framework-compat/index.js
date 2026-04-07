@@ -110,7 +110,7 @@ export async function smartTextReplacement(
     logger.debug('Falling back to simple replacement');
     return handleSimpleReplacement(element, newValue, start, end);
   } catch (error) {
-    logger.error('Error in smart replacement:', error);
+    logger.warn('Error in smart replacement:', error);
     return false;
   }
 }

@@ -54,7 +54,7 @@ export function isComplexEditor(element) {
 
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }
@@ -204,7 +204,6 @@ function checkDangerousStructure(element) {
 
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
-  }
-}
+  }}

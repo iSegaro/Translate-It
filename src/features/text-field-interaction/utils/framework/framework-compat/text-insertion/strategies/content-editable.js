@@ -133,7 +133,7 @@ export async function tryContentEditableInsertion(element, text, hasSelection) {
 
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

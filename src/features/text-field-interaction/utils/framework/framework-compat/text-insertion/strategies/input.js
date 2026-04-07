@@ -67,7 +67,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
 
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

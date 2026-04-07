@@ -46,7 +46,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
         return true;
       }
       // اگر روش ساده شکست بخورد، ادامه به character-by-character
-  logger.error('Reddit simple method failed, falling back to character-by-character');
+      logger.warn('Reddit simple method failed, falling back to character-by-character');
     }
     
     // فقط در صورتی کل محتوا را پاک کن که:
@@ -94,7 +94,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
               range.deleteContents();
               logger.debug('After deleteContents - selected content deleted');
             } catch (error) {
-              logger.error('Error deleting content:', error);
+              logger.warn('Error deleting content:', error);
               // fallback: تلاش برای پاک کردن محتوا با روش دیگر
               if (range.startContainer && range.endContainer) {
                 range.extractContents();
@@ -125,7 +125,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
             
             logger.debug('Range updated for next character');
           } catch (insertError) {
-            logger.error('Error inserting text node:', insertError);
+            logger.warn('Error inserting text node:', insertError);
             // fallback: یک approach متفاوت امتحان کردن
             try {
               // سعی کن یک range جدید ایجاد کنی
@@ -142,7 +142,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
               
               logger.init('Fallback range creation successful');
             } catch (fallbackError) {
-              logger.error('Fallback also failed:', fallbackError);
+              logger.warn('Fallback also failed:', fallbackError);
               // آخرین fallback: اضافه کردن مستقیم
               element.appendChild(document.createTextNode(char));
             }
@@ -216,15 +216,14 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     });
     element.dispatchEvent(changeEvent);
     
-  logger.info('Natural typing simulation completed');
+    logger.info('Natural typing simulation completed');
     return true;
-    
+
   } catch (error) {
-  logger.error('Error in natural typing:', error);
+    logger.warn('Error in natural typing:', error);
     return false;
   }
 }
-
 /**
  * جایگزینی ساده برای contentEditable در Reddit
  * @param {HTMLElement} element - المان هدف
@@ -279,16 +278,17 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       });
       
       if (!replacementWorked) {
-  logger.error('Selection replacement appears to have failed');
+        logger.warn('Selection replacement appears to have failed');
         return false;
       }
     } else {
       // جایگزینی کل محتوا
       const originalText = element.textContent || element.innerText;
-  logger.debug('Replacing all content');
+      logger.debug('Replacing all content');
       element.textContent = text;
       
       // تنظیم cursor در انتها
+      const selection = window.getSelection();
       const range = document.createRange();
       range.selectNodeContents(element);
       range.collapse(false);
@@ -301,7 +301,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       const currentText = element.textContent || element.innerText;
       const replacementWorked = currentText === text;
       
-  logger.info('Full replacement result:', {
+      logger.debug('Full replacement result:', {
         originalText,
         newText: text,
         currentText,
@@ -309,7 +309,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
       });
       
       if (!replacementWorked) {
-  logger.error('Full replacement appears to have failed');
+        logger.warn('Full replacement appears to have failed');
         return false;
       }
     }
@@ -332,7 +332,7 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
   logger.init('Reddit replacement completed successfully');
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }
@@ -387,8 +387,8 @@ async function clearElementContent(element) {
       cancelable: true
     });
     element.dispatchEvent(inputEvent);
-    
+
   } catch (error) {
-  logger.error('Error clearing content:', error);
+    logger.warn('Error clearing content:', error);
   }
 }

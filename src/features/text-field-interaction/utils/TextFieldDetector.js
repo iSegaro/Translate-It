@@ -53,7 +53,7 @@ export class TextFieldDetector {
       return detection;
 
     } catch (error) {
-      logger.error('Field detection failed:', error);
+      logger.warn('Field detection failed:', error);
       return this._getDefaultDetection();
     }
   }

@@ -49,7 +49,7 @@ export class ElementAttachment extends ResourceTracker {
     }
 
     if (!this.targetElement || !this.targetElement.isConnected) {
-      this.logger.error('Cannot attach: target element is invalid or not connected');
+      this.logger.warn('Cannot attach: target element is invalid or not connected');
       return;
     }
 
@@ -293,7 +293,7 @@ export class ElementAttachment extends ResourceTracker {
         });
       }
     } catch (error) {
-      this.logger.error('Error updating icon position:', error);
+      this.logger.warn('Error updating icon position:', error);
     }
   }
 

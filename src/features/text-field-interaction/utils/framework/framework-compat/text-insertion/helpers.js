@@ -56,7 +56,7 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
     
     return isSuccess;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }
@@ -86,7 +86,7 @@ export function findTextNodeAtPosition(element, position) {
 
     return element.firstChild || element;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return element.firstChild || element;
   }
 }

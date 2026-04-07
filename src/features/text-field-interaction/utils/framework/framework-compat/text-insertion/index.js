@@ -245,7 +245,7 @@ export async function universalTextInsertion(
     logger.warn('All universal insertion methods failed verification');
     return false;
   } catch (error) {
-    logger.error('Universal text insertion error', error);
+    logger.warn('Universal text insertion error', error);
     return false;
   }
 }

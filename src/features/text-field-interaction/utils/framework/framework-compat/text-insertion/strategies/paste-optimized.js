@@ -75,7 +75,7 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
 
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

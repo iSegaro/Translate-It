@@ -32,7 +32,7 @@ export async function tryGoogleDocsInsertion(element, text) {
 
     return false;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

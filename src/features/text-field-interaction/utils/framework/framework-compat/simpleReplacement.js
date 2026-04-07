@@ -18,7 +18,7 @@ export function handleSimpleReplacement(element, newValue, start, end) {
       return handleInputWithUndo(element, newValue, start, end);
     }
   } catch (error) {
-  logger.error('Error in simple replacement:', error);
+    logger.warn('Error in simple replacement:', error);
     return false;
   }
 }
@@ -57,7 +57,7 @@ function handleContentEditableWithUndo(element, newValue) {
           return true;
         }
       } catch (execError) {
-  logger.error('execCommand failed:', execError);
+        logger.warn('execCommand failed:', execError);
       }
       
       // fallback: استفاده از range API
@@ -84,7 +84,7 @@ function handleContentEditableWithUndo(element, newValue) {
           return true;
         }
       } catch (execError) {
-  logger.error('execCommand failed:', execError);
+        logger.warn('execCommand failed:', execError);
       }
       
       // fallback
@@ -97,7 +97,7 @@ function handleContentEditableWithUndo(element, newValue) {
     
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }
@@ -127,11 +127,11 @@ function handleInputWithUndo(element, newValue, start, end) {
     // استفاده از execCommand برای input elements
     try {
       if (document.execCommand && document.execCommand('insertText', false, newValue)) {
-  logger.debug('Used execCommand for input');
+        logger.debug('Used execCommand for input');
         return true;
       }
     } catch (execError) {
-  logger.error('execCommand failed:', execError);
+      logger.warn('execCommand failed:', execError);
     }
     
     // fallback: manual replacement
@@ -150,7 +150,7 @@ function handleInputWithUndo(element, newValue, start, end) {
     
     return true;
   } catch (error) {
-  logger.error('Error:', error);
+    logger.warn('Error:', error);
     return false;
   }
 }

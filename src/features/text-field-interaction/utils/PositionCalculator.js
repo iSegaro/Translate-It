@@ -46,7 +46,7 @@ export class PositionCalculator {
    */
   static calculateOptimalPosition(element, iconSize = null, options = {}) {
     if (!element || !element.getBoundingClientRect) {
-      this.logger.error('Invalid element provided to calculateOptimalPosition');
+      this.logger.warn('Invalid element provided to calculateOptimalPosition');
       return this.getFallbackPosition();
     }
 

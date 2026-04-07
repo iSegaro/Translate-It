@@ -138,7 +138,7 @@ export class IframePositionCalculator {
       });
 
     } catch (error) {
-      this.logger.error('Error converting iframe position:', error);
+      this.logger.warn('Error converting iframe position:', error);
       return this.formatPosition(position.x, position.y + this.config.ICON_OFFSET_IFRAME, {
         isFromMouseEvent: true,
         isFallback: true,
@@ -414,7 +414,7 @@ export class IframePositionCalculator {
       });
 
     } catch (error) {
-      this.logger.error('Failed to setup mouse tracking:', error);
+      this.logger.warn('Failed to setup mouse tracking:', error);
     }
   }
 
@@ -456,7 +456,7 @@ export class IframePositionCalculator {
       this.logger.debug('Mouse tracking disabled');
 
     } catch (error) {
-      this.logger.error('Failed to disable mouse tracking:', error);
+      this.logger.warn('Failed to disable mouse tracking:', error);
     }
   }
 
@@ -510,7 +510,7 @@ export class IframePositionCalculator {
       return null;
 
     } catch (error) {
-      this.logger.error('Error finding iframe by ID:', error);
+      this.logger.warn('Error finding iframe by ID:', error);
       return null;
     }
   }
@@ -556,7 +556,7 @@ export class IframePositionCalculator {
       });
 
     } catch (error) {
-      this.logger.error('Error handling iframe position request:', error);
+      this.logger.warn('Error handling iframe position request:', error);
     }
   }
 
@@ -582,7 +582,7 @@ export class IframePositionCalculator {
       }
 
     } catch (error) {
-      this.logger.error('Error handling position calculation response:', error);
+      this.logger.warn('Error handling position calculation response:', error);
     }
   }
 
