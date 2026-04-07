@@ -34,8 +34,8 @@ const LOAD_STRATEGIES = {
 // Feature categorization
 const FEATURE_CATEGORIES = {
   CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
-  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core translation features
-  INTERACTIVE: ['pageTranslation'], // UI interaction features
+  ESSENTIAL: ['textSelection', 'windowsManager', 'vue', 'contentMessageHandler', 'selectElement'], // Core UI and detection
+  INTERACTIVE: ['pageTranslation'], // Heavy interaction-only features
   ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
 };
 
@@ -77,18 +77,15 @@ async function initializeLogger() {
 
 import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
 
-// Minimal early check for exclusion removed in favor of shared utility
-// Check is now handled via checkUrlExclusionAsync() below
-
 // Initialize the content script with ultra-minimal footprint
 (async () => {
   // 1. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
+  // This includes checking if the extension is enabled globally
   if (await checkUrlExclusionAsync()) {
     return;
   }
 
   // 2. SELF-DETECTION: Never run content script inside our own UI frames
-  // This prevents infinite loops and massive memory overhead
   const isExtensionFrame = window.location.href.startsWith('chrome-extension://') || 
                            window.location.href.startsWith('moz-extension://') ||
                            document.documentElement.classList.contains('translate-it-ui-frame');
@@ -98,7 +95,7 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
   }
 
   try {
-    // Initialize logger first
+    // Initialize logger only if we're not excluded
     const scriptLogger = await initializeLogger();
     const isMainFrame = window === window.top;
 
