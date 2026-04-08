@@ -7,8 +7,10 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
+const notificationManager = new NotificationManager();
 
 /**
  * Centralized manager for extension context validation and error handling.
@@ -272,16 +274,16 @@ export class ExtensionContextManager {
         ExtensionContextManager._contextNotificationShown = false;
       }, 5000);
 
-      // Use the statically imported pageEventBus
-      if (pageEventBus && typeof pageEventBus.emit === 'function') {
-        pageEventBus.emit('show-notification', {
-          type: 'warning',
-          title: 'Extension Update',
-          message: ExtensionContextManager.getContextErrorMessage(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED),
-          duration: 5000,
-          showIcon: true
-        });
-      }
+      // Use NotificationManager for standardized toast notifications
+      notificationManager.show(
+        ExtensionContextManager.getContextErrorMessage(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED),
+        'warning',
+        5000,
+        { 
+          id: 'extension-update-warning',
+          persistent: false
+        }
+      );
     }
 
     // If we are in BACKGROUND context, use system notifications (browser.notifications)

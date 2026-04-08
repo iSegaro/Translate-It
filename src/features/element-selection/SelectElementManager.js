@@ -608,6 +608,7 @@ class SelectElementManager extends ResourceTracker {
     try {
       if (this.isActive) await this.deactivate({ reason: 'manual' });
       this.notificationManager = null;
+      this.baseNotificationManager = null;
       super.cleanup();
     } catch (error) { throw error; }
   }

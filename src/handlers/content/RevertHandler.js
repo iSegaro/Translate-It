@@ -6,6 +6,7 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
@@ -18,13 +19,12 @@ export class RevertHandler extends ResourceTracker {
     super('revert-handler')
     this.context = 'content-revert';
     this.isExecuting = false; // Prevent duplicate executions
+    this.notificationManager = new NotificationManager();
 
-    // Listen for revert requests from the PageEventBus (used by mobile dashboard and notifications)
-    pageEventBus.on('revert-translations', () => {
-      logger.info('Revert requested via PageEventBus');
-      this.executeRevert().catch(err => {
-        logger.error('Failed to execute revert from PageEventBus:', err);
-      });
+    // Listen for revert requests from the PageEventBus (used by mobile dashboard and notifications)    pageEventBus.on('revert-translations', () => {
+    logger.info('Revert requested via PageEventBus');
+    this.executeRevert().catch(err => {
+      logger.error('Failed to execute revert from PageEventBus:', err);
     });
   }
 
@@ -105,7 +105,7 @@ export class RevertHandler extends ResourceTracker {
         if (totalRevertedCount > 0) {
           const { getTranslationString } = await utilsFactory.getI18nUtils();
           const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
-          pageEventBus.emit('show-notification', { message, type: "revert", duration: NOTIFICATION_TIME.REVERT });
+          this.notificationManager.show(message, "revert", NOTIFICATION_TIME.REVERT);
           logger.info('Success notification sent');
         } else {
           // const { getTranslationString } = await utilsFactory.getI18nUtils();

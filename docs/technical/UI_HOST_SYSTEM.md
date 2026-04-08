@@ -42,18 +42,23 @@ pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
 });
 ```
 
-### Vanilla JS → Vue (Event Emission)
+### Vanilla JS → Vue (Event Emission via Managers)
 
 ```javascript
-// In any content script module
-import { pageEventBus } from '@/core/PageEventBus.js';
+// Recommended approach: Use NotificationManager (Standard Project Policy)
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
+
+const notifier = new NotificationManager();
 
 // Show a notification
-pageEventBus.emit('show-notification', {
-  message: 'Translation completed',
-  type: 'success',
-  duration: 4000
-});
+notifier.show('Translation completed', 'success', 4000);
+```
+
+### Direct Event Emission (Low-level)
+
+```javascript
+// Only use if a manager is not available or for specialized events
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 // Activate select mode
 pageEventBus.emit('select-mode-activated');

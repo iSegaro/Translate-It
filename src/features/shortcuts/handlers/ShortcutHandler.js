@@ -7,6 +7,7 @@ import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
 import { INPUT_TYPES, NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const Platform = {
   MAC: 'MAC',
@@ -42,6 +43,7 @@ export class ShortcutHandler extends ResourceTracker {
     // Platform will be detected asynchronously in activate()
     this.platform = null;
     this.modifierKey = 'ctrlKey'; // Default value, will be updated in activate()
+    this.notificationManager = new NotificationManager();
 
     // Track this instance for debugging
     window.__shortcutHandlerInstances.add(this);
@@ -513,14 +515,13 @@ export class ShortcutHandler extends ResourceTracker {
 
   showShortcutHint() {
     try {
-      // Use the statically imported pageEventBus
-      if (pageEventBus && typeof pageEventBus.emit === 'function') {
-        pageEventBus.emit('show-notification', {
-          message: `Press ${this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl'}+/ in a text field or with selected text to translate`,
-          type: 'info',
-          duration: NOTIFICATION_TIME.HINT
-        });
-      }
+      // Use NotificationManager for standardized toast notifications
+      this.notificationManager.show(
+        `Press ${this.modifierKey === 'metaKey' ? 'Cmd' : 'Ctrl'}+/ in a text field or with selected text to translate`,
+        'info',
+        NOTIFICATION_TIME.HINT,
+        { id: 'shortcut-hint' }
+      );
     } catch {
       // Error handled silently
     }
