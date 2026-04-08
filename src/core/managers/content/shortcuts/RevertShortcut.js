@@ -134,6 +134,20 @@ export class RevertShortcut {
 
       if (result.success) {
         logger.debug(`[RevertShortcut] Successfully reverted ${result.revertedCount} translations`);
+        
+        // CRITICAL: Notify background to broadcast revert to all other frames
+        // This ensures ESC key in Main frame also reverts translations in all IFrames
+        try {
+          const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+          
+          await sendMessage({
+            action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+            data: { source: 'esc_key', localResult: result }
+          });
+        } catch (msgError) {
+          logger.debug('[RevertShortcut] Failed to broadcast revert:', msgError);
+        }
       } else {
         logger.debug('[RevertShortcut] No translations found to revert');
       }
