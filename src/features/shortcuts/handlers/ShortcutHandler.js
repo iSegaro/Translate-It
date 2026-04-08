@@ -267,14 +267,21 @@ export class ShortcutHandler extends ResourceTracker {
             // If still default, try to refresh from settings store
             if (currentShortcut === 'Ctrl+/') {
               try {
-                const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
-                const settingsStore = useSettingsStore();
-                if (settingsStore.settings?.TEXT_FIELD_SHORTCUT && settingsStore.settings.TEXT_FIELD_SHORTCUT !== 'Ctrl+/') {
-                  currentShortcut = settingsStore.settings.TEXT_FIELD_SHORTCUT;
-                  logger.debug(`Updated shortcut from settings store: ${currentShortcut}`);
+                const { getActivePinia } = await import('pinia');
+                const activePinia = getActivePinia();
+                
+                if (activePinia) {
+                  const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
+                  const settingsStore = useSettingsStore();
+                  if (settingsStore.settings?.TEXT_FIELD_SHORTCUT && settingsStore.settings.TEXT_FIELD_SHORTCUT !== 'Ctrl+/') {
+                    currentShortcut = settingsStore.settings.TEXT_FIELD_SHORTCUT;
+                    logger.debug(`Updated shortcut from settings store: ${currentShortcut}`);
+                  }
+                } else {
+                  logger.debug('Pinia not active yet, skipping store-based shortcut refresh');
                 }
               } catch (storeError) {
-                logger.error(`Failed to get shortcut from settings store: ${storeError.message}`);
+                logger.debug(`Skip shortcut refresh from store: ${storeError.message}`);
               }
             }
 
@@ -327,13 +334,21 @@ export class ShortcutHandler extends ResourceTracker {
           if (currentShortcut === 'Ctrl+/') {
             // Try to get settings store directly
             try {
-              const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
-              const settingsStore = useSettingsStore();
-              await settingsStore.loadSettings();
-              const refreshedShortcut = settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/';
-              logger.info(`Shortcut listener setup: ${refreshedShortcut} (refreshed from settings store)`);
+              const { getActivePinia } = await import('pinia');
+              const activePinia = getActivePinia();
+
+              if (activePinia) {
+                const { useSettingsStore } = await import('@/features/settings/stores/settings.js');
+                const settingsStore = useSettingsStore();
+                await settingsStore.loadSettings();
+                const refreshedShortcut = settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/';
+                logger.info(`Shortcut listener setup: ${refreshedShortcut} (refreshed from settings store)`);
+              } else {
+                logger.debug('Pinia not active, using default shortcut for listener setup');
+                logger.info(`Shortcut listener setup: ${currentShortcut}`);
+              }
             } catch (storeError) {
-              logger.error(`Failed to refresh from settings store: ${storeError.message}`);
+              logger.debug(`Failed to refresh from settings store: ${storeError.message}`);
               logger.info(`Shortcut listener setup: ${currentShortcut} (using cache)`);
             }
           } else {
