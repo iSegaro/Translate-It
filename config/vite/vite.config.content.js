@@ -60,10 +60,7 @@ export const createContentConfig = (browser) => {
           ...baseConfig.build.rollupOptions.output,
           // Content script chunks - new lazy loading architecture
           manualChunks: (id) => {
-            // Content script entry point
-            if (id.includes('src/core/content-scripts/index')) {
-              return 'content/content-entry';
-            }
+            // Shared content script logic
             if (id.includes('src/core/content-scripts/ContentScriptCore')) {
               return 'content/content-core';
             }

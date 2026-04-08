@@ -1,5 +1,5 @@
-// Content script entry point - Ultra-optimized with smart loading
-// Minimal footprint with intelligent, interaction-based loading
+// Main Content script entry point - Top Frame only
+// Manages the complete Vue application, features, and UI.
 
 // Early Trusted Types setup - must run BEFORE any Vue code
 import browser from 'webextension-polyfill';
@@ -78,15 +78,20 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
 
 // Initialize the content script with ultra-minimal footprint
 (async () => {
-  // 1. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
+  // 1. FAST FAIL: Only run in the top frame for this script
+  if (window !== window.top) {
+    return;
+  }
+
+  // 2. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
   // This includes checking if the extension is enabled globally
   if (await checkUrlExclusionAsync()) {
     return;
   }
 
-  // 2. SELF-DETECTION: Never run content script inside our own UI frames
-  const isExtensionFrame = window.location.href.startsWith('chrome-extension://') || 
-                           window.location.href.startsWith('moz-extension://') ||
+  // 3. SELF-DETECTION: Never run content script inside our own UI frames
+  const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
+                           window.location.href.startsWith(browser.runtime.getURL('')) ||
                            document.documentElement.classList.contains('translate-it-ui-frame');
   
   if (isExtensionFrame) {
@@ -96,10 +101,9 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
   try {
     // Initialize logger only if we're not excluded
     const scriptLogger = await initializeLogger();
-    const isMainFrame = window === window.top;
 
     if (process.env.NODE_ENV === 'development') {
-      scriptLogger.debug(`Initializing content script in ${isMainFrame ? 'Main Frame' : 'Iframe'} mode`);
+      scriptLogger.debug('Initializing main frame content script (Full mode)');
     }
 
     // Create ContentScriptCore instance
@@ -126,15 +130,11 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
         scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
       }
 
-      // 2. Start intelligent loading sequence based on frame type
-      if (isMainFrame) {
-        startIntelligentLoading();
-      } else {
-        startLiteIframeLoading();
-      }
+      // 2. Start intelligent loading sequence
+      startIntelligentLoading();
 
       if (process.env.NODE_ENV === 'development') {
-        scriptLogger.info(`Content script initialized (${isMainFrame ? 'Full' : 'Lite'} mode)`);
+        scriptLogger.info('Main frame content script initialized (Full mode)');
       }
     }
   } catch (error) {
@@ -142,18 +142,6 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
     errorLogger.error('Critical initialization error:', error);
   }
 })();
-
-/**
- * Loading strategy for third-party iframes (Lite Mode)
- * Only loads features required for text selection and messaging
- */
-async function startLiteIframeLoading() {
-  const LITE_FEATURES = ['messaging', 'extensionContext', 'textSelection', 'contentMessageHandler'];
-  
-  for (const feature of LITE_FEATURES) {
-    await loadFeature(feature, 'CRITICAL');
-  }
-}
 
 async function startIntelligentLoading() {
   // Phase 1: Load critical features immediately

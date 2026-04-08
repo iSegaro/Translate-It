@@ -34,8 +34,15 @@ export function generateManifest(browser = 'chrome') {
     // Content scripts
     content_scripts: [
       {
-        js: ['src/core/content-scripts/index.js'],
-        // CSS files will be manually copied and injected via JS
+        js: ['src/core/content-scripts/index-main.js'],
+        // Main content script only for the top frame
+        matches: ['<all_urls>', 'file://*/*'],
+        run_at: 'document_idle',
+        all_frames: false
+      },
+      {
+        js: ['src/core/content-scripts/index-iframe.js'],
+        // Lite content script for all frames (iframes)
         matches: ['<all_urls>', 'file://*/*'],
         run_at: 'document_idle',
         all_frames: true
