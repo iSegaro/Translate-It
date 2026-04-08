@@ -156,9 +156,16 @@ export class RevertHandler extends ResourceTracker {
       if (selectElementReverted) {
         logger.debug('Reverted Select Element translation via global state');
         
-        // Update store to reset Revert badge
-        const mobileStore = useMobileStore();
-        mobileStore.setHasElementTranslations(false);
+        // Update store to reset Revert badge - only if Pinia is active
+        try {
+          const { getActivePinia } = await import('pinia');
+          if (getActivePinia()) {
+            const mobileStore = useMobileStore();
+            mobileStore.setHasElementTranslations(false);
+          }
+        } catch (e) {
+          logger.debug('Pinia not available for store update during revert');
+        }
         
         return 1;
       }
