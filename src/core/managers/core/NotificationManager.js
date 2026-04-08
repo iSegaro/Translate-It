@@ -15,7 +15,9 @@ export default class NotificationManager extends ResourceTracker {
   constructor() {
     super('notification-manager');
     this.logger = getScopedLogger(LOG_COMPONENTS.NOTIFICATIONS, 'NotificationManager');
+    this.activeStatusId = null;
   }
+
   /**
    * Shows a notification.
    *
@@ -24,33 +26,73 @@ export default class NotificationManager extends ResourceTracker {
    * @param {number|null} [duration=4000] The duration in ms. Use Infinity for persistent notifications.
    * @param {Object} [options={}] Additional options for the notification.
    * @param {boolean} [options.persistent=false] Whether the notification should be persistent.
-   * @param {Array} [options.actions=[]] Array of action objects {label, eventName}.
+   * @param {Array} [options.actions=[]] Array of action objects {label, eventName, onClick, handler}.
+   * @param {string} [options.id] Optional specific ID for the notification.
    * @returns {string} A unique ID for the notification.
    */
   show(message, type = 'info', duration = 4000, options = {}) {
-    const toastId = `${type}-${Date.now()}`;
+    const toastId = options.id || `${type}-${Date.now()}`;
 
     const detail = {
       id: toastId,
       message,
       type,
-      duration: options.persistent ? Infinity : duration,
-      persistent: options.persistent || false,
+      duration: options.persistent || duration === Infinity || duration === 0 ? Infinity : duration,
+      persistent: options.persistent || duration === Infinity || duration === 0 || false,
       actions: options.actions || []
     };
 
     const logLevel = type === 'error' ? 'error' : 'info';
     this.logger[logLevel](`[Notification] Showing ${type} notification: ${message}`);
-    this.logger.debug('Notification details', {
-      id: toastId,
-      type,
-      duration,
-      persistent: options.persistent,
-      hasActions: options.actions?.length > 0
-    });
-
+    
     pageEventBus.emit('show-notification', detail);
 
+    return toastId;
+  }
+
+  /**
+   * Shows a status/loading notification. 
+   * If a status notification is already showing, it updates it.
+   * 
+   * @param {string} message The status message.
+   * @param {Object} [options={}] Additional options.
+   * @returns {string} The notification ID.
+   */
+  showStatus(message, options = {}) {
+    if (this.activeStatusId) {
+      return this.update(this.activeStatusId, message, { type: 'status', ...options });
+    }
+
+    this.activeStatusId = this.show(message, 'status', 0, { 
+      persistent: true, 
+      ...options 
+    });
+    
+    return this.activeStatusId;
+  }
+
+  /**
+   * Updates an existing notification.
+   * 
+   * @param {string} toastId The ID of the notification to update.
+   * @param {string} message New message.
+   * @param {Object} [options={}] New options.
+   * @returns {string} The notification ID.
+   */
+  update(toastId, message, options = {}) {
+    this.logger.debug(`[Notification] Updating notification ${toastId}: ${message}`);
+    
+    const detail = {
+      id: toastId,
+      message,
+      type: options.type || 'info',
+      duration: options.persistent || options.duration === Infinity ? Infinity : (options.duration || 4000),
+      persistent: options.persistent || false,
+      actions: options.actions || [],
+      isUpdate: true
+    };
+
+    pageEventBus.emit('show-notification', detail);
     return toastId;
   }
 
@@ -59,6 +101,12 @@ export default class NotificationManager extends ResourceTracker {
    * @param {string} toastId The ID of the notification to dismiss.
    */
   dismiss(toastId) {
+    if (!toastId) return;
+    
+    if (toastId === this.activeStatusId) {
+      this.activeStatusId = null;
+    }
+
     this.logger.info(`[Notification] Dismissing notification: ${toastId}`);
     pageEventBus.emit('dismiss_notification', { id: toastId });
   }
@@ -67,15 +115,13 @@ export default class NotificationManager extends ResourceTracker {
    * Dismisses all currently visible notifications.
    */
   dismissAll() {
+    this.activeStatusId = null;
     this.logger.info('[Notification] Dismissing all notifications');
     pageEventBus.emit('dismiss_all_notifications');
   }
 
-  // Note: Select Element notification methods have been moved to NotificationSystem
-  // These methods are kept for backward compatibility but are deprecated
-
   cleanup() {
-    // Use ResourceTracker cleanup for automatic resource management
+    this.activeStatusId = null;
     super.cleanup();
   }
 }

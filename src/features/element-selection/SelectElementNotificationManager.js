@@ -1,5 +1,5 @@
 // SelectElementNotificationManager - Unified notification management for Select Element
-// Single responsibility: Manage Select Element notification lifecycle
+// Single responsibility: Manage Select Element notification lifecycle using central NotificationManager
 
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -14,374 +14,113 @@ class SelectElementNotificationManager extends ResourceTracker {
     super('select-element-notification-manager');
     
     this.notificationManager = notificationManager;
-    this.currentNotification = null;
+    this.toastId = null;
     this.isInitialized = false;
     
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementNotificationManager');
-    
-    this.logger.debug('SelectElementNotificationManager created');
   }
   
   // Singleton pattern
   static instance = null;
-  static initializing = false;
   
   static async getInstance(notificationManager) {
     if (!SelectElementNotificationManager.instance) {
-      if (SelectElementNotificationManager.initializing) {
-        // Wait for initialization to complete
-        while (SelectElementNotificationManager.initializing) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        return SelectElementNotificationManager.instance;
-      }
-      
-      SelectElementNotificationManager.initializing = true;
-      try {
-        SelectElementNotificationManager.instance = new SelectElementNotificationManager(notificationManager);
-        await SelectElementNotificationManager.instance.initialize();
-      } catch (error) {
-        SelectElementNotificationManager.instance = null;
-        throw error;
-      } finally {
-        SelectElementNotificationManager.initializing = false;
-      }
+      SelectElementNotificationManager.instance = new SelectElementNotificationManager(notificationManager);
+      await SelectElementNotificationManager.instance.initialize();
     } else if (notificationManager) {
-      // Update the reference to the notification manager in case the old one is stale
       SelectElementNotificationManager.instance.notificationManager = notificationManager;
     }
     return SelectElementNotificationManager.instance;
   }
   
-  static clearInstance() {
-    if (SelectElementNotificationManager.instance) {
-      SelectElementNotificationManager.instance.cleanup();
-      SelectElementNotificationManager.instance = null;
-    }
-  }
-  
   async initialize() {
-    if (this.isInitialized) {
-      this.logger.debug('SelectElementNotificationManager already initialized');
-      return;
-    }
+    if (this.isInitialized) return;
     
-    this.logger.debug('Initializing SelectElementNotificationManager');
-    
-    // Setup event listeners for direct communication with SelectElementManager
+    // Listen for cross-module events
     this.setupEventListeners();
-    
     this.isInitialized = true;
-    this.logger.info('SelectElementNotificationManager initialized successfully');
   }
   
   setupEventListeners() {
-    // Listen for show notification request
-    pageEventBus.on('show-select-element-notification', async (data) => {
-      await this.showNotification(data);
-    });
-
-    // Listen for update notification request
-    pageEventBus.on('update-select-element-notification', async (data) => {
-      await this.updateNotification(data);
-    });
-
-    // Listen for dismiss notification request
-    pageEventBus.on('dismiss-select-element-notification', (data) => {
-      this.dismissNotification(data);
-    });
-
-    // Listen for cancel event from notification
-    pageEventBus.on('cancel-select-element-mode', (data) => {
-      this.logger.debug('cancel-select-element-mode event received', { data });
-      // Force dismiss notification on cancel regardless of manager ID
-      this.dismissNotification({
-        managerId: data?.managerId,
-        isCancelAction: true
-      });
-    });
-
-    this.logger.debug('Event listeners setup for notification manager');
+    this.addEventListener(pageEventBus, 'show-select-element-notification', (data) => this.showNotification(data));
+    this.addEventListener(pageEventBus, 'update-select-element-notification', (data) => this.updateNotification(data));
+    this.addEventListener(pageEventBus, 'dismiss-select-element-notification', () => this.dismissNotification());
+    this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => this.dismissNotification());
   }
   
   async showNotification(data = {}) {
-    if (!this.isInitialized) {
-      this.logger.warn('SelectElementNotificationManager not initialized, cannot show notification');
-      return null;
-    }
-
-    // Force clean up any existing notification state before showing a new one
-    // This fixed the issue where subsequent activations wouldn't show the notification
-    if (this.currentNotification) {
-      this.logger.debug('Cleaning up stale notification state before showing new one');
-      this.dismissNotification({ isCancelAction: true });
-    }
+    // Only show in top frame
+    if (window !== window.top) return;
 
     try {
-      // Only show notifications in the main frame (top window)
-      if (window !== window.top) {
-        return 'iframe-notification-skipped';
-      }
+      const { getTranslationString } = await utilsFactory.getI18nUtils();
+      
+      const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+      const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';
+      const isMobile = deviceDetector.isMobile();
+      const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
+      const message = await getTranslationString(messageKey) || (isMobile ? 'Drag over text to translate.' : 'Click text to translate.');
 
-      // Create notification data (now async)
-      const notificationData = await this.createNotificationData(data);
-
-      // Show the notification through notification manager
-      const notificationId = this.notificationManager.show(
-        notificationData.message,
-        notificationData.type,
-        notificationData.duration,
+      const actions = [
         {
-          persistent: notificationData.persistent,
-          actions: notificationData.actions
+          label: cancelLabel,
+          onClick: data.actions?.cancel || (() => pageEventBus.emit('cancel-select-element-mode'))
+        },
+        {
+          label: revertLabel,
+          onClick: data.actions?.revert || (() => pageEventBus.emit('revert-translations'))
         }
-      );
+      ];
 
-      // Store notification reference
-      this.currentNotification = {
-        id: notificationId,
-        isActive: true,
-        managerId: data.managerId,
-        data: notificationData
-      };
-
-      this.logger.debug('Select Element notification shown', {
-        notificationId,
-        managerId: data.managerId
+      // Use central showStatus for a consistent experience
+      this.toastId = this.notificationManager.showStatus(message, {
+        id: 'select-element-toast',
+        actions
       });
-
-      return notificationId;
 
     } catch (error) {
       this.logger.error('Error showing Select Element notification:', error);
-      this.currentNotification = null; // Ensure state is cleared on error
-      return null;
     }
   }
   
   async updateNotification(data = {}) {
-    if (!this.currentNotification || !this.currentNotification.isActive) {
-      this.logger.debug('No active notification to update');
-      return null;
-    }
-
-    // Only update notifications in the main frame
-    if (window !== window.top) {
-      this.logger.debug('Select Element notification update requested from iframe, ignoring');
-      return null;
-    }
+    if (!this.toastId || window !== window.top) return;
 
     try {
-      // Update notification based on status
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const { getTranslationString } = await utilsFactory.getI18nUtils();
-        // Update the current notification with translation status but keep cancel button
         const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
         const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
 
-        const cancelAction = {
-          label: cancelLabel,
-          eventName: 'cancel-select-element-mode',
-          handler: () => {
-            // Emit cancel event through pageEventBus
-            pageEventBus.emit('cancel-select-element-mode', {
-              managerId: this.currentNotification?.managerId
-            });
-          }
-        };
-
-        // Show updated notification with cancel button
-        const updatedNotificationId = this.notificationManager.show(
-          translatingMessage,
-          'info',
-          0, // Persistent
-          {
-            persistent: true,
-            actions: [cancelAction] // Keep cancel action during translation
-          }
-        );
-
-        // Dismiss the old notification (if it has an ID)
-        const oldNotificationId = this.currentNotification?.id;
-        if (oldNotificationId) {
-          this.notificationManager.dismiss(oldNotificationId);
-        }
-
-        // Update notification reference
-        if (this.currentNotification) {
-          this.currentNotification.id = updatedNotificationId;
-          this.currentNotification.data.message = translatingMessage;
-          this.currentNotification.data.actions = [cancelAction];
-        } else {
-          // Create new notification reference if it was null
-          this.currentNotification = {
-            id: updatedNotificationId,
-            isActive: true,
-            data: {
-              message: translatingMessage,
-              actions: [cancelAction]
-            }
-          };
-        }
-        
-        this.logger.debug('Select Element notification updated for translation', {
-          oldNotificationId: oldNotificationId,
-          newNotificationId: updatedNotificationId,
-          hasCancelAction: true
+        // Update existing notification with new message but keep cancel button
+        this.notificationManager.update(this.toastId, translatingMessage, {
+          type: 'status',
+          persistent: true,
+          actions: [{
+            label: cancelLabel,
+            onClick: () => pageEventBus.emit('cancel-select-element-mode')
+          }]
         });
       }
-      
-      return this.currentNotification.id;
-      
     } catch (error) {
       this.logger.error('Error updating Select Element notification:', error);
-      return null;
     }
   }
   
-  dismissNotification(data = {}) {
-    this.logger.debug('dismissNotification called with data:', data);
-
-    if (!this.currentNotification) {
-      this.logger.debug('No notification to dismiss');
-      return;
+  dismissNotification() {
+    if (this.toastId) {
+      this.notificationManager.dismiss(this.toastId);
+      this.toastId = null;
     }
-
-    const notificationId = this.currentNotification.id;
-    const { managerId } = data;
-
-    this.logger.debug('Current notification managerId:', this.currentNotification.managerId, 'Requested managerId:', managerId);
-
-    // For cancel actions, always dismiss regardless of managerId to prevent stuck notifications
-    const isCancelAction = data?.isCancelAction;
-
-    // Verify this is the correct manager dismissing the notification (unless it's a cancel action)
-    if (!isCancelAction && managerId && this.currentNotification.managerId !== managerId) {
-      this.logger.debug('Notification dismissal requested by different manager, ignoring', {
-        requestedManagerId: managerId,
-        notificationManagerId: this.currentNotification.managerId
-      });
-      return;
-    }
-
-    // Only dismiss notifications in the main frame
-    if (window !== window.top || notificationId === 'iframe-notification-skipped') {
-      this.logger.debug('Notification dismissal requested from iframe or for skipped notification, ignoring');
-      this.currentNotification = null;
-      return;
-    }
-
-    try {
-      // Mark as inactive first
-      this.currentNotification.isActive = false;
-
-      // Dismiss through notification manager (if we have a valid ID)
-      if (notificationId) {
-        this.notificationManager.dismiss(notificationId);
-      }
-
-      // Clear current notification reference
-      this.currentNotification = null;
-
-      this.logger.debug('Select Element notification dismissed', {
-        notificationId,
-        managerId,
-        isCancelAction
-      });
-
-    } catch (error) {
-      this.logger.warn('Error during notification dismissal:', error);
-
-      // Fallback: clear references even if dismiss fails
-      this.currentNotification = null;
-    }
-  }
-  
-  async createNotificationData(data = {}) {
-    const { getTranslationString } = await utilsFactory.getI18nUtils();
-    // Get localized strings
-    const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
-    const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';
-    
-    // Select appropriate message based on device type
-    const isMobile = deviceDetector.isMobile();
-    const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
-    const defaultMessage = isMobile 
-      ? 'Drag your finger over any text to translate.' 
-      : 'Click on any text element to translate.';
-    
-    const message = await getTranslationString(messageKey) || defaultMessage;
-
-    const baseActions = [
-      {
-        label: cancelLabel,
-        onClick: data.actions?.cancel || (() => {
-          this.logger.debug('Cancel action triggered');
-          pageEventBus.emit('cancel-select-element-mode');
-        })
-      },
-      {
-        label: revertLabel,
-        onClick: data.actions?.revert || (() => {
-          this.logger.debug('Revert action triggered');
-          pageEventBus.emit('revert-translations');
-        })
-      }
-    ];
-
-    return {
-      message: message,
-      type: 'info',
-      duration: 0, // Persistent
-      persistent: true,
-      actions: baseActions
-    };
-  }
-  
-  // Public API
-  getNotificationId() {
-    return this.currentNotification ? this.currentNotification.id : null;
-  }
-  
-  isNotificationActive() {
-    return this.currentNotification?.isActive || false;
-  }
-  
-  getState() {
-    return {
-      isInitialized: this.isInitialized,
-      hasNotificationManager: !!this.notificationManager,
-      hasCurrentNotification: !!this.currentNotification,
-      currentNotification: this.currentNotification ? {
-        id: this.currentNotification.id,
-        isActive: this.currentNotification.isActive,
-        managerId: this.currentNotification.managerId
-      } : null
-    };
   }
   
   async cleanup() {
-    this.logger.info("Cleaning up SelectElement notification manager");
-    
-    try {
-      // Dismiss any active notification
-      this.dismissNotification();
-      
-      // Clean up tracked resources
-      super.cleanup();
-      
-      this.isInitialized = false;
-      
-      this.logger.info("SelectElement notification manager cleanup completed successfully");
-      
-    } catch (error) {
-      this.logger.error("Error during SelectElement notification manager cleanup:", error);
-      throw error;
-    }
+    this.dismissNotification();
+    super.cleanup();
+    this.isInitialized = false;
   }
 }
 
-// Export class and singleton getter
 export { SelectElementNotificationManager };
 export const getSelectElementNotificationManager = (notificationManager) => 
   SelectElementNotificationManager.getInstance(notificationManager);

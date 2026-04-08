@@ -1,4 +1,4 @@
-import { onMounted } from 'vue';
+import { onMounted, h } from 'vue';
 import { toast } from 'vue-sonner';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -61,7 +61,8 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       key.startsWith(`${detail.message}-${detail.type}`)
     );
 
-    if (isDuplicate) {
+    // Skip duplicate check for updates
+    if (isDuplicate && !detail.isUpdate) {
       return;
     }
 
@@ -85,33 +86,59 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
     const toastOptions = {
       id,
       duration: persistent ? Infinity : duration,
-      // CRITICAL: Apply direction via style option (most reliable method)
       style: {
         direction: detectedDirection,
         textAlign: toastRTL.value ? 'right' : 'left'
       }
     };
 
-    // Add action buttons if provided
+    // Enhanced Multi-Action Support
     if (actions && actions.length > 0) {
-      const actionHandler = (event) => {
-        if (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-        }
-
-        logger.debug('Toast action clicked:', actions[0].eventName);
-        if (window.pageEventBus) {
-          window.pageEventBus.emit(actions[0].eventName);
-        }
-        toast.dismiss(id);
-      };
-
-      toastOptions.action = {
-        label: actions[0].label,
-        onClick: actionHandler
-      };
+      if (actions.length === 1) {
+        // Standard single action
+        toastOptions.action = {
+          label: actions[0].label,
+          onClick: (event) => {
+            if (event) event.preventDefault();
+            if (actions[0].handler) actions[0].handler();
+            if (actions[0].onClick) actions[0].onClick();
+            if (actions[0].eventName && window.pageEventBus) {
+              window.pageEventBus.emit(actions[0].eventName);
+            }
+            toast.dismiss(id);
+          }
+        };
+      } else {
+        // Multi-action: Render custom VNode for actions
+        // We use the 'description' slot to render additional buttons or a custom layout
+        toastOptions.description = h('div', { 
+          style: { 
+            display: 'flex', 
+            gap: '8px', 
+            marginTop: '8px',
+            justifyContent: toastRTL.value ? 'flex-end' : 'flex-start'
+          } 
+        }, actions.map(action => h('button', {
+          style: {
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            border: '1px solid #ddd',
+            backgroundColor: '#fff',
+            color: '#333'
+          },
+          onClick: (event) => {
+            if (event) event.preventDefault();
+            if (action.handler) action.handler();
+            if (action.onClick) action.onClick();
+            if (action.eventName && window.pageEventBus) {
+              window.pageEventBus.emit(action.eventName);
+            }
+            toast.dismiss(id);
+          }
+        }, action.label)));
+      }
     }
     
     toastFn(message, toastOptions);
@@ -123,12 +150,8 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
   const handleDismissNotification = (detail) => {
     logger.info('Received dismiss_notification event:', detail);
 
-    // Skip select-element notifications - they are managed by SelectElementNotificationManager
-    if (detail.id.startsWith('select-element-') || detail.id.includes('select-element')) {
-      logger.debug('Ignoring dismiss_notification for select-element notification:', detail.id);
-      return;
-    }
-
+    // Standardized dismissal for all types (including select-element)
+    
     // Prevent double dismissal
     if (window.translateItDismissedNotifications.has(detail.id)) {
       logger.debug('Notification already dismissed, ignoring:', detail.id);
@@ -157,8 +180,8 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       tracker.addEventListener(pageEventBus, 'dismiss_notification', handleDismissNotification);
       tracker.addEventListener(pageEventBus, 'dismiss_all_notifications', () => {
         logger.info('Received dismiss_all_notifications event');
-        // Dismiss all notifications except select-element ones
-        toast.dismiss((t) => !t.id || (!t.id.includes('select-element') && !t.id.startsWith('select-element-')));
+        // Dismiss all notifications
+        toast.dismiss();
       });
     }
   });
