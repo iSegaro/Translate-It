@@ -100,21 +100,32 @@
 </template>
 
 <script setup>
-import { onUnmounted } from 'vue';
+import { onUnmounted, defineAsyncComponent } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+
+// --- UI Components ---
+
+// Static Imports (Critical & Immediate UI)
+// These are loaded immediately to ensure responsiveness and core system integrity.
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
-import TranslationWindow from '@/features/windows/components/TranslationWindow.vue';
-import TranslationIcon from '@/features/windows/components/TranslationIcon.vue';
 import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
-import MobileSheet from './components/mobile/MobileSheet.vue';
-import MobileFab from './components/mobile/MobileFab.vue';
-import DesktopFabMenu from './components/desktop/DesktopFabMenu.vue';
-import PageTranslationTooltip from './components/PageTranslationTooltip.vue';
+
+// Lazy Loaded Components (Optimized Resource Usage)
+// These components are loaded on-demand or based on device type to reduce the initial JS footprint.
+const TranslationWindow = defineAsyncComponent(() => import('@/features/windows/components/TranslationWindow.vue'));
+const TranslationIcon = defineAsyncComponent(() => import('@/features/windows/components/TranslationIcon.vue'));
+const PageTranslationTooltip = defineAsyncComponent(() => import('./components/PageTranslationTooltip.vue'));
+
+// Device-Specific Lazy Components
+const MobileSheet = defineAsyncComponent(() => import('./components/mobile/MobileSheet.vue'));
+const MobileFab = defineAsyncComponent(() => import('./components/mobile/MobileFab.vue'));
+const DesktopFabMenu = defineAsyncComponent(() => import('./components/desktop/DesktopFabMenu.vue'));
+
 import { TRANSLATION_HTML } from '@/shared/config/constants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
