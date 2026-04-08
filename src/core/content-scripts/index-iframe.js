@@ -6,56 +6,57 @@ window.browser = browser;
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
 
-(async () => {
-  // 1. SELF-DETECTION: Never run in the top frame (handled by index-main)
-  if (window === window.top) {
-    return;
-  }
+// --- CRITICAL PRE-INITIALIZATION ---
+if (!window.translateItContentCore) {
+  window.translateItContentCore = { initialized: false, vueLoaded: false };
+}
+if (!window.translateItContentScriptCore) {
+  window.translateItContentScriptCore = window.translateItContentCore;
+}
 
-  // 2. SMART FILTER: Ignore tiny iframes (ads, trackers, etc.) to save resources
-  // This is the most critical performance optimization for pages with many iframes.
+(async () => {
+  // 1. SELF-DETECTION: Never run in the top frame
+  if (window === window.top) return;
+
+  // 2. SMART FILTER: Ignore tiny iframes (ads, trackers, etc.)
   const MIN_FRAME_SIZE = 80;
   const isTinyFrame = window.innerWidth > 0 && window.innerHeight > 0 && 
                       (window.innerWidth < MIN_FRAME_SIZE || window.innerHeight < MIN_FRAME_SIZE);
 
-  if (isTinyFrame) {
-    // Silent exit for tiny frames like ads or trackers
-    return;
-  }
+  if (isTinyFrame) return;
 
-  // 3. PREVENT RE-INJECTION: Check if already loaded or if it's our own UI frame
+  // 3. PREVENT RE-INJECTION
   const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
                            window.location.href.startsWith(browser.runtime.getURL(''));
 
-  if (isExtensionFrame || window.translateItContentScriptLoaded) {
-    return;
-  }
+  if (isExtensionFrame || window.translateItContentScriptLoaded) return;
 
   try {
-    // Dynamic imports for core logic to keep the initial parsing overhead low
     const { ContentScriptCore } = await import('./ContentScriptCore.js');
     const { checkUrlExclusionAsync } = await import('@/features/exclusion/utils/exclusion-utils.js');
 
-    // 4. FAST FAIL: Check exclusion and extension status
-    if (await checkUrlExclusionAsync()) {
-      return;
-    }
+    // 4. FAST FAIL
+    if (await checkUrlExclusionAsync()) return;
 
-    // 5. Initialize Core in Lite Mode
+    // 5. Initialize Core
     const contentScriptCore = new ContentScriptCore();
+    window.translateItContentCore = contentScriptCore;
+    window.translateItContentScriptCore = contentScriptCore;
+    
     const initialized = await contentScriptCore.initializeCritical();
 
     if (initialized) {
-      // 6. Interaction Coordinator (Only for text selection detection)
+      // 6. Inject Styles
+      await contentScriptCore.injectMainDOMStyles();
+
+      // 7. Interaction Coordinator
       try {
         const { interactionCoordinator } = await import('./InteractionCoordinator.js');
         await interactionCoordinator.initialize();
-      } catch (e) {
-        // Non-critical error for iframe
-      }
+      } catch (e) {}
 
-      // 7. Load Lite Features (Messaging & Text Selection)
-      // We explicitly skip 'vue' and other heavy features in iframes.
+      // 8. Load Lite Features
+      // contentMessageHandler will automatically register all needed handlers including SelectElement
       const LITE_FEATURES = ['messaging', 'extensionContext', 'textSelection', 'contentMessageHandler'];
       
       for (const feature of LITE_FEATURES) {
@@ -67,6 +68,8 @@ setupTrustedTypesCompatibility();
       }
     }
   } catch (error) {
-    // Silent error for iframes to prevent console noise on third-party sites
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[IFrame] Initialization error:', error);
+    }
   }
 })();

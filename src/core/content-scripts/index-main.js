@@ -7,6 +7,19 @@ window.browser = browser;
 import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
 setupTrustedTypesCompatibility();
 
+// --- CRITICAL PRE-INITIALIZATION ---
+// Create placeholder objects for core infrastructure to prevent messaging errors
+// during the asynchronous boot process.
+if (!window.translateItContentCore) {
+  window.translateItContentCore = { initialized: false, vueLoaded: false };
+}
+if (!window.translateItContentScriptCore) {
+  window.translateItContentScriptCore = window.translateItContentCore;
+}
+
+import { ContentScriptCore } from './ContentScriptCore.js';
+import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
+
 let contentScriptCore = null;
 let featureLoadPromises = new Map();
 
@@ -44,9 +57,6 @@ let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 let ErrorHandler = null;
 
-// Static import ContentScriptCore to fix Firefox class compilation issues
-import { ContentScriptCore } from './ContentScriptCore.js';
-
 // Lazy load logging and error handling dependencies
 async function initializeLogger() {
   if (logger) return logger;
@@ -64,7 +74,6 @@ async function initializeLogger() {
     logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
     return logger;
   } catch {
-    // Fallback logger - direct console calls will be filtered through logging system later
     return {
       debug: () => {},
       info: (...args) => console.log('[ContentScriptIndex]', ...args),
@@ -74,8 +83,6 @@ async function initializeLogger() {
   }
 }
 
-import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
-
 // Initialize the content script with ultra-minimal footprint
 (async () => {
   // 1. FAST FAIL: Only run in the top frame for this script
@@ -84,7 +91,6 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
   }
 
   // 2. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
-  // This includes checking if the extension is enabled globally
   if (await checkUrlExclusionAsync()) {
     return;
   }
@@ -99,43 +105,44 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
   }
 
   try {
-    // Initialize logger only if we're not excluded
     const scriptLogger = await initializeLogger();
 
     if (process.env.NODE_ENV === 'development') {
       scriptLogger.debug('Initializing main frame content script (Full mode)');
     }
 
-    // Create ContentScriptCore instance
+    // Create and initialize ContentScriptCore instance
     try {
       contentScriptCore = new ContentScriptCore();
+      
+      // Update global references with the real instance
+      window.translateItContentCore = contentScriptCore;
+      window.translateItContentScriptCore = contentScriptCore;
+      
+      const initialized = await contentScriptCore.initializeCritical();
+      
+      if (initialized) {
+        // --- CRITICAL IDENTITY SETUP ---
+        // Ensure extension identity is established before any other feature loads
+        await contentScriptCore.loadFeature('extensionContext');
+
+        // 1. Initialize Smart Interaction Coordinator
+        try {
+          const { interactionCoordinator } = await import('./InteractionCoordinator.js');
+          await interactionCoordinator.initialize();
+        } catch (coordError) {
+          scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
+        }
+
+        // 2. Start intelligent loading sequence
+        startIntelligentLoading();
+
+        if (process.env.NODE_ENV === 'development') {
+          scriptLogger.info('Main frame content script initialized (Full mode)');
+        }
+      }
     } catch (error) {
-      scriptLogger.error('Failed to create ContentScriptCore instance:', error);
-      return;
-    }
-
-    // Initialize ContentScriptCore
-    const initialized = await contentScriptCore.initializeCritical();
-
-    // Expose globally
-    window.translateItContentCore = contentScriptCore;
-
-    if (initialized) {
-      // 1. Initialize Smart Interaction Coordinator
-      // This manages mouseup, keydown, and other listeners based on settings/exclusion
-      try {
-        const { interactionCoordinator } = await import('./InteractionCoordinator.js');
-        await interactionCoordinator.initialize();
-      } catch (coordError) {
-        scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
-      }
-
-      // 2. Start intelligent loading sequence
-      startIntelligentLoading();
-
-      if (process.env.NODE_ENV === 'development') {
-        scriptLogger.info('Main frame content script initialized (Full mode)');
-      }
+      scriptLogger.error('Failed to initialize ContentScriptCore instance:', error);
     }
   } catch (error) {
     const errorLogger = await initializeLogger();
@@ -144,14 +151,12 @@ import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-uti
 })();
 
 async function startIntelligentLoading() {
-  // Phase 1: Load critical features immediately
   await Promise.all(
     FEATURE_CATEGORIES.CRITICAL.map(feature =>
       loadFeature(feature, 'CRITICAL')
     )
   );
 
-  // Phase 2: Load essential features after short delay
   setTimeout(() => {
     Promise.all(
       FEATURE_CATEGORIES.ESSENTIAL.map(feature =>
@@ -160,9 +165,8 @@ async function startIntelligentLoading() {
     );
   }, LOAD_STRATEGIES.ESSENTIAL.delay);
 
-  // Phase 3: Delayed operations (mostly handled by InteractionCoordinator)
   setTimeout(() => {
-    // Optional preload logic can be added here if needed
+    // Optional preload logic
   }, LOAD_STRATEGIES.ON_DEMAND.delay);
 }
 
@@ -187,12 +191,11 @@ async function loadFeature(featureName, category) {
         }
       }
     } catch (error) {
-      // Use ErrorHandler for feature loading errors
       if (ErrorHandler) {
         const errorHandler = ErrorHandler.getInstance();
         await errorHandler.handle(error, {
           context: `feature-loading-${featureName}`,
-          isSilent: true, // Feature loading failures should not interrupt user
+          isSilent: true,
           showToast: false
         });
       }
