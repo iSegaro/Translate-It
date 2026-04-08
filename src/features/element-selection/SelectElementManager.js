@@ -64,6 +64,7 @@ class SelectElementManager extends ResourceTracker {
     }, { isCritical: true });
 
     this.notificationManager = null;
+    this.baseNotificationManager = null;
     this.contextWatchdogInterval = null;
 
     // Event handlers (bound)
@@ -92,6 +93,7 @@ class SelectElementManager extends ResourceTracker {
       ]);
 
       const baseNotificationManager = new NotificationManagerModule.default();
+      this.baseNotificationManager = baseNotificationManager;
       this.notificationManager = await getSelectElementNotificationManager(baseNotificationManager);
 
       this.setupKeyboardListeners();
@@ -164,9 +166,19 @@ class SelectElementManager extends ResourceTracker {
 
         const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
         if (activeProvider === ProviderRegistryIds.BING) {
-          pageEventBus.emit('show-notification', { type: 'warning', message: bingWarning || 'Bing may have issues. Try another provider.', duration: NOTIFICATION_TIME.WARNING_PROVIDER, id: `bing-warning` });
+          this.baseNotificationManager.show(
+            bingWarning || 'Bing may have issues. Try another provider.',
+            'warning',
+            NOTIFICATION_TIME.WARNING_PROVIDER,
+            { id: 'bing-warning' }
+          );
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
-          pageEventBus.emit('show-notification', { type: 'warning', message: lingvaWarning || 'Lingva may have issues. Try another provider.', duration: NOTIFICATION_TIME.WARNING_PROVIDER, id: `lingva-warning` });
+          this.baseNotificationManager.show(
+            lingvaWarning || 'Lingva may have issues. Try another provider.',
+            'warning',
+            NOTIFICATION_TIME.WARNING_PROVIDER,
+            { id: 'lingva-warning' }
+          );
         }
       }
 

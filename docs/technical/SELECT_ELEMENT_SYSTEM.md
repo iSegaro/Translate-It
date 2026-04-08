@@ -266,8 +266,8 @@ const manager = window.featureManager.getFeatureHandler('selectElement');
 
 ### Toast System Integration
 ```javascript
-// Uses centralized toast notification system
-// Actionable buttons trigger pageEventBus events
+// Uses centralized NotificationManager for displaying toasts
+// Actionable buttons trigger pageEventBus events for user interactions
 ```
 
 ## Configuration
