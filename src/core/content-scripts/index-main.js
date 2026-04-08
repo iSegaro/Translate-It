@@ -122,6 +122,17 @@ async function initializeLogger() {
       const initialized = await contentScriptCore.initializeCritical();
       
       if (initialized) {
+        // --- CROSS-FRAME EVENT SYNC ---
+        // Listen for events from iframes and re-broadcast them in the top frame's bus
+        window.addEventListener('message', (event) => {
+          if (event.data?.source === 'translate-it-iframe') {
+            const { type, data } = event.data;
+            if (type && window.pageEventBus) {
+              window.pageEventBus.emit(type, data);
+            }
+          }
+        });
+
         // --- CRITICAL IDENTITY SETUP ---
         // Ensure extension identity is established before any other feature loads
         await contentScriptCore.loadFeature('extensionContext');

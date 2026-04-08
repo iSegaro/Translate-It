@@ -422,6 +422,16 @@ class SelectElementManager extends ResourceTracker {
           // Emit both for backward compatibility and Coordinator discovery
           pageEventBus.emit(WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE);
           pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE');
+
+          // CRITICAL: Notify top frame about iframe translations so Desktop FAB can show Revert button
+          if (this.isInIframe) {
+            try {
+              window.top.postMessage({ 
+                type: WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE,
+                source: 'translate-it-iframe' 
+              }, '*');
+            } catch (e) { /* ignore cross-origin errors */ }
+          }
         }
       });
 
