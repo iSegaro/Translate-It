@@ -179,6 +179,16 @@ async function initializeLogger() {
               });
             }
           }
+
+          // Handle clicks inside iframes to dismiss UI
+          if (event.data?.type === 'TRANSLATE_IT_IFRAME_CLICK_DETECTED') {
+            if (window.windowsManagerInstance) {
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Main] Dismissing UI due to click inside iframe');
+              }
+              window.windowsManagerInstance.dismiss();
+            }
+          }
         });
 
         // 2. Synchronize deactivation across all frames when top frame deactivates

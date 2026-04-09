@@ -63,6 +63,30 @@ if (!window.translateItContentScriptCore) {
         await contentScriptCore.loadFeature(feature);
       }
 
+      // --- CROSS-FRAME CLICK SYNC (IFRAME) ---
+      // Listen for activation command from main frame
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'translateit-activate-click-listeners') {
+          // Temporarily listen for a click inside this iframe
+          const handleInternalClick = () => {
+            try {
+              window.top.postMessage({ 
+                type: 'TRANSLATE_IT_IFRAME_CLICK_DETECTED', 
+                source: 'translate-it-iframe' 
+              }, '*');
+            } catch (e) { /* ignore */ }
+            // Remove after one click to save resources
+            window.removeEventListener('click', handleInternalClick, { capture: true });
+          };
+          
+          window.addEventListener('click', handleInternalClick, { 
+            capture: true, 
+            once: true,
+            passive: true 
+          });
+        }
+      });
+
       // --- PAGE TRANSLATION COORDINATOR (IFRAME) ---
       // Listen for page-level actions from the top frame
       window.addEventListener('message', async (event) => {
