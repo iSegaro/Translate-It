@@ -488,42 +488,41 @@ export class ContextMenuManager extends ResourceTracker {
 
     try {
       const menuId = await new Promise((resolve, reject) => {
-        // Detect if we are in a Chromium-based browser to handle the specific lastError behavior
-        // Firefox usually doesn't have chrome.runtime.lastError warnings for unchecked callbacks
-        // but Chromium browsers do.
-        const isChromium = typeof chrome !== 'undefined' && !!chrome.runtime && !navigator.userAgent.includes('Firefox');
-        const chromeApi = isChromium ? chrome : null;
-        
-        if (chromeApi?.contextMenus?.create) {
-          // Chromium-specific: Use callback to clear lastError synchronously
-          chromeApi.contextMenus.create(menuConfig, () => {
-            const lastError = chromeApi.runtime.lastError;
+        // Use a universal approach that works in both Firefox and Chromium
+        // Most browser APIs (like contextMenus.create) are still synchronous or 
+        // use callbacks rather than returning a Promise, even in Firefox.
+        try {
+          // 1. Attempt to create the menu
+          const id = this.browser.contextMenus.create(menuConfig, () => {
+            // Check for Chromium/Chrome runtime errors in the callback
+            const lastError = (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime.lastError : null;
             if (lastError) {
               const msg = lastError.message || "";
               if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
-                logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists, skipping`);
+                logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (callback), skipping`);
                 resolve(menuConfig.id);
               } else {
                 reject(new Error(msg));
               }
             } else {
-              resolve(menuConfig.id);
+              resolve(menuConfig.id || id);
             }
           });
-        } else {
-          // Firefox/Standard: Use the polyfill which returns a promise
-          this.browser.contextMenus.create(menuConfig)
-            .then(id => resolve(id))
-            .catch(err => {
-              const msg = err.message || "";
-              // Handle both Chrome and Firefox error strings
-              if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
-                logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (polyfill/firefox), skipping`);
-                resolve(menuConfig.id);
-              } else {
-                reject(err);
-              }
-            });
+
+          // 2. Handle non-callback errors (especially for Firefox)
+          // If we reached here without a crash, the menu was at least submitted.
+          // Firefox will throw an error immediately if the ID is duplicate.
+          if (id) {
+            resolve(id);
+          }
+        } catch (err) {
+          const msg = err.message || "";
+          if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
+            logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (sync/exception), skipping`);
+            resolve(menuConfig.id);
+          } else {
+            reject(err);
+          }
         }
       });
 
