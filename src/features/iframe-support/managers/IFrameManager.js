@@ -17,7 +17,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
  * - Cross-frame communication with UnifiedMessaging  
  * - Error handling with ExtensionContextManager
  * - Intelligent caching with SmartCache
- * - Memory leak prevention with Memory Garbage Collector
+ * - Frame registry for all frames in the page
  */
 export class IFrameManager extends ResourceTracker {
   constructor() {
@@ -26,7 +26,7 @@ export class IFrameManager extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'IFrameManager');
     this.errorHandler = ErrorHandler.getInstance();
     
-    // Frame detection and registry
+    // Frame detection and registry (Standardized to isTopFrame)
     this.isTopFrame = window === window.top;
     this.isMainDocument = this.isTopFrame;
     this.frameId = this._generateFrameId();
@@ -280,12 +280,6 @@ export class IFrameManager extends ResourceTracker {
     });
     
     this.logger.info(`[IFrame] New frame registered: ${frameData.frameId} (total: ${this.frameCache.size})`);
-    this.logger.debug('Frame registration details', {
-      frameId: frameData.frameId,
-      isInIframe: frameData.isInIframe,
-      url: frameData.url,
-      totalFrames: this.frameCache.size
-    });
     
     // Broadcast to other frames about new registration
     if (this.isMainDocument) {
@@ -311,153 +305,29 @@ export class IFrameManager extends ResourceTracker {
   }
 
   /**
-   * Handle new iframe detection
+   * Handle new iframe detection (Simplified for Dual-Entry architecture)
+   * Manual script injection is removed as it's now handled by the manifest.
    */
   async _handleNewIframe(iframe) {
     try {
-      // Check basic iframe properties first
       if (!iframe || !iframe.tagName || iframe.tagName.toLowerCase() !== 'iframe') {
-        this.logger.debug('Invalid iframe element passed to _handleNewIframe');
         return;
       }
 
-      this.logger.debug('Handling new iframe', {
+      this.logger.debug('Handling new iframe detection', {
         src: iframe.src || 'no src',
-        id: iframe.id || 'no id',
-        className: iframe.className || 'no class'
+        id: iframe.id || 'no id'
       });
 
-      // Try to access iframe properties safely
-      let canAccessContent = false;
-      let contentWindow = null;
-      let contentDocument = null;
-      
-      try {
-        contentWindow = iframe.contentWindow;
-        contentDocument = iframe.contentDocument;
-        canAccessContent = !!(contentDocument && contentWindow);
-      } catch (accessError) {
-        this.logger.debug('Cannot access iframe content (cross-origin or security restriction)', {
-          src: iframe.src,
-          error: accessError.message
-        });
-        return; // Exit early if we can't access content
-      }
-
-      if (!canAccessContent) {
-        this.logger.debug('Iframe content not accessible, skipping injection', {
-          src: iframe.src
-        });
-        return;
-      }
-
-      // Wait for iframe to load
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Iframe load timeout after 5 seconds'));
-        }, 5000);
-
-        if (contentDocument && contentDocument.readyState === 'complete') {
-          clearTimeout(timeout);
-          resolve();
-        } else {
-          const onLoad = () => {
-            clearTimeout(timeout);
-            iframe.removeEventListener('load', onLoad);
-            resolve();
-          };
-          iframe.addEventListener('load', onLoad);
-        }
-      });
-      
-      // Check if content script needs to be injected
-      try {
-        if (contentWindow && !contentWindow.translateItContentScriptLoaded) {
-          await this._injectContentScriptToIframe(iframe);
-        } else {
-          this.logger.debug('Content script already loaded or window not accessible', {
-            src: iframe.src,
-            hasWindow: !!contentWindow,
-            scriptLoaded: contentWindow?.translateItContentScriptLoaded
-          });
-        }
-      } catch (injectionError) {
-        this.logger.debug('Content script injection failed', {
-          error: injectionError.message,
-          name: injectionError.name,
-          src: iframe.src,
-          isSecurityError: injectionError.name === 'SecurityError'
-        });
-        // Don't throw - injection failure is not critical
-      }
+      // No manual injection required here. 
+      // The content scripts (index-main/index-iframe) are injected automatically by the browser
+      // based on the manifest rules.
       
     } catch (error) {
-      this.logger.debug('Failed to handle new iframe', {
+      this.logger.debug('Failed to handle new iframe detection', {
         error: error.message,
-        name: error.name,
-        src: iframe?.src || 'unknown',
-        stack: error.stack?.substring(0, 200) + '...'
+        src: iframe?.src || 'unknown'
       });
-    }
-  }
-
-  /**
-   * Inject content script to iframe (if possible and needed)
-   */
-  async _injectContentScriptToIframe(iframe) {
-    try {
-      // Check if we can access iframe content (same-origin policy)
-      const iframeDoc = iframe.contentDocument;
-      const iframeWindow = iframe.contentWindow;
-      
-      if (!iframeDoc || !iframeWindow) {
-        this.logger.debug('Cannot access iframe content or window (cross-origin)', {
-          src: iframe.src,
-          hasDoc: !!iframeDoc,
-          hasWindow: !!iframeWindow
-        });
-        return;
-      }
-      
-      // Check if browser.scripting API is available
-      if (!browser.scripting || !browser.scripting.executeScript) {
-        this.logger.debug('browser.scripting API not available, skipping script injection');
-        return;
-      }
-
-      // Get frameId for script injection
-      let frameId;
-      try {
-        // Try to get frameId from contentWindow or generate one
-        frameId = iframeWindow.frameId || Math.floor(Math.random() * 1000000);
-      } catch (frameIdError) {
-        this.logger.debug('Could not get iframe frameId', {
-          error: frameIdError.message,
-          src: iframe.src
-        });
-        return;
-      }
-
-      this.logger.debug('Attempting to inject content script to iframe', {
-        src: iframe.src,
-        frameId: frameId,
-        hasScriptingAPI: !!(browser.scripting && browser.scripting.executeScript)
-      });
-
-      // Use browser.scripting.executeScript for MV3 compliance
-      await browser.scripting.executeScript({
-        target: { 
-          frameIds: [frameId] 
-        },
-        files: ['src/core/content-scripts/index.js']
-      });
-
-      this.logger.info(`[IFrame] Script injected successfully to iframe: ${frameId}`);
-      
-    } catch {
-      // Content script injection failed details logged at DEBUG level
-
-      // Don't re-throw - script injection failure is not critical for iframe functionality
     }
   }
 
@@ -555,11 +425,11 @@ export class IFrameManager extends ResourceTracker {
     const iframes = document.querySelectorAll('iframe');
     iframes.forEach(iframe => {
       try {
-        if (iframe.contentWindow && !excludeFrameIds.includes(iframe.contentWindow.frameId)) {
+        if (iframe.contentWindow) {
           iframe.contentWindow.postMessage(message, '*');
         }
-            } catch {
-        // Ignore CORS errors for cross-origin iframes
+      } catch {
+        // Ignore CORS errors
       }
     });
   }
