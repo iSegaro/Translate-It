@@ -50,7 +50,8 @@ class SelectElementNotificationManager extends ResourceTracker {
   
   async showNotification(data = {}) {
     // Only show in top frame
-    if (window !== window.top) return;
+    const isTopFrame = window === window.top;
+    if (!isTopFrame) return;
 
     try {
       const { getTranslationString } = await utilsFactory.getI18nUtils();
@@ -84,7 +85,8 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async updateNotification(data = {}) {
-    if (!this.toastId || window !== window.top) return;
+    const isTopFrame = window === window.top;
+    if (!this.toastId || !isTopFrame) return;
 
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {

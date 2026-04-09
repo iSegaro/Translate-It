@@ -111,7 +111,7 @@ export class CrossFrameManager {
     this.logger.info('[CrossFrame] Global click broadcast enabled');
     this._logXF('Broadcast enabled details', {
       frameId: this.frameId,
-      isInIframe: this.isInIframe
+      isTopFrame: this.isTopFrame
     });
   }
 
@@ -130,7 +130,7 @@ export class CrossFrameManager {
     this.logger.info('[CrossFrame] Global click broadcast disabled');
     this._logXF('Broadcast disabled details', {
       frameId: this.frameId,
-      isInIframe: this.isInIframe
+      isTopFrame: this.isTopFrame
     });
   }
 
@@ -202,7 +202,7 @@ export class CrossFrameManager {
    * Request window creation in main document (for iframes)
    */
   requestWindowCreation(selectedText, position) {
-    if (!this.frameRegistry.isInIframe) {
+    if (this.frameRegistry.isTopFrame) {
       this.logger.warn('requestWindowCreation called from main document');
       return;
     }
@@ -260,7 +260,7 @@ export class CrossFrameManager {
   getFrameInfo() {
     return {
       frameId: this.frameRegistry.frameId,
-      isInIframe: this.frameRegistry.isInIframe,
+      isTopFrame: this.frameRegistry.isTopFrame,
       isMainDocument: this.frameRegistry.isMainDocument,
       broadcastEnabled: this._broadcastEnabled,
       relayEnabled: this._relayEnabled,
@@ -292,7 +292,7 @@ export class CrossFrameManager {
     return this.frameRegistry.frameId;
   }
 
-  get isInIframe() {
-    return this.frameRegistry.isInIframe;
+  get isTopFrame() {
+    return this.frameRegistry.isTopFrame;
   }
 }

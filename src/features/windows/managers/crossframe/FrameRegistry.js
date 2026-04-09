@@ -10,7 +10,7 @@ export class FrameRegistry {
   constructor() {
   this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'FrameRegistry');
     this.frameId = Math.random().toString(36).substring(7);
-    this.isInIframe = window !== window.top;
+    this.isTopFrame = window === window.top;
     this.debugCrossFrame = false;
     
     this._setupRegistry();
@@ -36,7 +36,7 @@ export class FrameRegistry {
     }
 
     // Register with parent/top frames if in iframe
-    if (this.isInIframe) {
+    if (!this.isTopFrame) {
       this._registerWithParent();
     }
   }
@@ -79,7 +79,7 @@ export class FrameRegistry {
    * Handle iframe registration (main document only)
    */
   handleFrameRegistration(event) {
-    if (this.isInIframe) return; // Only main document handles registration
+    if (!this.isTopFrame) return; // Only main document handles registration
 
     try {
       // Create map store if not present
@@ -113,7 +113,7 @@ export class FrameRegistry {
    * Get iframe element by frame ID
    */
   getIframeByFrameId(frameId) {
-    if (this.isInIframe || !window.translateItFrameMap) {
+    if (!this.isTopFrame || !window.translateItFrameMap) {
       return null;
     }
     return window.translateItFrameMap.get(frameId);
@@ -137,7 +137,7 @@ export class FrameRegistry {
       }
 
       let cleanedCount = 0;
-      if (!this.isInIframe && window.translateItFrameMap) {
+      if (this.isTopFrame && window.translateItFrameMap) {
         // Clean up mapping entries that reference this frame
         for (const [id, element] of window.translateItFrameMap.entries()) {
           if (!element.isConnected) {
@@ -194,6 +194,6 @@ export class FrameRegistry {
   }
 
   get isMainDocument() {
-    return !this.isInIframe;
+    return this.isTopFrame;
   }
 }

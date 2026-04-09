@@ -518,7 +518,7 @@ export class WindowsManager extends ResourceTracker {
         this.clickManager.addOutsideClickListener();
 
         // Notify iframes to activate their click listeners
-        if (this.crossFrameManager && !this.crossFrameManager.isInIframe) {
+        if (this.crossFrameManager && this.isTopFrame) {
           this.crossFrameManager.messageRouter._broadcastToAllIframes({
             type: 'translateit-activate-click-listeners',
             frameId: this.crossFrameManager.frameId,
@@ -846,13 +846,13 @@ export class WindowsManager extends ResourceTracker {
         x: Math.round(position.x || 0),
         y: Math.round(position.y || 0)
       },
-      context: this.crossFrameManager.isInIframe ? 'iframe' : 'main-frame'
+      context: this.isTopFrame ? 'main-frame' : 'iframe'
     });
 
       
     // NEW: Create window directly in iframe using Vue UI Host
     // The old cross-frame logic is no longer needed since each frame has its own Vue UI Host
-    this.logger.info(`Creating window directly in current frame (${this.crossFrameManager.isInIframe ? 'iframe' : 'main-frame'})`);
+    this.logger.info(`Creating window directly in current frame (${this.isTopFrame ? 'main-frame' : 'iframe'})`);
 
     // PHASE 1: Show small loading window immediately
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -883,7 +883,7 @@ export class WindowsManager extends ResourceTracker {
         this.clickManager.addOutsideClickListener();
 
         // Notify iframes to activate their click listeners
-        if (this.crossFrameManager && !this.crossFrameManager.isInIframe) {
+        if (this.crossFrameManager && this.isTopFrame) {
           this.crossFrameManager.messageRouter._broadcastToAllIframes({
             type: 'translateit-activate-click-listeners',
             frameId: this.crossFrameManager.frameId,
@@ -1144,7 +1144,7 @@ export class WindowsManager extends ResourceTracker {
    * Handle window creation request from iframe
    */
   async _handleWindowCreationRequest(data) {
-    if (this.crossFrameManager.isInIframe) return;
+    if (!this.isTopFrame) return;
 
     try {
       // Get iframe element and adjust position
@@ -1234,7 +1234,7 @@ export class WindowsManager extends ResourceTracker {
    * Handle window creation response for iframe
    */
   _handleWindowCreatedResponse(data) {
-    if (!this.crossFrameManager.isInIframe) return;
+    if (this.isTopFrame) return;
 
     this.logger.info('Received window creation response in iframe', {
       success: data.success,
@@ -1259,7 +1259,7 @@ export class WindowsManager extends ResourceTracker {
    */
   async _handleTextSelectionWindowRequest(data, sourceWindow) {
     // Only handle in main frame
-    if (this.crossFrameManager.isInIframe) return;
+    if (!this.isTopFrame) return;
 
     try {
       // Adjust position for iframe coordinates
@@ -1820,8 +1820,8 @@ export class WindowsManager extends ResourceTracker {
     return this.crossFrameManager.frameId;
   }
 
-  get isInIframe() {
-    return this.crossFrameManager.isInIframe;
+  get isTopFrame() {
+    return this.crossFrameManager.isTopFrame;
   }
 
   /**

@@ -27,8 +27,8 @@ export class IFrameManager extends ResourceTracker {
     this.errorHandler = ErrorHandler.getInstance();
     
     // Frame detection and registry
-    this.isInIframe = window !== window.top;
-    this.isMainDocument = !this.isInIframe;
+    this.isTopFrame = window === window.top;
+    this.isMainDocument = this.isTopFrame;
     this.frameId = this._generateFrameId();
     
     // Frame registry with intelligent caching
@@ -48,7 +48,7 @@ export class IFrameManager extends ResourceTracker {
     
     this.logger.info('IFrameManager initialized', {
       frameId: this.frameId,
-      isInIframe: this.isInIframe,
+      isTopFrame: this.isTopFrame,
       isMainDocument: this.isMainDocument
     });
   }
@@ -121,7 +121,7 @@ export class IFrameManager extends ResourceTracker {
     // Add this frame to registry
     window.translateItFrameRegistry.set(this.frameId, {
       window: window,
-      isInIframe: this.isInIframe,
+      isTopFrame: this.isTopFrame,
       url: window.location.href,
       origin: window.location.origin,
       timestamp: Date.now()
@@ -162,12 +162,12 @@ export class IFrameManager extends ResourceTracker {
     const registrationMessage = {
       type: 'TRANSLATE_IT_FRAME_REGISTER',
       frameId: this.frameId,
-      isInIframe: this.isInIframe,
+      isTopFrame: this.isTopFrame,
       url: window.location.href,
       timestamp: Date.now()
     };
 
-    if (this.isInIframe) {
+    if (!this.isTopFrame) {
       // Register with parent frames
       this._sendToParent(registrationMessage);
     } else {
@@ -523,7 +523,7 @@ export class IFrameManager extends ResourceTracker {
   _getFrameInfo() {
     return {
       frameId: this.frameId,
-      isInIframe: this.isInIframe,
+      isTopFrame: this.isTopFrame,
       isMainDocument: this.isMainDocument,
       url: window.location.href,
       origin: window.location.origin,
@@ -569,7 +569,7 @@ export class IFrameManager extends ResourceTracker {
    */
   _broadcastToAllFrames(message) {
     // Send to parent
-    if (this.isInIframe) {
+    if (!this.isTopFrame) {
       this._sendToParent(message);
     }
     

@@ -67,7 +67,8 @@ export class SelectionManager extends ResourceTracker {
    * Get WindowsManager instance from FeatureManager
    */
   getWindowsManager() {
-    if (window !== window.top) {
+    const isTopFrame = window === window.top;
+    if (!isTopFrame) {
       // In iframe context, no direct WindowsManager needed
       return null;
     }
@@ -249,7 +250,8 @@ export class SelectionManager extends ResourceTracker {
 
     // Only handle cross-frame relaying if we are in an iframe
     // because the local PageEventBus won't reach the main frame's WindowsManager.
-    if (window !== window.top) {
+    const isTopFrame = window === window.top;
+    if (!isTopFrame) {
       this.logger.info('Relaying translation window request from iframe to parent', {
         frameId: this.frameId,
         textLength: selectedText.length

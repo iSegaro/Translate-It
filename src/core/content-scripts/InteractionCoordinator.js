@@ -25,6 +25,9 @@ class InteractionCoordinator {
     this.isPageExcluded = false;
     this.exclusionChecker = ExclusionChecker.getInstance();
     
+    // Cache frame detection for better performance and clean code
+    this.isTopFrame = window === window.top;
+    
     // Optimization flag: Only care about ESC if there's potentially something to revert/cancel
     this.revertMightBeNeeded = false;
     
@@ -156,7 +159,7 @@ class InteractionCoordinator {
       const { activateFeature } = await import('./chunks/lazy-features.js');
       await activateFeature('textSelection');
 
-      if (window === window.top) {
+      if (this.isTopFrame) {
         // In top frame, we can activate windowsManager directly
         await activateFeature('windowsManager');
       } else {

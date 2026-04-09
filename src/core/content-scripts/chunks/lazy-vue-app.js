@@ -189,8 +189,8 @@ async function createMountPoint() {
     throw new Error('Document body not available for mount point creation');
   }
 
-  const isInIframe = window !== window.top;
-  const hostId = isInIframe ? UI_HOST_IDS.IFRAME : UI_HOST_IDS.MAIN;
+  const isTopFrame = window === window.top;
+  const hostId = isTopFrame ? UI_HOST_IDS.MAIN : UI_HOST_IDS.IFRAME;
 
   // Check if host already exists
   let hostElement = document.getElementById(hostId);

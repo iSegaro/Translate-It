@@ -333,8 +333,8 @@ export function ContentScriptCore() {
     return true;
   };
 
-  eventTarget.isInIframe = function() {
-    return window !== window.top;
+  eventTarget.isTopFrame = function() {
+    return window === window.top;
   };
 
   eventTarget.isAccessible = function() {

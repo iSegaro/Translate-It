@@ -36,7 +36,7 @@ class SelectElementManager extends ResourceTracker {
     this.isProcessingClick = false;
     this.isInitialized = false;
     this.instanceId = Math.random().toString(36).substring(7);
-    this.isInIframe = window !== window.top;
+    this.isTopFrame = window === window.top;
 
     // Logger
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementManager');
@@ -156,7 +156,7 @@ class SelectElementManager extends ResourceTracker {
 
       this.elementSelector.activate();
 
-      if (window === window.top) {
+      if (this.isTopFrame) {
         this.showNotification();
         const [settings, bingWarning, lingvaWarning] = await Promise.all([
           getSettingsAsync(),
@@ -227,7 +227,7 @@ class SelectElementManager extends ResourceTracker {
       this.elementSelector.deactivate();
 
       // Always dismiss selection notifications during deactivation
-      if (window === window.top) {
+      if (this.isTopFrame) {
         this.dismissNotification();
       }
 
@@ -266,7 +266,7 @@ class SelectElementManager extends ResourceTracker {
 
       window.addEventListener('keydown', this.handleKeyDown, true);
 
-      if (window === window.top) {
+      if (this.isTopFrame) {
         this.iframeMessageHandler = (event) => {
           if (event.data?.type === 'translate-it-deactivate-select-element') {
             this.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
@@ -290,7 +290,7 @@ class SelectElementManager extends ResourceTracker {
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
-    if (window === window.top && this.iframeMessageHandler) {
+    if (this.isTopFrame && this.iframeMessageHandler) {
       window.removeEventListener('message', this.iframeMessageHandler);
       this.iframeMessageHandler = null;
     }
@@ -413,7 +413,7 @@ class SelectElementManager extends ResourceTracker {
   async startTranslation(targetElement, options = {}) {
     try {
       if (!this.isActive) return;
-      if (window === window.top) this.updateNotificationForTranslation();
+      if (this.isTopFrame) this.updateNotificationForTranslation();
 
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
         ...this.currentOptions,
@@ -424,7 +424,7 @@ class SelectElementManager extends ResourceTracker {
           pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE');
 
           // CRITICAL: Notify top frame about iframe translations so Desktop FAB can show Revert button
-          if (this.isInIframe) {
+          if (!this.isTopFrame) {
             try {
               window.top.postMessage({ 
                 type: WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE,
@@ -468,7 +468,7 @@ class SelectElementManager extends ResourceTracker {
   performPostTranslationCleanup(options = {}) {
     const reason = options.reason || 'success';
 
-    if (this.isInIframe) {
+    if (!this.isTopFrame) {
       try {
         // Notify top frame that this iframe has finished its selection/translation
         // This will trigger a global deactivation to clean up all other iframes
@@ -598,7 +598,7 @@ class SelectElementManager extends ResourceTracker {
    * @private
    */
   async _ensureStylesInjected() {
-    if (this.isInIframe) return;
+    if (!this.isTopFrame) return;
 
     const contentCore = window.translateItContentCore;
     if (contentCore && typeof contentCore.injectMainDOMStyles === 'function') {
@@ -607,12 +607,12 @@ class SelectElementManager extends ResourceTracker {
   }
 
   isSelectElementActive() { return this.isActive; }
-  getStatus() { return { serviceActive: this.isActive, isProcessingClick: this.isProcessingClick, isInitialized: this.isInitialized, instanceId: this.instanceId, isInIframe: this.isInIframe }; }
+  getStatus() { return { serviceActive: this.isActive, isProcessingClick: this.isProcessingClick, isInitialized: this.isInitialized, instanceId: this.instanceId, isTopFrame: this.isTopFrame }; }
   forceCleanup() {
     try {
       this.removeEventListeners();
       this.elementSelector.deactivate();
-      if (window === window.top) this.dismissNotification();
+      if (this.isTopFrame) this.dismissNotification();
     } catch (e) { /* ignore */ }
   }
 

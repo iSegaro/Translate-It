@@ -66,7 +66,7 @@ export class ClickManager extends ResourceTracker {
     };
 
     this.logger.debug('Outside click listener added', {
-      isInIframe: this.crossFrameManager.isInIframe,
+      isTopFrame: this.crossFrameManager.isTopFrame,
       frameId: this.crossFrameManager.frameId,
       hasActiveElements: this.state.hasActiveElements
     });

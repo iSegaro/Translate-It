@@ -75,7 +75,8 @@ if (typeof window !== 'undefined') {
   }
   
   // For iframe contexts, also ensure event bus is available in parent context
-  if (window !== window.top && window.parent) {
+  const isTopFrame = window === window.top;
+  if (!isTopFrame && window.parent) {
     try {
       // Try to share event bus with parent if possible (same origin)
       if (!window.parent.pageEventBus) {

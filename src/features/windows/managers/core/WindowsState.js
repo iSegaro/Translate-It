@@ -10,7 +10,7 @@ export class WindowsState {
   constructor(frameId) {
   this.logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'WindowsState');
     this.frameId = frameId;
-    this.isInIframe = window !== window.top;
+    this.isTopFrame = window === window.top;
     this.reset();
   }
 
@@ -181,7 +181,7 @@ export class WindowsState {
       isTranslationCancelled: this.isTranslationCancelled,
       hasOriginalText: !!this.originalText,
       isDragging: this.isDragging,
-      isInIframe: this.isInIframe,
+      isTopFrame: this.isTopFrame,
       hasIconClickContext: !!this.iconClickContext,
       _broadcastEnabled: this._broadcastEnabled,
       _relayEnabled: this._relayEnabled,
