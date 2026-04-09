@@ -135,6 +135,42 @@ async function initializeLogger() {
         };
 
         /**
+         * Computes the global translation status for the entire page.
+         * Exposed globally for ContentMessageHandler to use.
+         */
+        window.getGlobalPageTranslationStatus = () => {
+          let grandTotalTranslated = 0;
+          let grandTotalCount = 0;
+          let anyAutoTranslating = false;
+          let anyActiveTranslating = false;
+          let isTranslated = false;
+          
+          for (const progress of frameProgressMap.values()) {
+            grandTotalTranslated += progress.translatedCount || 0;
+            grandTotalCount += progress.totalCount || 0;
+            
+            if (progress.isAutoTranslating) anyAutoTranslating = true;
+            if (progress.isTranslated || progress.translatedCount > 0) isTranslated = true;
+            
+            const isExplicitlyIdle = progress.status === 'idle' || progress.isTranslating === false;
+            if (!isExplicitlyIdle && (progress.translatedCount < progress.totalCount || progress.totalCount === 0)) {
+              anyActiveTranslating = true;
+            }
+          }
+          
+          return {
+            success: true,
+            isActive: isTranslated || anyActiveTranslating || anyAutoTranslating,
+            isTranslating: anyActiveTranslating,
+            isTranslated: isTranslated,
+            isAutoTranslating: anyAutoTranslating,
+            translatedCount: grandTotalTranslated,
+            totalCount: grandTotalCount,
+            currentUrl: window.location.href
+          };
+        };
+
+        /**
          * Aggregates progress from all frames and emits a unified event
          */
         const emitAggregateProgress = (overrideAction = null, extraData = {}) => {

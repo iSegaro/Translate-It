@@ -676,6 +676,12 @@ export class ContentMessageHandler extends ResourceTracker {
   async handlePageGetStatus() {
     this.logger.debug('Page translation status request received');
 
+    // 1. PRIORITY: If we are in the top frame, use the aggregated status from index-main
+    if (window === window.top && typeof window.getGlobalPageTranslationStatus === 'function') {
+      return window.getGlobalPageTranslationStatus();
+    }
+
+    // 2. FALLBACK: Use local manager status (for iframes or if aggregator is missing)
     if (!this.pageTranslationManager) {
       try {
         const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
