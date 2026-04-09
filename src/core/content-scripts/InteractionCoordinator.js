@@ -150,10 +150,30 @@ class InteractionCoordinator {
 
   async _handleTextSelection() {
     const selection = window.getSelection();
-    if (selection?.toString().trim()) {
+    const selectedText = selection?.toString().trim();
+    
+    if (selectedText) {
       const { activateFeature } = await import('./chunks/lazy-features.js');
       await activateFeature('textSelection');
-      await activateFeature('windowsManager');
+
+      if (window === window.top) {
+        // In top frame, we can activate windowsManager directly
+        await activateFeature('windowsManager');
+      } else {
+        // In iframe, we notify top frame about the selection so it can show the UI
+        try {
+          window.top.postMessage({
+            type: 'TRANSLATE_IT_TEXT_SELECTION_DETECTED',
+            source: 'translate-it-iframe',
+            data: {
+              text: selectedText,
+              // We'll let windowsManager in main frame handle the positioning
+              // but we can pass hint that it's from iframe
+              fromIframe: true
+            }
+          }, '*');
+        } catch (e) { /* ignore cross-origin */ }
+      }
     }
   }
 

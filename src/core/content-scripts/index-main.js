@@ -153,6 +153,20 @@ async function initializeLogger() {
             }
             // The listener below (select-mode-deactivated) will handle the broadcast
           }
+
+          // Handle text selection from iframes to show the UI in main frame
+          if (event.data?.type === 'TRANSLATE_IT_TEXT_SELECTION_DETECTED') {
+            const { text } = event.data.data || {};
+            if (text && contentScriptCore) {
+              // Activate windowsManager in main frame to show icon/window
+              contentScriptCore.loadFeature('windowsManager').then(manager => {
+                // Optionally we could manually trigger the icon show here if needed
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Main] Showing UI for selection in iframe');
+                }
+              });
+            }
+          }
         });
 
         // 2. Synchronize deactivation across all frames when top frame deactivates
