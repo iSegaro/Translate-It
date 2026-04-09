@@ -65,12 +65,12 @@ export const useIFramePositioning = async () => {
  * Check if iframe support is available
  */
 export function checkIFrameSupport() {
-  const isInIframe = window !== window.top;
+  const isTopFrame = window === window.top;
   const hasFrameElement = !!window.frameElement;
   
   return {
     available: true, // Always available in simplified version
-    isInIframe,
+    isTopFrame,
     hasFrameElement,
     canAccessParent: hasFrameElement,
     frameDepth: getFrameDepth()
@@ -111,7 +111,7 @@ export async function initializeIFrameSupport(options = {}) {
     if (enableLogging) {
       const support = checkIFrameSupport();
       logger.info('IFrame support initialized', {
-        isInIframe: support.isInIframe,
+        isTopFrame: support.isTopFrame,
         frameDepth: support.frameDepth,
         canAccessParent: support.canAccessParent
       });

@@ -5,7 +5,7 @@ import { ref, computed } from 'vue';
  * Simplified composable for basic iframe detection
  */
 export function useIFrameDetection() {
-  const isInIframe = ref(window !== window.top);
+  const isTopFrame = ref(window === window.top);
   const isMainDocument = ref(window === window.top);
   const frameDepth = ref(getFrameDepth());
   
@@ -27,7 +27,7 @@ export function useIFrameDetection() {
   }
   
   return {
-    isInIframe,
+    isTopFrame,
     isMainDocument,
     frameDepth
   };
@@ -37,10 +37,10 @@ export function useIFrameDetection() {
  * Lightweight composable for iframe-aware positioning
  */
 export function useIFramePositioning() {
-  const { isInIframe } = useIFrameDetection();
+  const { isTopFrame } = useIFrameDetection();
   
   const transformPosition = (position) => {
-    if (!isInIframe.value) return position;
+    if (isTopFrame.value) return position;
     
     try {
       // Get iframe offset from parent
@@ -60,7 +60,7 @@ export function useIFramePositioning() {
   };
   
   const getFrameBounds = () => {
-    if (!isInIframe.value) {
+    if (isTopFrame.value) {
       return {
         width: window.innerWidth,
         height: window.innerHeight,
@@ -93,7 +93,7 @@ export function useIFramePositioning() {
   };
   
   return {
-    isInIframe,
+    isTopFrame,
     transformPosition,
     getFrameBounds
   };
@@ -103,14 +103,14 @@ export function useIFramePositioning() {
  * Main composable for iframe support (simplified)
  */
 export function useIFrameSupport() {
-  const { isInIframe, isMainDocument } = useIFrameDetection();
+  const { isTopFrame, isMainDocument } = useIFrameDetection();
   const { transformPosition, getFrameBounds } = useIFramePositioning();
   
-  const hasIFrameSupport = computed(() => isInIframe.value || isMainDocument.value);
+  const hasIFrameSupport = computed(() => isTopFrame.value || isMainDocument.value);
   
   return {
     // Basic detection
-    isInIframe,
+    isTopFrame,
     isMainDocument,
     hasIFrameSupport,
     
