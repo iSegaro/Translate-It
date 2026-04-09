@@ -1290,10 +1290,15 @@ export class WindowsManager extends ResourceTracker {
       
       if (iframe) {
         const iframeRect = iframe.getBoundingClientRect();
+        
+        // Both adjustedPosition and iframeRect are now viewport-relative.
+        // Adding them gives us the correct position relative to the main window's viewport.
         adjustedPosition.x += iframeRect.left;
         adjustedPosition.y += iframeRect.top;
-        // Mark as viewport-relative to prevent double scroll adjustment in Vue
+        
+        // Explicitly mark as viewport-relative so Vue UI can apply the main document scroll
         adjustedPosition._isViewportRelative = true;
+        adjustedPosition._isAbsolute = false;
       }
 
       await this.show(data.selectedText, adjustedPosition, data.options);

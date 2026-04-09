@@ -229,9 +229,15 @@ export class SelectionManager extends ResourceTracker {
       const iconSize = WindowsConfig.POSITIONING.ICON_SIZE || 32;
       const selectionCenter = rect.left + rect.width / 2;
 
+      // For iframes, we prefer sending viewport-relative coordinates
+      // because the main frame can easily map them to its own viewport.
+      const isTopFrame = window === window.top;
+      
       return {
-        x: selectionCenter - (iconSize / 2) + window.scrollX,
-        y: rect.bottom + (WindowsConfig.POSITIONING.SELECTION_OFFSET || 10) + window.scrollY
+        x: selectionCenter - (iconSize / 2) + (isTopFrame ? window.scrollX : 0),
+        y: rect.bottom + (WindowsConfig.POSITIONING.SELECTION_OFFSET || 10) + (isTopFrame ? window.scrollY : 0),
+        // Add a flag so the receiver knows if scroll was already included
+        _isViewportRelative: !isTopFrame
       };
 
     } catch (error) {
