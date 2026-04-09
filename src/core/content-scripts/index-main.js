@@ -121,17 +121,6 @@ async function initializeLogger() {
         // Start the multi-stage loading sequence
         featureLoader.startIntelligentLoading();
 
-        // 4. Register global handlers for popup sync in ContentMessageHandler
-        // Note: This must run after contentMessageHandler feature is loaded (part of ESSENTIAL)
-        featureLoader.loadFeature('contentMessageHandler', 'ESSENTIAL').then(() => {
-          const messageHandler = contentScriptCore.getMessageHandler();
-          if (messageHandler) {
-            messageHandler.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, async () => {
-              return aggregator.getGlobalPageTranslationStatus();
-            });
-          }
-        });
-
         if (process.env.NODE_ENV === 'development') {
           scriptLogger.info('Main frame content script initialized (Modular mode)');
         }
