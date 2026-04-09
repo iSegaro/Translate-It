@@ -37,13 +37,18 @@ export class PageTranslationFluidFilter {
     }
 
     // RULE: If no items in viewport, we don't start a batch just for buffer/off-screen
-    if (viewportItems.length === 0) {
+    // EXCEPTION: If lazy loading is disabled, we continue even if nothing is in viewport.
+    const isLazy = config.lazyLoading !== false;
+    if (viewportItems.length === 0 && isLazy) {
       return { batchItems: [], remainingItems: queue };
     }
 
     // 2. Sorting: Within categories, prioritize by score (DESC)
     viewportItems.sort((a, b) => b.score - a.score);
     bufferItems.sort((a, b) => b.score - a.score);
+    if (!isLazy) {
+      otherItems.sort((a, b) => b.score - a.score);
+    }
 
     const batchItems = [];
     let currentChars = 0;
@@ -77,11 +82,27 @@ export class PageTranslationFluidFilter {
     const usedBufferIds = new Set(usedBufferItems.map(i => i.id || i));
     const remainingBufferItems = bufferItems.filter(i => !usedBufferIds.has(i.id || i));
 
-    // 5. Finalizing Remaining Queue
+    // 5. Selection Phase C: Off-Screen Filling (Only if NOT lazy and space is left)
+    const usedOtherItems = [];
+    if (!isLazy && batchItems.length < chunkSize) {
+      for (const item of otherItems) {
+        if (batchItems.length >= chunkSize) break;
+        if (currentChars + item.text.length > maxChars) break;
+
+        batchItems.push(item);
+        usedOtherItems.push(item);
+        currentChars += item.text.length;
+      }
+    }
+
+    const usedOtherIds = new Set(usedOtherItems.map(i => i.id || i));
+    const remainingOtherItems = otherItems.filter(i => !usedOtherIds.has(i.id || i));
+
+    // 6. Finalizing Remaining Queue
     const remainingItems = [
       ...remainingViewportItems,
       ...remainingBufferItems,
-      ...otherItems
+      ...remainingOtherItems
     ];
 
     logger.debugLazy(() => [

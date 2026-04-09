@@ -11,12 +11,13 @@ export class PageTranslationQueueFilter {
   /**
    * Filter and prioritize items in the queue.
    * @param {Array} queue - Current scheduler queue
-   * @param {number} chunkSize - Maximum batch size
+   * @param {Object} config - Batch configuration (chunkSize, maxChars, lazyLoading)
    * @returns {Object} { batchItems, remainingItems }
    */
-  static process(queue, chunkSize) {
+  static process(queue, config) {
     const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'QueueFilter');
     const viewportBuffer = PAGE_TRANSLATION_TIMING.VIEWPORT_BUFFER_PX || 100;
+    const { chunkSize, maxChars } = config;
 
     const viewportItems = [];
     const bufferItems = [];
@@ -34,45 +35,76 @@ export class PageTranslationQueueFilter {
       }
     }
 
-    // RULE: If no items in viewport, we don't start a batch just for buffer
-    // (Except potentially for isFirstBatch, but that's handled by viewport logic anyway)
-    if (viewportItems.length === 0) {
-      // SMART PURGE: If the total queue is getting too large (e.g. > 1000) 
-      // but nothing is visible, we should drop very far away items
-      // to avoid continuous processing of thousands of off-screen nodes.
+    // RULE: If no items in viewport, we don't start a batch just for buffer/off-screen
+    // EXCEPTION: If lazy loading is disabled, we continue even if nothing is in viewport.
+    const isLazy = config.lazyLoading !== false;
+    if (viewportItems.length === 0 && isLazy) {
+      // SMART PURGE: Only purge in lazy mode to avoid memory leaks during long scrolls
       if (queue.length > 1000) {
         const MAX_DISTANCE_PX = 3000;
         const purgeResult = this._purgeDistantItems(otherItems, MAX_DISTANCE_PX);
         
         if (purgeResult.purgedCount > 0) {
           logger.debug(`Purged ${purgeResult.purgedCount} items that were too far (> ${MAX_DISTANCE_PX}px)`);
-          return { batchItems: [], remainingItems: [...bufferItems, ...purgeResult.remaining] };
+          return { batchItems: [], remainingItems: [...bufferItems, ...purgeResult.remaining], purgedCount: purgeResult.purgedCount, ejectedItems: purgeResult.ejectedItems };
         }
       }
       return { batchItems: [], remainingItems: queue };
     }
 
-    // Pick viewport items up to chunkSize
-    const batchItems = viewportItems.slice(0, chunkSize);
-    const remainingViewportItems = viewportItems.slice(chunkSize);
+    const batchItems = [];
+    let currentChars = 0;
 
-    let remainingItems = [...remainingViewportItems];
+    // 1. Selection Phase A: Viewport Items (Up to chunkSize/maxChars)
+    for (const item of viewportItems) {
+      if (batchItems.length >= chunkSize) break;
+      if (maxChars && currentChars + item.text.length > maxChars && batchItems.length > 0) break;
 
-    // FILLING LOGIC: Only add buffer if there is remaining space in the batch
-    if (batchItems.length < chunkSize) {
-      const spaceLeft = chunkSize - batchItems.length;
-      const bufferToPick = bufferItems.slice(0, spaceLeft);
-      batchItems.push(...bufferToPick);
-
-      // Items from buffer that weren't picked stay in queue
-      remainingItems.push(...bufferItems.slice(spaceLeft));
-    } else {
-      // If viewport filled the batch, ALL buffer items stay in queue
-      remainingItems.push(...bufferItems);
+      batchItems.push(item);
+      currentChars += item.text.length;
     }
 
-    // Add off-screen items back
-    remainingItems.push(...otherItems);
+    const selectedIds = new Set(batchItems.map(i => i.id || i));
+    const remainingViewportItems = viewportItems.filter(i => !selectedIds.has(i.id || i));
+
+    // 2. Selection Phase B: Smart Buffer Filling (Only if space is left)
+    const usedBufferItems = [];
+    if (batchItems.length < chunkSize) {
+      for (const item of bufferItems) {
+        if (batchItems.length >= chunkSize) break;
+        if (maxChars && currentChars + item.text.length > maxChars) break;
+
+        batchItems.push(item);
+        usedBufferItems.push(item);
+        currentChars += item.text.length;
+      }
+    }
+
+    const usedBufferIds = new Set(usedBufferItems.map(i => i.id || i));
+    const remainingBufferItems = bufferItems.filter(i => !usedBufferIds.has(i.id || i));
+
+    // 3. Selection Phase C: Off-Screen Filling (Only if NOT lazy and space is left)
+    const usedOtherItems = [];
+    if (!isLazy && batchItems.length < chunkSize) {
+      for (const item of otherItems) {
+        if (batchItems.length >= chunkSize) break;
+        if (maxChars && currentChars + item.text.length > maxChars) break;
+
+        batchItems.push(item);
+        usedOtherItems.push(item);
+        currentChars += item.text.length;
+      }
+    }
+
+    const usedOtherIds = new Set(usedOtherItems.map(i => i.id || i));
+    const remainingOtherItems = otherItems.filter(i => !usedOtherIds.has(i.id || i));
+
+    // 4. Finalizing Remaining Queue
+    const remainingItems = [
+      ...remainingViewportItems,
+      ...remainingBufferItems,
+      ...remainingOtherItems
+    ];
 
     logger.debugLazy(() => [
       'Filter Results (Smart Buffer):',
@@ -80,7 +112,8 @@ export class PageTranslationQueueFilter {
         totalQueue: queue.length,
         batch: batchItems.length,
         viewportFound: viewportItems.length,
-        bufferUsed: batchItems.length - Math.min(viewportItems.length, chunkSize),
+        bufferUsed: usedBufferItems.length,
+        otherUsed: usedOtherItems.length,
         remaining: remainingItems.length
       }
     ]);

@@ -281,7 +281,7 @@ export class PageTranslationScheduler extends ResourceTracker {
 
         // 1. SELECT BATCH: Use specialized filters based on the mode
         if (this.settings.translateAfterScrollStop) {
-          const result = PageTranslationQueueFilter.process(this.queue, config.chunkSize);
+          const result = PageTranslationQueueFilter.process(this.queue, config);
           currentBatch = result.batchItems;
           this.queue = result.remainingItems;
 
@@ -404,6 +404,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       providerRegistryId,
       targetLanguage,
       chunkSize: this.settings.chunkSize,
+      lazyLoading: this.settings.lazyLoading,
       maxChars: isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS
     };
   }
