@@ -130,8 +130,9 @@ async function initializeLogger() {
         
         /**
          * Aggregates progress from all frames and emits a unified event
+         * @param {string} overrideAction - Optional action to emit instead of progress
          */
-        const emitAggregateProgress = () => {
+        const emitAggregateProgress = (overrideAction = null) => {
           let grandTotalTranslated = 0;
           let grandTotalCount = 0;
           
@@ -141,11 +142,21 @@ async function initializeLogger() {
           }
           
           if (window.pageEventBus) {
-            window.pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+            const action = overrideAction || MessageActions.PAGE_TRANSLATE_PROGRESS;
+            const payload = {
               translatedCount: grandTotalTranslated,
               totalCount: grandTotalCount,
               isAggregated: true
-            });
+            };
+
+            // For completion/stop events, we need extra flags for the mobile store
+            if (action === MessageActions.PAGE_TRANSLATE_COMPLETE || 
+                action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
+              payload.isTranslated = grandTotalTranslated > 0;
+              payload.url = window.location.href;
+            }
+
+            window.pageEventBus.emit(action, payload);
           }
         };
 
@@ -197,6 +208,20 @@ async function initializeLogger() {
               return;
             }
 
+            // Handle iframe completion
+            if (type === 'TRANSLATE_IT_PAGE_COMPLETE') {
+              frameProgressMap.set(event.source, data);
+              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE);
+              return;
+            }
+
+            // Handle iframe stopped (auto-restore)
+            if (type === 'TRANSLATE_IT_PAGE_STOPPED') {
+              frameProgressMap.set(event.source, data);
+              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE);
+              return;
+            }
+
             if (type && window.pageEventBus) {
               window.pageEventBus.emit(type, data);
             }
@@ -240,11 +265,25 @@ async function initializeLogger() {
             broadcastPageAction(MessageActions.PAGE_TRANSLATE, options);
           });
 
-          // Track main frame's own progress
+          // Track main frame's own lifecycle
           window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
             if (!data.isAggregated) {
               frameProgressMap.set('main', data);
               emitAggregateProgress();
+            }
+          });
+
+          window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
+            if (!data.isAggregated) {
+              frameProgressMap.set('main', data);
+              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE);
+            }
+          });
+
+          window.pageEventBus.on(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (data) => {
+            if (!data.isAggregated) {
+              frameProgressMap.set('main', data);
+              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE);
             }
           });
 
