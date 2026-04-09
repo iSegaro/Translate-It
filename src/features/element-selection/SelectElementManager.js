@@ -468,10 +468,19 @@ class SelectElementManager extends ResourceTracker {
   performPostTranslationCleanup(options = {}) {
     const reason = options.reason || 'success';
 
-    if (window !== window.top) {
+    if (this.isInIframe) {
       try {
-        window.top.postMessage({ type: 'translate-it-deactivate-select-element', source: 'iframe-translation-complete', instanceId: this.instanceId }, '*');
+        // Notify top frame that this iframe has finished its selection/translation
+        // This will trigger a global deactivation to clean up all other iframes
+        window.top.postMessage({ 
+          type: 'translate-it-deactivate-select-element', 
+          source: 'iframe-translation-complete', 
+          instanceId: this.instanceId 
+        }, '*');
       } catch (e) { /* ignore */ }
+      
+      // Also locally deactivate to ensure clean state
+      this.deactivate({ preserveTranslations: true, reason, fromBackground: true }).catch(() => {});
     } else if (this.isActive) {
       this.deactivate({ preserveTranslations: true, reason }).catch(() => {});
     }
@@ -513,18 +522,11 @@ class SelectElementManager extends ResourceTracker {
 
   setupCrossFrameCommunication() {
     this.addEventListener(window, 'message', (event) => {
-      if (event.data?.type === 'DEACTIVATE_ALL_SELECT_MANAGERS' && event.data.source !== 'translate-it-main') {
+      // Respond to global deactivation signals
+      if (event.data?.type === 'DEACTIVATE_ALL_SELECT_MANAGERS') {
         this.deactivate({ fromBackground: true, reason: 'manual' });
       }
     });
-
-    if (window === window.top) {
-      const originalDeactivate = this.deactivate.bind(this);
-      this.deactivate = async (options = {}) => {
-        await originalDeactivate(options);
-        try { window.postMessage({ type: 'DEACTIVATE_ALL_SELECT_MANAGERS', source: 'translate-it-main' }, '*'); } catch { /* ignore */ }
-      };
-    }
   }
 
   async notifyBackgroundActivation() {

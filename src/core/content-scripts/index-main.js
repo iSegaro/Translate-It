@@ -122,8 +122,22 @@ async function initializeLogger() {
       const initialized = await contentScriptCore.initializeCritical();
       
       if (initialized) {
-        // --- CROSS-FRAME EVENT SYNC ---
-        // Listen for events from iframes and re-broadcast them in the top frame's bus
+        // --- CROSS-FRAME COORDINATION ---
+        
+        /**
+         * Broadcasts a deactivation signal to all iframes
+         */
+        const broadcastDeactivation = () => {
+          const broadcastMessage = { type: 'DEACTIVATE_ALL_SELECT_MANAGERS', source: 'translate-it-main' };
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            try {
+              iframe.contentWindow.postMessage(broadcastMessage, '*');
+            } catch (e) { /* ignore cross-origin */ }
+          });
+        };
+
+        // 1. Re-broadcast events from iframes to the top frame's bus
         window.addEventListener('message', (event) => {
           if (event.data?.source === 'translate-it-iframe') {
             const { type, data } = event.data;
@@ -131,7 +145,26 @@ async function initializeLogger() {
               window.pageEventBus.emit(type, data);
             }
           }
+
+          // Handle deactivation requests from iframes
+          if (event.data?.type === 'translate-it-deactivate-select-element') {
+            if (window.selectElementManagerInstance) {
+              window.selectElementManagerInstance.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
+            }
+            // The listener below (select-mode-deactivated) will handle the broadcast
+          }
         });
+
+        // 2. Synchronize deactivation across all frames when top frame deactivates
+        // This covers deactivation via click-in-main, ESC key, or notification buttons
+        if (window.pageEventBus) {
+          window.pageEventBus.on('select-mode-deactivated', () => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Main] Deactivation detected, broadcasting to all iframes');
+            }
+            broadcastDeactivation();
+          });
+        }
 
         // --- CRITICAL IDENTITY SETUP ---
         // Ensure extension identity is established before any other feature loads
