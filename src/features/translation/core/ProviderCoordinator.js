@@ -15,6 +15,8 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -172,10 +174,10 @@ export class ProviderCoordinator {
     
     let useStreaming = false;
     if (messageId && engine && supportsStreaming) {
-      if (providerType === 'ai') {
-        useStreaming = isSelectElement || (options.textLength > 500);
+      if (providerType === ProviderTypes.AI) {
+        useStreaming = isSelectElement || (options.textLength > TRANSLATION_CONSTANTS.STREAMING_THRESHOLDS.AI);
       } else {
-        useStreaming = isSelectElement && (options.textLength > 2000);
+        useStreaming = isSelectElement && (options.textLength > TRANSLATION_CONSTANTS.STREAMING_THRESHOLDS.TRADITIONAL);
       }
     }
 

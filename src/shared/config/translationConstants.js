@@ -63,4 +63,10 @@ export const TRANSLATION_CONSTANTS = {
     YANDEX: 'character_limit',
     DEEPL: 'character_limit',
   },
+
+  // Thresholds for deciding when to use streaming
+  STREAMING_THRESHOLDS: {
+    AI: 500,
+    TRADITIONAL: 2000,
+  },
 };
