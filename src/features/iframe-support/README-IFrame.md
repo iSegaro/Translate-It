@@ -1,54 +1,50 @@
-# IFrame Support System (Simplified)
+# IFrame Support System (Dual-Entry Architecture)
 
-Streamlined iframe support system for Translate-It extension with essential functionality and integration to existing architecture.
+Streamlined and high-performance iframe support system for Translate-It extension, optimized for Manifest V3 and multi-frame environments.
 
-## 🎯 Overview
+## Overview
 
-This system provides essential iframe support while maintaining compatibility with the existing Vue.js, ResourceTracker, Error Management, and Smart Messaging systems. The system has been simplified to include only the components that are actively used.
+This system manages the extension's behavior across multiple frames using a **Dual-Entry** approach. It ensures that heavy UI components (Vue) are only loaded in the main frame, while iframes run a "Lite Proxy" script. This architecture guarantees maximum performance and seamless coordination for features like Select Element and Whole Page Translation.
 
-## 📁 Structure
+## Structure
 
 ```
 src/features/iframe-support/
 ├── managers/
-│   └── IFrameManager.js          # Core iframe management with ResourceTracker
+│   └── IFrameManager.js          # Core management, registry & coordinate mapping
 ├── composables/
-│   └── useIFrameSupport.js       # Simplified Vue 3 composables for iframe functionality
-├── index.js                      # Simplified entry point and initialization
+│   └── useIFrameSupport.js       # Vue 3 composables (isTopFrame detection, etc.)
+├── index.js                      # Entry point for feature discovery
 └── README.md                     # This file
 ```
 
-## 🚀 Key Features (Simplified)
+## Key Features
 
-### ✅ Essential Integration with Existing Systems
-- **ResourceTracker**: Automatic memory management and cleanup  
-- **Error Management**: Centralized error handling with ExtensionContextManager
-- **Smart Messaging**: Optimized cross-frame communication
-- **Vue.js**: Simple reactive composables for basic iframe detection
+### Dual-Entry Architecture
+- **index-main.js**: Orchestrator for the top frame. Manages UI, Stores, and Coordination.
+- **index-iframe.js**: Lightweight proxy for all iframes. Filters out tiny frames (ads) and handles text detection.
 
-### ✅ Core Iframe Functionality
-- **Frame Management**: IFrameManager for frame registration and tracking
-- **Frame Registry**: Robust frame registration with corruption protection
-- **SelectElement Support**: Fixed to work properly in iframes with immediate UI deactivation
-- **Cross-Frame Communication**: Essential messaging between frames
+### Cross-Frame Coordination
+- **Event Synchronization**: Coordinated `ESC` key, `Revert`, and `Deactivation` across all frames.
+- **Smart Click Detection**: Clicks inside iframes correctly dismiss UI elements in the main frame.
+- **Progress Aggregation**: Hierarchical reporting where iframes send stats to the main frame for a unified FAB progress display.
 
-### ✅ Performance Optimized
-- **Memory Efficient**: Proper cleanup and resource tracking via ResourceTracker
-- **Reduced Console Noise**: Debug-level logging for multi-frame operations  
-- **Lightweight**: Only essential components, no unused abstractions
+### Intelligent Viewport Translation
+- **Browser-Native Detection**: Leverages standard `IntersectionObserver` within iframes to detect visibility relative to the top-level viewport.
+- **Lazy Promotion**: Heavy translation modules are only loaded in iframes when they become visible or are triggered by the user.
 
-## 📋 Usage
+### Performance Optimized
+- **Tiny Frame Filter**: Automatically ignores frames smaller than 80x80px (ads/trackers).
+- **Zero Memory Leaks**: Full integration with `ResourceTracker` for automatic cleanup of cross-frame listeners.
 
-### 1. Automatic Initialization (Content Script)
+## Usage
 
-The system automatically initializes when the content script loads:
+### 1. Automatic Initialization
+The system is automatically handled by the manifest and the two entry points:
+- `content-main.js` (Top frame only)
+- `content-iframe.js` (All frames)
 
-```javascript
-// Already integrated in content-scripts/index.js
-// No manual initialization required
-```
-
-### 2. Vue Composable Usage (Simplified)
+### 2. Vue Composable Usage (Standardized)
 
 ```vue
 <script setup>
@@ -57,158 +53,37 @@ import {
   useIFramePositioning 
 } from '@/features/iframe-support/composables/useIFrameSupport.js';
 
-// Simple iframe detection
-const { isInIframe, isMainDocument, frameDepth } = useIFrameDetection();
+// Standardized frame detection (Positive Logic)
+const { isTopFrame, isMainDocument, frameDepth } = useIFrameDetection();
 
-// Position transformation for iframe-aware UI
+// Positioning transformation
 const { transformPosition, getFrameBounds } = useIFramePositioning();
 
+// Coordinates are automatically mapped to the main viewport
 const adjustedPosition = transformPosition({ x: 100, y: 200 });
 </script>
 ```
 
-### 3. Direct API Usage (Simplified)
+## Recent Improvements (2026)
 
-```javascript
-import { initializeIFrameSupport, checkIFrameSupport } from '@/features/iframe-support/index.js';
+### 1. Unified Frame Detection
+Standardized all checks to use `isTopFrame` instead of `isInIframe` for better code clarity and consistency across the project.
 
-// Check iframe support availability
-const support = checkIFrameSupport();
-console.log('IFrame support available:', support.available);
+### 2. Precision Positioning Fix
+Fixed "Double Scroll" issue. Iframe selections now use absolute Viewport-Relative mapping, ensuring the translation icon appears exactly under the selected text regardless of scroll levels in any frame.
 
-// Initialize (simplified)
-const result = await initializeIFrameSupport({
-  enableLogging: true
-});
+### 3. Page Translation Aggregator
+Implemented a central aggregator in the top frame. It collects `translatedCount` and `totalCount` from all active iframes to show a true "Whole Page" progress percentage in the FAB.
 
-if (result.success) {
-  console.log('IFrame support initialized successfully');
-}
-```
+### 4. Cross-Frame Shortcut Sync
+Fixed the issue where the `ESC` key only reverted the main frame. It now broadcasts a global revert signal to all iframes.
 
-## 🎨 Vue Integration
+## Security Considerations
 
-### Lightweight Composables
-
-```vue
-<script setup>
-import { useIFrameDetection, useIFramePositioning } from '@/features/iframe-support/composables/useIFrameSupport.js';
-
-// Simple iframe detection
-const { isInIframe, isMainDocument, frameDepth } = useIFrameDetection();
-
-// Position transformation for iframe-aware UI
-const { transformPosition, getFrameBounds } = useIFramePositioning();
-
-const adjustedPosition = transformPosition({ x: 100, y: 200 });
-</script>
-```
-
-## 📊 Performance Benefits
-
-### Before IFrame Support
-- ❌ Select element only worked in main frame
-- ❌ Text fields in iframes not detected
-- ❌ Translation windows positioned incorrectly
-- ❌ Events didn't propagate across frames
-
-### After IFrame Support
-- ✅ **Complete iframe functionality** across all features
-- ✅ **Zero memory leaks** with ResourceTracker integration
-- ✅ **Optimized communication** with UnifiedMessaging
-- ✅ **Proper error handling** with ExtensionContextManager
-- ✅ **Vue-integrated** reactive components
-- ✅ **Immediate UI feedback** with SelectElement mode instant deactivation
-- ✅ **Clean logging** with multi-frame context awareness
-
-## 🔍 Integration with Existing Systems
-
-### ResourceTracker Integration
-
-```javascript
-// Automatic cleanup with ResourceTracker
-class IFrameManager extends ResourceTracker {
-  constructor() {
-    super('iframe-manager');
-    
-    // All resources automatically tracked and cleaned up
-    this.addEventListener(window, 'message', handler);
-    this.trackTimeout(callback, delay);
-    this.trackResource('custom-resource', cleanup);
-  }
-}
-```
-
-### Error Management Integration
-
-```javascript
-// Centralized error handling
-await ErrorHandler.getInstance().handle(error, {
-  context: 'iframe-operation',
-  showToast: false
-});
-
-// Safe operations
-const result = await ExtensionContextManager.safeSendMessage(message, context);
-```
-
-### Smart Messaging Integration
-
-```javascript
-// Optimized message passing
-const response = await sendMessage({
-  action: MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT,
-  data: { frameId, options }
-});
-```
-
-## 🛡️ Security Considerations
-
-- **Cross-Origin Safety**: Handles CORS restrictions gracefully
-- **Frame Sandboxing**: Respects iframe security boundaries
-- **Message Validation**: Validates all cross-frame messages
-- **Context Checking**: Uses ExtensionContextManager for safety
-- **Frame Registry Protection**: Defensive checks against registry corruption
-
-## 🐛 Recent Bug Fixes
-
-### SelectElement Mode Improvements
-- **Immediate UI Deactivation**: SelectElement mode now deactivates instantly upon click, providing immediate visual feedback before translation begins
-- **Proper Event Emission**: Fixed `select-mode-deactivated` event emission for cross-frame coordination
-- **Enhanced Cleanup**: Improved post-translation cleanup with full deactivation process
-
-### Logging Improvements
-- **Reduced Console Noise**: Changed multi-frame "unknown message" warnings to debug level with explanatory text
-- **Context-Aware Messages**: Added "(normal in multi-frame context)" indicators for expected behavior
-- **Fallback Translation Cleanup**: Enhanced cleanup triggers even for unknown message IDs in multi-frame environments
-
-### Translation Icon Click Detection (2025-09-27)
-- **Cross-Frame Click Detection**: Fixed issue where translation icons remained open when clicking inside iframes
-- **Iframe ClickManager**: Created dedicated ClickManager instances for iframes to handle outside click detection
-- **Message-Based Activation**: Main document now sends activation messages to iframes when translation UI is shown
-- **Automatic Cleanup**: ClickManager instances in iframes are automatically cleaned up when no longer needed
-
-## 🔮 Future Enhancements
-
-- **Advanced Positioning**: Enhanced collision detection algorithms
-- **User Preferences**: Customizable iframe handling options  
-- **Analytics Integration**: Detailed usage analytics
-- **Performance Monitoring**: Real-time performance metrics
-
-## 📚 Related Documentation
-
-- [Architecture Overview](../../docs/ARCHITECTURE.md)
-- [ResourceTracker System](../../docs/MEMORY_GARBAGE_COLLECTOR.md)
-- [Error Management](../../docs/ERROR_MANAGEMENT_SYSTEM.md)
-- [Smart Messaging](../../docs/MessagingSystem.md)
-- [Vue Integration Patterns](../../docs/VUE_INTEGRATION.md)
-
-## 🎯 Migration Notes
-
-This system maintains **100% backward compatibility** with existing code while adding comprehensive iframe support. No existing functionality is affected, and all new features are opt-in.
+- **Cross-Origin Safety**: Uses `postMessage` with strict source validation (`translate-it-main`/`iframe`).
+- **Placeholder Bootstrapping**: Uses pre-initialization objects to prevent messaging race conditions during asynchronous loading.
+- **Sandboxing**: Respects browser security boundaries while maintaining functional integration.
 
 ---
 
-**Status**: ✅ **Production Ready** (Simplified 2025-09-06)
-
-Streamlined iframe support system with essential functionality, full integration to existing architecture, and production-ready error handling. Simplified to remove unused components and focus on core functionality.
+**Status**: Refactored April 2026
