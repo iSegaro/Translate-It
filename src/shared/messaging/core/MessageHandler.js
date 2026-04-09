@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageFormat } from './MessagingCore.js';
+import { MessageActions } from './MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
 
@@ -100,10 +101,18 @@ class MessageHandler {
         return false;
       }
     } else {
-      // Streaming messages are now handled by ContentMessageHandler
-      // Don't log for these to reduce verbosity
-      const streamingActions = ['TRANSLATION_STREAM_UPDATE', 'TRANSLATION_STREAM_END', 'TRANSLATION_RESULT_UPDATE'];
-      if (!streamingActions.includes(action)) {
+      // Event-like or streaming messages that might not have a handler in all contexts
+      // Don't log for these to reduce verbosity in the console
+      const broadcastActions = [
+        MessageActions.TRANSLATION_STREAM_UPDATE, 
+        MessageActions.TRANSLATION_STREAM_END, 
+        MessageActions.TRANSLATION_RESULT_UPDATE,
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        MessageActions.PAGE_TRANSLATE_COMPLETE,
+        MessageActions.PAGE_RESTORE_COMPLETE,
+      ];
+      
+      if (!broadcastActions.includes(action)) {
         logger.debug(`No handler for: ${action}`);
       }
       // No handler, so we don't need to keep the message channel open
