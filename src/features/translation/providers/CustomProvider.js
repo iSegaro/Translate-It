@@ -8,6 +8,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'Custom');
 
@@ -42,15 +43,15 @@ export class CustomProvider extends BaseAIProvider {
 
     this._validateConfig({ apiUrl, apiKey }, ["apiUrl", "apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
+    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, CustomProvider.type, sessionId, isBatch, contextMetadata);
 
     const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
 
-    const isFirst = await this._isFirstTurn(sessionId);
+    const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[Custom] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
     logger.debug(`[Custom] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    const { messages } = await this._getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
 
     const fetchOptions = {
       method: "POST",
@@ -80,11 +81,11 @@ export class CustomProvider extends BaseAIProvider {
     });
 
     if (sessionId && result) {
-      await this._updateSessionHistory(sessionId, userText, result);
+      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
 
     logger.info(`[Custom] Translation completed successfully`);
-    return isBatch ? result : this._cleanAIResponse(result);
+    return result;
   }
 
   _validateConfig(config, requiredFields, context) {

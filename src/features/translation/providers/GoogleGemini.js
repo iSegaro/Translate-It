@@ -10,6 +10,7 @@ import {
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
@@ -51,9 +52,9 @@ export class GeminiProvider extends BaseAIProvider {
       `${this.providerName.toLowerCase()}-translation`
     );
 
-    const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
+    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, GeminiProvider.type, sessionId, isBatch, contextMetadata);
 
-    const isFirst = await this._isFirstTurn(sessionId);
+    const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
     logger.debug(`[Gemini] Translating ${isBatch ? 'batch' : text.length + ' chars'}`);
 
@@ -72,7 +73,7 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     if (sessionId) {
-      const history = await this._getConversationHistory(sessionId, translateMode);
+      const history = await AIConversationHelper.getConversationHistory(sessionId, translateMode);
       if (history.length > 0) {
         const contents = [];
         for (const turn of history) {
@@ -138,11 +139,11 @@ export class GeminiProvider extends BaseAIProvider {
       });
 
       if (sessionId && result) {
-        await this._updateSessionHistory(sessionId, userText, result);
+        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
       }
 
       logger.info(`[Gemini] Translation completed successfully`);
-      return isBatch ? result : this._cleanAIResponse(result);
+      return result;
     } catch (error) {
       if (thinkingEnabled && model?.includes('thinking') && (error.message?.includes('thinking_config') || error.message?.includes('400'))) {
         const retryBody = { ...requestBody };

@@ -8,6 +8,7 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
@@ -45,7 +46,7 @@ export class WebAIProvider extends BaseAIProvider {
 
     let prompt;
     if (isBatch) {
-      const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId, isBatch, contextMetadata);
+      const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, WebAIProvider.type, sessionId, isBatch, contextMetadata);
       prompt = `${systemPrompt}\n\nJSON data to translate:\n${userText}`;
     } else {
       prompt = await buildPrompt(text, sourceLang, targetLang, translateMode, this.constructor.type);
@@ -78,6 +79,6 @@ export class WebAIProvider extends BaseAIProvider {
     logger.info(`[WebAI] Translation completed successfully`);
     this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
     
-    return isBatch ? result : this._cleanAIResponse(result);
+    return result;
   }
 }

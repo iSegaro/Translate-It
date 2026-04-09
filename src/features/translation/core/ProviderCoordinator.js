@@ -17,6 +17,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -75,6 +76,11 @@ export class ProviderCoordinator {
       } else {
         // Standard execution (Single, Batch, or Stream)
         result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options, strategy);
+      }
+
+      // 7. Post-processing (Automatic cleaning for AI results)
+      if (strategy.type === ProviderTypes.AI && typeof result === 'string') {
+        result = AIResponseParser.cleanAIResponse(result);
       }
 
       return result;

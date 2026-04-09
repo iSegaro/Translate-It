@@ -261,29 +261,6 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
-   * Helper methods delegated to specialized utilities
-   */
-  async _isFirstTurn(sessionId) { return AIConversationHelper.isFirstTurn(sessionId); }
-  async _getConversationHistory(sessionId, translateMode = '') { return AIConversationHelper.getConversationHistory(sessionId, translateMode); }
-  async _preparePromptAndText(text, sourceLang, targetLang, translateMode, sessionId = null, isBatch = false, contextMetadata = null) {
-    return AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, this.constructor.type, sessionId, isBatch, contextMetadata);
-  }
-  async _getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '') {
-    return AIConversationHelper.getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode);
-  }
-  async _updateSessionHistory(sessionId, userContent, assistantContent) { return AIConversationHelper.updateSessionHistory(sessionId, userContent, assistantContent); }
-  
-  _cleanAIResponse(result) { return AIResponseParser.cleanAIResponse(result); }
-  _parseBatchResult(result, expectedCount, originalBatch) { return AIResponseParser.parseBatchResult(result, expectedCount, originalBatch, this.providerName); }
-  _fallbackParsing(result, expectedCount, originalBatch) { return AIResponseParser.fallbackParsing(result, expectedCount, originalBatch); }
-
-  _hasPlaceholders(texts) { return AITextProcessor.hasPlaceholders(texts); }
-  _getTotalComplexity(texts) { return AITextProcessor.getTotalComplexity(texts); }
-  _calculateTextComplexity(text) { return AITextProcessor.calculateTextComplexity(text); }
-  splitIntoSentences(text, sourceLanguage = 'en') { return AITextProcessor.splitIntoSentences(text, sourceLanguage); }
-  smartChunkWithPlaceholders(text, limit, sourceLanguage = 'en') { return AITextProcessor.smartChunkWithPlaceholders(text, limit, sourceLanguage); }
-
-  /**
    * Enhanced API call execution with centralized error handling
    */
   async _executeWithErrorHandling(params) {
