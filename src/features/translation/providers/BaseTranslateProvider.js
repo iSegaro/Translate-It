@@ -30,54 +30,6 @@ export class BaseTranslateProvider extends BaseProvider {
   }
 
   /**
-   * Override translate method to handle traditional delimiter-based batching
-   */
-  async translate(text, sourceLang, targetLang, options) {
-    const { mode: translateMode, originalSourceLang, originalTargetLang, messageId, engine, priority } = 
-      typeof options === 'object' && options !== null ? options : { mode: options };
-
-    const abortController = (messageId && engine) ? engine.getAbortController(messageId) : null;
-    const sessionId = options?.sessionId || null;
-
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) sourceLang = AUTO_DETECT_VALUE;
-
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
-      { providerName: this.providerName, useRegexFallback: true }
-    );
-
-    const sl = this._getLangCode(sourceLang);
-    const tl = this._getLangCode(targetLang);
-    if (sl === tl) return text;
-
-    let textsToTranslate;
-    let isJson = false;
-    let parsedJson = null;
-
-    try {
-      const parsed = JSON.parse(text);
-      if (this._isSpecificTextJsonFormat(parsed)) {
-        isJson = true;
-        parsedJson = parsed;
-        textsToTranslate = parsed.map((item) => item.text || '');
-      } else textsToTranslate = [text];
-    } catch { textsToTranslate = [text]; }
-
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController, priority, sessionId);
-
-    if (isJson && Array.isArray(translatedSegments)) {
-      let finalSegments = translatedSegments;
-      if (translatedSegments.length !== parsedJson.length) {
-        if (translatedSegments.length > parsedJson.length) finalSegments = translatedSegments.slice(0, parsedJson.length);
-        else finalSegments = [...translatedSegments, ...parsedJson.slice(translatedSegments.length).map(item => item.text || '')];
-      }
-      return JSON.stringify(parsedJson.map((item, index) => ({ ...item, text: finalSegments[index] || "" })), null, 2);
-    }
-
-    return translatedSegments[0];
-  }
-
-  /**
    * Enhanced batch translation with streaming support
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {

@@ -3,12 +3,10 @@
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-import { TranslationMode } from "@/shared/config/config.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
+import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -33,7 +31,6 @@ export class BaseProvider {
       const { getSettingsAsync } = await import("@/shared/config/config.js");
       const settings = await getSettingsAsync();
 
-      // Always set config - enabled or disabled
       proxyManager.setConfig({
         enabled: settings.PROXY_ENABLED || false,
         type: settings.PROXY_TYPE || 'http',
@@ -49,83 +46,29 @@ export class BaseProvider {
     }
   }
 
-  // By default providers are considered "not reliably returning JSON-mode"
+  // Provider capabilities
   static reliableJsonMode = false;
   static supportsDictionary = false;
 
   /**
-   * Orchestrates the entire translation process.
+   * Entry point for translation.
+   * Now delegated to ProviderCoordinator for better separation of concerns.
    */
   async translate(text, sourceLang, targetLang, options) {
-    const {
-      mode: translateMode,
-      originalSourceLang,
-      originalTargetLang,
-      messageId,
-      engine,
-    } = typeof options === 'object' && options !== null ? options : { mode: options };
-
-    const abortController = (messageId && engine) ? engine.getAbortController(messageId) : null;
-
-    if (this._isSameLanguage(sourceLang, targetLang)) return null;
-
-    // 1. Set Field/Subtitle mode BEFORE language swapping
-    if (translateMode === TranslationMode.Field || translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
-
-    // 2. Language swapping and normalization
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
-      { providerName: this.providerName, useRegexFallback: true }
-    );
-
-    // 3. Convert to provider-specific language codes
-    const sl = this._getLangCode(sourceLang);
-    const tl = this._getLangCode(targetLang);
-
-    if (sl === tl) return text;
-
-    // 4. JSON Mode Detection
-    let isJsonMode = false;
-    let originalJsonStruct;
-    let textsToTranslate = [text];
-
-    try {
-      const parsed = JSON.parse(text);
-      if (this._isSpecificTextJsonFormat(parsed)) {
-        isJsonMode = true;
-        originalJsonStruct = parsed;
-        textsToTranslate = originalJsonStruct.map((item) => item.text || '');
-        logger.debug(`[${this.providerName}] JSON mode detected with ${textsToTranslate.length} segments.`);
-      }
-    } catch { /* Not JSON */ }
-
-    // 5. Perform batch translation
-    const priority = options?.priority || (await import("@/features/translation/core/RateLimitManager.js")).TranslationPriority.NORMAL;
-    const translatedSegments = await this._batchTranslate(textsToTranslate, sl, tl, translateMode, engine, messageId, abortController, priority);
-
-    // 6. Reconstruct the final output
-    if (isJsonMode) {
-      if (translatedSegments.length !== originalJsonStruct.length) {
-        logger.error(`[${this.providerName}] JSON reconstruction failed due to segment mismatch.`);
-        return translatedSegments.join('\n');
-      }
-      const translatedJson = originalJsonStruct.map((item, index) => ({
-        ...item,
-        text: translatedSegments[index] || "",
-      }));
-      return JSON.stringify(translatedJson, null, 2);
-    } else {
-      return translatedSegments[0];
-    }
+    return providerCoordinator.execute(this, text, sourceLang, targetLang, options);
   }
 
   /**
-   * Abstract methods to be implemented by subclasses
+   * Abstract methods to be implemented by subclasses.
+   * Subclasses should implement either _batchTranslate or specialized single calls.
    */
-  async _batchTranslate() { throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`); }
-  _getLangCode() { throw new Error(`_getLangCode method must be implemented by ${this.constructor.name}`); }
+  async _batchTranslate() { 
+    throw new Error(`_batchTranslate method must be implemented by ${this.constructor.name}`); 
+  }
+  
+  _getLangCode() { 
+    throw new Error(`_getLangCode method must be implemented by ${this.constructor.name}`); 
+  }
 
   /**
    * Helper to check JSON format

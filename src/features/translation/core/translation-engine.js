@@ -118,7 +118,7 @@ export class TranslationEngine {
     const lengthError = this._validateTextLength(text, mode, provider);
     if (lengthError) return lengthError;
 
-    // 3. Resolve global languages for swapping logic
+    // 3. Resolve global languages for context (Coordinator will handle swapping)
     const [originalSourceLang, originalTargetLang] = await Promise.all([
       getSourceLanguageAsync(),
       getTargetLanguageAsync()
@@ -132,35 +132,22 @@ export class TranslationEngine {
       return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
     }
 
-    // 5. Handle Standard Streaming
-    const messageId = data.messageId;
-    const shouldUseStreaming = this._shouldUseStreamingForProvider(providerInstance, text, messageId, mode);
-    
-    if (shouldUseStreaming) {
-      this.lifecycleRegistry.registerStreamingSender(messageId, sender);
-      logger.debug(`[TranslationEngine] Using streaming translation for provider: ${provider}`);
-      return await this.executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang);
-    }
-
-    // 6. Standard translation call
-    let result = await providerInstance.translate(
-      text,
-      sourceLanguage,
-      targetLanguage,
-      {
-        mode: mode,
-        originalSourceLang: originalSourceLang,
-        originalTargetLang: originalTargetLang,
-        messageId: data.messageId,
-        sessionId: data.sessionId || data.messageId,
-        charCount: text.length,
-        engine: this
-      }
-    );
+    // 5. Standard execution via ProviderCoordinator
+    const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
+      mode: mode,
+      originalSourceLang,
+      originalTargetLang,
+      messageId: data.messageId,
+      sessionId: data.sessionId || data.messageId,
+      textLength: text.length,
+      engine: this,
+      sender: sender
+    });
 
     return {
       success: true,
       translatedText: result,
+      streaming: typeof result === 'object' && result?.streaming, // Coordinator might return status object
       provider,
       sourceLanguage,
       targetLanguage,
@@ -172,6 +159,7 @@ export class TranslationEngine {
 
   /**
    * Internal helper to resolve actual translation mode based on provider capabilities and settings.
+   * Now simplified and mostly delegates to coordinator logic.
    * @private
    */
   _resolveTranslationMode(data, providerClass) {
@@ -217,43 +205,6 @@ export class TranslationEngine {
       };
     }
     return null;
-  }
-
-  /**
-   * Determine if streaming should be used for this request.
-   * @private
-   */
-  _shouldUseStreamingForProvider(providerInstance, text, messageId, mode) {
-    if (!messageId) return false;
-    const providerType = providerInstance.constructor.type;
-    const isSelectElementMode = mode === TranslationMode.Select_Element;
-    
-    if (providerType === "ai") return isSelectElementMode ? text.length > 500 : false;
-    return (isSelectElementMode && text.length > 2000 && providerInstance.constructor.supportsStreaming !== false);
-  }
-
-  /**
-   * Execute translation with streaming support for non-JSON modes.
-   */
-  async executeStreamingTranslation(data, providerInstance, sender, originalSourceLang, originalTargetLang) {
-    const { text, provider, sourceLanguage, targetLanguage, mode, messageId } = data;
-    const { streamingManager } = await import("./StreamingManager.js");
-    const sessionId = data.sessionId || messageId;
-    
-    streamingManager.initializeStream(messageId, sender, providerInstance, [text], sessionId);
-    this.lifecycleRegistry.registerStreamingSender(messageId, sender);
-
-    try {
-      await providerInstance.translate(text, sourceLanguage, targetLanguage, { 
-        mode, originalSourceLang, originalTargetLang, messageId, sessionId, charCount: text.length, engine: this 
-      });
-      return { success: true, streaming: true, messageId, provider, timestamp: Date.now() };
-    } catch (error) {
-      await streamingManager.handleStreamError(messageId, error);
-      return { success: true, streaming: true, messageId, provider, timestamp: Date.now() };
-    } finally {
-      this.lifecycleRegistry.unregisterRequest(messageId);
-    }
   }
 
   /**
