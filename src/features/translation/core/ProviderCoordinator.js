@@ -46,7 +46,9 @@ export class ProviderCoordinator {
     logger.debug(`[Coordinator] Executing translation via ${providerName} (Mode: ${translateMode})`);
 
     // 1. Language Pre-processing
-    let [sl, tl] = await this._prepareLanguages(text, sourceLang, targetLang, globalSource, globalTarget, translateMode, providerName);
+    // Ensure we pass a string for language detection, even if text is an array
+    const detectionText = Array.isArray(text) ? text.join(' ') : text;
+    let [sl, tl] = await this._prepareLanguages(detectionText, sourceLang, targetLang, globalSource, globalTarget, translateMode, providerName);
 
     // 2. Normalize to provider-specific codes
     const providerSourceLang = provider._getLangCode(sl);
@@ -57,7 +59,8 @@ export class ProviderCoordinator {
     }
 
     // 3. Handle JSON Detection & Strategy
-    const jsonInfo = this._detectJsonMode(text, provider);
+    // If rawJsonPayload is true, it means the caller (like OptimizedJsonHandler) is already handling the structure
+    const jsonInfo = options.rawJsonPayload ? { isJson: false, parsed: null } : this._detectJsonMode(text, provider);
     
     // 4. Determine Execution Strategy
     const strategy = this._resolveExecutionStrategy(provider, jsonInfo.isJson, options);
@@ -78,12 +81,29 @@ export class ProviderCoordinator {
         result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options, strategy);
       }
 
-      // 7. Post-processing (Automatic cleaning for AI results)
+      // 7. Post-processing
+      let finalResult = result;
+      const wasArrayInput = Array.isArray(text);
+      const isTraditional = strategy.type === ProviderTypes.TRANSLATE;
+
       if (strategy.type === ProviderTypes.AI && typeof result === 'string') {
-        result = AIResponseParser.cleanAIResponse(result);
+        finalResult = AIResponseParser.cleanAIResponse(result);
+      } 
+      
+      // Handle Traditional Splitting: If we have a single string but expected multiple results
+      if (isTraditional && wasArrayInput && text.length > 1) {
+        const rawString = Array.isArray(finalResult) ? finalResult[0] : finalResult;
+        if (typeof rawString === 'string') {
+          finalResult = await providerCoordinator._robustSplit(rawString, text, provider);
+        }
       }
 
-      return result;
+      // 8. Output normalization: Return string if input was string (and not JSON mode)
+      if (!wasArrayInput && !jsonInfo.isJson && Array.isArray(finalResult)) {
+        return finalResult[0] || "";
+      }
+
+      return finalResult;
     } catch (error) {
       if (strategy.useStreaming) {
         await this._handleStreamError(messageId, error);
@@ -91,6 +111,30 @@ export class ProviderCoordinator {
       this._handleError(error, providerName);
       throw error;
     }
+  }
+
+  /**
+   * Robustly splits a translated string back into segments based on original text.
+   * @private
+   */
+  async _robustSplit(translatedText, originalSegments, provider) {
+    const expectedCount = originalSegments.length;
+    if (expectedCount <= 1) return [translatedText];
+    
+    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
+    
+    let segments = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+      translatedText, 
+      originalSegments, 
+      TRANSLATION_CONSTANTS.TEXT_DELIMITER, 
+      provider.providerName
+    );
+
+    if (segments.length !== expectedCount) {
+      if (segments.length > expectedCount) segments = segments.slice(0, expectedCount);
+      else while (segments.length < expectedCount) segments.push("");
+    }
+    return segments.map(s => s ? s.trim() : "");
   }
 
   /**

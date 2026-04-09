@@ -151,26 +151,26 @@ export class BaseTranslateProvider extends BaseProvider {
           { sessionId }
         );
 
-        const chunkResults = Array.isArray(chunkResponse) ? chunkResponse : (chunkResponse?.results || []);
-        allResults.push(...(chunkResults || chunk.texts.map(() => '')));
+        // Handle different response formats (Array, results object, or raw String)
+        let chunkResults;
+        if (Array.isArray(chunkResponse)) {
+          chunkResults = chunkResponse;
+        } else if (chunkResponse?.results && Array.isArray(chunkResponse.results)) {
+          chunkResults = chunkResponse.results;
+        } else if (typeof chunkResponse === 'string') {
+          // If provider returned a raw string, we'll split it later or return as is if single segment
+          chunkResults = [chunkResponse];
+        } else {
+          chunkResults = chunk.texts.map(() => '');
+        }
+
+        allResults.push(...chunkResults);
       } catch (error) { throw error; }
     }
     return allResults;
   }
 
   _calculateTraditionalCharCount(texts) { return TraditionalTextProcessor.calculateTraditionalCharCount(texts); }
-  async _robustSplit(translatedText, originalSegments) {
-    const expectedCount = originalSegments.length;
-    if (expectedCount <= 1) return [translatedText];
-    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-    let segments = TranslationSegmentMapper.mapTranslationToOriginalSegments(translatedText, originalSegments, TRANSLATION_CONSTANTS.TEXT_DELIMITER, this.providerName);
-
-    if (segments.length !== expectedCount) {
-      if (segments.length > expectedCount) segments = segments.slice(0, expectedCount);
-      else while (segments.length < expectedCount) segments.push("");
-    }
-    return segments.map(s => s ? s.trim() : "");
-  }
-
+  
   async _translateChunk() { throw new Error(`_translateChunk not implemented by ${this.providerName}`); }
 }

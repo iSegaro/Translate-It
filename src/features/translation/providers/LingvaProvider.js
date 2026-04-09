@@ -4,6 +4,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
+import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -84,14 +85,19 @@ export class LingvaProvider extends BaseTranslateProvider {
       originalCharCount
     });
 
-    if (!result) return chunkTexts;
+    if (!result) return chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
     // If we only translated the first one because of length
     if (textToTranslate === validTexts[0] && chunkTexts.length > 1) {
+      // Return partial array, Coordinator handles this correctly
       return [result, ...chunkTexts.slice(1)];
     }
 
-    // Standard splitting logic
-    return await this._robustSplit(result, chunkTexts);
+    // Return raw translated text. Coordinator will handle robust splitting for multiple segments.
+    if (result) {
+      logger.info(`[Lingva] Translation completed successfully`);
+    }
+
+    return result;
   }
 }

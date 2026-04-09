@@ -215,7 +215,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
-          return await this._robustSplit(targetText, chunkTexts);
+          // Return raw text string. Coordinator will handle robust splitting for multiple segments.
+          return targetText;
         },
         context,
         abortController,
@@ -224,7 +225,9 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         originalCharCount: options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0)
       });
 
-      const finalResult = result || chunkTexts.map(() => "");
+      // If result is a string and we have multiple segments, let Coordinator split it.
+      // If we are in a recursive call, we might need to wrap it in an array for the parent.
+      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(() => ""));
 
       // Add completion log for successful translation
       if (retryAttempt === 0 && finalResult.length > 0) {

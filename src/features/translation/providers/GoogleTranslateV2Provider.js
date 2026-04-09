@@ -173,16 +173,23 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       originalCharCount
     });
 
-    // Use robust split logic from base class OUTSIDE extractResponse
-    const translatedSegments = await this._robustSplit(responseObj.translatedText, chunkTexts);
-
     // Handle dictionary formatting for single segment
     if (chunkTexts.length === 1 && responseObj?.candidateText) {
       const formattedDictionary = this._formatDictionaryAsMarkdown(responseObj.candidateText);
-      return [`${translatedSegments[0]}\n\n${formattedDictionary}`];
+      const translatedWithDict = `${responseObj.translatedText}\n\n${formattedDictionary}`;
+      
+      logger.info(`[GoogleV2] Translation with dictionary completed successfully`);
+      return translatedWithDict;
     }
 
-    return translatedSegments || chunkTexts;
+    // Return translated text. Coordinator will handle robust splitting for multiple segments.
+    const finalResult = responseObj?.translatedText || chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+
+    if (finalResult) {
+      logger.info(`[GoogleV2] Translation completed successfully`);
+    }
+
+    return finalResult;
   }
 
   _formatDictionaryAsMarkdown(candidateText) {

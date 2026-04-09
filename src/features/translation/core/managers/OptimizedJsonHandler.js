@@ -174,26 +174,33 @@ export class OptimizedJsonHandler {
 
   /**
    * Internal helper to perform the actual provider call.
+   * Now uses the standard translate() method to ensure it passes through ProviderCoordinator.
    * @private
    */
   async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary) {
-    const providerClass = providerInstance?.constructor;
-    const isAIProvider = providerClass?.type === "ai" || typeof providerInstance?._translateBatch === 'function';
+    const isArrayInput = Array.isArray(batch);
+    
+    // Convert batch to the format expected by translate()
+    // For Select Element, we pass the array of texts
+    const textsToTranslate = isArrayInput 
+      ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
+      : (typeof batch === 'object' ? (batch.t || batch.text || '') : (batch || ''));
 
-    if (isAIProvider) {
-      return providerInstance._translateBatch(
-        batch, source, target, mode, abortController, null, messageId, sessionId,
-        { ...contextMetadata, contextSummary }
-      );
-    } else if (typeof providerInstance?._translateChunk === 'function') {
-      const chunkTexts = batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''));
-      return providerInstance._translateChunk(
-        chunkTexts, source, target, mode, abortController, 0, batch.length, 1, 1,
-        { sessionId, contextSummary }
-      );
-    } else {
-      throw new Error(`Provider method not available for optimized translation`);
-    }
+    return await providerInstance.translate(
+      textsToTranslate,
+      source,
+      target,
+      {
+        mode,
+        abortController,
+        messageId,
+        sessionId,
+        contextMetadata,
+        contextSummary,
+        priority: 'high', // Select Element usually deserves high priority
+        rawJsonPayload: true // Tell coordinator we are already handling the JSON structure
+      }
+    );
   }
 
   /**
@@ -201,12 +208,19 @@ export class OptimizedJsonHandler {
    * @private
    */
   _mapResults(originalBatch, translatedResults) {
-    let results = Array.isArray(translatedResults) ? translatedResults : [String(translatedResults)];
+    // Ensure we have an array of results
+    let results = Array.isArray(translatedResults) ? translatedResults : [translatedResults];
     
-    return results.map((text, idx) => {
-      const translatedContent = text?.text || text;
-      if (typeof originalBatch[idx] === 'object') {
-        return { ...originalBatch[idx], t: translatedContent, text: translatedContent };
+    // If results length doesn't match original batch, it means splitting failed or wasn't needed
+    // In that case, we fallback to treating the whole result as one string for the first item (legacy)
+    if (results.length !== originalBatch.length && originalBatch.length > 1) {
+      logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}. Check ProviderCoordinator splitting.`);
+    }
+
+    return originalBatch.map((item, idx) => {
+      const translatedContent = results[idx] !== undefined ? results[idx] : "";
+      if (typeof item === 'object') {
+        return { ...item, t: translatedContent, text: translatedContent };
       }
       return translatedContent;
     });

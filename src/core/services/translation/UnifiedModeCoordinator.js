@@ -105,13 +105,14 @@ export class UnifiedModeCoordinator {
 
           const batchResult = await rateLimitManager.executeWithRateLimit(
             provider || ProviderRegistryIds.GOOGLE_V2,
-            (opts) => {
-              if (providerInstance.constructor.type === "ai") {
-                return providerInstance._translateBatch(batch, sourceLanguage || 'auto', targetLanguage, TranslationMode.Page, abortController, translationEngine, messageId, sessionId, null);
-              } else {
-                return providerInstance._translateChunk(batch, sourceLanguage || 'auto', targetLanguage, TranslationMode.Page, abortController, 0, batch.length, i, batches.length, opts);
-              }
-            },
+            () => providerInstance.translate(batch, sourceLanguage || 'auto', targetLanguage, {
+              mode: TranslationMode.Page,
+              abortController,
+              messageId,
+              sessionId,
+              priority,
+              rawJsonPayload: true // Treat as handled structure
+            }),
             `batch-${i + 1}/${batches.length}`,
             priority,
             { sessionId }
@@ -120,7 +121,7 @@ export class UnifiedModeCoordinator {
           const statsAfter = statsManager.getSessionSummary(sessionId);
           totalActualChars += statsAfter ? (statsAfter.chars - charsBefore) : batch.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-          const chunkResults = Array.isArray(batchResult) ? batchResult : (batchResult?.results || []);
+          const chunkResults = Array.isArray(batchResult) ? batchResult : [batchResult];
           if (Array.isArray(chunkResults)) {
             batch.forEach((segment, idx) => {
               const globalIdx = segments.indexOf(segment);
