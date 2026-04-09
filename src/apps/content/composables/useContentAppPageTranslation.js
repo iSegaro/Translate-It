@@ -73,12 +73,21 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
-      const isDone = totalCount > 0 && translatedCount >= totalCount;
+      
+      // Use status from aggregator if available, otherwise calculate based on counts
+      let finalStatus = detail.status || (translatedCount >= totalCount ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING);
+      
+      // Map 'idle' status to COMPLETED for UI purposes (shows the badge/restore button)
+      if (finalStatus === 'idle') {
+        finalStatus = TRANSLATION_STATUS.COMPLETED;
+      }
 
       mobileStore.setPageTranslation({
         translatedCount,
         totalCount,
-        status: isDone ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING
+        isTranslating: detail.isTranslating !== undefined ? detail.isTranslating : mobileStore.pageTranslationData.isTranslating,
+        isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
+        status: finalStatus
       });
     });
 

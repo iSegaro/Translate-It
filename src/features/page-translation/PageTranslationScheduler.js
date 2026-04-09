@@ -34,6 +34,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.sessionContext = null;
     this.isScrolling = false;
     this.highPriorityCount = 0;
+    this.isWaitingForVisibility = false; // flag to track idle state
     
     this.settings = { 
       ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
@@ -73,6 +74,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.translatedCount = 0;
     this.totalTasks = 0;
     this.highPriorityCount = 0;
+    this.isWaitingForVisibility = false;
     this.fatalErrorOccurred = false;
     this.translationSessionId = null;
     this.sessionContext = null;
@@ -86,6 +88,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.sessionContext = null;
     this._reportPending = false;
     this.isScrolling = false;
+    this.isWaitingForVisibility = false;
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
@@ -300,12 +303,14 @@ export class PageTranslationScheduler extends ResourceTracker {
 
         if (currentBatch.length === 0) {
           this.logger.debug('No visible content in queue, stopping flush loop');
+          this.isWaitingForVisibility = true; // No visible content found
           break;
         }
 
         // Update high priority count based on removed items
         const removedHighPriority = currentBatch.filter(item => item.isHighPriority).length;
         this.highPriorityCount = Math.max(0, this.highPriorityCount - removedHighPriority);
+        this.isWaitingForVisibility = false; // We found something to translate
 
         // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;
@@ -461,22 +466,35 @@ export class PageTranslationScheduler extends ResourceTracker {
   }
 
   /**
-   * Check if translation is complete and emit event
+   * Check if translation is complete or temporarily idle (waiting for more visible content)
    */
   _checkCompletion() {
     // Small delay to ensure no more immediate tasks are coming
     this.trackTimeout(() => {
-      if (this.isTranslated && this.queue.length === 0 && this.activeFlushes === 0) {
-        if (this.totalTasks > 0 && this.translatedCount >= this.totalTasks) {
-          this.logger.info('Scheduler detected completion', { 
-            translated: this.translatedCount, 
-            total: this.totalTasks 
-          });
-          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
-            translatedCount: this.translatedCount,
-            totalCount: this.totalTasks
-          });
-        }
+      if (!this.isTranslated || this.activeFlushes > 0) return;
+
+      // Case 1: Pure Completion (Everything in queue is done)
+      if (this.queue.length === 0 && this.totalTasks > 0 && this.translatedCount >= this.totalTasks) {
+        this.logger.info('Scheduler detected total completion', { 
+          translated: this.translatedCount, 
+          total: this.totalTasks 
+        });
+        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+          translatedCount: this.translatedCount,
+          totalCount: this.totalTasks
+        });
+        this.isWaitingForVisibility = false;
+        return;
+      }
+
+      // Case 2: Partial Completion / Idle (Visible content done, but more invisible items exist)
+      // This is triggered if the last flush attempt found NO visible content.
+      if (this.isWaitingForVisibility && this.translatedCount > 0) {
+        this.logger.debug('Scheduler entering idle state (Visible content processed)');
+        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+          translatedCount: this.translatedCount,
+          totalCount: this.totalTasks
+        });
       }
     }, 500);
   }

@@ -57,8 +57,6 @@ let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 let ErrorHandler = null;
 
-// Static import ContentScriptCore to fix Firefox class compilation issues
-
 // Lazy load logging and error handling dependencies
 async function initializeLogger() {
   if (logger) return logger;
@@ -129,16 +127,32 @@ async function initializeLogger() {
         const frameProgressMap = new Map();
         
         /**
-         * Aggregates progress from all frames and emits a unified event
-         * @param {string} overrideAction - Optional action to emit instead of progress
+         * Updates a frame's progress data by merging it with existing data
          */
-        const emitAggregateProgress = (overrideAction = null) => {
+        const updateFrameData = (frameId, newData) => {
+          const existing = frameProgressMap.get(frameId) || {};
+          frameProgressMap.set(frameId, { ...existing, ...newData });
+        };
+
+        /**
+         * Aggregates progress from all frames and emits a unified event
+         */
+        const emitAggregateProgress = (overrideAction = null, extraData = {}) => {
           let grandTotalTranslated = 0;
           let grandTotalCount = 0;
+          let anyAutoTranslating = false;
+          let anyActiveTranslating = false;
           
           for (const progress of frameProgressMap.values()) {
             grandTotalTranslated += progress.translatedCount || 0;
             grandTotalCount += progress.totalCount || 0;
+            
+            if (progress.isAutoTranslating) anyAutoTranslating = true;
+            
+            const isExplicitlyIdle = progress.status === 'idle' || progress.isTranslating === false;
+            if (!isExplicitlyIdle && (progress.translatedCount < progress.totalCount || progress.totalCount === 0)) {
+              anyActiveTranslating = true;
+            }
           }
           
           if (window.pageEventBus) {
@@ -146,10 +160,13 @@ async function initializeLogger() {
             const payload = {
               translatedCount: grandTotalTranslated,
               totalCount: grandTotalCount,
-              isAggregated: true
+              isAutoTranslating: anyAutoTranslating,
+              isTranslating: anyActiveTranslating,
+              status: anyActiveTranslating ? 'translating' : 'idle',
+              isAggregated: true,
+              ...extraData
             };
 
-            // For completion/stop events, we need extra flags for the mobile store
             if (action === MessageActions.PAGE_TRANSLATE_COMPLETE || 
                 action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
               payload.isTranslated = grandTotalTranslated > 0;
@@ -177,7 +194,6 @@ async function initializeLogger() {
          * Broadcasts a page translation related action to all iframes
          */
         const broadcastPageAction = (action, data = {}) => {
-          // Reset stats on start or restore
           if (action === MessageActions.PAGE_TRANSLATE || action === MessageActions.PAGE_RESTORE) {
             frameProgressMap.clear();
           }
@@ -201,24 +217,21 @@ async function initializeLogger() {
           if (event.data?.source === 'translate-it-iframe') {
             const { type, data } = event.data;
             
-            // Handle aggregate progress reporting
             if (type === 'TRANSLATE_IT_PAGE_PROGRESS') {
-              frameProgressMap.set(event.source, data);
+              updateFrameData(event.source, data);
               emitAggregateProgress();
               return;
             }
 
-            // Handle iframe completion
             if (type === 'TRANSLATE_IT_PAGE_COMPLETE') {
-              frameProgressMap.set(event.source, data);
-              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE);
+              updateFrameData(event.source, { ...data, isTranslating: false, status: 'idle' });
+              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE, data);
               return;
             }
 
-            // Handle iframe stopped (auto-restore)
             if (type === 'TRANSLATE_IT_PAGE_STOPPED') {
-              frameProgressMap.set(event.source, data);
-              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE);
+              updateFrameData(event.source, { ...data, isTranslating: false, status: 'idle' });
+              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
               return;
             }
 
@@ -227,14 +240,12 @@ async function initializeLogger() {
             }
           }
 
-          // Handle deactivation requests from iframes
           if (event.data?.type === 'translate-it-deactivate-select-element') {
             if (window.selectElementManagerInstance) {
               window.selectElementManagerInstance.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
             }
           }
 
-          // Handle text selection from iframes
           if (event.data?.type === 'TRANSLATE_IT_TEXT_SELECTION_DETECTED') {
             const { text } = event.data.data || {};
             if (text && contentScriptCore) {
@@ -246,7 +257,6 @@ async function initializeLogger() {
             }
           }
 
-          // Handle clicks inside iframes
           if (event.data?.type === 'TRANSLATE_IT_IFRAME_CLICK_DETECTED') {
             if (window.windowsManagerInstance) {
               window.windowsManagerInstance.dismiss();
@@ -260,30 +270,29 @@ async function initializeLogger() {
             broadcastDeactivation();
           });
 
-          // Listen for Page Translation commands
           window.pageEventBus.on(MessageActions.PAGE_TRANSLATE, (options) => {
+            updateFrameData('main', { isAutoTranslating: true, isTranslating: true, status: 'translating' });
             broadcastPageAction(MessageActions.PAGE_TRANSLATE, options);
           });
 
-          // Track main frame's own lifecycle
           window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
             if (!data.isAggregated) {
-              frameProgressMap.set('main', data);
-              emitAggregateProgress();
+              updateFrameData('main', data);
+              emitAggregateProgress(null, data);
             }
           });
 
           window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
             if (!data.isAggregated) {
-              frameProgressMap.set('main', data);
-              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE);
+              updateFrameData('main', { ...data, isTranslating: false, status: 'idle' });
+              emitAggregateProgress(MessageActions.PAGE_TRANSLATE_COMPLETE, data);
             }
           });
 
           window.pageEventBus.on(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (data) => {
             if (!data.isAggregated) {
-              frameProgressMap.set('main', data);
-              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE);
+              updateFrameData('main', { ...data, isTranslating: false, status: 'idle' });
+              emitAggregateProgress(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
             }
           });
 
@@ -296,11 +305,9 @@ async function initializeLogger() {
           });
         }
 
-        // --- CRITICAL IDENTITY SETUP ---
-        // Ensure extension identity is established before any other feature loads
+        // --- IDENTITY & CORE LOAD ---
         await contentScriptCore.loadFeature('extensionContext');
 
-        // 1. Initialize Smart Interaction Coordinator
         try {
           const { interactionCoordinator } = await import('./InteractionCoordinator.js');
           await interactionCoordinator.initialize();
@@ -349,7 +356,7 @@ async function loadFeature(featureName, category) {
     return featureLoadPromises.get(featureName);
   }
 
-  const strategy = LOAD_STRATEGIES[category];
+  const strategy = LOAD_STRATEGIES[category] || { delay: 0 };
   const loadPromise = (async () => {
     try {
       if (strategy.delay > 0 && category !== 'INTERACTIVE') {

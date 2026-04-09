@@ -115,6 +115,20 @@ export class PageTranslationEventManager {
       if (!data?.isInternal) this.manager.resetError();
     });
 
+    bus.on(MessageActions.PAGE_TRANSLATE_IDLE, (data) => {
+      if (this.manager.isTranslating) {
+        this.manager.isTranslating = false;
+        
+        this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+          status: 'idle',
+          isTranslating: false,
+          isAutoTranslating: this.manager.isAutoTranslating,
+          translatedCount: data.translatedCount,
+          totalCount: data.totalCount
+        });
+      }
+    });
+
     bus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
       this.manager._handleFatalError(error, errorType, localizedMessage));
 

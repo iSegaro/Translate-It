@@ -167,6 +167,16 @@ export class PageTranslationManager extends ResourceTracker {
       await this.bridge.initialize(
         this.settings, 
         (text, context, score, node) => {
+          // If we were idle, switch back to translating state
+          if (this.isAutoTranslating && !this.isTranslating) {
+            this.isTranslating = true;
+            this._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+              status: 'translating',
+              isTranslating: true,
+              isAutoTranslating: true
+            });
+          }
+
           // If we are in "On Stop" mode, notify activity to reset the timer
           if (this.settings.translateAfterScrollStop) {
             this.scrollTracker.notifyActivity();

@@ -37,6 +37,7 @@ export class MessageActions {
   static PAGE_TRANSLATE_PROGRESS = 'page-translate-progress';
   static PAGE_TRANSLATE_COMPLETE = 'page-translate-complete';
   static PAGE_TRANSLATE_ERROR = 'page-translate-error';
+  static PAGE_TRANSLATE_IDLE = 'page-translate-idle';
   static PAGE_TRANSLATE_RESET_ERROR = 'page-translate-reset-error';
   static PAGE_RESTORE = 'page-restore';
   static PAGE_RESTORE_COMPLETE = 'page-restore-complete';
