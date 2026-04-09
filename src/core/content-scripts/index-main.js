@@ -57,6 +57,9 @@ let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 let ErrorHandler = null;
 
+// Static import ContentScriptCore to fix Firefox class compilation issues
+import { ContentScriptCore } from './ContentScriptCore.js';
+
 // Lazy load logging and error handling dependencies
 async function initializeLogger() {
   if (logger) return logger;
@@ -141,6 +144,16 @@ async function initializeLogger() {
         window.addEventListener('message', (event) => {
           if (event.data?.source === 'translate-it-iframe') {
             const { type, data } = event.data;
+            
+            // Handle aggregate progress reporting
+            if (type === 'TRANSLATE_IT_PAGE_PROGRESS') {
+              if (frameProgressMap) {
+                frameProgressMap.set(event.source, data);
+                emitAggregateProgress();
+              }
+              return; // Don't re-broadcast raw progress to prevent noise
+            }
+
             if (type && window.pageEventBus) {
               window.pageEventBus.emit(type, data);
             }
@@ -172,11 +185,84 @@ async function initializeLogger() {
         // 2. Synchronize deactivation across all frames when top frame deactivates
         // This covers deactivation via click-in-main, ESC key, or notification buttons
         if (window.pageEventBus) {
+          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+
           window.pageEventBus.on('select-mode-deactivated', () => {
             if (process.env.NODE_ENV === 'development') {
               console.log('[Main] Deactivation detected, broadcasting to all iframes');
             }
             broadcastDeactivation();
+          });
+
+          // --- PAGE TRANSLATION COORDINATION ---
+          const frameProgressMap = new Map();
+          
+          /**
+           * Aggregates progress from all frames and emits a unified event
+           */
+          const emitAggregateProgress = () => {
+            let grandTotalTranslated = 0;
+            let grandTotalCount = 0;
+            
+            for (const progress of frameProgressMap.values()) {
+              grandTotalTranslated += progress.translatedCount || 0;
+              grandTotalCount += progress.totalCount || 0;
+            }
+            
+            if (window.pageEventBus) {
+              window.pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+                translatedCount: grandTotalTranslated,
+                totalCount: grandTotalCount,
+                isAggregated: true // Marker for debugging
+              });
+            }
+          };
+
+          /**
+           * Broadcasts a page translation related action to all iframes
+           */
+          const broadcastPageAction = (action, data = {}) => {
+            // Reset stats on start or restore
+            if (action === MessageActions.PAGE_TRANSLATE || action === MessageActions.PAGE_RESTORE) {
+              frameProgressMap.clear();
+            }
+
+            const broadcastMessage = { 
+              type: 'TRANSLATE_IT_PAGE_ACTION', 
+              source: 'translate-it-main',
+              action,
+              data
+            };
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+              try {
+                iframe.contentWindow.postMessage(broadcastMessage, '*');
+              } catch (e) { /* ignore cross-origin */ }
+            });
+          };
+
+          // Listen for Page Translation commands and broadcast them
+          window.pageEventBus.on(MessageActions.PAGE_TRANSLATE, (options) => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Main] Page translation started, broadcasting to iframes');
+            }
+            broadcastPageAction(MessageActions.PAGE_TRANSLATE, options);
+          });
+
+          // Track main frame's own progress
+          window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+            if (!data.isAggregated) {
+              frameProgressMap.set('main', data);
+              emitAggregateProgress();
+            }
+          });
+
+          window.pageEventBus.on(MessageActions.PAGE_RESTORE, () => {
+            broadcastPageAction(MessageActions.PAGE_RESTORE);
+          });
+
+          window.pageEventBus.on(MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {
+            broadcastPageAction(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
           });
         }
 

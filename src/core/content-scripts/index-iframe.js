@@ -63,6 +63,57 @@ if (!window.translateItContentScriptCore) {
         await contentScriptCore.loadFeature(feature);
       }
 
+      // --- PAGE TRANSLATION COORDINATOR (IFRAME) ---
+      // Listen for page-level actions from the top frame
+      window.addEventListener('message', async (event) => {
+        if (event.data?.source === 'translate-it-main' && event.data?.type === 'TRANSLATE_IT_PAGE_ACTION') {
+          const { action, data } = event.data;
+          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+          
+          // Only load pageTranslation feature if we actually need to translate/restore
+          const manager = await contentScriptCore.loadFeature('pageTranslation');
+          
+          if (manager) {
+            switch (action) {
+              case MessageActions.PAGE_TRANSLATE:
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[IFrame] Starting page translation', window.location.href);
+                }
+                
+                // Set up one-time listener for progress reporting if not already set
+                if (!window._translateItProgressForwarderSet) {
+                  const bus = window.pageEventBus;
+                  if (bus) {
+                    bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
+                      try {
+                        window.top.postMessage({
+                          type: 'TRANSLATE_IT_PAGE_PROGRESS',
+                          source: 'translate-it-iframe',
+                          frameUrl: window.location.href,
+                          data: {
+                            translatedCount: data.translatedCount || 0,
+                            totalCount: data.totalCount || 0
+                          }
+                        }, '*');
+                      } catch (e) { /* ignore cross-origin */ }
+                    });
+                    window._translateItProgressForwarderSet = true;
+                  }
+                }
+
+                manager.translatePage(data || {}).catch(() => {});
+                break;
+              case MessageActions.PAGE_RESTORE:
+                manager.restorePage().catch(() => {});
+                break;
+              case MessageActions.PAGE_TRANSLATE_STOP_AUTO:
+                manager.stopAutoTranslation().catch(() => {});
+                break;
+            }
+          }
+        }
+      });
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[IFrame] Lite mode content script initialized', window.location.href);
       }
