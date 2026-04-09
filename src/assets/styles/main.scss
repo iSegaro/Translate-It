@@ -26,6 +26,26 @@
 
 // Context-specific styles - these should be overridden by specific entry points
 
+/* Global Base Styles (Scoped to specific app contexts) */
+body.popup-context,
+body.options-context,
+body.sidepanel-context {
+  font-family: variables.$font-family-base;
+  font-size: variables.$font-size-base;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-text-rendering: optimizeLegibility;
+  margin: 0;
+  padding: 0;
+  
+  #app {
+    width: 100%;
+    height: 100%;
+  }
+}
+
 /* Popup context - Fully fluid but with base size for Desktop Extension */
 body.popup-context {
   width: 100% !important;
@@ -33,12 +53,9 @@ body.popup-context {
   min-width: 450px !important; 
   min-height: 400px !important;
   height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
   overflow-x: hidden !important;
   display: flex !important;
   flex-direction: column !important;
-  background-color: var(--bg-color) !important;
 }
 
 /* Options context - only applied in options.js */

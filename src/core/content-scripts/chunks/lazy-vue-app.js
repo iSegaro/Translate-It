@@ -220,13 +220,11 @@ async function createMountPoint() {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        max-width: 100% !important;
-        max-height: 100% !important;
+        width: 0 !important;
+        height: 0 !important;
         pointer-events: none;
         z-index: 2147483647;
-        overflow: hidden !important;
+        overflow: visible !important;
       }
 
       #${UI_HOST_IDS.APP_CONTAINER} {

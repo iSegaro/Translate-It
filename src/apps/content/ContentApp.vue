@@ -243,7 +243,7 @@ logger.debug('ContentApp script setup executed (Modular Architecture).');
   z-index: 2147483647 !important;
   pointer-events: none !important;
   display: block !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 /* Individual components inside will override this (e.g., toaster, toolbars) */
