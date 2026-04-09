@@ -345,7 +345,7 @@ onUnmounted(() => {
 }
 
 /* Tablet responsive: make it fit in the header when in dropdown mode */
-@media (max-width: 1024px) {
+@media (max-width: #{$breakpoint-lg}) {
   .interface-locale-selector {
     width: fit-content !important;
     margin-inline-start: auto; /* Push to end in flex containers if needed */

@@ -192,7 +192,7 @@ onMounted(() => {
 }
 
 // Responsive adjustments for sidebar header
-@media (max-width: 1024px) {
+@media (max-width: #{$breakpoint-lg}) {
   .theme-selector-container {
     width: auto;
     padding: 0;

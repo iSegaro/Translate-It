@@ -113,11 +113,6 @@ onMounted(async () => {
 <style scoped lang="scss">
 @use '@/assets/styles/base/variables' as *;
 
-:root {
-  --breakpoint-lg: 1024px;
-  --breakpoint-md: 768px;
-}
-
 .options-sidebar {
   flex: 0 0 280px;
   padding: var(--spacing-md);
