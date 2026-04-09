@@ -21,10 +21,12 @@ export class RevertHandler extends ResourceTracker {
     this.isExecuting = false; // Prevent duplicate executions
     this.notificationManager = new NotificationManager();
 
-    // Listen for revert requests from the PageEventBus (used by mobile dashboard and notifications)    pageEventBus.on('revert-translations', () => {
-    logger.info('Revert requested via PageEventBus');
-    this.executeRevert().catch(err => {
-      logger.error('Failed to execute revert from PageEventBus:', err);
+    // Listen for revert requests from the PageEventBus (used by mobile dashboard and notifications)
+    pageEventBus.on('revert-translations', () => {
+      logger.info('Revert requested via PageEventBus');
+      this.executeRevert().catch(err => {
+        logger.error('Failed to execute revert from PageEventBus:', err);
+      });
     });
   }
 
