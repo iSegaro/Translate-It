@@ -118,11 +118,13 @@ export class PageTranslationEventManager {
     bus.on(MessageActions.PAGE_TRANSLATE_IDLE, (data) => {
       if (this.manager.isTranslating) {
         this.manager.isTranslating = false;
+        this.manager.isTranslated = data.translatedCount > 0;
         
         this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
           status: 'idle',
           isTranslating: false,
           isAutoTranslating: this.manager.isAutoTranslating,
+          isTranslated: this.manager.isTranslated,
           translatedCount: data.translatedCount,
           totalCount: data.totalCount
         });

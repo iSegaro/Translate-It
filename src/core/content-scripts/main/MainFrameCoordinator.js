@@ -195,6 +195,18 @@ export class MainFrameCoordinator {
       }
     });
 
+    // Page Translation idle (Main Frame)
+    pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_IDLE, (data) => {
+      if (!data.isAggregated) {
+        this.aggregator.updateFrameData('main', { 
+          ...data, 
+          isTranslating: false, 
+          status: 'idle' 
+        });
+        this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_IDLE, data);
+      }
+    });
+
     // Auto-Restore complete (Main Frame)
     pageEventBus.on(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (data) => {
       if (!data.isAggregated) {

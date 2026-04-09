@@ -192,7 +192,12 @@ export class PageTranslationManager extends ResourceTracker {
       this.isTranslating = true;
       this.isAutoTranslating = !!this.settings.autoTranslateOnDOMChanges;
 
-      return { success: true, url: this.currentUrl, messageId: this.translationMessageId };
+      return { 
+        success: true, 
+        url: this.currentUrl, 
+        messageId: this.translationMessageId,
+        isAutoTranslating: this.isAutoTranslating 
+      };
     } catch (error) {
       if (isSilentError(error)) {
         this.logger.debug('translatePage: Silent error caught', error.message);

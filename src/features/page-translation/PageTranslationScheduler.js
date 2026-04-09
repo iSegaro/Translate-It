@@ -451,7 +451,8 @@ export class PageTranslationScheduler extends ResourceTracker {
       this._reportPending = false;
       pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
         translatedCount: this.translatedCount, 
-        totalCount: this.totalTasks
+        totalCount: this.totalTasks,
+        isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
       });
       return;
     }
@@ -476,14 +477,25 @@ export class PageTranslationScheduler extends ResourceTracker {
 
       // Case 1: Pure Completion (Everything in queue is done)
       if (this.queue.length === 0 && this.totalTasks > 0 && this.translatedCount >= this.totalTasks) {
-        this.logger.info('Scheduler detected total completion', { 
-          translated: this.translatedCount, 
-          total: this.totalTasks 
-        });
-        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
-          translatedCount: this.translatedCount,
-          totalCount: this.totalTasks
-        });
+        // If auto-translating, we are never "truly" complete, just idle/watching
+        if (this.settings.autoTranslateOnDOMChanges) {
+          this.logger.debug('Scheduler detected completion of current queue in Auto mode, signaling idle');
+          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+            translatedCount: this.translatedCount,
+            totalCount: this.totalTasks,
+            isAutoTranslating: true
+          });
+        } else {
+          this.logger.info('Scheduler detected total completion', { 
+            translated: this.translatedCount, 
+            total: this.totalTasks 
+          });
+          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+            translatedCount: this.translatedCount,
+            totalCount: this.totalTasks,
+            isAutoTranslating: false
+          });
+        }
         this.isWaitingForVisibility = false;
         return;
       }
@@ -494,7 +506,8 @@ export class PageTranslationScheduler extends ResourceTracker {
         this.logger.debug('Scheduler entering idle state (Visible content processed)');
         pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
           translatedCount: this.translatedCount,
-          totalCount: this.totalTasks
+          totalCount: this.totalTasks,
+          isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
         });
       }
     }, 500);

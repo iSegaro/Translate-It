@@ -206,6 +206,17 @@ export function usePageTranslation() {
     if (data.message !== undefined) {
       message.value = data.message;
     }
+    
+    // Update state flags if provided
+    if (data.isTranslating !== undefined) {
+      isTranslating.value = !!data.isTranslating;
+    }
+    if (data.isTranslated !== undefined) {
+      isTranslated.value = !!data.isTranslated;
+    }
+    if (data.isAutoTranslating !== undefined) {
+      isAutoTranslating.value = !!data.isAutoTranslating;
+    }
   }
 
   /**
@@ -313,6 +324,7 @@ export function usePageTranslation() {
         progress.value = 0;
         break;
       case MessageActions.PAGE_TRANSLATE_PROGRESS:
+      case MessageActions.PAGE_TRANSLATE_IDLE:
         updateProgress(message.data || {});
         break;
       case MessageActions.PAGE_TRANSLATE_COMPLETE:
