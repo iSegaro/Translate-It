@@ -52,7 +52,7 @@ export class UnifiedTranslationService {
     const modeSpecificProvider = modeProviders ? modeProviders[data.mode] : null;
 
     if (modeSpecificProvider && modeSpecificProvider !== 'default') {
-      logger.debug(`[UnifiedService] Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
+      logger.debug(`Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
       return modeSpecificProvider;
     }
 
@@ -70,7 +70,7 @@ export class UnifiedTranslationService {
     }
 
     const estimatedChars = typeof data?.text === 'string' ? data.text.length : 0;
-    logger.info(`[UnifiedService] Request: ${messageId} (${estimatedChars.toLocaleString()} chars, mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
+    logger.info(`Request: ${messageId} (${estimatedChars.toLocaleString()} chars, mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
 
     // Ensure dependencies are available
     if (!this.translationEngine || !this.backgroundService) {
@@ -114,7 +114,7 @@ export class UnifiedTranslationService {
       return result;
 
     } catch (error) {
-      logger.debug('[UnifiedService] Request failed:', error.message);
+      logger.debug('Request failed:', error.message);
       this.requestTracker.updateRequest(messageId, {
         status: RequestStatus.FAILED,
         result: { success: false, error: error.message }
@@ -162,7 +162,7 @@ export class UnifiedTranslationService {
    * Cancel an active request through the engine and notify UI.
    */
   async cancelRequest(messageId) {
-    logger.info(`[UnifiedService] Cancelling request: ${messageId}`);
+    logger.info(`Cancelling request: ${messageId}`);
     const request = this.requestTracker.getRequest(messageId);
     if (!request) return { success: false, error: 'Request not found' };
 
@@ -178,7 +178,7 @@ export class UnifiedTranslationService {
    */
   cleanup() {
     const count = this.requestTracker.cleanup();
-    if (count > 0) logger.debug(`[UnifiedService] Cleaned up ${count} records`);
+    if (count > 0) logger.debug(`Cleaned up ${count} records`);
   }
 }
 

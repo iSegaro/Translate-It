@@ -22,7 +22,7 @@ const errorHandler = new ErrorHandler();
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
 export async function handleActivateSelectElementMode(message, sender) {
-  logger.debug('[Handler:activateSelectElementMode] Starting activation handler:', {
+  logger.debug('Starting activation handler:', {
     messageData: message.data,
     senderTab: sender?.tab?.id,
     senderUrl: sender?.url
@@ -34,11 +34,11 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     // If no tabId available (e.g., from sidepanel), get current active tab
     if (!targetTabId) {
-      logger.debug('[Handler:activateSelectElementMode] No tab ID from sender, finding active tab...');
+      logger.debug('No tab ID from sender, finding active tab...');
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       if (tabs.length > 0) {
         targetTabId = tabs[0].id;
-        logger.debug(`[Handler:activateSelectElementMode] Found active tab: ${targetTabId}`);
+        logger.debug(`Found active tab: ${targetTabId}`);
       }
     }
     
@@ -47,11 +47,11 @@ export async function handleActivateSelectElementMode(message, sender) {
     }
 
     // Check tab permissions before proceeding
-    logger.debug('[Handler:activateSelectElementMode] Checking tab access for:', targetTabId);
+    logger.debug('Checking tab access for:', targetTabId);
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
-    logger.debug('[Handler:activateSelectElementMode] Tab access result:', access);
+    logger.debug('Tab access result:', access);
     if (!access.isAccessible) {
-      logger.debug(`[Handler:activateSelectElementMode] Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
+      logger.debug(`Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
       return {
         success: false,
         message: access.errorMessage,
@@ -66,7 +66,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     let isActivating;
     let modeForContentScript = 'normal';
 
-    logger.debug(`[Handler:activateSelectElementMode] Message data: ${JSON.stringify(message, null, 2)}`);
+    logger.debug(`Message data: ${JSON.stringify(message, null, 2)}`);
 
     if (typeof message.data === 'boolean') {
       isActivating = message.data;
@@ -87,7 +87,7 @@ export async function handleActivateSelectElementMode(message, sender) {
 
     const action = isActivating ? MessageActions.ACTIVATE_SELECT_ELEMENT_MODE : MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE;
     
-    logger.debug(`[Handler:activateSelectElementMode] Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
+    logger.debug(`Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
     
     const contentMessage = MessageFormat.create(
       action,
@@ -126,7 +126,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     // Handle different response types from content script
     if (response === false) {
       // Content script returned false - legacy behavior
-      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned false - legacy response`, {
+      logger.debug(`Tab ${targetTabId} returned false - legacy response`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 80) + (access.fullUrl.length > 80 ? '...' : ''),
         isRestrictedByUrl: access.isRestricted,
@@ -136,7 +136,7 @@ export async function handleActivateSelectElementMode(message, sender) {
       // If tab is accessible but returned false, it's likely a legacy content script
       // In this case, treat false as success for backwards compatibility
       if (access.isAccessible && !access.isRestricted) {
-        logger.debug(`[activateSelectElementMode] Tab ${targetTabId} is accessible, treating false as success`);
+        logger.debug(`Tab ${targetTabId} is accessible, treating false as success`);
         return {
           success: true,
           message: isActivating ? "Select Element mode activated" : "Select Element mode deactivated",
@@ -161,7 +161,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     // Handle structured error response from content script
     if (response && response.success === false && response.error) {
-      logger.debug(`[activateSelectElementMode] Tab ${targetTabId} returned structured error`, {
+      logger.debug(`Tab ${targetTabId} returned structured error`, {
         tabId: targetTabId,
         error: response.error,
         errorType: response.errorType,
@@ -190,7 +190,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     
     if (!wasSuccessful) {
       // Only treat as communication failure if response is undefined/null or indicates actual failure
-      logger.warn(`[activateSelectElementMode] Element selection mode communication FAILED for tab ${targetTabId}`, {
+      logger.warn(`Element selection mode communication FAILED for tab ${targetTabId}`, {
         tabId: targetTabId,
         url: access.fullUrl.substring(0, 50) + (access.fullUrl.length > 50 ? '...' : ''),
         response,
@@ -211,7 +211,7 @@ export async function handleActivateSelectElementMode(message, sender) {
     // If successful, update the central state, which will broadcast to all UIs
     setStateForTab(targetTabId, isActivating);
     
-    logger.info(`[activateSelectElementMode] Element selection mode ${statusText} in tab ${targetTabId}`);
+    logger.info(`Element selection mode ${statusText} in tab ${targetTabId}`);
     
     return { 
       success: true, 
