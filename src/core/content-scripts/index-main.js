@@ -58,7 +58,6 @@ let LOG_COMPONENTS = null;
 let ErrorHandler = null;
 
 // Static import ContentScriptCore to fix Firefox class compilation issues
-import { ContentScriptCore } from './ContentScriptCore.js';
 
 // Lazy load logging and error handling dependencies
 async function initializeLogger() {
