@@ -125,7 +125,30 @@ async function initializeLogger() {
       
       if (initialized) {
         // --- CROSS-FRAME COORDINATION ---
+        const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+        const frameProgressMap = new Map();
         
+        /**
+         * Aggregates progress from all frames and emits a unified event
+         */
+        const emitAggregateProgress = () => {
+          let grandTotalTranslated = 0;
+          let grandTotalCount = 0;
+          
+          for (const progress of frameProgressMap.values()) {
+            grandTotalTranslated += progress.translatedCount || 0;
+            grandTotalCount += progress.totalCount || 0;
+          }
+          
+          if (window.pageEventBus) {
+            window.pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+              translatedCount: grandTotalTranslated,
+              totalCount: grandTotalCount,
+              isAggregated: true
+            });
+          }
+        };
+
         /**
          * Broadcasts a deactivation signal to all iframes
          */
@@ -139,18 +162,39 @@ async function initializeLogger() {
           });
         };
 
-        // 1. Re-broadcast events from iframes to the top frame's bus
+        /**
+         * Broadcasts a page translation related action to all iframes
+         */
+        const broadcastPageAction = (action, data = {}) => {
+          // Reset stats on start or restore
+          if (action === MessageActions.PAGE_TRANSLATE || action === MessageActions.PAGE_RESTORE) {
+            frameProgressMap.clear();
+          }
+
+          const broadcastMessage = { 
+            type: 'TRANSLATE_IT_PAGE_ACTION', 
+            source: 'translate-it-main',
+            action,
+            data
+          };
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            try {
+              iframe.contentWindow.postMessage(broadcastMessage, '*');
+            } catch (e) { /* ignore cross-origin */ }
+          });
+        };
+
+        // 1. Listen for events from iframes
         window.addEventListener('message', (event) => {
           if (event.data?.source === 'translate-it-iframe') {
             const { type, data } = event.data;
             
             // Handle aggregate progress reporting
             if (type === 'TRANSLATE_IT_PAGE_PROGRESS') {
-              if (frameProgressMap) {
-                frameProgressMap.set(event.source, data);
-                emitAggregateProgress();
-              }
-              return; // Don't re-broadcast raw progress to prevent noise
+              frameProgressMap.set(event.source, data);
+              emitAggregateProgress();
+              return;
             }
 
             if (type && window.pageEventBus) {
@@ -163,16 +207,13 @@ async function initializeLogger() {
             if (window.selectElementManagerInstance) {
               window.selectElementManagerInstance.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
             }
-            // The listener below (select-mode-deactivated) will handle the broadcast
           }
 
-          // Handle text selection from iframes to show the UI in main frame
+          // Handle text selection from iframes
           if (event.data?.type === 'TRANSLATE_IT_TEXT_SELECTION_DETECTED') {
             const { text } = event.data.data || {};
             if (text && contentScriptCore) {
-              // Activate windowsManager in main frame to show icon/window
-              contentScriptCore.loadFeature('windowsManager').then(manager => {
-                // Optionally we could manually trigger the icon show here if needed
+              contentScriptCore.loadFeature('windowsManager').then(() => {
                 if (process.env.NODE_ENV === 'development') {
                   console.log('[Main] Showing UI for selection in iframe');
                 }
@@ -180,81 +221,22 @@ async function initializeLogger() {
             }
           }
 
-          // Handle clicks inside iframes to dismiss UI
+          // Handle clicks inside iframes
           if (event.data?.type === 'TRANSLATE_IT_IFRAME_CLICK_DETECTED') {
             if (window.windowsManagerInstance) {
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[Main] Dismissing UI due to click inside iframe');
-              }
               window.windowsManagerInstance.dismiss();
             }
           }
         });
 
-        // 2. Synchronize deactivation across all frames when top frame deactivates
-        // This covers deactivation via click-in-main, ESC key, or notification buttons
+        // 2. Synchronize events via PageEventBus
         if (window.pageEventBus) {
-          const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-
           window.pageEventBus.on('select-mode-deactivated', () => {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Main] Deactivation detected, broadcasting to all iframes');
-            }
             broadcastDeactivation();
           });
 
-          // --- PAGE TRANSLATION COORDINATION ---
-          const frameProgressMap = new Map();
-          
-          /**
-           * Aggregates progress from all frames and emits a unified event
-           */
-          const emitAggregateProgress = () => {
-            let grandTotalTranslated = 0;
-            let grandTotalCount = 0;
-            
-            for (const progress of frameProgressMap.values()) {
-              grandTotalTranslated += progress.translatedCount || 0;
-              grandTotalCount += progress.totalCount || 0;
-            }
-            
-            if (window.pageEventBus) {
-              window.pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
-                translatedCount: grandTotalTranslated,
-                totalCount: grandTotalCount,
-                isAggregated: true // Marker for debugging
-              });
-            }
-          };
-
-          /**
-           * Broadcasts a page translation related action to all iframes
-           */
-          const broadcastPageAction = (action, data = {}) => {
-            // Reset stats on start or restore
-            if (action === MessageActions.PAGE_TRANSLATE || action === MessageActions.PAGE_RESTORE) {
-              frameProgressMap.clear();
-            }
-
-            const broadcastMessage = { 
-              type: 'TRANSLATE_IT_PAGE_ACTION', 
-              source: 'translate-it-main',
-              action,
-              data
-            };
-            const iframes = document.querySelectorAll('iframe');
-            iframes.forEach(iframe => {
-              try {
-                iframe.contentWindow.postMessage(broadcastMessage, '*');
-              } catch (e) { /* ignore cross-origin */ }
-            });
-          };
-
-          // Listen for Page Translation commands and broadcast them
+          // Listen for Page Translation commands
           window.pageEventBus.on(MessageActions.PAGE_TRANSLATE, (options) => {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Main] Page translation started, broadcasting to iframes');
-            }
             broadcastPageAction(MessageActions.PAGE_TRANSLATE, options);
           });
 
