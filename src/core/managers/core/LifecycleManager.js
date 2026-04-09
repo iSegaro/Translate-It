@@ -141,15 +141,15 @@ class LifecycleManager {
       'revertTranslation': Handlers.handleRevertTranslationLazy,
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
       [MessageActions.CANCEL_SESSION]: Handlers.handleCancelSessionLazy,
-      'TRANSLATION_RESULT_UPDATE': Handlers.handleTranslationResultLazy,
+      [MessageActions.TRANSLATION_RESULT_UPDATE]: Handlers.handleTranslationResultLazy,
       'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
 
       // TTS handlers - Lazy loaded for better performance
-      'GOOGLE_TTS_SPEAK': Handlers.handleTTSSpeakLazy,
+      [MessageActions.GOOGLE_TTS_SPEAK]: Handlers.handleTTSSpeakLazy,
       'TTS_SPEAK': Handlers.handleTTSSpeakLazy,
-      'TTS_STOP': Handlers.handleTTSStopLazy,
-      'GOOGLE_TTS_ENDED': Handlers.handleTTSEndedLazy,
-      'OFFSCREEN_READY': Handlers.handleOffscreenReadyLazy,
+      [MessageActions.TTS_STOP]: Handlers.handleTTSStopLazy,
+      [MessageActions.GOOGLE_TTS_ENDED]: Handlers.handleTTSEndedLazy,
+      [MessageActions.OFFSCREEN_READY]: Handlers.handleOffscreenReadyLazy,
       'clearTTSHandlerCache': Handlers.clearTTSHandlerCache,
       'getTTSHandlerStats': Handlers.getTTSHandlerStats,
       

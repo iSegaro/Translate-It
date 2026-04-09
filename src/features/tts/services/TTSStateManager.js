@@ -15,6 +15,76 @@ class TTSStateManager {
     this.offscreenDocumentPromise = null;
     this.lastTTSText = null;
     this.lastTTSLanguage = null;
+    
+    // Centralized audio reference for Firefox direct playback
+    this.activeFirefoxAudio = null;
+    this.activeFirefoxAudioUrl = null;
+  }
+
+  /**
+   * Play audio directly in Firefox
+   */
+  async playFirefoxAudio(audioBlobOrUrl) {
+    this.stopFirefoxAudio();
+
+    return new Promise((resolve, reject) => {
+      try {
+        const url = typeof audioBlobOrUrl === 'string' 
+          ? audioBlobOrUrl 
+          : URL.createObjectURL(audioBlobOrUrl);
+        
+        this.activeFirefoxAudioUrl = url;
+        const audio = new Audio(url);
+        this.activeFirefoxAudio = audio;
+
+        audio.onended = () => {
+          this.cleanupFirefoxAudio();
+          this.notifyTTSEnded('completed');
+        };
+
+        audio.onerror = (e) => {
+          this.cleanupFirefoxAudio();
+          reject(e);
+        };
+
+        audio.play()
+          .then(() => resolve())
+          .catch((err) => {
+            this.cleanupFirefoxAudio();
+            reject(err);
+          });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Stop any active Firefox audio
+   */
+  stopFirefoxAudio() {
+    if (this.activeFirefoxAudio) {
+      try {
+        this.activeFirefoxAudio.pause();
+        this.activeFirefoxAudio.src = '';
+      } catch (e) {
+        logger.debug('Error stopping Firefox audio:', e.message);
+      }
+    }
+    this.cleanupFirefoxAudio();
+  }
+
+  /**
+   * Internal cleanup for Firefox audio resources
+   */
+  cleanupFirefoxAudio() {
+    if (this.activeFirefoxAudioUrl && this.activeFirefoxAudioUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(this.activeFirefoxAudioUrl);
+      } catch (e) {}
+    }
+    this.activeFirefoxAudio = null;
+    this.activeFirefoxAudioUrl = null;
   }
 
   /**
@@ -51,10 +121,13 @@ class TTSStateManager {
       };
 
       if (this.currentTTSSender.tab?.id) {
-        await browserAPI.tabs.sendMessage(this.currentTTSSender.tab.id, {
-          ...message,
-          targetFrameId: this.currentTTSSender.frameId
-        });
+        // Send to the specific tab and frame that requested it
+        const options = {};
+        if (this.currentTTSSender.frameId !== undefined) {
+          options.frameId = this.currentTTSSender.frameId;
+        }
+        
+        await browserAPI.tabs.sendMessage(this.currentTTSSender.tab.id, message, options);
       } else {
         await browserAPI.runtime.sendMessage({
           ...message,

@@ -78,6 +78,7 @@ export class MessageActions {
   static GOOGLE_TTS_GET_STATUS = 'GOOGLE_TTS_GET_STATUS';
   static GOOGLE_TTS_ENDED = 'GOOGLE_TTS_ENDED';
   static PLAY_OFFSCREEN_AUDIO = 'playOffscreenAudio';
+  static OFFSCREEN_READY = 'OFFSCREEN_READY';
   
   // Capture actions
   static SCREEN_CAPTURE = 'SCREEN_CAPTURE';

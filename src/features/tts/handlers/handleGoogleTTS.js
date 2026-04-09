@@ -103,7 +103,8 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
             throw new Error(response.error || 'Offscreen playback failed');
           }
         } else {
-          await playGoogleTTSAudio(ttsUrl);
+          // Play directly in Firefox using the unified state manager
+          await ttsStateManager.playFirefoxAudio(ttsUrl);
         }
         
         return { success: true, processedVia: 'google-tts' };
@@ -146,7 +147,8 @@ export const handleGoogleTTSStopAll = async (message) => {
     if (isChromium()) {
       await ttsStateManager.stopAudioOnly();
     } else {
-      await stopGoogleTTSAudio();
+      // Direct call to state manager for Firefox cleanup
+      ttsStateManager.stopFirefoxAudio();
     }
     
     return { success: true, action: 'stopped' };
@@ -166,46 +168,5 @@ export const handleGoogleTTSEnded = async () => {
   } catch (error) {
     logger.warn('[GoogleTTS] End handling failed:', error);
     return { success: false, error: error.message };
-  }
-};
-
-// Firefox-specific direct audio helpers
-let currentFirefoxAudio = null;
-
-const playGoogleTTSAudio = (ttsUrl) => {
-  return new Promise((resolve, reject) => {
-    try {
-      if (currentFirefoxAudio) {
-        currentFirefoxAudio.pause();
-        currentFirefoxAudio.src = '';
-        currentFirefoxAudio = null;
-      }
-      
-      const audio = new Audio(ttsUrl);
-      currentFirefoxAudio = audio;
-      
-      audio.onended = () => {
-        currentFirefoxAudio = null;
-        ttsStateManager.notifyTTSEnded('completed');
-        resolve();
-      };
-      
-      audio.onerror = (error) => {
-        currentFirefoxAudio = null;
-        reject(new Error(`Firefox Google TTS failed: ${error.message}`));
-      };
-      
-      audio.play().then(() => resolve()).catch(reject);
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-const stopGoogleTTSAudio = async () => {
-  if (currentFirefoxAudio) {
-    currentFirefoxAudio.pause();
-    currentFirefoxAudio.src = '';
-    currentFirefoxAudio = null;
   }
 };

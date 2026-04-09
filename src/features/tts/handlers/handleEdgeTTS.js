@@ -63,21 +63,8 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
             throw new Error(response.error || 'Offscreen cached playback failed');
           }
         } else {
-          // Play directly in Firefox
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          await new Promise((resolve, reject) => {
-            audio.onended = () => {
-              URL.revokeObjectURL(audioUrl);
-              ttsStateManager.notifyTTSEnded('completed');
-              resolve();
-            };
-            audio.onerror = (e) => {
-              URL.revokeObjectURL(audioUrl);
-              reject(e);
-            };
-            audio.play().catch(reject);
-          });
+          // Play directly in Firefox using the unified state manager
+          await ttsStateManager.playFirefoxAudio(audioBlob);
         }
         
         return { success: true, processedVia: 'edge-tts' };
@@ -97,3 +84,34 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
     };
   }
 };
+
+/**
+ * Handle TTS Stop request for Edge TTS
+ */
+export const handleEdgeTTSStopAll = async (message) => {
+  try {
+    const { ttsId } = message.data || {};
+    const isSpecificStop = ttsId && ttsId !== 'all';
+    
+    if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
+      return { success: true, skipped: true };
+    }
+    
+    // notifyTTSEnded will check sender internal state
+    await ttsStateManager.notifyTTSEnded('stopped');
+    ttsStateManager.fullReset();
+    
+    if (isChromium()) {
+      await ttsStateManager.stopAudioOnly();
+    } else {
+      // Direct call to state manager for Firefox cleanup
+      ttsStateManager.stopFirefoxAudio();
+    }
+    
+    return { success: true, action: 'stopped' };
+  } catch (error) {
+    logger.warn('[EdgeTTS] Stop failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+

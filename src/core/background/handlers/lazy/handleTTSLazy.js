@@ -34,12 +34,14 @@ async function loadTTSHandlers() {
 
   const loadingPromise = Promise.all([
     import('@/features/tts/handlers/handleGoogleTTS.js'),
+    import('@/features/tts/handlers/handleEdgeTTS.js'),
     import('@/features/tts/handlers/handleOffscreenReady.js'),
     import('@/features/tts/services/TTSDispatcher.js')
-  ]).then(([googleTTS, offscreenReady, dispatcher]) => {
+  ]).then(([googleTTS, edgeTTS, offscreenReady, dispatcher]) => {
     const handlers = {
       handleTTSSpeak: dispatcher.TTSDispatcher.dispatchTTSRequest,
       handleGoogleTTSStopAll: googleTTS.handleGoogleTTSStopAll,
+      handleEdgeTTSStopAll: edgeTTS.handleEdgeTTSStopAll,
       handleGoogleTTSEnded: googleTTS.handleGoogleTTSEnded,
       handleOffscreenReady: offscreenReady.handleOffscreenReady
     };
@@ -112,18 +114,10 @@ export const handleTTSStopLazy = async (message, sender) => {
   try {
     logger.info('[TTSLazyHandler] TTS_STOP requested');
 
-    // For stop actions, use the dedicated stop handler
-    if (handlerCache.has('tts_handlers')) {
-      // Using cached handlers for TTS_STOP - logged at TRACE level for detailed debugging
-      // logger.trace('[TTSLazyHandler] Using cached handlers for TTS_STOP');
-      const { handleGoogleTTSStopAll } = handlerCache.get('tts_handlers');
-      return await handleGoogleTTSStopAll(message, sender);
-    } else {
-      // TTS handlers not loaded - logged at TRACE level for detailed debugging
-      // logger.trace('[TTSLazyHandler] TTS handlers not loaded, loading for stop...');
-      const { handleGoogleTTSStopAll } = await loadTTSHandlers();
-      return await handleGoogleTTSStopAll(message, sender);
-    }
+    // All stop handlers now use unified ttsStateManager logic,
+    // so loading and calling one is enough.
+    const { handleGoogleTTSStopAll } = await loadTTSHandlers();
+    return await handleGoogleTTSStopAll(message, sender);
   } catch (error) {
     logger.error('[TTSLazyHandler] Failed to handle TTS_STOP:', error);
     return {
