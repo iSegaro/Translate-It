@@ -373,7 +373,12 @@ export class PageTranslationScheduler extends ResourceTracker {
       // Resolve successfully translated items
       const translatedTexts = JSON.parse(result.translatedText);
       batch.forEach((item, index) => {
-        item.resolve(translatedTexts[index]?.text || translatedTexts[index] || item.text);
+        const translatedItem = translatedTexts[index];
+        const translatedText = (typeof translatedItem === 'object' && translatedItem !== null) 
+          ? (translatedItem.text || translatedItem.t || JSON.stringify(translatedItem))
+          : translatedItem;
+          
+        item.resolve(translatedText || item.text);
         this.translatedCount++;
       });
 

@@ -26,11 +26,11 @@ export class ProviderCoordinator {
    * Orchestrates the translation process for any provider.
    * 
    * @param {object} provider - The provider instance (AI or Traditional)
-   * @param {string} text - Text to translate
+   * @param {string|string[]} text - Text or array of texts to translate
    * @param {string} sourceLang - Requested source language
    * @param {string} targetLang - Requested target language
    * @param {object} options - Translation options and engine reference
-   * @returns {Promise<string|object>} Translated text or result object
+   * @returns {Promise<string|string[]|object>} Translated text or status object
    */
   async execute(provider, text, sourceLang, targetLang, options = {}) {
     const {
@@ -43,11 +43,11 @@ export class ProviderCoordinator {
     } = options;
 
     const providerName = provider.providerName || provider.constructor.name;
-    logger.debug(`[Coordinator] Executing translation via ${providerName} (Mode: ${translateMode})`);
+    const isArrayInput = Array.isArray(text);
+    const inputCount = isArrayInput ? text.length : 1;
 
     // 1. Language Pre-processing
-    // Ensure we pass a string for language detection, even if text is an array
-    const detectionText = Array.isArray(text) ? text.join(' ') : text;
+    const detectionText = isArrayInput ? text.join(' ') : text;
     let [sl, tl] = await this._prepareLanguages(detectionText, sourceLang, targetLang, globalSource, globalTarget, translateMode, providerName);
 
     // 2. Normalize to provider-specific codes
@@ -55,16 +55,18 @@ export class ProviderCoordinator {
     const providerTargetLang = provider._getLangCode(tl);
 
     if (providerSourceLang === providerTargetLang && providerSourceLang !== AUTO_DETECT_VALUE) {
+      logger.debug(`[Coordinator] Identical languages (${providerSourceLang}). Skipping.`);
       return text;
     }
 
     // 3. Handle JSON Detection & Strategy
-    // If rawJsonPayload is true, it means the caller (like OptimizedJsonHandler) is already handling the structure
     const jsonInfo = options.rawJsonPayload ? { isJson: false, parsed: null } : this._detectJsonMode(text, provider);
     
     // 4. Determine Execution Strategy
     const strategy = this._resolveExecutionStrategy(provider, jsonInfo.isJson, options);
     
+    logger.debug(`[Coordinator] 🚀 Start: ${providerName} | Mode: ${translateMode} | Segments: ${inputCount} | Stream: ${strategy.useStreaming}`);
+
     // 5. Initialize Streaming if needed
     if (strategy.useStreaming && !jsonInfo.isJson) {
       await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
@@ -74,28 +76,31 @@ export class ProviderCoordinator {
     try {
       let result;
       if (jsonInfo.isJson && !options.rawJsonPayload) {
-        // Transparently handle JSON-in-text (e.g. from context menu)
+        logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
         result = await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
       } else {
-        // Standard execution (Single, Batch, or Stream)
         result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options, strategy);
       }
 
-      // 7. Post-processing
+      // If we are in streaming mode, we return a status object so the Engine knows
+      if (strategy.useStreaming && !jsonInfo.isJson) {
+        return { success: true, streaming: true, messageId };
+      }
+
+      // 7. Post-processing & Normalization
       let finalResult = result;
-      const wasArrayInput = Array.isArray(text);
       const isTraditional = strategy.type === ProviderTypes.TRANSLATE;
 
+      // A. AI Post-processing
       if (strategy.type === ProviderTypes.AI && typeof result === 'string') {
         finalResult = AIResponseParser.cleanAIResponse(result);
       } 
       
-      // Handle Traditional Splitting: If we have a single string but expected multiple results
-      if (isTraditional && wasArrayInput && text.length > 1) {
-        // Optimization: If it's already an array of the correct size, DON'T split it again
-        const isAlreadyCorrectArray = Array.isArray(finalResult) && finalResult.length === text.length;
-        
+      // B. Traditional Splitting Logic
+      if (isTraditional && isArrayInput && inputCount > 1) {
+        const isAlreadyCorrectArray = Array.isArray(finalResult) && finalResult.length === inputCount;
         if (!isAlreadyCorrectArray) {
+          logger.debug(`[Coordinator] Result count mismatch (${Array.isArray(finalResult) ? finalResult.length : 'string'} vs ${inputCount}). Applying split.`);
           const rawString = Array.isArray(finalResult) ? finalResult[0] : finalResult;
           if (typeof rawString === 'string') {
             finalResult = await providerCoordinator._robustSplit(rawString, text, provider);
@@ -103,12 +108,18 @@ export class ProviderCoordinator {
         }
       }
 
-      // 8. Output normalization: Return string if input was string (and not JSON mode)
-      if (!wasArrayInput && !jsonInfo.isJson && Array.isArray(finalResult)) {
-        return finalResult[0] || "";
+      // 8. Output Normalization (Prevent [object Object])
+      if (!isArrayInput && !jsonInfo.isJson) {
+        const singleVal = Array.isArray(finalResult) ? finalResult[0] : finalResult;
+        return this._ensureString(singleVal);
+      }
+
+      if (Array.isArray(finalResult)) {
+        return finalResult.map(item => this._ensureString(item));
       }
 
       return finalResult;
+
     } catch (error) {
       if (strategy.useStreaming) {
         await this._handleStreamError(messageId, error);
@@ -116,6 +127,19 @@ export class ProviderCoordinator {
       this._handleError(error, providerName);
       throw error;
     }
+  }
+
+  /**
+   * Helper to ensure any value is converted to a clean string.
+   * @private
+   */
+  _ensureString(val) {
+    if (val === null || val === undefined) return "";
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object') {
+      return val.text || val.t || val.translatedText || JSON.stringify(val);
+    }
+    return String(val);
   }
 
   /**
@@ -136,6 +160,7 @@ export class ProviderCoordinator {
     );
 
     if (segments.length !== expectedCount) {
+      logger.warn(`[Coordinator] Split mismatch: got ${segments.length}, expected ${expectedCount}`);
       if (segments.length > expectedCount) segments = segments.slice(0, expectedCount);
       else while (segments.length < expectedCount) segments.push("");
     }
@@ -202,6 +227,7 @@ export class ProviderCoordinator {
    */
   _detectJsonMode(text, provider) {
     try {
+      if (typeof text !== 'string') return { isJson: false, parsed: null };
       const parsed = JSON.parse(text);
       const isJson = (
         Array.isArray(parsed) &&
@@ -221,14 +247,16 @@ export class ProviderCoordinator {
   _resolveExecutionStrategy(provider, isJson, options) {
     const { mode, messageId, engine } = options;
     const providerClass = provider.constructor;
-    const providerType = providerClass.type; // 'ai' or 'translate'
+    const providerType = providerClass.type;
 
     // Decide if we should use streaming
     const supportsStreaming = providerClass.supportsStreaming !== false;
     const isSelectElement = mode === TranslationMode.Select_Element;
+    const isPageBatch = mode === TranslationMode.Page;
     
     let useStreaming = false;
-    if (messageId && engine && supportsStreaming) {
+    // Don't stream for Page Batch as it has its own collector
+    if (messageId && engine && supportsStreaming && !isPageBatch) {
       if (providerType === ProviderTypes.AI) {
         useStreaming = isSelectElement || (options.textLength > TRANSLATION_CONSTANTS.STREAMING_THRESHOLDS.AI);
       } else {
@@ -251,7 +279,6 @@ export class ProviderCoordinator {
   async _executeJsonWrapped(provider, jsonArray, sourceLang, targetLang, mode, options) {
     const textsToTranslate = jsonArray.map(item => item.text || '');
     
-    // Re-use standard execution for the texts
     const translatedSegments = await this._executeStandard(
       provider, 
       textsToTranslate, 
@@ -263,16 +290,17 @@ export class ProviderCoordinator {
     );
 
     // Reconstruct JSON
-    if (Array.isArray(translatedSegments) && translatedSegments.length === jsonArray.length) {
+    const results = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];
+    if (results.length === jsonArray.length) {
       const translatedJson = jsonArray.map((item, index) => ({
         ...item,
-        text: translatedSegments[index] || "",
+        text: results[index] || "",
       }));
       return JSON.stringify(translatedJson, null, 2);
     }
     
-    logger.error(`[Coordinator] JSON mismatch: ${translatedSegments.length} vs ${jsonArray.length}`);
-    return Array.isArray(translatedSegments) ? translatedSegments.join('\n') : translatedSegments;
+    logger.error(`[Coordinator] JSON mismatch: ${results.length} vs ${jsonArray.length}`);
+    return results.join('\n');
   }
 
   /**
@@ -283,8 +311,6 @@ export class ProviderCoordinator {
     const { messageId, engine, sessionId, priority } = options;
     const texts = Array.isArray(text) ? text : [text];
 
-    // Delegate to the provider's internal batching logic
-    // Providers know best how to batch themselves, but we coordinate the call
     if (typeof provider._batchTranslate === 'function') {
       return await provider._batchTranslate(
         texts,
@@ -299,7 +325,6 @@ export class ProviderCoordinator {
       );
     }
 
-    // Fallback/Legacy: direct translate call (rarely used now)
     throw new Error(`Provider ${provider.providerName} does not implement _batchTranslate`);
   }
 

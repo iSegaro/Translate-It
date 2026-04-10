@@ -54,6 +54,7 @@ export class UnifiedModeCoordinator {
 
   /**
    * Specialized handler for Whole Page Translation (Batch processing).
+   * Now simplified to delegate orchestration to ProviderCoordinator.
    */
   async processPageTranslation(request, { translationEngine }) {
     const { messageId, data } = request;
@@ -61,87 +62,48 @@ export class UnifiedModeCoordinator {
 
     if (!text) throw new Error('No text provided for translation');
 
+    // Parse incoming segments
     const segments = typeof text === 'string' ? JSON.parse(text).map(item => item.text || item) : text.map(item => item.text || item);
-
-    const { registryIdToName, isProviderType, ProviderTypes, ProviderRegistryIds } = await import('@/features/translation/providers/ProviderConstants.js');
-    const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
-    const { rateLimitManager } = await import('@/features/translation/core/RateLimitManager.js');
-
-    const providerInstance = await translationEngine.getProvider(provider || ProviderRegistryIds.GOOGLE_V2);
-    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
-
-    rateLimitManager.reloadConfigurations();
-
-    const pName = registryIdToName(provider || ProviderRegistryIds.GOOGLE_V2);
-    const isAI = isProviderType(pName, ProviderTypes.AI);
-    const OPTIMAL_BATCH_SIZE = globalConfig.WHOLE_PAGE_CHUNK_SIZE;
-    const OPTIMAL_CHAR_LIMIT = isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS;
-    
-    const batches = translationEngine.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE, OPTIMAL_CHAR_LIMIT);
-    const results = new Array(segments.length).fill(null);
-    const errorMessages = [];
-    let hasErrors = false;
-    let totalActualChars = 0;
     const totalOriginalChars = segments.reduce((sum, t) => sum + (t?.length || 0), 0);
+
+    const providerInstance = await translationEngine.getProvider(provider);
+    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
 
     try {
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        if (translationEngine.isCancelled(messageId)) break;
+      const sessionId = request.sessionId || data.sessionId || messageId;
+      
+      // Execute the whole array via Provider (Coordinator will handle chunking internally)
+      const translatedSegments = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
+        mode: TranslationMode.Page,
+        abortController,
+        messageId,
+        sessionId,
+        priority,
+        rawJsonPayload: true // Treat as handled structure
+      });
 
-        // Apply delay for non-AI providers to respect rate limits
-        if (i > 0 && providerInstance.constructor.type !== "ai") {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      // Ensure we have an array of results that matches the input length
+      const results = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];
+      
+      const finalResults = segments.map((original, idx) => ({
+        text: results[idx] !== undefined ? results[idx] : original
+      }));
 
-        try {
-          const sessionId = request.sessionId || data.sessionId || messageId;
-          const statsBefore = statsManager.getSessionSummary(sessionId);
-          const charsBefore = statsBefore ? statsBefore.chars : 0;
-
-          if (abortController) abortController.sessionId = sessionId;
-
-          const batchResult = await rateLimitManager.executeWithRateLimit(
-            provider || ProviderRegistryIds.GOOGLE_V2,
-            () => providerInstance.translate(batch, sourceLanguage || 'auto', targetLanguage, {
-              mode: TranslationMode.Page,
-              abortController,
-              messageId,
-              sessionId,
-              priority,
-              rawJsonPayload: true // Treat as handled structure
-            }),
-            `batch-${i + 1}/${batches.length}`,
-            priority,
-            { sessionId }
-          );
-
-          const statsAfter = statsManager.getSessionSummary(sessionId);
-          totalActualChars += statsAfter ? (statsAfter.chars - charsBefore) : batch.reduce((sum, t) => sum + (t?.length || 0), 0);
-
-          const chunkResults = Array.isArray(batchResult) ? batchResult : [batchResult];
-          if (Array.isArray(chunkResults)) {
-            batch.forEach((segment, idx) => {
-              const globalIdx = segments.indexOf(segment);
-              if (globalIdx !== -1) results[globalIdx] = chunkResults[idx] || segment;
-            });
-          }
-        } catch (batchError) {
-          hasErrors = true;
-          errorMessages.push(batchError.message || String(batchError));
-          batch.forEach(s => { const idx = segments.indexOf(s); if (idx !== -1 && results[idx] === null) results[idx] = s; });
-        }
-      }
-
-      const finalResults = results.map(text => ({ text: text || "" }));
       return {
-        success: !hasErrors,
+        success: true,
         translatedText: JSON.stringify(finalResults),
-        actualCharCount: totalActualChars,
+        actualCharCount: totalOriginalChars, // Approximate or get from stats if needed
         originalCharCount: totalOriginalChars,
-        error: hasErrors ? errorMessages.join(', ') : null
+        error: null
+      };
+    } catch (error) {
+      logger.error(`[UnifiedCoordinator] Page translation failed:`, error.message);
+      return {
+        success: false,
+        translatedText: JSON.stringify(segments.map(s => ({ text: s }))),
+        error: error.message
       };
     } finally {
       translationEngine.lifecycleRegistry.unregisterRequest(messageId);
