@@ -92,9 +92,14 @@ export class ProviderCoordinator {
       
       // Handle Traditional Splitting: If we have a single string but expected multiple results
       if (isTraditional && wasArrayInput && text.length > 1) {
-        const rawString = Array.isArray(finalResult) ? finalResult[0] : finalResult;
-        if (typeof rawString === 'string') {
-          finalResult = await providerCoordinator._robustSplit(rawString, text, provider);
+        // Optimization: If it's already an array of the correct size, DON'T split it again
+        const isAlreadyCorrectArray = Array.isArray(finalResult) && finalResult.length === text.length;
+        
+        if (!isAlreadyCorrectArray) {
+          const rawString = Array.isArray(finalResult) ? finalResult[0] : finalResult;
+          if (typeof rawString === 'string') {
+            finalResult = await providerCoordinator._robustSplit(rawString, text, provider);
+          }
         }
       }
 

@@ -428,16 +428,15 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // Debug log the request (without exposing full text content)
     logger.debug('[DeepL] Request details:', {
       textCount: validTexts.length,
-      totalChars: validTexts.join('').length,
+      totalChars: this._calculateTraditionalCharCount(validTexts),
       sourceLang: sl || 'auto',
       targetLang: tl,
       betaLanguages: betaLanguagesEnabled,
-      formality: betaLanguagesEnabled ? 'N/A (beta)' : (await getDeeplFormalityAsync() || 'default'),
       hasXMLPlaceholders,
       hasContext: contextParts.length > 0
     });
 
-    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
+    const originalCharCount = this._calculateTraditionalCharCount(chunkTexts);
 
     try {
       const result = await this._executeRequest({
@@ -452,7 +451,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         extractResponse: (data) => {
           if (!data?.translations || !Array.isArray(data.translations)) {
-            logger.error('[DeepL] Invalid API response:', data);
+            logger.warn('[DeepL] Invalid API response format');
             return chunkTexts.map(() => '');
           }
 
@@ -532,7 +531,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
-        charCount: validTexts.join('').length, // Explicitly pass the accurate count
+        charCount: this._calculateTraditionalCharCount(validTexts),
         sessionId: options.sessionId,
         originalCharCount: options.originalCharCount || originalCharCount
       });
@@ -548,148 +547,50 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     } catch (error) {
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
-        logger.error('[DeepL] XML corruption detected, triggering fallback to atomic extraction', {
-          error: error.error,
-          details: error.validationDetails,
-          index: error.errorIndex
-        });
-
-        // Return original texts to trigger atomic extraction fallback in SelectElementManager
-        // This preserves backward compatibility and allows translation to continue
+        logger.error('[DeepL] XML corruption detected, falling back to original text for this chunk');
         return chunkTexts;
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
-      // Reduced retry attempts from 5 to 3 since we now escape XML characters properly
       if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 3) {
-        logger.debug(`[DeepL] HTTP 400 error with ${validTexts.length} segments, retrying with smaller chunks (attempt ${retryAttempt + 1}/3)`);
+        logger.debug(`[DeepL] HTTP 400 error, retrying with smaller chunks (${retryAttempt + 1}/3)`);
 
-        // Split into smaller chunks and retry SEQUENTIALLY (not parallel)
-        // DeepL Free API has issues with concurrent requests
-        const midPoint = Math.ceil(validTexts.length / 2);
+        const midPoint = Math.ceil(chunkTexts.length / 2);
         const firstHalf = chunkTexts.slice(0, midPoint);
         const secondHalf = chunkTexts.slice(midPoint);
 
-        let firstResult, secondResult;
-
-        try {
-          firstResult = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options);
-        } catch {
-          logger.debug(`[DeepL] First half failed, returning original texts for ${firstHalf.length} segments`);
-          firstResult = firstHalf;
-        }
-
-        try {
-          secondResult = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options);
-        } catch {
-          logger.debug(`[DeepL] Second half failed, returning original texts for ${secondHalf.length} segments`);
-          secondResult = secondHalf;
-        }
+        // Run both halves in parallel for better performance during fallback
+        const [firstResult, secondResult] = await Promise.all([
+          this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
+            .catch(() => firstHalf),
+          this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
+            .catch(() => secondHalf)
+        ]);
 
         return [...firstResult, ...secondResult];
       }
 
-      // Final fallback for HTTP 400: translate each segment individually (sequential)
-      // Only do this if we haven't already tried individual translation (now after 3 attempts)
+      // Final fallback for HTTP 400: translate each segment individually
       if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt >= 3) {
-        logger.debug(`[DeepL] Retry attempts exhausted, attempting sequential one-by-one translation for ${validTexts.length} segments`);
+        logger.debug(`[DeepL] Exhausted retries, attempting sequential fallback for ${validTexts.length} segments`);
 
         const results = [];
-        let successCount = 0;
-        const FALLBACK_BLANK_MARKER = '<n2/>';
-        const FALLBACK_SINGLE_MARKER = '<n1/>';
-
-        for (let i = 0; i < chunkTexts.length; i++) {
-          const text = chunkTexts[i];
-          // Skip empty texts
+        for (const text of chunkTexts) {
           if (!text || text.trim().length === 0) {
             results.push('');
             continue;
           }
 
           try {
-            // CRITICAL: Sanitize and escape XML special characters before processing
-            let sanitizedText = text
-              .replace(ZERO_WIDTH_PATTERN, '')
-              .replace(CONTROL_CHARS_PATTERN, '')
-              .replace(SPECIAL_UNICODE_PATTERN, '');
-
-            // Escape XML special characters to prevent parsing errors
-            sanitizedText = sanitizedText
-              .replace(/&/g, '&amp;')    // Must be first
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;');
-
-            // Step 1: Convert blank lines (\n\n) to marker
-            let textWithMarkers = sanitizedText.replace(/\n\n+/g, (match) => {
-              const blankLineCount = Math.floor(match.length / 2);
-              return FALLBACK_BLANK_MARKER.repeat(blankLineCount);
-            });
-
-            // Step 2: Convert single newlines (\n) to marker
-            textWithMarkers = textWithMarkers.replace(/\n/g, FALLBACK_SINGLE_MARKER);
-
-            // Translate single segment
-            const requestBody = new URLSearchParams();
-            requestBody.append('text', textWithMarkers);
-
-            if (sourceLang && sourceLang !== '') {
-              requestBody.append('source_lang', sourceLang);
-            }
-            requestBody.append('target_lang', targetLang);
-
-            if (betaLanguagesEnabled) {
-              requestBody.append('enable_beta_languages', '1');
-            }
-            
-            // Enable XML handling for markers
-            requestBody.append('tag_handling', 'xml');
-            requestBody.append('ignore_tags', 'n1,n2,x');
-            requestBody.append('split_sentences', 'nonewlines');
-            requestBody.append('preserve_formatting', '1');
-
-            const result = await this._executeRequest({
-              url: apiUrl,
-              fetchOptions: {
-                method: "POST",
-                headers: {
-                  "Authorization": `DeepL-Auth-Key ${apiKey}`,
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: requestBody,
-              },
-              extractResponse: (data) => {
-                if (!data?.translations || !Array.isArray(data.translations)) {
-                  return text;
-                }
-                let translated = data.translations[0]?.text || text;
-
-                // Restore markers
-                translated = translated.replace(/<n2\s*\/?>/g, '\n\n');
-                translated = translated.replace(/<n1\s*\/?>/g, '\n');
-
-                // Unescape XML entities back to original characters
-                translated = unescapeXML(translated);
-
-                return translated;
-              },
-              context,
-              abortController,
-              charCount: textWithMarkers.length, // Explicitly pass for fallback too
-              sessionId: options.sessionId,
-              originalCharCount: options.originalCharCount || text.length
-            });
-
-            results.push(result || text);
-            successCount++;
-            logger.debug(`[DeepL] Sequential fallback: segment ${i + 1}/${chunkTexts.length} translated`);
+            // Simplified call for single segment fallback
+            const res = await this._translateChunk([text], sourceLang, targetLang, translateMode, abortController, 5, 1, 0, 1, options);
+            results.push(Array.isArray(res) ? res[0] : res);
           } catch {
-            logger.debug(`[DeepL] Sequential fallback failed for segment ${i + 1}, using original`);
-            results.push(text); // Return original text as fallback
+            results.push(text);
           }
         }
 
-        logger.info(`[DeepL] Sequential fallback completed: ${successCount}/${chunkTexts.length} segments translated`);
+        logger.info(`[DeepL] Sequential fallback completed`);
         return results;
       }
 
