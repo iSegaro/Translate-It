@@ -55,8 +55,8 @@ export class GeminiProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
-    logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const requestBody = {
       contents: [{

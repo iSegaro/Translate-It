@@ -29,7 +29,21 @@ export const AIResponseParser = {
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
-    return this._extractAndParseJson(processedResult, expectedFormat);
+    const parsed = this._extractAndParseJson(processedResult, expectedFormat);
+
+    // Dynamic Format Bridge: AI often returns Array when Object was requested, and vice-versa.
+    // We intelligently convert them if they match the content.
+    if (expectedFormat === ResponseFormat.JSON_OBJECT && Array.isArray(parsed)) {
+      // Convert Array [translated_text1, ...] to Object {"1": "translated_text1", ...}
+      const bridged = {};
+      parsed.forEach((val, idx) => {
+        const text = (typeof val === 'object' && val !== null) ? (val.t || val.text || val.translation || '') : String(val);
+        bridged[idx + 1] = text;
+      });
+      return bridged;
+    }
+
+    return parsed;
   },
 
   /**

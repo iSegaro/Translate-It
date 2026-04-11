@@ -9,109 +9,91 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationSessionManager');
 
-export class TranslationSessionManager {
+class TranslationSessionManager {
   constructor() {
-    this.sessions = new Map();
-    this.maxSessions = 10;
+    this.sessions = new Map(); // sessionId -> session object
     this.sessionTtl = 30 * 60 * 1000; // 30 minutes
+    this.maxSessions = 50;
   }
 
   /**
-   * Get or create a session
-   * @param {string} sessionId - Unique identifier (e.g., Tab ID + mode)
-   * @param {string} providerName - Name of the AI provider
-   * @returns {object} - Session object
+   * Get an existing session or create a new one
    */
-  getOrCreateSession(sessionId, providerName) {
-    if (!sessionId) return null;
-
-    if (this.sessions.has(sessionId)) {
-      const session = this.sessions.get(sessionId);
-      session.lastUsed = Date.now();
+  getOrCreateSession(id, provider) {
+    if (this.sessions.has(id)) {
+      const session = this.sessions.get(id);
+      session.lastActivity = Date.now();
       return session;
     }
 
-    // LRU: If too many sessions, remove oldest
+    // Limit number of active sessions (LRU-ish)
     if (this.sessions.size >= this.maxSessions) {
-      this._removeOldestSession();
+      this._evictOldest();
     }
 
-    const newSession = {
-      id: sessionId,
-      provider: providerName,
-      history: [], // Array of {role, content}
+    const session = {
+      id,
+      provider,
+      history: [],
       systemPrompt: null,
       batchCount: 0,
-      lastUsed: Date.now(),
-      createdAt: Date.now()
+      turnCounter: 0, // Logical counter for logs
+      startTime: Date.now(),
+      lastActivity: Date.now()
     };
 
-    this.sessions.set(sessionId, newSession);
-    logger.debug(`Created new translation session: ${sessionId} for provider: ${providerName}`);
-    return newSession;
+    this.sessions.set(id, session);
+    return session;
   }
 
   /**
-   * Add message to session history with rolling window and character limit
-   * @param {string} sessionId - Session identifier
-   * @param {string} role - Message role ('user' or 'assistant')
-   * @param {string} content - Message content
-   * @param {number} maxHistoryTurns - Maximum number of turns to keep for context
+   * Add a message pair to history
    */
-  addMessage(sessionId, role, content, maxHistoryTurns = 2) {
-    const session = this.sessions.get(sessionId);
+  addMessage(id, role, content) {
+    const session = this.sessions.get(id);
     if (!session) return;
 
-    // Optimization: Truncate very long history messages to save tokens.
-    // 1000 chars is plenty for context (tone/terminology) without wasting budget.
-    const MAX_HISTORY_CONTENT_CHARS = 1000;
-    let processedContent = content;
-    
-    if (content && content.length > MAX_HISTORY_CONTENT_CHARS) {
-      processedContent = content.substring(0, MAX_HISTORY_CONTENT_CHARS) + '... (truncated)';
-      logger.debug(`History message truncated from ${content.length} to ${processedContent.length} chars`);
-    }
+    session.history.push({ role, content, timestamp: Date.now() });
+    session.lastActivity = Date.now();
 
-    session.history.push({ role, content: processedContent });
-    session.lastUsed = Date.now();
-
-    // Rolling window: Keep only last N turns (user + assistant = 1 turn)
-    // We keep 2x maxHistoryTurns messages
-    if (session.history.length > maxHistoryTurns * 2) {
-      session.history = session.history.slice(-(maxHistoryTurns * 2));
+    // Trim history if too long (keep last 20 messages / 10 turns)
+    if (session.history.length > 20) {
+      session.history = session.history.slice(-20);
     }
   }
 
   /**
-   * Store system prompt for the session
+   * Get logical turn number and increment it.
+   * Ensures the session exists before incrementing.
    */
-  setSystemPrompt(sessionId, prompt) {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.systemPrompt = prompt;
+  claimNextTurn(id, provider = 'Unknown') {
+    let session = this.sessions.get(id);
+    if (!session) {
+      session = this.getOrCreateSession(id, provider);
     }
+    session.turnCounter++;
+    session.lastActivity = Date.now();
+    return session.turnCounter;
   }
 
   /**
-   * Clear a specific session
+   * Get current turn number without incrementing
    */
-  clearSession(sessionId) {
-    if (this.sessions.has(sessionId)) {
-      this.sessions.delete(sessionId);
-      logger.debug(`Cleared translation session: ${sessionId}`);
-    }
+  getTurnNumber(id) {
+    const session = this.sessions.get(id);
+    return session ? (session.turnCounter || 1) : 1;
   }
 
   /**
-   * Remove oldest session based on lastUsed
+   * Evict the oldest session
    */
-  _removeOldestSession() {
+  _evictOldest() {
     let oldestId = null;
-    let oldestTime = Infinity;
+    let oldestTime = Date.now();
 
     for (const [id, session] of this.sessions.entries()) {
-      if (session.lastUsed < oldestTime) {
-        oldestTime = session.lastUsed;
+      if (session.lastActivity < oldestTime) {
+        oldestTime = session.lastActivity;
         oldestId = id;
       }
     }
@@ -128,7 +110,7 @@ export class TranslationSessionManager {
   cleanup() {
     const now = Date.now();
     for (const [id, session] of this.sessions.entries()) {
-      if (now - session.lastUsed > this.sessionTtl) {
+      if (now - session.lastActivity > this.sessionTtl) {
         this.sessions.delete(id);
         logger.debug(`Cleanup: Removed expired session: ${id}`);
       }

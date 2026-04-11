@@ -48,8 +48,8 @@ export class OpenRouterProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
-    logger.info(`[OpenRouter] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    logger.info(`[OpenRouter] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
