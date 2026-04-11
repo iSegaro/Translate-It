@@ -38,7 +38,7 @@ export class ProviderCoordinator {
     const expectedFormat = options.expectedFormat || (jsonInfo.isJson ? ResponseFormat.JSON_OBJECT : (Array.isArray(text) ? ResponseFormat.JSON_ARRAY : ResponseFormat.STRING));
     options.expectedFormat = expectedFormat;
     
-    logger.debug(`[Coordinator] 🚀 Start: ${providerName} | Mode: ${translateMode} | Segments: ${inputCount} | Format: ${expectedFormat}`);
+    logger.debug(`[Coordinator] Start: ${providerName} | Mode: ${translateMode} | Segments: ${inputCount} | Format: ${expectedFormat}`);
 
     // 5. Initialize Streaming if needed
     // Only enable coordinator-level streaming if not already handled by an orchestrator (rawJsonPayload)
