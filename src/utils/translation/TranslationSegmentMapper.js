@@ -11,162 +11,101 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SegmentMapper');
 
 export class TranslationSegmentMapper {
   /**
-   * Standard delimiter for separating text segments
+   * Standard delimiter for separating text segments.
+   * Using a more resilient pattern that traditional providers are less likely to merge.
    */
-  static STANDARD_DELIMITER = '\n\n---\n\n';
+  static STANDARD_DELIMITER = '\n[[---]]\n';
 
   /**
    * Enhanced mapping: attempt to reconstruct original segments from translated text
-   * @param {string} translatedText - The complete translated text
-   * @param {string[]} originalSegments - Original segments that were sent for translation
-   * @param {string} delimiter - The delimiter that should separate segments
-   * @param {string} providerName - Name of the provider for logging
-   * @returns {string[]} - Mapped segments matching original count
    */
   static mapTranslationToOriginalSegments(translatedText, originalSegments, delimiter, providerName = 'Unknown') {
     if (!translatedText || !Array.isArray(originalSegments)) {
       return [translatedText];
     }
 
-    // First, try standard splitting
-    let segments = translatedText.split(delimiter);
-
-    // If standard splitting works, return it
-    if (segments.length === originalSegments.length) {
-      return segments;
+    if (originalSegments.length <= 1) {
+      return [translatedText];
     }
 
-    // Enhanced fallback: try to split by alternative delimiters and patterns
+    // 1. Try standard splitting
+    let segments = translatedText.split(delimiter);
+    if (segments.length === originalSegments.length) return segments;
+
+    // 2. Try alternative common delimiters
     const alternatives = [
-      delimiter.trim(),
-      '\n\n---\n',                    // Missing newline
-      '\n---\n\n',                    // Missing newline on other side
-      '---',                         // Just the separator
-      '\n\n',                         // Double newlines
-      '\n',                          // Single newlines (last resort)
+      '[[---]]',
+      '\n---\n',
+      '---',
+      '\n\n',
+      '\n'
     ];
 
     for (const altDelim of alternatives) {
       const testSegments = translatedText.split(altDelim);
       if (testSegments.length === originalSegments.length) {
         logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
-        return testSegments;
+        return testSegments.map(s => s.trim());
       }
     }
 
-    // Advanced fallback: map based on whitespace and empty segments
-    const emptySegmentIndices = originalSegments
-      .map((seg, idx) => seg.trim() === '' ? idx : -1)
-      .filter(idx => idx !== -1);
-
-    if (emptySegmentIndices.length > 0) {
-      // If we have empty segments in original, try to map them
-      const nonEmptyOriginals = originalSegments.filter(seg => seg.trim() !== '');
-      const nonEmptyTranslated = segments.filter(seg => seg.trim() !== '');
-
-      if (nonEmptyTranslated.length === nonEmptyOriginals.length) {
-        // Reconstruct full array with empty segments
-        const result = new Array(originalSegments.length);
-        let translatedIdx = 0;
-
-        for (let i = 0; i < originalSegments.length; i++) {
-          if (originalSegments[i].trim() === '') {
-            result[i] = originalSegments[i]; // Keep original empty/whitespace
-          } else {
-            result[i] = nonEmptyTranslated[translatedIdx++];
-          }
-        }
-
-        logger.info(`[${providerName}] Successfully reconstructed segments with empty segment mapping`);
-        return result;
-      }
-    }
-
-    // Last resort: split by pattern matching original structure
-    try {
-      const result = this.splitByPattern(translatedText, originalSegments, providerName);
-      if (result.length === originalSegments.length) {
-        logger.info(`[${providerName}] Successfully split by pattern matching`);
-        return result;
-      }
-    } catch (error) {
-      logger.warn(`[${providerName}] Pattern splitting failed:`, error);
-    }
-
-    // If all else fails, return as single segment
-    return [translatedText];
-  }
-
-  /**
-   * Split translation text by matching patterns from original segments
-   * @param {string} translatedText - Complete translated text
-   * @param {string[]} originalSegments - Original segments for pattern reference
-   * @param {string} providerName - Name of the provider for logging
-   * @returns {string[]} - Split segments
-   */
-  static splitByPattern(translatedText, originalSegments, providerName = 'Unknown') {
-    const result = [];
-    let delimiterPattern = new RegExp(`(\n\n---\n\n|\\n\\n---\\n|\\n---\\n\n|---|\\n\\n|\\n)`, 'g');
-
-    logger.debug(`[${providerName}] Splitting translated text by pattern matching`);
-
-    // Try to find delimiters in translated text
-    const matches = [...translatedText.matchAll(delimiterPattern)];
-
-    if (matches.length === originalSegments.length - 1) {
-      // Extract segments between delimiters
-      let lastIndex = 0;
-      for (let i = 0; i < matches.length; i++) {
-        const match = matches[i];
-        const segment = translatedText.substring(lastIndex, match.index);
-        result.push(segment);
-        lastIndex = match.index + match[0].length;
-      }
-      result.push(translatedText.substring(lastIndex)); // Last segment
+    // 3. Handle Empty/Whitespace segments preservation
+    // This is critical for social media like Twitter where icons/dots are separate nodes
+    const nonEmptyOriginals = originalSegments.map((s, i) => ({ text: s, id: i })).filter(s => s.text.trim() !== '');
+    
+    // If we only have 1 non-empty segment, map everything to it
+    if (nonEmptyOriginals.length === 1) {
+      const result = originalSegments.map(s => s.trim() === '' ? s : '');
+      result[nonEmptyOriginals[0].id] = translatedText.trim();
       return result;
     }
 
-    // Fallback: try to estimate segment boundaries based on length ratios
-    const totalLength = translatedText.length;
-    const originalLengths = originalSegments.map(seg => seg.length);
-    const totalOriginalLength = originalLengths.reduce((a, b) => a + b, 0);
-
-    let currentIndex = 0;
-    for (let i = 0; i < originalSegments.length - 1; i++) {
-      const expectedLength = Math.round((originalLengths[i] / totalOriginalLength) * totalLength);
-      const segment = translatedText.substring(currentIndex, currentIndex + expectedLength);
-      result.push(segment);
-      currentIndex += expectedLength;
+    // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
+    try {
+      return this.splitByWordRatio(translatedText, originalSegments, providerName);
+    } catch (error) {
+      logger.warn(`[${providerName}] Smart splitting failed:`, error);
+      // Absolute fallback: first segment gets everything, others get original
+      return originalSegments.map((s, i) => i === 0 ? translatedText : s);
     }
-    result.push(translatedText.substring(currentIndex)); // Last segment
-
-    return result;
   }
 
   /**
-   * Create a simple alternative fallback for segment mapping
-   * @param {string} translatedText - The complete translated text
-   * @param {string[]} originalSegments - Original segments that were sent for translation
-   * @param {string} providerName - Name of the provider for logging
-   * @returns {string[]} - Mapped segments
+   * Split translated text based on word boundaries and length ratios.
+   * Prevents "half-word" splitting like "س ا ۸ عت" by respecting word boundaries.
+   * @private
    */
-  static createAlternativeFallback(translatedText, originalSegments, providerName = 'Unknown') {
-    // Try splitting by "---" (delimiter might have been translated)
-    const altSplit1 = translatedText.split(/\n*---\n*/);
-    if (altSplit1.length === originalSegments.length) {
-      logger.debug(`[${providerName}] Successfully recovered segments using alternative splitting`);
-      return altSplit1.map(t => t.trim());
+  static splitByWordRatio(translatedText, originalSegments, providerName) {
+    const totalOriginalChars = originalSegments.reduce((sum, s) => sum + s.length, 0);
+    const words = translatedText.trim().split(/\s+/);
+    
+    if (words.length === 0) return originalSegments.map(() => "");
+
+    const result = new Array(originalSegments.length).fill("");
+    let currentWordIdx = 0;
+
+    for (let i = 0; i < originalSegments.length; i++) {
+      if (originalSegments[i].trim() === "") {
+        result[i] = originalSegments[i];
+        continue;
+      }
+
+      const ratio = originalSegments[i].length / totalOriginalChars;
+      const targetWordCount = Math.max(1, Math.round(ratio * words.length));
+      
+      const segmentWords = words.slice(currentWordIdx, currentWordIdx + targetWordCount);
+      
+      // If it's the last segment, take all remaining words
+      if (i === originalSegments.length - 1 || (currentWordIdx + targetWordCount >= words.length)) {
+        result[i] = words.slice(currentWordIdx).join(" ");
+        break;
+      }
+
+      result[i] = segmentWords.join(" ");
+      currentWordIdx += targetWordCount;
     }
 
-    // Try splitting by double newlines
-    const altSplit2 = translatedText.split(/\n\n+/);
-    if (altSplit2.length === originalSegments.length) {
-      logger.debug(`[${providerName}] Successfully recovered segments using newline splitting`);
-      return altSplit2.map(t => t.trim());
-    }
-
-    // Last resort: distribute text evenly
-    logger.debug(`[${providerName}] Using fallback: returning original text count with empty strings`);
-    return originalSegments.map((_, index) => index === 0 ? translatedText : "");
+    logger.info(`[${providerName}] Used Word-Ratio splitting to preserve word integrity`);
+    return result;
   }
 }

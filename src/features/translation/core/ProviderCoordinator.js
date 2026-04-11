@@ -77,7 +77,7 @@ export class ProviderCoordinator {
           finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
             finalResult, 
             segments, 
-            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+            TranslationSegmentMapper.STANDARD_DELIMITER,
             providerName
           );
         }
