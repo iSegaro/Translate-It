@@ -64,6 +64,45 @@ export const AIConversationHelper = {
   },
 
   /**
+   * Helper to get conversation history as structured turns
+   * @param {string} sessionId - Session identifier
+   * @param {string} translateMode - Translation mode
+   * @returns {Promise<Array>} - Array of turns {user, assistant}
+   */
+  async getConversationHistory(sessionId, translateMode = '') {
+    if (!sessionId) return [];
+
+    // ONLY apply history logic for Select Element mode.
+    if (translateMode !== TranslationMode.Select_Element) {
+      return [];
+    }
+
+    try {
+      const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
+      const session = translationSessionManager.sessions.get(sessionId);
+      if (!session || !session.history || session.history.length === 0) return [];
+
+      const turns = [];
+      // Group history messages into turns (user + assistant pairs)
+      for (let i = 0; i < session.history.length; i += 2) {
+        const userMsg = session.history[i];
+        const assistantMsg = session.history[i + 1];
+        
+        if (userMsg && assistantMsg && userMsg.role === 'user' && assistantMsg.role === 'assistant') {
+          turns.push({
+            user: userMsg.content,
+            assistant: assistantMsg.content
+          });
+        }
+      }
+      return turns;
+    } catch (e) {
+      logger.warn('Failed to get conversation history:', e);
+      return [];
+    }
+  },
+
+  /**
    * Helper to prepare system prompt and user text.
    * Optimized to switch between Full and Follow-up prompts based on turn and mode.
    */
