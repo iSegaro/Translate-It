@@ -3,6 +3,17 @@
  * Shared constants used across translation providers
  */
 
+/**
+ * Expected format of the translation response.
+ * Used to enforce strict contracts between orchestrators and providers.
+ */
+export const ResponseFormat = {
+  STRING: 'STRING',           // Plain text (Popup, Selection, single segments)
+  JSON_ARRAY: 'JSON_ARRAY',   // Array of strings (Standard AI Batching)
+  JSON_OBJECT: 'JSON_OBJECT', // Array of objects with IDs (Select Element, Page Translation)
+  AUTO: 'AUTO'                // Heuristic-based fallback (legacy)
+};
+
 export const TRANSLATION_CONSTANTS = {
   // Standard delimiter for separating text segments in batch translation
   TEXT_DELIMITER: '\n\n---\n\n',

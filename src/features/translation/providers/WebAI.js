@@ -8,7 +8,8 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'WebAI');
 
@@ -31,52 +32,51 @@ export class WebAIProvider extends BaseAIProvider {
     super(ProviderNames.WEBAI);
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
+  /**
+   * Internal implementation of the WebAI API call.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
     const [apiUrl, apiModel] = await Promise.all([
       getWebAIApiUrlAsync(),
       getWebAIApiModelAsync(),
     ]);
 
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
-
-    logger.info(`[WebAI] Using model: ${apiModel}`);
-    logger.info(`[WebAI] Starting translation: ${finalOriginalCharCount} chars`);
-
     this._validateConfig({ apiUrl, apiModel }, ["apiUrl", "apiModel"], `${this.providerName.toLowerCase()}-translation`);
 
-    let prompt;
-    if (isBatch) {
-      const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, WebAIProvider.type, sessionId, isBatch, contextMetadata);
-      prompt = `${systemPrompt}\n\nJSON data to translate:\n${userText}`;
-    } else {
-      prompt = await buildPrompt(text, sourceLang, targetLang, translateMode, this.constructor.type);
-      // Manually add context metadata for non-batch WebAI if needed, but buildPrompt doesn't support it yet
-    }
+    logger.info(`[WebAI] Using model: ${apiModel}`);
+
+    // WebAI uses a single prompt string instead of separate messages
+    const fullPrompt = isBatch 
+      ? `${systemPrompt}\n\nJSON data to translate:\n${userText}`
+      : await buildPrompt(userText, options.sourceLang, options.targetLang, options.mode, this.constructor.type);
 
     const fetchOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: prompt,
+        message: fullPrompt,
         model: apiModel,
         images: [],
         max_tokens: 4096,
         reset_session: this.shouldResetSession(),
-        ...(isBatch && { response_format: { type: "json_object" } })
+        // Enforce JSON if requested
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),
     };
 
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
-      originalCharCount: finalOriginalCharCount,
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId
     });
 
-    logger.info(`[WebAI] Translation completed successfully`);
     this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
     
     return result;

@@ -128,8 +128,7 @@ export class TranslationEngine {
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     if (isSelectJson) {
       logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
-      const tabId = sender?.tab?.id;
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, tabId);
+      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender);
     }
 
     // 5. Standard execution via ProviderCoordinator

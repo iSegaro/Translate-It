@@ -4,12 +4,14 @@ import {
   getOpenAIApiKeysAsync,
   getOpenAIApiUrlAsync,
   getOpenAIModelAsync,
+  getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
-import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
@@ -33,7 +35,13 @@ export class OpenAIProvider extends BaseAIProvider {
     this.providerSettingKey = 'OPENAI_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
+  /**
+   * Internal implementation of the AI API call.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
     const [apiKeys, apiUrl, model] = await Promise.all([
       getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
@@ -44,15 +52,10 @@ export class OpenAIProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, OpenAIProvider.type, sessionId, isBatch, contextMetadata);
-
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
-
     const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[OpenAI] Model: ${model || 'gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[OpenAI] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
     const fetchOptions = {
       method: "POST",
@@ -64,15 +67,16 @@ export class OpenAIProvider extends BaseAIProvider {
         model: model || "gpt-3.5-turbo",
         messages: messages,
         max_tokens: 4096,
-        ...(isBatch && { response_format: { type: "json_object" } })
+        // Enforce JSON Mode if requested by contract
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),
     };
 
     const result = await this._executeRequest({
       url: apiUrl || "https://api.openai.com/v1/chat/completions",
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(messages),
-      originalCharCount: finalOriginalCharCount,
+      charCount: AITextProcessor.calculatePayloadChars(messages),
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
@@ -86,7 +90,6 @@ export class OpenAIProvider extends BaseAIProvider {
       await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
 
-    logger.info(`[OpenAI] Translation completed successfully`);
     return result;
   }
 
@@ -134,7 +137,7 @@ export class OpenAIProvider extends BaseAIProvider {
     return await this._executeRequest({
       url: apiUrl,
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(messages),
+      charCount: AITextProcessor.calculatePayloadChars(messages),
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-image-translation`,
       updateApiKey: (newKey, options) => {

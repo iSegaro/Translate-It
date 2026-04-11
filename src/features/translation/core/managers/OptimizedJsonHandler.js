@@ -4,183 +4,138 @@
  */
 
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ComplexityAnalyzer } from '../utils/ComplexityAnalyzer.js';
-import { TranslationBatcher } from '../utils/TranslationBatcher.js';
-import browser from 'webextension-polyfill';
+import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { TranslationMode } from "@/shared/config/config.js";
+import browser from "webextension-polyfill";
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
 export class OptimizedJsonHandler {
   /**
-   * Executes optimized translation for JSON payloads (Select Element mode).
-   * Orchestrates the entire streaming process with adaptive error handling.
-   * 
-   * @param {object} engine - Reference to the translation engine
-   * @param {object} data - The translation request data
-   * @param {object} providerInstance - The initialized provider instance
-   * @param {string} originalSourceLang - Global source language from settings
-   * @param {string} originalTargetLang - Global target language from settings
-   * @param {string} messageId - The request ID
-   * @param {number} tabId - The ID of the tab to stream results back to
-   * @returns {Promise<object>} Status object (success and streaming flag)
+   * Orchestrates the optimized translation process.
    */
-  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId = null, tabId = null) {
-    const { text, provider, sourceLanguage, targetLanguage, mode, contextMetadata, contextSummary } = data;
-    
-    // 1. Parse and validate input
-    let originalJson;
+  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender) {
+    const { text, sourceLanguage, targetLanguage, mode, options } = data;
+    const sessionId = data.sessionId || messageId;
+    const tabId = sender?.tab?.id;
+    const abortController = engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
+
+    let hasErrors = false;
+    let lastError = null;
+
     try {
-      originalJson = JSON.parse(text);
-    } catch {
-      throw new Error('Invalid JSON format for SelectElement mode');
-    }
+      const segments = typeof text === 'string' ? JSON.parse(text) : text;
+      const providerConfig = (await import('@/features/translation/core/ProviderConfigurations.js')).getProviderConfiguration(providerInstance.providerName);
+      
+      const batches = engine.createIntelligentBatches(
+        segments, 
+        providerConfig?.batching?.optimalSize || 25, 
+        providerConfig?.batching?.maxChars || 5000
+      );
 
-    if (!Array.isArray(originalJson)) {
-      throw new Error('SelectElement JSON must be an array');
-    }
+      logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments`);
 
-    const segments = originalJson;
+      for (let i = 0; i < batches.length; i++) {
+        if (engine.isCancelled(messageId)) break;
 
-    // 2. Prepare for batching
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-    rateLimitManager.reloadConfigurations();
-    
-    const OPTIMAL_BATCH_SIZE = 25; 
-    const batches = TranslationBatcher.createIntelligentBatches(segments, OPTIMAL_BATCH_SIZE);
-
-    // 3. Resolve actual languages (handling swapping logic)
-    const firstItem = segments[0];
-    const firstText = typeof firstItem === 'object' ? (firstItem.t || firstItem.text || '') : (firstItem || '');
-    const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
-    
-    const [actualSource, actualTarget] = await LanguageSwappingService.applyLanguageSwapping(
-      firstText, sourceLanguage, targetLanguage, data.originalSourceLang || sourceLanguage, data.originalTargetLang || targetLanguage,
-      { providerName: provider }
-    );
-
-    const effectiveSource = actualSource;
-    const effectiveTarget = actualTarget;
-    const sessionId = data.sessionId || messageId; 
-
-    // 4. Start Background Processing Loop (Silent)
-    (async () => {
-      let hasErrors = false;
-      let lastError = null;
-      let consecutiveFailures = 0;
-      const MAX_CONSECUTIVE_FAILURES = 3;
-      let adaptiveDelay = 0;
-
-      try {
-        for (let i = 0; i < batches.length; i++) {
-          // Check for cancellation
-          if (engine.isCancelled(messageId)) {
-            logger.info(`[JsonHandler] Translation cancelled for messageId: ${messageId}`);
-            break;
-          }
-
-          const batch = batches[i];
-          const batchSize = batch.length;
-          const batchComplexity = ComplexityAnalyzer.calculateBatchComplexity(batch);
-          const batchCharCount = batch.reduce((sum, item) => {
-            const text = typeof item === 'object' ? (item.t || item.text || '') : (item || '');
-            return sum + (text?.length || 0);
-          }, 0);
-          
-          const abortController = engine.lifecycleRegistry.getAbortController(messageId);
-          if (abortController) {
-            abortController.sessionId = sessionId;
-          }
-
-          // A. Apply intelligent delay
-          if (i > 0) {
-            const baseDelay = Math.min(2000 + (batchSize * 150), 5000); 
-            const complexityMultiplier = batchComplexity > 50 ? 1.5 : 1.0;
-            const failureMultiplier = Math.pow(2, consecutiveFailures);
-            
-            adaptiveDelay = Math.min(
-              baseDelay * complexityMultiplier * failureMultiplier + adaptiveDelay * 0.3,
-              20000 
-            );
-            
-            logger.debug(`[JsonHandler] Intelligent delay: ${Math.round(adaptiveDelay)}ms (batch: ${i + 1}/${batches.length}, complexity: ${batchComplexity})`);
-            await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
-          }
-          
-          // B. Execute batch translation
-          try {
-            const { statsManager } = await import('@/features/translation/core/TranslationStatsManager.js');
-            const statsBefore = statsManager.getSessionSummary(sessionId);
-            const charsBefore = statsBefore ? statsBefore.chars : 0;
-
-            const batchResult = await rateLimitManager.executeWithRateLimit(
-              provider,
-              () => this._performBatchCall(providerInstance, batch, effectiveSource, effectiveTarget, mode, abortController, messageId, sessionId, contextMetadata, contextSummary),
-              `batch-${i + 1}/${batches.length}`,
-              mode
-            );
-
-            // Success - reduce delay pressure
-            consecutiveFailures = 0;
-            adaptiveDelay = Math.max(adaptiveDelay * 0.8, 0);
-
-            // Update stats
-            const statsAfter = statsManager.getSessionSummary(sessionId);
-            const batchNetworkChars = statsAfter ? (statsAfter.chars - charsBefore) : batchCharCount;
-            statsManager.printSummary(sessionId, { status: 'Batch', batchChars: batchNetworkChars, batchOriginalChars: batchCharCount });
-
-            // C. Map and Stream results back to tab
-            const mappedResults = this._mapResults(batch, batchResult);
-            this._sendStreamUpdate(tabId, messageId, mappedResults, batch, i, provider, effectiveSource, effectiveTarget, mode);
-
-          } catch (error) {
-            // D. Error handling and retry logic
-            consecutiveFailures++;
-            hasErrors = true;
-            lastError = error;
-            const errorType = error.type || matchErrorToType(error);
-
-            if (errorType !== ErrorTypes.USER_CANCELLED) {
-              await ErrorHandler.getInstance().handle(error, {
-                context: 'JsonHandler.batch',
-                showToast: false,
-                metadata: { batchIndex: i + 1, consecutiveFailures, providerName: provider }
-              });
-            }
-            
-            this._sendStreamError(tabId, messageId, error, i, batch);
-            
-            if (isFatalError(error) || errorType === 'CIRCUIT_BREAKER_OPEN' || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-              logger.warn(`[JsonHandler] Stopping due to fatal error or failure threshold: ${errorType}`);
-              break;
-            }
+        const batch = batches[i];
+        
+        // Intelligent delay between batches
+        if (i > 0) {
+          const delay = this._calculateDelay(batch, i, batches.length, providerConfig);
+          if (delay > 0) {
+            logger.debug(`[JsonHandler] Intelligent delay: ${delay}ms (batch: ${i + 1}/${batches.length})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
-      } catch (error) {
-        logger.warn(`[JsonHandler] Critical error in processing loop:`, error);
-      } finally {
-        // E. Cleanup and Finalize session
-        this._finalizeSession(sessionId, messageId, tabId, hasErrors, lastError, effectiveTarget);
-      }
-    })();
 
-    return { success: true, streaming: true };
+        try {
+          const statsBefore = statsManager.getSessionSummary(sessionId);
+          const charsBefore = statsBefore ? statsBefore.chars : 0;
+          const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
+
+          const translatedBatch = await this._performBatchCall(
+            providerInstance, 
+            batch, 
+            sourceLanguage, 
+            targetLanguage, 
+            mode, 
+            abortController, 
+            messageId, 
+            sessionId, 
+            options?.contextMetadata, 
+            options?.contextSummary,
+            engine,
+            sender
+          );
+
+          const mappedResults = this._mapResults(batch, translatedBatch);
+          
+          // Stream results back to the tab
+          await this._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
+          
+          // Log batch statistics
+          const statsAfter = statsManager.getSessionSummary(sessionId);
+          if (statsAfter) {
+            statsManager.printSummary(sessionId, {
+              status: 'Batch',
+              batchChars: statsAfter.chars - charsBefore,
+              batchOriginalChars: statsAfter.originalChars - originalCharsBefore
+            });
+          }
+          
+        } catch (batchError) {
+          logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+          hasErrors = true;
+          lastError = batchError;
+
+          // Fallback: stream original text for this batch
+          await this._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
+          
+          // If the very first batch fails or it's a fatal error, we stop and report
+          if (i === 0 || isFatalError(batchError)) {
+            await this._sendStreamError(tabId, messageId, batchError, targetLanguage);
+            throw batchError;
+          }
+        }
+      }
+
+      // Tactical delay to ensure the last data packet is processed before the end signal
+      if (batches.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      // Notify the UI that streaming has ended
+      if (hasErrors) {
+        await this._sendStreamError(tabId, messageId, lastError, targetLanguage);
+      } else {
+        await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage);
+      }
+
+      // Log session summary
+      statsManager.printSummary(sessionId, {
+        status: 'Streaming',
+        success: !hasErrors,
+        clear: true
+      });
+
+      return { success: !hasErrors, streaming: true, error: lastError };
+    } finally {
+      engine.lifecycleRegistry.unregisterRequest(messageId);
+    }
   }
 
   /**
    * Internal helper to perform the actual provider call.
-   * Now uses the standard translate() method to ensure it passes through ProviderCoordinator.
    * @private
    */
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender) {
     const isArrayInput = Array.isArray(batch);
     
-    // Convert batch to the format expected by translate()
     // For Select Element, we pass the array of texts
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -197,8 +152,11 @@ export class OptimizedJsonHandler {
         sessionId,
         contextMetadata,
         contextSummary,
-        priority: 'high', // Select Element usually deserves high priority
-        rawJsonPayload: true // Tell coordinator we are already handling the JSON structure
+        engine,
+        sender,
+        priority: 'high',
+        rawJsonPayload: true,
+        expectedFormat: ResponseFormat.JSON_OBJECT // Explicit contract enforcement
       }
     );
   }
@@ -212,9 +170,8 @@ export class OptimizedJsonHandler {
     let results = Array.isArray(translatedResults) ? translatedResults : [translatedResults];
     
     // If results length doesn't match original batch, it means splitting failed or wasn't needed
-    // In that case, we fallback to treating the whole result as one string for the first item (legacy)
     if (results.length !== originalBatch.length && originalBatch.length > 1) {
-      logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}. Check ProviderCoordinator splitting.`);
+      logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}`);
     }
 
     return originalBatch.map((item, idx) => {
@@ -227,80 +184,101 @@ export class OptimizedJsonHandler {
   }
 
   /**
-   * Send progress update to the source tab.
+   * Calculate adaptive delay between batches to respect rate limits.
    * @private
    */
-  _sendStreamUpdate(tabId, messageId, mappedResults, originalBatch, batchIndex, provider, source, target, mode) {
-    if (!tabId) return;
+  _calculateDelay(batch, index, total, config) {
+    if (!config?.batching?.delayBetweenRequests) return 0;
     
-    const message = MessageFormat.create(
-      MessageActions.TRANSLATION_STREAM_UPDATE,
-      {
+    const baseDelay = config.batching.delayBetweenRequests;
+    const batchComplexity = batch.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
+    
+    // Increase delay for complex batches or AI providers
+    if (batchComplexity > 1000) return baseDelay * 1.5;
+    return baseDelay;
+  }
+
+  /**
+   * Send streamed results back to the requesting tab.
+   * @private
+   */
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage) {
+    if (!tabId) return;
+
+    // USE TRANSLATION_STREAM_UPDATE for packets to trigger onStreamUpdate callback
+    const streamMessage = {
+      action: MessageActions.TRANSLATION_STREAM_UPDATE,
+      messageId: messageId,
+      data: {
         success: true,
-        data: mappedResults,
-        originalData: originalBatch,
+        data: translatedData,
         batchIndex,
-        provider,
-        sourceLanguage: source,
-        targetLanguage: target,
-        timestamp: Date.now(),
-        translationMode: mode,
-      },
-      'background-stream',
-      messageId
-    );
-    
-    browser.tabs.sendMessage(tabId, message).catch(err => logger.debug('Stream update failed (tab closed?):', err.message));
-  }
+        totalBatches,
+        isComplete: batchIndex === totalBatches - 1,
+        targetLanguage,
+        translationMode: TranslationMode.Select_Element,
+        timestamp: Date.now()
+      }
+    };
 
-  /**
-   * Send error update for a specific batch.
-   * @private
-   */
-  _sendStreamError(tabId, messageId, error, batchIndex, originalBatch) {
-    if (!tabId) return;
-    
-    const message = MessageFormat.create(
-      MessageActions.TRANSLATION_STREAM_UPDATE,
-      {
-        success: false,
-        error: { message: error.message, type: error.type || matchErrorToType(error) },
-        batchIndex,
-        originalData: originalBatch,
-      },
-      'background-stream',
-      messageId
-    );
-    
-    browser.tabs.sendMessage(tabId, message).catch(() => {});
-  }
-
-  /**
-   * Clean up and send the final STREAM_END message.
-   * @private
-   */
-  async _finalizeSession(sessionId, messageId, tabId, hasErrors, lastError, targetLanguage) {
     try {
-      const { statsManager } = await import('@/features/translation/core/TranslationStatsManager.js');
-      statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
-    } catch (e) { /* ignore */ }
+      await browser.tabs.sendMessage(tabId, streamMessage);
+    } catch (err) {
+      logger.warn(`[JsonHandler] Failed to stream to tab ${tabId}:`, err.message);
+    }
+  }
 
+  /**
+   * Notify the UI that the streaming session has completed.
+   * @private
+   */
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage) {
     if (!tabId) return;
 
-    const endMessage = MessageFormat.create(
-      MessageActions.TRANSLATION_STREAM_END,
-      { 
-        success: !hasErrors,
-        error: hasErrors ? { 
-          message: lastError?.message || 'Translation failed', 
-          type: lastError?.type || matchErrorToType(lastError) || 'TRANSLATION_ERROR'
+    const endMessage = {
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: {
+        success: true,
+        completed: true,
+        provider: providerName,
+        targetLanguage,
+        translationMode: TranslationMode.Select_Element,
+        timestamp: Date.now()
+      }
+    };
+
+    try {
+      await browser.tabs.sendMessage(tabId, endMessage);
+    } catch (e) {
+      logger.debug(`[JsonHandler] Failed to send stream end:`, e.message);
+    }
+  }
+
+  /**
+   * Report a fatal error to the UI and end the stream.
+   * @private
+   */
+  async _sendStreamError(tabId, messageId, lastError, targetLanguage) {
+    if (!tabId) return;
+
+    const endMessage = {
+      action: MessageActions.TRANSLATION_STREAM_END,
+      messageId,
+      data: {
+        success: false,
+        error: lastError ? {
+          message: lastError.message || String(lastError),
+          type: lastError.type || 'TRANSLATION_ERROR'
         } : null,
-        targetLanguage
-      },
-      'background-stream',
-      messageId
-    );
+        targetLanguage,
+        translationMode: TranslationMode.Select_Element,
+        timestamp: Date.now()
+      }
+    };
     
-    browser.tabs.sendMessage(tabId, endMessage).catch(() => {});
+    try {
+      await browser.tabs.sendMessage(tabId, endMessage);
+    } catch (e) {}
   }
 }

@@ -1,64 +1,57 @@
 /**
- * Base AI Provider - Enhanced base class for all AI-powered translation providers
- * Provides streaming support, smart batching, and provider-specific optimizations
+ * Base AI Provider - Enhanced base class for AI translation services (Gemini, OpenAI, etc.)
+ * Provides centralized batching, prompt preparation, and streaming support for AI models.
  */
 
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { createTimeoutPromise, calculateBatchTimeout } from '@/features/translation/utils/timeoutCalculator.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
-import { AIResponseParser } from "./utils/AIResponseParser.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
-import { AIStreamManager } from "./utils/AIStreamManager.js";
+import { TranslationMode } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
 export class BaseAIProvider extends BaseProvider {
-  // Provider capabilities - to be overridden by subclasses
-  static supportsStreaming = false;
-  static preferredBatchStrategy = 'smart'; 
-  static optimalBatchSize = 15;
-  static maxComplexity = 300;
-  static supportsImageTranslation = false;
-  
-  // Batch processing strategy - to be overridden by subclasses
-  static batchStrategy = 'json'; 
-  static errorHandlingLevel = 'standard'; 
+  // AI-specific capabilities - to be overridden by subclasses
+  static isAI = true;
+  static supportsStreaming = true;
+  static batchStrategy = 'json'; // default to JSON batching for AI
+  static supportsDictionary = false;
 
   constructor(providerName) {
     super(providerName);
   }
 
   /**
-   * Convert language to AI provider format (full language names)
-   */
-  _getLangCode(lang) {
-    if (!lang) return AUTO_DETECT_VALUE;
-    const languageName = getLanguageNameFromCode(lang);
-    logger.debug(`[${this.providerName}] Language conversion: "${lang}" → "${languageName}"`);
-    return languageName || AUTO_DETECT_VALUE;
-  }
-
-  /**
    * Enhanced batch translation with streaming support
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
-    if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata);
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    // 1. Try streaming if supported and beneficial
+    if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata);
+
+    // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. JSON batching)
+    if (texts.length > 1 && this.constructor.batchStrategy === 'json') {
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat);
+    }
+
+    // 3. Fallback to traditional sequential batching for single segments or non-JSON providers
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
   }
 
   /**
    * Determine if streaming should be used for this request
    */
-  _shouldUseStreaming(texts, messageId, engine) {
+  _shouldUseStreaming(texts, messageId, engine, translateMode) {
+    // Disable internal AI streaming for Select Element or Page modes 
+    if (translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page) {
+      return false;
+    }
+
     return this.constructor.supportsStreaming && 
            messageId && 
            engine && 
@@ -66,229 +59,84 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
-   * Streaming batch translation with real-time results
+   * Batch translation implementation (e.g. using JSON)
+   * @protected
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
-    const startTime = Date.now();
-    const sessionId = messageId; 
-    const totalChars = texts.reduce((sum, text) => sum + (typeof text === 'object' ? (text.t || text.text || '').length : text?.length || 0), 0);
-    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments (${totalChars} chars, mode: ${translateMode})`);
-
-    const batches = this._createOptimalBatches(texts, translateMode);
-    const allResults = [];
-    
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
-        const error = new Error('Translation cancelled by user');
-        error.type = ErrorTypes.USER_CANCELLED;
-        throw error;
-      }
-
-      const batch = batches[batchIndex];
-      logger.debug(`[${this.providerName}] Processing streaming batch ${batchIndex + 1}/${batches.length} (${batch.length} segments)`);
-
-      try {
-        const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-        
-        const batchResults = await Promise.race([
-          rateLimitManager.executeWithRateLimit(
-            this.providerName,
-            () => this._translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata),
-            `streaming-batch-${batchIndex + 1}/${batches.length}`,
-            translateMode
-          ),
-          this._createBatchTimeoutPromise(batch.length)
-        ]);
-
-        allResults.push(...batchResults);
-
-        await AIStreamManager.streamBatchResults(
-          this.providerName,
-          batchResults,
-          batch,
-          batchIndex,
-          messageId,
-          engine,
-          sourceLang,
-          targetLang
-        );
-      } catch (error) {
-        const errorType = matchErrorToType(error);
-        if (errorType === ErrorTypes.USER_CANCELLED) {
-          logger.debug(`[${this.providerName}] Streaming batch ${batchIndex + 1} cancelled:`, error);
-        } else {
-          logger.error(`[${this.providerName}] Streaming batch ${batchIndex + 1} failed:`, error);
-        }
-        
-        await AIStreamManager.streamErrorResults(this.providerName, error, batchIndex, messageId, engine);
-        await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { error: { message: error.message, type: errorType } });
-        throw error;
-      }
-    }
-
-    await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { targetLanguage: targetLang });
-
-    const totalTime = Date.now() - startTime;
-    if (translateMode === 'select_element') {
-      const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-      const perfStats = rateLimitManager.getPerformanceStats(this.providerName);
-      logger.info(`[${this.providerName}] Select Element performance: ${texts.length} segments, ${totalChars} chars, ${batches.length} batches, ${totalTime}ms, ${(totalChars / totalTime * 1000).toFixed(1)} chars/s`);
-    }
-
-    return allResults;
-  }
-
-  /**
-   * Traditional sequential batch processing (fallback)
-   */
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, contextMetadata = null) {
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-    const results = [];
-    const sessionId = messageId; 
-    
-    for (let i = 0; i < texts.length; i++) {
-      if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
-        const error = new Error('Translation cancelled by user');
-        error.type = ErrorTypes.USER_CANCELLED;
-        throw error;
-      }
-      
-      try {
-        const content = typeof texts[i] === 'object' ? (texts[i].t || texts[i].text || '') : texts[i];
-        const result = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          () => this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, content?.length || 0, contextMetadata),
-          `segment-${i + 1}/${texts.length}`,
-          translateMode
-        );
-        results.push(result || content);
-      } catch (error) {
-        throw error;
-      }
-    }
-    
-    return results;
-  }
-
-  /**
-   * Create optimal batches based on provider strategy
-   */
-  _createOptimalBatches(texts, translateMode = null) {
-    return AITextProcessor.createOptimalBatches(texts, this.providerName, translateMode, {
-      strategy: this.constructor.preferredBatchStrategy,
-      optimalSize: this.constructor.optimalBatchSize,
-      maxComplexity: this.constructor.maxComplexity
-    });
-  }
-
-  /**
-   * Create a timeout promise for batch processing
-   */
-  _createBatchTimeoutPromise(batchSize) {
-    const timeoutMs = calculateBatchTimeout(batchSize, this.providerName);
-    return createTimeoutPromise(timeoutMs, `Rate limit execution`);
-  }
-
-  /**
-   * Abstract method to translate a batch
-   */
-  async _translateBatch(batch, sourceLang, targetLang, translateMode, abortController, engine = null, messageId = null, sessionId = null, contextMetadata = null) {
-    const batchStrategy = this.constructor.batchStrategy || 'single';
-    
+  async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null) {
     try {
-      if (batchStrategy === 'json') {
-        const jsonInput = batch.map((item, i) => {
-          if (typeof item === 'object') {
-            return { id: item.i || item.uid || i, text: item.t || item.text, role: item.r || item.role };
-          }
-          return { id: i, text: item };
-        });
-        const batchText = JSON.stringify(jsonInput, null, 2);
-        const originalChars = batch.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
-        
-        const result = await this._translateSingle(batchText, sourceLang, targetLang, translateMode, abortController, true, sessionId, originalChars, contextMetadata);
-        const parsedResults = this._parseBatchResult(result, batch.length, batch);
-        if (parsedResults.length === batch.length) return parsedResults;
-        throw new Error('JSON batch result count mismatch');
-      }
+      const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
       
-      if (batch.length === 1) {
-        const content = typeof batch[0] === 'object' ? (batch[0].t || batch[0].text || '') : batch[0];
-        return [await this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, content?.length || 0, contextMetadata)];
-      }
+      // Ensure promptText is a string for the AI API
+      const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
 
-      throw new Error(`Unsupported batch strategy: ${batchStrategy}`);
+      const response = await this._callAI(systemPrompt, finalUserText, {
+        abortController,
+        messageId,
+        sessionId,
+        mode: translateMode,
+        sourceLang,
+        targetLang,
+        isBatch: true,
+        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY
+      });
+
+      // Stats recording is handled by ProviderRequestEngine. 
+      // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
+      return AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY);
     } catch (error) {
-      const isFatal = isFatalError(error) || [429, 401, 403, 402, 404].includes(error.statusCode);
-      if (isFatal) throw error;
-      
-      logger.warn(`[${this.providerName}] Batch failed, falling back to individual requests:`, error.message);
-      return this._fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId, contextMetadata);
-    }
-  }
-
-  /**
-   * Fallback to individual requests
-   */
-  async _fallbackSingleRequests(batch, sourceLang, targetLang, translateMode, engine, messageId, abortController, sessionId = null, contextMetadata = null) {
-    const results = [];
-    for (let i = 0; i < batch.length; i++) {
-      if (abortController && abortController.signal.aborted) {
-        const cancelError = new Error('Translation cancelled');
-        cancelError.name = 'AbortError';
-        throw cancelError;
-      }
-      
-      try {
-        const content = typeof batch[i] === 'object' ? (batch[i].t || batch[i].text || '') : batch[i];
-        if (i > 0) await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        const result = await Promise.race([
-          this._translateSingle(content, sourceLang, targetLang, translateMode, abortController, false, sessionId, content?.length || 0, contextMetadata),
-          new Promise((_, reject) => setTimeout(() => reject(new Error(`Segment timeout`)), 8000))
-        ]);
-        
-        const translatedResult = result || content;
-        results.push(translatedResult);
-        if (engine && messageId) {
-          await AIStreamManager.streamFallbackResult(this.providerName, [translatedResult], [batch[i]], i, messageId, engine, sourceLang, targetLang);
-        }
-      } catch (error) {
-        throw error;
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Enhanced API call execution with centralized error handling
-   */
-  async _executeWithErrorHandling(params) {
-    try {
-      return await this._executeApiCall(params);
-    } catch (error) {
-      const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
-        throw error;
-      }
-      await ErrorHandler.getInstance().handle(error, { context: params.context || `${this.providerName.toLowerCase()}-translation` });
+      logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
       throw error;
     }
   }
 
-  _calculateAIPayloadChars(messages) {
-    if (!messages) return 0;
-    if (typeof messages === 'string') return messages.length;
-    if (Array.isArray(messages)) {
-      return messages.reduce((sum, msg) => {
-        if (msg && msg.content) return sum + (typeof msg.content === 'string' ? msg.content.length : JSON.stringify(msg.content).length);
-        if (msg && Array.isArray(msg.parts)) return sum + msg.parts.reduce((pSum, part) => pSum + (part.text?.length || 0), 0);
-        return sum;
-      }, 0);
+  /**
+   * Traditional sequential translation for small segments
+   */
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    const results = [];
+    for (const text of texts) {
+      if (abortController?.signal?.aborted) throw new Error('Cancelled');
+      
+      const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, null, sessionId);
+      
+      const response = await this._callAI(systemPrompt, userText, {
+        abortController,
+        messageId,
+        sessionId,
+        mode: translateMode,
+        sourceLang,
+        targetLang,
+        expectedFormat: expectedFormat || ResponseFormat.STRING
+      });
+      
+      results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
     }
-    try { return JSON.stringify(messages).length; } catch { return 0; }
+    return results.length === 1 && texts.length === 1 ? results[0] : results;
   }
-  
-  async _translateSingle() { throw new Error(`_translateSingle must be implemented by ${this.constructor.name}`); }
-  async _getConfig() { throw new Error(`_getConfig method must be implemented by ${this.constructor.name}`); }
+
+  /**
+   * Streaming batch translation implementation
+   * @protected
+   */
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    // To be implemented by subclasses (e.g. OpenAI, Gemini)
+    throw new Error(`_streamingBatchTranslate not implemented by ${this.providerName}`);
+  }
+
+  /**
+   * Helper to prepare the prompt and text for AI models
+   * @protected
+   */
+  async _preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId = null) {
+    const isBatch = Array.isArray(texts);
+    return await AIConversationHelper.preparePromptAndText(texts, sourceLang, targetLang, translateMode, this.constructor.type, sessionId, isBatch, contextMetadata);
+  }
+
+  /**
+   * Abstract method to call the actual AI API
+   * @protected
+   */
+  async _callAI() {
+    throw new Error(`_callAI not implemented by ${this.providerName}`);
+  }
 }

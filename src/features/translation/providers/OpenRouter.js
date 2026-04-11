@@ -1,8 +1,6 @@
 // src/core/providers/OpenRouterProvider.js
-import browser from 'webextension-polyfill';
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
-  CONFIG,
   getOpenRouterApiKeysAsync,
   getOpenRouterApiModelAsync,
 } from "@/shared/config/config.js";
@@ -10,21 +8,22 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenRouter');
 
 export class OpenRouterProvider extends BaseAIProvider {
   static type = "ai";
-  static description = "OpenRouter API";
+  static description = "OpenRouter Multi-Model API";
   static displayName = "OpenRouter";
   static reliableJsonMode = true;
   static supportsDictionary = true;
 
-  static supportsStreaming = true;
+  static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
-  static supportsImageTranslation = true;
 
   static batchStrategy = 'json';
 
@@ -33,7 +32,13 @@ export class OpenRouterProvider extends BaseAIProvider {
     this.providerSettingKey = 'OPENROUTER_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
+  /**
+   * Internal implementation of the OpenRouter API call.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
     const [apiKeys, model] = await Promise.all([
       getOpenRouterApiKeysAsync(),
       getOpenRouterApiModelAsync(),
@@ -43,36 +48,32 @@ export class OpenRouterProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, OpenRouterProvider.type, sessionId, isBatch, contextMetadata);
-
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
-
     const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
-    logger.info(`[OpenRouter] Model: ${model || 'openai/gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[OpenRouter] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
+    logger.info(`[OpenRouter] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
     const fetchOptions = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": browser.runtime.getURL("/"),
-        "X-Title": browser.runtime.getManifest().name,
+        "HTTP-Referer": "https://github.com/Translate-It", // Required by OpenRouter
+        "X-Title": "Translate-It Extension",
       },
       body: JSON.stringify({
         model: model || "openai/gpt-3.5-turbo",
         messages: messages,
-        max_tokens: 4096,
+        // Enforce JSON Mode if requested
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),
     };
 
     const result = await this._executeRequest({
-      url: CONFIG.OPENROUTER_API_URL,
+      url: "https://openrouter.ai/api/v1/chat/completions",
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(messages),
-      originalCharCount: finalOriginalCharCount,
+      charCount: AITextProcessor.calculatePayloadChars(messages),
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
@@ -86,7 +87,6 @@ export class OpenRouterProvider extends BaseAIProvider {
       await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
 
-    logger.info(`[OpenRouter] Translation completed successfully`);
     return result;
   }
 

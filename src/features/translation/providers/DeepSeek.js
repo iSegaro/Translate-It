@@ -1,29 +1,30 @@
 // src/core/providers/DeepSeekProvider.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
-  CONFIG,
   getDeepSeekApiKeysAsync,
+  getDeepSeekApiUrlAsync,
   getDeepSeekApiModelAsync,
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepSeek');
 
 export class DeepSeekProvider extends BaseAIProvider {
   static type = "ai";
-  static description = "DeepSeek AI";
+  static description = "DeepSeek AI models";
   static displayName = "DeepSeek";
-  static reliableJsonMode = false;
+  static reliableJsonMode = true;
   static supportsDictionary = true;
 
   static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
   static maxComplexity = 400;
-  static supportsImageTranslation = false;
 
   static batchStrategy = 'json';
 
@@ -32,9 +33,16 @@ export class DeepSeekProvider extends BaseAIProvider {
     this.providerSettingKey = 'DEEPSEEK_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
-    const [apiKeys, model] = await Promise.all([
+  /**
+   * Internal implementation of the DeepSeek API call.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
+    const [apiKeys, apiUrl, model] = await Promise.all([
       getDeepSeekApiKeysAsync(),
+      getDeepSeekApiUrlAsync(),
       getDeepSeekApiModelAsync(),
     ]);
 
@@ -42,15 +50,10 @@ export class DeepSeekProvider extends BaseAIProvider {
 
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, DeepSeekProvider.type, sessionId, isBatch, contextMetadata);
-
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
-
     const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[DeepSeek] Model: ${model || 'deepseek-chat'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[DeepSeek] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
     const fetchOptions = {
       method: "POST",
@@ -61,16 +64,17 @@ export class DeepSeekProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "deepseek-chat",
         messages: messages,
-        stream: false,
         max_tokens: 4096,
+        // DeepSeek supports JSON Mode
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),
     };
 
     const result = await this._executeRequest({
-      url: CONFIG.DEEPSEEK_API_URL,
+      url: apiUrl || "https://api.deepseek.com/chat/completions",
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(messages),
-      originalCharCount: finalOriginalCharCount,
+      charCount: AITextProcessor.calculatePayloadChars(messages),
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
@@ -84,7 +88,6 @@ export class DeepSeekProvider extends BaseAIProvider {
       await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
 
-    logger.info(`[DeepSeek] Translation completed successfully`);
     return result;
   }
 

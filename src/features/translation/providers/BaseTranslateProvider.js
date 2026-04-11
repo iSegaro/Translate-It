@@ -6,15 +6,13 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
-import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -32,11 +30,11 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Enhanced batch translation with streaming support
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
   }
 
   /**
@@ -44,7 +42,12 @@ export class BaseTranslateProvider extends BaseProvider {
    */
   _shouldUseStreaming(texts, messageId, engine, translateMode = null) {
     if (!this.constructor.supportsStreaming || !messageId || !engine) return false;
-    if (translateMode === TranslationMode.Page) return false;
+    
+    // Disable internal streaming for modes that have specialized orchestrators (Page, Select Element)
+    if (translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element) {
+      return false;
+    }
+    
     return texts.length > 1 || this._needsChunking(texts);
   }
 
@@ -58,14 +61,20 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Streaming batch translation with real-time results
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
     
     if (messageId && engine) {
       try {
-        const sender = engine.streamingSenders?.get(messageId) || null;
-        streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
-      } catch (error) { logger.error(`[${this.providerName}] Failed to initialize streaming session:`, error); }
+        const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
+        if (sender) {
+          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+        } else {
+          logger.debug(`[${this.providerName}] No sender found for streaming messageId: ${messageId}`);
+        }
+      } catch (error) { 
+        logger.warn(`[${this.providerName}] Failed to initialize streaming session:`, error.message); 
+      }
     }
     
     const chunks = this._createChunks(texts);
@@ -83,13 +92,12 @@ export class BaseTranslateProvider extends BaseProvider {
 
       try {
         const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
-        const { statsManager } = await import("@/features/translation/core/TranslationStatsManager.js");
         const statsBefore = sessionId ? statsManager.getSessionSummary(sessionId) : null;
         const charsBefore = statsBefore ? statsBefore.chars : 0;
 
         if (abortController) abortController.sessionId = sessionId;
 
-        const chunkResults = await rateLimitManager.executeWithRateLimit(
+        const chunkResponse = await rateLimitManager.executeWithRateLimit(
           this.providerName,
           (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0) }),
           chunkContext,
@@ -101,8 +109,8 @@ export class BaseTranslateProvider extends BaseProvider {
         const actualChunkChars = statsAfter ? (statsAfter.chars - charsBefore) : this._calculateTraditionalCharCount(chunk.texts);
         const originalChunkChars = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-        allResults.push(...chunkResults);
-        await TraditionalStreamManager.streamChunkResults(this.providerName, chunkResults, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
+        allResults.push(...chunkResponse);
+        await TraditionalStreamManager.streamChunkResults(this.providerName, chunkResponse, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
       } catch (error) {
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
@@ -122,7 +130,7 @@ export class BaseTranslateProvider extends BaseProvider {
     return TraditionalTextProcessor.createChunks(texts, this.providerName, this.constructor.chunkingStrategy, this.constructor.characterLimit, this.constructor.maxChunksPerBatch);
   }
 
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
     const allResults = [];
@@ -158,7 +166,6 @@ export class BaseTranslateProvider extends BaseProvider {
         } else if (chunkResponse?.results && Array.isArray(chunkResponse.results)) {
           chunkResults = chunkResponse.results;
         } else if (typeof chunkResponse === 'string') {
-          // If provider returned a raw string, we'll split it later or return as is if single segment
           chunkResults = [chunkResponse];
         } else {
           chunkResults = chunk.texts.map(() => '');

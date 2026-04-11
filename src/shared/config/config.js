@@ -756,6 +756,10 @@ export const getDeepSeekApiModelAsync = async () => {
   return getSettingValueAsync("DEEPSEEK_API_MODEL", CONFIG.DEEPSEEK_API_MODEL);
 };
 
+export const getDeepSeekApiUrlAsync = async () => {
+  return getSettingValueAsync("DEEPSEEK_API_URL", CONFIG.DEEPSEEK_API_URL);
+};
+
 // Custom Provider Specific
 export const getCustomApiUrlAsync = async () => {
   return getSettingValueAsync("CUSTOM_API_URL", CONFIG.CUSTOM_API_URL);

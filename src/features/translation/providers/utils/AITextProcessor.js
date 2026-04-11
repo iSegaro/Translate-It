@@ -411,5 +411,37 @@ export const AITextProcessor = {
         maxComplexity: defaults.maxComplexity
       };
     }
+  },
+
+  /**
+   * Calculate network character count for AI payload (messages array)
+   * @param {Array} messages - Array of message objects
+   * @returns {number} - Total character count
+   */
+  calculatePayloadChars(messages) {
+    if (!Array.isArray(messages)) return 0;
+    return messages.reduce((sum, msg) => {
+      if (!msg || !msg.content) return sum;
+      const contentStr = typeof msg.content === 'string' 
+        ? msg.content 
+        : JSON.stringify(msg.content);
+      return sum + contentStr.length;
+    }, 0);
+  },
+
+  /**
+   * Estimate original chars from a JSON string payload
+   * @param {string|object} jsonInput - Input JSON
+   * @returns {number} - Estimated character count
+   */
+  estimateOriginalChars(jsonInput) {
+    if (!jsonInput) return 0;
+    const segments = typeof jsonInput === 'string' ? JSON.parse(jsonInput) : jsonInput;
+    if (!Array.isArray(segments)) return String(jsonInput).length;
+    
+    return segments.reduce((sum, item) => {
+      const text = typeof item === 'object' ? (item.t || item.text || '') : String(item);
+      return sum + text.length;
+    }, 0);
   }
 };

@@ -9,6 +9,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'Custom');
 
@@ -32,7 +34,14 @@ export class CustomProvider extends BaseAIProvider {
     this.providerSettingKey = 'CUSTOM_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
+  /**
+   * Internal implementation of the AI API call.
+   * Handles authentication, endpoint resolution, and payload formatting.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
     const [apiUrl, apiKeys, model] = await Promise.all([
       getCustomApiUrlAsync(),
       getCustomApiKeysAsync(),
@@ -43,15 +52,10 @@ export class CustomProvider extends BaseAIProvider {
 
     this._validateConfig({ apiUrl, apiKey }, ["apiUrl", "apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
-    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, CustomProvider.type, sessionId, isBatch, contextMetadata);
-
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
-
     const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[Custom] Model: ${model || 'default'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[Custom] Translating ${isBatch ? 'batch' : finalOriginalCharCount + ' chars'}`);
 
-    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, translateMode);
+    const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
     const fetchOptions = {
       method: "POST",
@@ -63,14 +67,16 @@ export class CustomProvider extends BaseAIProvider {
         model: model,
         messages: messages,
         max_tokens: 4096,
+        // Apply JSON mode if requested by the contract
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),
     };
 
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(messages),
-      originalCharCount: finalOriginalCharCount,
+      charCount: AITextProcessor.calculatePayloadChars(messages),
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
@@ -84,7 +90,6 @@ export class CustomProvider extends BaseAIProvider {
       await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
 
-    logger.info(`[Custom] Translation completed successfully`);
     return result;
   }
 

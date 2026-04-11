@@ -63,11 +63,15 @@ export class StreamingManager extends ResourceTracker {
     };
 
     // Store sender information for streaming updates
-    this.senderInfo.set(messageId, {
-      tab: sender.tab,
-      frameId: sender.frameId,
-      url: sender.url
-    });
+    if (sender) {
+      this.senderInfo.set(messageId, {
+        tab: sender.tab,
+        frameId: sender.frameId,
+        url: sender.url
+      });
+    } else {
+      logger.warn(`[StreamingManager] No sender info provided for messageId: ${messageId}`);
+    }
 
     // Initialize streaming session
     this.activeStreams.set(messageId, streamInfo);

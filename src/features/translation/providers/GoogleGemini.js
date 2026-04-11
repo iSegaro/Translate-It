@@ -6,15 +6,16 @@ import {
   getGeminiModelAsync,
   getGeminiThinkingEnabledAsync,
   getGeminiApiUrlAsync,
+  getPromptBASEScreenCaptureAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
+import { AITextProcessor } from "./utils/AITextProcessor.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
-
-import { getPromptBASEScreenCaptureAsync } from "@/shared/config/config.js";
 
 export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
@@ -36,7 +37,13 @@ export class GeminiProvider extends BaseAIProvider {
     this.providerSettingKey = 'GEMINI_API_KEY';
   }
 
-  async _translateSingle(text, sourceLang, targetLang, translateMode, abortController, isBatch = false, sessionId = null, originalCharCount = 0, contextMetadata = null) {
+  /**
+   * Internal implementation of the Gemini API call.
+   * @protected
+   */
+  async _callAI(systemPrompt, userText, options = {}) {
+    const { abortController, sessionId, expectedFormat, isBatch } = options;
+
     const [apiKeys, model, thinkingEnabled, rawApiUrl] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
@@ -46,17 +53,10 @@ export class GeminiProvider extends BaseAIProvider {
 
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
 
-    this._validateConfig(
-      { apiKey },
-      ["apiKey"],
-      `${this.providerName.toLowerCase()}-translation`
-    );
-
-    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(text, sourceLang, targetLang, translateMode, GeminiProvider.type, sessionId, isBatch, contextMetadata);
+    this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
     const isFirst = await AIConversationHelper.isFirstTurn(sessionId);
     logger.info(`[Gemini] Model: ${model || 'gemini-1.5-flash'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${isFirst ? '1' : 'Subsequent'})` : ''}`);
-    logger.debug(`[Gemini] Translating ${isBatch ? 'batch' : text.length + ' chars'}`);
 
     const requestBody = {
       contents: [{
@@ -68,12 +68,13 @@ export class GeminiProvider extends BaseAIProvider {
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 8192, 
-        ...(isBatch && { response_mime_type: "application/json" })
+        // Enforce JSON Mode for Structured Data
+        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_mime_type: "application/json" })
       }
     };
 
     if (sessionId) {
-      const history = await AIConversationHelper.getConversationHistory(sessionId, translateMode);
+      const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode);
       if (history.length > 0) {
         const contents = [];
         for (const turn of history) {
@@ -100,17 +101,12 @@ export class GeminiProvider extends BaseAIProvider {
       const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
       if (modelConfig?.url) {
         apiUrl = modelConfig.url;
-        logger.debug(`[Gemini] Using specific Google endpoint for model ${model}`);
       }
     }
 
     let url = apiUrl || CONFIG.GEMINI_API_URL;
-    if (!url.includes(':generateContent')) {
-      url = `${url}:generateContent`;
-    }
+    if (!url.includes(':generateContent')) url = `${url}:generateContent`;
     url = `${url}?key=${apiKey}`;
-
-    const context = `${this.providerName.toLowerCase()}-translation`;
 
     const fetchOptions = {
       method: "POST",
@@ -118,17 +114,16 @@ export class GeminiProvider extends BaseAIProvider {
       body: JSON.stringify(requestBody),
     };
 
-    const charCount = this._calculateAIPayloadChars([...requestBody.contents, requestBody.systemInstruction]);
-    const finalOriginalCharCount = originalCharCount || (isBatch ? this._estimateOriginalCharsFromJson(text) : text.length);
+    const charCount = AITextProcessor.calculatePayloadChars([...requestBody.contents, requestBody.systemInstruction]);
 
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
         charCount,
-        originalCharCount: finalOriginalCharCount,
+        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
         extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
-        context,
+        context: `${this.providerName.toLowerCase()}-translation`,
         abortController,
         sessionId,
         updateApiKey: (newKey, options) => {
@@ -142,9 +137,9 @@ export class GeminiProvider extends BaseAIProvider {
         await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
       }
 
-      logger.info(`[Gemini] Translation completed successfully`);
       return result;
     } catch (error) {
+      // Thinking config fallback
       if (thinkingEnabled && model?.includes('thinking') && (error.message?.includes('thinking_config') || error.message?.includes('400'))) {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
@@ -153,7 +148,7 @@ export class GeminiProvider extends BaseAIProvider {
           fetchOptions: { ...fetchOptions, body: JSON.stringify(retryBody) },
           charCount,
           extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
-          context: `${context}-fallback`,
+          context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
           updateApiKey: (newKey, options) => {
@@ -202,7 +197,7 @@ export class GeminiProvider extends BaseAIProvider {
     return await this._executeRequest({
       url,
       fetchOptions,
-      charCount: this._calculateAIPayloadChars(requestBody.contents),
+      charCount: AITextProcessor.calculatePayloadChars(requestBody.contents),
       extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
       context: `${this.providerName.toLowerCase()}-image-translation`,
       updateApiKey: (newKey, options) => {
@@ -211,13 +206,6 @@ export class GeminiProvider extends BaseAIProvider {
         options.url = urlObj.toString();
       }
     });
-  }
-
-  _createError(type, message) {
-    const error = new Error(message);
-    error.type = type;
-    error.context = `${this.providerName.toLowerCase()}-provider`;
-    return error;
   }
 }
 
