@@ -143,9 +143,16 @@ export const AIResponseParser = {
       }
     }
 
-    // Final Fallback for JSON_OBJECT when only one item is expected but AI returns plain text
-    if (expectedFormat === ResponseFormat.JSON_OBJECT && !text.includes('{') && !text.includes('[')) {
-      return { translations: [{ text: this._stripMarkdown(text) }] };
+    // Final Fallback: If AI returns plain text but we expected structured data
+    // This happens often with single-segment batches where AI ignores JSON instructions
+    if (!jsonString.includes('{') && !jsonString.includes('[')) {
+      const cleanText = this._stripMarkdown(jsonString);
+      if (expectedFormat === ResponseFormat.JSON_OBJECT) {
+        return { translations: [{ text: cleanText }] };
+      }
+      if (expectedFormat === ResponseFormat.JSON_ARRAY) {
+        return [cleanText];
+      }
     }
 
     throw new Error(`Failed to parse response as ${expectedFormat}`);
