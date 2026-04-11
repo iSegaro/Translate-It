@@ -114,13 +114,11 @@ export class GeminiProvider extends BaseAIProvider {
       body: JSON.stringify(requestBody),
     };
 
-    const charCount = AITextProcessor.calculatePayloadChars([...requestBody.contents, requestBody.systemInstruction]);
-
     try {
       const result = await this._executeRequest({
         url,
         fetchOptions,
-        charCount,
+        charCount: fetchOptions.body.length,
         originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
         extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
         context: `${this.providerName.toLowerCase()}-translation`,

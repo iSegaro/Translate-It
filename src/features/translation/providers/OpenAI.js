@@ -75,7 +75,7 @@ export class OpenAIProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url: apiUrl || "https://api.openai.com/v1/chat/completions",
       fetchOptions,
-      charCount: AITextProcessor.calculatePayloadChars(messages),
+      charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,

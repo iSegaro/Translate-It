@@ -72,7 +72,7 @@ export class OpenRouterProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url: "https://openrouter.ai/api/v1/chat/completions",
       fetchOptions,
-      charCount: AITextProcessor.calculatePayloadChars(messages),
+      charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-translation`,

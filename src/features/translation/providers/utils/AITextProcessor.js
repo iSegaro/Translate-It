@@ -414,19 +414,52 @@ export const AITextProcessor = {
   },
 
   /**
-   * Calculate network character count for AI payload (messages array)
-   * @param {Array} messages - Array of message objects
+   * Calculate network character count for AI payload (messages array or content object)
+   * @param {Array|object} messages - Input data to measure
    * @returns {number} - Total character count
    */
   calculatePayloadChars(messages) {
-    if (!Array.isArray(messages)) return 0;
-    return messages.reduce((sum, msg) => {
-      if (!msg || !msg.content) return sum;
-      const contentStr = typeof msg.content === 'string' 
-        ? msg.content 
-        : JSON.stringify(msg.content);
-      return sum + contentStr.length;
-    }, 0);
+    if (!messages) return 0;
+    
+    // Handle single object (like Gemini system instruction or WebAI prompt)
+    if (!Array.isArray(messages)) {
+      return this._measureMessageContent(messages);
+    }
+
+    return messages.reduce((sum, msg) => sum + this._measureMessageContent(msg), 0);
+  },
+
+  /**
+   * Internal helper to measure content of a single message object
+   * @private
+   */
+  _measureMessageContent(msg) {
+    if (!msg) return 0;
+
+    // 1. Standard 'content' field (OpenAI, DeepSeek, OpenRouter)
+    if (msg.content) {
+      return typeof msg.content === 'string' ? msg.content.length : JSON.stringify(msg.content).length;
+    }
+
+    // 2. Gemini 'parts' array
+    if (Array.isArray(msg.parts)) {
+      return msg.parts.reduce((sum, part) => {
+        if (part.text) return sum + part.text.length;
+        if (part.inline_data?.data) return sum + part.inline_data.data.length;
+        return sum + JSON.stringify(part).length;
+      }, 0);
+    }
+
+    // 3. WebAI 'message' field
+    if (msg.message) return String(msg.message).length;
+
+    // 4. Fallback: measure the whole object if it doesn't match known formats
+    if (typeof msg === 'object') {
+      // Exclude metadata fields from count if possible, but for safety measure the whole string
+      return JSON.stringify(msg).length;
+    }
+
+    return String(msg).length;
   },
 
   /**

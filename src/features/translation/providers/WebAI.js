@@ -70,6 +70,7 @@ export class WebAIProvider extends BaseAIProvider {
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
+      charCount: AITextProcessor.calculatePayloadChars(fetchOptions.body),
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
       context: `${this.providerName.toLowerCase()}-translation`,
