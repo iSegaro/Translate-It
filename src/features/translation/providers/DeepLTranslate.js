@@ -386,7 +386,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // 1. Prepare rich context (Environmental + Compact History)
     // DeepL context is free and significantly improves quality for related segments.
     const { AIConversationHelper } = await import("./utils/AIConversationHelper.js");
-    const richContext = await AIConversationHelper.prepareDeepLContext(sessionId, options.contextMetadata);
+    const richContext = await AIConversationHelper.prepareDeepLContext(sessionId, options.contextMetadata, translateMode);
 
     if (richContext) {
       requestBody.append('context', richContext);

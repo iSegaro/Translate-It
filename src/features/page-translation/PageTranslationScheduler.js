@@ -343,6 +343,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         sourceLanguage: AUTO_DETECT_VALUE, 
         targetLanguage: config.targetLanguage,
         mode: TranslationMode.Page,
+        contextMetadata: this.settings.aiContextTranslationEnabled ? { pageTitle: document.title } : null,
         options: { rawJsonPayload: true },
         sessionId: this.translationSessionId 
       },

@@ -111,6 +111,8 @@ export class TranslationHandler {
       // Create promise for result
       const resultPromise = this._createTranslationPromise(messageId);
 
+      const isAIContextEnabled = settingsManager.get('AI_CONTEXT_TRANSLATION_ENABLED', true);
+
       // Prepare payload (force source language to 'auto')
       const payload = {
         text: selectedText,
@@ -119,6 +121,7 @@ export class TranslationHandler {
         provider: finalProvider,
         messageId: messageId,
         mode: translationMode,
+        contextMetadata: isAIContextEnabled ? { pageTitle: document.title } : null,
         options: { ...options }
       };
 
@@ -137,6 +140,7 @@ export class TranslationHandler {
             sourceLanguage: payload.from,
             targetLanguage: payload.to,
             mode: payload.mode,
+            contextMetadata: payload.contextMetadata,
             options: payload.options
           }
         });

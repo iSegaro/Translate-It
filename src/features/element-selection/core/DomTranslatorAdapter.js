@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { getTranslationApiAsync, getTargetLanguageAsync, getSmartContextTranslationEnabledAsync } from '@/config.js';
+import { getTranslationApiAsync, getTargetLanguageAsync, getAIContextTranslationEnabledAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
@@ -90,7 +90,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Context
       const contextMetadata = extractContextMetadata(element);
       const contextSummary = contextMetadata.contextSummary; // Extract the summary
-      const isSmartContextEnabled = await getSmartContextTranslationEnabledAsync();
+      const isAIContextEnabled = await getAIContextTranslationEnabledAsync();
 
       const [provider, targetLanguage] = await Promise.all([
         options.provider || getTranslationApiAsync(),
@@ -208,9 +208,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
           originalSourceLang: this.originalSettings.source,
           originalTargetLang: this.originalSettings.target,
           mode: TranslationMode.Select_Element,
-          contextMetadata: isSmartContextEnabled ? contextMetadata : null,
+          contextMetadata: isAIContextEnabled ? contextMetadata : null,
           contextSummary: contextSummary,
-          options: { rawJsonPayload: true, enableDictionary: false, smartContext: isSmartContextEnabled },
+          options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
           sessionId: this.sessionMessageId, 
         },
         context: MessageContexts.SELECT_ELEMENT,

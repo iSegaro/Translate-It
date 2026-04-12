@@ -40,7 +40,8 @@ export class PageTranslationSettingsLoader {
       getWholePageAttributesToTranslateAsync(),
       getWholePageShowOriginalOnHoverAsync(),
       getWholePageTranslateAfterScrollStopAsync(),
-      getWholePageScrollStopDelayAsync()
+      getWholePageScrollStopDelayAsync(),
+      getAIContextTranslationEnabledAsync()
     ]);
 
     const [
@@ -54,7 +55,8 @@ export class PageTranslationSettingsLoader {
       attributesToTranslate,
       showOriginalOnHover,
       translateAfterScrollStop,
-      scrollStopDelay
+      scrollStopDelay,
+      aiContextTranslationEnabled
     ] = settingsData;
 
     // Formatting: Ensure rootMargin has unit

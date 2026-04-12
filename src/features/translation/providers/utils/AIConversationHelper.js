@@ -92,7 +92,7 @@ export const AIConversationHelper = {
   /**
    * Prepares a compact context string for DeepL
    */
-  async prepareDeepLContext(sessionId, contextMetadata) {
+  async prepareDeepLContext(sessionId, contextMetadata, translateMode = null) {
     let contextParts = [];
 
     const [contextEnabled, historyEnabled] = await Promise.all([
@@ -107,19 +107,28 @@ export const AIConversationHelper = {
       if (contextMetadata.role) contextParts.push(`Context: ${contextMetadata.role}`);
     }
 
-    // 2. Compact History (Last successful translation snippet)
-    if (historyEnabled && sessionId) {
+    // 2. Compact History (Last full turn: User + Assistant)
+    // History is only included for Select Element to maintain style/consistency
+    if (historyEnabled && sessionId && translateMode === TranslationMode.Select_Element) {
       try {
         const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
         const session = translationSessionManager.sessions.get(sessionId);
-        if (session && session.history.length > 0) {
-          const lastAssistantMsg = [...session.history].reverse().find(m => m.role === 'assistant');
-          if (lastAssistantMsg) {
-            const snippet = typeof lastAssistantMsg.content === 'string' 
-              ? lastAssistantMsg.content.substring(0, 300) 
-              : JSON.stringify(lastAssistantMsg.content).substring(0, 300);
-            contextParts.push(`Last translation reference: ${snippet}`);
+        if (session && session.history.length >= 2) {
+          const lastTwo = session.history.slice(-2);
+          const userPart = lastTwo.find(m => m.role === 'user');
+          const assistantPart = lastTwo.find(m => m.role === 'assistant');
+          
+          if (userPart && assistantPart) {
+            const userSnippet = typeof userPart.content === 'string' ? userPart.content : JSON.stringify(userPart.content);
+            const assistantSnippet = typeof assistantPart.content === 'string' ? assistantPart.content : JSON.stringify(assistantPart.content);
+            
+            contextParts.push(`Last turn reference: [Original: "${userSnippet.substring(0, 150)}..." | Translated: "${assistantSnippet.substring(0, 150)}..."]`);
           }
+        } else if (session && session.history.length > 0) {
+          // Fallback for single message
+          const lastMsg = session.history[session.history.length - 1];
+          const snippet = typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
+          contextParts.push(`Reference: ${snippet.substring(0, 200)}`);
         }
       } catch (e) {}
     }
