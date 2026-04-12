@@ -1921,5 +1921,20 @@
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "میلی ثانیه"
+  },
+  "ai_optimization_section_title": {
+    "message": "بهینه‌سازی هوش مصنوعی"
+  },
+  "ai_context_translation_label": {
+    "message": "درک هوشمند محیط (Context)"
+  },
+  "ai_context_translation_description": {
+    "message": "ارسال اطلاعات صفحه (عنوان و بخش‌ها) به مدل‌های AI برای افزایش دقت ترجمه در متن‌های کوتاه یا مبهم. (در DeepL همیشه فعال است)"
+  },
+  "ai_conversation_history_label": {
+    "message": "حافظه گفتگو"
+  },
+  "ai_conversation_history_description": {
+    "message": "نگهداری حافظه کوتاه از ترجمه‌های قبلی در همان سشن. برای حفظ یکدستی استایل در مود انتخاب المان ضروری است."
   }
 }

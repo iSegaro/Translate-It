@@ -50,6 +50,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
@@ -90,7 +91,7 @@ const openrouterApiModel = computed({
 const openrouterCustomModel = computed({
   get: () => {
     const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || 'openai/gpt-4o';
-    const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+    const isPredefined = openrouterApiModelOptions?.value?.some(option => option.value === currentModel && option.value !== 'custom') || false;
     return isPredefined ? '' : currentModel;
   },
   set: (value) => {
@@ -111,6 +112,8 @@ const testingKeys = ref(false)
 const testResult = ref(null)
 
 const testKeys = async (providerName) => {
+  if (!openrouterApiKey.value.trim()) return
+
   testingKeys.value = true
   testResult.value = null
 

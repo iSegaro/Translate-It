@@ -20,6 +20,31 @@
       />
     </div>
 
+    <!-- AI Optimization Section -->
+    <div class="setting-section ai-optimization-section">
+      <h3>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</h3>
+      
+      <div class="setting-group vertical">
+        <BaseCheckbox
+          v-model="aiContextEnabled"
+          :label="t('ai_context_translation_label') || 'Smart Context Understanding'"
+        />
+        <p class="setting-description">
+          {{ t('ai_context_translation_description') }}
+        </p>
+      </div>
+
+      <div class="setting-group vertical">
+        <BaseCheckbox
+          v-model="aiHistoryEnabled"
+          :label="t('ai_conversation_history_label') || 'Conversation Memory'"
+        />
+        <p class="setting-description">
+          {{ t('ai_conversation_history_description') }}
+        </p>
+      </div>
+    </div>
+
     <!-- Proxy Settings Section -->
     <div class="setting-section proxy-section">
       <h3>{{ t('proxy_section_title') || 'Proxy Settings' }}</h3>
@@ -175,6 +200,17 @@ const excludedSites = computed({
       .filter(Boolean)
     settingsStore.updateSettingLocally('EXCLUDED_SITES', sites)
   }
+})
+
+// AI Optimization settings
+const aiContextEnabled = computed({
+  get: () => settingsStore.settings?.SMART_CONTEXT_TRANSLATION_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('SMART_CONTEXT_TRANSLATION_ENABLED', value)
+})
+
+const aiHistoryEnabled = computed({
+  get: () => settingsStore.settings?.AI_CONVERSATION_HISTORY_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('AI_CONVERSATION_HISTORY_ENABLED', value)
 })
 
 // Proxy settings refs synchronized with store (like other tabs)
@@ -365,6 +401,30 @@ const testProxyConnection = async () => {
     flex-grow: 1;
     min-width: 200px;
   }
+
+  &.vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-xs;
+    margin-bottom: $spacing-lg;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.setting-description {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  margin: 0 0 0 $spacing-xl; // Align with checkbox label
+  line-height: 1.4;
+  max-width: 800px;
+}
+
+// Adjust description margin for RTL
+[dir="rtl"] .setting-description {
+  margin: 0 $spacing-xl 0 0;
 }
 
 .excluded-sites-input {

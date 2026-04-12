@@ -1930,5 +1930,20 @@
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ms"
+  },
+  "ai_optimization_section_title": {
+    "message": "AI Optimization"
+  },
+  "ai_context_translation_label": {
+    "message": "Smart Context Understanding"
+  },
+  "ai_context_translation_description": {
+    "message": "Sends page metadata (title, section) to AI models. This improves translation accuracy for short or ambiguous text. (Always enabled for DeepL)"
+  },
+  "ai_conversation_history_label": {
+    "message": "Conversation Memory"
+  },
+  "ai_conversation_history_description": {
+    "message": "Maintains a short memory of previous translations in the same session. Essential for consistent style in Select Element mode."
   }
 }

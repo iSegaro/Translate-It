@@ -236,6 +236,10 @@ export const CONFIG = {
   // --- Versioning ---
   PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching & key abbreviation)
 
+  // --- AI Optimization Settings ---
+  AI_CONTEXT_TRANSLATION_ENABLED: true, // ارسال کانتکست (عنوان صفحه، تیتر بخش) به پرووایدرهای هوشمند
+  AI_CONVERSATION_HISTORY_ENABLED: true, // ارسال تاریخچه ترجمه‌های قبلی برای حفظ استایل (مخصوص Select Element)
+
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -999,6 +1003,21 @@ export const getDeeplApiKeysAsync = async () => {
 export const getCustomApiKeysAsync = async () => {
   const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
   return ApiKeyManager.getKeys('CUSTOM_API_KEY');
+};
+
+// --- AI Optimization Settings Getters ---
+export const getAIContextTranslationEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "AI_CONTEXT_TRANSLATION_ENABLED",
+    CONFIG.AI_CONTEXT_TRANSLATION_ENABLED
+  );
+};
+
+export const getAIConversationHistoryEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "AI_CONVERSATION_HISTORY_ENABLED",
+    CONFIG.AI_CONVERSATION_HISTORY_ENABLED
+  );
 };
 
 // --- Whole Page Translation Settings Getters (NEW) ---

@@ -10,7 +10,8 @@ import {
   getPromptBASEAIBatchAsync, 
   getPromptBASEAIFollowupAsync, 
   TranslationMode,
-  getSmartContextTranslationEnabledAsync
+  getAIContextTranslationEnabledAsync,
+  getAIConversationHistoryEnabledAsync
 } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
@@ -18,8 +19,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper
 export const AIConversationHelper = {
   /**
    * Check if this is the first turn in a session
-   * @param {string} sessionId - Session ID
-   * @returns {Promise<boolean>} - True if first turn or no session
    */
   async isFirstTurn(sessionId) {
     if (!sessionId) return true;
@@ -34,9 +33,6 @@ export const AIConversationHelper = {
 
   /**
    * Reserve and get the next turn number for a session
-   * @param {string} sessionId 
-   * @param {string} providerName
-   * @returns {Promise<number>}
    */
   async claimNextTurn(sessionId, providerName = 'Unknown') {
     if (!sessionId) return 1;
@@ -50,8 +46,6 @@ export const AIConversationHelper = {
 
   /**
    * Get current turn number for a session
-   * @param {string} sessionId 
-   * @returns {Promise<number>}
    */
   async getTurnNumber(sessionId) {
     if (!sessionId) return 1;
@@ -65,17 +59,15 @@ export const AIConversationHelper = {
 
   /**
    * Helper to get conversation history as structured turns
-   * @param {string} sessionId - Session identifier
-   * @param {string} translateMode - Translation mode
-   * @returns {Promise<Array>} - Array of turns {user, assistant}
    */
   async getConversationHistory(sessionId, translateMode = '') {
     if (!sessionId) return [];
 
-    // ONLY apply history logic for Select Element mode.
-    if (translateMode !== TranslationMode.Select_Element) {
-      return [];
-    }
+    // History is primarily used for Select Element to maintain style
+    if (translateMode !== TranslationMode.Select_Element) return [];
+
+    const historyEnabled = await getAIConversationHistoryEnabledAsync();
+    if (!historyEnabled) return [];
 
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
@@ -83,16 +75,11 @@ export const AIConversationHelper = {
       if (!session || !session.history || session.history.length === 0) return [];
 
       const turns = [];
-      // Group history messages into turns (user + assistant pairs)
       for (let i = 0; i < session.history.length; i += 2) {
         const userMsg = session.history[i];
         const assistantMsg = session.history[i + 1];
-        
         if (userMsg && assistantMsg && userMsg.role === 'user' && assistantMsg.role === 'assistant') {
-          turns.push({
-            user: userMsg.content,
-            assistant: assistantMsg.content
-          });
+          turns.push({ user: userMsg.content, assistant: assistantMsg.content });
         }
       }
       return turns;
@@ -103,30 +90,71 @@ export const AIConversationHelper = {
   },
 
   /**
-   * Helper to prepare system prompt and user text.
-   * Optimized to switch between Full and Follow-up prompts based on turn and mode.
+   * Prepares a compact context string for DeepL
+   */
+  async prepareDeepLContext(sessionId, contextMetadata) {
+    let contextParts = [];
+
+    const [contextEnabled, historyEnabled] = await Promise.all([
+      getAIContextTranslationEnabledAsync(),
+      getAIConversationHistoryEnabledAsync()
+    ]);
+
+    // 1. Structural Context (Site Title, Section Heading)
+    if (contextEnabled && contextMetadata) {
+      if (contextMetadata.pageTitle) contextParts.push(`Site: ${contextMetadata.pageTitle}`);
+      if (contextMetadata.heading) contextParts.push(`Section: ${contextMetadata.heading}`);
+      if (contextMetadata.role) contextParts.push(`Context: ${contextMetadata.role}`);
+    }
+
+    // 2. Compact History (Last successful translation snippet)
+    if (historyEnabled && sessionId) {
+      try {
+        const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
+        const session = translationSessionManager.sessions.get(sessionId);
+        if (session && session.history.length > 0) {
+          const lastAssistantMsg = [...session.history].reverse().find(m => m.role === 'assistant');
+          if (lastAssistantMsg) {
+            const snippet = typeof lastAssistantMsg.content === 'string' 
+              ? lastAssistantMsg.content.substring(0, 300) 
+              : JSON.stringify(lastAssistantMsg.content).substring(0, 300);
+            contextParts.push(`Last translation reference: ${snippet}`);
+          }
+        }
+      } catch (e) {}
+    }
+
+    return contextParts.length > 0 ? contextParts.join('. ') : undefined;
+  },
+
+  /**
+   * Helper to prepare system prompt and user text for AI providers
    */
   async preparePromptAndText(text, sourceLang, targetLang, translateMode, providerType, sessionId = null, isBatch = false, contextMetadata = null) {
+    const providerName = providerType; 
+    
     const firstTurn = await this.isFirstTurn(sessionId);
+    const [historyEnabled, contextEnabled] = await Promise.all([
+      getAIConversationHistoryEnabledAsync(),
+      getAIContextTranslationEnabledAsync()
+    ]);
+
     let promptTemplate;
 
     if (isBatch) {
-      // Logic: Select Element uses Follow-up for Turn 2+. Page Translate always uses Full.
-      const canUseFollowup = translateMode === TranslationMode.Select_Element && !firstTurn;
+      const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
       
-      promptTemplate = canUseFollowup 
+      promptTemplate = useFollowup 
         ? await getPromptBASEAIFollowupAsync() 
         : await getPromptBASEAIBatchAsync();
         
-      // Reinforce the contract for Follow-up prompts to prevent LLM confusion
-      if (canUseFollowup) {
+      if (useFollowup) {
         promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetLang}.`;
       }
     } else {
       promptTemplate = await buildPrompt("_{TEXT}", sourceLang, targetLang, translateMode, providerType);
     }
 
-    // Standard placeholder replacement
     if (!promptTemplate.includes("_{TEXT}")) {
       promptTemplate += "\n\nText to translate:\n_{TEXT}";
     }
@@ -138,11 +166,14 @@ export const AIConversationHelper = {
     const userText = typeof text === 'string' ? text : JSON.stringify(text);
 
     let finalSystemPrompt = systemPrompt;
-    if (contextMetadata) {
-      const isSmartContextEnabled = await getSmartContextTranslationEnabledAsync();
-      if (isSmartContextEnabled) {
-        finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
-      }
+
+    // Inject context only for DOM-related modes if enabled
+    const contextSupportedMode = translateMode === TranslationMode.Select_Element || 
+                                translateMode === TranslationMode.Page || 
+                                translateMode === TranslationMode.Selection;
+
+    if (contextMetadata && contextEnabled && contextSupportedMode) {
+      finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
     }
 
     return { 
@@ -152,8 +183,7 @@ export const AIConversationHelper = {
   },
 
   /**
-   * Helper to get conversation messages for AI providers.
-   * Manages history injection based on the translation mode.
+   * Helper to get conversation messages for AI providers
    */
   async getConversationMessages(sessionId, providerName, currentText, systemPrompt, translateMode = '') {
     if (!sessionId) {
@@ -165,8 +195,8 @@ export const AIConversationHelper = {
 
     const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
     const session = translationSessionManager.getOrCreateSession(sessionId, providerName);
+    const historyEnabled = await getAIConversationHistoryEnabledAsync();
 
-    // Turn 1: Always send System Prompt + User Text
     if (session.turnCounter <= 1) {
       session.systemPrompt = systemPrompt;
       return {
@@ -175,15 +205,13 @@ export const AIConversationHelper = {
       };
     }
 
-    // Turn 2+: Optimized Context
     const messages = [
       { role: 'system', content: systemPrompt || session.systemPrompt }
     ];
 
-    // Enable history ONLY for Select Element to maintain contextual consistency
-    // Limit to last 2 turns (4 messages) to prevent token bloat
-    if (translateMode === TranslationMode.Select_Element) {
-      const maxHistoryMessages = 4; 
+    // History limited to last 2 messages (1 turn) only for Select Element
+    if (historyEnabled && translateMode === TranslationMode.Select_Element) {
+      const maxHistoryMessages = 2; // Last 1 turn (User + Assistant)
       const history = session.history.slice(-maxHistoryMessages);
       messages.push(...history);
     }

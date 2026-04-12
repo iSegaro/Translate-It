@@ -383,41 +383,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       ignore_tags: 'n1,n2,x'
     });
 
-    // CRITICAL: Add contextual metadata for better translation quality
-    // DeepL context is limited to 1000 characters and works best in the source language
-    const contextParts = [];
+    // 1. Prepare rich context (Environmental + Compact History)
+    // DeepL context is free and significantly improves quality for related segments.
+    const { AIConversationHelper } = await import("./utils/AIConversationHelper.js");
+    const richContext = await AIConversationHelper.prepareDeepLContext(sessionId, options.contextMetadata);
 
-    // 1. Add history context (previous original texts) if sessionId is available
-    if (sessionId) {
-      try {
-        const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
-        const session = translationSessionManager.sessions.get(sessionId);
-        if (session?.history?.length > 0) {
-          const sourceHistory = session.history
-            .filter(msg => msg.role === 'user')
-            .map(msg => msg.content)
-            .join(' ')
-            .substring(0, 500); // Limit history part to keep room for structural context
-          
-          if (sourceHistory) contextParts.push(`History: ${sourceHistory}`);
-        }
-      } catch (e) {
-        logger.debug('[DeepL] Failed to extract history context:', e.message);
-      }
-    }
-
-    // 2. Add structural context summary (Page, Section, Role, Parent)
-    if (options.contextSummary) {
-      contextParts.push(options.contextSummary);
-    }
-
-    if (contextParts.length > 0) {
-      const translationContext = contextParts.join(' | ').substring(0, 1000);
-      requestBody.append('context', translationContext);
-
-      logger.debug('[DeepL] Context parameter added', {
-        contextLength: translationContext.length,
-        contextPreview: translationContext.substring(0, 100) + '...'
+    if (richContext) {
+      requestBody.append('context', richContext);
+      logger.debug('[DeepL] Rich context integrated', { 
+        length: richContext.length,
+        preview: richContext.substring(0, 100) + '...'
       });
     }
 
@@ -433,7 +408,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       targetLang: tl,
       betaLanguages: betaLanguagesEnabled,
       hasXMLPlaceholders,
-      hasContext: contextParts.length > 0
+      hasContext: !!richContext
     });
 
     const originalCharCount = this._calculateTraditionalCharCount(chunkTexts);
