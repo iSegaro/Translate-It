@@ -69,25 +69,29 @@ export class OpenRouterProvider extends BaseAIProvider {
       }),
     };
 
-    const result = await this._executeRequest({
-      url: "https://openrouter.ai/api/v1/chat/completions",
-      fetchOptions,
-      charCount: fetchOptions.body.length,
-      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-      extractResponse: (data) => data?.choices?.[0]?.message?.content,
-      context: `${this.providerName.toLowerCase()}-translation`,
-      abortController,
-      sessionId,
-      updateApiKey: (newKey, options) => {
-        options.headers.Authorization = `Bearer ${newKey}`;
+    try {
+      const result = await this._executeRequest({
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        fetchOptions,
+        charCount: fetchOptions.body.length,
+        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+        extractResponse: (data) => data?.choices?.[0]?.message?.content,
+        context: `${this.providerName.toLowerCase()}-translation`,
+        abortController,
+        sessionId,
+        updateApiKey: (newKey, options) => {
+          options.headers.Authorization = `Bearer ${newKey}`;
+        }
+      });
+
+      if (sessionId && result) {
+        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
       }
-    });
 
-    if (sessionId && result) {
-      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+      return result;
+    } catch (error) {
+      throw error;
     }
-
-    return result;
   }
 
   _validateConfig(config, requiredFields, context) {

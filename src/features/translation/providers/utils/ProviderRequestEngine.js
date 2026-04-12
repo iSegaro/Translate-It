@@ -133,8 +133,18 @@ export const ProviderRequestEngine = {
     const finalOriginalCharCount = originalCharCount || 0;
 
     const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
-    const sessionTag = finalSessionId ? ` [Session: ${finalSessionId}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
-    logger.debug(`[Call #${globalCallId}]${sessionTag} executeApiCall starting for context: ${context} (${finalCharCount} chars)`);
+    const sessionTag = finalSessionId ? ` [Session: ${finalSessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
+    
+    // CENTRALIZED SMART LOGGING: REQUEST
+    logger.debugLazy(() => {
+      const sanitizedUrl = this._maskSensitiveData(url);
+      const payload = this._parsePayload(fetchOptions.body);
+      return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
+        context,
+        charCount: finalCharCount,
+        payload
+      }];
+    });
     
     const startTime = Date.now();
 
@@ -153,7 +163,14 @@ export const ProviderRequestEngine = {
 
       const response = await proxyManager.fetch(url, finalFetchOptions);
       const duration = Date.now() - startTime;
-      logger.debug(`[Call #${globalCallId}] executeApiCall response status: ${response.status} (${duration}ms)`);
+      
+      // CENTRALIZED SMART LOGGING: RESPONSE
+      logger.debugLazy(() => {
+        return [`[Call #${globalCallId}] Response: ${response.status} (${duration}ms)`, {
+          status: response.status,
+          duration
+        }];
+      });
 
       if (!response.ok) {
         statsManager.recordError(provider.providerName, finalSessionId);
@@ -252,5 +269,56 @@ export const ProviderRequestEngine = {
       }
       throw err;
     }
+  },
+
+  /**
+   * Masks sensitive data in strings or objects (API Keys, etc.)
+   * @private
+   */
+  _maskSensitiveData(url) {
+    if (!url || typeof url !== 'string') return url;
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.searchParams.has('key')) urlObj.searchParams.set('key', '***');
+      if (urlObj.searchParams.has('api_key')) urlObj.searchParams.set('api_key', '***');
+      return urlObj.toString();
+    } catch {
+      return url;
+    }
+  },
+
+  /**
+   * Smartly parses different payload types (JSON, Form Data, String)
+   * @private
+   */
+  _parsePayload(body) {
+    if (!body) return null;
+    
+    // 1. JSON
+    if (typeof body === 'string' && (body.startsWith('{') || body.startsWith('['))) {
+      try {
+        return JSON.parse(body);
+      } catch {
+        return body;
+      }
+    }
+
+    // 2. URLSearchParams (FormData representation)
+    if (body instanceof URLSearchParams || (typeof body === 'string' && body.includes('='))) {
+      try {
+        const params = new URLSearchParams(body);
+        const obj = {};
+        for (const [key, value] of params.entries()) {
+          // Mask context if needed, but usually we want to see it for debug
+          obj[key] = value;
+        }
+        return obj;
+      } catch {
+        return body;
+      }
+    }
+
+    return body;
   }
 };
+
