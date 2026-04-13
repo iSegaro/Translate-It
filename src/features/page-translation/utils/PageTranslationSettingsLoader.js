@@ -10,6 +10,7 @@ import {
   getTranslationApiAsync, 
   getTargetLanguageAsync,
   getModeProvidersAsync,
+  getAIContextTranslationEnabledAsync,
   TranslationMode
 } from '@/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -83,6 +84,7 @@ export class PageTranslationSettingsLoader {
       showOriginalOnHover: !!showOriginalOnHover,
       translateAfterScrollStop: !!translateAfterScrollStop,
       scrollStopDelay: Number(scrollStopDelay) || 500,
+      aiContextTranslationEnabled: !!aiContextTranslationEnabled,
       chunkSize: CONFIG.WHOLE_PAGE_CHUNK_SIZE,
       maxConcurrentFlushes: CONFIG.WHOLE_PAGE_MAX_CONCURRENT_REQUESTS
     };
