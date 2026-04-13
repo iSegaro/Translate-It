@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
 import { getTranslationString, clearTranslationsCache } from '@/utils/i18n/i18n.js';
+import { ExtensionContextManager } from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppLocalization');
 
@@ -51,7 +52,11 @@ export function useContentAppLocalization(settingsStore) {
 
       return isRTL;
     } catch (error) {
-      logger.error('Error fetching RTL from storage:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'getRTLFromStorage');
+      } else {
+        logger.error('Error fetching RTL from storage:', error);
+      }
       return false;
     }
   };
