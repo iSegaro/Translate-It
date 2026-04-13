@@ -6,7 +6,12 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { getTranslationApiAsync, getTargetLanguageAsync, getAIContextTranslationEnabledAsync } from '@/config.js';
+import { 
+  getTranslationApiAsync, 
+  getTargetLanguageAsync, 
+  getAIContextTranslationEnabledAsync,
+  getSourceLanguageAsync
+} from '@/config.js';
 import { AUTO_DETECT_VALUE, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
@@ -49,7 +54,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
    * Loads original settings from storage
    */
   async _loadOriginalSettings() {
-    const { getSourceLanguageAsync, getTargetLanguageAsync } = await import('@/shared/config/config.js');
     const [source, target] = await Promise.all([
       getSourceLanguageAsync(),
       getTargetLanguageAsync()

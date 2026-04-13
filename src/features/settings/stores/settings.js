@@ -260,8 +260,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (key === 'DEBUG_MODE' && value === false) {
         const currentApi = settings.value['TRANSLATION_API'];
         if (currentApi === 'mock') {
-          const { CONFIG: configDefaults } = await import('@/shared/config/config.js');
-          const defaultApi = configDefaults.TRANSLATION_API || 'googlev2';
+          const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
           
           settings.value['TRANSLATION_API'] = defaultApi;
           updates['TRANSLATION_API'] = defaultApi;

@@ -2,6 +2,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { getSettingsAsync } from '@/shared/config/config.js';
 
 /**
  * Extension-Only Proxy Manager
@@ -207,7 +208,6 @@ export class ProxyManager {
    */
   async _initializeProxy() {
     try {
-      const { getSettingsAsync } = await import('@/shared/config/config.js');
       const settings = await getSettingsAsync();
 
       if (settings.PROXY_ENABLED) {

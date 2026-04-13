@@ -11,7 +11,8 @@ import {
   getTargetLanguageAsync,
   getModeProvidersAsync,
   getAIContextTranslationEnabledAsync,
-  TranslationMode
+  TranslationMode,
+  CONFIG
 } from '@/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -70,8 +71,6 @@ export class PageTranslationSettingsLoader {
     if (!effectiveProvider) {
       effectiveProvider = modeProviders?.[TranslationMode.Page] || globalTranslationApi;
     }
-
-    const { CONFIG } = await import('@/shared/config/config.js');
 
     const settings = {
       translationApi: effectiveProvider,

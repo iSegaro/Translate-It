@@ -7,6 +7,10 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
+import { revertSelectElementTranslation } from '@/features/element-selection/core/DomTranslatorAdapter.js';
+import { getActivePinia } from 'pinia';
+import { state } from '@/shared/config/config.js';
+import { getTranslationHandlerInstance } from "@/core/InstanceManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
@@ -152,7 +156,6 @@ export class RevertHandler extends ResourceTracker {
     try {
       // First, try to revert Select Element translation using global state
       // This works even when SelectElementManager is deactivated
-      const { revertSelectElementTranslation } = await import('@/features/element-selection/core/DomTranslatorAdapter.js');
       const selectElementReverted = await revertSelectElementTranslation();
 
       if (selectElementReverted) {
@@ -160,7 +163,6 @@ export class RevertHandler extends ResourceTracker {
         
         // Update store to reset Revert badge - only if Pinia is active
         try {
-          const { getActivePinia } = await import('pinia');
           if (getActivePinia()) {
             const mobileStore = useMobileStore();
             mobileStore.setHasElementTranslations(false);
@@ -198,7 +200,6 @@ export class RevertHandler extends ResourceTracker {
     try {
       // Get translation handler for context
       const translationHandler = await this.getTranslationHandler();
-      const { state } = await import("../../config.js");
 
       const context = {
         state,
@@ -292,8 +293,7 @@ export class RevertHandler extends ResourceTracker {
         return window.translationHandlerInstance;
       }
       
-      // Fallback: try to import and get instance
-      const { getTranslationHandlerInstance } = await import("../../core/InstanceManager.js");
+      // Fallback: use statically imported getter
       return getTranslationHandlerInstance();
     } catch (error) {
       logger.warn('Could not get TranslationHandler:', error);

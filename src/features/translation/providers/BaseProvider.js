@@ -7,6 +7,7 @@ import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
+import { getSettingsAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -28,7 +29,6 @@ export class BaseProvider {
    */
   async _initializeProxy() {
     try {
-      const { getSettingsAsync } = await import("@/shared/config/config.js");
       const settings = await getSettingsAsync();
 
       proxyManager.setConfig({

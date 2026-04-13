@@ -8,8 +8,14 @@ import { IFRAME_CONFIG, POSITION_CONFIG, ConfigUtils } from '../config/TextField
 import IframePositionCalculator from '../utils/IframePositionCalculator.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
-import { SelectionTranslationMode } from '@/shared/config/config.js';
+import { 
+  SelectionTranslationMode,
+  getActiveSelectionIconOnTextfieldsAsync,
+  getExtensionEnabledAsync,
+  getTranslateOnTextSelectionAsync
+} from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import '@/features/windows/managers/core/WindowsConfig.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDoubleClickHandler');
 
@@ -821,12 +827,6 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    */
   async isTextFieldIconsEnabled() {
     try {
-      const {
-        getActiveSelectionIconOnTextfieldsAsync,
-        getExtensionEnabledAsync,
-        getTranslateOnTextSelectionAsync
-      } = await import('@/shared/config/config.js');
-
       const activeSelectionIconEnabled = await getActiveSelectionIconOnTextfieldsAsync();
       const extensionEnabled = await getExtensionEnabledAsync();
       const translateOnTextSelection = await getTranslateOnTextSelectionAsync();
@@ -868,31 +868,27 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
    */
   requestWindowCreationInMainFrame(selectedText, position, actualTextField = null) {
     try {
-      // Import module for side effects (ensure module is loaded)
-      import('@/features/windows/managers/core/WindowsConfig.js').then(() => {
-        const message = {
-          type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
-          frameId: ConfigUtils.generateFrameId(),
-          selectedText: selectedText,
-          position: position,
-          timestamp: Date.now(),
-          // Include text field info for typing detection
-          textFieldInfo: actualTextField ? {
-            tagName: actualTextField.tagName,
-            id: actualTextField.id,
-            className: actualTextField.className
-          } : null
-        };
+      const message = {
+        type: IFRAME_CONFIG.MESSAGE_TYPES.TEXT_SELECTION_WINDOW_REQUEST,
+        frameId: ConfigUtils.generateFrameId(),
+        selectedText: selectedText,
+        position: position,
+        timestamp: Date.now(),
+        // Include text field info for typing detection
+        textFieldInfo: actualTextField ? {
+          tagName: actualTextField.tagName,
+          id: actualTextField.id,
+          className: actualTextField.className
+        } : null
+      };
 
-        if (window.parent !== window) {
-          window.parent.postMessage(message, '*');
-          logger.info('Text field translation window request sent to parent frame', {
-            frameId: message.frameId,
-            textLength: selectedText.length
-          });
-        }
-      });
-
+      if (window.parent !== window) {
+        window.parent.postMessage(message, '*');
+        logger.info('Text field translation window request sent to parent frame', {
+          frameId: message.frameId,
+          textLength: selectedText.length
+        });
+      }
     } catch (error) {
       logger.error('Failed to request window creation in main frame:', error);
     }

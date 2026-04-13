@@ -6,8 +6,16 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { getTranslationApiAsync } from '@/shared/config/config.js';
+import { 
+  getTranslationApiAsync, 
+  getDebugModeAsync, 
+  getTargetLanguageAsync,
+  CONFIG 
+} from '@/shared/config/config.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { providerRegistry } from '@/features/translation/providers/ProviderRegistry.js';
+import { PROVIDER_MANIFEST } from '@/features/translation/providers/ProviderManifest.js';
+import { handleActivateSelectElementModeLazy } from '@/core/background/handlers/lazy/handleElementSelectionLazy.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -29,9 +37,6 @@ const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 // --- Get API Providers from Registry ---
 async function getApiProviders() {
   try {
-    const { providerRegistry } = await import('@/features/translation/providers/ProviderRegistry.js');
-    const { getDebugModeAsync } = await import('@/shared/config/config.js');
-
     // Get current debug mode from storage to correctly filter Mock provider
     const isDebug = await getDebugModeAsync();
 
@@ -96,7 +101,6 @@ async function getApiProviders() {
       }
 
       // Check against known provider IDs for extra validation from manifest
-      const { PROVIDER_MANIFEST } = await import('@/features/translation/providers/ProviderManifest.js');
       const knownProviderIds = PROVIDER_MANIFEST.map(p => p.id.toLowerCase());
 
       if (!knownProviderIds.includes(id.toLowerCase())) {
@@ -620,7 +624,6 @@ export class ContextMenuManager extends ResourceTracker {
 
       logger.info(`Activating select mode for tab ${tab.id} via central handler`);
       
-      const { getTargetLanguageAsync } = await import('@/shared/config/config.js');
       const targetLanguage = await getTargetLanguageAsync();
 
       const message = {
@@ -630,8 +633,7 @@ export class ContextMenuManager extends ResourceTracker {
       };
       const sender = { tab };
 
-      // Load Element Selection handler lazily
-      const { handleActivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
+      // Element Selection handler is already imported statically
       await handleActivateSelectElementModeLazy(message, sender);
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -796,8 +798,7 @@ export class ContextMenuManager extends ResourceTracker {
           if (changes.DEBUG_MODE && changes.DEBUG_MODE.newValue === false) {
             const settings = await storageManager.get(['TRANSLATION_API']);
             if (settings.TRANSLATION_API === 'mock') {
-              const { CONFIG: configDefaults } = await import('@/shared/config/config.js');
-              const defaultApi = configDefaults.TRANSLATION_API || 'googlev2';
+              const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
               
               await storageManager.set({ TRANSLATION_API: defaultApi });
               logger.info(`Background Integrity: Debug mode disabled while Mock was active. Reverted to ${defaultApi}`);

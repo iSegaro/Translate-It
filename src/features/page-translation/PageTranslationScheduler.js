@@ -1,6 +1,6 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { TranslationMode, CONFIG } from '@/shared/config/config.js';
 import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
@@ -13,6 +13,8 @@ import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './Pa
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 
 /**
  * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
@@ -92,15 +94,13 @@ export class PageTranslationScheduler extends ResourceTracker {
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
-      import('@/shared/messaging/core/UnifiedMessaging.js').then(({ sendRegularMessage }) => {
-        sendRegularMessage({
-          action: MessageActions.CANCEL_TRANSLATION,
-          data: { 
-            messageId: this.translationSessionId,
-            reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
-          }
-        }).catch(() => {});
-      });
+      sendRegularMessage({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: { 
+          messageId: this.translationSessionId,
+          reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+        }
+      }).catch(() => {});
     }
 
     if (this.batchTimer) {
@@ -401,8 +401,6 @@ export class PageTranslationScheduler extends ResourceTracker {
     const providerRegistryId = this.settings.translationApi;
     const targetLanguage = this.settings.targetLanguage;
     
-    const { registryIdToName, isProviderType, ProviderTypes } = await import('@/features/translation/providers/ProviderConstants.js');
-    const { CONFIG: globalConfig } = await import('@/shared/config/config.js');
     const providerName = registryIdToName(providerRegistryId);
     const isAI = isProviderType(providerName, ProviderTypes.AI);
 
@@ -411,7 +409,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       targetLanguage,
       chunkSize: this.settings.chunkSize,
       lazyLoading: this.settings.lazyLoading,
-      maxChars: isAI ? globalConfig.WHOLE_PAGE_AI_MAX_CHARS : globalConfig.WHOLE_PAGE_MAX_CHARS
+      maxChars: isAI ? CONFIG.WHOLE_PAGE_AI_MAX_CHARS : CONFIG.WHOLE_PAGE_MAX_CHARS
     };
   }
 
