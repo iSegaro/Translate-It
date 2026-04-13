@@ -83,6 +83,9 @@
   "api_provider_deepl": {
     "message": "DeepL"
   },
+  "api_provider_mock": {
+    "message": "Development Mock"
+  },
   "provider_default": {
     "message": "Default"
   },
@@ -169,6 +172,12 @@
   },
   "provider_custom_description": {
     "message": "Custom OpenAI-compatible API endpoint. Configure your own URL and key."
+  },
+  "provider_mock_title": {
+    "message": "Development Mock"
+  },
+  "provider_mock_description": {
+    "message": "A simulated provider used for development and testing."
   },
   "options_page_title": {
     "message": "Settings"

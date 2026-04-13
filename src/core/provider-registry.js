@@ -3,6 +3,7 @@
  */
 
 import { PROVIDER_MANIFEST, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
+import { CONFIG } from '@/shared/config/config.js';
 
 /**
  * Re-export ProviderCategories for UI components
@@ -32,15 +33,32 @@ export const PROVIDER_REGISTRY = PROVIDER_MANIFEST.map(provider => ({
 // For backward compatibility and easy access
 const FALLBACK_PROVIDERS = PROVIDER_REGISTRY;
 
+/**
+ * Filter providers based on system state (e.g. hide Mock in production)
+ */
+const filterProviders = (providers, debugMode = null) => {
+  const isDebug = debugMode !== null ? debugMode : CONFIG.DEBUG_MODE;
+  
+  return providers.filter(p => {
+    // Basic support check
+    if (!p.supported) return false;
+    
+    // Hide Mock provider if not in debug mode
+    if (p.id === 'mock' && !isDebug) return false;
+    
+    return true;
+  });
+};
+
 // Export functions for compatibility
-export const getProvidersForDropdown = () => FALLBACK_PROVIDERS.filter(p => p.supported);
+export const getProvidersForDropdown = (debugMode = null) => filterProviders(FALLBACK_PROVIDERS, debugMode);
 export const getProviderById = (id) => FALLBACK_PROVIDERS.find(p => p.id === id);
-export const getSupportedProviders = () => FALLBACK_PROVIDERS.filter(p => p.supported);
+export const getSupportedProviders = (debugMode = null) => filterProviders(FALLBACK_PROVIDERS, debugMode);
 
 // Export class for compatibility
 export class ProviderRegistry {
-  static getAll() {
-    return FALLBACK_PROVIDERS.filter(p => p.supported);
+  static getAll(debugMode = null) {
+    return filterProviders(FALLBACK_PROVIDERS, debugMode);
   }
   
   static getById(id) {

@@ -252,7 +252,25 @@ export const useSettingsStore = defineStore('settings', () => {
   const updateSettingAndPersist = async (key, value) => {
     try {
       settings.value[key] = value // Update local state
-      await storageManager.set({ [key]: value }) // Persist immediately
+      
+      const updates = { [key]: value };
+
+      // SMART CLEANUP: If Debug Mode is disabled while Mock provider is active, 
+      // automatically switch to the system default provider.
+      if (key === 'DEBUG_MODE' && value === false) {
+        const currentApi = settings.value['TRANSLATION_API'];
+        if (currentApi === 'mock') {
+          const { CONFIG: configDefaults } = await import('@/shared/config/config.js');
+          const defaultApi = configDefaults.TRANSLATION_API || 'googlev2';
+          
+          settings.value['TRANSLATION_API'] = defaultApi;
+          updates['TRANSLATION_API'] = defaultApi;
+          
+          logger.info(`Debug mode disabled while Mock was active. Reverting provider to default: ${defaultApi}`);
+        }
+      }
+
+      await storageManager.set(updates) // Persist all changes
       return true
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {

@@ -83,6 +83,9 @@
   "api_provider_deepl": {
     "message": "DeepL"
   },
+  "api_provider_mock": {
+    "message": "開発用モック"
+  },
   "provider_default": {
     "message": "デフォルト"
   },
@@ -169,6 +172,12 @@
   },
   "provider_custom_description": {
     "message": "カスタムOpenAI互換APIエンドポイント。独自のURLとキーを設定してください。"
+  },
+  "provider_mock_title": {
+    "message": "開発用モック"
+  },
+  "provider_mock_description": {
+    "message": "開発およびテストに使用されるシミュレーションプロバイダーです。"
   },
   "options_page_title": {
     "message": "設定"

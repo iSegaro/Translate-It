@@ -30,15 +30,21 @@ const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 async function getApiProviders() {
   try {
     const { providerRegistry } = await import('@/features/translation/providers/ProviderRegistry.js');
+    const { getDebugModeAsync } = await import('@/shared/config/config.js');
 
-    // Get all available providers (both loaded and lazy registered)
-    const availableProviders = providerRegistry.getAllAvailable();
+    // Get current debug mode from storage to correctly filter Mock provider
+    const isDebug = await getDebugModeAsync();
+
+    // Get available providers with dynamic debug mode override
+    const availableProviders = providerRegistry.getAllAvailable().filter(p => {
+      if (p.id === 'mock' && !isDebug) return false;
+      return true;
+    });
 
     // Log provider structure for debugging
     logger.info("Processing available providers for context menu", {
       totalProviders: availableProviders.length,
-      lazyProviders: availableProviders.filter(p => p.isLazy).length,
-      loadedProviders: availableProviders.filter(p => !p.isLazy).length
+      isDebugMode: isDebug
     });
 
     const validProviders = [];
@@ -783,12 +789,38 @@ export class ContextMenuManager extends ResourceTracker {
    */
   registerStorageListener() {
     if (browser?.storage?.onChanged) {
-      this.storageListener = (changes, areaName) => {
-        if (areaName === "local" && (changes.TRANSLATION_API || changes.TRANSLATE_WITH_SELECT_ELEMENT || changes.EXTENSION_ENABLED)) {
-          logger.info(
-            "Settings changed in storage (API, Select Element or Global Enable). Rebuilding context menus for synchronization."
-          );
-          this.setupDefaultMenus();
+      this.storageListener = async (changes, areaName) => {
+        if (areaName === "local") {
+          // 1. DATA INTEGRITY CHECK: 
+          // If Debug Mode is disabled while Mock provider is selected, revert to default.
+          if (changes.DEBUG_MODE && changes.DEBUG_MODE.newValue === false) {
+            const settings = await storageManager.get(['TRANSLATION_API']);
+            if (settings.TRANSLATION_API === 'mock') {
+              const { CONFIG: configDefaults } = await import('@/shared/config/config.js');
+              const defaultApi = configDefaults.TRANSLATION_API || 'googlev2';
+              
+              await storageManager.set({ TRANSLATION_API: defaultApi });
+              logger.info(`Background Integrity: Debug mode disabled while Mock was active. Reverted to ${defaultApi}`);
+              
+              // Note: This set() will trigger this listener again, 
+              // but the 'if' above won't match, preventing infinite loops.
+              return; 
+            }
+          }
+
+          // 2. UI SYNC:
+          // Rebuild menus if relevant settings changed
+          if (
+            changes.TRANSLATION_API || 
+            changes.TRANSLATE_WITH_SELECT_ELEMENT || 
+            changes.EXTENSION_ENABLED ||
+            changes.DEBUG_MODE
+          ) {
+            logger.info(
+              "Settings changed in storage. Rebuilding context menus for synchronization."
+            );
+            this.setupDefaultMenus();
+          }
         }
       };
       browser.storage.onChanged.addListener(this.storageListener);

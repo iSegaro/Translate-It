@@ -576,7 +576,35 @@ const handleClickOutside = (event) => {
   }
 }
 
-const availableProviders = ref([])
+// Computed
+const availableProviders = computed(() => {
+  // Use provider registry for consistent provider information
+  // Pass current debug mode state to allow/hide mock provider dynamically
+  const debugMode = settingsStore.settings?.DEBUG_MODE || false;
+  const providersFromRegistry = getProvidersForDropdown(debugMode);
+  
+  const mappedProviders = providersFromRegistry.map(provider => ({
+    id: provider.id,
+    name: provider.name,
+    icon: provider.icon
+  }));
+
+  if (props.allowDefault) {
+    const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
+    const defaultProvider = getProviderById(defaultProviderId);
+    
+    return [
+      { 
+        id: 'default', 
+        name: t('provider_default') || 'Default', 
+        icon: defaultProvider?.icon || 'providers/google.svg' 
+      },
+      ...mappedProviders
+    ];
+  }
+  
+  return mappedProviders;
+});
 
 // Ephemeral Sync State from store
 const ephemeralSync = computed(() => translationStore.ephemeralSync)
@@ -803,30 +831,6 @@ const handleStorageChange = (changes, areaName) => {
 
 // Initialize providers
 onMounted(() => {
-  // Use provider registry for consistent provider information
-  const providersFromRegistry = getProvidersForDropdown()
-  const mappedProviders = providersFromRegistry.map(provider => ({
-    id: provider.id,
-    name: provider.name,
-    icon: provider.icon
-  }))
-
-  if (props.allowDefault) {
-    const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
-    const defaultProvider = getProviderById(defaultProviderId);
-    
-    availableProviders.value = [
-      { 
-        id: 'default', 
-        name: t('provider_default') || 'Default', 
-        icon: defaultProvider?.icon || 'providers/google.svg' 
-      },
-      ...mappedProviders
-    ]
-  } else {
-    availableProviders.value = mappedProviders
-  }
-  
   /**
    * USE CAPTURE PHASE FOR CLICK-OUTSIDE
    * Why? Content script UI often uses @click.stop to prevent events from reaching the host page.

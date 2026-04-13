@@ -83,6 +83,9 @@
   "api_provider_deepl": {
     "message": "DeepL"
   },
+  "api_provider_mock": {
+    "message": "شبیه‌ساز توسعه"
+  },
   "provider_default": {
     "message": "پیش‌فرض"
   },
@@ -169,6 +172,12 @@
   },
   "provider_custom_description": {
     "message": "استفاده از APIهای سازگار با OpenAI. آدرس سرور و کلید اختصاصی خود را وارد کنید."
+  },
+  "provider_mock_title": {
+    "message": "شبیه‌ساز توسعه"
+  },
+  "provider_mock_description": {
+    "message": "یک پرووایدر شبیه‌سازی شده برای اهداف توسعه و تست."
   },
   "options_page_title": {
     "message": "تنظیمات"

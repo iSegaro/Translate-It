@@ -36,6 +36,7 @@ export const ProviderNames = {
   // Browser & Custom
   BROWSER_API: 'browserTranslate',
   CUSTOM: 'Custom',
+  MOCK: 'MockProvider',
 
   // Legacy aliases (for backward compatibility)
   DEEPL: 'DeepLTranslate', // Same as DEEPL_TRANSLATE
@@ -61,6 +62,7 @@ export const ProviderRegistryIds = {
   WEBAI: 'webai',
   BROWSER: 'browser',
   CUSTOM: 'custom',
+  MOCK: 'mock',
 };
 
 /**
@@ -71,6 +73,7 @@ export const ProviderTypes = {
   AI: 'ai',
   NATIVE: 'native',
   CUSTOM: 'custom',
+  MOCK: 'mock',
 };
 
 /**
@@ -106,6 +109,7 @@ export function isProviderType(providerName, type) {
     [ProviderNames.WEBAI]: ProviderTypes.AI,
     [ProviderNames.BROWSER_API]: ProviderTypes.NATIVE,
     [ProviderNames.CUSTOM]: ProviderTypes.CUSTOM,
+    [ProviderNames.MOCK]: ProviderTypes.MOCK,
   };
   return providerTypeMap[providerName] === type;
 }
@@ -131,6 +135,7 @@ export function registryIdToName(registryId) {
     [ProviderRegistryIds.WEBAI]: ProviderNames.WEBAI,
     [ProviderRegistryIds.BROWSER]: ProviderNames.BROWSER_API,
     [ProviderRegistryIds.CUSTOM]: ProviderNames.CUSTOM,
+    [ProviderRegistryIds.MOCK]: ProviderNames.MOCK,
   };
   return idToNameMap[registryId] || null;
 }
@@ -156,6 +161,7 @@ export function nameToRegistryId(providerName) {
     [ProviderNames.WEBAI]: ProviderRegistryIds.WEBAI,
     [ProviderNames.BROWSER_API]: ProviderRegistryIds.BROWSER,
     [ProviderNames.CUSTOM]: ProviderRegistryIds.CUSTOM,
+    [ProviderNames.MOCK]: ProviderRegistryIds.MOCK,
   };
   return nameToIdMap[providerName] || null;
 }

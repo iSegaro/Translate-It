@@ -194,6 +194,20 @@ const getRawManifest = () => [
     needsApiKey: false,
     supported: true,
   },
+
+  // --- Group: DEVELOPMENT ---
+  {
+    id: ProviderRegistryIds.MOCK,
+    name: ProviderNames.MOCK,
+    displayName: "Development Mock",
+    type: ProviderTypes.MOCK,
+    category: ProviderCategories.LOCAL,
+    icon: "custom.png",
+    importFunction: () => import("./MockProvider.js").then(m => ({ default: m.MockProvider })),
+    features: ["text", "context", "smart", "bulk", "streaming"],
+    needsApiKey: false,
+    supported: true, // Enable it here, we will filter it in the registry
+  },
 ];
 
 let cachedManifest = null;
