@@ -128,45 +128,56 @@ export const AIResponseParser = {
   _extractAndParseJson(text, expectedFormat) {
     let jsonString = text.trim();
 
-    // 1. Try direct parsing
-    try {
-      return JSON.parse(jsonString);
-    } catch (e) {
-      // 2. Try markdown extraction
-      const cleanedFromMarkdown = this._stripMarkdown(jsonString);
-      if (cleanedFromMarkdown !== jsonString) {
-        try { return JSON.parse(cleanedFromMarkdown); } catch (e2) {}
+    // 1. Direct parsing - only if it looks like a clean JSON object/array
+    if ((jsonString.startsWith('{') && jsonString.endsWith('}')) || (jsonString.startsWith('[') && jsonString.endsWith(']'))) {
+      try {
+        return JSON.parse(jsonString);
+      } catch (e) {
+        // Continue to robust extraction if direct parse fails
       }
+    }
 
-      // 3. Robust Boundary Search
-      const firstBracket = jsonString.indexOf('[');
-      const firstBrace = jsonString.indexOf('{');
-      const start = (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) ? firstBracket : firstBrace;
+    // 2. Try markdown extraction
+    const cleanedFromMarkdown = this._stripMarkdown(jsonString);
+    if (cleanedFromMarkdown !== jsonString) {
+      try { return JSON.parse(cleanedFromMarkdown); } catch (e2) {}
+    }
+
+    // 3. Robust Boundary Search
+    // Find the ACTUAL first bracket/brace that leads to a valid JSON
+    const firstBracket = jsonString.indexOf('[');
+    const firstBrace = jsonString.indexOf('{');
+    
+    // Determine where to start looking
+    let searchIndices = [];
+    if (firstBracket !== -1) searchIndices.push(firstBracket);
+    if (firstBrace !== -1) searchIndices.push(firstBrace);
+    searchIndices.sort((a, b) => a - b);
+
+    for (const start of searchIndices) {
+      const isArray = jsonString[start] === '[';
+      const lastToken = isArray ? ']' : '}';
+      const lastIndex = jsonString.lastIndexOf(lastToken);
       
-      if (start !== -1) {
-        const lastBracket = jsonString.lastIndexOf(']');
-        const lastBrace = jsonString.lastIndexOf('}');
-        const end = Math.max(lastBracket, lastBrace);
-        
-        if (end > start) {
-          try {
-            const candidate = jsonString.substring(start, end + 1);
-            return JSON.parse(candidate);
-          } catch (e3) {}
+      if (lastIndex > start) {
+        try {
+          const candidate = jsonString.substring(start, lastIndex + 1);
+          return JSON.parse(candidate);
+        } catch (e3) {
+          // Continue to next possible start point
         }
       }
     }
 
     // Final Fallback: If AI returns plain text but we expected structured data
     // This happens often with single-segment batches where AI ignores JSON instructions
-    if (!jsonString.includes('{') && !jsonString.includes('[')) {
-      const cleanText = this._stripMarkdown(jsonString);
-      if (expectedFormat === ResponseFormat.JSON_OBJECT) {
-        return { translations: [{ text: cleanText }] };
-      }
-      if (expectedFormat === ResponseFormat.JSON_ARRAY) {
-        return [cleanText];
-      }
+    // Also happens with Mock providers or when AI is chatty
+    const cleanText = this._stripMarkdown(jsonString);
+    if (expectedFormat === ResponseFormat.JSON_OBJECT) {
+      return { translations: [{ text: cleanText }] };
+    }
+    if (expectedFormat === ResponseFormat.JSON_ARRAY) {
+      return [cleanText];
     }
 
     throw new Error(`Failed to parse response as ${expectedFormat}`);
