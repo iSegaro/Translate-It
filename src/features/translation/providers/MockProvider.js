@@ -25,7 +25,8 @@ export class MockProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { sessionId } = options;
+    const { sessionId, expectedFormat } = options;
+    const { ResponseFormat } = await import("@/shared/config/translationConstants.js");
 
     // 1. Network Latency Simulation (400ms to 1000ms)
     await new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 600));
@@ -41,10 +42,18 @@ export class MockProvider extends BaseAIProvider {
         mockResult = JSON.stringify(processedData);
       } else {
         // Plain text translation
-        mockResult = `[MOCK] ${userText}`;
+        const translatedText = `(MOCK) ${userText}`;
+
+        // Respect expected format for structured responses
+        // We return a simple array as it's most compatible with batch handlers
+        if (expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) {
+          mockResult = JSON.stringify([translatedText]);
+        } else {
+          mockResult = translatedText;
+        }
       }
     } catch (e) {
-      mockResult = `[MOCK_ERROR_FALLBACK] ${userText}`;
+      mockResult = `(MOCK_ERROR_FALLBACK) ${userText}`;
       logger.error('Mock transformation failed:', e);
     }
 
@@ -66,7 +75,7 @@ export class MockProvider extends BaseAIProvider {
       return {
         translations: data.translations.map(item => ({
           ...item,
-          text: `[MOCK] ${item.text || item.t || 'No Text'}`
+          text: `(MOCK) ${item.text || item.t || 'No Text'}`
         }))
       };
     }
@@ -75,7 +84,7 @@ export class MockProvider extends BaseAIProvider {
     if (Array.isArray(data)) {
       return data.map(item => ({
         ...item,
-        t: `[MOCK] ${item.t || item.text || 'No Text'}`
+        t: `(MOCK) ${item.t || item.text || 'No Text'}`
       }));
     }
 
