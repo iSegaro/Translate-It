@@ -46,10 +46,18 @@ async function loadTranslationsForLanguageCached(lang) {
   }
 
   try {
-    const url = browser.runtime.getURL(`_locales/${lang}/messages.json`);
+    // Use ExtensionContextManager.safeGetURL for robust resource path resolution
+    const url = ExtensionContextManager.safeGetURL(`_locales/${lang}/messages.json`);
+    
+    // If we get a data URI fallback, it means the extension context is dead
+    if (url.startsWith('data:')) {
+      logger.debug(`Context dead while loading translations for "${lang}"`);
+      return null;
+    }
+
     const response = await fetch(url);
     if (!response.ok) {
-      logger.warn(`Translation not found for language "${lang}"`);
+      logger.warn(`Translation not found for language "${lang}" (Status: ${response.status})`);
       return null;
     }
     const translations = await response.json();
