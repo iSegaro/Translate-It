@@ -152,8 +152,27 @@ export class OptimizedJsonHandler {
   }
 
   _mapResults(originalBatch, translatedResults) {
-    let results = Array.isArray(translatedResults) ? translatedResults : [translatedResults];
+    // Robust normalization: AI providers might return objects, arrays, or bridged structures
+    let rawItems = [];
+    if (Array.isArray(translatedResults)) {
+      rawItems = translatedResults;
+    } else if (typeof translatedResults === 'object' && translatedResults !== null) {
+      // Extract from common AI wrappers
+      rawItems = translatedResults.translations || 
+                 translatedResults.results || 
+                 Object.values(translatedResults).find(v => Array.isArray(v)) || 
+                 Object.values(translatedResults);
+    } else {
+      rawItems = [translatedResults];
+    }
     
+    // Ensure rawItems is always an array of text strings
+    const results = rawItems.map(item => {
+      if (item === null || item === undefined) return '';
+      if (typeof item === 'object') return item.t || item.text || item.translation || JSON.stringify(item);
+      return String(item);
+    });
+
     if (results.length !== originalBatch.length && originalBatch.length > 1) {
       logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}`);
     }
