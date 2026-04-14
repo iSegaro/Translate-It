@@ -2,6 +2,7 @@ import { BaseAIProvider } from "./BaseAIProvider.js";
 import { ProviderNames } from "./ProviderConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MockProvider');
 
@@ -25,13 +26,49 @@ export class MockProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { sessionId, expectedFormat } = options;
+    const { sessionId, expectedFormat, isBatch } = options;
     const { ResponseFormat } = await import("@/shared/config/translationConstants.js");
 
-    // 1. Network Latency Simulation (400ms to 1000ms)
+    // 1. Stats and Detailed Logging (Simulate ProviderRequestEngine behavior)
+    const charCount = (systemPrompt?.length || 0) + (userText?.length || 0);
+    const originalCharCount = isBatch && typeof userText === 'string' && (userText.startsWith('{') || userText.startsWith('['))
+      ? userText.length // Approximate for mock
+      : (userText?.length || 0);
+
+    const { globalCallId, sessionCallId } = statsManager.recordRequest(
+      this.providerName, 
+      sessionId, 
+      charCount, 
+      originalCharCount
+    );
+
+    const sessionTag = sessionId ? ` [Session: ${sessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
+    const mockUrl = `https://github.com/iSegaro/Translate-It`;
+
+    // Log the simulated request (Lazy to maintain high-performance logging standard)
+    logger.debugLazy(() => {
+      const payload = {
+        model: "mock-gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userText }
+        ],
+        temperature: 0,
+        mock_options: { expectedFormat, isBatch }
+      };
+      return [`[Call #${globalCallId}]${sessionTag} Request: ${mockUrl}`, {
+        context: 'mock-translation',
+        charCount,
+        payload
+      }];
+    });
+
+    const startTime = Date.now();
+
+    // 2. Network Latency Simulation (400ms to 1000ms)
     await new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 600));
 
-    // 2. Intelligent Data Processing
+    // 3. Intelligent Data Processing
     let mockResult = "";
 
     try {
@@ -57,10 +94,16 @@ export class MockProvider extends BaseAIProvider {
       logger.error('Mock transformation failed:', e);
     }
 
-    // 3. Debug log for verification
-    if (sessionId) {
-      logger.debug(`[Mock Session: ${sessionId.substring(0, 8)}] History/Context check passed ✅`);
-    }
+    const duration = Date.now() - startTime;
+
+    // Log the simulated response
+    logger.debugLazy(() => {
+      return [`[Call #${globalCallId}] Response: 200 OK (${duration}ms)`, {
+        status: 200,
+        duration,
+        resultPreview: typeof mockResult === 'string' ? mockResult.substring(0, 100) : 'JSON'
+      }];
+    });
 
     return mockResult;
   }
