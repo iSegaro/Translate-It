@@ -174,8 +174,9 @@ export class RevertHandler extends ResourceTracker {
         return 1;
       }
 
-      // Fallback: Try to get SelectElementManager instance through FeatureManager
-      const selectElementManager = await this.getSelectElementManagerFromFeatureManager();
+      // Fallback: Try to get SelectElementManager instance using the unified getter
+      // which includes fallbacks to global window instances if FeatureManager is not available
+      const selectElementManager = await this.getSelectElementManager();
 
       if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
         const revertedCount = await selectElementManager.revertTranslations();

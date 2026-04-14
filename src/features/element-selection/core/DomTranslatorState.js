@@ -8,15 +8,27 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import DOMPurify from 'dompurify';
 import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
 
-export const globalSelectElementState = {
-  translationHistory: [], // Store all translations for proper revert
-  isTranslating: false,
+// Global translation state registry to ensure singleton behavior across chunks
+const getGlobalState = () => {
+  if (typeof window !== 'undefined') {
+    if (!window.__selectElementTranslationState__) {
+      window.__selectElementTranslationState__ = {
+        translationHistory: [], // Store all translations for proper revert
+        isTranslating: false,
+        currentTranslation: null
+      };
+    }
+    return window.__selectElementTranslationState__;
+  }
+  // Fallback for non-browser environments (tests/SSR)
+  return { 
+    translationHistory: [], 
+    isTranslating: false,
+    currentTranslation: null
+  };
 };
 
-// Make it available globally for legacy RevertHandler access if needed
-if (typeof window !== 'undefined') {
-  window.__selectElementTranslationState__ = globalSelectElementState;
-}
+export const globalSelectElementState = getGlobalState();
 
 /**
  * Get the global Select Element translation state
@@ -26,11 +38,6 @@ export function getSelectElementTranslationState() {
   return globalSelectElementState;
 }
 
-/**
- * Global function to revert ALL Select Element translations
- * Can be called independently of the Adapter class
- * @returns {Promise<number>} Number of translations reverted
- */
 export async function revertSelectElementTranslation() {
   if (!globalSelectElementState.translationHistory || globalSelectElementState.translationHistory.length === 0) {
     return 0;
