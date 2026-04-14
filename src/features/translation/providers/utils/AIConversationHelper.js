@@ -185,11 +185,10 @@ export const AIConversationHelper = {
       finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
     }
 
-    return { 
-      systemPrompt: finalSystemPrompt.replace("_{TEXT}", "the text provided in the next message").trim(), 
-      userText 
-    };
-  },
+    return {
+      systemPrompt: finalSystemPrompt.replace("_{TEXT}", "the text provided in the user message").trim(),
+      userText
+    };  },
 
   /**
    * Helper to get conversation messages for AI providers
