@@ -14,7 +14,6 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
-import { CONFIG } from "@/src/config.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 export class GeminiProvider extends BaseAIProvider {
