@@ -161,16 +161,21 @@ export const AIConversationHelper = {
         promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetLang}.`;
       }
     } else {
-      promptTemplate = await buildPrompt("_{TEXT}", sourceLang, targetLang, translateMode, providerType);
+      promptTemplate = await buildPrompt("$_{TEXT}", sourceLang, targetLang, translateMode, providerType);
     }
 
-    if (!promptTemplate.includes("_{TEXT}")) {
-      promptTemplate += "\n\nText to translate:\n_{TEXT}";
+    if (!promptTemplate.includes("$_{TEXT}")) {
+      promptTemplate += "\n\nText to translate:\n$_{TEXT}";
     }
 
+    const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
+    const sourceName = sourceLang === 'auto' ? 'Detect automatically' : (getLanguageNameFromCode(sourceLang) || sourceLang);
+    const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+
+    // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT} with global regex
     const systemPrompt = promptTemplate
-      .replace("_{SOURCE}", sourceLang)
-      .replace("_{TARGET}", targetLang);
+      .replace(/\$_{SOURCE}/g, sourceName)
+      .replace(/\$_{TARGET}/g, targetName);
 
     const userText = typeof text === 'string' ? text : JSON.stringify(text);
 
@@ -185,8 +190,13 @@ export const AIConversationHelper = {
       finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
     }
 
+    // Replace text placeholder according to project standard $_{TEXT} with global regex
+    const resultPrompt = finalSystemPrompt
+      .replace(/\$_{TEXT}/g, "the text provided in the user message")
+      .trim();
+
     return {
-      systemPrompt: finalSystemPrompt.replace("_{TEXT}", "the text provided in the user message").trim(),
+      systemPrompt: resultPrompt,
       userText
     };  },
 

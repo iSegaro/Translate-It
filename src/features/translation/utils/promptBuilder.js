@@ -11,6 +11,8 @@ import {
   TranslationMode,
 } from "@/shared/config/config.js";
 
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
@@ -47,7 +49,7 @@ function isSpecificTextJsonFormat(obj) {
  * @returns {Promise<string>} - پرامت نهایی ساخته شده.
  */
 export async function buildPrompt(
-  text,
+  text = "$_{TEXT}",
   sourceLang,
   targetLang,
   translateMode = TranslationMode.Field,
@@ -65,14 +67,18 @@ export async function buildPrompt(
 
   const isAI = providerType === 'ai';
 
+  // Use full language names for better AI performance
+  const sourceName = sourceLang === 'auto' ? 'Detect automatically' : (getLanguageNameFromCode(sourceLang) || sourceLang);
+  const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
     logger.debug('AI provider in Batch mode. Using AI batch prompt.');
     const batchPromptTemplate = await getPromptBASEAIBatchAsync();
     return batchPromptTemplate
-      .replace("_{SOURCE}", sourceLang)
-      .replace("_{TARGET}", targetLang)
-      .replace("_{TEXT}", text);
+      .replace(/\$_{SOURCE}/g, sourceName)
+      .replace(/\$_{TARGET}/g, targetName)
+      .replace(/\$_{TEXT}/g, text);
   }
 
 
@@ -82,7 +88,7 @@ export async function buildPrompt(
     logger.debug('AI provider in Select Element mode (batch). Using batch prompt.');
     const batchPromptTemplate = await getPromptBASEBatchAsync();
     return batchPromptTemplate
-      .replace(/\$_{TARGET}/g, targetLang)
+      .replace(/\$_{TARGET}/g, targetName)
       .replace(/\$_{TEXT}/g, text);
   }
 
@@ -108,12 +114,12 @@ export async function buildPrompt(
   
   // IMPORTANT: The placeholder format is $_{VAR}, not ${\\_\_VAR}.
   const userRules = promptTemplate
-    .replace(/\$_{SOURCE}/g, sourceLang)
-    .replace(/\$_{TARGET}/g, targetLang);
+    .replace(/\$_{SOURCE}/g, sourceName)
+    .replace(/\$_{TARGET}/g, targetName);
 
   let finalPromptWithUserRules = promptBase
-    .replace(/\$_{SOURCE}/g, sourceLang)
-    .replace(/\$_{TARGET}/g, targetLang)
+    .replace(/\$_{SOURCE}/g, sourceName)
+    .replace(/\$_{TARGET}/g, targetName)
     .replace(/\$_{USER_RULES}/g, userRules);
 
   // Inject the actual text to be translated.
