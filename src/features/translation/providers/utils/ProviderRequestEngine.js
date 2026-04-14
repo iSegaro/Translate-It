@@ -139,9 +139,24 @@ export const ProviderRequestEngine = {
     logger.debugLazy(() => {
       const sanitizedUrl = this._maskSensitiveData(url);
       const payload = this._parsePayload(fetchOptions.body);
+      
+      // Extract a readable summary of what's being sent
+      let textPreview = '';
+      if (payload) {
+        if (Array.isArray(payload.messages)) {
+          const lastUserMsg = payload.messages.filter(m => m.role === 'user').pop();
+          textPreview = lastUserMsg?.content?.substring(0, 100) || '';
+        } else if (payload.text) {
+          textPreview = String(payload.text).substring(0, 100);
+        } else if (payload.q) {
+          textPreview = Array.isArray(payload.q) ? payload.q[0].substring(0, 100) : payload.q.substring(0, 100);
+        }
+      }
+
       return [`[Call #${globalCallId}]${sessionTag} Request: ${sanitizedUrl}`, {
         context,
         charCount: finalCharCount,
+        preview: textPreview,
         payload
       }];
     });
@@ -164,11 +179,40 @@ export const ProviderRequestEngine = {
       const response = await proxyManager.fetch(url, finalFetchOptions);
       const duration = Date.now() - startTime;
       
+      let responseData = null;
+      let result = null;
+
+      if (response.ok) {
+        const clonedResponse = response.clone();
+        const contentType = clonedResponse.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            responseData = await clonedResponse.json();
+            // result = await extractResponse(responseData, response.status); // Don't call yet, might have side effects
+          } catch (e) {}
+        } else {
+          try {
+            responseData = await clonedResponse.text();
+          } catch (e) {}
+        }
+      }
+
       // CENTRALIZED SMART LOGGING: RESPONSE
       logger.debugLazy(() => {
+        let resultPreview = '';
+        if (responseData) {
+          try {
+            // Try to extract a preview of the actual translation
+            const preview = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+            resultPreview = preview.substring(0, 500);
+          } catch (e) {}
+        }
+
         return [`[Call #${globalCallId}] Response: ${response.status} (${duration}ms)`, {
           status: response.status,
-          duration
+          duration,
+          preview: resultPreview,
+          responseData
         }];
       });
 

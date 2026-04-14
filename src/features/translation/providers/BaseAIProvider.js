@@ -66,6 +66,11 @@ export class BaseAIProvider extends BaseProvider {
     try {
       const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
       
+      logger.debugLazy(() => [`[${this.providerName}] Batch Prompt preparation complete`, { 
+        systemPrompt, 
+        userText: typeof userText === 'string' ? userText : JSON.parse(userText) 
+      }]);
+
       // Ensure promptText is a string for the AI API
       const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
 
@@ -99,6 +104,8 @@ export class BaseAIProvider extends BaseProvider {
       
       const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, null, sessionId);
       
+      logger.debugLazy(() => [`[${this.providerName}] Traditional Prompt preparation complete`, { systemPrompt, userText }]);
+
       const response = await this._callAI(systemPrompt, userText, {
         abortController,
         messageId,
