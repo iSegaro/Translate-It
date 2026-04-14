@@ -322,7 +322,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         }
       }
     } catch (error) {
-      this.logger.debug('Critical error in scheduler flush loop:', error.message);
+      this.logger.error('Critical error in scheduler flush loop:', error);
     } finally {
       this.activeFlushes--;
       this._checkCompletion();

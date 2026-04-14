@@ -230,6 +230,8 @@ export class QueueManager {
           }
         }
       }
+    } catch (error) {
+      logger.error(`Critical error in _processQueue for ${providerName}:`, error);
     } finally {
       this.processing.set(providerName, false);
     }

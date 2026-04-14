@@ -46,7 +46,7 @@ export async function handleTranslate(message, sender) {
     return result;
 
   } catch (translationError) {
-    logger.debug('[Handler:TRANSLATE] Caught error from translation engine:', translationError.message);
+    logger.error('[Handler:TRANSLATE] Caught error from translation engine:', translationError);
 
     // Don't show error notification for user cancellations
     if (translationError.type !== ErrorTypes.USER_CANCELLED) {

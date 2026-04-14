@@ -91,7 +91,7 @@ export async function handleTranslateText(message, sender, sendResponse) {
       success: false,
       error: error.message || 'Translation failed'
     };
-    logger.debug(`[TRANSLATE_TEXT] Returning catch error response:`, errorResponse);
+    logger.error(`[TRANSLATE_TEXT] Returning catch error response:`, error);
     return errorResponse;
   }
 }
