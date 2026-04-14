@@ -6,6 +6,7 @@
 import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { TRANSLATION_CONSTANTS } from '@/shared/config/translationConstants.js';
 import { 
   getPromptBASEAIBatchAsync, 
   getPromptBASEAIBatchAutoAsync,
@@ -19,6 +20,41 @@ import {
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
 
 export const AIConversationHelper = {
+  /**
+   * Internal helper to truncate text intelligently at sentence or word boundaries
+   * to maintain meaning while staying under the character limit.
+   * @private
+   */
+  _truncateSmart(text, maxLength) {
+    if (!text || typeof text !== 'string' || text.length <= maxLength) return text;
+
+    // 1. Try to find the last sentence end (., !, ?, \n) within the last 25% of the allowed range
+    const searchRangeStart = Math.floor(maxLength * 0.75);
+    const lastSentenceEnd = Math.max(
+      text.lastIndexOf('. ', maxLength),
+      text.lastIndexOf('! ', maxLength),
+      text.lastIndexOf('? ', maxLength),
+      text.lastIndexOf('\n', maxLength)
+    );
+
+    let cutIndex = -1;
+
+    if (lastSentenceEnd >= searchRangeStart) {
+      // Prioritize sentence ends if they are reasonably close to the limit
+      cutIndex = lastSentenceEnd + 1;
+    } else {
+      // 2. Fallback: Find the last space before the limit to avoid cutting a word
+      cutIndex = text.lastIndexOf(' ', maxLength);
+    }
+
+    // 3. Last resort: Hard cut if no space or sentence end is found (e.g., very long word)
+    if (cutIndex <= 0) cutIndex = maxLength;
+
+    // 4. Clean up trailing punctuation/whitespace and add ellipsis
+    // Includes Arabic/Persian comma (U+060C)
+    return text.substring(0, cutIndex).replace(/[.,;:\-\s\u060C]+$/, '') + '...';
+  },
+
   /**
    * Check if this is the first turn in a session
    */
@@ -61,8 +97,11 @@ export const AIConversationHelper = {
 
   /**
    * Helper to get conversation history as structured turns
+   * @param {string} sessionId - Active session ID
+   * @param {string} translateMode - Current translation mode
+   * @param {Object} options - Options for history (maxTurns, maxChars)
    */
-  async getConversationHistory(sessionId, translateMode = '') {
+  async getConversationHistory(sessionId, translateMode = '', options = {}) {
     if (!sessionId) return [];
 
     // History is primarily used for Select Element to maintain style
@@ -71,17 +110,27 @@ export const AIConversationHelper = {
     const historyEnabled = await getAIConversationHistoryEnabledAsync();
     if (!historyEnabled) return [];
 
+    const { 
+      maxTurns = 1, 
+      maxChars = TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI 
+    } = options;
+
     try {
       const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
       const session = translationSessionManager.sessions.get(sessionId);
       if (!session || !session.history || session.history.length === 0) return [];
 
       const turns = [];
-      for (let i = 0; i < session.history.length; i += 2) {
-        const userMsg = session.history[i];
-        const assistantMsg = session.history[i + 1];
+      const messagesToProcess = session.history.slice(-(maxTurns * 2));
+
+      for (let i = 0; i < messagesToProcess.length; i += 2) {
+        const userMsg = messagesToProcess[i];
+        const assistantMsg = messagesToProcess[i + 1];
         if (userMsg && assistantMsg && userMsg.role === 'user' && assistantMsg.role === 'assistant') {
-          turns.push({ user: userMsg.content, assistant: assistantMsg.content });
+          turns.push({ 
+            user: this._truncateSmart(userMsg.content, maxChars), 
+            assistant: this._truncateSmart(assistantMsg.content, maxChars) 
+          });
         }
       }
       return turns;
@@ -112,6 +161,7 @@ export const AIConversationHelper = {
     // 2. Compact History (Last full turn: User + Assistant)
     // History is only included for Select Element to maintain style/consistency
     if (historyEnabled && sessionId && translateMode === TranslationMode.Select_Element) {
+      const charLimit = TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.DEEPL;
       try {
         const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js');
         const session = translationSessionManager.sessions.get(sessionId);
@@ -124,13 +174,13 @@ export const AIConversationHelper = {
             const userSnippet = typeof userPart.content === 'string' ? userPart.content : JSON.stringify(userPart.content);
             const assistantSnippet = typeof assistantPart.content === 'string' ? assistantPart.content : JSON.stringify(assistantPart.content);
             
-            contextParts.push(`Last turn reference: [Original: "${userSnippet.substring(0, 150)}..." | Translated: "${assistantSnippet.substring(0, 150)}..."]`);
+            contextParts.push(`Last turn reference: [Original: "${this._truncateSmart(userSnippet, charLimit)}" | Translated: "${this._truncateSmart(assistantSnippet, charLimit)}"]`);
           }
         } else if (session && session.history.length > 0) {
           // Fallback for single message
           const lastMsg = session.history[session.history.length - 1];
           const snippet = typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
-          contextParts.push(`Reference: ${snippet.substring(0, 200)}`);
+          contextParts.push(`Reference: ${this._truncateSmart(snippet, charLimit + 50)}`);
         }
       } catch (e) {}
     }
@@ -235,10 +285,17 @@ export const AIConversationHelper = {
       { role: 'system', content: systemPrompt || session.systemPrompt }
     ];
 
-    // History limited to last 2 messages (1 turn) only for Select Element
+    // History limited to last 1 turn with character capping for token optimization
     if (historyEnabled && translateMode === TranslationMode.Select_Element) {
       const maxHistoryMessages = 2; // Last 1 turn (User + Assistant)
-      const history = session.history.slice(-maxHistoryMessages);
+      const rawHistory = session.history.slice(-maxHistoryMessages);
+      
+      const charLimit = TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI;
+      const history = rawHistory.map(msg => ({
+        ...msg,
+        content: this._truncateSmart(msg.content, charLimit)
+      }));
+      
       messages.push(...history);
     }
 

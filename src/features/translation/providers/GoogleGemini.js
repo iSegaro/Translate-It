@@ -13,8 +13,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
-import { ResponseFormat } from "@/shared/config/translationConstants.js";
-
+import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { CONFIG } from "@/src/config.js";
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 export class GeminiProvider extends BaseAIProvider {
@@ -74,7 +74,12 @@ export class GeminiProvider extends BaseAIProvider {
     };
 
     if (sessionId) {
-      const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode);
+      // Limit history to last 2 turns with character capping to optimize tokens
+      const history = await AIConversationHelper.getConversationHistory(sessionId, options.mode, { 
+        maxTurns: 2,
+        maxChars: TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI 
+      });
+      
       if (history.length > 0) {
         const contents = [];
         for (const turn of history) {

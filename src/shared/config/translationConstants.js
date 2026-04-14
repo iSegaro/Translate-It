@@ -80,4 +80,10 @@ export const TRANSLATION_CONSTANTS = {
     AI: 500,
     TRADITIONAL: 2000,
   },
+
+  // Character limits for conversation history to optimize tokens
+  HISTORY_CHARACTER_LIMITS: {
+    AI: 300,      // Max characters per history message for AI providers
+    DEEPL: 150,   // Max characters for DeepL context snippets
+  }
 };
