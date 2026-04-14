@@ -8,12 +8,13 @@ To prevent "Log Storms" and redundant red logs, the system follows a strict prop
 
 1.  **Providers/Core (Level: WARN)**: Throw structured Error objects. They should **never** call `ErrorHandler.handle()` directly. Technical issues (like API 429/402) are logged as `logger.warn`.
 2.  **Middleware/Managers (Level: DEBUG)**: Intercept and propagate errors. They add metadata (context) but don't show UI notifications. They log lifecycle events as `logger.debug`.
-3.  **UI/Composables (Level: ERROR)**: The final boundary. Only here is `ErrorHandler.handle()` called to show Toasts/UI Alerts. This is the **only** layer allowed to produce red `console.error` logs.
+    *   **Exception**: Critical runtime/unexpected errors in Background handlers (e.g., `TypeError`, `is not a function`) MUST use `logger.error` to ensure visibility, even if they don't trigger UI notifications.
+3.  **UI/Composables (Level: ERROR)**: The final boundary. Only here is `ErrorHandler.handle()` called to show Toasts/UI Alerts. This is the **only** layer allowed to produce red `console.error` logs for *expected* business/API errors.
 
 ## Core Mandates
 
 *   **Error Identity Preservation**: Never throw raw strings. Always throw `new Error()` or structured objects. Preserve `originalError`, `type`, and `statusCode`.
-*   **Single Red Log Policy**: Only `ErrorHandler.handle()` should produce a red log. All intermediate layers must use `warn` or `debug`.
+*   **Single Red Log Policy**: Only `ErrorHandler.handle()` (or critical background exceptions) should produce a red log. All intermediate layers must use `warn` or `debug`.
 *   **Context Awareness**: Use `ExtensionContextManager` to silence noise from reloaded/invalidated tabs and handle cross-platform differences.
 
 ---

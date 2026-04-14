@@ -26,7 +26,7 @@ To maintain a clean console, logging follows a strict numerical hierarchy: `leve
 
 | Level | Name | Responsibility (Strategy) | Visibility |
 |-------|------|---------------------------|------------|
-| `0` | **ERROR** | **Final Handlers only.** Only `ErrorHandler` or fatal app crashes. | Always |
+| `0` | **ERROR** | **Final Handlers & Critical Background.** `ErrorHandler`, fatal app crashes, or unexpected runtime errors in background (e.g. `TypeError`, `is not a function`). | Always |
 | `1` | **WARN** | **Providers & Core.** Used for technical limits (429, 402, Network errors). | **Production Default** |
 | `2` | **INFO** | **Milestones.** Processes starting/ending (e.g., "Translation started"). | Development/Debug |
 | `3` | **DEBUG** | **Granular Traces.** High-frequency events (e.g., "Mouse moved", "Message sent"). | Development only |
