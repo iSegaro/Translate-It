@@ -413,12 +413,16 @@ class ApiKeyManager {
    */
   static async _testOpenRouterKey(key, context = {}) {
     try {
-      const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/models';
+      // Use auth/key endpoint instead of models to properly validate the key
+      // models endpoint is public and may return 200 even for invalid keys
+      const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/auth/key';
       const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
       const response = await proxyManager.fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${key}`
+          'Authorization': `Bearer ${key}`,
+          'HTTP-Referer': 'https://github.com/iSegaro/Translate-It',
+          'X-Title': 'Translate-It Extension'
         }
       });
       return response.ok;
