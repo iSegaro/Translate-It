@@ -1954,5 +1954,11 @@
   },
   "ai_conversation_history_description": {
     "message": "Maintains a short memory of previous translations in the same session. Essential for consistent style in Select Element mode."
+  },
+  "bilingual_translation_label": {
+    "message": "Bilingual Translation (Swap Language)"
+  },
+  "bilingual_translation_description": {
+    "message": "If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto)."
   }
 }

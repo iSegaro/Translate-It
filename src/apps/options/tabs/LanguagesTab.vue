@@ -26,6 +26,19 @@
           type="target"
         />
       </div>
+
+      <!-- Bilingual Translation Setting -->
+      <div class="setting-group bilingual-setting">
+        <div class="bilingual-content">
+          <BaseCheckbox
+            v-model="bilingualTranslation"
+            :label="t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)'"
+          />
+          <span class="setting-description">
+            {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
+          </span>
+        </div>
+      </div>
     </template>
 
     <!-- Validation errors -->
@@ -76,6 +89,7 @@ import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { useI18n } from 'vue-i18n'
@@ -94,6 +108,7 @@ const { t } = useI18n()
 // Form values as refs
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
+const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -250,6 +265,7 @@ onMounted(async () => {
   await loadLanguages();
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
   targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'fa'
+  bilingualTranslation.value = settingsStore.settings?.BILINGUAL_TRANSLATION ?? false
   // Validate on mount to show error if languages are the same
   await validateLanguages()
 })
@@ -262,6 +278,9 @@ watch(sourceLanguage, (value) => {
 watch(targetLanguage, (value) => {
   settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
   validateLanguages()
+})
+watch(bilingualTranslation, (value) => {
+  settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
 })
 
 // ========== API Settings ==========
@@ -502,6 +521,29 @@ defineExpose({
     .ti-provider-button {
       width: 100% !important;
     }
+  }
+}
+
+.bilingual-setting {
+  margin-top: $spacing-md;
+  flex-direction: column !important;
+  align-items: stretch !important;
+
+  .bilingual-content {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    :deep(.base-checkbox) {
+      margin-bottom: 0;
+    }
+  }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    margin-inline-start: 32px; // Align with checkbox label
+    line-height: 1.4;
   }
 }
 

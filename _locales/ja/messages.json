@@ -1939,5 +1939,11 @@
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ミリ秒"
+  },
+  "bilingual_translation_label": {
+    "message": "双方向翻訳 (言語の自動入れ替え)"
+  },
+  "bilingual_translation_description": {
+    "message": "検出された言語が翻訳先言語と一致する場合、自動的に翻訳元言語（翻訳元が自動の場合は英語）へ翻訳します。"
   }
 }
