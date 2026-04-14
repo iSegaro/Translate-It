@@ -105,6 +105,17 @@ class TranslationSessionManager {
   }
 
   /**
+   * Clear a specific session by ID
+   * @param {string} id - Session ID to clear
+   */
+  clearSession(id) {
+    if (this.sessions.has(id)) {
+      this.sessions.delete(id);
+      logger.debug(`Manual: Cleared session: ${id}`);
+    }
+  }
+
+  /**
    * Cleanup expired sessions
    */
   cleanup() {
