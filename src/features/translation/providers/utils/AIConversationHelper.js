@@ -185,7 +185,14 @@ export const AIConversationHelper = {
       } catch (e) {}
     }
 
-    return contextParts.length > 0 ? contextParts.join('. ') : undefined;
+    if (contextParts.length === 0) return undefined;
+
+    // Final safety guard: DeepL API context parameter has a hard limit of 1024 characters.
+    // We join and truncate at 1000 for maximum safety while preserving meaning.
+    const finalContext = contextParts.join('. ');
+    return finalContext.length > 1000 
+      ? this._truncateSmart(finalContext, 1000) 
+      : finalContext;
   },
 
   /**
