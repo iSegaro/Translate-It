@@ -188,7 +188,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     // Final fallback to regex detection
     logger.debug('Using regex fallback for language detection');
     // Use internal regex fallback from centralized service
-    const fallbackResult = LanguageSwappingService._applyRegexFallback(text, 'auto', 'fa', 'English', 'Farsi', 'BrowserAPI');
+    const fallbackResult = await LanguageSwappingService._applyRegexFallback(text, 'auto', 'fa', 'English', 'Farsi', 'BrowserAPI');
     if (fallbackResult[0] !== 'auto' || fallbackResult[1] !== 'fa') {
       return "fa";
     }
@@ -255,12 +255,6 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     }
 
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
-
-    // Language detection and swapping using centralized service
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      text, sourceLang, targetLang, originalSourceLang, originalTargetLang,
-      { providerName: 'BrowserAPI', useRegexFallback: true }
-    );
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
     if (_translateMode === TranslationMode.Field) {
@@ -445,12 +439,6 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       // Error will be caught and handled by central system
       throw err;
     }
-
-    // Handle language swapping using centralized service
-    [sourceLang, targetLang] = await LanguageSwappingService.applyLanguageSwapping(
-      chunkTexts.join(' '), sourceLang, targetLang, 'English', 'Farsi',
-      { providerName: 'BrowserAPI', useRegexFallback: true }
-    );
 
     // Convert language codes
     const sourceLanguageCode = sourceLang === AUTO_DETECT_VALUE

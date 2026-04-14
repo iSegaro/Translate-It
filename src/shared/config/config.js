@@ -239,6 +239,7 @@ export const CONFIG = {
   // --- AI Optimization Settings ---
   AI_CONTEXT_TRANSLATION_ENABLED: true, // ارسال کانتکست (عنوان صفحه، تیتر بخش) به پرووایدرهای هوشمند
   AI_CONVERSATION_HISTORY_ENABLED: true, // ارسال تاریخچه ترجمه‌های قبلی برای حفظ استایل (مخصوص Select Element)
+  BILINGUAL_TRANSLATION: false, // ترجمه دوطرفه: اگر متن ورودی به زبان مقصد بود، آن را به زبان مبدا ترجمه کن
 
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
@@ -317,6 +318,28 @@ Output only the translated text:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_FIELD ---*/
+
+/*--- Start PROMPT_BASE_FIELD_AUTO ---*/
+  PROMPT_BASE_FIELD_AUTO: `You are a professional translation service. Your task is to accurately and fluently translate text into $_{TARGET}, or from $_{TARGET} into English, depending on the input.
+
+Strictly follow these instructions:
+
+- Detect the input language.
+- If the input is NOT in $_{TARGET}, translate it into $_{TARGET}.
+- If the input is in $_{TARGET}, translate it into English.
+- If the input is grammatically incorrect but written in $_{TARGET}, translate it into English, preserving the intended meaning.
+
+Translation quality requirements:
+- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
+- Prioritize clarity, tone, and readability over literal or word-for-word translation.
+- Maintain the original formatting, structure, and line breaks exactly.
+- Do **not** include any additional explanations, comments, markdown, or extra content.
+
+Output only the translated text:
+
+$_{TEXT}
+`,
+/*--- End PROMPT_BASE_FIELD_AUTO ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
   PROMPT_BASE_SELECT: `Act as a professional JSON translation service. The input is a JSON array of objects with abbreviated keys: "t" (text to translate), "i" (unique ID), "b" (block ID), and "r" (element role).
@@ -409,6 +432,27 @@ $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH ---*/
 
+/*--- Start PROMPT_BASE_AI_BATCH_AUTO ---*/
+  PROMPT_BASE_AI_BATCH_AUTO: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic. Translate the following JSON data into $_{TARGET}.
+
+Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Each item MUST contain the "id" and the translated "text".
+
+Example:
+Input: {"translations": [{"id": "t1", "text": "Hello", "role": "p"}]}
+Output: {"translations": [{"id": "t1", "text": "سلام", "role": "p"}]}
+
+CRITICAL - Placeholder Preservation Instructions:
+  If the text contains special placeholders like [[AIWC-0]]:
+  1. Copy these placeholders to your translation WITHOUT any changes.
+  2. Ensure each placeholder appears exactly once.
+
+Return ONLY the JSON object with the "translations" key, no additional text or markdown.
+
+$_{TEXT}
+`,
+/*--- End PROMPT_BASE_AI_BATCH_AUTO ---*/
+
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
   PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
   Maintain the exact same JSON structure (Object with "translations" array) as shown in the previous turn.
@@ -417,6 +461,15 @@ $_{TEXT}
   
   Return only the JSON object, no additional text.`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
+
+/*--- Start PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
+  PROMPT_BASE_AI_FOLLOWUP_AUTO: `You are a professional translation service. Continue translating the following JSON data into $_{TARGET}.
+  Maintain the exact same JSON structure (Object with "translations" array) as shown in the previous turn.
+  
+  Example format: {"translations": [{"id": "...", "text": "..."}]}
+  
+  Return only the JSON object, no additional text.`,
+/*--- End PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
 
 
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
@@ -490,6 +543,12 @@ $_{TEXT}
 - If the input is in any other language, translate it into $_{TARGET}, focusing on readability, tone, and meaning rather than literal translation.
 - If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
   /*--- End PROMPT_TEMPLATE ---*/
+
+  /*--- Start PROMPT_TEMPLATE_AUTO ---*/
+  PROMPT_TEMPLATE_AUTO: `- If the input is NOT in $_{TARGET}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
+- If the input is already in $_{TARGET}, translate it into English with the same level of fluency and clarity.
+- If the input contains grammatical errors but is in $_{TARGET}, translate it into English, correcting and expressing the intended meaning in a clear, natural way.`,
+  /*--- End PROMPT_TEMPLATE_AUTO ---*/
 };
 
 export const state = {
@@ -693,6 +752,10 @@ export const getPromptAsync = async () => {
   return getSettingValueAsync("PROMPT_TEMPLATE", CONFIG.PROMPT_TEMPLATE);
 };
 
+export const getPromptAutoAsync = async () => {
+  return getSettingValueAsync("PROMPT_TEMPLATE_AUTO", CONFIG.PROMPT_TEMPLATE_AUTO);
+};
+
 export const getPromptDictionaryAsync = async () => {
   return getSettingValueAsync(
     "PROMPT_BASE_DICTIONARY",
@@ -719,12 +782,24 @@ export const getPromptBASEAIBatchAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_AI_BATCH", CONFIG.PROMPT_BASE_AI_BATCH);
 };
 
+export const getPromptBASEAIBatchAutoAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_AI_BATCH_AUTO", CONFIG.PROMPT_BASE_AI_BATCH_AUTO);
+};
+
 export const getPromptBASEAIFollowupAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_AI_FOLLOWUP", CONFIG.PROMPT_BASE_AI_FOLLOWUP);
 };
 
+export const getPromptBASEAIFollowupAutoAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_AI_FOLLOWUP_AUTO", CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO);
+};
+
 export const getPromptBASEFieldAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_FIELD", CONFIG.PROMPT_BASE_FIELD);
+};
+
+export const getPromptBASEFieldAutoAsync = async () => {
+  return getSettingValueAsync("PROMPT_BASE_FIELD_AUTO", CONFIG.PROMPT_BASE_FIELD_AUTO);
 };
 
 export const getPromptBASEScreenCaptureAsync = async () => {
@@ -1017,6 +1092,13 @@ export const getAIConversationHistoryEnabledAsync = async () => {
   return getSettingValueAsync(
     "AI_CONVERSATION_HISTORY_ENABLED",
     CONFIG.AI_CONVERSATION_HISTORY_ENABLED
+  );
+};
+
+export const getBilingualTranslationEnabledAsync = async () => {
+  return getSettingValueAsync(
+    "BILINGUAL_TRANSLATION",
+    CONFIG.BILINGUAL_TRANSLATION
   );
 };
 

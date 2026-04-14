@@ -36,6 +36,10 @@ function getDefaultSettings() {
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'replace',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
     PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
+    PROMPT_TEMPLATE_AUTO: CONFIG.PROMPT_TEMPLATE_AUTO || '',
+    PROMPT_BASE_FIELD_AUTO: CONFIG.PROMPT_BASE_FIELD_AUTO || '',
+    PROMPT_BASE_AI_BATCH_AUTO: CONFIG.PROMPT_BASE_AI_BATCH_AUTO || '',
+    PROMPT_BASE_AI_FOLLOWUP_AUTO: CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO || '',
     API_KEY: CONFIG.API_KEY || '',
     OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',
     OPENAI_API_MODEL: CONFIG.OPENAI_API_MODEL || 'gpt-4o',
@@ -109,6 +113,7 @@ function getDefaultSettings() {
     // AI Optimization Settings
     AI_CONTEXT_TRANSLATION_ENABLED: CONFIG.AI_CONTEXT_TRANSLATION_ENABLED ?? true,
     AI_CONVERSATION_HISTORY_ENABLED: CONFIG.AI_CONVERSATION_HISTORY_ENABLED ?? true,
+    BILINGUAL_TRANSLATION: CONFIG.BILINGUAL_TRANSLATION ?? false,
     translationHistory: []
   };
 }
@@ -446,9 +451,13 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     }
     
-    // Validate prompt template
+    // Validate prompt templates
     if (!settings.value.PROMPT_TEMPLATE || !settings.value.PROMPT_TEMPLATE.includes('$_{TEXT}')) {
       errors.push('Prompt template must include $_{TEXT} placeholder')
+    }
+    
+    if (settings.value.PROMPT_TEMPLATE_AUTO && !settings.value.PROMPT_TEMPLATE_AUTO.includes('$_{TEXT}')) {
+      errors.push('Auto prompt template must include $_{TEXT} placeholder if provided')
     }
     
     return {

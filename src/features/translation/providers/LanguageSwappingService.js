@@ -3,6 +3,7 @@ import { isPersianText } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getBilingualTranslationEnabledAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
 
@@ -43,7 +44,9 @@ export class LanguageSwappingService {
     const { providerName = 'LanguageSwapping', useRegexFallback = true } = options;
 
     try {
+      const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const detectionResult = await browser.i18n.detectLanguage(text);
+      
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
@@ -51,8 +54,24 @@ export class LanguageSwappingService {
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = targetNorm.split("-")[0];
-        // Language detection details logged at TRACE level
+        
+        // --- BILINGUAL LOGIC ---
+        // If bilingual is enabled AND detected language is the same as target language,
+        // we swap the target language with the source language.
+        if (bilingualEnabled && detectedLangCode === targetLangCode) {
+           let newTargetLang;
+           if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
+             newTargetLang = originalSourceLang;
+           } else {
+             // Fallback to English if original source was auto-detect
+             newTargetLang = "en";
+           }
+           
+           logger.debug(`${providerName}: Bilingual swap detected. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+           return [targetNorm, newTargetLang];
+        }
 
+        // --- ORIGINAL AUTO-DETECT SWAP LOGIC ---
         // Only swap if text detected as target language AND source is auto-detect
         if (detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE) {
           let newTargetLang;
@@ -70,12 +89,12 @@ export class LanguageSwappingService {
 
         // No language swapping needed
       } else if (useRegexFallback) {
-        return this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
+        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
       }
     } catch (error) {
       logger.error(`${providerName}: Language detection failed:`, error);
       if (useRegexFallback) {
-        return this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
+        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
       }
     }
 
@@ -83,20 +102,22 @@ export class LanguageSwappingService {
     return [sourceLang, targetLang];
   }
 
-  static _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
+  static async _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
     const targetLangCode = targetNorm.split("-")[0];
     const sourceLangCode = sourceNorm.split("-")[0];
+    
+    const bilingualEnabled = await getBilingualTranslationEnabledAsync();
 
     // Only swap languages if:
     // 1. Text is Persian AND
-    // 2. Source is auto-detect AND
+    // 2. (Source is auto-detect OR bilingual is enabled) AND
     // 3. Target is Persian or Arabic AND
     // 4. Target language is NOT what the user actually wants (not explicit source)
     if (
       isPersianText(text) &&
-      sourceNorm === AUTO_DETECT_VALUE &&
+      (sourceNorm === AUTO_DETECT_VALUE || bilingualEnabled) &&
       (targetLangCode === "fa" || targetLangCode === "ar") &&
       targetLangCode !== sourceLangCode
     ) {

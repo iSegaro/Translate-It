@@ -23,10 +23,36 @@ export class ProviderCoordinator {
     const { messageId, engine, sessionId, mode } = options;
     const translateMode = mode || TranslationMode.Selection;
 
-    // 1. Language Normalization (Conversion to Provider-specific formats)
-    const { source: providerSourceLang, target: providerTargetLang } = this._normalizeLanguages(provider, sourceLang, targetLang);
+    // 1. Language Detection & Swapping (Bilingual logic / Auto-detect swap)
+    // Perform this BEFORE normalization to use standard codes
+    let processedSourceLang = sourceLang;
+    let processedTargetLang = targetLang;
+    
+    // We only swap if we have original languages (usually from TranslationEngine)
+    // If not provided, we assume current source/target are the "original" ones
+    const originalSource = options.originalSourceLang || sourceLang;
+    const originalTarget = options.originalTargetLang || targetLang;
 
-    // 2. JSON Detection (Check if input is a wrapped JSON structure)
+    try {
+      const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
+      const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
+        sampleText, 
+        sourceLang, 
+        targetLang, 
+        originalSource, 
+        originalTarget,
+        { providerName }
+      );
+      processedSourceLang = swappedSource;
+      processedTargetLang = swappedTarget;
+    } catch (e) {
+      logger.warn(`[Coordinator] Language swapping failed:`, e);
+    }
+
+    // 2. Language Normalization (Conversion to Provider-specific formats)
+    const { source: providerSourceLang, target: providerTargetLang } = this._normalizeLanguages(provider, processedSourceLang, processedTargetLang);
+
+    // 3. JSON Detection (Check if input is a wrapped JSON structure)
     const jsonInfo = this._detectJsonStructure(text);
 
     // 3. Metadata Awareness

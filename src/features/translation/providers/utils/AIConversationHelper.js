@@ -8,7 +8,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { 
   getPromptBASEAIBatchAsync, 
+  getPromptBASEAIBatchAutoAsync,
   getPromptBASEAIFollowupAsync, 
+  getPromptBASEAIFollowupAutoAsync,
   TranslationMode,
   getAIContextTranslationEnabledAsync,
   getAIConversationHistoryEnabledAsync
@@ -153,9 +155,15 @@ export const AIConversationHelper = {
     if (isBatch) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
       
-      promptTemplate = useFollowup 
-        ? await getPromptBASEAIFollowupAsync() 
-        : await getPromptBASEAIBatchAsync();
+      if (sourceLang === 'auto') {
+        promptTemplate = useFollowup 
+          ? await getPromptBASEAIFollowupAutoAsync() 
+          : await getPromptBASEAIBatchAutoAsync();
+      } else {
+        promptTemplate = useFollowup 
+          ? await getPromptBASEAIFollowupAsync() 
+          : await getPromptBASEAIBatchAsync();
+      }
         
       if (useFollowup) {
         promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetLang}.`;
@@ -169,7 +177,7 @@ export const AIConversationHelper = {
     }
 
     const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
-    const sourceName = sourceLang === 'auto' ? 'Detect automatically' : (getLanguageNameFromCode(sourceLang) || sourceLang);
+    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
     const targetName = getLanguageNameFromCode(targetLang) || targetLang;
 
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT} with global regex

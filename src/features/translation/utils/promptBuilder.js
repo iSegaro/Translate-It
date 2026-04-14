@@ -1,13 +1,16 @@
 // src/features/translation/utils/promptBuilder.js
 import {
   getPromptAsync,
+  getPromptAutoAsync,
   getPromptBASESelectAsync,
   getPromptPopupTranslateAsync,
   getPromptBASEFieldAsync,
+  getPromptBASEFieldAutoAsync,
   getEnableDictionaryAsync,
   getPromptDictionaryAsync,
   getPromptBASEBatchAsync, // Import the new getter
   getPromptBASEAIBatchAsync,
+  getPromptBASEAIBatchAutoAsync,
   TranslationMode,
 } from "@/shared/config/config.js";
 
@@ -68,13 +71,16 @@ export async function buildPrompt(
   const isAI = providerType === 'ai';
 
   // Use full language names for better AI performance
-  const sourceName = sourceLang === 'auto' ? 'Detect automatically' : (getLanguageNameFromCode(sourceLang) || sourceLang);
+  const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
   const targetName = getLanguageNameFromCode(targetLang) || targetLang;
 
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
     logger.debug('AI provider in Batch mode. Using AI batch prompt.');
-    const batchPromptTemplate = await getPromptBASEAIBatchAsync();
+    const batchPromptTemplate = sourceLang === 'auto'
+      ? await getPromptBASEAIBatchAutoAsync()
+      : await getPromptBASEAIBatchAsync();
+
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
@@ -106,11 +112,15 @@ export async function buildPrompt(
     promptBase = await getPromptDictionaryAsync();
   } else {
     // Fallback for simple field translation or other modes.
-    promptBase = await getPromptBASEFieldAsync();
+    promptBase = sourceLang === 'auto' 
+      ? await getPromptBASEFieldAutoAsync() 
+      : await getPromptBASEFieldAsync();
   }
 
   // Now, build the final prompt by injecting languages and user rules.
-  const promptTemplate = await getPromptAsync();
+  const promptTemplate = sourceLang === 'auto' 
+    ? await getPromptAutoAsync() 
+    : await getPromptAsync();
   
   // IMPORTANT: The placeholder format is $_{VAR}, not ${\\_\_VAR}.
   const userRules = promptTemplate
