@@ -154,23 +154,45 @@ export class OptimizedJsonHandler {
   _mapResults(originalBatch, translatedResults) {
     // Robust normalization: AI providers might return objects, arrays, or bridged structures
     let rawItems = [];
-    if (Array.isArray(translatedResults)) {
-      rawItems = translatedResults;
-    } else if (typeof translatedResults === 'object' && translatedResults !== null) {
+    let currentResults = translatedResults;
+
+    // Handle case where translatedResults is a string that looks like JSON
+    if (typeof currentResults === 'string' && 
+        (currentResults.trim().startsWith('{') || currentResults.trim().startsWith('['))) {
+      try {
+        currentResults = JSON.parse(currentResults);
+      } catch (e) {
+        // Not valid JSON, keep as string
+      }
+    }
+
+    if (Array.isArray(currentResults)) {
+      rawItems = currentResults;
+    } else if (typeof currentResults === 'object' && currentResults !== null) {
       // Extract from common AI wrappers
-      rawItems = translatedResults.translations || 
-                 translatedResults.results || 
-                 Object.values(translatedResults).find(v => Array.isArray(v)) || 
-                 Object.values(translatedResults);
+      rawItems = currentResults.translations || 
+                 currentResults.results || 
+                 Object.values(currentResults).find(v => Array.isArray(v)) || 
+                 Object.values(currentResults);
     } else {
-      rawItems = [translatedResults];
+      rawItems = [currentResults];
     }
     
     // Ensure rawItems is always an array of text strings
     const results = rawItems.map(item => {
       if (item === null || item === undefined) return '';
-      if (typeof item === 'object') return item.t || item.text || item.translation || JSON.stringify(item);
-      return String(item);
+      let text = (typeof item === 'object') ? (item.t || item.text || item.translation || JSON.stringify(item)) : String(item);
+      
+      // FINAL SAFETY: If the extracted text still looks like JSON (e.g. contains {"translations":),
+      // it means parsing failed completely. We should NOT show this to the user.
+      if (typeof text === 'string' && text.length > 20 && 
+          (text.includes('{"') || text.includes('["')) && 
+          (text.includes('":') || text.includes('",'))) {
+        logger.warn('[JsonHandler] Extracted text looks like raw JSON, rejecting to prevent UI corruption');
+        return null; // Force fallback to original text below
+      }
+      
+      return text;
     });
 
     if (results.length !== originalBatch.length && originalBatch.length > 1) {

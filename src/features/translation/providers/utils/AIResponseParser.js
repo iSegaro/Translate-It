@@ -62,11 +62,27 @@ export const AIResponseParser = {
         rawItems = parsed;
       } else if (typeof parsed === 'object' && parsed !== null) {
         // Handle {"translations": [...]} or similar wrappers
-        rawItems = parsed.translations || parsed.results || Object.values(parsed).find(v => Array.isArray(v)) || Object.values(parsed);
+        let potentialItems = parsed.translations || parsed.results || Object.values(parsed).find(v => Array.isArray(v));
+        
+        // CRITICAL FIX: If translations is a STRING (double encoding), try to parse it
+        if (typeof potentialItems === 'string') {
+          try {
+            potentialItems = JSON.parse(potentialItems);
+          } catch (e) {
+            // Try to repair common AI malformed JSON (e.g. single quotes used incorrectly)
+            try {
+              const repaired = potentialItems.replace(/'/g, '"').replace(/\\"/g, '"');
+              potentialItems = JSON.parse(repaired);
+            } catch (e2) {}
+          }
+        }
+        
+        rawItems = Array.isArray(potentialItems) ? potentialItems : Object.values(parsed);
       }
 
       if (!Array.isArray(rawItems)) {
-        throw new Error('Response is not an array');
+        // Final attempt: if we have a single object that isn't an array, wrap it
+        rawItems = [parsed];
       }
 
       // Map results back to the original indices
@@ -74,10 +90,51 @@ export const AIResponseParser = {
       const unmappedTexts = [];
 
       rawItems.forEach((item) => {
-        const text = (typeof item === 'object' && item !== null) ? (item.t || item.text || item.translation || '') : String(item);
-        const id = (typeof item === 'object' && item !== null && (item.i !== undefined || item.id !== undefined)) ? (item.i || item.id) : null;
+        let text = '';
+        let id = null;
 
-        if (id !== null) {
+        if (typeof item === 'object' && item !== null) {
+          // 1. Extract ID
+          id = item.i !== undefined ? item.i : (item.id !== undefined ? item.id : null);
+          
+          // 2. Extract Text (robust)
+          text = item.t || item.text || item.translation || '';
+          
+          // CRITICAL FIX: If text is empty but ID is an object (common AI hallucination),
+          // the translation might be INSIDE the ID object.
+          if (!text && typeof id === 'object' && id !== null) {
+            const keys = Object.keys(id);
+            if (keys.length > 0) {
+              text = id[keys[0]]; // Take the first value inside the ID object
+              id = keys[0];       // Take the key as the real ID
+            }
+          }
+          
+          // If still no text, check if any other field contains a string longer than ID
+          // and doesn't look like a technical key
+          if (!text) {
+            const values = Object.values(item).filter(v => typeof v === 'string' && v.length > 2);
+            if (values.length > 0) {
+              // Exclude values that look like UUIDs or IDs
+              const candidates = values.filter(v => !/^[a-z0-9-]{10,}$/i.test(v));
+              text = candidates.length > 0 ? candidates.sort((a, b) => b.length - a.length)[0] : values[0];
+            }
+          }
+        } else {
+          text = String(item);
+        }
+
+        // Final check for text: if it's still a JSON string, try to parse it one more time
+        if (typeof text === 'string' && (text.startsWith('{') || text.startsWith('['))) {
+          try {
+            const innerParsed = JSON.parse(text);
+            if (typeof innerParsed === 'object') {
+              text = innerParsed.t || innerParsed.text || innerParsed.translation || Object.values(innerParsed)[0] || text;
+            }
+          } catch (e) {}
+        }
+
+        if (id !== null && id !== undefined) {
           const idx = typeof id === 'string' 
             ? originalBatch.findIndex(ob => (typeof ob === 'object' ? (ob.i || ob.uid || ob.id) : null) === id)
             : parseInt(id, 10);
