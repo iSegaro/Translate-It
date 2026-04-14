@@ -79,7 +79,7 @@ class MessageHandler {
             this._sendResponse(messageId, response);
           })
           .catch(error => {
-            logger.debug(`Error in promise-based handler for ${action}:`, error.message);
+            logger.error(`Error in promise-based handler for ${action}:`, error);
             const errorResponse = MessageFormat.createErrorResponse(error, messageId);
             this._sendResponse(messageId, errorResponse);
           });
@@ -96,7 +96,7 @@ class MessageHandler {
             sendResponse(result);
           }
         } catch (error) {
-          logger.debug(`Failed to send synchronous response for ${action}:`, error.message);
+          logger.error(`Failed to send synchronous response for ${action}:`, error);
         }
         return false;
       }
@@ -142,7 +142,7 @@ class MessageHandler {
       try {
         sendResponse(response);
       } catch (error) {
-        logger.debug(`Failed to send response for messageId ${messageId}:`, error.message);
+        logger.error(`Failed to send response for messageId ${messageId}:`, error);
       }
       this.pendingResponses.delete(messageId);
     } else {
