@@ -1316,7 +1316,8 @@ export const useTranslationStore = defineStore('translation', {
 - `src/background/handlers/element-selection/` - Element selection handlers
 
 ### Content Scripts
-- `src/content-scripts/index.js` - Main content script entry
+- `src/core/content-scripts/index-main.js` - Main content script entry point (Top Frame)
+- `src/core/content-scripts/index-iframe.js` - Lightweight content script for iframes
 - `src/managers/content/select-element/SelectElementManager.js` - Element selection manager
 
 ---

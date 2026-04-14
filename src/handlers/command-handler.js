@@ -101,11 +101,11 @@ async function handleSelectElementCommand(tab) {
         if (browser.scripting) {
           await browser.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['src/core/content-scripts/index.js']
+            files: ['src/core/content-scripts/index-main.js']
           });
         } else {
           await browser.tabs.executeScript(tab.id, {
-            file: 'src/core/content-scripts/index.js',
+            file: 'src/core/content-scripts/index-main.js',
             allFrames: false
           });
         }

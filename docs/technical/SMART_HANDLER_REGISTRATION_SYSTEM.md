@@ -72,10 +72,10 @@ async deactivateFeature(featureName) {
 
 ## Content Script Integration
 
-The main content script (`src/core/content-scripts/index.js`) is now extremely lean, delegating all listener management to the Coordinator:
+The main content script (`src/core/content-scripts/index-main.js`) is now extremely lean, delegating all listener management to the Coordinator:
 
 ```javascript
-// index.js
+// index-main.js
 const { interactionCoordinator } = await import('./InteractionCoordinator.js');
 await interactionCoordinator.initialize();
 ```

@@ -32,13 +32,13 @@ export async function handleRestartContentScript(message, sender, sendResponse) 
     // Execute content script reinjection
     await browser.scripting.executeScript({
       target: { tabId },
-      files: ['/content-scripts/main.js'] // Main content script entry point
+      files: ['src/core/content-scripts/index-main.js'] // Main content script entry point
     });
     
     // Reinject CSS if needed
     await browser.scripting.insertCSS({
       target: { tabId },
-      files: ['/styles/content.css']
+      files: ['translate-it.css']
     });
     
     logger.debug(`Content script restarted successfully for tab ${tabId}`);

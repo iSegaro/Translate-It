@@ -103,7 +103,7 @@ export async function handleStartAreaCapture(
       try {
         await browser.scripting.executeScript({
           target: { tabId },
-          files: ["browser-polyfill.js", "content.bundle.js"],
+          files: ["src/core/content-scripts/index-main.js"],
         });
 
         // Retry after injection

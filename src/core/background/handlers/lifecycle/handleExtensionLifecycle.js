@@ -29,7 +29,7 @@ export async function handleExtensionLifecycle(
       browser.scripting
         .executeScript({
           target: { tabId: sender.tab.id },
-          files: ["content.bundle.js"],
+          files: ["src/core/content-scripts/index-main.js"],
         })
         .catch((injectionError) => {
           logger.error('Content script injection fallback failed:', injectionError
