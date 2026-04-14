@@ -4,6 +4,7 @@
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { safeConsole } from '@/shared/logging/SafeConsole.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StatsManager');
 
@@ -171,16 +172,19 @@ class TranslationStatsManager {
     });
 
     if (tableData.length === 0) {
-      console.log('📊 [TranslationStats] No API calls recorded yet.');
+      logger.info('📊 [TranslationStats] No API calls recorded yet.');
       return;
     }
 
-    console.group('📊 Translation API Statistics');
-    console.table(tableData);
-    console.log(`Total Global Calls: ${this.global.totalCalls}`);
-    console.log(`Total Characters: ${this.global.totalChars.toLocaleString()}`);
-    console.log(`Uptime: ${Math.round((Date.now() - this.global.startTime) / 1000)}s`);
-    console.groupEnd();
+    // Check if logging is enabled for this component/level
+    if (logger.isDebugEnabled?.() || true) {
+      safeConsole.group('📊 Translation API Statistics');
+      safeConsole.table(tableData);
+      safeConsole.log(`Total Global Calls: ${this.global.totalCalls}`);
+      safeConsole.log(`Total Characters: ${this.global.totalChars.toLocaleString()}`);
+      safeConsole.log(`Uptime: ${Math.round((Date.now() - this.global.startTime) / 1000)}s`);
+      safeConsole.groupEnd();
+    }
   }
 }
 
