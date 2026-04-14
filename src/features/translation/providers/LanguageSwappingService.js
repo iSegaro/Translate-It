@@ -55,9 +55,10 @@ export class LanguageSwappingService {
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = targetNorm.split("-")[0];
         
-        // --- BILINGUAL LOGIC ---
-        // If bilingual is enabled AND detected language is the same as target language,
-        // we swap the target language with the source language.
+        // --- BILINGUAL & AUTO-SWAP LOGIC ---
+        // BILINGUAL_TRANSLATION is now the master switch.
+        // If enabled AND detected language is the same as target language,
+        // we swap to provide bilingual experience.
         if (bilingualEnabled && detectedLangCode === targetLangCode) {
            let newTargetLang;
            if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
@@ -67,27 +68,11 @@ export class LanguageSwappingService {
              newTargetLang = "en";
            }
            
-           logger.debug(`${providerName}: Bilingual swap detected. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+           logger.debug(`${providerName}: Bilingual swap applied. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         }
 
-        // --- ORIGINAL AUTO-DETECT SWAP LOGIC ---
-        // Only swap if text detected as target language AND source is auto-detect
-        if (detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE) {
-          let newTargetLang;
-
-          if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-            newTargetLang = originalSourceLang;
-          } else {
-            // Default to English when user has auto-detect and target matches detected language
-            newTargetLang = "en";
-          }
-
-          logger.debug(`${providerName}: Languages swapped due to detection from ${targetLang} to ${newTargetLang}`);
-          return [targetNorm, newTargetLang];
-        }
-
-        // No language swapping needed
+        // No language swapping needed or allowed
       } else if (useRegexFallback) {
         return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
       }
@@ -112,12 +97,12 @@ export class LanguageSwappingService {
 
     // Only swap languages if:
     // 1. Text is Persian AND
-    // 2. (Source is auto-detect OR bilingual is enabled) AND
+    // 2. Bilingual is enabled AND
     // 3. Target is Persian or Arabic AND
     // 4. Target language is NOT what the user actually wants (not explicit source)
     if (
       isPersianText(text) &&
-      (sourceNorm === AUTO_DETECT_VALUE || bilingualEnabled) &&
+      bilingualEnabled &&
       (targetLangCode === "fa" || targetLangCode === "ar") &&
       targetLangCode !== sourceLangCode
     ) {
