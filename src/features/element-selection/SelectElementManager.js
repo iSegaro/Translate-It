@@ -201,16 +201,16 @@ class SelectElementManager extends ResourceTracker {
   async deactivate(options = {}) {
     if (!this.isActive) return;
 
-    const {
-      fromBackground = false,
-      preserveTranslations = reason !== 'cancel',
-      silent = false,
-      reason = 'manual' // 'success', 'error', 'cancel', 'manual', 'conflict'
-    } = options;
-
-    this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
-
     try {
+      const {
+        reason = 'manual', // 'success', 'error', 'cancel', 'manual', 'conflict'
+        fromBackground = false,
+        silent = false,
+        preserveTranslations = options.reason !== 'cancel'
+      } = options;
+
+      this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
+
       this.isActive = false;
       this.activationTime = 0;
       
@@ -239,7 +239,19 @@ class SelectElementManager extends ResourceTracker {
       pageEventBus.emit('select-mode-deactivated');
 
     } catch (error) {
-      this.logger.warn('Error deactivating SelectElementManager:', error);
+      this.logger.error('Critical error deactivating SelectElementManager:', error);
+      
+      // Integrate with the centralized error system for unexpected manager failures
+      if (!ExtensionContextManager.isContextError(error)) {
+        ErrorHandler.getInstance().handle(error, {
+          context: 'element-selection-deactivate',
+          severity: 'error',
+          showToast: false // Keep it silent but logged correctly
+        }).catch(() => {});
+      } else {
+        ExtensionContextManager.handleContextError(error, 'element-selection-deactivate');
+      }
+      
       this.emergencyCleanup();
     } finally {
       // Final guard for the UI lock
