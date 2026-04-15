@@ -101,15 +101,17 @@ async function getApiProviders() {
       }
 
       // Check against known provider IDs for extra validation from manifest
-      const knownProviderIds = PROVIDER_MANIFEST.map(p => p.id.toLowerCase());
+      const knownProviderIds = PROVIDER_MANIFEST
+        .map(p => p.id ? String(p.id).toLowerCase() : null)
+        .filter(id => id !== null);
 
-      if (!knownProviderIds.includes(id.toLowerCase())) {
+      if (id && !knownProviderIds.includes(String(id).toLowerCase())) {
         logger.warn("Unknown provider ID detected:", { id, name });
         // Don't filter out unknown providers, just warn - they might be newly added
       }
 
       validProviders.push({
-        id: id.toLowerCase(), // Normalize ID to lowercase
+        id: id ? String(id).toLowerCase() : 'unknown', // Normalize ID to lowercase
         defaultTitle: name,
         category: category
       });
@@ -120,14 +122,14 @@ async function getApiProviders() {
     const seenIds = new Set();
 
     for (const provider of validProviders) {
-      const normalizedId = provider.id.toLowerCase();
-      if (!seenIds.has(normalizedId)) {
+      const normalizedId = provider.id ? String(provider.id).toLowerCase() : null;
+      if (normalizedId && !seenIds.has(normalizedId)) {
         seenIds.add(normalizedId);
         uniqueProviders.push({
           ...provider,
           id: normalizedId // Ensure consistent case
         });
-      } else {
+      } else if (normalizedId) {
         logger.warn(`Removing duplicate provider with id: ${provider.id}`);
       }
     }
@@ -508,11 +510,11 @@ export class ContextMenuManager extends ResourceTracker {
             const lastError = (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime.lastError : null;
             if (lastError) {
               const msg = lastError.message || "";
-              if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
+              if (msg && typeof msg === 'string' && (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists'))) {
                 logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (callback), skipping`);
                 resolve(menuConfig.id);
               } else {
-                reject(new Error(msg));
+                reject(new Error(msg || "Unknown context menu creation error"));
               }
             } else {
               resolve(menuConfig.id || id);
@@ -526,8 +528,8 @@ export class ContextMenuManager extends ResourceTracker {
             resolve(id);
           }
         } catch (err) {
-          const msg = err.message || "";
-          if (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists')) {
+          const msg = err ? (err.message || String(err)) : "";
+          if (msg && typeof msg === 'string' && (msg.toLowerCase().includes('duplicate id') || msg.toLowerCase().includes('already exists'))) {
             logger.debug(`Context menu with duplicate ID "${menuConfig.id}" already exists (sync/exception), skipping`);
             resolve(menuConfig.id);
           } else {
