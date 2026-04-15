@@ -64,33 +64,26 @@ export async function revertSelectElementTranslation() {
         continue;
       }
 
-      // 1. Restore content
-      if (originalHTML && element) {
-        // SAFETY: If element is HTML or BODY, we must be careful not to destroy the whole document structure
-        if (element.tagName === 'HTML' || element.tagName === 'BODY') {
-          // For root elements, it's safer to only restore text nodes or use a less destructive method
-          if (originalTextNodesData && originalTextNodesData.length > 0) {
-            originalTextNodesData.forEach(({ node, originalText }) => {
-              if (node && node.parentNode) node.nodeValue = originalText;
-            });
-          } else {
-             // Last resort for root: set innerHTML but skip sanitization that breaks styles
-             element.innerHTML = originalHTML;
-          }
-        } else {
-          // Standard element restoration - Direct restoration without aggressive sanitization 
-          // that might strip original inline styles or critical attributes.
-          element.innerHTML = originalHTML;
-        }
-        revertedCount++;
-      } else if (originalTextNodesData && originalTextNodesData.length > 0) {
-        // Fallback to surgical text node restoration if HTML is not available
+      // 1. Restore content - SURGICAL RESTORATION ONLY
+      // We NEVER use innerHTML for active page elements as it destroys event listeners, 
+      // breaks SPAs, and causes massive layout recalculations.
+      if (originalTextNodesData && originalTextNodesData.length > 0) {
+        let restoredNodes = 0;
         originalTextNodesData.forEach(({ node, originalText }) => {
-          if (node && node.parentNode) {
+          // Verify the node still exists and is attached to the document
+          if (node && node.parentNode && document.documentElement.contains(node)) {
             node.nodeValue = originalText;
+            restoredNodes++;
           }
         });
-        revertedCount++;
+        
+        if (restoredNodes > 0) {
+          revertedCount++;
+        } else {
+          logger.debug('No valid text nodes found to restore for this element');
+        }
+      } else {
+        logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration to preserve page integrity.');
       }
 
       // 2. Restore direction and styles for the element, its descendants, and its ancestors.

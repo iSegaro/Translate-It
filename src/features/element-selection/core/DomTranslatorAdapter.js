@@ -199,16 +199,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       });
 
-      // Store state BEFORE translation
-      this._storeTranslationState({ 
-        element, 
-        elementId, 
-        originalHTML, 
-        originalTextNodesData: textNodesData.map(d => ({ node: d.node, originalText: d.text })), 
-        targetLanguage,
-        partial: true
-      });
-
       this.isTranslating = true;
       this.currentMessageId = messageId;
 
