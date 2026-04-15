@@ -5,6 +5,8 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { safeConsole } from '@/shared/logging/SafeConsole.js';
+import { CONFIG } from '@/shared/config/config.js';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StatsManager');
 
@@ -149,7 +151,18 @@ class TranslationStatsManager {
     
     message += `Total Requests: ${summary.calls} | Total Chars: ${totalCharsDisplay} | Errors: ${summary.errors} | Total Time: ${durationStr}`;
 
-    logger.info(message);
+    // Check if debug mode is active via StorageManager cache for performance
+    const isDebugActive = storageManager.getCached('DEBUG_MODE', CONFIG.DEBUG_MODE);
+
+    if (isDebugActive) {
+      // If debug is on, we want to see these important stats at level 1, 
+      // but without the yellow "warn" appearance. We bypass the Logger layer 
+      // by using safeConsole.info directly, formatting it to match regular logs.
+      const timestamp = new Date().toLocaleTimeString("en-US", {
+        hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit"
+      });
+      safeConsole.info(`[${timestamp}] Translation.StatsManager: ${message}`);
+    }
 
     if (clear) {
       this.clearSession(sessionId);
