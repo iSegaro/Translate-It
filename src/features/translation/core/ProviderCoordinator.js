@@ -79,7 +79,7 @@ export class ProviderCoordinator {
         logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
         result = await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
       } else {
-        result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options, strategy);
+        result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
       }
 
       // If we are in coordinator-level streaming mode, we return a status object
@@ -93,19 +93,23 @@ export class ProviderCoordinator {
       if (strategy.type === ProviderTypes.AI) {
         finalResult = this._cleanResult(result, expectedFormat);
       } else {
-        // Traditional providers normalization: Ensure array format if input was multiple segments
-        finalResult = this._ensureString(result);
-        
-        // CRITICAL for Select Element: If result is a single string but we had multiple inputs, split it
-        if (typeof finalResult === 'string' && inputCount > 1) {
-          const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-          const segments = Array.isArray(text) ? text : [text];
-          finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-            finalResult, 
-            segments, 
-            TranslationSegmentMapper.STANDARD_DELIMITER,
-            providerName
-          );
+        // Traditional providers normalization: If the provider correctly returned an array matching the input count, preserve it.
+        if (Array.isArray(result) && result.length === inputCount) {
+          finalResult = result;
+        } else {
+          finalResult = this._ensureString(result);
+          
+          // CRITICAL for Select Element/Page Translate: If result is a single string but we had multiple inputs, split it
+          if (typeof finalResult === 'string' && inputCount > 1) {
+            const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
+            const segments = Array.isArray(text) ? text : [text];
+            finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+              finalResult, 
+              segments, 
+              TranslationSegmentMapper.STANDARD_DELIMITER,
+              providerName
+            );
+          }
         }
       }
 
@@ -143,7 +147,7 @@ export class ProviderCoordinator {
       try {
         const parsed = JSON.parse(trimmed);
         return { isJson: true, parsed };
-      } catch (e) {
+      } catch {
         return { isJson: false };
       }
     }
@@ -231,7 +235,7 @@ export class ProviderCoordinator {
    * The core execution logic that delegates to the provider's batching or single translation.
    * @private
    */
-  async _executeStandard(provider, text, sourceLang, targetLang, mode, options, strategy) {
+  async _executeStandard(provider, text, sourceLang, targetLang, mode, options) {
     const { messageId, engine, sessionId, priority } = options;
     const texts = Array.isArray(text) ? text : [text];
 
