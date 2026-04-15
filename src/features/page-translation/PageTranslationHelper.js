@@ -33,19 +33,16 @@ export class PageTranslationHelper {
     const { TRANSLATED_MARKER, TRANSLATE_DIR, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
 
     // 1. Remove our own markers and direction attributes from all elements
-    const elementsWithDir = document.querySelectorAll(`[${TRANSLATED_MARKER}], [${TRANSLATE_DIR}], [dir], [${HAS_ORIGINAL}]`);
-    elementsWithDir.forEach(el => {
+    // We do NOT touch 'dir' here because restoreElementDirection (called by bridge.restore)
+    // should have already handled it properly using saved original state.
+    const elementsWithMarkers = document.querySelectorAll(`[${TRANSLATED_MARKER}], [${TRANSLATE_DIR}], [${HAS_ORIGINAL}]`);
+    elementsWithMarkers.forEach(el => {
       el.removeAttribute(TRANSLATED_MARKER);
       el.removeAttribute(TRANSLATE_DIR);
       el.removeAttribute(HAS_ORIGINAL);
-      
-      // Only remove 'dir' if we were the ones who set it
-      if (el.hasAttribute(TRANSLATE_DIR)) {
-        el.removeAttribute('dir');
-      }
     });
 
-    // 2. Specific reset for common containers
+    // 2. Specific reset for common containers (just the markers)
     const containers = ['html', 'body', 'main', 'article', 'section'];
     containers.forEach(tag => {
       const el = document.querySelector(tag);
@@ -55,10 +52,6 @@ export class PageTranslationHelper {
         el.removeAttribute(HAS_ORIGINAL);
       }
     });
-    
-    // 3. Reset any direction changes on the root elements
-    document.documentElement.removeAttribute('dir');
-    document.body.removeAttribute('dir');
   }
 
   static isInViewportWithMargin(node, margin) {

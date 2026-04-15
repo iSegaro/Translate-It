@@ -46,13 +46,13 @@ export function stripBiDiMarks(text) {
  * Detect text direction from actual text content (more accurate for mixed content)
  * Uses strong directional character detection following Unicode Bidirectional Algorithm principles
  * @param {string} text - Text to analyze
- * @returns {string} 'rtl' or 'ltr'
+ * @returns {string|null} 'rtl', 'ltr' or null if no strong characters
  */
 export function detectDirectionFromContent(text = '') {
-  if (!text || typeof text !== 'string') return 'ltr';
+  if (!text || typeof text !== 'string') return null;
 
   const trimmedText = text.trim();
-  if (trimmedText.length === 0) return 'ltr';
+  if (trimmedText.length === 0) return null;
 
   // Count RTL and LTR STRONG characters
   let rtlStrongCount = 0;
@@ -60,9 +60,6 @@ export function detectDirectionFromContent(text = '') {
 
   for (let i = 0; i < trimmedText.length; i++) {
     const code = trimmedText.codePointAt(i);
-    // If the character is outside the BMP (Basic Multilingual Plane), 
-    // it's represented as a surrogate pair (occupies 2 units in string length).
-    // codePointAt returns the full code, so we skip the next surrogate unit.
     if (code > 0xFFFF) i++;
 
     if (isRTLStrongCharacter(code)) {
@@ -72,11 +69,10 @@ export function detectDirectionFromContent(text = '') {
     }
   }
 
-  // If no strong directional characters, default to LTR
-  if (rtlStrongCount === 0 && ltrStrongCount === 0) return 'ltr';
+  // If no strong directional characters, return null
+  if (rtlStrongCount === 0 && ltrStrongCount === 0) return null;
   
-  // If there are ANY RTL characters, and the LTR count isn't overwhelmingly dominant
-  // we treat it as RTL. This handles mixed technical Farsi text like "WebAI به API".
+  // If there are ANY RTL characters...
   if (rtlStrongCount > 0) {
     if (ltrStrongCount === 0) return 'rtl';
     const ltrRatio = ltrStrongCount / (rtlStrongCount + ltrStrongCount);
@@ -230,9 +226,7 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
   const isTargetRTL = isRTL(targetLanguage);
   const fallbackDir = isTargetRTL ? 'rtl' : 'ltr';
   
-  const targetDir = (textNode.textContent && textNode.textContent.trim().length > 0) 
-    ? detectedDir 
-    : fallbackDir;
+  const targetDir = detectedDir || fallbackDir;
   
   let container = textNode.parentElement;
 
@@ -245,7 +239,13 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     // to ensure correct punctuation and BiDi flow for translated Persian/Arabic text.
     // If we've already set this container to RTL, don't let a subsequent LTR node override it.
     const currentAppliedDir = container.getAttribute('data-translate-dir');
-    if (!(targetDir === 'ltr' && currentAppliedDir === 'rtl')) {
+    
+    // PRESERVATION RULE: If the target language is RTL, we strongly avoid forcing LTR 
+    // on containers to prevent layout shifts (like columns moving to the left).
+    // We only apply LTR if the element is a specific text-formatting tag and NOT a block container.
+    const shouldSkipLTR = isTargetRTL && targetDir === 'ltr' && !FORMATTING_TAGS.has(container.tagName.toUpperCase());
+
+    if (!shouldSkipLTR && !(targetDir === 'ltr' && currentAppliedDir === 'rtl')) {
       
       if (container.style.direction !== targetDir) {
         // Capture alignment BEFORE changing direction
@@ -289,9 +289,7 @@ export function applyElementDirection(element, targetLanguage) {
   const isTargetRTL = isRTL(targetLanguage);
   const fallbackDir = isTargetRTL ? 'rtl' : 'ltr';
 
-  const directionAttr = (element.textContent && element.textContent.trim().length > 0)
-    ? detectedDir
-    : fallbackDir;
+  const directionAttr = detectedDir || fallbackDir;
 
   // Capture alignment BEFORE changing direction
   const preservedAlign = getPreservedAlignment(element);
@@ -349,9 +347,9 @@ export function restoreElementDirection(element) {
   // 2. Clean all its descendants
   element.querySelectorAll('[data-dir-original-saved]').forEach(restore);
   
-  // 3. Clean all its ancestors up to the body
+  // 3. Clean all its ancestors up to the root (html)
   let parent = element.parentElement;
-  while (parent && parent !== document.body) {
+  while (parent) {
     restore(parent);
     parent = parent.parentElement;
   }
