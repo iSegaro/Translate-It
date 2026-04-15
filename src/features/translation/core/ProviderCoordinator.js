@@ -95,7 +95,7 @@ export class ProviderCoordinator {
       } else {
         // Traditional providers normalization: If the provider correctly returned an array matching the input count, preserve it.
         if (Array.isArray(result) && result.length === inputCount) {
-          finalResult = result;
+          finalResult = inputCount === 1 ? result[0] : result;
         } else {
           finalResult = this._ensureString(result);
           

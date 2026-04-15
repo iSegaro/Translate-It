@@ -25,7 +25,16 @@ export class TranslationSegmentMapper {
     }
 
     if (originalSegments.length <= 1) {
-      return [translatedText];
+      return Array.isArray(translatedText) ? translatedText : [translatedText];
+    }
+
+    // 0. Handle cases where translatedText is already an array (e.g. from a provider that returns arrays)
+    if (Array.isArray(translatedText)) {
+      if (translatedText.length === originalSegments.length) {
+        return translatedText;
+      }
+      // If it is an array but wrong length, join it to try splitting by delimiters below
+      translatedText = translatedText.join('\n');
     }
 
     // 1. Try standard splitting
