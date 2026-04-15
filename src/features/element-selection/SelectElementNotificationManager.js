@@ -57,7 +57,6 @@ class SelectElementNotificationManager extends ResourceTracker {
       const { getTranslationString } = await utilsFactory.getI18nUtils();
       
       const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
-      const revertLabel = await getTranslationString('SELECT_ELEMENT_REVERT') || 'Revert';
       const isMobile = deviceDetector.isMobile();
       const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
       const message = await getTranslationString(messageKey) || (isMobile ? 'Drag over text to translate.' : 'Click text to translate.');
@@ -66,10 +65,6 @@ class SelectElementNotificationManager extends ResourceTracker {
         {
           label: cancelLabel,
           onClick: data.actions?.cancel || (() => pageEventBus.emit('cancel-select-element-mode'))
-        },
-        {
-          label: revertLabel,
-          onClick: data.actions?.revert || (() => pageEventBus.emit('revert-translations'))
         }
       ];
 
