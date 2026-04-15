@@ -199,6 +199,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
         });
       });
 
+      // Store state BEFORE translation
+      this._storeTranslationState({ 
+        element, 
+        elementId, 
+        originalHTML, 
+        originalTextNodesData: textNodesData.map(d => ({ node: d.node, originalText: d.text })), 
+        targetLanguage,
+        partial: true
+      });
+
+      this.isTranslating = true;
+      this.currentMessageId = messageId;
+
       await contentScriptIntegration.initialize();
       
       const response = await sendRegularMessage({
@@ -322,6 +335,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // Non-streaming fallback already applied translations in _handleDirectResponse
     
     DirectionManager.applyElementDirection(element, finalTarget);
+    
+    // Update the existing state entry with finalized metadata
     if (globalSelectElementState.currentTranslation) {
       globalSelectElementState.currentTranslation.targetLanguage = finalTarget;
       globalSelectElementState.currentTranslation.partial = false;
@@ -354,22 +369,29 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (!isSuccess) {
         contentScriptIntegration.streamingHandler.cancelHandler(messageId);
       }
-      // Note: streamingHandler automatically cleans up on stream end or cancel
       this.currentMessageId = null;
     }
   }
 
   async cancelTranslation(options = {}) {
     if (!this.isTranslating) return;
+    const { silent = false } = options;
+    
     const messageId = this.currentMessageId;
     if (messageId) {
       try {
-        // Use the proper centralized cancellation method
+        // 1. Stop the network request in background
         contentScriptIntegration.cancelTranslationRequest(messageId, ActionReasons.USER_CANCELLED);
       } catch (e) { /* ignore */ }
     }
 
+    // 2. Clear state pointers
     this._cleanupCurrentSession(false);
+    
+    // 3. CRITICAL: Revert any partial translations already applied to DOM
+    try {
+      if (!silent) await this.revertTranslation();
+    } catch (e) { /* ignore */ }
   }
 
   isCurrentlyTranslating() { return this.isTranslating; }

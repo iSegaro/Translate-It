@@ -64,13 +64,24 @@ export async function revertSelectElementTranslation() {
         continue;
       }
 
-      // 1. Restore content (innerHTML is most reliable for restoring attributes/styles of children)
+      // 1. Restore content
       if (originalHTML && element) {
-        // Safe: clear content first (using literal empty string)
-        element.innerHTML = '';
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(DOMPurify.sanitize(originalHTML), 'text/html');
-        element.append(...doc.body.childNodes);
+        // SAFETY: If element is HTML or BODY, we must be careful not to destroy the whole document structure
+        if (element.tagName === 'HTML' || element.tagName === 'BODY') {
+          // For root elements, it's safer to only restore text nodes or use a less destructive method
+          if (originalTextNodesData && originalTextNodesData.length > 0) {
+            originalTextNodesData.forEach(({ node, originalText }) => {
+              if (node && node.parentNode) node.nodeValue = originalText;
+            });
+          } else {
+             // Last resort for root: set innerHTML but skip sanitization that breaks styles
+             element.innerHTML = originalHTML;
+          }
+        } else {
+          // Standard element restoration - Direct restoration without aggressive sanitization 
+          // that might strip original inline styles or critical attributes.
+          element.innerHTML = originalHTML;
+        }
         revertedCount++;
       } else if (originalTextNodesData && originalTextNodesData.length > 0) {
         // Fallback to surgical text node restoration if HTML is not available

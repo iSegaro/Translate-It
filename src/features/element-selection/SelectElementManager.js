@@ -203,12 +203,12 @@ class SelectElementManager extends ResourceTracker {
 
     const {
       fromBackground = false,
-      preserveTranslations = true,
+      preserveTranslations = reason !== 'cancel',
       silent = false,
       reason = 'manual' // 'success', 'error', 'cancel', 'manual', 'conflict'
     } = options;
 
-    this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, options);
+    this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
 
     try {
       this.isActive = false;
