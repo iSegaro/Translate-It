@@ -11,6 +11,8 @@ import {
   getPromptBASEBatchAsync, // Import the new getter
   getPromptBASEAIBatchAsync,
   getPromptBASEAIBatchAutoAsync,
+  getPromptBASEScreenCaptureAsync,
+  getSourceLanguageAsync,
   TranslationMode,
 } from "@/shared/config/config.js";
 
@@ -71,8 +73,19 @@ export async function buildPrompt(
   const isAI = providerType === 'ai';
 
   // Use full language names for better AI performance
-  const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
-  const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+  // Capitalize first letter of language names for better presentation
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  
+  // In 'auto' mode, we still need the actual source language for reverse translation logic in templates
+  let actualSourceLang = sourceLang === 'auto' ? await getSourceLanguageAsync() : sourceLang;
+  
+  // If the stored setting is also 'auto', fallback to 'en' to avoid "Auto to Auto" translation
+  if (actualSourceLang === 'auto') {
+    actualSourceLang = 'en';
+  }
+  
+  const sourceName = capitalize(getLanguageNameFromCode(actualSourceLang) || actualSourceLang);
+  const targetName = capitalize(getLanguageNameFromCode(targetLang) || targetLang);
 
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
@@ -111,36 +124,40 @@ export async function buildPrompt(
   } else if (await getEnableDictionaryAsync() && translateMode === TranslationMode.Dictionary_Translation) {
     promptBase = await getPromptDictionaryAsync();
   } else {
-    // Fallback for simple field translation or other modes.
-    promptBase = sourceLang === 'auto' 
-      ? await getPromptBASEFieldAutoAsync() 
-      : await getPromptBASEFieldAsync();
+    // Fallback for simple field translation or other modes (Selection, Field, ScreenCapture, etc.)
+    if (translateMode === TranslationMode.ScreenCapture) {
+      promptBase = await getPromptBASEScreenCaptureAsync();
+    } else {
+      promptBase = sourceLang === 'auto' 
+        ? await getPromptBASEFieldAutoAsync() 
+        : await getPromptBASEFieldAsync();
+    }
   }
 
-  // Now, build the final prompt by injecting languages and user rules.
+  // Now, build the final prompt by injecting languages and instructions.
   const promptTemplate = sourceLang === 'auto' 
     ? await getPromptAutoAsync() 
     : await getPromptAsync();
   
   // IMPORTANT: The placeholder format is $_{VAR}, not ${\\_\_VAR}.
-  const userRules = promptTemplate
+  const promptInstructions = promptTemplate
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName);
 
-  let finalPromptWithUserRules = promptBase
+  let finalPromptWithInstructions = promptBase
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName)
-    .replace(/\$_{USER_RULES}/g, userRules);
+    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
 
   // Inject the actual text to be translated.
   let finalPrompt;
-  if (finalPromptWithUserRules.includes("$_{TEXT}")) {
-    finalPrompt = finalPromptWithUserRules.replace(
+  if (finalPromptWithInstructions.includes("$_{TEXT}")) {
+    finalPrompt = finalPromptWithInstructions.replace(
       /\$_{TEXT}/g,
       text,
     );
   } else {
-    finalPrompt = `${finalPromptWithUserRules}\n\n${text}\n\n`;
+    finalPrompt = `${finalPromptWithInstructions}\n\n${text}\n\n`;
   }
 
   return finalPrompt;

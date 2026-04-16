@@ -300,12 +300,7 @@ export const CONFIG = {
   PROMPT_BASE_FIELD: `You are a professional translation service. Your task is to accurately and fluently translate text between $_{SOURCE} and $_{TARGET}, or from any other language into $_{TARGET}, depending on the input.
 
 Strictly follow these instructions:
-
-- Detect the input language.
-- If the input is in $_{SOURCE}, translate it into $_{TARGET}.
-- If the input is in $_{TARGET}, translate it into $_{SOURCE}.
-- If the input is in any other language, translate it into $_{TARGET}.
-- If the input is grammatically incorrect but written in $_{TARGET}, translate it into $_{SOURCE}, preserving the intended meaning.
+$_{PROMPT_INSTRUCTIONS}
 
 Translation quality requirements:
 - Produce fluent, natural, and idiomatic translations as if written by a native speaker.
@@ -320,14 +315,10 @@ $_{TEXT}
 /*--- End PROMPT_BASE_FIELD ---*/
 
 /*--- Start PROMPT_BASE_FIELD_AUTO ---*/
-  PROMPT_BASE_FIELD_AUTO: `You are a professional translation service. Your task is to accurately and fluently translate text into $_{TARGET}, or from $_{TARGET} into English, depending on the input.
+  PROMPT_BASE_FIELD_AUTO: `You are a professional translation service. Your task is to accurately and fluently translate text into $_{TARGET}, or from $_{TARGET} into $_{SOURCE}, depending on the input.
 
 Strictly follow these instructions:
-
-- Detect the input language.
-- If the input is NOT in $_{TARGET}, translate it into $_{TARGET}.
-- If the input is in $_{TARGET}, translate it into English.
-- If the input is grammatically incorrect but written in $_{TARGET}, translate it into English, preserving the intended meaning.
+$_{PROMPT_INSTRUCTIONS}
 
 Translation quality requirements:
 - Produce fluent, natural, and idiomatic translations as if written by a native speaker.
@@ -546,8 +537,8 @@ $_{TEXT}
 
   /*--- Start PROMPT_TEMPLATE_AUTO ---*/
   PROMPT_TEMPLATE_AUTO: `- If the input is NOT in $_{TARGET}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
-- If the input is already in $_{TARGET}, translate it into English with the same level of fluency and clarity.
-- If the input contains grammatical errors but is in $_{TARGET}, translate it into English, correcting and expressing the intended meaning in a clear, natural way.`,
+- If the input is already in $_{TARGET}, translate it into $_{SOURCE} with the same level of fluency and clarity.
+- If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/
 };
 

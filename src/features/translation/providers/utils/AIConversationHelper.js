@@ -237,10 +237,11 @@ export const AIConversationHelper = {
     const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
     const targetName = getLanguageNameFromCode(targetLang) || targetLang;
 
-    // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT} with global regex
+    // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
     const systemPrompt = promptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName);
+      .replace(/\$_{TARGET}/g, targetName)
+      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
 
     // Determine if we should wrap the text in a JSON structure
     // We wrap for batch requests or specific modes that use AI batch prompts
