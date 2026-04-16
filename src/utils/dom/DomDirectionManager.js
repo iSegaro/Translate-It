@@ -263,11 +263,22 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
     }
 
     // SURGICAL STOP: In Select Element mode, we respect the user's selection boundary.
-    // We stop at the first block-level container encountered at or above the rootElement.
-    if (rootElement && (container === rootElement || container.contains(rootElement))) {
-      if (BLOCK_TAGS.has(container.tagName.toUpperCase())) {
-        break;
+    // We stop IMMEDIATELY once we reach the rootElement to prevent affecting siblings or shared parents.
+    if (rootElement && (container === rootElement)) {
+      if (container.style.direction !== targetDir) {
+        const preservedAlign = getPreservedAlignment(container);
+        saveOriginalStyles(container);
+        container.style.direction = targetDir;
+        if (preservedAlign) container.style.textAlign = preservedAlign;
+        container.setAttribute('data-translate-dir', targetDir);
       }
+      break;
+    }
+    
+    // Safety check for parent context in Select Element mode:
+    // If we've already gone outside the rootElement, stop immediately.
+    if (rootElement && !container.contains(rootElement) && container !== rootElement) {
+      break;
     }
     
     container = container.parentElement;
