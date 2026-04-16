@@ -89,6 +89,11 @@ export class BaseAIProvider extends BaseProvider {
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
       return AIResponseParser.parseBatchResult(response, texts.length, texts, this.providerName, expectedFormat || ResponseFormat.JSON_ARRAY);
     } catch (error) {
+      if (sessionId) {
+        import('../core/TranslationStatsManager.js').then(m => {
+          m.statsManager.recordError(this.providerName, sessionId);
+        }).catch(() => {});
+      }
       logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
       throw error;
     }
