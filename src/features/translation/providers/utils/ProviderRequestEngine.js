@@ -180,7 +180,6 @@ export const ProviderRequestEngine = {
       const duration = Date.now() - startTime;
       
       let responseData = null;
-      let result = null;
 
       if (response.ok) {
         const clonedResponse = response.clone();
@@ -188,7 +187,6 @@ export const ProviderRequestEngine = {
         if (contentType && contentType.includes('application/json')) {
           try {
             responseData = await clonedResponse.json();
-            // result = await extractResponse(responseData, response.status); // Don't call yet, might have side effects
           } catch (e) {}
         } else {
           try {
@@ -217,8 +215,6 @@ export const ProviderRequestEngine = {
       });
 
       if (!response.ok) {
-        statsManager.recordError(provider.providerName, finalSessionId);
-        
         let body = {};
         try {
           body = await response.json();
@@ -298,6 +294,15 @@ export const ProviderRequestEngine = {
 
       return await extractResponse(responseText, response.status);
     } catch (err) {
+      // Record error in stats if it's not a cancellation
+      const isCancellation = err.type === ErrorTypes.USER_CANCELLED || 
+                             err.type === ErrorTypes.TRANSLATION_CANCELLED ||
+                             err.name === 'AbortError';
+      
+      if (!isCancellation) {
+        statsManager.recordError(provider.providerName, finalSessionId);
+      }
+
       if (err.name === 'AbortError') {
         const abortErr = new Error('Translation cancelled by user');
         abortErr.type = ErrorTypes.USER_CANCELLED;
@@ -365,4 +370,3 @@ export const ProviderRequestEngine = {
     return body;
   }
 };
-
