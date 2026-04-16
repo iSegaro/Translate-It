@@ -8,6 +8,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from '@/shared/config/translationConstants.js';
 import { 
+  getPromptAsync,
+  getPromptAutoAsync,
   getPromptBASEAIBatchAsync, 
   getPromptBASEAIBatchAutoAsync,
   getPromptBASEAIFollowupAsync, 
@@ -236,6 +238,15 @@ export const AIConversationHelper = {
     const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
     const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
     const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+
+    // Resolve instructions from template even for AI batch prompts
+    const promptInstructionsTemplate = sourceLang === 'auto' 
+      ? await getPromptAutoAsync() 
+      : await getPromptAsync();
+    
+    const promptInstructions = promptInstructionsTemplate
+      .replace(/\$_{SOURCE}/g, sourceName)
+      .replace(/\$_{TARGET}/g, targetName);
 
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
     const systemPrompt = promptTemplate
