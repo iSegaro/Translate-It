@@ -357,7 +357,10 @@ $_{TEXT}
 
 
 /*--- Start PROMPT_BASE_BATCH ---*/
-  PROMPT_BASE_BATCH: `You are an expert translation service. Your task is to translate a batch of texts from auto-detect language to $_{TARGET}.
+  PROMPT_BASE_BATCH: `You are an expert translation service. Your task is to translate a batch of texts from $_{SOURCE} to $_{TARGET}.
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
 
 You will receive a series of texts separated by a unique delimiter:
 "
@@ -377,7 +380,6 @@ Your response must adhere to these strict rules:
 4.  Do NOT add any extra explanations, comments, or markdown.
 5.  Maintain the original tone and formatting for each segment.
 6.  If translation is unnecessary (e.g., for numbers, hashtags, URLs), **return the original value unchanged.**
-7.  Ensure translations are fluent, idiomatic, and natural — not literal or robotic.
 
 Example Input:
 Hello
@@ -403,63 +405,59 @@ $_{TEXT}
 /*--- End PROMPT_BASE_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_BATCH ---*/
-  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic. Translate the following JSON data from $_{SOURCE} to $_{TARGET}.
+  PROMPT_BASE_AI_BATCH: `You are an expert translation service. Translate the following JSON data from $_{SOURCE} to $_{TARGET}.
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
 
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-Example:
-Input: {"translations": [{"id": "t1", "text": "Hello", "role": "p"}]}
-Output: {"translations": [{"id": "t1", "text": "سلام", "role": "p"}]}
+CRITICAL - Placeholder Preservation:
+  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
-CRITICAL - Placeholder Preservation Instructions:
-  If the text contains special placeholders like [[AIWC-0]]:
-  1. Copy these placeholders to your translation WITHOUT any changes.
-  2. Ensure each placeholder appears exactly once.
-
-Return ONLY the JSON object with the "translations" key, no additional text or markdown.
+Return ONLY the JSON object, no additional text or markdown.
 
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH ---*/
 
 /*--- Start PROMPT_BASE_AI_BATCH_AUTO ---*/
-  PROMPT_BASE_AI_BATCH_AUTO: `You are an expert translation service. Ensure that the translation is fluent, natural, and idiomatic. Translate the following JSON data into $_{TARGET}.
+  PROMPT_BASE_AI_BATCH_AUTO: `You are an expert translation service. Translate the following JSON data into $_{TARGET}.
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
 
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-Example:
-Input: {"translations": [{"id": "t1", "text": "Hello", "role": "p"}]}
-Output: {"translations": [{"id": "t1", "text": "سلام", "role": "p"}]}
+CRITICAL - Placeholder Preservation:
+  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
-CRITICAL - Placeholder Preservation Instructions:
-  If the text contains special placeholders like [[AIWC-0]]:
-  1. Copy these placeholders to your translation WITHOUT any changes.
-  2. Ensure each placeholder appears exactly once.
-
-Return ONLY the JSON object with the "translations" key, no additional text or markdown.
+Return ONLY the JSON object, no additional text or markdown.
 
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_AI_BATCH_AUTO ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
-  PROMPT_BASE_AI_FOLLOWUP: `You are a professional translation service. Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
-  Maintain the exact same JSON structure (Object with "translations" array) as shown in the previous turn.
+  PROMPT_BASE_AI_FOLLOWUP: `Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
   
-  Example format: {"translations": [{"id": "...", "text": "..."}]}
-  
-  Return only the JSON object, no additional text.`,
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
+
+Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
+Return only the JSON object, no additional text.`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
-  PROMPT_BASE_AI_FOLLOWUP_AUTO: `You are a professional translation service. Continue translating the following JSON data into $_{TARGET}.
-  Maintain the exact same JSON structure (Object with "translations" array) as shown in the previous turn.
-  
-  Example format: {"translations": [{"id": "...", "text": "..."}]}
-  
-  Return only the JSON object, no additional text.`,
+  PROMPT_BASE_AI_FOLLOWUP_AUTO: `Continue translating the following JSON data into $_{TARGET}.
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
+
+Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
+Return only the JSON object, no additional text.`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
 
 
@@ -529,16 +527,17 @@ $_{TEXT}
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
   /*--- Start PROMPT_TEMPLATE ---*/
-  PROMPT_TEMPLATE: `- If the input is in $_{SOURCE}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
-- If the input is in $_{TARGET}, translate it into $_{SOURCE} with the same level of fluency and clarity.
-- If the input is in any other language, translate it into $_{TARGET}, focusing on readability, tone, and meaning rather than literal translation.
-- If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
+  PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
+- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Prioritize clarity, tone, and readability while preserving the original intent and formatting.
+- If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   /*--- Start PROMPT_TEMPLATE_AUTO ---*/
-  PROMPT_TEMPLATE_AUTO: `- If the input is NOT in $_{TARGET}, translate it into $_{TARGET} using fluent and natural language, while preserving the original intent.
-- If the input is already in $_{TARGET}, translate it into $_{SOURCE} with the same level of fluency and clarity.
-- If the input contains grammatical errors but is in $_{TARGET}, translate it into $_{SOURCE}, correcting and expressing the intended meaning in a clear, natural way.`,
+  PROMPT_TEMPLATE_AUTO: `- Translate the input text into $_{TARGET}.
+- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Prioritize clarity, tone, and readability while preserving the original intent and formatting.
+- If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/
 };
 
