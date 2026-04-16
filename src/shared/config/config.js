@@ -333,13 +333,17 @@ $_{TEXT}
 /*--- End PROMPT_BASE_FIELD_AUTO ---*/
 
 /*--- Start PROMPT_BASE_SELECT ---*/
-  PROMPT_BASE_SELECT: `Act as a professional JSON translation service. The input is a JSON array of objects with abbreviated keys: "t" (text to translate), "i" (unique ID), "b" (block ID), and "r" (element role).
+  PROMPT_BASE_SELECT: `Act as a professional JSON translation service. Your task is to accurately and fluently translate text from $_{SOURCE} into $_{TARGET}.
 
-Your task:
-  1. Translate the "t" (text) according to rules: $_{USER_RULES}
-  2. Return a valid JSON array. Do not omit any entries.
-  3. Ensure translations are natural and idiomatic.
-  4. KEEP "i", "b", and "r" keys and their values UNCHANGED.
+The input is a JSON array of objects with abbreviated keys: "t" (text to translate), "i" (unique ID), "b" (block ID), and "r" (element role).
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
+
+Specific JSON Rules:
+  1. Return a valid JSON array. Do not omit any entries.
+  2. Ensure translations are natural and idiomatic.
+  3. KEEP "i", "b", and "r" keys and their values UNCHANGED.
 
 Example:
 Input: [{"t": "Hello", "i": "n1", "b": "b1", "r": "h1"}]
