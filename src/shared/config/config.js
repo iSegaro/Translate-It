@@ -481,9 +481,12 @@ $_{TEXT}
 /*--- End PROMPT_BASE_DICTIONARY ---*/
 
   /*--- Start PROMPT_BASE_POPUP_TRANSLATE ---*/
-  PROMPT_BASE_POPUP_TRANSLATE: `You are a translation service. Your task is to translate the input text into $_{TARGET}, while strictly preserving its structure, formatting, and line breaks.
+  PROMPT_BASE_POPUP_TRANSLATE: `You are a professional translation service. Your task is to accurately and fluently translate the input text into $_{TARGET}, while strictly preserving its structure, formatting, and line breaks.
 
-Instructions:
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
+
+Translation quality requirements:
   - Automatically detect the input language.
   - Translate the content into $_{TARGET}.
   - Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical.
@@ -508,6 +511,7 @@ $_{TEXT}
    - Any other textual information visible in the image
 
 2. **Translation Guidelines:**
+   - Strictly follow these instructions: $_{PROMPT_INSTRUCTIONS}
    - Automatically detect the language of extracted text
    - Translate all extracted text into $_{TARGET}
    - Maintain **natural, fluent, and idiomatic** translations
