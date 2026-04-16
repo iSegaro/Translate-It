@@ -23,7 +23,7 @@ export class OpenRouterProvider extends BaseAIProvider {
   static supportsStreaming = true; 
   static preferredBatchStrategy = 'smart';
   static optimalBatchSize = 25;
-  static maxComplexity = 400;
+  static maxComplexity = 200; // Further reduced for stability with strict/unstable free models
 
   static batchStrategy = 'json';
 
@@ -64,6 +64,7 @@ export class OpenRouterProvider extends BaseAIProvider {
       body: JSON.stringify({
         model: model || "openai/gpt-3.5-turbo",
         messages: messages,
+        max_tokens: 4096,
         // Enforce JSON Mode if requested
         ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
       }),

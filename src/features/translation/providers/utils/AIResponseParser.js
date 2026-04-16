@@ -22,6 +22,36 @@ export const AIResponseParser = {
     // Standard cleanup for all AI responses (invisible characters)
     let processedResult = result.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 
+    // 1. SMART UNESCAPE: Handle AI models (like Llama/Cerebras) that fail UTF-8 
+    // and return escaped Unicode or even triple-escaped sequences.
+    // We do this BEFORE any parsing to ensure values inside JSON objects are fixed.
+    if (processedResult.includes('\\\\u') || processedResult.includes('\\u')) {
+      try {
+        // Fix non-standard 6-digit/double-escaped escapes like \\u000648 -> \u0648
+        processedResult = processedResult.replace(/\\\\u000([0-9a-fA-F]{3})/g, '\\u$1');
+        processedResult = processedResult.replace(/\\u000([0-9a-fA-F]{3})/g, '\\u$1');
+        
+        // Unescape standard Unicode sequences (both \u0648 and \\u0648)
+        processedResult = processedResult.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
+          try {
+            return String.fromCharCode(parseInt(grp, 16));
+          } catch (e) { return match; }
+        });
+        
+        // Strip remaining dangerous control characters (00-1F) except common ones
+        processedResult = processedResult.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '');
+      } catch (e) {
+        console.warn('[AIResponseParser] Unicode decoding failed:', e);
+      }
+    }
+
+    // 2. PRE-PROCESS: Fix a very specific hallucination where AI repeats "text" key with empty value
+    // Example: {"id":"1", "text":"Actual Translation", "text":""}
+    if (processedResult.includes('"text":""') || processedResult.includes('"text": ""')) {
+      processedResult = processedResult.replace(/("text"\s*:\s*"[^"]*")\s*,\s*"text"\s*:\s*""/g, '$1');
+      processedResult = processedResult.replace(/"text"\s*:\s*""\s*,\s*("text"\s*:\s*"[^"]*")/g, '$1');
+    }
+
     // Strategy 1: Plain Text (STRING)
     // We NEVER attempt JSON parsing for plain strings to avoid corruption of text like "[Hello]"
     if (expectedFormat === ResponseFormat.STRING) {
@@ -29,7 +59,34 @@ export const AIResponseParser = {
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
-    const parsed = this._extractAndParseJson(processedResult, expectedFormat);
+    let parsed = this._extractAndParseJson(processedResult, expectedFormat);
+
+    // Dynamic Format Bridge: Handle multi-encoded or escaped JSON strings (Deep recursion)
+    // AI sometimes returns stringified JSON nested inside another JSON or escaped multiple times.
+    let depth = 0;
+    while (typeof parsed === 'string' && depth < 3) {
+      let candidate = parsed.trim();
+
+      // Remove possible surrounding quotes if the whole thing is double-quoted
+      if (candidate.startsWith('"') && candidate.endsWith('"') && candidate.length > 2) {
+        candidate = candidate.substring(1, candidate.length - 1);
+      }
+
+      // Check if it looks like JSON or escaped JSON
+      if ((candidate.includes('{') || candidate.includes('['))) {
+        try {
+          // Attempt to unescape common multiple backslashes (e.g. \\\" -> \")
+          const unescaped = candidate.replace(/\\\\\\"/g, '"').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+          const nextParse = this._extractAndParseJson(unescaped, expectedFormat);
+          if (nextParse && (typeof nextParse === 'object' || Array.isArray(nextParse))) {
+            parsed = nextParse;
+            depth++;
+            continue; // Try one more level if needed
+          }
+        } catch (e) {}
+      }
+      break; // Not JSON or couldn't be parsed further
+    }
 
     // Dynamic Format Bridge: AI often returns Array when Object was requested, and vice-versa.
     // We intelligently convert them if they match the content.
@@ -183,29 +240,49 @@ export const AIResponseParser = {
    * @private
    */
   _extractAndParseJson(text, expectedFormat) {
+    if (!text || typeof text !== 'string') return null;
     let jsonString = text.trim();
 
-    // 1. Direct parsing - only if it looks like a clean JSON object/array
-    if ((jsonString.startsWith('{') && jsonString.endsWith('}')) || (jsonString.startsWith('[') && jsonString.endsWith(']'))) {
-      try {
-        return JSON.parse(jsonString);
-      } catch (e) {
-        // Continue to robust extraction if direct parse fails
+    // SANITY CHECK: Detect repetitive 'garbage' output (common in failing free models)
+    // If the string contains the same short pattern repeated many times
+    if (jsonString.length > 100) {
+      const sample = jsonString.substring(0, 50);
+      const occurrences = (jsonString.match(new RegExp(sample.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+      if (occurrences > 5) {
+        throw new Error("AI returned repetitive garbage output");
       }
+    }
+
+    // 1. Direct parsing
+    try {
+      return JSON.parse(jsonString);
+    } catch (e) {
+      // Try repairing truncated JSON if it looks incomplete
+      try {
+        return JSON.parse(this._repairTruncatedJson(jsonString));
+      } catch (eRep) {}
     }
 
     // 2. Try markdown extraction
     const cleanedFromMarkdown = this._stripMarkdown(jsonString);
     if (cleanedFromMarkdown !== jsonString) {
-      try { return JSON.parse(cleanedFromMarkdown); } catch (e2) {}
+      try { return JSON.parse(cleanedFromMarkdown); } catch (e2) {
+        try {
+          const repaired = cleanedFromMarkdown.replace(/'/g, '"');
+          return JSON.parse(repaired);
+        } catch (e2b) {
+          // Try repairing truncated content inside markdown
+          try {
+            return JSON.parse(this._repairTruncatedJson(cleanedFromMarkdown));
+          } catch (e2c) {}
+        }
+      }
     }
 
     // 3. Robust Boundary Search
-    // Find the ACTUAL first bracket/brace that leads to a valid JSON
     const firstBracket = jsonString.indexOf('[');
     const firstBrace = jsonString.indexOf('{');
     
-    // Determine where to start looking
     let searchIndices = [];
     if (firstBracket !== -1) searchIndices.push(firstBracket);
     if (firstBrace !== -1) searchIndices.push(firstBrace);
@@ -216,20 +293,40 @@ export const AIResponseParser = {
       const lastToken = isArray ? ']' : '}';
       const lastIndex = jsonString.lastIndexOf(lastToken);
       
+      // Case A: Found matching closing token
       if (lastIndex > start) {
+        const candidate = jsonString.substring(start, lastIndex + 1);
         try {
-          const candidate = jsonString.substring(start, lastIndex + 1);
           return JSON.parse(candidate);
         } catch (e3) {
-          // Continue to next possible start point
+          try {
+            return JSON.parse(candidate.replace(/'/g, '"'));
+          } catch (e3b) {}
         }
+      } 
+      // Case B: No closing token, but starts like JSON (Truncated)
+      else if (lastIndex === -1 || lastIndex < start) {
+        try {
+          const candidate = jsonString.substring(start);
+          return JSON.parse(this._repairTruncatedJson(candidate));
+        } catch (e4) {}
       }
     }
 
+    // Final Fallback...
+
+
     // Final Fallback: If AI returns plain text but we expected structured data
     // This happens often with single-segment batches where AI ignores JSON instructions
-    // Also happens with Mock providers or when AI is chatty
     const cleanText = this._stripMarkdown(jsonString);
+    
+    // SAFETY CHECK: If the clean text still looks like JSON but we reached this fallback,
+    // it means it's likely a malformed/truncated JSON. We should NOT return it as plain text.
+    if ((cleanText.startsWith('{') || cleanText.startsWith('[')) && 
+        (cleanText.includes('":') || cleanText.includes('",'))) {
+      throw new Error(`AI returned malformed JSON that couldn't be parsed as ${expectedFormat}`);
+    }
+
     if (expectedFormat === ResponseFormat.JSON_OBJECT) {
       return { translations: [{ text: cleanText }] };
     }
@@ -238,5 +335,52 @@ export const AIResponseParser = {
     }
 
     throw new Error(`Failed to parse response as ${expectedFormat}`);
+  },
+
+  /**
+   * Attempts to repair a truncated JSON string by closing unclosed structures.
+   * @private
+   */
+  _repairTruncatedJson(json) {
+    if (!json || typeof json !== 'string') return json;
+
+    let repaired = json.trim();
+
+    // 0. Initial cleanup: Handle AI using single quotes for 'translations' key incorrectly
+    // This was specifically seen in the Call #1 logs: "translations':[
+    repaired = repaired.replace(/translations'\s*:/g, '"translations":');
+
+    // 1. Remove trailing comma if present
+    repaired = repaired.replace(/,\s*$/, '');
+
+    // 1b. Safety: If ends with a single backslash, remove it as it's likely a broken escape
+    if (repaired.endsWith('\\')) {
+      repaired = repaired.substring(0, repaired.length - 1);
+    }
+
+    // 2. Count open vs closed structures
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closedBraces = (repaired.match(/\}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closedBrackets = (repaired.match(/\]/g) || []).length;
+
+    // 3. Handle unclosed strings (very common in truncation)
+    const quoteCount = (repaired.match(/"/g) || []).length;
+    if (quoteCount % 2 !== 0) {
+      repaired += '"';
+    }
+
+    // 4. Close objects and arrays
+    for (let i = 0; i < (openBraces - closedBraces); i++) {
+      repaired += '}';
+    }
+    for (let i = 0; i < (openBrackets - closedBrackets); i++) {
+      repaired += ']';
+    }
+
+    // Double check trailing comma after adding quotes
+    repaired = repaired.replace(/,\s*([\]\}])/g, '$1');
+
+    return repaired;
   }
 };
