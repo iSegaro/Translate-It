@@ -468,15 +468,18 @@ Return only the JSON object, no additional text.`,
 /*--- Start PROMPT_BASE_DICTIONARY ---*/
   PROMPT_BASE_DICTIONARY: `You are a professional dictionary service. Your task is to accurately translate the word or phrase from $_{SOURCE} into $_{TARGET}.
 
-Format your response as:
-- Main translation (in $_{TARGET})
-- Part of speech (in $_{TARGET}): noun, verb, adjective, etc.
-- 2-3 most common synonyms or alternative meanings in $_{TARGET} (if any)
+Format your response exactly as follows using Markdown:
+**$_{TEXT}**
+   
+- **Main Translation**: [Primary meaning in $_{TARGET}]
+- **Noun**: [Meanings if it's a noun, separated by comma]
+- **Verb**: [Meanings if it's a verb, separated by comma]
+- **Adjective**: [Meanings if it's an adjective, separated by comma]
 
-Keep it brief and useful. Do not include examples, long definitions, or explanations. 
-All information provided MUST be in $_{TARGET}.
+Keep it very brief. Only include relevant parts of speech. No examples or explanations.
+All translations MUST be in $_{TARGET}.
 
-Now, please translate the following:
+Now, please translate:
 $_{TEXT}
 `,
 /*--- End PROMPT_BASE_DICTIONARY ---*/
