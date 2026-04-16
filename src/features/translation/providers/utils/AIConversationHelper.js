@@ -242,7 +242,29 @@ export const AIConversationHelper = {
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName);
 
-    const userText = typeof text === 'string' ? text : JSON.stringify(text);
+    // Determine if we should wrap the text in a JSON structure
+    // We wrap for batch requests or specific modes that use AI batch prompts
+    const shouldWrap = isBatch || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page;
+
+    let userText;
+    if (shouldWrap) {
+      const textsArray = Array.isArray(text) ? text : [text];
+      // Wrap into the structured JSON format expected by PROMPT_BASE_AI_BATCH
+      // This ensures compatibility with strict AI models that expect 'translations' and 'id'
+      userText = JSON.stringify({
+        translations: textsArray.map((t, idx) => {
+          if (typeof t === 'object' && t !== null) {
+            return {
+              id: String(t.i || t.id || idx),
+              text: t.t || t.text || ''
+            };
+          }
+          return { id: String(idx), text: String(t) };
+        })
+      });
+    } else {
+      userText = typeof text === 'string' ? text : JSON.stringify(text);
+    }
 
     let finalSystemPrompt = systemPrompt;
 

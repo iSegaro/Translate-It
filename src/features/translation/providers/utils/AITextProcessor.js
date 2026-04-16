@@ -469,10 +469,16 @@ export const AITextProcessor = {
    */
   estimateOriginalChars(jsonInput) {
     if (!jsonInput) return 0;
-    const segments = typeof jsonInput === 'string' ? JSON.parse(jsonInput) : jsonInput;
-    if (!Array.isArray(segments)) return String(jsonInput).length;
+    let data = typeof jsonInput === 'string' ? JSON.parse(jsonInput) : jsonInput;
     
-    return segments.reduce((sum, item) => {
+    // Handle wrapped AI batch format {"translations": [...]}
+    if (typeof data === 'object' && data !== null && Array.isArray(data.translations)) {
+      data = data.translations;
+    }
+
+    if (!Array.isArray(data)) return String(jsonInput).length;
+    
+    return data.reduce((sum, item) => {
       const text = typeof item === 'object' ? (item.t || item.text || '') : String(item);
       return sum + text.length;
     }, 0);
