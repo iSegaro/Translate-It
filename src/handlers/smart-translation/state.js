@@ -27,6 +27,10 @@ export const activeProcessing = new Map();
  * Clean up old data to prevent memory leaks
  */
 export function cleanupOldData() {
+  const initialSources = messageSources.size;
+  const initialProcessed = processedMessageIds.size;
+  const initialToasts = successfullyCompletedToastIds.size;
+  
   const now = Date.now();
 
   // Clean up old message sources
@@ -52,11 +56,24 @@ export function cleanupOldData() {
     recentIds.forEach(id => successfullyCompletedToastIds.add(id));
   }
 
-  logger.debug('Cleaned up old data', {
-    messageSources: messageSources.size,
-    processedIds: processedMessageIds.size,
-    completedToasts: successfullyCompletedToastIds.size
-  });
+  const removedSources = initialSources - messageSources.size;
+  const removedProcessed = initialProcessed - processedMessageIds.size;
+  const removedToasts = initialToasts - successfullyCompletedToastIds.size;
+
+  if (removedSources > 0 || removedProcessed > 0 || removedToasts > 0) {
+    logger.debug('Cleaned up old data', {
+      current: {
+        messageSources: messageSources.size,
+        processedIds: processedMessageIds.size,
+        completedToasts: successfullyCompletedToastIds.size
+      },
+      removed: {
+        sources: removedSources,
+        processed: removedProcessed,
+        toasts: removedToasts
+      }
+    });
+  }
 }
 
 // Schedule periodic cleanup using resource tracker
