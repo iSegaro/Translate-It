@@ -129,7 +129,7 @@ class TranslationStatsManager {
     
     // Choose appropriate icon
     let icon = success ? '✅' : '❌';
-    if (status === 'Progress' || status === 'Batch' || status === 'Streaming') icon = '📊';
+    if (status === 'Progress' || status === 'Batch') icon = '📊';
     else if (status === 'Stopped' || status === 'Cancelled') icon = 'ℹ️';
     else if (status === 'Restored' || status === 'Page Restored') icon = '🔄';
 
