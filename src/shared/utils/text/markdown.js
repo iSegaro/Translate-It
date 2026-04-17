@@ -315,24 +315,29 @@ export class SimpleMarkdown {
     }
 
     return text
+      // Strip code blocks (```code```) - do this first to preserve content but remove markers
+      .replace(/```[\s\S]*?```/g, (match) => {
+        return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+      })
+      // Strip headers (# header)
+      .replace(/^#+\s?/gm, "")
+      // Strip blockquotes (> quote)
+      .replace(/^>\s?/gm, "")
+      // Strip horizontal rules (---, ***, ___)
+      .replace(/^([-*_])\1{2,}$/gm, "")
+      // Strip list markers: unordered (- item, * item, + item)
+      .replace(/^\s*([-*+])\s+/gm, "")
+      // Strip list markers: ordered (1. item)
+      .replace(/^\s*\d+\.\s+/gm, "")
+      // Strip task list markers ([ ], [x])
+      .replace(/^\s*\[[ xX]\]\s+/gm, "")
       // Strip bold/italic markers (**bold**, __bold__, *italic*, _italic_)
       .replace(/(\*\*|__|\*|_)/g, "")
       // Strip markdown links [text](url) keeping only text
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      // Strip blockquotes (> quote)
-      .replace(/^>\s?/gm, "")
-      // Strip headers (# header)
-      .replace(/^#+\s?/gm, "")
-      // Strip code markers (`code`)
+      // Strip inline code markers (`code`)
       .replace(/`([^`]+)`/g, "$1")
-      // Strip code blocks (```code```)
-      .replace(/```[\s\S]*?```/g, (match) => {
-        // Remove the backticks and potential language identifier
-        return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
-      })
-      // Strip horizontal rules (---, ***, ___)
-      .replace(/^([-*_])\1{2,}$/gm, "")
-      // Optional: Normalize multiple newlines to single newlines
+      // Normalize multiple newlines to double newlines, then trim
       .replace(/\n{3,}/g, "\n\n")
       .trim();
   }
