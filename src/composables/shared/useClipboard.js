@@ -67,8 +67,8 @@ export function useClipboard() {
     const originalMarkdown = translationResult?.dataset?.originalMarkdown;
     const textContent = translationResult?.textContent || "";
 
-    // If original markdown exists, strip it. Otherwise use the rendered text content
-    const text = originalMarkdown ? SimpleMarkdown.strip(originalMarkdown) : textContent;
+    // If original markdown exists, clean it. Otherwise use the rendered text content
+    const text = originalMarkdown ? SimpleMarkdown.getCleanTranslation(originalMarkdown) : textContent;
 
     return await copyText(text, feedbackCallback);
   };

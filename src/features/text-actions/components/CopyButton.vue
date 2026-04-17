@@ -146,7 +146,7 @@ const handleCopy = async (event) => {
   }
 
   // Clean text if requested
-  const textToCopy = props.clean ? SimpleMarkdown.strip(props.text) : props.text
+  const textToCopy = props.clean ? SimpleMarkdown.getCleanTranslation(props.text) : props.text
   
   // Log click event
   logger.debug('📋 Copy button clicked!', {

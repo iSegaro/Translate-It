@@ -131,8 +131,8 @@ export class TranslationRenderer {
     icon.addEventListener("click", async (e) => {
       e.stopPropagation();
       
-      // Strip markdown for a clean copy
-      const cleanText = SimpleMarkdown.strip(textToCopy);
+      // Clean translation for a clean copy
+      const cleanText = SimpleMarkdown.getCleanTranslation(textToCopy);
       
       // Log click event
       this.logger.debug('📋 Copy icon clicked!', { 

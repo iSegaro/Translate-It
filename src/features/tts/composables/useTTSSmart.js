@@ -64,7 +64,7 @@ export function useTTSSmart() {
       logger.info(`[useTTSSmart] Starting TTS: ${text.length} chars in ${language}`);
 
       // Clean the text for TTS (e.g., strip markdown, handle dictionary mode)
-      const cleanText = SimpleMarkdown.getTTSFriendlyText(text);
+      const cleanText = SimpleMarkdown.getCleanTranslation(text);
       
       logger.debug(`[useTTSSmart] Final TTS text: "${cleanText.trim()}"`);
 

@@ -297,11 +297,12 @@ export class SimpleMarkdown {
   }
 
   /**
-   * Clean text specifically for TTS, extracting only the meaning in dictionary mode
+   * Extract only the primary translation/meaning, cleaning markdown and ignoring dictionary details if present.
+   * Useful for TTS and "Clean Copy" operations.
    * @param {string} text - The markdown text
-   * @returns {string} Clean plain text suitable for speech
+   * @returns {string} Clean plain text of the primary meaning
    */
-  static getTTSFriendlyText(text) {
+  static getCleanTranslation(text) {
     if (!text || typeof text !== "string") {
       return "";
     }
@@ -315,7 +316,6 @@ export class SimpleMarkdown {
 
     // Structural Check: In dictionary mode, we typically have a main translation 
     // followed by lines with labels (Noun:, Verb:, etc.)
-    // We check if any line (except possibly the first one) is a label line.
     let isDictionary = false;
     for (let i = 1; i < lines.length; i++) {
       if (this._isLabelLine(lines[i])) {
@@ -325,11 +325,11 @@ export class SimpleMarkdown {
     }
 
     if (isDictionary) {
-      // It's a dictionary entry - only speak the first line (the primary meaning)
+      // It's a dictionary entry - only return the first line (the primary meaning)
       return this.strip(lines[0]);
     }
 
-    // Not a dictionary entry - strip markdown and return everything
+    // Not a dictionary entry (e.g. a paragraph) - strip markdown and return everything
     return this.strip(text);
   }
 

@@ -331,7 +331,7 @@ const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
 const handleCopy = async () => {
   if (!translatedText.value) return;
   try {
-    const textToCopy = SimpleMarkdown.strip(translatedText.value);
+    const textToCopy = SimpleMarkdown.getCleanTranslation(translatedText.value);
     await navigator.clipboard.writeText(textToCopy);
     logger.debug(`Text copied successfully (cleaned)`);
   } catch (error) {
