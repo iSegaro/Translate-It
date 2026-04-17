@@ -7,6 +7,7 @@ import { TranslationMode, CONFIG } from "@/shared/config/config.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { isRTLLanguage } from '@/features/element-selection/utils/textDirection.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
 
 let logger = null;
 const getLogger = () => {
@@ -130,14 +131,17 @@ export class TranslationRenderer {
     icon.addEventListener("click", async (e) => {
       e.stopPropagation();
       
+      // Strip markdown for a clean copy
+      const cleanText = SimpleMarkdown.strip(textToCopy);
+      
       // Log click event
       this.logger.debug('📋 Copy icon clicked!', { 
-        text: textToCopy.slice(0, 20) + (textToCopy.length > 20 ? '...' : ''), 
+        text: cleanText.slice(0, 20) + (cleanText.length > 20 ? '...' : ''), 
         title: title 
       });
       
       try {
-        await navigator.clipboard.writeText(textToCopy);
+        await navigator.clipboard.writeText(cleanText);
         
         // Visual feedback
         const originalOpacity = icon.style.opacity;
