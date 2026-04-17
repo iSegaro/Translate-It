@@ -170,15 +170,17 @@ export class SimpleMarkdown {
   static _isLabelLine(text) {
     // Pattern to match label lines like:
     // - "**noun:** test, experiment" (markdown bold)
-    // - "**adjective:** probational" (markdown bold)
-    // - "نوع: اسم", "Definition: something", "مترادف: word, word" (regular labels)
+    // - "اسم: آزمایش" (regular labels)
     const trimmedText = text.trim();
     
-    // Check for markdown bold labels like **noun:** or **adjective:**
-    const markdownLabelPattern = /^\*\*[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\*\*\s*:\s+.+$/;
+    // Check for markdown bold labels: **Label**: content
+    // We look for ** at start, some characters, ** then a colon.
+    const markdownLabelPattern = /^\*\*.*?\*\*\s*:\s*.*$/;
     
-    // Check for regular labels like "noun:" or "نوع:"
-    const regularLabelPattern = /^[\w\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+\s*:\s+.+$/;
+    // Check for regular labels: Label: content
+    // We look for characters at the start followed immediately by a colon and then some content.
+    // This pattern is more inclusive for different languages.
+    const regularLabelPattern = /^[^:\n]+\s*:\s*.+$/;
     
     return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
   }
@@ -197,20 +199,10 @@ export class SimpleMarkdown {
     const labelPart = text.substring(0, colonIndex).trim();
     const content = text.substring(colonIndex + 1).trim();
     
-    // Check if label is already in markdown bold format (**label**)
-    const markdownBoldPattern = /^\*\*(.*?)\*\*$/;
-    const markdownMatch = labelPart.match(markdownBoldPattern);
-    
-    let labelElement;
-    if (markdownMatch) {
-      // Extract the text from **text** format
-      labelElement = document.createElement("strong");
-      labelElement.textContent = markdownMatch[1];
-    } else {
-      // Regular label - make it bold
-      labelElement = document.createElement("strong");
-      labelElement.textContent = labelPart;
-    }
+    // Create a bold element for the label and strip any markdown markers
+    // This ensures a clean label regardless of how the AI formatted the bolding.
+    const labelElement = document.createElement("strong");
+    labelElement.textContent = this.strip(labelPart);
     
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
@@ -302,6 +294,43 @@ export class SimpleMarkdown {
     }
 
     return span;
+  }
+
+  /**
+   * Clean text specifically for TTS, extracting only the meaning in dictionary mode
+   * @param {string} text - The markdown text
+   * @returns {string} Clean plain text suitable for speech
+   */
+  static getTTSFriendlyText(text) {
+    if (!text || typeof text !== "string") {
+      return "";
+    }
+
+    // Split into non-empty lines
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    
+    if (lines.length <= 1) {
+      return this.strip(text);
+    }
+
+    // Structural Check: In dictionary mode, we typically have a main translation 
+    // followed by lines with labels (Noun:, Verb:, etc.)
+    // We check if any line (except possibly the first one) is a label line.
+    let isDictionary = false;
+    for (let i = 1; i < lines.length; i++) {
+      if (this._isLabelLine(lines[i])) {
+        isDictionary = true;
+        break;
+      }
+    }
+
+    if (isDictionary) {
+      // It's a dictionary entry - only speak the first line (the primary meaning)
+      return this.strip(lines[0]);
+    }
+
+    // Not a dictionary entry - strip markdown and return everything
+    return this.strip(text);
   }
 
   /**

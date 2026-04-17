@@ -7,6 +7,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
@@ -62,11 +63,16 @@ export function useTTSSmart() {
       
       logger.info(`[useTTSSmart] Starting TTS: ${text.length} chars in ${language}`);
 
+      // Clean the text for TTS (e.g., strip markdown, handle dictionary mode)
+      const cleanText = SimpleMarkdown.getTTSFriendlyText(text);
+      
+      logger.debug(`[useTTSSmart] Final TTS text: "${cleanText.trim()}"`);
+
       // The dispatcher in background will handle routing to Google or Edge and language fallbacks
       const message = {
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
-          text: text.trim(),
+          text: cleanText.trim(),
           language: language,
           ttsId: currentTTSId.value
         },
