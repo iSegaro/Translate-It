@@ -184,6 +184,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
 
 // Import adjacent SCSS
 import './TranslationWindow.scss';
@@ -330,7 +331,9 @@ const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
 const handleCopy = async () => {
   if (!translatedText.value) return;
   try {
-    await navigator.clipboard.writeText(translatedText.value);
+    const textToCopy = SimpleMarkdown.strip(translatedText.value);
+    await navigator.clipboard.writeText(textToCopy);
+    logger.debug(`Text copied successfully (cleaned)`);
   } catch (error) {
     logger.error(`Failed to copy:`, error);
   }
