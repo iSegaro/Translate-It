@@ -125,12 +125,28 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
       const hasTranslations = detail.translatedCount > 0;
-      mobileStore.setPageTranslation({ 
+      const currentState = mobileStore.pageTranslationData;
+
+      // Skip empty messages if we already have completed state
+      // This prevents iframe messages from overwriting main frame translation data
+      if (!hasTranslations && currentState.isTranslated) return;
+
+      const baseState = {
         isTranslating: false,
         isAutoTranslating: false,
         isTranslated: hasTranslations,
         status: hasTranslations ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.IDLE
-      });
+      };
+
+      if (hasTranslations) {
+        mobileStore.setPageTranslation({
+          ...baseState,
+          translatedCount: detail.translatedCount,
+          totalCount: detail.totalCount || detail.translatedCount
+        });
+      } else {
+        mobileStore.setPageTranslation(baseState);
+      }
     });
 
     // Element Translation Sync

@@ -96,12 +96,15 @@ export class MainFrameCoordinator {
 
         // Stopped (Auto-Restore) signals
         if (type === 'TRANSLATE_IT_PAGE_STOPPED') {
-          this.aggregator.updateFrameData(event.source, { 
-            ...data, 
-            isTranslating: false, 
-            status: 'idle' 
+          this.aggregator.updateFrameData(event.source, {
+            ...data,
+            isTranslating: false,
+            status: 'idle'
           });
-          this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
+          // Emit to PageEventBus so content app receives iframe data
+          if (pageEventBus) {
+            pageEventBus.emit(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
+          }
           return;
         }
 
@@ -210,12 +213,12 @@ export class MainFrameCoordinator {
     // Auto-Restore complete (Main Frame)
     pageEventBus.on(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (data) => {
       if (!data.isAggregated) {
-        this.aggregator.updateFrameData('main', { 
-          ...data, 
-          isTranslating: false, 
-          status: 'idle' 
+        this.aggregator.updateFrameData('main', {
+          ...data,
+          isTranslating: false,
+          status: 'idle'
         });
-        this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
+        // Don't emit - PageTranslationManager already handled broadcasting
       }
     });
 

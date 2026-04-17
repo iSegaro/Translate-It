@@ -33,7 +33,7 @@ export class PageTranslationManager extends ResourceTracker {
   constructor() {
     super('page-translation-manager');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Manager');
-    
+
     this.toastIntegration = new ToastIntegration(pageEventBus);
     this.notificationManager = new NotificationManager();
 
@@ -226,7 +226,7 @@ export class PageTranslationManager extends ResourceTracker {
 
       // 2. Use standard library restore
       this.bridge.restore(document.documentElement);
-      
+
       // 3. Deep clean any remaining markers
       PageTranslationHelper.deepCleanDOM();
 
@@ -272,23 +272,23 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this.logger.info('Stopping page translation/persistence without restoring');
-      
+
       this.scrollTracker.stop();
       this.bridge.stopPersistence();
       this.isAutoTranslating = false;
       this.isTranslating = false;
       this.isTranslated = this.scheduler.translatedCount > 0;
-      
+
       // Stop the scheduler from processing more batches
       this.scheduler.setTranslationState(false);
 
       const resultData = {
-        url: this.currentUrl, 
+        url: this.currentUrl,
         translatedCount: this.scheduler.translatedCount,
-        isTranslated: this.isTranslated, 
+        isTranslated: this.isTranslated,
         isAutoTranslating: false
       };
-      
+
       this._broadcastEvent(MessageActions.PAGE_AUTO_RESTORE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
@@ -377,10 +377,19 @@ export class PageTranslationManager extends ResourceTracker {
 
   async _broadcastEvent(action, data = {}) {
     try {
+      const isTopFrame = window.self === window.top;
+
+      // Always emit to pageEventBus (both main frame and iframes)
+      // This ensures content app receives messages from all frames
       pageEventBus.emit(action, data);
-      sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
-    } catch {
-      // Silent error
+
+      // Only broadcast to background from the main frame (top-level window)
+      // This prevents duplicate messages from iframes to other contexts
+      if (isTopFrame) {
+        sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
+      }
+    } catch (error) {
+      this.logger.debug('Broadcast event failed - iframe or background unavailable:', error);
     }
   }
 
