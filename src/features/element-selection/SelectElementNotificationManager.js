@@ -15,6 +15,7 @@ class SelectElementNotificationManager extends ResourceTracker {
     
     this.notificationManager = notificationManager;
     this.toastId = null;
+    this.showPending = false;
     this.isInitialized = false;
     
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementNotificationManager');
@@ -53,13 +54,20 @@ class SelectElementNotificationManager extends ResourceTracker {
     const isTopFrame = window === window.top;
     if (!isTopFrame) return;
 
+    this.showPending = true;
     try {
       const { getTranslationString } = await utilsFactory.getI18nUtils();
       
+      // Check if we should still show this after async call
+      if (!this.showPending) return;
+
       const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
       const isMobile = deviceDetector.isMobile();
       const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
       const message = await getTranslationString(messageKey) || (isMobile ? 'Drag over text to translate.' : 'Click text to translate.');
+
+      // Final check before showing
+      if (!this.showPending) return;
 
       const actions = [
         {
@@ -76,6 +84,8 @@ class SelectElementNotificationManager extends ResourceTracker {
 
     } catch (error) {
       this.logger.error('Error showing Select Element notification:', error);
+    } finally {
+      this.showPending = false;
     }
   }
   
@@ -85,12 +95,20 @@ class SelectElementNotificationManager extends ResourceTracker {
 
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
-        const { getTranslationString } = await utilsFactory.getI18nUtils();
-        const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
-        const translatingMessage = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+        const i18n = await utilsFactory.getI18nUtils();
+        const translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+        
+        // CRITICAL: Re-check toastId after async await
+        if (!this.toastId) return;
 
-        // Update existing notification with new message but keep cancel button
+        const cancelLabel = await i18n.getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+
+        // Final safety check
+        if (!this.toastId) return;
+
+        // Update existing notification - ALWAYS use 'select-element-toast' as ID for safety
         this.notificationManager.update(this.toastId, translatingMessage, {
+          id: 'select-element-toast',
           type: 'status',
           persistent: true,
           actions: [{
@@ -105,6 +123,7 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   dismissNotification() {
+    this.showPending = false;
     if (this.toastId) {
       this.notificationManager.dismiss(this.toastId);
       this.toastId = null;

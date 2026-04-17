@@ -154,6 +154,9 @@ class SelectElementManager extends ResourceTracker {
       const servicesAvailable = await this._ensureServicesAvailable();
       if (!servicesAvailable) throw new Error('Services initialization failed');
 
+      // CRITICAL: Re-check if still active after async operations
+      if (!this.isActive) return { isActive: false };
+
       this.elementSelector.activate();
 
       if (this.isTopFrame) {
@@ -163,6 +166,12 @@ class SelectElementManager extends ResourceTracker {
           getTranslationString('BING_WPT_WARNING'),
           getTranslationString('LINGVA_WPT_WARNING')
         ]);
+
+        // RE-CHECK again after another set of async calls
+        if (!this.isActive) {
+          this.dismissNotification();
+          return { isActive: false };
+        }
 
         const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
         if (activeProvider === ProviderRegistryIds.BING) {
@@ -495,6 +504,9 @@ class SelectElementManager extends ResourceTracker {
       this.deactivate({ preserveTranslations: true, reason, fromBackground: true }).catch(() => {});
     } else if (this.isActive) {
       this.deactivate({ preserveTranslations: true, reason }).catch(() => {});
+    } else {
+      // Safety guard: ensure notification is dismissed in top frame even if already inactive
+      this.dismissNotification();
     }
     this.isProcessingClick = false;
   }
