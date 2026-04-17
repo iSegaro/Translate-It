@@ -3,6 +3,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useClipboard');
 
@@ -62,9 +63,13 @@ export function useClipboard() {
 
   // Handle clipboard-related operations for translated text
   const handleCopyTarget = async (translationResult, feedbackCallback) => {
-    // Get the original markdown text if available, otherwise fall back to textContent
+    // Get the original markdown text if available, and strip it for a clean copy
     const originalMarkdown = translationResult?.dataset?.originalMarkdown;
-    const text = originalMarkdown || translationResult?.textContent || "";
+    const textContent = translationResult?.textContent || "";
+
+    // If original markdown exists, strip it. Otherwise use the rendered text content
+    const text = originalMarkdown ? SimpleMarkdown.strip(originalMarkdown) : textContent;
+
     return await copyText(text, feedbackCallback);
   };
 
