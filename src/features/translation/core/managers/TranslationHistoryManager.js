@@ -19,13 +19,16 @@ export class TranslationHistoryManager {
   /**
    * Add a single translation result to the history.
    * Persists the update to browser storage.
-   * 
+   *
    * @param {object} data - Original request data (text, languages)
    * @param {object} result - Translation result (translatedText)
    * @returns {Promise<void>}
    */
   async addToHistory(data, result) {
-    if (!data.text || !result.translatedText) return;
+    if (!data.text || !result.translatedText) {
+      logger.debug('[HistoryManager] Skipping empty translation');
+      return;
+    }
 
     try {
       const historyItem = {
@@ -38,9 +41,11 @@ export class TranslationHistoryManager {
 
       // Ensure history is loaded from storage first to get the latest state
       await this.loadHistoryFromStorage();
-      
+
       this.history = [historyItem, ...this.history].slice(0, this.MAX_HISTORY_ITEMS);
       await this.saveHistoryToStorage();
+
+      logger.info(`[HistoryManager] Translation saved to history: "${data.text.slice(0, 30)}..." → "${result.translatedText.slice(0, 30)}..."`);
     } catch (error) {
       logger.error("[HistoryManager] Failed to add translation to history:", error);
     }

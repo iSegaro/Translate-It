@@ -8,7 +8,17 @@
         :label="t('advance_debug_mode_label') || 'Debug Mode'"
       />
     </div>
-    
+
+    <div class="setting-group vertical">
+      <BaseCheckbox
+        v-model="enableTranslationHistory"
+        :label="t('enable_translation_history_label') || 'Enable Translation History'"
+      />
+      <p class="setting-description">
+        {{ t('enable_translation_history_description') || 'Save your translations for future reference. Disabled for page translation and element selection.' }}
+      </p>
+    </div>
+
     <div class="setting-group">
       <label>{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
       <BaseTextarea
@@ -186,6 +196,11 @@ const { t } = useI18n()
 const debugMode = computed({
   get: () => settingsStore.settings?.DEBUG_MODE || false,
   set: (value) => settingsStore.updateSettingLocally('DEBUG_MODE', value)
+})
+
+const enableTranslationHistory = computed({
+  get: () => settingsStore.settings?.ENABLE_TRANSLATION_HISTORY ?? true,
+  set: (value) => settingsStore.updateSettingLocally('ENABLE_TRANSLATION_HISTORY', value)
 })
 
 const excludedSites = computed({

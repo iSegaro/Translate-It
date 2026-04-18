@@ -1960,5 +1960,11 @@
   },
   "bilingual_translation_description": {
     "message": "If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto)."
+  },
+  "enable_translation_history_label": {
+    "message": "Enable Translation History"
+  },
+  "enable_translation_history_description": {
+    "message": "Save your translations locally for future reference."
   }
 }
