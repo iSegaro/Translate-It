@@ -40,6 +40,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -129,7 +130,7 @@ onMounted(async () => {
   try {
     const savedData = await storageManager.get('MOBILE_FAB_POSITION');
     const pos = savedData.MOBILE_FAB_POSITION;
-    
+
     if (pos) {
       userPreferredY.value = pos.y !== null ? pos.y : MOBILE_CONSTANTS.FAB.DEFAULT_Y;
       side.value = pos.side || MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
@@ -137,14 +138,20 @@ onMounted(async () => {
       userPreferredY.value = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
       side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     }
-    
+
     checkBounds();
     tracker.trackTimeout(() => {
       isReady.value = true;
       tracker.trackTimeout(() => { isPositioning.value = false; }, 500);
     }, 150);
   } catch (err) {
-    logger.error('Failed to load mobile FAB position:', err);
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-fab:load-position');
+    } else {
+      logger.error('Failed to load mobile FAB position:', err);
+    }
+
+    // Set defaults on any error
     userPreferredY.value = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
     fabPosition.value.y = userPreferredY.value;
     side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
@@ -246,11 +253,15 @@ const onFabDragEnd = async (e) => {
 
   try {
     userPreferredY.value = fabPosition.value.y;
-    await storageManager.set({ 
-      MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y } 
+    await storageManager.set({
+      MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y }
     });
   } catch (err) {
-    logger.error('Failed to save mobile FAB position:', err);
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-fab:save-position');
+    } else {
+      logger.error('Failed to save mobile FAB position:', err);
+    }
   }
   
   startFabIdleTimer();
@@ -258,15 +269,24 @@ const onFabDragEnd = async (e) => {
 
 const onMobileFabClick = () => {
   logger.info('Mobile FAB clicked');
-  const selection = window.getSelection()?.toString().trim() || '';
-  const effectiveSelection = pendingText.value || selection;
-  const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);
 
-  if (hasFreshSelection) {
-    window.windowsManagerInstance?._showMobileSheet(effectiveSelection);
-    isSelectionDirty.value = false;
-  } else {
-    mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+  try {
+    const selection = window.getSelection()?.toString().trim() || '';
+    const effectiveSelection = pendingText.value || selection;
+    const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);
+
+    if (hasFreshSelection) {
+      window.windowsManagerInstance?._showMobileSheet(effectiveSelection);
+      isSelectionDirty.value = false;
+    } else {
+      mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+    }
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-fab:click');
+    } else {
+      logger.error('Mobile FAB click handler failed:', err);
+    }
   }
 };
 

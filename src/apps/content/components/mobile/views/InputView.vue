@@ -147,6 +147,7 @@ import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
@@ -199,8 +200,12 @@ const handlePaste = async () => {
       inputText.value = text;
       pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_pasted_message'), type: 'success' });
     }
-  } catch {
-    pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_paste_failed'), type: 'error' });
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-input:paste');
+    } else {
+      pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_paste_failed'), type: 'error' });
+    }
   }
 }
 
@@ -236,10 +241,17 @@ const handleTranslate = async () => {
       resultText.value = errorInfo.message;
     }
   } catch (error) {
-    isError.value = true;
-    const errorInfo = await getErrorForDisplay(error, 'mobile-input');
-    logger.error('Manual translation exception', { error: errorInfo.message });
-    resultText.value = errorInfo.message;
+    if (ExtensionContextManager.isContextError(error)) {
+      // Close dashboard to make toast visible
+      mobileStore.closeSheet();
+      ExtensionContextManager.handleContextError(error, 'mobile-input:translate');
+      resultText.value = t('mobile_input_context_error') || "Extension context unavailable. Please refresh the page.";
+    } else {
+      isError.value = true;
+      const errorInfo = await getErrorForDisplay(error, 'mobile-input');
+      logger.error('Manual translation exception', { error: errorInfo.message });
+      resultText.value = errorInfo.message;
+    }
   } finally { isLoading.value = false; }
 }
 

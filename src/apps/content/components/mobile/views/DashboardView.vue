@@ -138,6 +138,7 @@ import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
@@ -162,11 +163,19 @@ const allowedFeatures = ref({
 });
 
 const updateAllowedFeatures = async () => {
-  const status = await exclusionChecker.getFeatureStatus();
-  if (status.initialized) {
-    allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
-    allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
-    logger.debug('Mobile Dashboard allowed features updated', allowedFeatures.value);
+  try {
+    const status = await exclusionChecker.getFeatureStatus();
+    if (status.initialized) {
+      allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
+      allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+      logger.debug('Mobile Dashboard allowed features updated', allowedFeatures.value);
+    }
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:features');
+    } else {
+      logger.error('Update allowed features failed:', err);
+    }
   }
 };
 
@@ -178,51 +187,107 @@ const pendingSelection = ref({
 const isTTSVisible = computed(() => pendingSelection.value.hasSelection || tts.isPlaying.value);
 
 const translatePage = (event) => {
-  if (event) { event.preventDefault(); event.stopPropagation(); }
-  logger.info('Page translation requested from Mobile Dashboard');
-  const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
-  if (isCurrentlyTranslating) mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION)
-  else { 
-    pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
-    mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
-    
-    // Respect the auto-close setting
-    if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
+  try {
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    logger.info('Page translation requested from Mobile Dashboard');
+    const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
+
+    if (isCurrentlyTranslating) {
+      mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
+    } else {
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE);
+      mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
+
+      // Respect the auto-close setting
+      if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
+        mobileStore.closeSheet();
+      }
+    }
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      // Close dashboard to make toast visible
       mobileStore.closeSheet();
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:translate-page');
+    } else {
+      logger.error('Page translation handler failed:', err);
     }
   }
 }
 
-const activateSelectElement = () => { 
-  logger.info('Select Element mode requested from Mobile Dashboard');
-  mobileStore.closeSheet(); 
-  pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE) 
+const activateSelectElement = () => {
+  try {
+    logger.info('Select Element mode requested from Mobile Dashboard');
+    mobileStore.closeSheet();
+    pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE);
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:select-element');
+    } else {
+      logger.error('Select Element handler failed:', err);
+    }
+  }
 }
-const goToInputView = () => { 
-  logger.debug('Navigating to Input View');
-  mobileStore.resetSelectionData(); 
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT) 
+const goToInputView = () => {
+  try {
+    logger.debug('Navigating to Input View');
+    mobileStore.resetSelectionData();
+    mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT);
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:input-view');
+    } else {
+      logger.error('Navigate to Input View failed:', err);
+    }
+  }
 }
-const goToHistoryView = () => { 
+
+const goToHistoryView = () => {
   logger.debug('Navigating to History View');
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) 
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY);
 }
-const openSettings = () => { 
-  logger.debug('Opening Settings from Mobile Dashboard');
-  pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS) 
+const openSettings = () => {
+  try {
+    logger.debug('Opening Settings from Mobile Dashboard');
+    pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS);
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      // Close dashboard to make toast visible
+      mobileStore.closeSheet();
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:open-settings');
+    } else {
+      logger.error('Open Settings handler failed:', err);
+    }
+  }
 }
-const revertTranslations = () => { 
-  logger.info('Reverting page translations from Mobile Dashboard');
-  pageEventBus.emit('revert-translations') 
+
+const revertTranslations = () => {
+  try {
+    logger.info('Reverting page translations from Mobile Dashboard');
+    pageEventBus.emit('revert-translations');
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:revert');
+    } else {
+      logger.error('Revert translations handler failed:', err);
+    }
+  }
 }
 
 const handleTTS = async () => {
-  if (tts.isPlaying.value) {
-    logger.info('Stopping TTS from Mobile Dashboard');
-    await tts.stop();
-  } else if (pendingSelection.value.hasSelection) {
-    logger.info('Starting TTS from Mobile Dashboard for selected text');
-    await tts.speak(pendingSelection.value.text);
+  try {
+    if (tts.isPlaying.value) {
+      logger.info('Stopping TTS from Mobile Dashboard');
+      await tts.stop();
+    } else if (pendingSelection.value.hasSelection) {
+      logger.info('Starting TTS from Mobile Dashboard for selected text');
+      await tts.speak(pendingSelection.value.text);
+    }
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:tts');
+    } else {
+      logger.error('TTS handler failed:', err);
+    }
   }
 };
 
