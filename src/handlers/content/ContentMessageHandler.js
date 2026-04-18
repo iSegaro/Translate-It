@@ -618,10 +618,23 @@ export class ContentMessageHandler extends ResourceTracker {
       // Execute page translation - PASS message.data to support options like { isAuto: true }
       const result = await this.pageTranslationManager.translatePage(message.data || {});
 
-      this.logger.info('Page translation completed', {
-        translatedCount: result.translatedCount,
-        totalNodes: result.totalNodes
-      });
+      // Log appropriate message based on whether this is auto-translation (async) or immediate completion
+      if (result.isAutoTranslating) {
+        this.logger.info('Page translation started (auto-translate mode)', {
+          messageId: result.messageId,
+          url: result.url
+        });
+      } else if (result.translatedCount !== undefined || result.totalNodes !== undefined) {
+        this.logger.info('Page translation completed', {
+          translatedCount: result.translatedCount,
+          totalNodes: result.totalNodes
+        });
+      } else {
+        this.logger.info('Page translation initiated', {
+          messageId: result.messageId,
+          url: result.url
+        });
+      }
 
       return result;
 
