@@ -349,7 +349,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   flex-shrink: 0;
   position: relative;
-  z-index: 10; /* Restored to original priority */
+  z-index: 100; /* Increased to ensure dropdowns appear above translation form toolbars */
 }
 
 /* Wide layout: Translate button alongside language selectors */
@@ -389,7 +389,7 @@ onUnmounted(() => {
   max-width: 100%;
   overflow: visible;
   position: relative;
-  z-index: 11;
+  z-index: 110;
   min-height: 40px;
   box-sizing: border-box;
   padding: 0 8px;
@@ -437,7 +437,7 @@ onUnmounted(() => {
   align-items: center !important;
   justify-content: center !important;
   position: relative !important;
-  z-index: 12 !important;
+  z-index: 120 !important;
   background: var(--color-bg-secondary) !important;
   border: 1px solid var(--color-border) !important;
   border-radius: 4px !important;
@@ -457,7 +457,7 @@ onUnmounted(() => {
   align-items: center;
   width: 100%;
   position: relative;
-  z-index: 5;
+  z-index: 105;
   min-height: 40px;
   box-sizing: border-box;
   margin-top: 8px;
