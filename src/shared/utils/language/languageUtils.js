@@ -36,6 +36,34 @@ export async function detectTextLanguage(text) {
 }
 
 /**
+ * Check if two languages are "near" or similar (e.g., fa and ar, or zh versions)
+ * This helps prevent aggressive overrides when detection might be ambiguous
+ * @param {string} lang1 - First language code
+ * @param {string} lang2 - Second language code
+ * @returns {boolean} True if languages are similar
+ */
+export function areLanguagesSimilar(lang1, lang2) {
+  if (!lang1 || !lang2) return false;
+  
+  const l1 = lang1.split('-')[0].toLowerCase();
+  const l2 = lang2.split('-')[0].toLowerCase();
+  
+  if (l1 === l2) return true;
+
+  // Near language groups
+  const nearGroups = [
+    ['fa', 'ar', 'ur', 'ps'], // Arabic script languages
+    ['zh', 'zh-cn', 'zh-tw', 'zh-hk', 'lzh', 'yue'], // Chinese variants (Simplified, Traditional, Classical, Cantonese)
+    ['ru', 'uk', 'be'], // East Slavic
+    ['hi', 'mr', 'ne', 'sa'], // Devanagari script languages
+    ['sr', 'hr', 'bs', 'cnr'], // Serbo-Croatian variants
+    ['ms', 'id'] // Malay and Indonesian
+  ];
+
+  return nearGroups.some(group => group.includes(l1) && group.includes(l2));
+}
+
+/**
  * Get language information from language code
  * @param {string} detectedLanguageCode - Language code to look up
  * @returns {Object|null} Language info object with code, name, direction

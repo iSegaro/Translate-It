@@ -27,6 +27,11 @@ export function isSingleWordOrShortPhrase(text) {
 }
 
 /**
+ * Arabic script language codes for centralized management
+ */
+export const ARABIC_SCRIPT_LANGUAGES = ['fa', 'ar', 'ur', 'ps'];
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -34,9 +39,9 @@ export function isSingleWordOrShortPhrase(text) {
 export const isPersianText = (text) => {
   if (!text || typeof text !== 'string') return false;
 
-  // Persian-specific characters (not present in Arabic):
-  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
-  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/;
+  // Persian-specific characters (not present in standard Arabic):
+  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF), ک (U+06A9), ی (U+06CC)
+  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
   return persianExclusiveChars.test(text);
 };
 
@@ -65,13 +70,15 @@ export const detectArabicScriptLanguage = (text, preferences = {}) => {
   // Check if it's Arabic script
   if (!isArabicScriptText(text)) return null;
 
-  // Persian-specific characters (not present in Arabic):
-  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
-  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/
+  // Persian-specific characters (not present in standard Arabic):
+  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF), ک (U+06A9 - Persian Kaf), ی (U+06CC - Persian Yeh)
+  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
 
-  // Arabic-specific characters (less common in Persian):
-  // ة (U+0629), ي (U+064A), ك (U+0643), Harakat (U+064B-U+065F)
-  const arabicExclusiveChars = /[\u0629\u064A\u0643\u064B-\u065F]/
+  // Arabic-specific characters (not standard in Persian):
+  // ة (U+0629), ي (U+064A - Arabic Yeh), ك (U+0643 - Arabic Kaf), ى (U+0649 - Alef Maksura), 
+  // ئ (U+0626), ؤ (U+0624), إ (U+0625), أ (U+0623), 
+  // Harakat (U+064B-U+065F - common in Arabic, rare in plain Persian text)
+  const arabicExclusiveChars = /[\u0629\u064A\u0643\u0649\u0626\u0624\u0625\u0623\u064B-\u065F]/;
 
   // Priority 1: Persian exclusive characters
   if (persianExclusiveChars.test(text)) return 'fa';

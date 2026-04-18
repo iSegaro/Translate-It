@@ -3,8 +3,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.js';
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
-import { detectTextLanguage } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage } from '@/shared/utils/text/textAnalysis.js';
+import { detectTextLanguage, areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
@@ -40,11 +40,35 @@ export class TTSDispatcher {
       if (isExplicitAuto || globalAutoDetectEnabled) {
         const preferences = await getLanguageDetectionPreferencesAsync();
         const detected = await TTSDispatcher._detectLanguage(text, preferences);
+        
         if (detected) {
-          // Only override if user asked for 'auto' OR if we found a strong mismatch
-          if (isExplicitAuto || (globalAutoDetectEnabled && targetLanguage !== detected)) {
-            logger.debug(`[TTSDispatcher] Detected language: ${detected}`);
+          // Rule 1: Always override if user explicitly asked for 'auto'
+          if (isExplicitAuto) {
+            logger.debug(`[TTSDispatcher] Detected language for auto: ${detected}`);
             targetLanguage = detected;
+          } 
+          // Rule 2: If global auto-detect is enabled but user chose a specific language
+          // We only override if there's a "strong mismatch" (NOT similar languages)
+          // AND the user hasn't explicitly chosen a language (priority to user)
+          else if (globalAutoDetectEnabled && targetLanguage !== detected) {
+            // Only override if the detected language is NOT similar to chosen one.
+            if (!areLanguagesSimilar(targetLanguage, detected)) {
+              
+              // SCRIPT VALIDATION (Clean Logic): 
+              // Check if both target language and detected language use the same script family.
+              const isTargetArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(targetLanguage);
+              const isDetectedArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(detected);
+              const isScriptMismatch = isTargetArabicScript !== isDetectedArabicScript;
+              
+              if (isScriptMismatch) {
+                logger.debug(`[TTSDispatcher] Strong script mismatch: Chosen=${targetLanguage}, Detected=${detected}. Overriding.`);
+                targetLanguage = detected;
+              } else {
+                logger.debug(`[TTSDispatcher] Mismatch detected but scripts are compatible. Respecting user choice: ${targetLanguage}`);
+              }
+            } else {
+              logger.debug(`[TTSDispatcher] Detected ${detected} is similar to chosen ${targetLanguage}. Respecting user choice.`);
+            }
           }
         } else if (isExplicitAuto) {
           targetLanguage = 'en'; 
@@ -87,10 +111,18 @@ export class TTSDispatcher {
           if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.GOOGLE)) {
             const preferences = await getLanguageDetectionPreferencesAsync();
             const redetected = await TTSDispatcher._detectLanguage(text, preferences);
-            if (redetected && redetected !== resolution.language) {
+            
+            // Apply similar language logic here too
+            const shouldSwitch = redetected && 
+                                redetected !== resolution.language && 
+                                !areLanguagesSimilar(resolution.language, redetected);
+
+            if (shouldSwitch) {
+              logger.debug(`[TTSDispatcher] Recovery: Switching from ${resolution.language} to ${redetected}`);
               const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
               response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
             } else {
+              logger.debug(`[TTSDispatcher] Recovery: Staying with ${resolution.language}`);
               response = await handleGoogleTTSSpeak(message, sender, resolution.language);
             }
           }
@@ -161,6 +193,7 @@ export class TTSDispatcher {
           if (lang === 'ko' && !/[\uAC00-\uD7AF]/.test(sample)) return 'en';
           if (lang === 'ja' && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(sample)) return 'en';
           if (lang === 'zh' && !/[\u4E00-\u9FFF]/.test(sample)) return 'en';
+          if ((lang === 'fa' || lang === 'ar') && !isArabicScriptText(sample)) return 'en';
           
           return lang;
         }
