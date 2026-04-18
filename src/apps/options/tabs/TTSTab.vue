@@ -148,7 +148,7 @@ const updateSettingLocally = (key, value) => {
 }
 
 .setting-group {
-  margin-bottom: $spacing-lg;
+  margin-bottom: $spacing-xl;
   max-width: 100%;
 }
 
@@ -158,14 +158,13 @@ const updateSettingLocally = (key, value) => {
   align-items: center;
   margin-bottom: $spacing-xs;
   gap: $spacing-md;
-  flex-wrap: wrap;
   
   label {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
     flex: 1;
-    min-width: 200px;
+    cursor: pointer;
   }
 }
 
@@ -174,35 +173,35 @@ const updateSettingLocally = (key, value) => {
 }
 
 .setting-description {
-  font-size: $font-size-xs;
+  font-size: $font-size-sm;
   color: var(--color-text-secondary);
   margin-top: $spacing-xs;
-  line-height: 1.4;
+  line-height: 1.5;
+  max-width: 90%;
 }
 
 .section-divider {
   border: 0;
   border-top: $border-width $border-style var(--color-border);
   margin: $spacing-xl 0;
+  opacity: 0.6;
 }
 
 .select-wrapper {
   position: relative;
   width: 100%;
+  min-width: 200px;
   max-width: 250px;
   
   &::after {
-    content: '';
+    content: '▾';
     position: absolute;
-    right: $spacing-sm;
+    right: $spacing-md;
     top: 50%;
     transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 5px solid var(--color-text-secondary);
+    color: var(--color-text-secondary);
     pointer-events: none;
+    font-size: 1.2em;
   }
   
   .theme-select {
@@ -217,16 +216,17 @@ const updateSettingLocally = (key, value) => {
     border-radius: $border-radius-base;
     appearance: none;
     cursor: pointer;
-    transition: border-color $transition-base, box-shadow $transition-base;
+    transition: all $transition-base;
     
     &:hover {
       border-color: var(--color-primary);
+      background-color: var(--color-background);
     }
     
     &:focus {
       outline: none;
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+      box-shadow: 0 0 0 3px var(--color-primary-alpha);
     }
   }
 }
@@ -242,7 +242,7 @@ const updateSettingLocally = (key, value) => {
       background-color: var(--color-primary);
       
       &::after {
-        transform: translateX(20px);
+        transform: translateX(18px);
       }
     }
     
@@ -255,20 +255,24 @@ const updateSettingLocally = (key, value) => {
   .toggle-label {
     position: relative;
     display: inline-block;
-    width: 44px;
-    height: 24px;
+    width: 38px;
+    height: 20px;
     background-color: var(--color-border);
-    border-radius: 12px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: background-color $transition-base;
+    transition: all $transition-base;
+    
+    &:hover {
+      filter: brightness(0.95);
+    }
     
     &::after {
       content: '';
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       background-color: white;
       border-radius: 50%;
       transition: transform $transition-base;
@@ -280,23 +284,25 @@ const updateSettingLocally = (key, value) => {
 // Tablet responsive
 @media (max-width: #{$breakpoint-lg}) {
   .setting-item {
-    align-items: flex-start;
+    gap: $spacing-sm;
   }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .setting-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: $spacing-sm;
+    flex-wrap: wrap;
     
     label {
-      min-width: 100%;
+      min-width: 150px;
     }
   }
   
   .select-wrapper {
+    max-width: 100%;
+  }
+  
+  .setting-description {
     max-width: 100%;
   }
 }
