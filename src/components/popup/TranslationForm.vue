@@ -155,26 +155,10 @@ const currentSourceLanguage = computed(() => {
     return props.sourceLanguage
   }
 
-  // If auto-detect is selected, check if we can detect the text language
-  if (sourceText.value) {
-    // Use user preferences for language detection
-    const detectedLanguage = detectArabicScriptLanguage(
-      sourceText.value,
-      settingsStore.settings.LANGUAGE_DETECTION_PREFERENCES
-    )
-
-    if (detectedLanguage) {
-      const languageName = detectedLanguage === 'fa' ? 'Persian' : 'Arabic'
-      logger.debug(`[TranslationForm] Detected ${languageName} text, using "${detectedLanguage}"`)
-      return detectedLanguage
-    }
-    // Add more language detections here if needed
-  }
-
-  // Fallback to settings
-  const lang = settingsStore.settings.SOURCE_LANGUAGE
-  logger.debug('[TranslationForm] Using settings sourceLanguage:', lang)
-  return lang
+  // If auto-detect is selected, keep 'auto' to let LanguageSwappingService handle detection
+  // This prevents edge cases where UI shows detected language but translation fails
+  logger.debug('[TranslationForm] Using auto source for language swapping logic')
+  return AUTO_DETECT_VALUE
 })
 
 const currentTargetLanguage = computed(() => {

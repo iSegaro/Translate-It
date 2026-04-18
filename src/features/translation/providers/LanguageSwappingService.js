@@ -40,13 +40,49 @@ export class LanguageSwappingService {
     return lower;
   }
 
+  /**
+   * Get detected language for a text without performing swap
+   * Used to provide accurate source language when source='auto'
+   */
+  static async getDetectedLanguage(text) {
+    try {
+      const preferences = await getLanguageDetectionPreferencesAsync();
+
+      // First try Arabic script detection with preferences
+      const detected = detectArabicScriptLanguage(text, preferences);
+      if (detected) {
+        logger.debug(`[LanguageSwappingService] Detected Arabic script language: ${detected}`);
+        return detected;
+      }
+
+      // Fallback to browser API detection
+      const detectionResult = await browser.i18n.detectLanguage(text);
+      if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
+        const mainDetection = detectionResult.languages[0];
+        const detectedLangCode = mainDetection.language.split("-")[0];
+        logger.debug(`[LanguageSwappingService] Fallback detected language (browser API): ${detectedLangCode}`);
+        return detectedLangCode;
+      }
+
+      logger.debug(`[LanguageSwappingService] Could not detect language reliably`);
+      return null;
+    } catch (error) {
+      logger.error(`[LanguageSwappingService] Error getting detected language:`, error);
+      return null;
+    }
+  }
+
   static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi', options = {}) {
     const { providerName = 'LanguageSwapping', useRegexFallback = true } = options;
 
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const detectionResult = await browser.i18n.detectLanguage(text);
-      
+
+      // Get user language detection preferences for accurate Arabic script detection
+      const preferences = await getLanguageDetectionPreferencesAsync();
+      const accurateDetectedLang = detectArabicScriptLanguage(text, preferences);
+
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = mainDetection.language.split("-")[0];
@@ -54,12 +90,16 @@ export class LanguageSwappingService {
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = targetNorm.split("-")[0];
-        
+
         // --- BILINGUAL & AUTO-SWAP LOGIC ---
-        // BILINGUAL_TRANSLATION is now the master switch.
-        // If enabled AND detected language is the same as target language,
-        // we swap to provide bilingual experience.
-        if (bilingualEnabled && detectedLangCode === targetLangCode) {
+        // BILINGUAL_TRANSLATION is the master switch.
+        // Use accurate Arabic script detection for bilingual logic.
+        // Only swap when source is AUTO to respect user's explicit source choice.
+        const accurateLangCode = accurateDetectedLang || detectedLangCode;
+
+        const shouldSwap = bilingualEnabled && accurateLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
+
+        if (shouldSwap) {
            let newTargetLang;
            if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
              newTargetLang = originalSourceLang;
@@ -67,8 +107,8 @@ export class LanguageSwappingService {
              // Fallback to English if original source was auto-detect
              newTargetLang = "en";
            }
-           
-           logger.debug(`${providerName}: Bilingual swap applied. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+
+           logger.debug(`${providerName}: Bilingual swap applied. Detected ${accurateLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         }
 
@@ -102,15 +142,15 @@ export class LanguageSwappingService {
     const detectedLanguage = detectArabicScriptLanguage(text, preferences);
 
     // Only swap languages if:
-    // 1. Text is Arabic script (Persian or Arabic) AND
+    // 1. Text is Arabic script (detectedLanguage exists) AND
     // 2. Bilingual is enabled AND
-    // 3. Target is Persian or Arabic AND
-    // 4. Target language is NOT what the user actually wants (not explicit source)
+    // 3. Detected language matches target language (meaning text is already in target language) AND
+    // 4. Source is AUTO (only apply swap when auto-detect is selected)
     if (
       detectedLanguage &&
       bilingualEnabled &&
-      (targetLangCode === "fa" || targetLangCode === "ar") &&
-      targetLangCode !== sourceLangCode
+      detectedLanguage === targetLangCode &&
+      sourceNorm === AUTO_DETECT_VALUE
     ) {
       let newTargetLang;
 
@@ -121,7 +161,7 @@ export class LanguageSwappingService {
         newTargetLang = "en";
       }
 
-      logger.debug(`${providerName}: Languages swapped using regex fallback from ${targetLang} to ${newTargetLang} (originalSource: ${originalSourceLang}, originalTarget: ${originalTargetLang})`);
+      logger.debug(`${providerName}: Regex fallback swap: ${targetLang} → ${newTargetLang} (detected: ${detectedLanguage})`);
       return [targetNorm, newTargetLang];
     }
 

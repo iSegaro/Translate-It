@@ -11,6 +11,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -35,15 +36,31 @@ export class ProviderCoordinator {
 
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
+
       const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
-        sampleText, 
-        sourceLang, 
-        targetLang, 
-        originalSource, 
+        sampleText,
+        sourceLang,
+        targetLang,
+        originalSource,
         originalTarget,
         { providerName }
       );
-      processedSourceLang = swappedSource;
+
+      logger.debug(`[Coordinator] Language swap result: ${swappedSource} → ${swappedTarget}`);
+
+      // If source is 'auto', use detected language from swap service
+      // This prevents Edge API from incorrectly detecting the source language
+      if (swappedSource === AUTO_DETECT_VALUE) {
+        const detectedLanguage = await LanguageSwappingService.getDetectedLanguage(sampleText);
+        if (detectedLanguage) {
+          logger.debug(`[Coordinator] Using detected source language: ${detectedLanguage} (instead of auto)`);
+          processedSourceLang = detectedLanguage;
+        } else {
+          processedSourceLang = swappedSource;
+        }
+      } else {
+        processedSourceLang = swappedSource;
+      }
       processedTargetLang = swappedTarget;
     } catch (e) {
       logger.warn(`[Coordinator] Language swapping failed:`, e);
