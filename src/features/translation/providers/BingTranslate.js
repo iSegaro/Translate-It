@@ -38,7 +38,6 @@ export class BingTranslateProvider extends BaseTranslateProvider {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return PROVIDER_LANGUAGE_MAPPINGS.BING.auto;
 
-    // Use the utility function to get the provider-specific language code
     return getProviderLanguageCode(normalized, 'BING') || normalized;
   }
 
