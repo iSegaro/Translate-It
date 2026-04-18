@@ -4,9 +4,11 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { detectTextLanguage } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText, isArabicScriptText } from '@/shared/utils/text/textAnalysis.js';
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
+import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
+import storageCore from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSDispatcher');
 
@@ -14,15 +16,14 @@ export class TTSDispatcher {
   static async dispatchTTSRequest(message, sender) {
     try {
       const { text, language } = message.data || {};
-      
-      // 1. Get user settings
-      const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-      const settings = await browserAPI.storage.local.get([
-        'TTS_ENGINE', 
-        'TTS_FALLBACK_ENABLED',
-        'TTS_AUTO_DETECT_ENABLED'
-      ]);
-      
+
+      // 1. Get user settings using StorageCore
+      const settings = await storageCore.get({
+        'TTS_ENGINE': TTS_ENGINES.GOOGLE,
+        'TTS_FALLBACK_ENABLED': true,
+        'TTS_AUTO_DETECT_ENABLED': true
+      });
+
       const preferredEngine = settings.TTS_ENGINE || TTS_ENGINES.GOOGLE;
       const fallbackEnabled = settings.TTS_FALLBACK_ENABLED !== false;
       const globalAutoDetectEnabled = settings.TTS_AUTO_DETECT_ENABLED !== false;
@@ -37,7 +38,8 @@ export class TTSDispatcher {
 
       // 2. Proactive Language Detection (Context-aware)
       if (isExplicitAuto || globalAutoDetectEnabled) {
-        const detected = await TTSDispatcher._detectLanguage(text);
+        const preferences = await getLanguageDetectionPreferencesAsync();
+        const detected = await TTSDispatcher._detectLanguage(text, preferences);
         if (detected) {
           // Only override if user asked for 'auto' OR if we found a strong mismatch
           if (isExplicitAuto || (globalAutoDetectEnabled && targetLanguage !== detected)) {
@@ -83,7 +85,8 @@ export class TTSDispatcher {
           
           // Check if Google is at least allowed before trying recovery
           if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.GOOGLE)) {
-            const redetected = await TTSDispatcher._detectLanguage(text);
+            const preferences = await getLanguageDetectionPreferencesAsync();
+            const redetected = await TTSDispatcher._detectLanguage(text, preferences);
             if (redetected && redetected !== resolution.language) {
               const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
               response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
@@ -115,24 +118,20 @@ export class TTSDispatcher {
 
   /**
    * High-Precision Language Detection with Script Validation
+   * @param {string} text - Text to analyze
+   * @param {Object} preferences - User language detection preferences
+   * @returns {string|null} Detected language code or null
    */
-  static async _detectLanguage(text) {
+  static async _detectLanguage(text, preferences = {}) {
     if (!text || !text.trim()) return null;
-    
+
     const sample = text.trim();
 
-    // 1. Arabic Script Analysis
-    if (/[\u0600-\u06FF]/.test(sample)) {
-      const persianExclusive = /[\u067E\u0686\u0698\u06AF\u06CC\u06A9]/;
-      const arabicExclusive = /[\u0629\u064A\u0643\u064B-\u065F]/;
+    // 1. Arabic Script Analysis with user preferences
+    const arabicScriptLanguage = detectArabicScriptLanguage(sample, preferences);
 
-      if (persianExclusive.test(sample)) return 'fa';
-      if (arabicExclusive.test(sample)) return 'ar';
-      if (isArabicScriptText(sample)) {
-        // Default to Persian if it's Arabic script but no exclusive chars found
-        return 'fa';
-      }
-      return 'ar';
+    if (arabicScriptLanguage) {
+      return arabicScriptLanguage;
     }
 
     // 2. East Asian Script Analysis

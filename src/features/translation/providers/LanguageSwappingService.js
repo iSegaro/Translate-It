@@ -1,9 +1,9 @@
 import browser from 'webextension-polyfill';
-import { isPersianText, isArabicScriptText } from "@/shared/utils/text/textAnalysis.js";
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBilingualTranslationEnabledAsync } from "@/shared/config/config.js";
+import { getBilingualTranslationEnabledAsync, getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
 
@@ -92,8 +92,14 @@ export class LanguageSwappingService {
     const sourceNorm = this._normalizeLangValue(sourceLang);
     const targetLangCode = targetNorm.split("-")[0];
     const sourceLangCode = sourceNorm.split("-")[0];
-    
+
     const bilingualEnabled = await getBilingualTranslationEnabledAsync();
+
+    // Get user language detection preferences using StorageManager
+    const preferences = await getLanguageDetectionPreferencesAsync();
+
+    // Detect language with user preferences
+    const detectedLanguage = detectArabicScriptLanguage(text, preferences);
 
     // Only swap languages if:
     // 1. Text is Arabic script (Persian or Arabic) AND
@@ -101,7 +107,7 @@ export class LanguageSwappingService {
     // 3. Target is Persian or Arabic AND
     // 4. Target language is NOT what the user actually wants (not explicit source)
     if (
-      isArabicScriptText(text) &&
+      detectedLanguage &&
       bilingualEnabled &&
       (targetLangCode === "fa" || targetLangCode === "ar") &&
       targetLangCode !== sourceLangCode

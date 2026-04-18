@@ -39,6 +39,30 @@
           </span>
         </div>
       </div>
+
+      <!-- Language Detection Preferences -->
+      <div class="setting-group language-pref-setting">
+        <label>{{ t('language_detection_label') || 'Language Detection Preferences' }}</label>
+        <div class="language-pref-content">
+          <label class="pref-label">
+            {{ t('arabic_script_priority_label') || 'When Arabic script is detected:' }}
+          </label>
+          <select
+            v-model="arabicScriptPreference"
+            class="pref-select"
+          >
+            <option value="fa">
+              {{ t('persian_language_name') || 'Persian' }} ({{ t('default_label') || 'Default' }})
+            </option>
+            <option value="ar">
+              {{ t('arabic_language_name') || 'Arabic' }}
+            </option>
+          </select>
+          <span class="setting-description">
+            {{ t('arabic_script_priority_description') || 'Choose which language should be prioritized when text contains Arabic script characters (both Persian and Arabic use similar characters).' }}
+          </span>
+        </div>
+      </div>
     </template>
 
     <!-- Validation errors -->
@@ -109,6 +133,7 @@ const { t } = useI18n()
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
 const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
+const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -281,6 +306,13 @@ watch(targetLanguage, (value) => {
 })
 watch(bilingualTranslation, (value) => {
   settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
+})
+
+// Language Detection Preferences
+watch(arabicScriptPreference, (value) => {
+  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
+  preferences['arabic-script'] = value
+  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
 })
 
 // ========== API Settings ==========
@@ -543,6 +575,53 @@ defineExpose({
     font-size: $font-size-sm;
     color: var(--color-text-secondary);
     margin-inline-start: 32px; // Align with checkbox label
+    line-height: 1.4;
+  }
+}
+
+.language-pref-setting {
+  margin-top: $spacing-md;
+  flex-direction: column !important;
+  align-items: stretch !important;
+
+  .language-pref-content {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    .pref-label {
+      font-size: $font-size-base;
+      color: var(--color-text);
+      margin-bottom: $spacing-xs;
+      font-weight: $font-weight-medium;
+    }
+
+    .pref-select {
+      width: 100%;
+      max-width: 300px;
+      padding: $spacing-sm $spacing-md;
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-sm;
+      background-color: var(--color-background);
+      color: var(--color-text);
+      font-size: $font-size-base;
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--color-border-hover);
+      }
+
+      &:focus {
+        outline: 2px solid var(--color-primary);
+        border-color: var(--color-primary);
+      }
+    }
+  }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    margin-top: $spacing-xs;
     line-height: 1.4;
   }
 }

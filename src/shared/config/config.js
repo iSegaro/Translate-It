@@ -66,6 +66,9 @@ export const CONFIG = {
   APPLICATION_LOCALIZE: "en",
   SOURCE_LANGUAGE: "en",
   TARGET_LANGUAGE: "fa",
+  LANGUAGE_DETECTION_PREFERENCES: {
+    "arabic-script": "fa" // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
+  },
   THEME: "auto",
   TIMEOUT: 30000,
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
@@ -1102,6 +1105,13 @@ export const getBilingualTranslationEnabledAsync = async () => {
   return getSettingValueAsync(
     "BILINGUAL_TRANSLATION",
     CONFIG.BILINGUAL_TRANSLATION
+  );
+};
+
+export const getLanguageDetectionPreferencesAsync = async () => {
+  return getSettingValueAsync(
+    "LANGUAGE_DETECTION_PREFERENCES",
+    CONFIG.LANGUAGE_DETECTION_PREFERENCES
   );
 };
 

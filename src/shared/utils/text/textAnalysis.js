@@ -54,6 +54,42 @@ export const isArabicScriptText = (text) => {
 };
 
 /**
+ * Detect language for Arabic script text with user preferences
+ * @param {string} text - Text to analyze
+ * @param {Object} preferences - User language detection preferences
+ * @returns {string|null} Language code ('fa', 'ar') or null if not Arabic script
+ */
+export const detectArabicScriptLanguage = (text, preferences = {}) => {
+  if (!text || typeof text !== 'string') return null;
+
+  // Check if it's Arabic script
+  if (!isArabicScriptText(text)) return null;
+
+  // Persian-specific characters (not present in Arabic):
+  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
+  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/
+
+  // Arabic-specific characters (less common in Persian):
+  // ة (U+0629), ي (U+064A), ك (U+0643), Harakat (U+064B-U+065F)
+  const arabicExclusiveChars = /[\u0629\u064A\u0643\u064B-\u065F]/
+
+  // Priority 1: Persian exclusive characters
+  if (persianExclusiveChars.test(text)) return 'fa';
+
+  // Priority 2: Arabic exclusive characters
+  if (arabicExclusiveChars.test(text)) return 'ar';
+
+  // Priority 3: Use user preference for ambiguous text
+  const userPreference = preferences['arabic-script'];
+  if (userPreference) {
+    return userPreference;
+  }
+
+  // Priority 4: Default to Persian (for backward compatibility)
+  return 'fa';
+};
+
+/**
  * Check if RTL (Right-to-Left) should be applied to text
  * @param {string} text - Text to check
  * @returns {boolean} True if RTL should be applied

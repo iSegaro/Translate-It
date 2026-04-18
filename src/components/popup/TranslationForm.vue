@@ -59,6 +59,7 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { detectArabicScriptLanguage } from '@/shared/utils/text/textAnalysis.js';
 
 // Import adjacent SCSS
 import './TranslationForm.scss';
@@ -156,14 +157,16 @@ const currentSourceLanguage = computed(() => {
 
   // If auto-detect is selected, check if we can detect the text language
   if (sourceText.value) {
-    if (isPersianText(sourceText.value)) {
-      logger.debug('[TranslationForm] Detected Persian text, using "fa"')
-      return 'fa'
-    }
-    // Check for Arabic script (both Arabic and Persian)
-    if (isArabicScriptText(sourceText.value)) {
-      logger.debug('[TranslationForm] Detected Arabic script, defaulting to "fa" for Persian')
-      return 'fa'
+    // Use user preferences for language detection
+    const detectedLanguage = detectArabicScriptLanguage(
+      sourceText.value,
+      settingsStore.settings.LANGUAGE_DETECTION_PREFERENCES
+    )
+
+    if (detectedLanguage) {
+      const languageName = detectedLanguage === 'fa' ? 'Persian' : 'Arabic'
+      logger.debug(`[TranslationForm] Detected ${languageName} text, using "${detectedLanguage}"`)
+      return detectedLanguage
     }
     // Add more language detections here if needed
   }
