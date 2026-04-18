@@ -230,13 +230,16 @@ export class PageTranslationManager extends ResourceTracker {
       // 3. Deep clean any remaining markers
       PageTranslationHelper.deepCleanDOM();
 
-      // 4. Complete reset
+      // 4. Get the count before resetting
+      const restoredCount = this.scheduler.translatedCount || 0;
+
+      // 5. Complete reset
       this.resetLocalState();
 
       // Small delay for DOM to stabilize
       await delay(PAGE_TRANSLATION_TIMING.DOM_STABILIZATION_DELAY);
 
-      const resultData = { url: this.currentUrl, restoredCount: 0 };
+      const resultData = { url: this.currentUrl, restoredCount };
       this._broadcastEvent(MessageActions.PAGE_RESTORE_COMPLETE, resultData);
       return { success: true, ...resultData };
     } catch (error) {
