@@ -1988,6 +1988,12 @@
   "arabic_language_name": {
     "message": "عربی"
   },
+  "urdu_language_name": {
+    "message": "اردو"
+  },
+  "pashto_language_name": {
+    "message": "پشتو"
+  },
   "arabic_script_priority_description": {
     "message": "هنگامی که تشخیص بین خط فارسی و عربی دشوار است، اولویت به خط عربی داده شود."
   }

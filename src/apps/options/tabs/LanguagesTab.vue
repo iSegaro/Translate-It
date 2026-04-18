@@ -57,9 +57,15 @@
             <option value="ar">
               {{ t('arabic_language_name') || 'Arabic' }}
             </option>
+            <option value="ur">
+              {{ t('urdu_language_name') || 'Urdu' }}
+            </option>
+            <option value="ps">
+              {{ t('pashto_language_name') || 'Pashto' }}
+            </option>
           </select>
           <span class="setting-description">
-            {{ t('arabic_script_priority_description') || 'Choose which language should be prioritized when text contains Arabic script characters (both Persian and Arabic use similar characters).' }}
+            {{ t('arabic_script_priority_description') || 'Choose which language should be prioritized when text contains Arabic script characters (Persian, Arabic, Urdu, and Pashto use similar characters).' }}
           </span>
         </div>
       </div>

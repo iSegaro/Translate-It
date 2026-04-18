@@ -62,7 +62,7 @@ export const isArabicScriptText = (text) => {
  * Detect language for Arabic script text with user preferences
  * @param {string} text - Text to analyze
  * @param {Object} preferences - User language detection preferences
- * @returns {string|null} Language code ('fa', 'ar') or null if not Arabic script
+ * @returns {string|null} Language code ('fa', 'ar', 'ur', 'ps') or null if not Arabic script
  */
 export const detectArabicScriptLanguage = (text, preferences = {}) => {
   if (!text || typeof text !== 'string') return null;
@@ -70,29 +70,33 @@ export const detectArabicScriptLanguage = (text, preferences = {}) => {
   // Check if it's Arabic script
   if (!isArabicScriptText(text)) return null;
 
-  // Persian-specific characters (not present in standard Arabic):
+  // 1. Language-specific unique characters
+  
+  // Urdu-specific (U+0621, U+0624, U+0626, U+0679, U+0686, U+0688, U+0691, U+06AF, U+06BA, U+06BE, U+06C1, U+06D2)
+  const urduExclusiveChars = /[\u0679\u0688\u0691\u06BA\u06BE\u06C1\u06D2]/;
+  if (urduExclusiveChars.test(text)) return 'ur';
+
+  // Pashto-specific (U+0672, U+0675, U+0681, U+0685, U+0692, U+069A, U+06BC, U+06CD, U+06D0)
+  const pashtoExclusiveChars = /[\u0672\u0675\u0681\u0685\u0692\u069A\u06BC\u06CD\u06D0]/;
+  if (pashtoExclusiveChars.test(text)) return 'ps';
+
+  // Persian-specific (not present in standard Arabic):
   // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF), ک (U+06A9 - Persian Kaf), ی (U+06CC - Persian Yeh)
   const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
-
-  // Arabic-specific characters (not standard in Persian):
-  // ة (U+0629), ي (U+064A - Arabic Yeh), ك (U+0643 - Arabic Kaf), ى (U+0649 - Alef Maksura), 
-  // ئ (U+0626), ؤ (U+0624), إ (U+0625), أ (U+0623), 
-  // Harakat (U+064B-U+065F - common in Arabic, rare in plain Persian text)
-  const arabicExclusiveChars = /[\u0629\u064A\u0643\u0649\u0626\u0624\u0625\u0623\u064B-\u065F]/;
-
-  // Priority 1: Persian exclusive characters
   if (persianExclusiveChars.test(text)) return 'fa';
 
-  // Priority 2: Arabic exclusive characters
+  // Arabic-specific (not standard in Persian/Urdu/Pashto):
+  // ة (U+0629), ي (U+064A - Arabic Yeh), ك (U+0643 - Arabic Kaf), ى (U+0649 - Alef Maksura)
+  const arabicExclusiveChars = /[\u0629\u064A\u0643\u0649]/;
   if (arabicExclusiveChars.test(text)) return 'ar';
 
-  // Priority 3: Use user preference for ambiguous text
+  // 2. Use user preference for ambiguous text (like "سلام")
   const userPreference = preferences['arabic-script'];
-  if (userPreference) {
+  if (userPreference && ARABIC_SCRIPT_LANGUAGES.includes(userPreference)) {
     return userPreference;
   }
 
-  // Priority 4: Default to Persian (for backward compatibility)
+  // 3. Final Default
   return 'fa';
 };
 
