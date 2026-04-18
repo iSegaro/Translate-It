@@ -363,33 +363,48 @@
           </span>
         </div>
 
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="wholePageTranslateAfterScrollStop"
-            :disabled="!extensionEnabled"
-          >
-            <div class="inline-setting-content">
-              <span>{{ t('whole_page_translate_after_scroll_stop_label') || 'Translate on scroll stop' }}</span>
-              <div 
-                v-if="wholePageTranslateAfterScrollStop"
-                class="number-input-container inline-delay-input"
-              >
-                <input
-                  v-model.number="wholePageScrollStopDelay"
-                  type="number"
-                  min="100"
-                  max="5000"
-                  step="100"
-                  class="base-number-input compact-input"
-                  :disabled="!extensionEnabled"
-                  @click.stop
-                />
-                <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
-              </div>
+        <div class="setting-group sub-setting-group whole-page-trigger-group">
+          <div class="trigger-modes-container">
+            <span class="trigger-label">{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
+            <div class="radio-group-horizontal">
+              <BaseRadio
+                v-model="wholePageTranslateAfterScrollStop"
+                :value="true"
+                name="wholePageTrigger"
+                :disabled="!extensionEnabled"
+                :label="t('whole_page_trigger_on_stop') || 'On Scroll Stop'"
+              />
+              <BaseRadio
+                v-model="wholePageTranslateAfterScrollStop"
+                :value="false"
+                name="wholePageTrigger"
+                :disabled="!extensionEnabled"
+                :label="t('whole_page_trigger_fluid') || 'Fluid (During Scroll)'"
+              />
             </div>
-          </BaseCheckbox>
+          </div>
+          
+          <div class="delay-setting-container">
+            <span class="delay-label">{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
+            <div class="number-input-container inline-delay-input">
+              <input
+                v-model.number="wholePageScrollStopDelay"
+                type="number"
+                min="100"
+                max="5000"
+                step="100"
+                class="base-number-input compact-input"
+                :disabled="!extensionEnabled"
+              />
+              <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+            </div>
+          </div>
+          
           <span class="setting-description">
-            {{ t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.' }}
+            {{ wholePageTranslateAfterScrollStop 
+               ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
+               : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
+            }}
           </span>
         </div>
       </div>
@@ -602,6 +617,34 @@ const dictionaryProvider = computed({
     font-weight: 600;
     color: var(--color-text);
     min-width: 150px;
+  }
+}
+
+.whole-page-trigger-group {
+  margin-top: $spacing-md;
+
+  .trigger-modes-container, .delay-setting-container {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    margin-bottom: $spacing-sm;
+    
+    .trigger-label, .delay-label {
+      font-size: $font-size-sm;
+      font-weight: 500;
+      color: var(--color-text);
+      min-width: 160px;
+    }
+    
+    .radio-group-horizontal {
+      display: flex;
+      align-items: center;
+      gap: $spacing-xl;
+    }
+  }
+
+  .delay-setting-container {
+    margin-top: $spacing-xs;
   }
 }
 

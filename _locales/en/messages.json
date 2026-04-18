@@ -1935,7 +1935,22 @@
     "message": "Translate on scroll stop"
   },
   "whole_page_translate_after_scroll_stop_description": {
-    "message": "Only trigger translation when you stop scrolling."
+    "message": "Only trigger translation when you stop scrolling. Best for performance and saving API credits."
+  },
+  "whole_page_translate_fluid_description": {
+    "message": "Translate continuously with a slight delay during scrolling. More responsive but may increase API requests."
+  },
+  "whole_page_trigger_mode_label": {
+    "message": "Translation Trigger Mode"
+  },
+  "whole_page_trigger_on_stop": {
+    "message": "On Scroll Stop"
+  },
+  "whole_page_trigger_fluid": {
+    "message": "Fluid (During Scroll)"
+  },
+  "whole_page_delay_label": {
+    "message": "Translation Delay"
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ms"

@@ -1926,7 +1926,22 @@
     "message": "ترجمه با توقف اسکرول"
   },
   "whole_page_translate_after_scroll_stop_description": {
-    "message": "فقط زمانی که اسکرول متوقف شود، ترجمه انجام می‌شود."
+    "message": "فقط زمانی که اسکرول متوقف شود، ترجمه انجام می‌شود. مناسب برای کارایی بیشتر و صرفه‌جویی در مصرف API."
+  },
+  "whole_page_translate_fluid_description": {
+    "message": "ترجمه به صورت مداوم با تاخیری اندک در حین اسکرول. پاسخگویی سریع‌تر اما ممکن است مصرف API را افزایش دهد."
+  },
+  "whole_page_trigger_mode_label": {
+    "message": "حالت شروع ترجمه"
+  },
+  "whole_page_trigger_on_stop": {
+    "message": "هنگام توقف اسکرول"
+  },
+  "whole_page_trigger_fluid": {
+    "message": "روان (در حین اسکرول)"
+  },
+  "whole_page_delay_label": {
+    "message": "تاخیر در ترجمه"
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "میلی ثانیه"

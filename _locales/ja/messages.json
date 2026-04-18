@@ -1935,7 +1935,22 @@
     "message": "スクロール停止時に翻訳"
   },
   "whole_page_translate_after_scroll_stop_description": {
-    "message": "スクロールが停止したときのみ، 翻訳を実行します。"
+    "message": "スクロールが停止したときのみ、翻訳を実行します。パフォーマンスの向上とAPIクレジットの節約に最適です。"
+  },
+  "whole_page_translate_fluid_description": {
+    "message": "スクロール中にわずかな遅延をおいて継続的に翻訳します。レスポンスは速くなりますが、APIリクエストが増える可能性があります。"
+  },
+  "whole_page_trigger_mode_label": {
+    "message": "翻訳開始タイミング"
+  },
+  "whole_page_trigger_on_stop": {
+    "message": "スクロール停止時"
+  },
+  "whole_page_trigger_fluid": {
+    "message": "流動的（スクロール中）"
+  },
+  "whole_page_delay_label": {
+    "message": "翻訳遅延時間"
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ミリ秒"

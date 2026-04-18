@@ -232,10 +232,18 @@ export class PageTranslationScheduler extends ResourceTracker {
     // Adaptive delay: 
     // - Very first batch is slightly delayed to collect initial content.
     // - High priority items (Viewport) trigger faster processing (50ms).
-    // - Low priority items use the standard pool delay (150ms-300ms).
+    // - Low priority items:
+    //    a) If translateAfterScrollStop is true: use poolDelay (internal batching)
+    //    b) If translateAfterScrollStop is false (Fluid): use user-defined scrollStopDelay
+    const standardDelay = this.settings.translateAfterScrollStop 
+      ? (this.settings.poolDelay || PAGE_TRANSLATION_TIMING.STANDARD_LOAD_DELAY)
+      : (this.settings.scrollStopDelay || PAGE_TRANSLATION_TIMING.STANDARD_LOAD_DELAY);
+
     const delay = this.isFirstBatch 
       ? PAGE_TRANSLATION_TIMING.FIRST_BATCH_DELAY 
-      : (isHighPriority ? PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY : (this.settings.poolDelay || PAGE_TRANSLATION_TIMING.STANDARD_LOAD_DELAY));
+      : (isHighPriority 
+          ? Math.min(PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY, standardDelay) 
+          : standardDelay);
 
     if (this.batchTimer) {
       // If a high-priority item comes in, we might want to speed up the existing timer

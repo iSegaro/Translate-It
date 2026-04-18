@@ -58,6 +58,23 @@ export class PageTranslationEventManager {
         }
       }
     });
+
+    // Listen for mode changes (Fluid vs On Stop)
+    storageManager.on('change:WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', ({ newValue }) => {
+      this.logger.info('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP changed in storage:', newValue);
+      if (this.manager.settings) {
+        this.manager.settings.translateAfterScrollStop = !!newValue;
+        
+        // Update scroll tracker based on the new mode
+        if (this.manager.isTranslating || this.manager.isAutoTranslating) {
+          if (newValue) {
+            this.manager.scrollTracker.start(this.manager.settings.scrollStopDelay);
+          } else {
+            this.manager.scrollTracker.stop();
+          }
+        }
+      }
+    });
   }
 
   _setupPageEventBusListeners() {
