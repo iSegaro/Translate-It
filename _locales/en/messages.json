@@ -1981,5 +1981,23 @@
   },
   "enable_translation_history_description": {
     "message": "Save translations in history."
+  },
+  "language_detection_label": {
+    "message": "Language Detection"
+  },
+  "arabic_script_priority_label": {
+    "message": "Arabic Script Priority"
+  },
+  "persian_language_name": {
+    "message": "Persian"
+  },
+  "default_label": {
+    "message": "Default"
+  },
+  "arabic_language_name": {
+    "message": "Arabic"
+  },
+  "arabic_script_priority_description": {
+    "message": "Prioritize Arabic script detection when the script is ambiguous between Persian and Arabic."
   }
 }

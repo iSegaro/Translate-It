@@ -1972,5 +1972,23 @@
   },
   "enable_translation_history_description": {
     "message": "ثبت ترجمه‌ها در تاریخچه."
+  },
+  "language_detection_label": {
+    "message": "تشخیص زبان"
+  },
+  "arabic_script_priority_label": {
+    "message": "اولویت خط عربی"
+  },
+  "persian_language_name": {
+    "message": "فارسی"
+  },
+  "default_label": {
+    "message": "پیش‌فرض"
+  },
+  "arabic_language_name": {
+    "message": "عربی"
+  },
+  "arabic_script_priority_description": {
+    "message": "هنگامی که تشخیص بین خط فارسی و عربی دشوار است، اولویت به خط عربی داده شود."
   }
 }

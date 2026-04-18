@@ -1981,5 +1981,23 @@
   },
   "enable_translation_history_description": {
     "message": "翻訳を履歴に保存します。"
+  },
+  "language_detection_label": {
+    "message": "言語検出"
+  },
+  "arabic_script_priority_label": {
+    "message": "アラビア文字の優先"
+  },
+  "persian_language_name": {
+    "message": "ペルシア語"
+  },
+  "default_label": {
+    "message": "デフォルト"
+  },
+  "arabic_language_name": {
+    "message": "アラビア語"
+  },
+  "arabic_script_priority_description": {
+    "message": "ペルシア語とアラビア語で文字の判別が曖昧な場合、アラビア文字としての検出を優先します。"
   }
 }
