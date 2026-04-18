@@ -32,7 +32,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
-    return getProviderLanguageCode('GOOGLE', lang);
+    return getProviderLanguageCode(lang, 'GOOGLE');
   }
 
   /**

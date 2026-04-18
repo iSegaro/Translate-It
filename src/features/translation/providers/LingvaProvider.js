@@ -32,7 +32,7 @@ export class LingvaProvider extends BaseTranslateProvider {
 
   _getLangCode(lang) {
     if (!lang || lang === AUTO_DETECT_VALUE) return "auto";
-    return getProviderLanguageCode('GOOGLE', lang);
+    return getProviderLanguageCode(lang, 'GOOGLE');
   }
 
   /**
