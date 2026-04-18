@@ -36,14 +36,14 @@ export function generateManifest(browser = 'chrome') {
       {
         js: ['src/core/content-scripts/index-main.js'],
         // Main content script only for the top frame
-        matches: ['<all_urls>', 'file://*/*'],
+        matches: [ '<all_urls>', 'file:///*', '*://*/*' ],
         run_at: 'document_idle',
         all_frames: false
       },
       {
         js: ['src/core/content-scripts/index-iframe.js'],
         // Lite content script for all frames (iframes)
-        matches: ['<all_urls>', 'file://*/*'],
+        matches: [ '<all_urls>', 'file:///*', '*://*/*' ],
         run_at: 'document_idle',
         all_frames: true
       }
