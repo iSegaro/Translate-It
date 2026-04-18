@@ -15,7 +15,7 @@
         :label="t('enable_translation_history_label') || 'Enable Translation History'"
       />
       <p class="setting-description">
-        {{ t('enable_translation_history_description') || 'Save your translations for future reference. Disabled for page translation and element selection.' }}
+        {{ t('enable_translation_history_description') || 'Save translations in history.' }}
       </p>
     </div>
 

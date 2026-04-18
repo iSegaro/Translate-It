@@ -1965,6 +1965,6 @@
     "message": "翻訳履歴を有効にする"
   },
   "enable_translation_history_description": {
-    "message": "将来の参照のために翻訳をローカルに保存します。"
+    "message": "翻訳を履歴に保存します。"
   }
 }
