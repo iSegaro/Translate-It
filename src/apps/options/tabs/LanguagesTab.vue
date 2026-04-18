@@ -68,6 +68,29 @@
             {{ t('arabic_script_priority_description') || 'Choose which language should be prioritized when text contains Arabic script characters (Persian, Arabic, Urdu, and Pashto use similar characters).' }}
           </span>
         </div>
+
+        <div class="language-pref-content mt-md">
+          <label class="pref-label">
+            {{ t('chinese_script_priority_label') || 'When Chinese script is detected:' }}
+          </label>
+          <select
+            v-model="chineseScriptPreference"
+            class="pref-select"
+          >
+            <option value="zh-cn">
+              {{ t('chinese_simplified_name') || 'Chinese (Simplified)' }} ({{ t('default_label') || 'Default' }})
+            </option>
+            <option value="zh-tw">
+              {{ t('chinese_traditional_name') || 'Chinese (Traditional)' }}
+            </option>
+            <option value="lzh">
+              {{ t('chinese_classical_name') || 'Chinese (Classical)' }}
+            </option>
+            <option value="yue">
+              {{ t('chinese_cantonese_name') || 'Cantonese' }}
+            </option>
+          </select>
+        </div>
       </div>
     </template>
 
@@ -140,6 +163,7 @@ const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
 const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
 const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
+const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -318,6 +342,12 @@ watch(bilingualTranslation, (value) => {
 watch(arabicScriptPreference, (value) => {
   const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
   preferences['arabic-script'] = value
+  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
+})
+
+watch(chineseScriptPreference, (value) => {
+  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
+  preferences['chinese-script'] = value
   settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
 })
 

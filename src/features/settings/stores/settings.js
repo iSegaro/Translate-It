@@ -33,7 +33,8 @@ function getDefaultSettings() {
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
     LANGUAGE_DETECTION_PREFERENCES: CONFIG.LANGUAGE_DETECTION_PREFERENCES || {
-      "arabic-script": "fa" // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
+      "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
+      "chinese-script": "zh-cn" // چینی ساده‌شده
     },
     TIMEOUT: CONFIG.TIMEOUT || 30000,
     selectionTranslationMode: CONFIG.selectionTranslationMode || SelectionTranslationMode.ON_CLICK,

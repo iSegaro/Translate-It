@@ -33,23 +33,55 @@ export class TTSLanguageService {
   }
 
   /**
+   * Maps a language code to the nearest supported one for a specific engine.
+   * Helps with variants like lzh (Classical Chinese) which aren't natively supported.
+   */
+  static getSupportedLanguageCode(engine, language) {
+    if (!language) return 'en';
+    const lang = language.toLowerCase().split('-')[0];
+
+    // Mapping for Near Languages that lack native TTS support
+    const ttsMappings = {
+      'lzh': 'zh-tw', // Classical Chinese -> Traditional Chinese (for pronunciation)
+      'ps': 'ps',     // Pashto (Edge supports it)
+      'ur': 'ur'      // Urdu (Edge supports it)
+    };
+
+    const mapped = ttsMappings[lang];
+
+    // If we have a mapping and the engine supports it, use it
+    if (mapped && TTSLanguageService.supportsLanguage(engine, mapped)) {
+      return mapped;
+    }
+
+    return language;
+  }
+
+  /**
    * Determine the best engine to use based on support and settings
    */
   static resolveTTSSettings(language, preferredEngine = TTS_ENGINES.GOOGLE, fallbackEnabled = true) {
-    if (TTSLanguageService.supportsLanguage(preferredEngine, language)) {
-      return { engine: preferredEngine, language };
+    // First, normalize the language code for TTS compatibility
+    const normalizedLang = TTSLanguageService.getSupportedLanguageCode(preferredEngine, language);
+
+    if (TTSLanguageService.supportsLanguage(preferredEngine, normalizedLang)) {
+      return { engine: preferredEngine, language: normalizedLang };
     }
 
     if (fallbackEnabled) {
       const otherEngine = preferredEngine === TTS_ENGINES.GOOGLE ? TTS_ENGINES.EDGE : TTS_ENGINES.GOOGLE;
-      if (TTSLanguageService.supportsLanguage(otherEngine, language)) {
-        logger.debug(`[TTSLanguageService] Switching engine to ${otherEngine} for language ${language}`);
-        return { engine: otherEngine, language };
+      // Also normalize for the other engine
+      const otherNormalized = TTSLanguageService.getSupportedLanguageCode(otherEngine, language);
+
+      if (TTSLanguageService.supportsLanguage(otherEngine, otherNormalized)) {
+        logger.debug(`[TTSLanguageService] Switching engine to ${otherEngine} for language ${otherNormalized}`);
+        return { engine: otherEngine, language: otherNormalized };
       }
     }
 
-    return { engine: preferredEngine, language };
+    return { engine: preferredEngine, language: normalizedLang };
   }
+
 
   /**
    * Gets the specific Edge TTS voice for a language

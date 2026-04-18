@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, isChineseScriptText, detectChineseScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -48,14 +48,21 @@ export class LanguageSwappingService {
     try {
       const preferences = await getLanguageDetectionPreferencesAsync();
 
-      // First try Arabic script detection with preferences
-      const detected = detectArabicScriptLanguage(text, preferences);
-      if (detected) {
-        logger.debug(`[LanguageSwappingService] Detected Arabic script language: ${detected}`);
-        return detected;
+      // 1. Try Arabic script detection with preferences
+      const arabicDetected = detectArabicScriptLanguage(text, preferences);
+      if (arabicDetected) {
+        logger.debug(`[LanguageSwappingService] Detected Arabic script language: ${arabicDetected}`);
+        return arabicDetected;
       }
 
-      // Fallback to browser API detection
+      // 2. Try Chinese script detection with preferences
+      const chineseDetected = detectChineseScriptLanguage(text, preferences);
+      if (chineseDetected) {
+        logger.debug(`[LanguageSwappingService] Detected Chinese script language: ${chineseDetected}`);
+        return chineseDetected;
+      }
+
+      // 3. Fallback to browser API detection
       const detectionResult = await browser.i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
@@ -79,9 +86,12 @@ export class LanguageSwappingService {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const detectionResult = await browser.i18n.detectLanguage(text);
 
-      // Get user language detection preferences for accurate Arabic script detection
+      // Get user language detection preferences for accurate script detection
       const preferences = await getLanguageDetectionPreferencesAsync();
-      const accurateDetectedLang = detectArabicScriptLanguage(text, preferences);
+      
+      const arabicDetected = detectArabicScriptLanguage(text, preferences);
+      const chineseDetected = detectChineseScriptLanguage(text, preferences);
+      const accurateDetectedLang = arabicDetected || chineseDetected;
 
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
@@ -93,7 +103,7 @@ export class LanguageSwappingService {
 
         // --- BILINGUAL & AUTO-SWAP LOGIC ---
         // BILINGUAL_TRANSLATION is the master switch.
-        // Use accurate Arabic script detection for bilingual logic.
+        // Use accurate script detection (Arabic/Chinese) for bilingual logic.
         // Only swap when source is AUTO to respect user's explicit source choice.
         const accurateLangCode = accurateDetectedLang || detectedLangCode;
 
@@ -131,18 +141,19 @@ export class LanguageSwappingService {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
     const targetLangCode = targetNorm.split("-")[0];
-    const sourceLangCode = sourceNorm.split("-")[0];
 
     const bilingualEnabled = await getBilingualTranslationEnabledAsync();
 
-    // Get user language detection preferences using StorageManager
+    // Get user language detection preferences
     const preferences = await getLanguageDetectionPreferencesAsync();
 
-    // Detect language with user preferences
-    const detectedLanguage = detectArabicScriptLanguage(text, preferences);
+    // Detect language with user preferences (Arabic and Chinese scripts)
+    const arabicDetected = detectArabicScriptLanguage(text, preferences);
+    const chineseDetected = detectChineseScriptLanguage(text, preferences);
+    const detectedLanguage = arabicDetected || chineseDetected;
 
     // Only swap languages if:
-    // 1. Text is Arabic script (detectedLanguage exists) AND
+    // 1. Text script is recognized (detectedLanguage exists) AND
     // 2. Bilingual is enabled AND
     // 3. Detected language matches target language (meaning text is already in target language) AND
     // 4. Source is AUTO (only apply swap when auto-detect is selected)

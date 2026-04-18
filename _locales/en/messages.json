@@ -2003,6 +2003,21 @@
   "pashto_language_name": {
     "message": "Pashto"
   },
+  "chinese_simplified_name": {
+    "message": "Chinese (Simplified)"
+  },
+  "chinese_traditional_name": {
+    "message": "Chinese (Traditional)"
+  },
+  "chinese_classical_name": {
+    "message": "Chinese (Classical)"
+  },
+  "chinese_cantonese_name": {
+    "message": "Cantonese"
+  },
+  "chinese_script_priority_label": {
+    "message": "When Chinese script is detected:"
+  },
   "arabic_script_priority_description": {
     "message": "Prioritize Arabic script detection when the script is ambiguous between Persian and Arabic."
   }

@@ -4,7 +4,7 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { detectTextLanguage, areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
@@ -58,7 +58,12 @@ export class TTSDispatcher {
               // Check if both target language and detected language use the same script family.
               const isTargetArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(targetLanguage);
               const isDetectedArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(detected);
-              const isScriptMismatch = isTargetArabicScript !== isDetectedArabicScript;
+              
+              const isTargetChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(targetLanguage);
+              const isDetectedChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(detected);
+              
+              const isScriptMismatch = (isTargetArabicScript !== isDetectedArabicScript) || 
+                                       (isTargetChineseScript !== isDetectedChineseScript);
               
               if (isScriptMismatch) {
                 logger.debug(`[TTSDispatcher] Strong script mismatch: Chosen=${targetLanguage}, Detected=${detected}. Overriding.`);
@@ -161,15 +166,15 @@ export class TTSDispatcher {
 
     // 1. Arabic Script Analysis with user preferences
     const arabicScriptLanguage = detectArabicScriptLanguage(sample, preferences);
+    if (arabicScriptLanguage) return arabicScriptLanguage;
 
-    if (arabicScriptLanguage) {
-      return arabicScriptLanguage;
-    }
+    // 2. Chinese Script Analysis with user preferences
+    const chineseScriptLanguage = detectChineseScriptLanguage(sample, preferences);
+    if (chineseScriptLanguage) return chineseScriptLanguage;
 
-    // 2. East Asian Script Analysis
+    // 3. East Asian Script Analysis (Fallback for JA/KO)
     if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
     if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
-    if (/[\u4E00-\u9FFF]/.test(sample)) return 'zh';
 
     // 3: Specific Latin Diacritics (Instant markers for short strings)
     if (/[ß]/.test(sample)) return 'de'; // German unique
@@ -192,7 +197,7 @@ export class TTSDispatcher {
           
           if (lang === 'ko' && !/[\uAC00-\uD7AF]/.test(sample)) return 'en';
           if (lang === 'ja' && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(sample)) return 'en';
-          if (lang === 'zh' && !/[\u4E00-\u9FFF]/.test(sample)) return 'en';
+          if (lang === 'zh' && !isChineseScriptText(sample)) return 'en';
           if ((lang === 'fa' || lang === 'ar') && !isArabicScriptText(sample)) return 'en';
           
           return lang;

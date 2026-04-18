@@ -59,7 +59,6 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { detectArabicScriptLanguage } from '@/shared/utils/text/textAnalysis.js';
 
 // Import adjacent SCSS
 import './TranslationForm.scss';
@@ -129,23 +128,6 @@ watch(sourceText, (newValue, oldValue) => {
     logger.debug("📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
   }
 }, { deep: true })
-
-// Helper function to detect if text is Persian (distinguishes from Arabic)
-const isPersianText = (text) => {
-  if (!text) return false
-  // Persian-specific characters (not present in Arabic):
-  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
-  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/
-  return persianExclusiveChars.test(text)
-}
-
-// Helper function to detect if text contains Arabic script (both Arabic and Persian)
-const isArabicScriptText = (text) => {
-  if (!text) return false
-  // Arabic/Persian Unicode range: \u0600-\u06FF
-  const arabicScriptRegex = /[\u0600-\u06FF]/
-  return arabicScriptRegex.test(text)
-}
 
 // Reactive language values - use props first, then fallback to settings
 const currentSourceLanguage = computed(() => {

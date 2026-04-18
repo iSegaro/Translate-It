@@ -67,7 +67,8 @@ export const CONFIG = {
   SOURCE_LANGUAGE: "en",
   TARGET_LANGUAGE: "fa",
   LANGUAGE_DETECTION_PREFERENCES: {
-    "arabic-script": "fa" // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
+    "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
+    "chinese-script": "zh-cn" // پیش‌فرض: چینی ساده‌شده
   },
   THEME: "auto",
   TIMEOUT: 30000,

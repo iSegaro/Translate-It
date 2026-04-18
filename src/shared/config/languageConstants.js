@@ -32,6 +32,9 @@ export const LANGUAGE_NAME_TO_CODE_MAP = {
   cebuano: "ceb",
   "chinese (simplified)": "zh-CN",
   chinese: "zh-CN",
+  "chinese (traditional)": "zh-TW",
+  "chinese (classical)": "lzh",
+  cantonese: "yue",
   croatian: "hr",
   czech: "cs",
   danish: "da",
@@ -171,6 +174,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     pt: "pt",
     "zh-CN": "zh-Hans", // Simplified Chinese
     "zh-TW": "zh-Hant", // Traditional Chinese
+    "yue": "zh-HK",     // Cantonese (Bing uses HK code)
+    "lzh": "zh-Hant",   // Classical (Fallback to Traditional for Bing)
   },
 
   // Yandex Translate Language Codes
@@ -429,7 +434,10 @@ export function getProviderLanguageCode(lang, provider = 'GOOGLE') {
 const AI_ENHANCED_LANGUAGE_MAPPINGS = {
   'ar': 'Arabic (Modern Standard)',
   'zh': 'Chinese (Simplified)',
+  'zh-cn': 'Chinese (Simplified)',
   'zh-tw': 'Chinese (Traditional)',
+  'lzh': 'Classical Chinese (Literary Chinese)',
+  'yue': 'Cantonese (Traditional Script)',
   'he': 'Hebrew (Modern)',
   'fa': 'Persian (Farsi)',
 };

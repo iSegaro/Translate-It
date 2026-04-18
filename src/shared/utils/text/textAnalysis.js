@@ -32,6 +32,11 @@ export function isSingleWordOrShortPhrase(text) {
 export const ARABIC_SCRIPT_LANGUAGES = ['fa', 'ar', 'ur', 'ps'];
 
 /**
+ * Chinese script language codes for centralized management
+ */
+export const CHINESE_SCRIPT_LANGUAGES = ['zh-cn', 'zh-tw', 'lzh', 'yue'];
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -135,4 +140,46 @@ export const correctTextDirection = (element, text) => {
 
   const isRtl = shouldApplyRtl(text);
   applyElementDirection(element, isRtl);
+};
+
+/**
+ * Check if text contains Chinese characters (CJK Unified Ideographs)
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains Chinese characters
+ */
+export const isChineseScriptText = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  // CJK Unified Ideographs range
+  return /[\u4E00-\u9FFF]/.test(text);
+};
+
+/**
+ * Detect specific Chinese variant with user preferences
+ * @param {string} text - Text to analyze
+ * @param {Object} preferences - User language detection preferences
+ * @returns {string|null} Language code ('zh-cn', 'zh-tw', 'lzh', 'yue') or null
+ */
+export const detectChineseScriptLanguage = (text, preferences = {}) => {
+  if (!text || !isChineseScriptText(text)) return null;
+
+  // 1. Heuristic: Unique Markers for Traditional vs Simplified
+
+  // Traditional Chinese unique markers (Commonly used characters that were simplified)
+  // 們 (men), 國 (guo), 學 (xue), 會 (hui), 這 (zhe)
+  const traditionalMarkers = /[\u5011\u570B\u5B78\u6703\u9019]/;
+  if (traditionalMarkers.test(text)) return 'zh-tw';
+
+  // Simplified Chinese unique markers
+  // 们 (men), 国 (guo), 学 (xue), 会 (hui), 这 (zhe)
+  const simplifiedMarkers = /[\u4EEC\u56FD\u5B66\u4F1A\u8FD9]/;
+  if (simplifiedMarkers.test(text)) return 'zh-cn';
+
+  // 2. Use user preference for ambiguous text
+  const userPreference = preferences['chinese-script'];
+  if (userPreference && CHINESE_SCRIPT_LANGUAGES.includes(userPreference)) {
+    return userPreference;
+  }
+
+  // 3. Final Default
+  return 'zh-cn';
 };

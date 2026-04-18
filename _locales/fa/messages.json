@@ -1994,6 +1994,21 @@
   "pashto_language_name": {
     "message": "پشتو"
   },
+  "chinese_simplified_name": {
+    "message": "چینی (ساده‌شده)"
+  },
+  "chinese_traditional_name": {
+    "message": "چینی (سنتی)"
+  },
+  "chinese_classical_name": {
+    "message": "چینی (کلاسیک)"
+  },
+  "chinese_cantonese_name": {
+    "message": "کانتونی"
+  },
+  "chinese_script_priority_label": {
+    "message": "هنگامی که خط چینی تشخیص داده شد:"
+  },
   "arabic_script_priority_description": {
     "message": "هنگامی که تشخیص بین خط فارسی و عربی دشوار است، اولویت به خط عربی داده شود."
   }
