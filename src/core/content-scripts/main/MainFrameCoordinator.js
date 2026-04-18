@@ -3,6 +3,10 @@
  * Handles cross-frame communication and synchronization between the main frame and iframes.
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'MainFrameCoordinator');
 
 export class MainFrameCoordinator {
   constructor(aggregator, MessageActions, contentScriptCore) {
@@ -73,22 +77,64 @@ export class MainFrameCoordinator {
     window.addEventListener('message', (event) => {
       // 1. Process messages from our own lite-iframes
       if (event.data?.source === 'translate-it-iframe') {
-        const { type, data } = event.data;
-        
-        // Progress updates
+        const { type, data, frameUrl, action } = event.data;
+
+        // Use frameUrl as unique identifier instead of event.source (which is always window.top)
+        const frameId = frameUrl || event.source;
+
+        logger.debug(`Received iframe message: type=${type}, action=${action}, frameUrl=${frameUrl}`);
+
+        // Generic page events (NEW: forwards all events from IFrame)
+        if (type === 'TRANSLATE_IT_PAGE_EVENT' && action) {
+          logger.debug(`Processing TRANSLATE_IT_PAGE_EVENT: action=${action}, data=`, data);
+          // Update frame data based on action type
+          if (action === this.MessageActions.PAGE_TRANSLATE_PROGRESS) {
+            this.aggregator.updateFrameData(frameId, data);
+            this.aggregator.emitAggregateProgress();
+          } else if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE) {
+            this.aggregator.updateFrameData(frameId, {
+              ...data,
+              isTranslating: false,
+              status: 'idle',
+              isTranslated: true
+            });
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_COMPLETE, data);
+          } else if (action === this.MessageActions.PAGE_TRANSLATE_IDLE) {
+            this.aggregator.updateFrameData(frameId, {
+              ...data,
+              isTranslating: false,
+              status: 'idle',
+              isTranslated: (data.translatedCount || 0) > 0
+            });
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_IDLE, data);
+          } else if (action === this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
+            this.aggregator.updateFrameData(frameId, {
+              ...data,
+              isTranslating: false,
+              status: 'idle'
+            });
+            // Emit to PageEventBus so content app receives iframe data
+            if (pageEventBus) {
+              pageEventBus.emit(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
+            }
+          }
+          return;
+        }
+
+        // Legacy progress updates (backward compatibility)
         if (type === 'TRANSLATE_IT_PAGE_PROGRESS') {
-          this.aggregator.updateFrameData(event.source, data);
+          this.aggregator.updateFrameData(frameId, data);
           this.aggregator.emitAggregateProgress();
           return;
         }
 
         // Completion signals
         if (type === 'TRANSLATE_IT_PAGE_COMPLETE') {
-          this.aggregator.updateFrameData(event.source, { 
-            ...data, 
-            isTranslating: false, 
-            status: 'idle', 
-            isTranslated: true 
+          this.aggregator.updateFrameData(frameId, {
+            ...data,
+            isTranslating: false,
+            status: 'idle',
+            isTranslated: true
           });
           this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_COMPLETE, data);
           return;
@@ -96,7 +142,7 @@ export class MainFrameCoordinator {
 
         // Stopped (Auto-Restore) signals
         if (type === 'TRANSLATE_IT_PAGE_STOPPED') {
-          this.aggregator.updateFrameData(event.source, {
+          this.aggregator.updateFrameData(frameId, {
             ...data,
             isTranslating: false,
             status: 'idle'

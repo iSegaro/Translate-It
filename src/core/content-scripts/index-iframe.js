@@ -133,7 +133,11 @@ if (!window.translateItContentScriptCore) {
                           frameUrl: window.location.href,
                           data: {
                             translatedCount: data.translatedCount || 0,
-                            totalCount: data.totalCount || 0
+                            totalCount: data.totalCount || 0,
+                            isTranslated: data.isTranslated,
+                            isAutoTranslating: data.isAutoTranslating,
+                            isTranslating: data.isTranslating,
+                            status: data.status
                           }
                         }, '*');
                       } catch (e) { /* ignore */ }

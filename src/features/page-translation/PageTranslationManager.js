@@ -387,6 +387,23 @@ export class PageTranslationManager extends ResourceTracker {
       // This prevents duplicate messages from iframes to other contexts
       if (isTopFrame) {
         sendRegularMessage({ action, data, context: 'page-translation-broadcast' }, { silent: true }).catch(() => {});
+      } else {
+        // IFrame: Send to Main Frame for aggregation
+        this.logger.debug(`IFrame sending event to main frame: ${action}`, data);
+        try {
+          window.top.postMessage({
+            type: 'TRANSLATE_IT_PAGE_EVENT',
+            action,
+            data: {
+              ...data,
+              frameUrl: window.location.href
+            },
+            source: 'translate-it-iframe'
+          }, '*');
+          this.logger.debug(`IFrame successfully sent event to main frame`);
+        } catch (e) {
+          this.logger.warn('IFrame failed to send event to main frame:', e);
+        }
       }
     } catch (error) {
       this.logger.debug('Broadcast event failed - iframe or background unavailable:', error);

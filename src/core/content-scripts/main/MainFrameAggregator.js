@@ -3,6 +3,10 @@
  * Manages and aggregates translation progress from the main frame and all child iframes.
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.IFRAME, 'Aggregator');
 
 export class MainFrameAggregator {
   constructor(MessageActions) {
@@ -76,7 +80,7 @@ export class MainFrameAggregator {
    */
   emitAggregateProgress(overrideAction = null, extraData = {}) {
     const status = this.getGlobalPageTranslationStatus();
-    
+
     if (pageEventBus) {
       const action = overrideAction || this.MessageActions.PAGE_TRANSLATE_PROGRESS;
       const payload = {
@@ -90,11 +94,13 @@ export class MainFrameAggregator {
       };
 
       // Special handling for completion events
-      if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE || 
+      if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE ||
           action === this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
         payload.isTranslated = status.translatedCount > 0;
         payload.url = window.location.href;
       }
+
+      logger.debug(`Emitting aggregated event: ${action}`, payload);
 
       pageEventBus.emit(action, payload);
     }

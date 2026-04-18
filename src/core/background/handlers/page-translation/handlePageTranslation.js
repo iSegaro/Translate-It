@@ -58,33 +58,53 @@ export async function handlePageTranslation(message, sender) {
     ];
 
     if (eventActions.includes(message.action)) {
+      // Filter out empty/invalid completion messages before broadcasting
+      if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE) {
+        const data = message.data || {};
+        // Skip completion messages with no meaningful data
+        if (!data.translatedCount && !data.totalCount && !data.isTranslated && !data.messageId) {
+          logger.debug('Skipping empty PAGE_TRANSLATE_COMPLETE message');
+          return { success: true };
+        }
+      }
+
+      // Filter out empty/invalid auto-restore complete messages
+      if (message.action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
+        const data = message.data || {};
+        // Skip auto-restore messages with no translation data unless they have explicit isTranslated flag
+        if (!data.translatedCount && !data.isTranslated) {
+          logger.debug('Skipping empty PAGE_AUTO_RESTORE_COMPLETE message');
+          return { success: true };
+        }
+      }
+
       // Log Page Session Summary on completion, cancellation or error
-      if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE || 
+      if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE ||
           message.action === MessageActions.PAGE_TRANSLATE_CANCELLED ||
           message.action === MessageActions.PAGE_TRANSLATE_ERROR ||
           message.action === MessageActions.PAGE_RESTORE_COMPLETE) {
-        
+
         // Find session ID in all possible locations - prioritization is key
-        const sessionId = message.data?.sessionId || 
-                         message.sessionId || 
-                         message.data?.messageId || 
+        const sessionId = message.data?.sessionId ||
+                         message.sessionId ||
+                         message.data?.messageId ||
                          message.messageId;
-        
+
         // Map action to status label
         let status = 'Complete';
         if (message.action === MessageActions.PAGE_TRANSLATE_CANCELLED) status = 'Stopped';
         else if (message.action === MessageActions.PAGE_TRANSLATE_ERROR) status = 'Error';
         else if (message.action === MessageActions.PAGE_RESTORE_COMPLETE) status = 'Page Restored';
-        
+
         // Decide whether to clear based on the action type
         // We only clear on Restore or Cancel, not on "Complete" because of Lazy Loading
-        const shouldClear = message.action === MessageActions.PAGE_RESTORE_COMPLETE || 
+        const shouldClear = message.action === MessageActions.PAGE_RESTORE_COMPLETE ||
                            message.action === MessageActions.PAGE_TRANSLATE_CANCELLED;
-        
-        statsManager.printSummary(sessionId, { 
-          status, 
+
+        statsManager.printSummary(sessionId, {
+          status,
           success: message.action !== MessageActions.PAGE_TRANSLATE_ERROR,
-          clear: shouldClear 
+          clear: shouldClear
         });
       }
 

@@ -53,11 +53,12 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     // Page Translation Life-cycle Events
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, (detail) => {
-      mobileStore.setPageTranslation({ 
-        isTranslating: true, 
+      logger.debug('PAGE_TRANSLATE_START received:', detail);
+      mobileStore.setPageTranslation({
+        isTranslating: true,
         isTranslated: false,
         isAutoTranslating: detail.isAutoTranslating || false,
-        status: TRANSLATION_STATUS.TRANSLATING, 
+        status: TRANSLATION_STATUS.TRANSLATING,
         translatedCount: 0,
         totalCount: 0,
         errorMessage: null
@@ -71,12 +72,13 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
+      logger.debug('PAGE_TRANSLATE_PROGRESS received:', detail);
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
-      
+
       // Use status from aggregator if available, otherwise calculate based on counts
       let finalStatus = detail.status || (translatedCount >= totalCount ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING);
-      
+
       // Map 'idle' status to COMPLETED for UI purposes (shows the badge/restore button)
       if (finalStatus === 'idle') {
         finalStatus = TRANSLATION_STATUS.COMPLETED;
@@ -91,12 +93,34 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       });
     });
 
+    tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_IDLE, (detail) => {
+      logger.debug('PAGE_TRANSLATE_IDLE received:', detail);
+      const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
+      const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
+
+      // IDLE means visible content is done but more might be hidden - show as COMPLETED for UI
+      mobileStore.setPageTranslation({
+        translatedCount,
+        totalCount,
+        isTranslating: false,
+        isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
+        isTranslated: translatedCount > 0,
+        status: TRANSLATION_STATUS.COMPLETED
+      });
+    });
+
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
-      mobileStore.setPageTranslation({ 
-        isTranslating: false, 
+      // Skip empty/invalid completion messages - they might come from iframes or initialization
+      if (!detail || (detail.translatedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating)) {
+        logger.debug('Skipping empty PAGE_TRANSLATE_COMPLETE message:', detail);
+        return;
+      }
+
+      mobileStore.setPageTranslation({
+        isTranslating: false,
         isTranslated: true,
         isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
-        status: TRANSLATION_STATUS.COMPLETED, 
+        status: TRANSLATION_STATUS.COMPLETED,
         translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
         totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
       });
@@ -127,9 +151,12 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       const hasTranslations = detail.translatedCount > 0;
       const currentState = mobileStore.pageTranslationData;
 
-      // Skip empty messages if we already have completed state
+      // Skip empty messages if we already have active/valid translation state
       // This prevents iframe messages from overwriting main frame translation data
-      if (!hasTranslations && currentState.isTranslated) return;
+      if (!hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
+        logger.debug('Skipping empty auto-restore message, keeping current state:', currentState);
+        return;
+      }
 
       const baseState = {
         isTranslating: false,

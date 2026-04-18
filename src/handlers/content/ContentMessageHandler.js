@@ -594,6 +594,21 @@ export class ContentMessageHandler extends ResourceTracker {
     }
 
     try {
+      // Ensure Vue app is loaded so mobileStore can track translation state
+      if (window.translateItContentCore && !window.translateItContentCore.vueLoaded) {
+        try {
+          this.logger.debug('Loading Vue app for page translation state tracking...');
+          await window.translateItContentCore.loadVueApp();
+          this.logger.info('Vue app loaded for page translation state tracking');
+        } catch (vueError) {
+          this.logger.warn('Failed to load Vue app, translation will continue without UI state sync:', vueError);
+        }
+      } else if (window.translateItContentCore && window.translateItContentCore.vueLoaded) {
+        this.logger.debug('Vue app already loaded, ready for state tracking');
+      } else {
+        this.logger.warn('translateItContentCore not available, UI state sync may not work');
+      }
+
       // If PageTranslationManager is not available, try to load the feature on-demand
       if (!this.pageTranslationManager) {
         try {
