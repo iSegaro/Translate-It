@@ -2,6 +2,7 @@
 
 import { getAvailableLanguageCodes } from './LanguagePackLoader.js';
 import { lazyLoadTranslationLanguage, preloadUserLanguages, getLanguageDataLazy } from './LazyLanguageLoader.js';
+import { getCanonicalCode } from '@/shared/config/languageConstants.js';
 
 // A minimal list of languages for UI elements to avoid loading all language data.
 export const basicLanguageList = [
@@ -9,7 +10,8 @@ export const basicLanguageList = [
   { code: "fa", name: "Farsi" },
   { code: "de", name: "German" },
   { code: "fr", name: "French" },
-  { code: "zh", name: "Chinese (Simplified)" },
+  { code: "zh-cn", name: "Chinese (Simplified)" },
+  { code: "zh-tw", name: "Chinese (Traditional)" },
   { code: "es", name: "Spanish" },
   { code: "hi", name: "Hindi" },
   { code: "ar", name: "Arabic" },
@@ -28,19 +30,20 @@ const languageCache = new Map();
  * @returns {Promise<Object|null>} The language data object or null if not found.
  */
 export async function getLanguageData(code) {
-  if (languageCache.has(code)) {
-    return languageCache.get(code);
+  const canonicalCode = getCanonicalCode(code);
+  if (languageCache.has(canonicalCode)) {
+    return languageCache.get(canonicalCode);
   }
 
   try {
     // Use lazy loading for better performance
-    const langData = await lazyLoadTranslationLanguage(code);
+    const langData = await lazyLoadTranslationLanguage(canonicalCode);
     if (langData) {
-      languageCache.set(code, langData);
+      languageCache.set(canonicalCode, langData);
     }
     return langData;
   } catch {
-    // console.error(`Failed to load language data for ${code}:`, error);
+    // console.error(`Failed to load language data for ${canonicalCode}:`, error);
     return null;
   }
 }
@@ -69,9 +72,10 @@ export async function getLanguageCodeForTTS(languageName) {
   const lowerCaseName = languageName.toLowerCase();
 
   // Quick check for code
-  if (lowerCaseName.length <= 3) {
-      const lang = await getLanguageData(lowerCaseName);
-      if(lang) return lowerCaseName;
+  const canonicalCode = getCanonicalCode(lowerCaseName);
+  if (canonicalCode.length <= 5) {
+      const lang = await getLanguageData(canonicalCode);
+      if(lang) return canonicalCode;
   }
 
   // Load the full list to search by name (this is inefficient but necessary for now)

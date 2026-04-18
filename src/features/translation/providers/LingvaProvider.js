@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'LingvaProvider');
 
@@ -30,8 +31,8 @@ export class LingvaProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
-    if (lang === AUTO_DETECT_VALUE) return "auto";
-    return lang;
+    if (!lang || lang === AUTO_DETECT_VALUE) return "auto";
+    return getProviderLanguageCode('GOOGLE', lang);
   }
 
   /**

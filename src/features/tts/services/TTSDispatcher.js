@@ -51,28 +51,24 @@ export class TTSDispatcher {
           // We only override if there's a "strong mismatch" (NOT similar languages)
           // AND the user hasn't explicitly chosen a language (priority to user)
           else if (globalAutoDetectEnabled && targetLanguage !== detected) {
-            // Only override if the detected language is NOT similar to chosen one.
-            if (!areLanguagesSimilar(targetLanguage, detected)) {
-              
-              // SCRIPT VALIDATION (Clean Logic): 
-              // Check if both target language and detected language use the same script family.
-              const isTargetArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(targetLanguage);
-              const isDetectedArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(detected);
-              
-              const isTargetChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(targetLanguage);
-              const isDetectedChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(detected);
-              
-              const isScriptMismatch = (isTargetArabicScript !== isDetectedArabicScript) || 
-                                       (isTargetChineseScript !== isDetectedChineseScript);
-              
-              if (isScriptMismatch) {
-                logger.debug(`[TTSDispatcher] Strong script mismatch: Chosen=${targetLanguage}, Detected=${detected}. Overriding.`);
-                targetLanguage = detected;
-              } else {
-                logger.debug(`[TTSDispatcher] Mismatch detected but scripts are compatible. Respecting user choice: ${targetLanguage}`);
-              }
+            
+            // SCRIPT VALIDATION (Clean Logic): 
+            // Check if both target language and detected language use the same script family.
+            const isTargetArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(targetLanguage);
+            const isDetectedArabicScript = ARABIC_SCRIPT_LANGUAGES.includes(detected);
+            
+            const isTargetChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(targetLanguage);
+            const isDetectedChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(detected);
+            
+            const isScriptMismatch = (isTargetArabicScript !== isDetectedArabicScript) || 
+                                     (isTargetChineseScript !== isDetectedChineseScript);
+            
+            // Only override if there is a fundamental script mismatch (e.g. user selected 'en' but text is Arabic)
+            if (isScriptMismatch && !areLanguagesSimilar(targetLanguage, detected)) {
+              logger.debug(`[TTSDispatcher] Strong script mismatch: Chosen=${targetLanguage}, Detected=${detected}. Overriding.`);
+              targetLanguage = detected;
             } else {
-              logger.debug(`[TTSDispatcher] Detected ${detected} is similar to chosen ${targetLanguage}. Respecting user choice.`);
+              logger.debug(`[TTSDispatcher] Detected ${detected} is similar to or script-compatible with chosen ${targetLanguage}. Respecting user choice.`);
             }
           }
         } else if (isExplicitAuto) {
@@ -127,13 +123,12 @@ export class TTSDispatcher {
               const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
               response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
             } else {
-              logger.debug(`[TTSDispatcher] Recovery: Staying with ${resolution.language}`);
               response = await handleGoogleTTSSpeak(message, sender, resolution.language);
             }
           }
         }
-      } else {
-        // First try with Google
+      } else if (resolution.engine === TTS_ENGINES.GOOGLE) {
+        // Explicitly try Google if resolved
         response = await handleGoogleTTSSpeak(message, sender, resolution.language);
         
         // If Google fails (e.g. Unsupported language) AND fallback is allowed
@@ -144,6 +139,8 @@ export class TTSDispatcher {
             response = await handleEdgeTTSSpeak(message, sender, resolution.language);
           }
         }
+      } else {
+        throw new Error(`Unsupported TTS engine: ${resolution.engine}`);
       }
 
       return response;

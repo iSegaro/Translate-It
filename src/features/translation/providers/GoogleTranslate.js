@@ -1,6 +1,6 @@
 // src/core/providers/GoogleTranslateProvider.js
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
-import {
+import { 
   getGoogleTranslateUrlAsync,
   getEnableDictionaryAsync
 } from "@/shared/config/config.js";
@@ -8,7 +8,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
-import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
+import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
@@ -32,9 +32,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
-    if (!lang || typeof lang !== "string") return "auto";
-    const lowerCaseLang = lang.toLowerCase();
-    return LANGUAGE_NAME_TO_CODE_MAP[lowerCaseLang] || lowerCaseLang;
+    return getProviderLanguageCode('GOOGLE', lang);
   }
 
   /**

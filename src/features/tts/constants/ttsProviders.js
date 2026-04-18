@@ -33,25 +33,27 @@ export const PROVIDER_CONFIGS = {
       'fi': 'fi-FI-NooraNeural', 'ru': 'ru-RU-SvetlanaNeural', 'uk': 'uk-UA-PolinaNeural',
       'pl': 'pl-PL-AgnieszkaNeural', 'ro': 'ro-RO-AlinaNeural', 'hu': 'hu-HU-NoemiNeural',
       'cs': 'cs-CZ-VlastaNeural', 'sk': 'sk-SK-ViktoriaNeural', 'el': 'el-GR-AthinaNeural',
-      'ja': 'ja-JP-NanamiNeural', 'ko': 'ko-KR-SunHiNeural', 'zh': 'zh-CN-XiaoxiaoNeural',
+      'ja': 'ja-JP-NanamiNeural', 'ko': 'ko-KR-SunHiNeural', 'zh': 'zh-cn-XiaoxiaoNeural',
       'hi': 'hi-IN-SwaraNeural', 'bn': 'bn-IN-TanishaNeural', 'ta': 'ta-IN-PallaviNeural',
       'te': 'te-IN-ShrutiNeural', 'th': 'th-TH-PremwadeeNeural', 'vi': 'vi-VN-HoaiMyNeural',
-      'id': 'id-ID-GadisNeural', 'ms': 'ms-MY-LatreeNeural'
-    }
-  },
+      'id': 'id-ID-GadisNeural', 'ms': 'ms-MY-LatreeNeural',
+      'zh-hk': 'zh-HK-HiuGaaiNeural', 'yue': 'zh-HK-HiuMaanNeural',
+      'lzh': 'zh-TW-HsiaoChenNeural', 'ps': 'ps-AF-LatifaNeural', 'ur': 'ur-PK-UzmaNeural'
+      }
+      },
 
-  // --- Google TTS Data ---
-  [TTS_ENGINES.GOOGLE]: {
-    name: 'Google TTS',
-    baseUrl: 'https://translate.google.com/translate_tts',
-    clientParam: 'tw-ob',
-    encoding: 'UTF-8',
-    offscreenPath: 'html/offscreen.html',
-    maxTextLength: 200,
-    defaultLanguage: 'en',
-    cleaningRegex: /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\uFF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g,
-    supportedLanguages: new Set([
-      'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw',
+      // --- Google TTS Data ---
+      [TTS_ENGINES.GOOGLE]: {
+      name: 'Google TTS',
+      baseUrl: 'https://translate.google.com/translate_tts',
+      clientParam: 'tw-ob',
+      encoding: 'UTF-8',
+      offscreenPath: 'html/offscreen.html',
+      maxTextLength: 200,
+      defaultLanguage: 'en',
+      cleaningRegex: /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\FB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\FF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g,
+      supportedLanguages: new Set([
+      'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw', 'yue',
       'ar', 'hi', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',
       'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
       'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',

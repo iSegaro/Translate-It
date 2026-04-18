@@ -19,11 +19,15 @@ const TRANSLATION_LANGUAGE_CHUNKS = {
   'it': 'locales/it',
   'pt': 'locales/pt',
   'ru': 'locales/ru',
-  'zh': 'locales/zh',
   'ja': 'locales/ja',
   'ko': 'locales/ko',
+  'zh-cn': 'locales/zh-cn',
+  'zh-tw': 'locales/zh-tw',
+  'lzh': 'locales/lzh',
+  'yue': 'locales/yue',
   'ar': 'locales/ar',
-  'hi': 'locales/hi',
+
+
   'bn': 'locales/bn',
   'ur': 'locales/ur',
   'tr': 'locales/tr',
@@ -165,11 +169,20 @@ export function isTranslationLanguagePackAvailable(langCode) {
 function normalizeTranslationLanguageCode(langCode) {
   if (!langCode) return 'en';
 
-  // Convert to lowercase and extract primary language code
-  const normalized = langCode.toLowerCase().split('-')[0];
+  const lowerCode = langCode.toLowerCase();
+  
+  // 1. Try exact match first (e.g., 'zh-cn' should stay 'zh-cn')
+  if (TRANSLATION_LANGUAGE_CHUNKS[lowerCode]) {
+    return lowerCode;
+  }
 
-  // Return the normalized code if it exists in our chunks, otherwise default to 'en'
-  return TRANSLATION_LANGUAGE_CHUNKS[normalized] ? normalized : 'en';
+  // 2. Fallback to base language (e.g., 'en-US' -> 'en')
+  const base = lowerCode.split('-')[0];
+  if (TRANSLATION_LANGUAGE_CHUNKS[base]) {
+    return base;
+  }
+
+  return 'en';
 }
 
 /**

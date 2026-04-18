@@ -1,6 +1,6 @@
 {
   "name": "Chinese (Simplified)",
-  "voiceCode": "zh-CN",
+  "nativeName": "简体中文",
   "promptName": "Chinese (Simplified)",
-  "code": "zh"
+  "code": "zh-cn"
 }

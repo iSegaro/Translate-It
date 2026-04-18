@@ -3,7 +3,10 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
-import { LANGUAGE_NAME_TO_CODE_MAP } from "@/shared/config/languageConstants.js";
+import {
+  LANGUAGE_NAME_TO_CODE_MAP,
+  getProviderLanguageCode
+} from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
@@ -39,8 +42,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
   _getLangCode(lang) {
     if (!lang || lang === AUTO_DETECT_VALUE) return "auto";
-    const lowerCaseLang = lang.toLowerCase();
-    return LANGUAGE_NAME_TO_CODE_MAP[lowerCaseLang] || lowerCaseLang;
+    return getProviderLanguageCode('GOOGLE', lang);
   }
 
   /**

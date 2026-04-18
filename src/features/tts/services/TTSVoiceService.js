@@ -17,14 +17,33 @@ class TTSVoiceService {
 
   /**
    * Get the best neural voice for a language
-   * @param {string} langCode - ISO language code (e.g., 'fa')
+   * @param {string} langCode - ISO language code (e.g., 'fa' or 'zh-hk')
    * @returns {Promise<string|null>} - Voice name (e.g., 'fa-IR-DilaraNeural')
    */
   async getBestVoice(langCode) {
+    if (!langCode) return null;
     const voices = await this.getVoices();
-    const baseLang = langCode.split('-')[0].toLowerCase();
+    const normalizedTarget = langCode.toLowerCase();
+    const baseLang = normalizedTarget.split('-')[0];
 
-    // Future-proof: This map can eventually come from user settings
+    if (!voices || voices.length === 0) {
+      return PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[normalizedTarget] || 
+             PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[baseLang] || null;
+    }
+
+    // 1. Try exact locale match first (e.g. 'zh-hk')
+    const exactMatch = voices.find(v => v.Locale.toLowerCase() === normalizedTarget && v.ShortName.includes('Neural'));
+    if (exactMatch) return exactMatch.ShortName;
+
+    // 2. Filter voices for the requested language family
+    const langVoices = voices.filter(v => {
+      const locale = v.Locale.toLowerCase();
+      return locale === baseLang || locale.startsWith(`${baseLang}-`);
+    });
+
+    if (langVoices.length === 0) return null;
+
+    // 3. Try to find the preferred dialect for this family (e.g. en-US)
     const dialectPriorities = {
       'en': 'en-us',
       'ar': 'ar-sa',
@@ -33,30 +52,17 @@ class TTSVoiceService {
       'pt': 'pt-br'
     };
 
-    if (!voices || voices.length === 0) {
-      return PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[baseLang] || null;
-    }
-
-    // 1. Filter voices for the requested language family
-    const langVoices = voices.filter(v => {
-      const locale = v.Locale.toLowerCase();
-      return locale === baseLang || locale.startsWith(`${baseLang}-`);
-    });
-
-    if (langVoices.length === 0) return null;
-
-    // 2. Try to find the preferred dialect (e.g. en-US)
     const preferredLocale = dialectPriorities[baseLang];
     if (preferredLocale) {
       const dialectMatch = langVoices.find(v => v.Locale.toLowerCase() === preferredLocale && v.ShortName.includes('Neural'));
       if (dialectMatch) return dialectMatch.ShortName;
     }
 
-    // 3. Fallback to any Neural voice in the same language family
+    // 4. Fallback to any Neural voice in the same language family
     const anyNeural = langVoices.find(v => v.ShortName.includes('Neural'));
     if (anyNeural) return anyNeural.ShortName;
 
-    // 4. Last resort: return the first available voice
+    // 5. Last resort: return the first available voice
     return langVoices[0].ShortName;
   }
 

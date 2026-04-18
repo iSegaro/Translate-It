@@ -30,9 +30,9 @@ export const LANGUAGE_NAME_TO_CODE_MAP = {
   bulgarian: "bg",
   catalan: "ca",
   cebuano: "ceb",
-  "chinese (simplified)": "zh-CN",
-  chinese: "zh-CN",
-  "chinese (traditional)": "zh-TW",
+  "chinese (simplified)": "zh-cn",
+  chinese: "zh-cn",
+  "chinese (traditional)": "zh-tw",
   "chinese (classical)": "lzh",
   cantonese: "yue",
   croatian: "hr",
@@ -97,7 +97,32 @@ export const LANGUAGE_CODE_TO_NAME_MAP = Object.fromEntries(
 // Provider-specific language code mappings
 export const PROVIDER_LANGUAGE_MAPPINGS = {
   // Google Translate Language Codes
-  GOOGLE: LANGUAGE_NAME_TO_CODE_MAP,
+  GOOGLE: {
+    ...LANGUAGE_NAME_TO_CODE_MAP,
+    "zh-cn": "zh-CN",
+    "zh-tw": "zh-TW",
+    "lzh": "zh-CN",   // Google Classical fallback
+    "yue": "yue",     // Cantonese
+    "ps": "ps",
+    "ur": "ur",
+    "ak": "ak", "ace": "ace", "ach": "ach", "aa": "aa", "awa": "awa", "bal": "bal", 
+    "ban": "ban", "bci": "bci", "btk": "btk", "bts": "bts", "bbc": "bbc", "bew": "bew", 
+    "bik": "bik", "bua": "bua", "ch": "ch", "ce": "ce", "chk": "chk", "chv": "chv", 
+    "crh": "crh", "din": "din", "doi": "doi", "dyu": "dyu", "dz": "dz", "ee": "ee", 
+    "fon": "fon", "fr-CA": "fr-CA", "fur": "fur", "ff": "ff", "gaa": "gaa", "gri": "gri", 
+    "hrp": "hrp", "hnn": "hnn", "hsb": "hsb", "iba": "iba", "ilo": "ilo", "inh": "inh", 
+    "ikt": "ikt", "iu": "iu", "jam": "jam", "jbo": "jbo", "kac": "kac", "kl": "kl", 
+    "kau": "kau", "pam": "pam", "kha": "kha", "kmb": "kmb", "kon": "kon", "krw": "krw", 
+    "kru": "kru", "lij": "lij", "li": "li", "lmo": "lmo", "lua": "lua", "mad": "mad", 
+    "mak": "mak", "mfa": "mfa", "mwr": "mwr", "mfe": "mfe", "mhr": "mhr", "min": "min", 
+    "mzo": "mzo", "nah": "nah", "nd": "nd", "nr": "nr", "new": "new", "nko": "nko", 
+    "nus": "nus", "oc": "oc", "os": "os", "pag": "pag", "pap": "pap", "qvi": "qvi", 
+    "rom": "rom", "rn": "rn", "smn": "smn", "sag": "sag", "sat": "sat", "se": "se", 
+    "nso": "nso", "st": "st", "sn": "sn", "crs": "crs", "shn": "shn", "szl": "szl", 
+    "skr": "skr", "ss": "ss", "ty": "ty", "tmh": "tmh", "tet": "tet", "bo": "bo", 
+    "tiv": "tiv", "tpi": "tpi", "to": "to", "tum": "tum", "tyv": "tyv", "udm": "udm", 
+    "ve": "ve", "vec": "vec", "war": "war", "wol": "wol", "sah": "sah"
+  },
 
   // Bing Translate Language Codes
   BING: {
@@ -172,8 +197,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     iw: "he", // Hebrew uses 'iw' in Bing
     tl: "fil", // Filipino uses 'fil' in Bing
     pt: "pt",
-    "zh-CN": "zh-Hans", // Simplified Chinese
-    "zh-TW": "zh-Hant", // Traditional Chinese
+    "zh-cn": "zh-Hans", // Simplified Chinese
+    "zh-tw": "zh-Hant", // Traditional Chinese
     "yue": "zh-HK",     // Cantonese (Bing uses HK code)
     "lzh": "zh-Hant",   // Classical (Fallback to Traditional for Bing)
   },
@@ -311,12 +336,14 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
  * Maps different code variations to a canonical form for matching
  */
 const CANONICAL_CODE_MAP = {
-  // Chinese variations - all map to 'zh'
-  'zh': 'zh',
-  'zhcn': 'zh',     // zh-CN normalized
-  'zhtw': 'zh',     // zh-TW normalized
-  'zhans': 'zh',    // zh-Hans normalized
-  'zhant': 'zh',    // zh-Hant normalized
+  // Chinese variations
+  'zh': 'zh-cn',
+  'zhcn': 'zh-cn',     // zh-CN normalized
+  'zhtw': 'zh-tw',     // zh-TW normalized
+  'zhans': 'zh-cn',    // zh-Hans normalized
+  'zhant': 'zh-tw',    // zh-Hant normalized
+  'yue': 'yue',
+  'lzh': 'lzh',
 
   // Filipino/Tagalog variations
   'fil': 'fil',
@@ -336,8 +363,11 @@ export function getCanonicalCode(code) {
 }
 
 export const PROVIDER_SUPPORTED_LANGUAGES = {
-  // Google Translate - supports all standard languages (use values for codes)
-  google: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
+  // Google Translate - supports all standard languages and many new ones from user list
+  google: [
+    'af', 'sq', 'am', 'ar', 'hy', 'as', 'ay', 'az', 'bm', 'ba', 'eu', 'be', 'bn', 'bho', 'bs', 'br', 'bg', 'ca', 'ceb', 'ny', 'zh-cn', 'zh-tw', 'co', 'hr', 'cs', 'da', 'dv', 'doi', 'nl', 'en', 'eo', 'et', 'ee', 'tl', 'fi', 'fr', 'fy', 'gl', 'ka', 'de', 'el', 'gn', 'gu', 'ht', 'ha', 'haw', 'iw', 'he', 'hi', 'hmn', 'hu', 'is', 'ig', 'ilo', 'id', 'ga', 'it', 'ja', 'jw', 'kn', 'kk', 'km', 'rw', 'gom', 'ko', 'kri', 'ku', 'ckb', 'ky', 'lo', 'la', 'lv', 'ln', 'lt', 'lg', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mni-mtei', 'lus', 'mn', 'my', 'ne', 'no', 'or', 'om', 'ps', 'fa', 'pl', 'pt', 'pa', 'qu', 'ro', 'ru', 'sm', 'sa', 'gd', 'nso', 'sr', 'st', 'sn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'tg', 'ta', 'tt', 'te', 'th', 'ti', 'ts', 'tr', 'tk', 'ak', 'uk', 'ur', 'ug', 'uz', 'vi', 'cy', 'xh', 'yi', 'yo', 'zu',
+    'yue', 'ace', 'ach', 'aa', 'awa', 'bal', 'ban', 'bci', 'btk', 'bts', 'bbc', 'bew', 'bik', 'bua', 'ch', 'ce', 'chk', 'chv', 'crh', 'din', 'dyu', 'dz', 'fon', 'fr-CA', 'fur', 'ff', 'gaa', 'gri', 'hrp', 'hnn', 'hsb', 'iba', 'inh', 'ikt', 'iu', 'jam', 'jbo', 'kac', 'kl', 'kau', 'pam', 'kha', 'kmb', 'kon', 'krw', 'kru', 'lij', 'li', 'lmo', 'lua', 'mad', 'mak', 'mfa', 'mwr', 'mfe', 'mhr', 'min', 'mzo', 'nah', 'nd', 'nr', 'new', 'nko', 'nus', 'oc', 'os', 'pag', 'pap', 'qvi', 'rom', 'rn', 'smn', 'sag', 'sat', 'se', 'crs', 'shn', 'szl', 'skr', 'ss', 'ty', 'tmh', 'tet', 'bo', 'tiv', 'tpi', 'to', 'tum', 'tyv', 'udm', 've', 'vec', 'war', 'wol', 'sah'
+  ],
 
   // Bing Translate - languages from BING mapping (excluding aliases)
   bing: [
@@ -346,7 +376,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     'id', 'is', 'it', 'ja', 'kk', 'km', 'kn', 'ko', 'ku', 'lo', 'lt', 'lv', 'mg',
     'mi', 'ml', 'mr', 'ms', 'mt', 'my', 'ne', 'nl', 'no', 'pa', 'pl', 'ps', 'pt',
     'ro', 'ru', 'sk', 'sl', 'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'th', 'tl', 'tr',
-    'uk', 'ur', 'vi', 'zh-CN', 'zh-TW'
+    'uk', 'ur', 'vi', 'zh-cn', 'zh-tw'
   ],
 
   // Yandex Translate - same as Google
@@ -436,7 +466,7 @@ const AI_ENHANCED_LANGUAGE_MAPPINGS = {
   'zh': 'Chinese (Simplified)',
   'zh-cn': 'Chinese (Simplified)',
   'zh-tw': 'Chinese (Traditional)',
-  'lzh': 'Classical Chinese (Literary Chinese)',
+  'lzh': 'Chinese (Literary / Classical)',
   'yue': 'Cantonese (Traditional Script)',
   'he': 'Hebrew (Modern)',
   'fa': 'Persian (Farsi)',

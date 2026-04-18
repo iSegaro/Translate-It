@@ -43,6 +43,7 @@ export class TTSLanguageService {
     // Mapping for Near Languages that lack native TTS support
     const ttsMappings = {
       'lzh': 'zh-tw', // Classical Chinese -> Traditional Chinese (for pronunciation)
+      'yue': 'zh-hk', // Cantonese -> Hong Kong (for Edge TTS compatibility)
       'ps': 'ps',     // Pashto (Edge supports it)
       'ur': 'ur'      // Urdu (Edge supports it)
     };
@@ -88,16 +89,25 @@ export class TTSLanguageService {
    * Now attempts dynamic resolution with static fallback.
    */
   static async getEdgeVoiceForLanguage(language) {
+    if (!language) return null;
+    const lowerLang = language.toLowerCase();
+
     // 1. Try dynamic service (live list)
     try {
-      const dynamicVoice = await ttsVoiceService.getBestVoice(language);
+      const dynamicVoice = await ttsVoiceService.getBestVoice(lowerLang);
       if (dynamicVoice) return dynamicVoice;
     } catch (e) {
       logger.debug('Dynamic voice resolution failed, using static fallback');
     }
 
     // 2. Static fallback from config
-    const baseLanguage = language.split('-')[0].toLowerCase();
-    return PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[baseLanguage] || null;
+    const voices = PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices;
+    
+    // First try exact match (e.g. 'zh-hk')
+    if (voices[lowerLang]) return voices[lowerLang];
+
+    // Then try base language (e.g. 'zh')
+    const baseLanguage = lowerLang.split('-')[0];
+    return voices[baseLanguage] || null;
   }
 }

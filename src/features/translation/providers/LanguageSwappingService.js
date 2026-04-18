@@ -4,6 +4,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getBilingualTranslationEnabledAsync, getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
+import { LANGUAGE_NAME_TO_CODE_MAP, getCanonicalCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
 
@@ -17,26 +18,7 @@ export class LanguageSwappingService {
     const autoAliases = new Set(['auto', 'auto-detect', 'autodetect', 'auto detect', 'detect']);
     if (autoAliases.has(lower)) return AUTO_DETECT_VALUE;
 
-    const langNameToCodeMap = {
-      afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az",
-      belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca",
-      cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN",
-      croatian: "hr", czech: "cs", danish: "da", dutch: "nl",
-      english: "en", estonian: "et", farsi: "fa", persian: "fa",
-      filipino: "fil", finnish: "fi", french: "fr", german: "de",
-      greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu",
-      indonesian: "id", italian: "it", japanese: "ja", kannada: "kn",
-      kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt",
-      malay: "ms", malayalam: "ml", marathi: "mr", nepali: "ne",
-      norwegian: "no", odia: "or", pashto: "ps", polish: "pl",
-      portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru",
-      serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl",
-      spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl",
-      tamil: "ta", telugu: "te", thai: "th", turkish: "tr",
-      ukrainian: "uk", urdu: "ur", uzbek: "uz", vietnamese: "vi"
-    };
-
-    if (langNameToCodeMap[lower]) return langNameToCodeMap[lower];
+    if (LANGUAGE_NAME_TO_CODE_MAP[lower]) return LANGUAGE_NAME_TO_CODE_MAP[lower];
     return lower;
   }
 
@@ -66,7 +48,7 @@ export class LanguageSwappingService {
       const detectionResult = await browser.i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
-        const detectedLangCode = mainDetection.language.split("-")[0];
+        const detectedLangCode = getCanonicalCode(mainDetection.language);
         logger.debug(`[LanguageSwappingService] Fallback detected language (browser API): ${detectedLangCode}`);
         return detectedLangCode;
       }
@@ -95,17 +77,17 @@ export class LanguageSwappingService {
 
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
-        const detectedLangCode = mainDetection.language.split("-")[0];
+        const detectedLangCode = getCanonicalCode(mainDetection.language);
 
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
-        const targetLangCode = targetNorm.split("-")[0];
+        const targetLangCode = getCanonicalCode(targetNorm);
 
         // --- BILINGUAL & AUTO-SWAP LOGIC ---
         // BILINGUAL_TRANSLATION is the master switch.
         // Use accurate script detection (Arabic/Chinese) for bilingual logic.
         // Only swap when source is AUTO to respect user's explicit source choice.
-        const accurateLangCode = accurateDetectedLang || detectedLangCode;
+        const accurateLangCode = getCanonicalCode(accurateDetectedLang || detectedLangCode);
 
         const shouldSwap = bilingualEnabled && accurateLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
 
@@ -140,7 +122,7 @@ export class LanguageSwappingService {
   static async _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
-    const targetLangCode = targetNorm.split("-")[0];
+    const targetLangCode = getCanonicalCode(targetNorm);
 
     const bilingualEnabled = await getBilingualTranslationEnabledAsync();
 
@@ -150,7 +132,7 @@ export class LanguageSwappingService {
     // Detect language with user preferences (Arabic and Chinese scripts)
     const arabicDetected = detectArabicScriptLanguage(text, preferences);
     const chineseDetected = detectChineseScriptLanguage(text, preferences);
-    const detectedLanguage = arabicDetected || chineseDetected;
+    const detectedLanguage = getCanonicalCode(arabicDetected || chineseDetected);
 
     // Only swap languages if:
     // 1. Text script is recognized (detectedLanguage exists) AND
