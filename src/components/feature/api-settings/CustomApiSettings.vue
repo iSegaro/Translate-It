@@ -44,6 +44,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { storageManager } from '@/shared/storage/core/StorageCore.js'
 
 const { t } = useI18n()
 
@@ -73,12 +74,30 @@ const testKeys = async (providerName) => {
   testResult.value = null
 
   try {
+    // If URL is empty, get from storage and update the field
+    let testApiUrl = customApiUrl.value
+
+    if (!testApiUrl || testApiUrl.trim() === '') {
+      // Read directly from storage (same as ApiKeyManager does)
+      const settings = await storageManager.get({
+        CUSTOM_API_URL: '',
+        CUSTOM_API_MODEL: ''
+      })
+      const storedUrl = settings.CUSTOM_API_URL || ''
+
+      if (storedUrl && storedUrl.trim() !== '') {
+        testApiUrl = storedUrl
+        // Update the field to show the stored URL (triggers computed setter)
+        customApiUrl.value = storedUrl
+      }
+    }
+
     // Test keys directly from textbox value, passing current URL and Model context
     const result = await ApiKeyManager.testKeysDirect(
-      customApiKey.value, 
+      customApiKey.value,
       providerName,
       {
-        apiUrl: customApiUrl.value,
+        apiUrl: testApiUrl,
         apiModel: customApiModel.value
       }
     )

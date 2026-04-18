@@ -487,9 +487,9 @@ class ApiKeyManager {
         apiModel = settings.CUSTOM_API_MODEL;
       }
 
-      if (!apiUrl) {
+      if (!apiUrl || apiUrl.trim() === '') {
         logger.warn('[ApiKeyManager] Custom API URL is not configured, cannot test key');
-        return true; 
+        return false;
       }
 
       // Try to determine models endpoint
