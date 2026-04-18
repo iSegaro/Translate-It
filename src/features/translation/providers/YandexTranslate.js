@@ -4,24 +4,15 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-import {
+import { 
   getYandexTranslateUrlAsync
 } from "@/shared/config/config.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'YandexTranslate');
-
-// Yandex language code mapping
-const yandexLangCode = {
-  af: "af", sq: "sq", am: "am", ar: "ar", hy: "hy", az: "az", eu: "eu", be: "be", bn: "bn", bs: "bs", bg: "bg", ca: "ca", hr: "hr", cs: "cs", da: "da", nl: "nl", en: "en", eo: "eo", et: "et", fi: "fi", fr: "fr", gl: "gl", ka: "ka", de: "de", el: "el", gu: "gu", ht: "ht", hi: "hi", hu: "hu", is: "is", id: "id", ga: "ga", it: "it", ja: "ja", kn: "kn", kk: "kk", km: "km", ko: "ko", ky: "ky", lo: "lo", la: "la", lv: "lv", lt: "lt", lb: "lb", mk: "mk", mg: "mg", ms: "ms", ml: "ml", mt: "mt", mi: "mi", mr: "mr", mn: "mn", my: "my", ne: "ne", no: "no", fa: "fa", pl: "pl", pt: "pt", pa: "pa", ro: "ro", ru: "ru", gd: "gd", sr: "sr", si: "si", sk: "sk", sl: "sl", es: "es", su: "su", sw: "sw", sv: "sv", tg: "tg", ta: "ta", te: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", uz: "uz", vi: "vi", cy: "cy", xh: "xh", yi: "yi", tl: "tl", iw: "he", jw: "jv", "zh-CN": "zh",
-};
-
-// Language name to code mapping
-const langNameToCodeMap = {
-  afrikaans: "af", albanian: "sq", arabic: "ar", azerbaijani: "az", belarusian: "be", bengali: "bn", bulgarian: "bg", catalan: "ca", cebuano: "ceb", "chinese (simplified)": "zh-CN", chinese: "zh-CN", croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en", estonian: "et", farsi: "fa", persian: "fa", filipino: "fil", finnish: "fi", french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi", hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt", malay: "ms", malayalam: "ml", marathi: "mr", nepal: "ne", norwegian: "no", odia: "or", pashto: "ps", polish: "pl", portuguese: "pt", punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhala: "si", slovak: "sk", slovenian: "sl", spanish: "es", swahili: "sw", swedish: "sv", tagalog: "tl", tamil: "ta", telugu: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", uz: "uz", vietnamese: "vi",
-};
 
 export class YandexTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -44,11 +35,8 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
-    const normalized = LanguageSwappingService._normalizeLangValue(lang);
-    if (normalized === AUTO_DETECT_VALUE) return 'auto';
-    if (yandexLangCode[normalized]) return yandexLangCode[normalized];
-    const mapped = langNameToCodeMap[normalized] || normalized;
-    return yandexLangCode[mapped] || mapped;
+    if (!lang || lang === AUTO_DETECT_VALUE) return 'auto';
+    return getProviderLanguageCode('YANDEX', lang);
   }
 
   _generateUuid() {

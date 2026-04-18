@@ -168,7 +168,32 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
   },
 
   // Yandex Translate Language Codes
-  YANDEX: LANGUAGE_NAME_TO_CODE_MAP,
+  YANDEX: {
+    auto: "auto",
+    "zh-cn": "zh",
+    "zh-tw": "zh",
+    "zh": "zh",
+    "fa": "fa",
+    "iw": "he",
+    "jw": "jv",
+    "tl": "tl",
+    "no": "no",
+    // Standard and Special Mappings for Yandex
+    abq: "abq", ab: "ab", af: "af", sq: "sq", am: "am", ar: "ar", hy: "hy", az: "az", 
+    ba: "ba", eu: "eu", be: "be", bn: "bn", bs: "bs", bg: "bg", my: "my", bua: "bua", 
+    ca: "ca", ceb: "ceb", cv: "cv", hr: "hr", cs: "cs", da: "da", nl: "nl", sjn: "sjn", 
+    emj: "emj", myv: "myv", eo: "eo", et: "et", fi: "fi", fr: "fr", gl: "gl", glt: "glt", 
+    ka: "ka", de: "de", el: "el", gu: "gu", ht: "ht", he: "he", mrj: "mrj", hi: "hi", 
+    hu: "hu", is: "is", id: "id", ga: "ga", it: "it", ja: "ja", jv: "jv", kbd: "kbd", 
+    kn: "kn", krc: "krc", kk: "kk", kazlat: "kazlat", km: "km", kv: "kv", ko: "ko", 
+    ky: "ky", lo: "lo", la: "la", lv: "lv", lt: "lt", lb: "lb",
+    // Other existing ones
+    mk: "mk", mg: "mg", ms: "ms", ml: "ml", mt: "mt", mi: "mi", mr: "mr", mn: "mn", 
+    ne: "ne", pl: "pl", pt: "pt", pa: "pa", ro: "ro", ru: "ru", gd: "gd", sr: "sr", 
+    si: "si", sk: "sk", sl: "sl", es: "es", su: "su", sw: "sw", sv: "sv", tg: "tg", 
+    ta: "ta", te: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", uz: "uz", vi: "vi", 
+    cy: "cy", xh: "xh", yi: "yi"
+  },
 
   // DeepL Translate Language Codes (UPPERCASE)
   // Standard languages
@@ -338,8 +363,11 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     'ace', 'af', 'sq', 'am', 'ar', 'arz', 'ary', 'arb', 'hy', 'as', 'ast', 'az', 'ban', 'bn', 'ba', 'eu', 'bbc', 'be', 'bho', 'bik', 'brx', 'bs', 'bg', 'yue', 'ca', 'ceb', 'hne', 'lzh', 'zh-Hans', 'zh-Hant', 'co', 'hr', 'cs', 'da', 'prs', 'dv', 'doi', 'nl', 'en', 'en-GB', 'epo', 'et', 'fo', 'fj', 'fil', 'fi', 'fr', 'fr-CA', 'fy', 'fur', 'gl', 'lug', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'he', 'hil', 'hi', 'mww', 'hu', 'iba', 'is', 'ig', 'ilo', 'id', 'ikt', 'iu', 'iu-Latn', 'ga', 'it', 'jam', 'ja', 'jav', 'kea', 'kn', 'pam', 'ks', 'kk', 'km', 'rw', 'tlh-Latn', 'gom', 'ko', 'kri', 'ku', 'kmr', 'ky', 'lo', 'la', 'lv', 'lij', 'lim', 'ln', 'lt', 'lmo', 'dsb', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mr', 'mwr', 'mfe', 'min', 'mn-Cyrl', 'mn-Mong', 'my', 'mi', 'ne', 'nb', 'nno', 'nya', 'oc', 'or', 'pap', 'ps', 'fa', 'pl', 'pt', 'pt-PT', 'pa', 'pnb', 'otq', 'ro', 'run', 'ru', 'sm', 'sa', 'srd', 'sr-Cyrl', 'sr-Latn', 'st', 'nso', 'tn', 'crs', 'sn', 'scn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'ty', 'tgk', 'ta', 'tt', 'te', 'tet', 'th', 'bo', 'ti', 'tpi', 'to', 'tr', 'tk', 'uk', 'hsb', 'ur', 'ug', 'uz', 'vec', 'vi', 'war', 'cy', 'xh', 'ydd', 'yo', 'yua', 'zu'
   ],
 
-  // Yandex Translate - same as Google
-  yandex: Object.values(LANGUAGE_NAME_TO_CODE_MAP),
+  // Yandex Translate - based on provided list
+  yandex: [
+    'ru', 'fa', 'en', 'abq', 'ab', 'af', 'sq', 'am', 'ar', 'hy', 'az', 'ba', 'eu', 'be', 'bn', 'bs', 'bg', 'my', 'bua', 'ca', 'ceb', 'zh', 'cv', 'hr', 'cs', 'da', 'nl', 'sjn', 'emj', 'myv', 'eo', 'et', 'fi', 'fr', 'gl', 'glt', 'ka', 'de', 'el', 'gu', 'ht', 'he', 'mrj', 'hi', 'hu', 'is', 'id', 'ga', 'it', 'ja', 'jv', 'kbd', 'kn', 'krc', 'kk', 'kazlat', 'km', 'kv', 'ko', 'ky', 'lo', 'la', 'lv', 'lt', 'lb',
+    'mk', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'ne', 'pl', 'pt', 'pa', 'ro', 'ru', 'gd', 'sr', 'si', 'sk', 'sl', 'es', 'su', 'sw', 'sv', 'tg', 'ta', 'te', 'th', 'tr', 'uk', 'ur', 'uz', 'vi', 'cy', 'xh', 'yi'
+  ],
 
   // Browser API - uses Chrome's built-in translation (from BrowserAPI.js langNameToCodeMap)
   // Using canonical codes for matching
