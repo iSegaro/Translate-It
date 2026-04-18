@@ -202,10 +202,12 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     // 2. CAPACITY FLUSH (Efficiency)
     // If we have enough HIGH PRIORITY items to fill a full API request (chunkSize),
-    // we flush immediately UNLESS we are currently scrolling/active and in "On Stop" mode.
-    // Exception: Always allow the very first batch to flush when full to ensure initial visibility.
+    // we flush immediately UNLESS:
+    // a) We are in "On Stop" mode and still scrolling.
+    // b) We are in "Fluid" mode and it's not the first batch (we want to respect the user's delay).
     if (this.highPriorityCount >= (this.settings.chunkSize || 250)) {
-      const shouldWait = this.settings.translateAfterScrollStop && this.isScrolling && !this.isFirstBatch;
+      const isFluidAndNotFirst = !this.settings.translateAfterScrollStop && !this.isFirstBatch;
+      const shouldWait = (this.settings.translateAfterScrollStop && this.isScrolling && !this.isFirstBatch) || isFluidAndNotFirst;
       
       if (!shouldWait) {
         this.logger.debug('High-priority items reached capacity. Forcing immediate flush.');
@@ -223,12 +225,6 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     const isHighPriority = score >= this.settings.priorityThreshold;
     
-    // If we have a full chunk, flush immediately (for non-scroll-stop mode)
-    if (!this.settings.translateAfterScrollStop && this.queue.length >= this.settings.chunkSize) {
-      this.flush();
-      return;
-    }
-
     // Adaptive delay: 
     // - Very first batch is slightly delayed to collect initial content.
     // - High priority items (Viewport) trigger faster processing (50ms).
@@ -242,7 +238,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     const delay = this.isFirstBatch 
       ? PAGE_TRANSLATION_TIMING.FIRST_BATCH_DELAY 
       : (isHighPriority 
-          ? Math.min(PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY, standardDelay) 
+          ? (this.settings.translateAfterScrollStop ? Math.min(PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY, standardDelay) : standardDelay)
           : standardDelay);
 
     if (this.batchTimer) {
