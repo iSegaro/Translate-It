@@ -77,7 +77,9 @@ export class MainFrameCoordinator {
     window.addEventListener('message', (event) => {
       // 1. Process messages from our own lite-iframes
       if (event.data?.source === 'translate-it-iframe') {
-        const { type, data, frameUrl, action } = event.data;
+        const { type, data, action } = event.data;
+        // frameUrl is inside data object, not at the top level
+        const frameUrl = data?.frameUrl;
 
         // Use frameUrl as unique identifier instead of event.source (which is always window.top)
         const frameId = frameUrl || event.source;
