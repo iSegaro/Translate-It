@@ -4,7 +4,7 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { detectTextLanguage } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText } from '@/shared/utils/text/textAnalysis.js';
+import { isPersianText, isArabicScriptText } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 
@@ -128,7 +128,10 @@ export class TTSDispatcher {
 
       if (persianExclusive.test(sample)) return 'fa';
       if (arabicExclusive.test(sample)) return 'ar';
-      if (isPersianText(sample)) return 'fa';
+      if (isArabicScriptText(sample)) {
+        // Default to Persian if it's Arabic script but no exclusive chars found
+        return 'fa';
+      }
       return 'ar';
     }
 

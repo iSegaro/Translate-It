@@ -27,16 +27,30 @@ export function isSingleWordOrShortPhrase(text) {
 }
 
 /**
- * Check if text contains Persian characters
+ * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
  */
 export const isPersianText = (text) => {
   if (!text || typeof text !== 'string') return false;
 
-  // Persian Unicode range (U+0600 to U+06FF)
-  const persianRegex = /[\u0600-\u06FF]/;
-  return persianRegex.test(text);
+  // Persian-specific characters (not present in Arabic):
+  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
+  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/;
+  return persianExclusiveChars.test(text);
+};
+
+/**
+ * Check if text contains Arabic script (both Arabic and Persian)
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains Arabic script characters
+ */
+export const isArabicScriptText = (text) => {
+  if (!text || typeof text !== 'string') return false;
+
+  // Arabic/Persian Unicode range (U+0600 to U+06FF)
+  const arabicScriptRegex = /[\u0600-\u06FF]/;
+  return arabicScriptRegex.test(text);
 };
 
 /**

@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isPersianText } from "@/shared/utils/text/textAnalysis.js";
+import { isPersianText, isArabicScriptText } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -96,12 +96,12 @@ export class LanguageSwappingService {
     const bilingualEnabled = await getBilingualTranslationEnabledAsync();
 
     // Only swap languages if:
-    // 1. Text is Persian AND
+    // 1. Text is Arabic script (Persian or Arabic) AND
     // 2. Bilingual is enabled AND
     // 3. Target is Persian or Arabic AND
     // 4. Target language is NOT what the user actually wants (not explicit source)
     if (
-      isPersianText(text) &&
+      isArabicScriptText(text) &&
       bilingualEnabled &&
       (targetLangCode === "fa" || targetLangCode === "ar") &&
       targetLangCode !== sourceLangCode

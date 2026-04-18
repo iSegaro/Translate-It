@@ -129,12 +129,21 @@ watch(sourceText, (newValue, oldValue) => {
   }
 }, { deep: true })
 
-// Helper function to detect if text is Persian
+// Helper function to detect if text is Persian (distinguishes from Arabic)
 const isPersianText = (text) => {
   if (!text) return false
-  // Persian Unicode range: \u0600-\u06FF
-  const persianRegex = /[\u0600-\u06FF]/
-  return persianRegex.test(text)
+  // Persian-specific characters (not present in Arabic):
+  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF)
+  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF]/
+  return persianExclusiveChars.test(text)
+}
+
+// Helper function to detect if text contains Arabic script (both Arabic and Persian)
+const isArabicScriptText = (text) => {
+  if (!text) return false
+  // Arabic/Persian Unicode range: \u0600-\u06FF
+  const arabicScriptRegex = /[\u0600-\u06FF]/
+  return arabicScriptRegex.test(text)
 }
 
 // Reactive language values - use props first, then fallback to settings
@@ -149,6 +158,11 @@ const currentSourceLanguage = computed(() => {
   if (sourceText.value) {
     if (isPersianText(sourceText.value)) {
       logger.debug('[TranslationForm] Detected Persian text, using "fa"')
+      return 'fa'
+    }
+    // Check for Arabic script (both Arabic and Persian)
+    if (isArabicScriptText(sourceText.value)) {
+      logger.debug('[TranslationForm] Detected Arabic script, defaulting to "fa" for Persian')
       return 'fa'
     }
     // Add more language detections here if needed
