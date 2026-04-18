@@ -395,15 +395,15 @@
                 step="100"
                 class="base-number-input compact-input"
                 :disabled="!extensionEnabled"
-              />
+              >
               <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
             </div>
           </div>
           
           <span class="setting-description">
             {{ wholePageTranslateAfterScrollStop 
-               ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
-               : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
+              ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
+              : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
             }}
           </span>
         </div>

@@ -83,7 +83,6 @@
         {{ t('tts_autodetect_desc') || 'Automatically detect the actual language of the text. If the selected engine fails to pronounce the text, it will attempt to identify the correct language and try again.' }}
       </div>
     </div>
-    
   </div>
 </template>
 
