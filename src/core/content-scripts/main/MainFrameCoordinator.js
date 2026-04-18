@@ -117,6 +117,18 @@ export class MainFrameCoordinator {
             if (pageEventBus) {
               pageEventBus.emit(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
             }
+          } else if (action === this.MessageActions.PAGE_RESTORE_COMPLETE) {
+            // Clear frame data on restore to ensure clean state
+            this.aggregator.updateFrameData(frameId, {
+              isTranslating: false,
+              isTranslated: false,
+              isAutoTranslating: false,
+              status: 'idle',
+              translatedCount: 0,
+              totalCount: 0
+            });
+            // Emit aggregated restore complete to update UI state
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_RESTORE_COMPLETE, data);
           }
           return;
         }
@@ -271,6 +283,21 @@ export class MainFrameCoordinator {
     // General commands to broadcast
     pageEventBus.on(this.MessageActions.PAGE_RESTORE, () => {
       this.broadcastPageAction(this.MessageActions.PAGE_RESTORE);
+    });
+
+    // Page Restore complete - clear aggregator data
+    pageEventBus.on(this.MessageActions.PAGE_RESTORE_COMPLETE, (data) => {
+      if (!data.isAggregated) {
+        this.aggregator.clearAll();
+        // Emit aggregated event to ensure all contexts get clean state
+        this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_RESTORE_COMPLETE, {
+          isTranslating: false,
+          isTranslated: false,
+          isAutoTranslating: false,
+          translatedCount: 0,
+          totalCount: 0
+        });
+      }
     });
 
     pageEventBus.on(this.MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {

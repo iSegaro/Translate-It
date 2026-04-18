@@ -98,6 +98,15 @@ export class MainFrameAggregator {
           action === this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
         payload.isTranslated = status.translatedCount > 0;
         payload.url = window.location.href;
+      } else if (action === this.MessageActions.PAGE_RESTORE_COMPLETE) {
+        // For restore complete, force clean state regardless of frame data
+        payload.isTranslated = false;
+        payload.isTranslating = false;
+        payload.isAutoTranslating = false;
+        payload.translatedCount = 0;
+        payload.totalCount = 0;
+        payload.status = 'idle';
+        payload.url = window.location.href;
       }
 
       logger.debug(`Emitting aggregated event: ${action}`, payload);

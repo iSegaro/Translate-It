@@ -142,6 +142,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
+      logger.debug('PAGE_RESTORE_COMPLETE received, resetting page translation state');
       if (mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.ERROR) {
         mobileStore.resetPageTranslation();
       }
