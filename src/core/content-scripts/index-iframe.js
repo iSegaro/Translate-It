@@ -53,7 +53,7 @@ if (!window.translateItContentScriptCore) {
       try {
         const { interactionCoordinator } = await import('./InteractionCoordinator.js');
         await interactionCoordinator.initialize();
-      } catch (e) {}
+      } catch { /* ignore */ }
 
       // 8. Load Lite Features
       // contentMessageHandler will automatically register all needed handlers including SelectElement
@@ -74,7 +74,7 @@ if (!window.translateItContentScriptCore) {
                 type: 'TRANSLATE_IT_IFRAME_CLICK_DETECTED', 
                 source: 'translate-it-iframe' 
               }, '*');
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
             // Remove after one click to save resources
             window.removeEventListener('click', handleInternalClick, { capture: true });
           };
@@ -140,7 +140,7 @@ if (!window.translateItContentScriptCore) {
                             status: data.status
                           }
                         }, '*');
-                      } catch (e) { /* ignore */ }
+                      } catch { /* ignore */ }
                     }
 
                     window._translateItProgressForwarderSet = true;

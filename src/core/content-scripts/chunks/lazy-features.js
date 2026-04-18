@@ -4,7 +4,6 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
@@ -241,7 +240,7 @@ async function initializeAndActivateFeatures() {
         if (await exclusionChecker.isFeatureAllowed(featureName)) {
           await featureManager.activateFeature(featureName);
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
     featuresInitialized = true;
   }
@@ -279,7 +278,7 @@ export async function activateFeature(featureName) {
     if (await exclusionChecker.isFeatureAllowed(featureName)) {
       await featureManager.activateFeature(featureName);
     }
-  } catch (e) {}
+  } catch { /* ignore */ }
 }
 
 export function cleanupFeatures() {

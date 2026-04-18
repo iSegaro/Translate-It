@@ -146,7 +146,7 @@ class InteractionCoordinator {
       const { getFeatureManager } = await import('./chunks/lazy-features.js');
       const fm = getFeatureManager();
       if (fm && fm.isFeatureActive(featureName)) await fm.deactivateFeature(featureName);
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 
   // --- Event Handlers ---
@@ -175,7 +175,7 @@ class InteractionCoordinator {
               fromIframe: true
             }
           }, '*');
-        } catch (e) { /* ignore cross-origin */ }
+        } catch { /* ignore cross-origin */ }
       }
     }
   }
@@ -235,7 +235,7 @@ class InteractionCoordinator {
   }
 
   cleanup() {
-    for (const [key, { eventType, handler, target }] of this.activeListeners) {
+    for (const [_, { eventType, handler, target }] of this.activeListeners) {
       target.removeEventListener(eventType, handler);
     }
     this.activeListeners.clear();

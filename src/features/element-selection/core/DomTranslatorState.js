@@ -5,7 +5,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import DOMPurify from 'dompurify';
 import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
 
 // Global translation state registry to ensure singleton behavior across chunks
@@ -53,7 +52,6 @@ export async function revertSelectElementTranslation() {
     for (const translation of translationsToRevert) {
       const { 
         element, 
-        originalHTML, 
         originalTextNodesData
       } = translation;
 

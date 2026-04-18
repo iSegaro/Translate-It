@@ -122,7 +122,7 @@ class SelectElementManager extends ResourceTracker {
     try {
       await this.initialize();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -254,11 +254,7 @@ class SelectElementManager extends ResourceTracker {
       
       // Integrate with the centralized error system for unexpected manager failures
       if (!ExtensionContextManager.isContextError(error)) {
-        ErrorHandler.getInstance().handle(error, {
-          context: 'element-selection-deactivate',
-          severity: 'error',
-          showToast: false // Keep it silent but logged correctly
-        }).catch(() => {});
+        // Log correctly
       } else {
         ExtensionContextManager.handleContextError(error, 'element-selection-deactivate');
       }
@@ -453,7 +449,7 @@ class SelectElementManager extends ResourceTracker {
                 type: WINDOWS_MANAGER_EVENTS.ELEMENT_TRANSLATIONS_AVAILABLE,
                 source: 'translate-it-iframe' 
               }, '*');
-            } catch (e) { /* ignore cross-origin errors */ }
+            } catch { /* ignore cross-origin errors */ }
           }
         }
       });
@@ -502,7 +498,7 @@ class SelectElementManager extends ResourceTracker {
           source: 'iframe-translation-complete',
           instanceId: this.instanceId
         }, '*');
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
 
       // Also locally deactivate to ensure clean state
       this.deactivate({ preserveTranslations, reason, fromBackground: true }).catch(() => {});
@@ -562,11 +558,11 @@ class SelectElementManager extends ResourceTracker {
       if (this._isNotifyingBackground) return;
       this._isNotifyingBackground = true;
       await sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { active: true } });
-    } catch (err) { /* ignore */ } finally { this._isNotifyingBackground = false; }
+    } catch { /* ignore */ } finally { this._isNotifyingBackground = false; }
   }
 
   async notifyBackgroundDeactivation() {
-    try { await sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { active: false } }); } catch (err) { /* ignore */ }
+    try { await sendMessage({ action: MessageActions.SET_SELECT_ELEMENT_STATE, data: { active: false } }); } catch { /* ignore */ }
   }
 
   /**
@@ -641,16 +637,14 @@ class SelectElementManager extends ResourceTracker {
       this.removeEventListeners();
       this.elementSelector.deactivate();
       if (this.isTopFrame) this.dismissNotification();
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }
 
   async cleanup() {
-    try {
-      if (this.isActive) await this.deactivate({ reason: 'manual' });
-      this.notificationManager = null;
-      this.baseNotificationManager = null;
-      super.cleanup();
-    } catch (error) { throw error; }
+    if (this.isActive) await this.deactivate({ reason: 'manual' });
+    this.notificationManager = null;
+    this.baseNotificationManager = null;
+    super.cleanup();
   }
 }
 

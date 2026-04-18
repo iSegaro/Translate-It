@@ -9,15 +9,11 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
 import { TranslationHistoryManager } from "./managers/TranslationHistoryManager.js";
 import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
-import { ComplexityAnalyzer } from "./utils/ComplexityAnalyzer.js";
 import { TranslationBatcher } from "./utils/TranslationBatcher.js";
-import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
 
@@ -70,7 +66,7 @@ export class TranslationEngine {
     data.messageId = messageId;
 
     // Register and detect duplicate
-    const abortController = this.lifecycleRegistry.registerRequest(messageId, data.text);
+    this.lifecycleRegistry.registerRequest(messageId, data.text);
 
     try {
       const result = await this.executeTranslation(data, sender);

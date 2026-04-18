@@ -238,7 +238,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
 
       return await this._finalizeTranslation({
-        result, element, elementId, textNodesData, nodeMap, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
       });
 
     } catch (error) {
@@ -314,7 +314,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, textNodesData, nodeMap, targetLanguage, onComplete, sessionId }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId }) {
     if (!result?.success) {
       if (result.cancelled) return { success: false, cancelled: true, element };
       throw result.error || new Error('Translation failed');
@@ -365,14 +365,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   async cancelTranslation(options = {}) {
     if (!this.isTranslating) return;
-    const { silent = false } = options;
 
     const messageId = this.currentMessageId;
     if (messageId) {
       try {
         // 1. Stop the network request in background
         contentScriptIntegration.cancelTranslationRequest(messageId, ActionReasons.USER_CANCELLED);
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     // 2. Clear state pointers

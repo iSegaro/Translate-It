@@ -6,7 +6,6 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'ExtensionContext');
@@ -336,14 +335,14 @@ export class ExtensionContextManager {
             } catch { /* ignore */ }
           }, 5000);
         }
-      } catch (e) {
+      } catch {
         // System notifications might fail if the background context itself is being torn down
         logger.debug('Could not show system notification for background context error');
       }
     }
 
     if (fallbackAction && typeof fallbackAction === 'function') {
-      try { fallbackAction(); } catch (e) { /* ignore fallback errors */ }
+      try { fallbackAction(); } catch { /* ignore */ }
     }
 
     return { handled: true, silent };
@@ -430,12 +429,8 @@ export class ExtensionContextManager {
   static async safeSendMessage(message, context = 'messaging') {
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
-        try {
-          const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-          return await sendMessage(msg);
-        } catch (err) {
-          throw err;
-        }
+        const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+        return await sendMessage(msg);
       },
       { 
         context: `sendMessage-${context}`,
