@@ -1945,5 +1945,26 @@
   },
   "bilingual_translation_description": {
     "message": "検出された言語が翻訳先言語と一致する場合、自動的に翻訳元言語（翻訳元が自動の場合は英語）へ翻訳します。"
+  },
+  "ai_optimization_section_title": {
+    "message": "AIの最適化"
+  },
+  "ai_context_translation_label": {
+    "message": "スマートな文脈理解"
+  },
+  "ai_context_translation_description": {
+    "message": "ページのメタデータ（タイトル、セクション）をAIモデルに送信します。これにより、短いテキストや曖昧なテキストの翻訳精度が向上します。（DeepLでは常に有効です）"
+  },
+  "ai_conversation_history_label": {
+    "message": "会話メモリ"
+  },
+  "ai_conversation_history_description": {
+    "message": "同じセッション内の以前の翻訳の短いメモリを維持します。要素選択モードでの一貫したスタイルに不可欠です。"
+  },
+  "enable_translation_history_label": {
+    "message": "翻訳履歴を有効にする"
+  },
+  "enable_translation_history_description": {
+    "message": "将来の参照のために翻訳をローカルに保存します。"
   }
 }
