@@ -13,15 +13,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-import { PROVIDER_LANGUAGE_MAPPINGS } from "@/shared/config/languageConstants.js";
+import { 
+  getProviderLanguageCode,
+  PROVIDER_LANGUAGE_MAPPINGS
+} from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
-
-// Use mappings from languageConstants.js
-const DEEPL_LANG_CODE_MAP = PROVIDER_LANGUAGE_MAPPINGS.DEEPL;
-const DEEPL_BETA_LANG_CODE_MAP = PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA;
 
 export class DeepLTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -75,25 +74,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   /**
    * Convert language code to DeepL uppercase format
    * @param {string} lang - Language code or name
-   * @param {boolean} enableBetaLanguages - Whether beta languages are enabled
    * @returns {string} DeepL language code (uppercase)
    */
-  _getLangCode(lang, enableBetaLanguages = false) {
+  _getLangCode(lang) {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return ''; // DeepL auto-detect uses empty string
 
-    // Check standard languages first
-    if (DEEPL_LANG_CODE_MAP[normalized]) {
-      return DEEPL_LANG_CODE_MAP[normalized];
-    }
-
-    // Check beta languages if enabled
-    if (enableBetaLanguages && DEEPL_BETA_LANG_CODE_MAP[normalized]) {
-      return DEEPL_BETA_LANG_CODE_MAP[normalized];
-    }
-
-    // Convert to uppercase as fallback
-    return normalized.toUpperCase().replace(/-/g, '-');
+    return getProviderLanguageCode(normalized, 'DEEPL');
   }
 
   /**
@@ -334,13 +321,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // Auto-detect: if source or target language is a beta language, enable beta languages
     // Check if sl is a beta language
     const sourceIsBeta = sl && sl !== '' &&
-      !DEEPL_LANG_CODE_MAP[sourceLang.toLowerCase()] &&
-      DEEPL_BETA_LANG_CODE_MAP[sourceLang.toLowerCase()];
+      !PROVIDER_LANGUAGE_MAPPINGS.DEEPL[sourceLang.toLowerCase()] &&
+      PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA[sourceLang.toLowerCase()];
 
     // Check if tl is a beta language
     const targetIsBeta = tl &&
-      !DEEPL_LANG_CODE_MAP[targetLang.toLowerCase()] &&
-      DEEPL_BETA_LANG_CODE_MAP[targetLang.toLowerCase()];
+      !PROVIDER_LANGUAGE_MAPPINGS.DEEPL[targetLang.toLowerCase()] &&
+      PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA[targetLang.toLowerCase()];
 
     // Auto-enable beta languages if needed
     if (sourceIsBeta || targetIsBeta) {

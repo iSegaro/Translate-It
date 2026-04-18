@@ -199,116 +199,30 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
   // Standard languages
   DEEPL: {
     auto: '',
-    'bg': 'BG',
-    'cs': 'CS',
-    'da': 'DA',
-    'de': 'DE',
-    'el': 'EL',
-    'en': 'EN',
-    'es': 'ES',
-    'et': 'ET',
-    'fi': 'FI',
-    'fr': 'FR',
-    'hu': 'HU',
-    'id': 'ID',
-    'it': 'IT',
-    'ja': 'JA',
-    'ko': 'KO',
-    'lt': 'LT',
-    'lv': 'LV',
-    'nb': 'NB',
-    'nl': 'NL',
-    'pl': 'PL',
-    'pt': 'PT',
-    'pt-br': 'PT-BR',
-    'ro': 'RO',
-    'ru': 'RU',
-    'sk': 'SK',
-    'sl': 'SL',
-    'sv': 'SV',
-    'tr': 'TR',
-    'uk': 'UK',
-    'zh': 'ZH',
-    'zh-cn': 'ZH',
+    'bg': 'BG', 'cs': 'CS', 'da': 'DA', 'de': 'DE', 'el': 'EL', 'en': 'EN', 'es': 'ES', 
+    'et': 'ET', 'fi': 'FI', 'fr': 'FR', 'hu': 'HU', 'id': 'ID', 'it': 'IT', 'ja': 'JA', 
+    'ko': 'KO', 'lt': 'LT', 'lv': 'LV', 'nb': 'NB', 'nl': 'NL', 'pl': 'PL', 'pt': 'PT', 
+    'pt-br': 'PT-BR', 'ro': 'RO', 'ru': 'RU', 'sk': 'SK', 'sl': 'SL', 'sv': 'SV', 
+    'tr': 'TR', 'uk': 'UK', 
+    'zh': 'ZH', 
+    'zh-cn': 'ZH-HANS', 
+    'zh-tw': 'ZH-HANT',
   },
 
   // DeepL Beta Languages (require enable_beta_languages parameter)
   DEEPL_BETA: {
-    'ace': 'ACE',        // Acehnese
-    'af': 'AF',          // Afrikaans
-    'an': 'AN',          // Aragonese
-    'as': 'AS',          // Assamese
-    'ay': 'AY',          // Aymara
-    'az': 'AZ',          // Azerbaijani
-    'ba': 'BA',          // Bashkir
-    'be': 'BE',          // Belarusian
-    'bho': 'BHO',        // Bhojpuri
-    'bn': 'BN',          // Bengali
-    'br': 'BR',          // Breton
-    'bs': 'BS',          // Bosnian
-    'ca': 'CA',          // Catalan
-    'ceb': 'CEB',        // Cebuano
-    'ckb': 'CKB',        // Kurdish (Sorani)
-    'cy': 'CY',          // Welsh
-    'eo': 'EO',          // Esperanto
-    'eu': 'EU',          // Basque
-    'fa': 'FA',          // Persian (Farsi)
-    'ga': 'GA',          // Irish
-    'gl': 'GL',          // Galician
-    'gn': 'GN',          // Guarani
-    'gom': 'GOM',        // Konkani
-    'gu': 'GU',          // Gujarati
-    'ha': 'HA',          // Hausa
-    'hi': 'HI',          // Hindi
-    'hr': 'HR',          // Croatian
-    'ht': 'HT',          // Haitian Creole
-    'hy': 'HY',          // Armenian
-    'ig': 'IG',          // Igbo
-    'is': 'IS',          // Icelandic
-    'jv': 'JV',          // Javanese
-    'ka': 'KA',          // Georgian
-    'kk': 'KK',          // Kazakh
-    'kmr': 'KMR',        // Kurdish (Kurmanji)
-    'ky': 'KY',          // Kyrgyz
-    'la': 'LA',          // Latin
-    'lb': 'LB',          // Luxembourgish
-    'lmo': 'LMO',        // Lombard
-    'ln': 'LN',          // Lingala
-    'mai': 'MAI',        // Maithili
-    'mg': 'MG',          // Malagasy
-    'mi': 'MI',          // Maori
-    'mk': 'MK',          // Macedonian
-    'mn': 'MN',          // Mongolian
-    'mr': 'MR',          // Marathi
-    'ms': 'MS',          // Malay
-    'mt': 'MT',          // Maltese
-    'my': 'MY',          // Burmese
-    'ne': 'NE',          // Nepali
-    'oc': 'OC',          // Occitan
-    'pag': 'PAG',        // Pangasinan
-    'pam': 'PAM',        // Kapampangan
-    'prs': 'PRS',        // Dari
-    'ps': 'PS',          // Pashto
-    'qu': 'QU',          // Quechua
-    'sa': 'SA',          // Sanskrit
-    'scn': 'SCN',        // Sicilian
-    'sq': 'SQ',          // Albanian
-    'sr': 'SR',          // Serbian
-    'su': 'SU',          // Sundanese
-    'sw': 'SW',          // Swahili
-    'ta': 'TA',          // Tamil
-    'te': 'TE',          // Telugu
-    'tg': 'TG',          // Tajik
-    'tk': 'TK',          // Turkmen
-    'tl': 'TL',          // Tagalog
-    'tn': 'TN',          // Tswana
-    'ts': 'TS',          // Tsonga
-    'tt': 'TT',          // Tatar
-    'ur': 'UR',          // Urdu
-    'uz': 'UZ',          // Uzbek
-    'wo': 'WO',          // Wolof
-    'xh': 'XH',          // Xhosa
-    'yue': 'YUE',        // Cantonese
+    'ace': 'ACE', 'af': 'AF', 'sq': 'SQ', 'ar': 'AR', 'an': 'AN', 'hy': 'HY', 'as': 'AS', 
+    'ay': 'AY', 'az': 'AZ', 'ba': 'BA', 'eu': 'EU', 'be': 'BE', 'bn': 'BN', 'bho': 'BHO', 
+    'bs': 'BS', 'br': 'BR', 'my': 'MY', 'yue': 'YUE', 'ca': 'CA', 'ceb': 'CEB', 'hr': 'HR', 
+    'prs': 'PRS', 'eo': 'EO', 'gl': 'GL', 'ka': 'KA', 'gn': 'GN', 'gu': 'GU', 'ht': 'HT', 
+    'ha': 'HA', 'he': 'HE', 'hi': 'HI', 'ig': 'IG', 'ga': 'GA', 'jv': 'JV', 'pam': 'PAM', 
+    'kk': 'KK', 'gom': 'GOM', 'kmr': 'KMR', 'ckb': 'CKB', 'ky': 'KY', 'la': 'LA', 
+    'ln': 'LN', 'lmo': 'LMO', 'lb': 'LB', 'mk': 'MK', 'mai': 'MAI', 'mg': 'MG', 'ms': 'MS', 
+    'ml': 'ML', 'mt': 'MT', 'mi': 'MI', 'mr': 'MR', 'mn': 'MN', 'ne': 'NE', 'oc': 'OC', 
+    'om': 'OM', 'pag': 'PAG', 'ps': 'PS', 'fa': 'FA', 'pa': 'PA', 'qu': 'QU', 'sa': 'SA', 
+    'sr': 'SR', 'st': 'ST', 'scn': 'SCN', 'su': 'SU', 'sw': 'SW', 'tg': 'TG', 'ta': 'TA', 
+    'tt': 'TT', 'te': 'TE', 'ts': 'TS', 'tn': 'TN', 'tk': 'TK', 'ur': 'UR', 'uz': 'UZ', 
+    'vi': 'VI', 'cy': 'CY', 'wo': 'WO', 'xh': 'XH', 'yi': 'YI', 'zu': 'ZU'
   },
 };
 
@@ -391,7 +305,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
   deepl: [
     'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
     'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
-    'sv', 'tr', 'uk', 'zh', 'zh-cn'
+    'sv', 'tr', 'uk', 'zh', 'zh-cn', 'zh-tw'
   ],
 
   // DeepL with beta languages enabled
@@ -399,14 +313,15 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     // Standard languages
     'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
     'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
-    'sv', 'tr', 'uk', 'zh', 'zh-cn',
-    // Beta languages
+    'sv', 'tr', 'uk', 'zh', 'zh-cn', 'zh-tw',
+    // Beta languages (new extensive list)
     'ace', 'af', 'an', 'as', 'ay', 'az', 'ba', 'be', 'bho', 'bn', 'br', 'bs', 'ca',
     'ceb', 'ckb', 'cy', 'eo', 'eu', 'fa', 'ga', 'gl', 'gn', 'gom', 'gu', 'ha', 'hi',
     'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ky', 'la', 'lb', 'lmo',
     'ln', 'mai', 'mg', 'mi', 'mk', 'mn', 'mr', 'ms', 'mt', 'my', 'ne', 'oc', 'pag',
     'pam', 'prs', 'ps', 'qu', 'sa', 'scn', 'sq', 'sr', 'su', 'sw', 'ta', 'te', 'tg',
-    'tk', 'tl', 'tn', 'ts', 'tt', 'ur', 'uz', 'wo', 'xh', 'yue'
+    'tk', 'tl', 'tn', 'ts', 'tt', 'ur', 'uz', 'wo', 'xh', 'yue', 'yi', 'zu', 'om',
+    'pa', 'st', 'sn'
   ],
 
   // AI Providers (Gemini, OpenAI, OpenRouter, DeepSeek, WebAI, Custom)
