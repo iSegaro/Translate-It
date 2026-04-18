@@ -366,7 +366,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async cancelTranslation(options = {}) {
     if (!this.isTranslating) return;
     const { silent = false } = options;
-    
+
     const messageId = this.currentMessageId;
     if (messageId) {
       try {
@@ -377,11 +377,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     // 2. Clear state pointers
     this._cleanupCurrentSession(false);
-    
-    // 3. CRITICAL: Revert any partial translations already applied to DOM
-    try {
-      if (!silent) await this.revertTranslation();
-    } catch (e) { /* ignore */ }
+
+    // NOTE: We do NOT revert partial translations on cancel.
+    // The user can manually revert via the Revert button if desired.
+    // Partial translations that were already applied remain visible.
   }
 
   isCurrentlyTranslating() { return this.isTranslating; }

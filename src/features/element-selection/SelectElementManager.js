@@ -215,7 +215,9 @@ class SelectElementManager extends ResourceTracker {
         reason = 'manual', // 'success', 'error', 'cancel', 'manual', 'conflict'
         fromBackground = false,
         silent = false,
-        preserveTranslations = options.reason !== 'cancel'
+        preserveTranslations = options.preserveTranslations !== undefined
+          ? options.preserveTranslations
+          : reason !== 'error' // Default: preserve for everything except error
       } = options;
 
       this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
@@ -479,7 +481,7 @@ class SelectElementManager extends ResourceTracker {
       }
 
       if (isFatalError(error) && !isCancellation) {
-        this.deactivate({ preserveTranslations: true, reason: 'error' });
+        this.deactivate({ preserveTranslations: false, reason: 'error' });
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
       }
@@ -488,22 +490,24 @@ class SelectElementManager extends ResourceTracker {
 
   performPostTranslationCleanup(options = {}) {
     const reason = options.reason || 'success';
+    // For error case, we want to revert partial translations to avoid broken state
+    const preserveTranslations = reason !== 'error';
 
     if (!this.isTopFrame) {
       try {
         // Notify top frame that this iframe has finished its selection/translation
         // This will trigger a global deactivation to clean up all other iframes
-        window.top.postMessage({ 
-          type: 'translate-it-deactivate-select-element', 
-          source: 'iframe-translation-complete', 
-          instanceId: this.instanceId 
+        window.top.postMessage({
+          type: 'translate-it-deactivate-select-element',
+          source: 'iframe-translation-complete',
+          instanceId: this.instanceId
         }, '*');
       } catch (e) { /* ignore */ }
-      
+
       // Also locally deactivate to ensure clean state
-      this.deactivate({ preserveTranslations: true, reason, fromBackground: true }).catch(() => {});
+      this.deactivate({ preserveTranslations, reason, fromBackground: true }).catch(() => {});
     } else if (this.isActive) {
-      this.deactivate({ preserveTranslations: true, reason }).catch(() => {});
+      this.deactivate({ preserveTranslations, reason }).catch(() => {});
     } else {
       // Safety guard: ensure notification is dismissed in top frame even if already inactive
       this.dismissNotification();
