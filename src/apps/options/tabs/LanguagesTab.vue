@@ -13,18 +13,25 @@
         />
       </div>
 
-      <div class="provider-settings">
-        <div
-          v-if="selectedProviderInfo && !providerSettingsComponent"
-          class="api-info"
-        >
-          <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-          <p class="setting-description">
-            {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
-          </p>
-        </div>
+      <div class="provider-settings-container">
+        <Transition name="fade-slide">
+          <div 
+            :key="selectedProvider"
+            class="provider-settings"
+          >
+            <div
+              v-if="selectedProviderInfo && !providerSettingsComponent"
+              class="api-info"
+            >
+              <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
+              <p class="setting-description">
+                {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
+              </p>
+            </div>
 
-        <component :is="providerSettingsComponent" />
+            <component :is="providerSettingsComponent" />
+          </div>
+        </Transition>
       </div>
     </div>
 
@@ -661,8 +668,18 @@ defineExpose({
 .api-settings-section {
   margin-top: 0;
 
-  .provider-settings {
+  .provider-settings-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
     margin-top: $spacing-lg;
+    overflow: hidden;
+  }
+
+  .provider-settings {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: fit-content;
   }
 
   .api-info {
@@ -1080,5 +1097,21 @@ defineExpose({
     justify-content: space-between !important;
     text-align: right !important;
   }
-}
-</style>
+  }
+
+  // Transitions for provider settings
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+  }
+
+  .fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+  }
+  </style>
