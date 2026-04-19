@@ -944,13 +944,20 @@ defineExpose({
     }
 
     .pref-select {
-      flex: 0 0 180px; // Slightly narrower select
-      padding: 4px $spacing-sm; // Tighter padding
+      flex: 0 0 250px;
+      width: 250px;
+      padding: 6px $spacing-sm;
       border: 1px solid var(--color-border);
       border-radius: $border-radius-sm;
       background-color: var(--color-background);
       color: var(--color-text);
       font-size: $font-size-sm;
+      cursor: pointer;
+
+      &:focus {
+        border-color: var(--color-primary);
+        outline: none;
+      }
     }
   }
 }
