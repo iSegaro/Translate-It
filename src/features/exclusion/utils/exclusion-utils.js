@@ -23,7 +23,7 @@ export async function checkUrlExclusionAsync(url) {
     });
     
     return !!(response && response.success && response.excluded);
-  } catch (error) {
+  } catch {
     // Fail safe: if messaging fails, assume not excluded and let regular logic handle it later
     return false;
   }

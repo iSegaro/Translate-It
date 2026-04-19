@@ -184,7 +184,7 @@ export const AIConversationHelper = {
           const snippet = typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content);
           contextParts.push(`Reference: ${this._truncateSmart(snippet, charLimit + 50)}`);
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     if (contextParts.length === 0) return undefined;
@@ -201,8 +201,6 @@ export const AIConversationHelper = {
    * Helper to prepare system prompt and user text for AI providers
    */
   async preparePromptAndText(text, sourceLang, targetLang, translateMode, providerType, sessionId = null, isBatch = false, contextMetadata = null) {
-    const providerName = providerType; 
-    
     const firstTurn = await this.isFirstTurn(sessionId);
     const [historyEnabled, contextEnabled] = await Promise.all([
       getAIConversationHistoryEnabledAsync(),
@@ -357,8 +355,6 @@ export const AIConversationHelper = {
       
       const session = translationSessionManager.sessions.get(sessionId);
       if (session) session.batchCount++;
-    } catch (e) {
-      logger.warn('Failed to update session history:', e);
-    }
+    } catch { /* ignore */ }
   }
 };

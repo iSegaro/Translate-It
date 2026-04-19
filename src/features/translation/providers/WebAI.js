@@ -67,23 +67,19 @@ export class WebAIProvider extends BaseAIProvider {
       }),
     };
 
-    try {
-      const result = await this._executeRequest({
-        url: apiUrl,
-        fetchOptions,
-        charCount: AITextProcessor.calculatePayloadChars(fetchOptions.body),
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-        extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-        sessionId
-      });
+    const result = await this._executeRequest({
+      url: apiUrl,
+      fetchOptions,
+      charCount: AITextProcessor.calculatePayloadChars(fetchOptions.body),
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+      extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+      sessionId
+    });
 
-      this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
+    
+    return result;
   }
 }

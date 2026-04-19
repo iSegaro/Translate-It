@@ -4,7 +4,7 @@
  */
 
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { ResponseFormat, TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
+import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
@@ -161,9 +161,7 @@ export class OptimizedJsonHandler {
         (currentResults.trim().startsWith('{') || currentResults.trim().startsWith('['))) {
       try {
         currentResults = JSON.parse(currentResults);
-      } catch (e) {
-        // Not valid JSON, keep as string
-      }
+      } catch { /* ignore */ }
     }
 
     if (Array.isArray(currentResults)) {
@@ -255,7 +253,7 @@ export class OptimizedJsonHandler {
     };
     try {
       await browser.tabs.sendMessage(tabId, endMessage);
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 
   async _sendStreamError(tabId, messageId, lastError, targetLanguage) {
@@ -273,6 +271,6 @@ export class OptimizedJsonHandler {
     };
     try {
       await browser.tabs.sendMessage(tabId, endMessage);
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 }

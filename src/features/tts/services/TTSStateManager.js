@@ -81,7 +81,7 @@ class TTSStateManager {
     if (this.activeFirefoxAudioUrl && this.activeFirefoxAudioUrl.startsWith('blob:')) {
       try {
         URL.revokeObjectURL(this.activeFirefoxAudioUrl);
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
     this.activeFirefoxAudio = null;
     this.activeFirefoxAudioUrl = null;
@@ -186,9 +186,7 @@ class TTSStateManager {
       if (browserAPI.offscreen && await browserAPI.offscreen.hasDocument()) {
         await browserAPI.offscreen.closeDocument();
       }
-    } catch (e) {
-      logger.debug('Error closing offscreen:', e.message);
-    } finally {
+    } catch { /* ignore */ } finally {
       this.offscreenDocumentPromise = null;
     }
   }
@@ -206,9 +204,7 @@ class TTSStateManager {
         });
         logger.debug('Sent stop command to offscreen document');
       }
-    } catch (e) {
-      logger.debug('Failed to send stop command to offscreen:', e.message);
-    }
+    } catch { /* ignore */ }
   }
 }
 

@@ -33,12 +33,16 @@ const Healers = {
         processed = processed.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
           try {
             return String.fromCharCode(parseInt(grp, 16));
-          } catch (e) { return match; }
+          } catch { return match; }
         });
         
         // Strip remaining dangerous control characters (00-1F) except common ones
-        return processed.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '');
-      } catch (e) { return text; }
+        const lowRange = '\\x00-\\x08';
+        const midRange = '\\x0B-\\x0C';
+        const highRange = '\\x0E-\\x1F';
+        const controlPattern = new RegExp(`[${lowRange}${midRange}${highRange}]`, 'g');
+        return processed.replace(controlPattern, '');
+      } catch { return text; }
     },
 
     // 3. QUOTE HEALER: Fix AI using single quotes for JSON keys or values
@@ -91,7 +95,7 @@ const Healers = {
               depth++;
               continue;
             }
-          } catch (e) {}
+          } catch { /* ignore */ }
         }
         break;
       }
@@ -188,11 +192,11 @@ export const AIResponseParser = {
     if (typeof potentialItems === 'string') {
       try {
         potentialItems = JSON.parse(potentialItems);
-      } catch (e) {
+      } catch {
         try {
           const repaired = potentialItems.replace(/'/g, '"').replace(/\\"/g, '"');
           potentialItems = JSON.parse(repaired);
-        } catch (e2) {}
+        } catch { /* ignore */ }
       }
     }
     
@@ -240,7 +244,7 @@ export const AIResponseParser = {
         if (typeof inner === 'object') {
           text = inner.t || inner.text || inner.translation || Object.values(inner)[0] || text;
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     return { text, id };
@@ -293,14 +297,14 @@ export const AIResponseParser = {
 
     if (this._isGarbageOutput(jsonString)) throw new Error("AI returned repetitive garbage output");
 
-    try { return JSON.parse(jsonString); } catch (e) {
-      try { return JSON.parse(this._repairTruncatedJson(jsonString)); } catch (eRep) {}
+    try { return JSON.parse(jsonString); } catch {
+      try { return JSON.parse(this._repairTruncatedJson(jsonString)); } catch { /* ignore */ }
     }
 
     const cleaned = this._stripMarkdown(jsonString);
     if (cleaned !== jsonString) {
-      try { return JSON.parse(cleaned); } catch (e) {
-        try { return JSON.parse(this._repairTruncatedJson(cleaned)); } catch (e2) {}
+      try { return JSON.parse(cleaned); } catch {
+        try { return JSON.parse(this._repairTruncatedJson(cleaned)); } catch { /* ignore */ }
       }
     }
 
@@ -322,14 +326,14 @@ export const AIResponseParser = {
       
       if (lastIndex > start) {
         const candidate = jsonString.substring(start, lastIndex + 1);
-        try { return JSON.parse(candidate); } catch (e) {
-          try { return JSON.parse(this._repairTruncatedJson(candidate)); } catch (e2) {}
+        try { return JSON.parse(candidate); } catch {
+          try { return JSON.parse(this._repairTruncatedJson(candidate)); } catch { /* ignore */ }
         }
       } else {
         try {
           const candidate = jsonString.substring(start);
           return JSON.parse(this._repairTruncatedJson(candidate));
-        } catch (e) {}
+        } catch { /* ignore */ }
       }
     }
 
@@ -392,6 +396,6 @@ export const AIResponseParser = {
     for (let i = 0; i < (openBraces - closedBraces); i++) repaired += '}';
     for (let i = 0; i < (openBrackets - closedBrackets); i++) repaired += ']';
 
-    return repaired.replace(/,\s*([\]\}])/g, '$1');
+    return repaired.replace(/,\s*([\]}])/g, '$1');
   }
 };

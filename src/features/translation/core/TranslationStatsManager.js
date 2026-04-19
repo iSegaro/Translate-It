@@ -190,7 +190,7 @@ class TranslationStatsManager {
     }
 
     // Check if logging is enabled for this component/level
-    if (logger.isDebugEnabled?.() || true) {
+    if (logger.isDebugEnabled?.() !== false) {
       safeConsole.group('📊 Translation API Statistics');
       safeConsole.table(tableData);
       safeConsole.log(`Total Global Calls: ${this.global.totalCalls}`);

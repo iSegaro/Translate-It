@@ -11,10 +11,7 @@
 import { LOG_LEVELS } from './logConstants.js';
 import {
   getGlobalDebugState,
-  getGlobalLogLevel,
-  setGlobalLogLevel,
   getComponentLogLevel,
-  setComponentLogLevel,
   getSharedLogLevelCache,
   incrementShouldLogCalls,
   incrementCacheHits,
@@ -129,7 +126,6 @@ function shouldLog(component, level) {
 
   incrementCacheMisses();
 
-  const globalState = getGlobalDebugState();
   const componentLevel = getComponentLogLevel(component);
   
   // Logic: 
@@ -164,7 +160,6 @@ export function shouldDebug(component) {
 // Log batching system
 const logBatch = [];
 let batchTimeout = null;
-const BATCH_DELAY = 100;
 
 function processLogBatch() {
   if (logBatch.length === 0) return;
@@ -206,13 +201,6 @@ function getConsoleMethod(level) {
     case 2: case 'info': return safeConsole.info.bind(safeConsole);
     case 3: case 'debug': return safeConsole.debug.bind(safeConsole);
     default: return safeConsole.log.bind(safeConsole);
-  }
-}
-
-function batchLog(component, level, levelNum, message, data) {
-  logBatch.push({ component, level, levelNum, message, data, timestamp: Date.now() });
-  if (!batchTimeout) {
-    batchTimeout = setTimeout(processLogBatch, BATCH_DELAY);
   }
 }
 
@@ -271,9 +259,8 @@ export function createLogger(component, subComponent = null) {
     },
 
     isDebugEnabled: () => {
-      const globalState = getGlobalDebugState();
       const componentLevel = getComponentLogLevel(component);
-      return globalState.debugOverride || componentLevel >= LOG_LEVELS.DEBUG;
+      return getGlobalDebugState().debugOverride || componentLevel >= LOG_LEVELS.DEBUG;
     },
 
     debugLazy: createLazyLogMethod(component, loggerName, LOG_LEVELS.DEBUG, safeConsole.log.bind(safeConsole)),

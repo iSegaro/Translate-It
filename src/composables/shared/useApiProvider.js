@@ -5,7 +5,6 @@ import { getProvidersForDropdown, getProviderById } from "@/core/provider-regist
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import browser from "webextension-polyfill";
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useApiProvider');

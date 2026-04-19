@@ -39,7 +39,6 @@
 
 <script setup>
 import { computed } from 'vue'
-import browser from 'webextension-polyfill'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Props

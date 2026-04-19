@@ -7,7 +7,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIStreamManager');

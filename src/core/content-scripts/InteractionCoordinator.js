@@ -235,7 +235,7 @@ class InteractionCoordinator {
   }
 
   cleanup() {
-    for (const [_, { eventType, handler, target }] of this.activeListeners) {
+    for (const { eventType, handler, target } of this.activeListeners.values()) {
       target.removeEventListener(eventType, handler);
     }
     this.activeListeners.clear();

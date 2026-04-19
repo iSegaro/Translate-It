@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, isChineseScriptText, detectChineseScriptLanguage, detectDevanagariScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
+import { detectArabicScriptLanguage, detectChineseScriptLanguage, detectDevanagariScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

@@ -147,8 +147,6 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       url.searchParams.set("IID", tokenData.IID?.length ? `${tokenData.IID}.${BingTranslateProvider.bingAccessToken.count++}` : "");
       url.searchParams.set("isVertical", "1");
 
-      const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
-
       // Enhanced API call with HTML response detection
       const result = await this._executeApiCall({
         url: url.toString(),

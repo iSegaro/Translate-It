@@ -70,29 +70,25 @@ export class DeepSeekProvider extends BaseAIProvider {
       }),
     };
 
-    try {
-      const result = await this._executeRequest({
-        url: apiUrl || "https://api.deepseek.com/chat/completions",
-        fetchOptions,
-        charCount: fetchOptions.body.length,
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-        extractResponse: (data) => data?.choices?.[0]?.message?.content,
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-        sessionId,
-        updateApiKey: (newKey, options) => {
-          options.headers.Authorization = `Bearer ${newKey}`;
-        }
-      });
-
-      if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+    const result = await this._executeRequest({
+      url: apiUrl || "https://api.deepseek.com/chat/completions",
+      fetchOptions,
+      charCount: fetchOptions.body.length,
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+      sessionId,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
       }
+    });
 
-      return result;
-    } catch (error) {
-      throw error;
+    if (sessionId && result) {
+      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
+
+    return result;
   }
 
   _validateConfig(config, requiredFields, context) {

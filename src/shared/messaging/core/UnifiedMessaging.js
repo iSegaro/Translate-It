@@ -114,7 +114,7 @@ export async function sendMessage(message, options = {}) {
             messageId: message.messageId
           });
           if (checkResponse && checkResponse.completed) return checkResponse.results;
-        } catch (e) {}
+        } catch { /* ignore */ }
       }
 
       if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {

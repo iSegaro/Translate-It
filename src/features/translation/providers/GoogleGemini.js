@@ -145,10 +145,11 @@ export class GeminiProvider extends BaseAIProvider {
       if (thinkingEnabled && model?.includes('thinking') && (error.message?.includes('thinking_config') || error.message?.includes('400'))) {
         const retryBody = { ...requestBody };
         delete retryBody.generationConfig.thinking_config;
+        const retryBodyJson = JSON.stringify(retryBody);
         return await this._executeRequest({
           url,
-          fetchOptions: { ...fetchOptions, body: JSON.stringify(retryBody) },
-          charCount,
+          fetchOptions: { ...fetchOptions, body: retryBodyJson },
+          charCount: retryBodyJson.length,
           extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,

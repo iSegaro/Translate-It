@@ -4,7 +4,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
-  LANGUAGE_NAME_TO_CODE_MAP,
   getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";

@@ -4,8 +4,6 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
 
 /**
  * PageTranslationEventManager - Specialized class to handle external events

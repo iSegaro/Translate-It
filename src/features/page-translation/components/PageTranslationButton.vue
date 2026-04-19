@@ -181,7 +181,6 @@ import { Icon } from '@iconify/vue';
 import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
-import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 const props = defineProps({

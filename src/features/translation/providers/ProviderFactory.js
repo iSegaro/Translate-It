@@ -1,6 +1,4 @@
 import { providerRegistry } from "./ProviderRegistry.js";
-import { CONFIG } from "@/shared/config/config.js";
-import { ProviderRegistryIds } from "./ProviderConstants.js";
 
 export class ProviderFactory {
   constructor() {

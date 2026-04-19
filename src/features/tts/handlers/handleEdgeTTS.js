@@ -3,7 +3,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { EdgeTTSClient } from '@/features/tts/services/EdgeTTSClient.js';
 import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.js';
 import { isChromium } from '@/core/browserHandlers.js';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 
@@ -24,7 +23,7 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
     // Interrupt previous
     if (ttsStateManager.currentTTSRequest) {
       await ttsStateManager.notifyTTSEnded('interrupted');
-      try { await ttsStateManager.currentTTSRequest; } catch (e) {}
+      try { await ttsStateManager.currentTTSRequest; } catch { /* ignore */ }
     }
 
     if (!text || !text.trim()) {

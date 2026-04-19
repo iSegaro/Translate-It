@@ -70,35 +70,31 @@ export class OpenRouterProvider extends BaseAIProvider {
       }),
     };
 
-    try {
-      const result = await this._executeRequest({
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        fetchOptions,
-        charCount: fetchOptions.body.length,
-        originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-        extractResponse: (data) => {
-          if (data?.error) {
-            const errorMsg = data.error.message || data.error.metadata?.raw || 'Unknown OpenRouter Error';
-            throw new Error(`API_ERROR: ${errorMsg}`);
-          }
-          return data?.choices?.[0]?.message?.content;
-        },
-        context: `${this.providerName.toLowerCase()}-translation`,
-        abortController,
-        sessionId,
-        updateApiKey: (newKey, options) => {
-          options.headers.Authorization = `Bearer ${newKey}`;
+    const result = await this._executeRequest({
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      fetchOptions,
+      charCount: fetchOptions.body.length,
+      originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
+      extractResponse: (data) => {
+        if (data?.error) {
+          const errorMsg = data.error.message || data.error.metadata?.raw || 'Unknown OpenRouter Error';
+          throw new Error(`API_ERROR: ${errorMsg}`);
         }
-      });
-
-      if (sessionId && result) {
-        await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+        return data?.choices?.[0]?.message?.content;
+      },
+      context: `${this.providerName.toLowerCase()}-translation`,
+      abortController,
+      sessionId,
+      updateApiKey: (newKey, options) => {
+        options.headers.Authorization = `Bearer ${newKey}`;
       }
+    });
 
-      return result;
-    } catch (error) {
-      throw error;
+    if (sessionId && result) {
+      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
+
+    return result;
   }
 
   _validateConfig(config, requiredFields, context) {

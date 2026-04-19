@@ -421,7 +421,7 @@ export class IFrameManager extends ResourceTracker {
   /**
    * Broadcast message to all iframes
    */
-  _broadcastToIframes(message, excludeFrameIds = []) {
+  _broadcastToIframes(message) {
     const iframes = document.querySelectorAll('iframe');
     iframes.forEach(iframe => {
       try {

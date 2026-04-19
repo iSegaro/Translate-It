@@ -3,11 +3,6 @@
  * Used to adjust batch sizes and delays dynamically based on content density.
  */
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ComplexityAnalyzer');
-
 export const ComplexityAnalyzer = {
   /**
    * Calculate complexity for a single text segment.
@@ -36,7 +31,7 @@ export const ComplexityAnalyzer = {
     
     // Bonus for mixed scripts (e.g., Latin + Farsi)
     const hasLatin = /[a-zA-Z]/.test(text);
-    const hasNonLatin = /[^\u0000-\u007F]/.test(text); 
+    const hasNonLatin = /[^\x20-\x7E]/.test(text); 
     if (hasLatin && hasNonLatin) complexity += 10;
     
     return Math.round(complexity);
@@ -86,7 +81,7 @@ export const ComplexityAnalyzer = {
       
       // Weight mixed scripts
       const hasLatin = /[a-zA-Z]/.test(text);
-      const hasNonLatin = /[^\u0000-\u007F]/.test(text); 
+      const hasNonLatin = /[^\x20-\x7E]/.test(text); 
       if (hasLatin && hasNonLatin) textComplexity += 8;
       
       totalComplexity += textComplexity;

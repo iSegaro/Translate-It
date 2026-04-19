@@ -37,9 +37,7 @@ export class MainFrameCoordinator {
     document.querySelectorAll('iframe').forEach(iframe => {
       try {
         iframe.contentWindow.postMessage(broadcastMessage, '*');
-      } catch (e) {
-        // Cross-origin restrictions are expected for some iframes
-      }
+      } catch { /* ignore cross-origin */ }
     });
   }
 
@@ -64,9 +62,7 @@ export class MainFrameCoordinator {
     document.querySelectorAll('iframe').forEach(iframe => {
       try {
         iframe.contentWindow.postMessage(broadcastMessage, '*');
-      } catch (e) {
-        // Silently skip iframes with strict cross-origin policies
-      }
+      } catch { /* ignore cross-origin */ }
     });
   }
 

@@ -115,7 +115,7 @@ class TTSVoiceService {
       if (cache && cache.timestamp && (Date.now() - cache.timestamp < this.cacheTTL)) {
         return cache.data;
       }
-    } catch (e) {}
+    } catch { /* ignore */ }
     return null;
   }
 
@@ -132,7 +132,7 @@ class TTSVoiceService {
           data: voices
         }
       });
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 }
 

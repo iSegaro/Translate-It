@@ -77,8 +77,8 @@ export class ErrorHandler {
       const redactKeys = (text) => {
         if (!text || typeof text !== 'string') return text;
         return text
-          .replace(/(key|api_key)=([a-zA-Z0-9_\-]+)/gi, '$1=***') // Mask URL params
-          .replace(/(AIzaSy)[a-zA-Z0-9_\-]{35}/g, '$1***'); // Mask standard Gemini key pattern
+          .replace(/(key|api_key)=([a-zA-Z0-9_-]+)/gi, '$1=***') // Mask URL params
+          .replace(/(AIzaSy)[a-zA-Z0-9_-]{35}/g, '$1***'); // Mask standard Gemini key pattern
       };
       
       const sanitizedRaw = redactKeys(raw);

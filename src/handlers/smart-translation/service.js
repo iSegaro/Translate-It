@@ -13,7 +13,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
-import { resourceTracker, processedMessageIds, activeProcessing, successfullyCompletedToastIds, cleanupOldData } from './state.js';
+import { resourceTracker, processedMessageIds, activeProcessing, successfullyCompletedToastIds } from './state.js';
 import { storePendingTranslationData, getPendingTranslationData, clearPendingTranslationData, clearPendingNotificationData, pendingTranslationByToastId } from './dataStore.js';
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';

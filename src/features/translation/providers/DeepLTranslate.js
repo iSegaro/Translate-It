@@ -192,9 +192,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
-    // Recover sessionId and blockContainer from abortController if available
+    // Recover sessionId from abortController if available
     const sessionId = options.sessionId || abortController?.sessionId;
-    const blockContainer = options.blockContainer || abortController?.blockContainer;
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
     // Normalize language codes

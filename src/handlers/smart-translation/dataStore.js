@@ -5,12 +5,10 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
-import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { resourceTracker, messageSources, processedMessageIds } from './state.js';
 import { MAX_AGE, MAX_PROCESSED_MESSAGE_IDS } from './constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationDataStore');
-const notificationManager = new NotificationManager();
 
 // Store pending translation data - WeakMap is more resilient to cleanup
 export const pendingTranslationData = new WeakMap();

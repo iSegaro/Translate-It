@@ -187,11 +187,11 @@ export const ProviderRequestEngine = {
         if (contentType && contentType.includes('application/json')) {
           try {
             responseData = await clonedResponse.json();
-          } catch (e) {}
+          } catch { /* ignore */ }
         } else {
           try {
             responseData = await clonedResponse.text();
-          } catch (e) {}
+          } catch { /* ignore */ }
         }
       }
 
@@ -203,7 +203,7 @@ export const ProviderRequestEngine = {
             // Try to extract a preview of the actual translation
             const preview = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
             resultPreview = preview.substring(0, 500);
-          } catch (e) {}
+          } catch { /* ignore */ }
         }
 
         return [`[Call #${globalCallId}] Response: ${response.status} (${duration}ms)`, {

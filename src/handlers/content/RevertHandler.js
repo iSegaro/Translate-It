@@ -167,7 +167,7 @@ export class RevertHandler extends ResourceTracker {
             const mobileStore = useMobileStore();
             mobileStore.setHasElementTranslations(false);
           }
-        } catch (e) {
+        } catch {
           logger.debug('Pinia not available for store update during revert');
         }
         

@@ -45,7 +45,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     // 2. Interrupt previous
     if (ttsStateManager.currentTTSRequest) {
       await ttsStateManager.notifyTTSEnded('interrupted');
-      try { await ttsStateManager.currentTTSRequest; } catch (e) {}
+      try { await ttsStateManager.currentTTSRequest; } catch { /* ignore */ }
     }
     
     if (!text || !text.trim()) {

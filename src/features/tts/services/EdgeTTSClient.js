@@ -151,7 +151,7 @@ export class EdgeTTSClient {
 
       const payload = JSON.parse(atob(base64));
       return payload.exp ? payload.exp * 1000 : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   }

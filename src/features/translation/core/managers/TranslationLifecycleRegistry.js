@@ -93,9 +93,7 @@ export class TranslationLifecycleRegistry {
       // Notify streaming manager to clean up resources
       const { streamingManager } = await import("../StreamingManager.js");
       await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
-    } catch (error) {
-      logger.debug(`[LifecycleRegistry] Failed to notify StreamingManager:`, error.message);
-    }
+    } catch { /* ignore */ }
 
     return true;
   }
@@ -113,13 +111,13 @@ export class TranslationLifecycleRegistry {
         this.cancelledRequests.add(messageId);
         abortController.abort();
         cancelledCount++;
-      } catch (error) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
     try {
       const { streamingManager } = await import("../StreamingManager.js");
       await streamingManager.cancelAllStreams('All translations cancelled by user');
-    } catch (error) { /* ignore */ }
+    } catch { /* ignore */ }
 
     return cancelledCount;
   }

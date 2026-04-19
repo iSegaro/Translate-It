@@ -3,8 +3,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.js';
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
-import { detectTextLanguage, areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES, isDevanagariScriptText, detectDevanagariScriptLanguage, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
+import { areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
+import { isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES, detectDevanagariScriptLanguage, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
@@ -208,7 +208,7 @@ export class TTSDispatcher {
           return lang;
         }
       }
-    } catch (e) {
+    } catch {
       // ignore native errors
     }
     

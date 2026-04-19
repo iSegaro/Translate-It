@@ -101,9 +101,7 @@ export class MainFeatureLoader {
           showToast: false
         });
       }
-    } catch (e) {
-      // Fallback if ErrorHandler itself is not available
-    }
+    } catch { /* ignore */ }
 
     const errorLogger = await this.initializeLogger();
     errorLogger.warn(`[MainFeatureLoader] Failed to load feature ${featureName}`, {

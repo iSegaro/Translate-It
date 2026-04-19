@@ -1,4 +1,3 @@
-import { PAGE_TRANSLATION_TIMING } from '../PageTranslationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 

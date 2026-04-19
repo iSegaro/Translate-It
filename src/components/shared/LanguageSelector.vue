@@ -70,7 +70,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { CONFIG } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
-import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 
 // Import adjacent SCSS
 import './LanguageSelector.scss'

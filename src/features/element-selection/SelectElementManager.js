@@ -613,7 +613,7 @@ class SelectElementManager extends ResourceTracker {
         await this.elementSelector.initialize();
       }
       return true;
-    } catch (error) { return false; }
+    } catch { return false; }
   }
 
   /**

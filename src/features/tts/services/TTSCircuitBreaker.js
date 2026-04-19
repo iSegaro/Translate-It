@@ -96,7 +96,7 @@ class TTSCircuitBreaker {
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       const result = await browserAPI.storage.local.get(this.storageKey);
       return result[this.storageKey] || {};
-    } catch (e) {
+    } catch {
       return {};
     }
   }
@@ -109,9 +109,7 @@ class TTSCircuitBreaker {
     try {
       const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
       await browserAPI.storage.local.set({ [this.storageKey]: state });
-    } catch (e) {
-      logger.error('Failed to save circuit state:', e);
-    }
+    } catch { /* ignore */ }
   }
 }
 

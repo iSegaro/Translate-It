@@ -14,7 +14,6 @@ import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoordinator');
 
@@ -88,8 +87,6 @@ export class UnifiedTranslationCoordinator {
 
       return result;
 
-    } catch (error) {
-      throw error;
     } finally {
       this.activeTranslations.delete(messageId);
     }
