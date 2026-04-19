@@ -568,6 +568,18 @@ const testProxyConnection = async () => {
     color: var(--color-text);
     transition: color $transition-base;
 
+    &:hover {
+      color: var(--color-primary);
+
+      .accordion-icon-wrapper {
+        color: var(--color-primary);
+      }
+
+      .accordion-title-text {
+        color: var(--color-primary);
+      }
+    }
+
     .checkbox-area {
       display: flex;
       align-items: center;
@@ -593,10 +605,6 @@ const testProxyConnection = async () => {
         padding: 4px 0;
         transition: color $transition-base;
 
-        &:hover {
-          color: var(--color-primary);
-        }
-
         &.active {
           color: var(--color-primary);
           font-weight: $font-weight-medium;
@@ -616,12 +624,6 @@ const testProxyConnection = async () => {
       justify-content: center;
       margin-inline-end: -$spacing-md;
       margin-inline-start: auto;
-
-      &:hover {
-        .accordion-icon-wrapper {
-          color: var(--color-primary);
-        }
-      }
     }
   }
 

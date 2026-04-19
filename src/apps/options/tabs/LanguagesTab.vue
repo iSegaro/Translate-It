@@ -885,6 +885,10 @@ defineExpose({
       .accordion-icon-wrapper {
         color: var(--color-primary);
       }
+
+      .accordion-title-text {
+        color: var(--color-primary);
+      }
     }
 
     &.active {
@@ -923,10 +927,6 @@ defineExpose({
         padding: 4px 0;
         transition: color $transition-base;
 
-        &:hover {
-          color: var(--color-primary);
-        }
-
         &.active {
           color: var(--color-primary);
           font-weight: $font-weight-medium;
@@ -945,12 +945,6 @@ defineExpose({
       align-items: center;
       justify-content: center;
       margin-inline-end: -$spacing-md;
-
-      &:hover {
-        .accordion-icon-wrapper {
-          color: var(--color-primary);
-        }
-      }
     }
   }
 
