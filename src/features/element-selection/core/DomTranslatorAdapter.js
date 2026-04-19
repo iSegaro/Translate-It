@@ -363,7 +363,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async cancelTranslation(options = {}) {
+  async cancelTranslation(_options = {}) {
     if (!this.isTranslating) return;
 
     const messageId = this.currentMessageId;

@@ -92,7 +92,7 @@ export class BaseAIProvider extends BaseProvider {
       if (sessionId) {
         import('../core/TranslationStatsManager.js').then(m => {
           m.statsManager.recordError(this.providerName, sessionId);
-        }).catch(() => {});
+        }).catch(() => { /* ignore */ });
       }
       logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
       throw error;
@@ -130,7 +130,7 @@ export class BaseAIProvider extends BaseProvider {
    * Streaming batch translation implementation
    * @protected
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _streamingBatchTranslate(_texts, _sourceLang, _targetLang, _translateMode, _engine, _messageId, _abortController, _priority, _sessionId, _expectedFormat) {
     // To be implemented by subclasses (e.g. OpenAI, Gemini)
     throw new Error(`_streamingBatchTranslate not implemented by ${this.providerName}`);
   }

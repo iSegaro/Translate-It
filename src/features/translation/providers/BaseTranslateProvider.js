@@ -61,7 +61,7 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Streaming batch translation with real-time results
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, _expectedFormat) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
     
     if (messageId && engine) {
@@ -72,9 +72,7 @@ export class BaseTranslateProvider extends BaseProvider {
         } else {
           logger.debug(`[${this.providerName}] No sender found for streaming messageId: ${messageId}`);
         }
-      } catch (error) { 
-        logger.warn(`[${this.providerName}] Failed to initialize streaming session:`, error.message); 
-      }
+      } catch { /* ignore */ }
     }
     
     const chunks = this._createChunks(texts);
@@ -130,7 +128,7 @@ export class BaseTranslateProvider extends BaseProvider {
     return TraditionalTextProcessor.createChunks(texts, this.providerName, this.constructor.chunkingStrategy, this.constructor.characterLimit, this.constructor.maxChunksPerBatch);
   }
 
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, _expectedFormat) {
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
     const allResults = [];
@@ -147,32 +145,30 @@ export class BaseTranslateProvider extends BaseProvider {
       const chunk = chunks[i];
       const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
 
-      try {
-        if (abortController) abortController.sessionId = sessionId;
-        const originalCharCount = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
+      if (abortController) abortController.sessionId = sessionId;
+      const originalCharCount = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-        const chunkResponse = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
-          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
-          chunkContext,
-          priority,
-          { sessionId }
-        );
+      const chunkResponse = await rateLimitManager.executeWithRateLimit(
+        this.providerName,
+        (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
+        chunkContext,
+        priority,
+        { sessionId }
+      );
 
-        // Handle different response formats (Array, results object, or raw String)
-        let chunkResults;
-        if (Array.isArray(chunkResponse)) {
-          chunkResults = chunkResponse;
-        } else if (chunkResponse?.results && Array.isArray(chunkResponse.results)) {
-          chunkResults = chunkResponse.results;
-        } else if (typeof chunkResponse === 'string') {
-          chunkResults = [chunkResponse];
-        } else {
-          chunkResults = chunk.texts.map(() => '');
-        }
+      // Handle different response formats (Array, results object, or raw String)
+      let chunkResults;
+      if (Array.isArray(chunkResponse)) {
+        chunkResults = chunkResponse;
+      } else if (chunkResponse?.results && Array.isArray(chunkResponse.results)) {
+        chunkResults = chunkResponse.results;
+      } else if (typeof chunkResponse === 'string') {
+        chunkResults = [chunkResponse];
+      } else {
+        chunkResults = chunk.texts.map(() => '');
+      }
 
-        allResults.push(...chunkResults);
-      } catch (error) { throw error; }
+      allResults.push(...chunkResults);
     }
     return allResults;
   }

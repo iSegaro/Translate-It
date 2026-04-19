@@ -12,9 +12,9 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { 
-  getProviderLanguageCode,
-  getCanonicalCode 
+  getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
+import { ProviderNames } from "./ProviderConstants.js";
 import browser from 'webextension-polyfill';
 
 const TEXT_DELIMITER = "\n\n---\n\n";
@@ -104,12 +104,12 @@ export class browserTranslateProvider extends BaseTranslateProvider {
         const results = await browserTranslateProvider.detector.detect(text);
         
         if (results && results.length > 0 && results[0].confidence > 0.5) {
-          logger.info('Language detected using LanguageDetector: ${results[0].detectedLanguage}');
+          logger.info(`Language detected using LanguageDetector: ${results[0].detectedLanguage}`);
           return results[0].detectedLanguage;
         }
       }
-    } catch (error) {
-      logger.warn(`LanguageDetector failed (${error.message}), falling back to browser.i18n.detectLanguage`);
+    } catch {
+      logger.warn('LanguageDetector failed, falling back to browser.i18n.detectLanguage');
     }
 
     // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
@@ -120,7 +120,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       
       if (detectionResult?.languages && detectionResult.languages.length > 0) {
         const detectedLang = detectionResult.languages[0].language.split("-")[0];
-        logger.info('Language detected using browser.i18n.detectLanguage: ${detectedLang}');
+        logger.info(`Language detected using browser.i18n.detectLanguage: ${detectedLang}`);
         return detectedLang;
       } else {
         logger.info('browser.i18n.detectLanguage result empty');
@@ -181,7 +181,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     return translator;
   }
 
-  async translate(text, sourceLang, targetLang, _translateMode = null, originalSourceLang = 'English', originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, _translateMode = null, _originalSourceLang = 'English', _originalTargetLang = 'Farsi') {
     logger.info(`[BrowserAPI] Starting translation: ${text.length} chars`);
     
     // Check API availability first
@@ -352,7 +352,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
         try {
           this.translators[key].destroy();
         } catch {
-          logger.error('Error destroying translator ${key}:');
+          logger.error(`Error destroying translator ${key}`);
         }
         delete this.translators[key];
       }
@@ -373,7 +373,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
    * @param {string} _sessionId - Session identifier (unused)
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, _retryAttempt = 0, _chunkIndex = 0, _totalChunks = 1, _blockContainer = null, _sessionId = null) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, _retryAttempt, _chunkIndex, _totalChunks, _blockContainer, _sessionId) {
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");

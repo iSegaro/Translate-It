@@ -184,7 +184,6 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "zh": "zh",
     "fa": "fa",
     "ps": "fa", // Pashto fallback
-    "mr": "hi", // Marathi fallback to Hindi
     "ne": "ne",
     "ur": "ur",
     "iw": "he",
@@ -202,9 +201,9 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     ky: "ky", lo: "lo", la: "la", lv: "lv", lt: "lt", lb: "lb",
     // Other existing ones
     mk: "mk", mg: "mg", ms: "ms", ml: "ml", mt: "mt", mi: "mi", mr: "mr", mn: "mn", 
-    ne: "ne", pl: "pl", pt: "pt", pa: "pa", ro: "ro", ru: "ru", gd: "gd", sr: "sr", 
+    pl: "pl", pt: "pt", pa: "pa", ro: "ro", ru: "ru", gd: "gd", sr: "sr", 
     si: "si", sk: "sk", sl: "sl", es: "es", su: "su", sw: "sw", sv: "sv", tg: "tg", 
-    ta: "ta", te: "te", th: "th", tr: "tr", uk: "uk", ur: "ur", uz: "uz", vi: "vi", 
+    ta: "ta", te: "te", th: "th", tr: "tr", uk: "uk", uz: "uz", vi: "vi", 
     cy: "cy", xh: "xh", yi: "yi"
   },
 
