@@ -61,8 +61,8 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Streaming batch translation with real-time results
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, _expectedFormat) {
-    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts`);
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     
     if (messageId && engine) {
       try {
@@ -128,7 +128,8 @@ export class BaseTranslateProvider extends BaseProvider {
     return TraditionalTextProcessor.createChunks(texts, this.providerName, this.constructor.chunkingStrategy, this.constructor.characterLimit, this.constructor.maxChunksPerBatch);
   }
 
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, _expectedFormat) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    logger.debug(`[${this.providerName}] Starting traditional batch translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
     const allResults = [];
