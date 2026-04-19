@@ -92,11 +92,33 @@ const logLevelOptions = [
     min-width: 100px;
     max-width: 120px;
     
-    :deep(.ti-select) {
-      padding-top: 4px;
-      padding-bottom: 4px;
-      font-size: $font-size-sm;
+    // Target the select directly and ensure arrow visibility
+    &.log-level-select {
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+      padding-right: 2em !important;
+      padding-left: $spacing-xs !important;
+      font-size: $font-size-sm !important;
+      background-color: var(--color-background) !important;
+      
+      // Re-state the arrow icon to ensure it's not lost during styling
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+      background-position: right 6px center !important;
+      background-repeat: no-repeat !important;
+      background-size: 1.2em 1.2em !important;
+      
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
     }
+  }
+}
+
+// Dark mode arrow
+[data-theme='dark'], .theme-dark {
+  .log-level-select.log-level-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
   }
 }
 
