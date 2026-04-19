@@ -159,7 +159,7 @@ export class PageTranslationBridge extends ResourceTracker {
           return originalFn.call(this, node, wrappedCallback);
         } catch (e) {
           if (e.message && e.message.includes('already been translated')) {
-            bridge.logger.warn('Node already translated, skipping.', node);
+            bridge.logger.debug('Node already translated, skipping.', node);
             return; // Silently ignore this specific error
           }
           throw e;
