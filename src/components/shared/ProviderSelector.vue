@@ -14,6 +14,7 @@
         :title="t('popup_translate_button_title') || 'ترجمه'"
         :disabled="isTranslating || disabled"
         @click="handleTranslate"
+        @keydown="handleKeydown"
       >
         <img
           :src="currentProviderIcon"
@@ -531,7 +532,18 @@ const handleKeydown = (event) => {
       }
       return
     }
-    if (key === 'Enter' || key === ' ') {
+    if (key === 'Enter') {
+      event.preventDefault()
+      // In split mode, Enter triggers translation instead of opening dropdown
+      if (props.mode === 'split') {
+        handleTranslate()
+      } else {
+        toggleDropdown()
+        focusedIndex.value = currentIndex !== -1 ? currentIndex : 0
+      }
+      return
+    }
+    if (key === ' ') {
       event.preventDefault()
       toggleDropdown()
       focusedIndex.value = currentIndex !== -1 ? currentIndex : 0
