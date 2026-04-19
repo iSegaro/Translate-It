@@ -181,9 +181,12 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     return translator;
   }
 
-  async translate(text, sourceLang, targetLang, _translateMode = null, _originalSourceLang = 'English', _originalTargetLang = 'Farsi') {
+  async translate(text, sourceLang, targetLang, options = {}) {
     logger.info(`[BrowserAPI] Starting translation: ${text.length} chars`);
     
+    // Extract mode from options if it's an object, or use it as mode if it's a string (legacy/compatibility)
+    const translateMode = typeof options === 'string' ? options : (options?.mode || null);
+
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
@@ -201,12 +204,12 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     if (this._isSameLanguage(sourceLang, targetLang)) return null;
 
     // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (_translateMode === TranslationMode.Field) {
+    if (translateMode === TranslationMode.Field) {
       sourceLang = AUTO_DETECT_VALUE;
     }
 
     // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (_translateMode === TranslationMode.Subtitle) {
+    if (translateMode === TranslationMode.Subtitle) {
       sourceLang = AUTO_DETECT_VALUE;
     }
 
