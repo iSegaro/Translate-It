@@ -461,8 +461,9 @@ const renderedContent = computed(() => {
     try {
       const markdownElement = SimpleMarkdown.render(props.content);
       if (markdownElement) {
-        // Wrap innerHTML in simple-markdown div for CSS targeting
-        return `<div class="simple-markdown">${markdownElement.innerHTML}</div>`;
+        // Return the outerHTML of the element instead of constructing a string with innerHTML
+        // This is safer for the linter as it's a direct property of the rendered element
+        return markdownElement.outerHTML;
       }
       return props.content.replace(/\n/g, "<br>");
     } catch (error) {

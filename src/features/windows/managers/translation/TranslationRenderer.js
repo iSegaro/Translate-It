@@ -357,8 +357,14 @@ export class TranslationRenderer {
 
     const marks = element.querySelectorAll('mark');
     marks.forEach(mark => {
-      // eslint-disable-next-line noUnsanitized/property -- Safe: using element's own innerHTML
-      mark.outerHTML = mark.innerHTML;
+      const parent = mark.parentNode;
+      if (parent) {
+        // Safe way to unwrap: move all children of 'mark' to its parent, then remove 'mark'
+        while (mark.firstChild) {
+          parent.insertBefore(mark.firstChild, mark);
+        }
+        parent.removeChild(mark);
+      }
     });
   }
 

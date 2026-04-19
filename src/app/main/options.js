@@ -206,7 +206,7 @@ async function initializeApp() {
     
     // Show detailed error UI using DOM methods
     const appElement = document.getElementById('app');
-    appElement.innerHTML = ''; // Clear existing content
+    appElement.textContent = ''; // Clear existing content
 
     const errorDiv = document.createElement('div');
     errorDiv.style.cssText = 'padding: 16px; color: red; font-family: monospace;';
@@ -248,8 +248,9 @@ initializeApp()
 // Fallback mechanism for debugging
 setTimeout(() => {
   const appElement = document.getElementById('app')
-  if (appElement && appElement.innerHTML.includes('Failed to load extension options')) {
-    logger.debug('⚠� App failed to initialize, checking potential issues...')
+  if (appElement && appElement.textContent.includes('Failed to load extension options')) {
+    logger.debug('⚠ App failed to initialize, checking potential issues...')
+
     
     // Check if required APIs are available
     logger.debug('� browser API check:')
@@ -264,7 +265,7 @@ setTimeout(() => {
     logger.debug('- #app element:', document.getElementById('app'))
     
     // Show simple recovery UI using DOM methods
-    appElement.innerHTML = ''; // Clear existing content
+    appElement.textContent = ''; // Clear existing content
 
     const containerDiv = document.createElement('div');
     containerDiv.style.cssText = 'padding: 20px; max-width: 600px; margin: 40px auto; border: 2px solid #e74c3c; border-radius: 8px; background: #fff;';
@@ -300,7 +301,9 @@ setTimeout(() => {
     containerDiv.appendChild(ul);
 
     const p2 = document.createElement('p');
-    p2.innerHTML = '<strong>Check the browser console for detailed error messages.</strong>';
+    const strongText = document.createElement('strong');
+    strongText.textContent = 'Check the browser console for detailed error messages.';
+    p2.appendChild(strongText);
     containerDiv.appendChild(p2);
 
     const buttonDiv = document.createElement('div');

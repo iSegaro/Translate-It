@@ -196,9 +196,17 @@ export class TranslationRenderer {
   }
 
   _escapeHtml(text) {
-    const div = document.createElement('div')
-    div.textContent = text
-    return div.innerHTML
+    if (typeof text !== 'string') return text;
+    // Safer regex-based escape to avoid any innerHTML usage
+    return text.replace(/[&<>"']/g, function(m) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[m];
+    });
   }
 
   /**

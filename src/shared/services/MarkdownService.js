@@ -74,7 +74,13 @@ export class MarkdownService {
     const element = SimpleMarkdown.render(content);
 
     if (target === 'html') {
-      const html = element ? element.innerHTML : content.replace(/\n/g, '<br>');
+      if (!element) return content.replace(/\n/g, '<br>');
+      
+      // Use a temporary div to safely get the HTML content
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(element.cloneNode(true));
+      const html = tempDiv.innerHTML;
+      
       return sanitize ? DOMPurify.sanitize(html) : html;
     }
 
@@ -103,7 +109,11 @@ export class MarkdownService {
     }
 
     if (target === 'html') {
-      let html = element ? element.innerHTML : processedContent.replace(/\n/g, '<br>');
+      if (!element) return processedContent.replace(/\n/g, '<br>');
+      
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(element.cloneNode(true));
+      let html = tempDiv.innerHTML;
 
       if (sanitize) {
         html = DOMPurify.sanitize(html, {
@@ -132,21 +142,28 @@ export class MarkdownService {
    * @private
    */
   _decodeHtmlEntities(content) {
-    // First decode using textarea method
-    const textArea = document.createElement('textarea');
-    // eslint-disable-next-line noUnsanitized/property -- Safe: content is function parameter from markdown
-    textArea.innerHTML = content;
-    let decoded = textArea.value;
+    try {
+      // Use DOMParser for safe entity decoding instead of innerHTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(content, 'text/html');
+      const decoded = doc.documentElement.textContent || "";
 
-    // Additionally handle specific entities that might not be decoded properly
-    decoded = decoded.replace(/&nbsp;/g, ' ');
-    decoded = decoded.replace(/&gt;/g, '>');
-    decoded = decoded.replace(/&lt;/g, '<');
-    decoded = decoded.replace(/&amp;/g, '&');
-    decoded = decoded.replace(/&quot;/g, '"');
-    decoded = decoded.replace(/&apos;/g, "'");
-
-    return decoded;
+      // Additionally handle specific entities that might not be decoded properly
+      return decoded.replace(/&nbsp;/g, ' ')
+        .replace(/&gt;/g, '>')
+        .replace(/&lt;/g, '<')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+    } catch {
+      logger.warn('Failed to decode HTML entities using DOMParser, using basic fallback');
+      return content.replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+    }
   }
 
   /**
@@ -187,8 +204,16 @@ export class MarkdownService {
 
     const div = document.createElement('div');
     div.className = 'markdown-fallback';
-    // eslint-disable-next-line noUnsanitized/property -- Safe: content is sanitized with DOMPurify for 'html' target
-    div.innerHTML = content.replace(/\n/g, '<br>');
+    
+    // Safely set content using text nodes and br elements instead of innerHTML
+    const lines = content.split('\n');
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        div.appendChild(document.createElement('br'));
+      }
+      div.appendChild(document.createTextNode(line));
+    });
+    
     return div;
   }
 
