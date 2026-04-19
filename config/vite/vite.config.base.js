@@ -116,7 +116,7 @@ export const createBaseConfig = (browser, options = {}) => {
 
             // 4. Large Language Data (Keeps the main bundle small)
             if (id.includes('src/utils/i18n/locales/')) {
-              const localeMatch = id.match(/locales\/([a-z]{2,3})\.json$/);
+              const localeMatch = id.match(/locales\/([a-z0-9-]+)\.json$/);
               if (localeMatch) return `locales/${localeMatch[1]}`;
             }
             if (id.includes('languages.js')) {

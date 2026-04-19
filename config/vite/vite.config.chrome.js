@@ -267,7 +267,13 @@ export default defineConfig({
           outDir: baseOutDir,
           emptyOutDir: false,
           rollupOptions: {
-            output: { format: 'es' }
+            ...baseConfig.build?.rollupOptions,
+            manualChunks: undefined,
+            output: {
+              ...baseConfig.build?.rollupOptions?.output,
+              manualChunks: undefined,
+              format: 'es'
+            }
           }
         }
       },

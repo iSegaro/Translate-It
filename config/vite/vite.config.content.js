@@ -107,6 +107,12 @@ export const createContentConfig = (browser) => {
               return 'content/utils';
             }
 
+            // 4. Large Language Data (Keeps the main bundle small)
+            if (id.includes('src/utils/i18n/locales/')) {
+              const localeMatch = id.match(/locales\/([a-z0-9-]+)\.json$/);
+              if (localeMatch) return `locales/${localeMatch[1]}`;
+            }
+
             // Store chunks for content scripts
             if (id.includes('src/store')) {
               return 'content/store';
