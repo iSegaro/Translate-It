@@ -83,7 +83,10 @@
         </div>
         
         <div class="export-area">
-          <BaseDropdown position="bottom-start">
+          <BaseDropdown 
+            position="bottom-start"
+            :disabled="isExporting"
+          >
             <template #trigger="{ toggle, open }">
               <button
                 class="action-btn outline"

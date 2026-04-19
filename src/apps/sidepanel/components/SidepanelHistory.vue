@@ -86,12 +86,14 @@
       <BaseDropdown 
         position="top-start" 
         size="sm"
+        :disabled="!hasHistory"
         :dir="t('IsRTL') === 'true' ? 'rtl' : 'ltr'"
       >
         <template #trigger="{ toggle }">
           <button
             class="export-btn"
             :title="t('SIDEPANEL_EXPORT_HISTORY_TOOLTIP') || 'Export history data'"
+            :disabled="!hasHistory"
             @click.stop="toggle"
           >
             <img
@@ -135,6 +137,7 @@
         id="clearAllHistoryBtn"
         class="clear-all-btn"
         :title="t('SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP')"
+        :disabled="!hasHistory"
         @click="handleClearAllHistory"
       >
         <img
@@ -486,9 +489,15 @@ onUnmounted(() => {
   transition: all $transition-fast;
   white-space: nowrap;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-background);
     border-color: var(--color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
   }
 
   .export-icon {
@@ -513,8 +522,16 @@ onUnmounted(() => {
   transition: background-color $transition-fast;
   white-space: nowrap;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: #d32f2f; /* Darker red for hover */
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+    filter: grayscale(0.8);
   }
 
   .clear-all-icon {

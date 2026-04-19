@@ -5,8 +5,8 @@
   >
     <div
       class="dropdown-trigger"
-      :class="{ active: isOpen }"
-      tabindex="0"
+      :class="{ active: isOpen, disabled: props.disabled }"
+      :tabindex="props.disabled ? -1 : 0"
       @click="toggle"
       @keydown.enter.prevent="toggle"
       @keydown.space.prevent="toggle"
@@ -222,6 +222,11 @@ onUnmounted(() => {
   outline: none;
   display: block;
   
+  &.disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
   &:focus {
     box-shadow: 0 0 0 2px var(--color-primary), 0 0 0 4px rgba(25, 118, 210, 0.1);
     border-radius: var(--border-radius-base);
