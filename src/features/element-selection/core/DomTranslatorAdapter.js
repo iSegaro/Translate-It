@@ -363,15 +363,24 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async cancelTranslation(_options = {}) {
+  async cancelTranslation(options = {}) {
+    const { silent = false } = options;
     if (!this.isTranslating) return;
+
+    if (!silent) {
+      this.logger.debug('Cancelling element translation');
+    }
 
     const messageId = this.currentMessageId;
     if (messageId) {
       try {
         // 1. Stop the network request in background
         contentScriptIntegration.cancelTranslationRequest(messageId, ActionReasons.USER_CANCELLED);
-      } catch { /* ignore */ }
+      } catch (error) {
+        if (!silent) {
+          this.logger.warn('Failed to cancel translation request:', error);
+        }
+      }
     }
 
     // 2. Clear state pointers
