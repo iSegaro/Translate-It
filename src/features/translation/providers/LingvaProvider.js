@@ -43,16 +43,18 @@ export class LingvaProvider extends BaseTranslateProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
-   * @param {number} _retryAttempt - Current retry attempt
-   * @param {number} _segmentCount - Number of segments in this chunk
-   * @param {number} _chunkIndex - Current chunk index
-   * @param {number} _totalChunks - Total number of chunks
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, _retryAttempt, _segmentCount, _chunkIndex, _totalChunks) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks) {
     const apiPath = await this._getApiPath();
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
+
+    logger.debug(`[Lingva] Translating chunk ${chunkIndex + 1}/${totalChunks} (${segmentCount} segments, attempt ${retryAttempt + 1})`);
 
     // Filter and join texts using the standard delimiter
     const validTexts = chunkTexts.map(t => (t || "").replace(/\//g, ' '));
