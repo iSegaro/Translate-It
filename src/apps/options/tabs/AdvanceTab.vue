@@ -30,120 +30,147 @@
       />
     </div>
 
-    <!-- Proxy Settings Section -->
-    <div class="setting-section proxy-section">
-      <h3>{{ t('proxy_section_title') || 'Proxy Settings' }}</h3>
-      <p class="section-description">
-        {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
-      </p>
-      
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="proxyEnabled"
-          :label="t('proxy_enabled_label') || 'Enable Proxy'"
-        />
+    <!-- Proxy Settings Section (Accordion Style) -->
+    <div class="setting-group proxy-setting accordion-item">
+      <div class="accordion-header-wrapper">
+        <div class="checkbox-area">
+          <BaseCheckbox
+            v-model="proxyEnabled"
+            class="proxy-main-checkbox"
+          />
+          <span 
+            class="accordion-title-text"
+            :class="{ disabled: !proxyEnabled, active: activeAccordion === 'proxy' }"
+            @click="proxyEnabled ? toggleAccordion('proxy') : (proxyEnabled = true)"
+          >
+            {{ t('proxy_section_title') || 'Proxy Settings' }}
+          </span>
+        </div>
+        
+        <div 
+          v-if="proxyEnabled"
+          class="accordion-trigger-area"
+          :class="{ active: activeAccordion === 'proxy' }"
+          @click="toggleAccordion('proxy')"
+        >
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: activeAccordion === 'proxy' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
+        </div>
       </div>
 
-      <template v-if="proxyEnabled">
-        <div class="setting-group">
-          <label>{{ t('proxy_type_label') || 'Proxy Type' }}</label>
-          <BaseSelect
-            v-model="proxyType"
-            :options="proxyTypeOptions"
-            class="proxy-select"
-          />
-        </div>
-
-        <div class="setting-group proxy-connection">
-          <div class="proxy-input-group">
-            <label>{{ t('proxy_host_label') || 'Host' }}</label>
-            <BaseInput
-              v-model="proxyHost"
-              placeholder="proxy.example.com"
-              dir="ltr"
-              class="proxy-input"
+      <div
+        class="accordion-content"
+        :class="{ open: activeAccordion === 'proxy' && proxyEnabled }"
+      >
+        <div class="accordion-inner">
+          <p class="setting-description mb-md">
+            {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
+          </p>
+          
+          <div class="setting-group">
+            <label>{{ t('proxy_type_label') || 'Proxy Type' }}</label>
+            <BaseSelect
+              v-model="proxyType"
+              :options="proxyTypeOptions"
+              class="proxy-select"
             />
           </div>
 
-          <div class="proxy-input-group">
-            <label>{{ t('proxy_port_label') || 'Port' }}</label>
-            <BaseInput
-              v-model="proxyPort"
-              type="number"
-              placeholder="8080"
-              min="1"
-              max="65535"
-              dir="ltr"
-              class="proxy-input proxy-port"
-            />
-          </div>
-        </div>
+          <div class="setting-group proxy-connection">
+            <div class="proxy-input-group">
+              <label>{{ t('proxy_host_label') || 'Host' }}</label>
+              <BaseInput
+                v-model="proxyHost"
+                placeholder="proxy.example.com"
+                dir="ltr"
+                class="proxy-input"
+              />
+            </div>
 
-        <div class="setting-group proxy-auth">
-          <div class="proxy-input-group">
-            <label>{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
-            <BaseInput
-              v-model="proxyUsername"
-              placeholder=""
-              dir="ltr"
-              class="proxy-input"
-            />
+            <div class="proxy-input-group">
+              <label>{{ t('proxy_port_label') || 'Port' }}</label>
+              <BaseInput
+                v-model="proxyPort"
+                type="number"
+                placeholder="8080"
+                min="1"
+                max="65535"
+                dir="ltr"
+                class="proxy-input proxy-port"
+              />
+            </div>
           </div>
 
-          <div class="proxy-input-group">
-            <label>{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
-            <BaseInput
-              v-model="proxyPassword"
-              type="password"
-              placeholder=""
-              dir="ltr"
-              class="proxy-input"
-            />
-          </div>
-        </div>
+          <div class="setting-group proxy-auth">
+            <div class="proxy-input-group">
+              <label>{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
+              <BaseInput
+                v-model="proxyUsername"
+                placeholder=""
+                dir="ltr"
+                class="proxy-input"
+              />
+            </div>
 
-        <div class="setting-group proxy-test">
-          <div class="test-container">
-            <button
-              :disabled="isTestingProxy || !canTestProxy"
-              :class="['test-button', testResultClass]"
-              @click="testProxyConnection"
-            >
-              <span
-                v-if="isTestingProxy"
-                class="button-content"
+            <div class="proxy-input-group">
+              <label>{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
+              <BaseInput
+                v-model="proxyPassword"
+                type="password"
+                placeholder=""
+                dir="ltr"
+                class="proxy-input"
+              />
+            </div>
+          </div>
+
+          <div class="setting-group proxy-test">
+            <div class="test-container">
+              <button
+                :disabled="isTestingProxy || !canTestProxy"
+                :class="['test-button', testResultClass]"
+                @click="testProxyConnection"
               >
-                <div class="spinner" />
-                {{ t('proxy_testing') || 'Testing...' }}
-              </span>
-              <span
-                v-else
-                class="button-content"
-              >
-                <svg
-                  class="test-icon"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
+                <span
+                  v-if="isTestingProxy"
+                  class="button-content"
                 >
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
-                </svg>
-                {{ testButtonText }}
-              </span>
-            </button>
+                  <div class="spinner" />
+                  {{ t('proxy_testing') || 'Testing...' }}
+                </span>
+                <span
+                  v-else
+                  class="button-content"
+                >
+                  <svg
+                    class="test-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
+                  </svg>
+                  {{ testButtonText }}
+                </span>
+              </button>
 
-            <div
-              v-if="testResult"
-              :class="['test-result', testResult.success ? 'success' : 'error']"
-            >
-              {{ testResult.message }}
+              <div
+                v-if="testResult"
+                :class="['test-result', testResult.success ? 'success' : 'error']"
+              >
+                {{ testResult.message }}
+              </div>
             </div>
           </div>
         </div>
-      </template>
+      </div>
     </div>
   </section>
 </template>
@@ -166,6 +193,17 @@ const { handleError } = useErrorHandler()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AdvanceTab')
 
 const { t } = useI18n()
+
+// Accordion state management
+const activeAccordion = ref(null)
+
+const toggleAccordion = (name) => {
+  if (activeAccordion.value === name) {
+    activeAccordion.value = null
+  } else {
+    activeAccordion.value = name
+  }
+}
 
 // Advanced settings
 const debugMode = computed({
@@ -212,6 +250,13 @@ onMounted(() => {
 
 // Update settings locally when changed (like other tabs)
 watch(proxyEnabled, (value) => {
+  if (value) {
+    // Auto-open this accordion when enabled
+    activeAccordion.value = 'proxy'
+  } else if (activeAccordion.value === 'proxy') {
+    // Close if it was open
+    activeAccordion.value = null
+  }
   settingsStore.updateSettingLocally('PROXY_ENABLED', value)
 })
 
@@ -425,22 +470,137 @@ const testProxyConnection = async () => {
   }
 }
 
-.setting-section {
-  margin-top: $spacing-xl;
-  padding-top: $spacing-xl;
-  border-top: 2px solid var(--color-border);
+// Accordion styles for proxy setting
+.accordion-item {
+  margin-top: $spacing-lg;
+  border-top: 1px solid var(--color-border);
+  padding: 0;
+  display: flex;
+  flex-direction: column !important;
+  align-items: stretch !important;
 
-  // Reduce top spacing and border when following setting-group
-  &.proxy-section {
-    margin-top: $spacing-lg;
-    padding-top: $spacing-lg;
+  .accordion-header-wrapper {
+    width: 100%;
+    padding: $spacing-sm 0;
+    background: transparent;
+    border: none;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    cursor: pointer;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    transition: color $transition-base;
+
+    .checkbox-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 0 0 auto;
+      
+      :deep(.proxy-main-checkbox) {
+        gap: 0 !important;
+        width: auto !important;
+        flex: none !important;
+        flex-grow: 0 !important;
+        min-width: auto !important;
+        margin: 0 !important;
+
+        .ti-checkbox__label {
+          display: none !important;
+        }
+      }
+
+      .accordion-title-text {
+        cursor: pointer;
+        user-select: none;
+        padding: 4px 0;
+        transition: color $transition-base;
+
+        &:hover {
+          color: var(--color-primary);
+        }
+
+        &.active {
+          color: var(--color-primary);
+          font-weight: $font-weight-medium;
+        }
+
+        &.disabled {
+          opacity: 0.9;
+        }
+      }
+    }
+
+    .accordion-trigger-area {
+      padding: $spacing-sm $spacing-md;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-inline-end: -$spacing-md;
+      margin-inline-start: auto;
+
+      &:hover {
+        .accordion-icon-wrapper {
+          color: var(--color-primary);
+        }
+      }
+    }
   }
 
-  .section-description {
+  .accordion-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    opacity: 0;
+    overflow: hidden;
+    width: 100%;
+
+    &.open {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+
+    .accordion-inner {
+      min-height: 0;
+      padding: 0 0 $spacing-md 0;
+    }
+  }
+
+  .accordion-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--color-text-secondary);
+
+    &.active {
+      transform: rotate(45deg);
+      color: var(--color-primary);
+    }
+
+    .accordion-icon {
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+  }
+
+  .setting-description {
     font-size: $font-size-sm;
     color: var(--color-text-secondary);
-    margin-bottom: $spacing-lg;
-    line-height: 1.5;
+    line-height: 1.4;
+    margin-bottom: $spacing-sm;
+
+    &.mb-md {
+      margin-inline-start: 28px;
+    }
   }
 }
 
