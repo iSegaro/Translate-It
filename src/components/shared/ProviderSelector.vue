@@ -24,6 +24,7 @@
         <span>{{ t('popup_translate_button_text') || 'ترجمه' }}</span>
       </button>
       <button 
+        ref="triggerBtnRef"
         type="button"
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
@@ -129,6 +130,7 @@
     v-bind="$attrs"
   >
     <button
+      ref="triggerBtnRef"
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :disabled="disabled"
@@ -240,6 +242,7 @@
     v-bind="$attrs"
   >
     <button
+      ref="triggerBtnRef"
       class="ti-provider-icon-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
@@ -344,6 +347,7 @@
     v-bind="$attrs"
   >
     <button
+      ref="triggerBtnRef"
       class="ti-provider-mobile-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :disabled="disabled"
@@ -428,7 +432,7 @@
 
 <script setup>
 import './ProviderSelector.scss'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -493,14 +497,13 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 
 // State
 const selectorRef = ref(null)
+const triggerBtnRef = ref(null)
 const dropdownMenuRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const isTranslating = ref(false)
 const focusedIndex = ref(-1)
 const dropdownMaxHeight = ref('400px')
-
-import { nextTick } from 'vue'
 
 // Handle keyboard navigation
 const handleKeydown = (event) => {
@@ -556,7 +559,7 @@ const handleKeydown = (event) => {
       break
     case 'Escape':
     case 'Tab':
-      isDropdownOpen.value = false
+      closeDropdown()
       break
   }
 }
@@ -572,7 +575,9 @@ const scrollToFocused = () => {
   })
 }
 
-// Handle click outside to close dropdown (Shadow DOM compatible)
+/**
+ * Handle click outside to close dropdown (Shadow DOM compatible)
+ */
 const handleClickOutside = (event) => {
   if (!isDropdownOpen.value || !selectorRef.value) return
 
@@ -581,11 +586,13 @@ const handleClickOutside = (event) => {
   
   // If the component container is NOT in the event path, the click was outside
   if (!path.includes(selectorRef.value)) {
-    isDropdownOpen.value = false
+    closeDropdown()
   }
 }
 
-// Computed
+/**
+ * Computed list of providers based on current settings and props
+ */
 const availableProviders = computed(() => {
   // Use provider registry for consistent provider information
   // Pass current debug mode state to allow/hide mock provider dynamically
@@ -618,7 +625,9 @@ const availableProviders = computed(() => {
 // Ephemeral Sync State from store
 const ephemeralSync = computed(() => translationStore.ephemeralSync)
 
-// Computed
+/**
+ * Currently selected provider ID
+ */
 const currentProvider = computed(() => {
   if (props.modelValue) return props.modelValue
   return settingsStore.settings.TRANSLATION_API
@@ -634,7 +643,9 @@ const currentProviderName = computed(() => {
   return provider?.name || 'Google Translate'
 })
 
-// Helper to determine if a provider icon should be inverted in dark mode
+/**
+ * Helper to determine if a provider icon should be inverted in dark mode
+ */
 const isProviderInverted = (providerId) => {
   let effectiveId = providerId
   
@@ -647,7 +658,9 @@ const isProviderInverted = (providerId) => {
   return blackIcons.includes(effectiveId)
 }
 
-// Helper to get effective provider ID for sync icons
+/**
+ * Helper to get effective provider ID for sync icons
+ */
 const getEffectiveProviderId = (type) => {
   const isSynced = ephemeralSync.value[type]
   if (isSynced) return currentProvider.value
@@ -658,7 +671,9 @@ const getEffectiveProviderId = (type) => {
   return settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Select_Element] || settingsStore.settings.TRANSLATION_API
 }
 
-// Methods
+/**
+ * Resolves a provider icon URL safely
+ */
 const getProviderIcon = (iconPath) => {
   try {
     const fallback = 'icons/providers/google.svg';
@@ -685,6 +700,9 @@ const getProviderIcon = (iconPath) => {
   }
 }
 
+/**
+ * Resolves the icon for sync rows
+ */
 const getEffectiveIcon = (type) => {
   const isSynced = ephemeralSync.value[type]
   let providerId;
@@ -707,6 +725,9 @@ const getEffectiveIcon = (type) => {
   return getProviderIcon(provider?.icon || 'providers/google.svg')
 }
 
+/**
+ * Toggles provider synchronization for specific modes
+ */
 const toggleSync = (type) => {
   translationStore.ephemeralSync[type] = !translationStore.ephemeralSync[type]
   
@@ -717,27 +738,33 @@ const toggleSync = (type) => {
   logger.debug(`[ProviderSelector] Toggled sync for ${type}:`, translationStore.ephemeralSync[type])
 }
 
+/**
+ * Handles the main translation button click (split mode)
+ */
 const handleTranslate = () => {
-  logger.debug('🗳️ Translate button clicked!', {
+  logger.debug('Translate button clicked!', {
     currentProvider: currentProvider.value,
     isTranslating: isTranslating.value,
     mode: props.mode
   })
   
   if (isTranslating.value) {
-    logger.debug('⏳ Translation already in progress, ignoring click')
+    logger.debug('Translation already in progress, ignoring click')
     return
   }
   
   isTranslating.value = true
   emit('translate', { provider: currentProvider.value })
   
-  // Reset after a delay using ResourceTracker (actual implementation should listen for translation completion)
+  // Reset after a delay using ResourceTracker
   tracker.trackTimeout(() => {
     isTranslating.value = false
   }, 1000)
 }
 
+/**
+ * Toggles the provider selection dropdown
+ */
 const toggleDropdown = () => {
   if (props.disabled) return;
 
@@ -776,10 +803,7 @@ const toggleDropdown = () => {
         // Detect if we are in an Extension Popup or Sidepanel
         const isPopupOrSidepanel = props.isGlobal || window.innerWidth < 600;
         
-        // Use a smarter limit:
-        // In Popup: max 400px
-        // In Shadow DOM: max 600px (ideal for standard desktop viewports)
-        // BUT always constrained by the actual available space
+        // Use a smarter limit
         const maxLimit = isPopupOrSidepanel ? 400 : 600;
         
         dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(150, availableHeight))}px`;
@@ -788,7 +812,7 @@ const toggleDropdown = () => {
     });
   }
 
-  logger.debug('🔧 Provider selector dropdown toggled!', {
+  logger.debug('Provider selector dropdown toggled!', {
     currentState: isDropdownOpen.value,
     newState: newState,
     direction: isUpward.value ? 'up' : 'down'
@@ -797,8 +821,22 @@ const toggleDropdown = () => {
   isDropdownOpen.value = newState;
 }
 
+/**
+ * Closes the dropdown and restores focus to the trigger button
+ */
+const closeDropdown = () => {
+  isDropdownOpen.value = false;
+  // Return focus to trigger button to prevent focus jumping to tab/top of page
+  nextTick(() => {
+    triggerBtnRef.value?.focus();
+  });
+}
+
+/**
+ * Selects a new provider and emits changes
+ */
 const selectProvider = async (provider) => {
-  logger.debug('🔧 Provider selected!', {
+  logger.debug('Provider selected!', {
     providerId: provider.id,
     providerName: provider.name || 'Unknown',
     mode: props.mode,
@@ -818,19 +856,24 @@ const selectProvider = async (provider) => {
     
     emit('update:modelValue', provider.id)
     emit('provider-change', provider.id)
-    isDropdownOpen.value = false
+    closeDropdown()
   } catch (error) {
     logger.error('Failed to update provider:', error)
     await handleError(error, 'provider-selector-change')
   }
 }
 
+/**
+ * Handles change for compact select mode
+ */
 const handleProviderChange = (event) => {
-  logger.debug('🔧 Provider change event triggered:', event.target.value)
+  logger.debug('Provider change event triggered:', event.target.value)
   selectProvider({ id: event.target.value })
 }
 
-// Storage change handler for cross-context updates
+/**
+ * Storage change handler for cross-context updates
+ */
 const handleStorageChange = (changes, areaName) => {
   if (areaName === 'sync' || areaName === 'local') {
     if (changes.TRANSLATION_API) {
@@ -858,6 +901,5 @@ onMounted(() => {
 
 onUnmounted(() => {
   // Event listener cleanup is now handled automatically by useResourceTracker
-  // No manual cleanup needed!
 })
 </script>
