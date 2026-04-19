@@ -207,14 +207,23 @@
             {{ t('debug_section_description') || 'Enable detailed logging for specific components. Overrides global log level.' }}
           </p>
           
-          <div class="debug-grid">
-            <LogLevelItem
-              v-for="(name, key) in LOG_COMPONENTS"
-              :key="key"
-              :component-name="name"
-              :model-value="getComponentLogLevel(name)"
-              @update:model-value="updateComponentLogLevel(name, $event)"
-            />
+          <div class="debug-categories">
+            <div 
+              v-for="(category, catId) in LOG_CATEGORIES" 
+              :key="catId"
+              class="debug-category-group"
+            >
+              <h4 class="category-title">{{ category.label }}</h4>
+              <div class="debug-grid">
+                <LogLevelItem
+                  v-for="name in category.components"
+                  :key="name"
+                  :component-name="name"
+                  :model-value="getComponentLogLevel(name)"
+                  @update:model-value="updateComponentLogLevel(name, $event)"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -231,7 +240,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
 import LogLevelItem from '../components/LogLevelItem.vue'
 
 import { useI18n } from 'vue-i18n'
@@ -635,12 +644,44 @@ const testProxyConnection = async () => {
       min-height: 0;
       padding: 0 0 $spacing-md 0;
 
+      .debug-categories {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xl;
+        margin-top: $spacing-md;
+        margin-inline-start: 28px;
+      }
+
+      .debug-category-group {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-sm;
+      }
+
+      .category-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        opacity: 0.7;
+        margin-bottom: $spacing-xs;
+
+        &::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(90deg, var(--color-border-light, #eee), transparent);
+        }
+      }
+
       .debug-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: $spacing-sm;
-        margin-top: $spacing-md;
-        margin-inline-start: 28px;
       }
     }
   }
