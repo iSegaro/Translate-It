@@ -33,15 +33,14 @@
           />
           <span 
             class="accordion-title-text"
-            :class="{ disabled: !proxyEnabled, active: activeAccordion === 'proxy' }"
-            @click="proxyEnabled ? toggleAccordion('proxy') : (proxyEnabled = true)"
+            :class="{ active: activeAccordion === 'proxy' }"
+            @click="toggleAccordion('proxy')"
           >
             {{ t('proxy_section_title') || 'Proxy Settings' }}
           </span>
         </div>
         
         <div 
-          v-if="proxyEnabled"
           class="accordion-trigger-area"
           :class="{ active: activeAccordion === 'proxy' }"
           @click="toggleAccordion('proxy')"
@@ -57,7 +56,7 @@
 
       <div
         class="accordion-content"
-        :class="{ open: activeAccordion === 'proxy' && proxyEnabled }"
+        :class="{ open: activeAccordion === 'proxy' }"
       >
         <div class="accordion-inner">
           <p class="setting-description mb-md">
@@ -176,15 +175,14 @@
           />
           <span 
             class="accordion-title-text"
-            :class="{ disabled: !debugMode, active: activeAccordion === 'debug' }"
-            @click="debugMode ? toggleAccordion('debug') : (debugMode = true)"
+            :class="{ active: activeAccordion === 'debug' }"
+            @click="toggleAccordion('debug')"
           >
             {{ t('advance_debug_mode_label') || 'Debug Mode' }}
           </span>
         </div>
         
         <div 
-          v-if="debugMode"
           class="accordion-trigger-area"
           :class="{ active: activeAccordion === 'debug' }"
           @click="toggleAccordion('debug')"
@@ -200,7 +198,7 @@
 
       <div
         class="accordion-content"
-        :class="{ open: activeAccordion === 'debug' && debugMode }"
+        :class="{ open: activeAccordion === 'debug' }"
       >
         <div class="accordion-inner">
           <p class="setting-description mb-md">

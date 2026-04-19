@@ -75,8 +75,8 @@
             <!-- Clickable Title Text with smart logic -->
             <span 
               class="accordion-title-text"
-              :class="{ disabled: !bilingualTranslation, active: activeAccordion === 'bilingual' }"
-              @click="bilingualTranslation ? toggleAccordion('bilingual') : (bilingualTranslation = true)"
+              :class="{ active: activeAccordion === 'bilingual' }"
+              @click="toggleAccordion('bilingual')"
             >
               {{ t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)' }}
             </span>
@@ -84,7 +84,6 @@
           
           <!-- Right Side: Manual Toggle Icon -->
           <div 
-            v-if="bilingualTranslation"
             class="accordion-trigger-area"
             :class="{ active: activeAccordion === 'bilingual' }"
             @click="toggleAccordion('bilingual')"
@@ -100,7 +99,7 @@
 
         <div
           class="accordion-content"
-          :class="{ open: activeAccordion === 'bilingual' && bilingualTranslation }"
+          :class="{ open: activeAccordion === 'bilingual' }"
         >
           <div class="accordion-inner">
             <p class="setting-description mb-md">
