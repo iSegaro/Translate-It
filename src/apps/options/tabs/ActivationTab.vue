@@ -108,13 +108,17 @@
             :disabled="!extensionEnabled"
             :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
           />
-          <ShortcutPicker
-            v-if="enableShortcutForTextFields"
-            v-model="textFieldShortcut"
-            :disabled="!extensionEnabled"
-            :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
-            class="inline-picker"
-          />
+          <div 
+            class="shortcut-picker-animated-wrapper"
+            :class="{ open: enableShortcutForTextFields }"
+          >
+            <ShortcutPicker
+              v-model="textFieldShortcut"
+              :disabled="!extensionEnabled"
+              :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
+              class="inline-picker"
+            />
+          </div>
         </div>
         <span
           v-if="!enableShortcutForTextFields"
@@ -633,6 +637,26 @@ const dictionaryProvider = computed({
     font-weight: 600;
     color: var(--color-text);
     min-width: 150px;
+  }
+
+  .shortcut-picker-animated-wrapper {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-10px) scale(0.95);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    flex-shrink: 0;
+
+    &.open {
+      max-width: 300px;
+      opacity: 1;
+      transform: translateX(0) scale(1);
+      pointer-events: auto;
+      margin-inline-start: $spacing-xs; // Small extra gap when open
+    }
   }
 }
 
