@@ -128,10 +128,10 @@ export class BaseAIProvider extends BaseProvider {
 
   /**
    * Streaming batch translation implementation
+   * To be implemented by subclasses (e.g. OpenAI, Gemini)
    * @protected
    */
-  async _streamingBatchTranslate(_texts, _sourceLang, _targetLang, _translateMode, _engine, _messageId, _abortController, _priority, _sessionId, _expectedFormat) {
-    // To be implemented by subclasses (e.g. OpenAI, Gemini)
+  async _streamingBatchTranslate() {
     throw new Error(`_streamingBatchTranslate not implemented by ${this.providerName}`);
   }
 
