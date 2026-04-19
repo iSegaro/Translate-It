@@ -4,7 +4,7 @@
     v-if="mode === 'split'"
     ref="selectorRef"
     class="ti-split-translate-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
     <div class="ti-split-translate-button">
@@ -27,6 +27,7 @@
         type="button"
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
+        :disabled="disabled"
         @click.stop="toggleDropdown"
         @keydown="handleKeydown"
       >
@@ -35,6 +36,7 @@
           alt="Dropdown"
           type="inline"
           class="ti-dropdown-arrow"
+          :disabled="disabled"
         />
       </button>
     </div>
@@ -123,12 +125,13 @@
     v-else-if="mode === 'button'"
     ref="selectorRef"
     class="ti-provider-button-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
     <button
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
+      :disabled="disabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -145,6 +148,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
+        :disabled="disabled"
       />
     </button>
     
@@ -232,13 +236,14 @@
     v-else-if="mode === 'icon-only'"
     ref="selectorRef"
     class="ti-provider-icon-only-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
     <button
       class="ti-provider-icon-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
+      :disabled="disabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -335,12 +340,13 @@
     v-else-if="mode === 'mobile'"
     ref="selectorRef"
     class="ti-provider-mobile-container"
-    :class="{ 'ti-dropdown-open': isDropdownOpen }"
+    :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
     <button
       class="ti-provider-mobile-button"
       :class="{ 'ti-active': isDropdownOpen }"
+      :disabled="disabled"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -357,6 +363,7 @@
         type="inline"
         class="dropdown-arrow"
         :class="{ rotated: isDropdownOpen }"
+        :disabled="disabled"
       />
     </button>
     
@@ -398,12 +405,14 @@
   <div
     v-else
     class="ti-provider-compact-container"
+    :class="{ 'is-disabled': disabled }"
     v-bind="$attrs"
   >
     <select
       :value="currentProvider"
       class="ti-provider-select"
       :class="{ 'is-dark': settingsStore.isDarkTheme }"
+      :disabled="disabled"
       @change="handleProviderChange"
     >
       <option
@@ -730,6 +739,8 @@ const handleTranslate = () => {
 }
 
 const toggleDropdown = () => {
+  if (props.disabled) return;
+
   // Deactivate select element mode if it's active when user interacts with this control
   if (isSelectModeActive.value) {
     deactivateSelectMode();

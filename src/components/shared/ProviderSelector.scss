@@ -351,6 +351,22 @@
   pointer-events: none !important;
 }
 
+/* Disabled state styles */
+.is-disabled {
+  opacity: 0.6 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+
+  * {
+    cursor: not-allowed !important;
+  }
+}
+
+button:disabled, select:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+}
+
 /* Provider Dropdown Menu */
 .ti-provider-dropdown-menu {
   position: absolute !important;
