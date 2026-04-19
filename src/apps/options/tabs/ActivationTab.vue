@@ -30,42 +30,44 @@
 
         <!-- Mobile UI Mode Settings nested under FAB -->
         <div 
-          v-if="showDesktopFab"
           class="sub-options-group fab-sub-options"
+          :class="{ open: showDesktopFab }"
         >
-          <div class="radio-group ui-mode-radio-group">
-            <BaseRadio
-              v-model="mobileUiMode"
-              :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
-              name="mobileUiMode"
-              :disabled="!extensionEnabled"
-            >
-              <div class="radio-label-content">
-                <span class="label-title">{{ t('mobile_ui_mode_auto') }}</span>
-              </div>
-            </BaseRadio>
-            <BaseRadio
-              v-model="mobileUiMode"
-              :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
-              name="mobileUiMode"
-              :disabled="!extensionEnabled"
-            >
-              <div class="radio-label-content">
-                <span class="label-title">{{ t('mobile_ui_mode_mobile') }}</span>
-                <span class="label-description">{{ t('mobile_ui_mode_mobile_desc') }}</span>
-              </div>
-            </BaseRadio>
-            <BaseRadio
-              v-model="mobileUiMode"
-              :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
-              name="mobileUiMode"
-              :disabled="!extensionEnabled"
-            >
-              <div class="radio-label-content">
-                <span class="label-title">{{ t('mobile_ui_mode_desktop') }}</span>
-                <span class="label-description">{{ t('mobile_ui_mode_desktop_desc') }}</span>
-              </div>
-            </BaseRadio>
+          <div class="sub-options-inner">
+            <div class="radio-group ui-mode-radio-group">
+              <BaseRadio
+                v-model="mobileUiMode"
+                :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
+                name="mobileUiMode"
+                :disabled="!extensionEnabled"
+              >
+                <div class="radio-label-content">
+                  <span class="label-title">{{ t('mobile_ui_mode_auto') }}</span>
+                </div>
+              </BaseRadio>
+              <BaseRadio
+                v-model="mobileUiMode"
+                :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
+                name="mobileUiMode"
+                :disabled="!extensionEnabled"
+              >
+                <div class="radio-label-content">
+                  <span class="label-title">{{ t('mobile_ui_mode_mobile') }}</span>
+                  <span class="label-description">{{ t('mobile_ui_mode_mobile_desc') }}</span>
+                </div>
+              </BaseRadio>
+              <BaseRadio
+                v-model="mobileUiMode"
+                :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
+                name="mobileUiMode"
+                :disabled="!extensionEnabled"
+              >
+                <div class="radio-label-content">
+                  <span class="label-title">{{ t('mobile_ui_mode_desktop') }}</span>
+                  <span class="label-description">{{ t('mobile_ui_mode_desktop_desc') }}</span>
+                </div>
+              </BaseRadio>
+            </div>
           </div>
         </div>
       </div>
@@ -124,32 +126,34 @@
 
       <!-- Text Field Mode Options -->
       <div 
-        v-if="translateOnTextFields || enableShortcutForTextFields"
         class="sub-options-group"
+        :class="{ open: translateOnTextFields || enableShortcutForTextFields }"
       >
-        <div class="radio-group">
-          <BaseRadio
-            v-model="textFieldMode"
-            value="copy"
-            name="textFieldMode"
-            :disabled="!extensionEnabled"
-            :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
-          />
-          <BaseRadio
-            v-model="textFieldMode"
-            value="replace"
-            name="textFieldMode"
-            :disabled="!extensionEnabled"
-            :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
-          />
-        </div>
+        <div class="sub-options-inner">
+          <div class="radio-group">
+            <BaseRadio
+              v-model="textFieldMode"
+              value="copy"
+              name="textFieldMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
+            />
+            <BaseRadio
+              v-model="textFieldMode"
+              value="replace"
+              name="textFieldMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
+            />
+          </div>
 
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox 
-            v-model="replaceOnSpecialSites" 
-            :disabled="!extensionEnabled || textFieldMode !== 'copy'"
-            :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
-          />
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox 
+              v-model="replaceOnSpecialSites" 
+              :disabled="!extensionEnabled || textFieldMode !== 'copy'"
+              :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
+            />
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -210,61 +214,63 @@
 
       <!-- Selection Mode Options -->
       <div 
-        v-if="translateOnTextSelection"
         class="sub-options-group"
+        :class="{ open: translateOnTextSelection }"
       >
-        <div class="radio-group">
-          <BaseRadio
-            v-model="selectionTranslationMode"
-            :value="SelectionTranslationMode.IMMEDIATE"
-            name="selectionTranslationMode"
-            :disabled="!extensionEnabled"
-            :label="t('options_selection_mode_immediate') || 'Immediate'"
-          />
-          <BaseRadio
-            v-model="selectionTranslationMode"
-            :value="SelectionTranslationMode.ON_CLICK"
-            name="selectionTranslationMode"
-            :disabled="!extensionEnabled"
-            :label="t('options_selection_mode_onclick') || 'On Click'"
-          />
-          <BaseRadio
-            v-model="selectionTranslationMode"
-            :value="SelectionTranslationMode.ON_FAB_CLICK"
-            name="selectionTranslationMode"
-            :disabled="!extensionEnabled || !showDesktopFab"
-            :label="t('options_selection_mode_onfabclick') || 'Use Desktop FAB'"
-          />
-        </div>
+        <div class="sub-options-inner">
+          <div class="radio-group">
+            <BaseRadio
+              v-model="selectionTranslationMode"
+              :value="SelectionTranslationMode.IMMEDIATE"
+              name="selectionTranslationMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_selection_mode_immediate') || 'Immediate'"
+            />
+            <BaseRadio
+              v-model="selectionTranslationMode"
+              :value="SelectionTranslationMode.ON_CLICK"
+              name="selectionTranslationMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_selection_mode_onclick') || 'On Click'"
+            />
+            <BaseRadio
+              v-model="selectionTranslationMode"
+              :value="SelectionTranslationMode.ON_FAB_CLICK"
+              name="selectionTranslationMode"
+              :disabled="!extensionEnabled || !showDesktopFab"
+              :label="t('options_selection_mode_onfabclick') || 'Use Desktop FAB'"
+            />
+          </div>
 
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="requireCtrlForTextSelection"
-            :disabled="!extensionEnabled || selectionTranslationMode !== SelectionTranslationMode.IMMEDIATE"
-            :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
-          />
-        </div>
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="requireCtrlForTextSelection"
+              :disabled="!extensionEnabled || selectionTranslationMode !== SelectionTranslationMode.IMMEDIATE"
+              :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
+            />
+          </div>
 
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="activeSelectionIconOnTextfields"
-            :disabled="!extensionEnabled"
-            :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
-          />
-          <span class="setting-description">
-            {{ t('active_selection_icon_on_textfields_description') || 'Show translation icon when selecting text inside text fields (input, textarea).' }}
-          </span>
-        </div>
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="activeSelectionIconOnTextfields"
+              :disabled="!extensionEnabled"
+              :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
+            />
+            <span class="setting-description">
+              {{ t('active_selection_icon_on_textfields_description') || 'Show translation icon when selecting text inside text fields (input, textarea).' }}
+            </span>
+          </div>
 
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="enhancedTripleClickDrag"
-            :disabled="!extensionEnabled"
-            :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
-          />
-          <span class="setting-description">
-            {{ t('enhanced_triple_click_drag_description') || 'When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs.' }}
-          </span>
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="enhancedTripleClickDrag"
+              :disabled="!extensionEnabled"
+              :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
+            />
+            <span class="setting-description">
+              {{ t('enhanced_triple_click_drag_description') || 'When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs.' }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -327,85 +333,87 @@
       </div>
 
       <div
-        v-if="wholePageEnabled"
         class="sub-options-group"
+        :class="{ open: wholePageEnabled }"
       >
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="wholePageLazyLoading"
-            :disabled="!extensionEnabled"
-            :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
-          />
-          <span class="setting-description">
-            {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
-          </span>
-        </div>
-
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="wholePageAutoTranslate"
-            :disabled="!extensionEnabled"
-            :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
-          />
-          <span class="setting-description">
-            {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
-          </span>
-        </div>
-
-        <div class="setting-group sub-setting-group">
-          <BaseCheckbox
-            v-model="wholePageShowOriginal"
-            :disabled="!extensionEnabled"
-            :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
-          />
-          <span class="setting-description">
-            {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
-          </span>
-        </div>
-
-        <div class="setting-group sub-setting-group whole-page-trigger-group">
-          <div class="trigger-modes-container">
-            <span class="trigger-label">{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
-            <div class="radio-group-horizontal">
-              <BaseRadio
-                v-model="wholePageTranslateAfterScrollStop"
-                :value="true"
-                name="wholePageTrigger"
-                :disabled="!extensionEnabled"
-                :label="t('whole_page_trigger_on_stop') || 'On Scroll Stop'"
-              />
-              <BaseRadio
-                v-model="wholePageTranslateAfterScrollStop"
-                :value="false"
-                name="wholePageTrigger"
-                :disabled="!extensionEnabled"
-                :label="t('whole_page_trigger_fluid') || 'Fluid (During Scroll)'"
-              />
-            </div>
+        <div class="sub-options-inner">
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageLazyLoading"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
+            </span>
           </div>
-          
-          <div class="delay-setting-container">
-            <span class="delay-label">{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
-            <div class="number-input-container inline-delay-input">
-              <input
-                v-model.number="wholePageScrollStopDelay"
-                type="number"
-                min="100"
-                max="5000"
-                step="100"
-                class="base-number-input compact-input"
-                :disabled="!extensionEnabled"
-              >
-              <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
-            </div>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageAutoTranslate"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
+            </span>
           </div>
-          
-          <span class="setting-description">
-            {{ wholePageTranslateAfterScrollStop 
-              ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
-              : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
-            }}
-          </span>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageShowOriginal"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
+            </span>
+          </div>
+
+          <div class="setting-group sub-setting-group whole-page-trigger-group">
+            <div class="trigger-modes-container">
+              <span class="trigger-label">{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
+              <div class="radio-group-horizontal">
+                <BaseRadio
+                  v-model="wholePageTranslateAfterScrollStop"
+                  :value="true"
+                  name="wholePageTrigger"
+                  :disabled="!extensionEnabled"
+                  :label="t('whole_page_trigger_on_stop') || 'On Scroll Stop'"
+                />
+                <BaseRadio
+                  v-model="wholePageTranslateAfterScrollStop"
+                  :value="false"
+                  name="wholePageTrigger"
+                  :disabled="!extensionEnabled"
+                  :label="t('whole_page_trigger_fluid') || 'Fluid (During Scroll)'"
+                />
+              </div>
+            </div>
+            
+            <div class="delay-setting-container">
+              <span class="delay-label">{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
+              <div class="number-input-container inline-delay-input">
+                <input
+                  v-model.number="wholePageScrollStopDelay"
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="100"
+                  class="base-number-input compact-input"
+                  :disabled="!extensionEnabled"
+                >
+                <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+              </div>
+            </div>
+            
+            <span class="setting-description">
+              {{ wholePageTranslateAfterScrollStop 
+                ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
+                : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
+              }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -767,11 +775,30 @@ const dictionaryProvider = computed({
 }
 
 .sub-options-group {
-  padding-inline-start: $spacing-lg;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.2s ease, 
+              margin 0.25s ease, 
+              padding 0.25s ease;
+  opacity: 0;
+  overflow: hidden;
   margin-inline-start: $spacing-md;
-  border-inline-start: 2px solid var(--color-border);
-  margin-top: $spacing-base;
-  padding-top: $spacing-base;
+  border-inline-start: 2px solid transparent; // Animated border color
+
+  &.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    margin-top: $spacing-base;
+    border-inline-start-color: var(--color-border);
+  }
+
+  .sub-options-inner {
+    min-height: 0;
+    padding-inline-start: $spacing-lg;
+    padding-top: $spacing-base;
+    padding-bottom: $spacing-xs;
+  }
   
   .radio-group {
     display: flex;
