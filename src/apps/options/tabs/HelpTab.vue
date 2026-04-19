@@ -12,7 +12,12 @@
           @click="toggleAccordion('shortcut')"
         >
           <span>{{ t('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
-          <span class="accordion-icon">{{ openAccordion === 'shortcut' ? '−' : '+' }}</span>
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: openAccordion === 'shortcut' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
         </button>
         <div 
           class="accordion-content"
@@ -36,7 +41,12 @@
           @click="toggleAccordion('apiKeys')"
         >
           <span>{{ t('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
-          <span class="accordion-icon">{{ openAccordion === 'apiKeys' ? '−' : '+' }}</span>
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: openAccordion === 'apiKeys' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
         </button>
         <div 
           class="accordion-content"
@@ -227,39 +237,60 @@ onMounted(() => {
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
-    transition: background-color $transition-base;
+    transition: background-color $transition-base, color $transition-base;
 
     &:hover {
       background-color: var(--tab-button-hover-bg, #f1f3f4);
+      
+      .accordion-icon-wrapper {
+        color: var(--color-primary);
+      }
     }
 
     &.active {
       background-color: var(--tab-button-active-bg, #e8f0fe);
       color: var(--tab-button-active-color, var(--color-primary));
     }
+  }
+
+  .accordion-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--color-text-secondary);
+
+    &.active {
+      transform: rotate(45deg);
+      color: var(--color-primary);
+    }
 
     .accordion-icon {
-      font-size: $font-size-lg;
-      font-weight: $font-weight-bold;
-      margin-inline-start: $spacing-sm;
-      transition: transform $transition-base;
-      min-width: 20px;
-      text-align: center;
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
     }
   }
 
   .accordion-content {
-    max-height: 0;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    opacity: 0;
     overflow: hidden;
-    transition: max-height $transition-slow ease-out;
     background-color: var(--color-background);
 
     &.open {
-      max-height: 1000px;
-      transition: max-height $transition-slow ease-in;
+      grid-template-rows: 1fr;
+      opacity: 1;
     }
 
     .accordion-inner {
+      min-height: 0;
       padding: $spacing-lg;
 
       .markdown-content {

@@ -866,12 +866,14 @@ defineExpose({
   .accordion-content {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    opacity: 0;
     overflow: hidden;
     width: 100%;
 
     &.open {
       grid-template-rows: 1fr;
+      opacity: 1;
     }
 
     .accordion-inner {
