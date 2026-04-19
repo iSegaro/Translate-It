@@ -65,18 +65,21 @@
 
       <!-- Bilingual Translation Setting (Accordion Style) -->
       <div class="setting-group bilingual-setting accordion-item">
-        <div class="accordion-header-wrapper">
+        <div 
+          class="accordion-header-wrapper"
+          @click="toggleAccordion('bilingual')"
+        >
           <div class="checkbox-area">
             <!-- Small Checkbox only with specific class -->
             <BaseCheckbox
               v-model="bilingualTranslation"
               class="bilingual-main-checkbox"
+              @click.stop
             />
             <!-- Clickable Title Text with smart logic -->
             <span 
               class="accordion-title-text"
               :class="{ active: activeAccordion === 'bilingual' }"
-              @click="toggleAccordion('bilingual')"
             >
               {{ t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)' }}
             </span>
@@ -86,7 +89,6 @@
           <div 
             class="accordion-trigger-area"
             :class="{ active: activeAccordion === 'bilingual' }"
-            @click="toggleAccordion('bilingual')"
           >
             <div 
               class="accordion-icon-wrapper"
@@ -532,10 +534,10 @@ watch(bilingualTranslation, (value) => {
       bilingualTranslationModes.value[TranslationMode.Field] = true;
     }
 
-    // Auto-open this accordion and close others when enabled
+    // Always ensure accordion is open when checkbox is turned on
     activeAccordion.value = 'bilingual';
   } else if (activeAccordion.value === 'bilingual') {
-    // Close if it was open
+    // Close if it was open when turned off
     activeAccordion.value = null;
   }
   

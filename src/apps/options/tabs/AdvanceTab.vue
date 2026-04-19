@@ -25,16 +25,19 @@
 
     <!-- Proxy Settings Section (Accordion Style) -->
     <div class="setting-group proxy-setting accordion-item">
-      <div class="accordion-header-wrapper">
+      <div 
+        class="accordion-header-wrapper"
+        @click="toggleAccordion('proxy')"
+      >
         <div class="checkbox-area">
           <BaseCheckbox
             v-model="proxyEnabled"
             class="proxy-main-checkbox"
+            @click.stop
           />
           <span 
             class="accordion-title-text"
             :class="{ active: activeAccordion === 'proxy' }"
-            @click="toggleAccordion('proxy')"
           >
             {{ t('proxy_section_title') || 'Proxy Settings' }}
           </span>
@@ -43,7 +46,6 @@
         <div 
           class="accordion-trigger-area"
           :class="{ active: activeAccordion === 'proxy' }"
-          @click="toggleAccordion('proxy')"
         >
           <div 
             class="accordion-icon-wrapper"
@@ -167,16 +169,19 @@
 
     <!-- Debug Mode Section (Accordion Style) -->
     <div class="setting-group debug-setting accordion-item">
-      <div class="accordion-header-wrapper">
+      <div 
+        class="accordion-header-wrapper"
+        @click="toggleAccordion('debug')"
+      >
         <div class="checkbox-area">
           <BaseCheckbox
             v-model="debugMode"
             class="debug-main-checkbox"
+            @click.stop
           />
           <span 
             class="accordion-title-text"
             :class="{ active: activeAccordion === 'debug' }"
-            @click="toggleAccordion('debug')"
           >
             {{ t('advance_debug_mode_label') || 'Debug Mode' }}
           </span>
@@ -185,7 +190,6 @@
         <div 
           class="accordion-trigger-area"
           :class="{ active: activeAccordion === 'debug' }"
-          @click="toggleAccordion('debug')"
         >
           <div 
             class="accordion-icon-wrapper"
@@ -304,10 +308,8 @@ onMounted(() => {
 // Update settings locally when changed (like other tabs)
 watch(debugMode, (value) => {
   if (value) {
-    // Auto-open this accordion when enabled
     activeAccordion.value = 'debug'
   } else if (activeAccordion.value === 'debug') {
-    // Close if it was open
     activeAccordion.value = null
   }
   settingsStore.updateSettingLocally('DEBUG_MODE', value)
@@ -315,10 +317,8 @@ watch(debugMode, (value) => {
 
 watch(proxyEnabled, (value) => {
   if (value) {
-    // Auto-open this accordion when enabled
     activeAccordion.value = 'proxy'
   } else if (activeAccordion.value === 'proxy') {
-    // Close if it was open
     activeAccordion.value = null
   }
   settingsStore.updateSettingLocally('PROXY_ENABLED', value)
