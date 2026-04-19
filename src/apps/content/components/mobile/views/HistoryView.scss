@@ -135,12 +135,35 @@
 .ti-m-history-list {
   flex: 1 !important;
   overflow-y: auto !important;
+  padding-bottom: 20px !important;
+  margin: 0 -5px !important;
+  padding: 0 5px !important;
+}
+
+.ti-m-history-list-inner {
   display: flex !important;
   flex-direction: column !important;
   gap: 12px !important;
-  padding-bottom: 20px !important;
-  margin: 0 -5px !important; /* جبران فاصله جانبی برای کارتها */
-  padding: 0 5px !important;
+}
+
+/* List Transitions */
+.ti-m-history-list-enter-active,
+.ti-m-history-list-leave-active {
+  transition: all 0.3s ease !important;
+}
+
+.ti-m-history-list-enter-from {
+  opacity: 0 !important;
+  transform: translateY(-10px) !important;
+}
+
+.ti-m-history-list-leave-to {
+  opacity: 0 !important;
+  transform: translateX(30px) !important;
+}
+
+.ti-m-history-list-move {
+  transition: transform 0.3s ease !important;
 }
 
 .ti-m-history-card {
@@ -150,11 +173,6 @@
   flex-direction: column !important;
   gap: 8px !important;
   cursor: pointer !important;
-  transition: transform 0.1s ease !important;
-}
-
-.ti-m-history-card:active {
-  transform: scale(0.98) !important;
 }
 
 .ti-m-card-header {
@@ -184,11 +202,13 @@
   align-items: center !important;
   justify-content: center !important;
   border-radius: 50% !important;
-  -webkit-tap-highlight-color: rgba(244, 67, 54, 0.1) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: all 0.2s ease !important;
 }
 
 .ti-m-delete-btn:active {
-  background-color: rgba(244, 67, 54, 0.1) !important;
+  background-color: rgba(244, 67, 54, 0.15) !important;
+  transform: scale(0.9) !important;
 }
 
 .ti-m-icon-img-small {

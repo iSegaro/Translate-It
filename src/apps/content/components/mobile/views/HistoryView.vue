@@ -100,48 +100,55 @@
         <span>{{ t('history_no_history') || 'No translation history yet' }}</span>
       </div>
 
-      <div 
-        v-for="(item, index) in historyItems" 
-        :key="item.timestamp || index"
-        class="ti-m-history-card"
-        :style="historyCardStyle"
-        @click="selectItem(item)"
+      <TransitionGroup 
+        v-else
+        name="ti-m-history-list"
+        tag="div"
+        class="ti-m-history-list-inner"
       >
-        <!-- Card Header: Languages & Delete -->
-        <div class="ti-m-card-header">
-          <div class="ti-m-lang-badge">
-            {{ getLangName(item.sourceLanguage) }} → {{ getLangName(item.targetLanguage) }}
-          </div>
-          <button 
-            class="ti-m-delete-btn"
-            @click.stop="(e) => removeItem(index, e)"
-          >
-            <img
-              src="@/icons/ui/trash-small.svg"
-              class="ti-m-icon-img-small"
-              :style="trashIconStyle"
+        <div 
+          v-for="(item, index) in historyItems" 
+          :key="item.timestamp || index"
+          class="ti-m-history-card"
+          :style="historyCardStyle"
+          @click="selectItem(item)"
+        >
+          <!-- Card Header: Languages & Delete -->
+          <div class="ti-m-card-header">
+            <div class="ti-m-lang-badge">
+              {{ getLangName(item.sourceLanguage) }} → {{ getLangName(item.targetLanguage) }}
+            </div>
+            <button 
+              class="ti-m-delete-btn"
+              @click.stop="(e) => removeItem(index, e)"
             >
-          </button>
-        </div>
+              <img
+                src="@/icons/ui/trash-small.svg"
+                class="ti-m-icon-img-small"
+                :style="trashIconStyle"
+              >
+            </button>
+          </div>
 
-        <!-- Card Content -->
-        <div 
-          class="ti-m-source-preview" 
-          :dir="shouldApplyRtl(item.sourceText) ? 'rtl' : 'ltr'"
-        >
-          {{ item.sourceText }}
+          <!-- Card Content -->
+          <div 
+            class="ti-m-source-preview" 
+            :dir="shouldApplyRtl(item.sourceText) ? 'rtl' : 'ltr'"
+          >
+            {{ item.sourceText }}
+          </div>
+          <div 
+            class="ti-m-target-preview" 
+            :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
+          >
+            {{ truncateText(item.translatedText) }}
+          </div>
+          
+          <div class="ti-m-timestamp">
+            {{ formatTime(item.timestamp) }}
+          </div>
         </div>
-        <div 
-          class="ti-m-target-preview" 
-          :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
-        >
-          {{ truncateText(item.translatedText) }}
-        </div>
-        
-        <div class="ti-m-timestamp">
-          {{ formatTime(item.timestamp) }}
-        </div>
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
