@@ -167,13 +167,15 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     war: "war", cy: "cy", xh: "xh", ydd: "ydd", yo: "yo", yua: "yua", zu: "zu"
   },
 
-  // Yandex Translate Language Codes
+  // Yandex Translate - based on provided list
   YANDEX: {
     auto: "auto",
     "zh-cn": "zh",
     "zh-tw": "zh",
     "zh": "zh",
     "fa": "fa",
+    "ps": "fa", // Pashto fallback
+    "ur": "ur",
     "iw": "he",
     "jw": "jv",
     "tl": "tl",
@@ -207,6 +209,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "catalan": "ca",
     "chinese (simplified)": "zh",
     "zh-cn": "zh",
+    "zh-tw": "zh",
+    "lzh": "zh",
     "chinese": "zh",
     "croatian": "hr",
     "czech": "cs",
@@ -216,6 +220,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "estonian": "et",
     "farsi": "fa",
     "persian": "fa",
+    "ps": "fa",
+    "ur": "ur",
     "filipino": "fil",
     "finnish": "fi",
     "french": "fr",
@@ -259,6 +265,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'zh': 'ZH', 
     'zh-cn': 'ZH-HANS', 
     'zh-tw': 'ZH-HANT',
+    'ps': 'FA',
+    'ur': 'FA',
   },
 
   // DeepL Beta Languages (require enable_beta_languages parameter)
