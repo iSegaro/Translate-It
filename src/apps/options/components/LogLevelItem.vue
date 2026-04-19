@@ -89,8 +89,8 @@ const logLevelOptions = [
   }
 
   .log-level-select {
-    min-width: 100px;
-    max-width: 120px;
+    min-width: 60px;
+    max-width: 75px;
     
     // Target the select directly and ensure arrow visibility
     &.log-level-select {
