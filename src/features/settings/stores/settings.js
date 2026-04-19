@@ -89,6 +89,7 @@ function getDefaultSettings() {
     MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
     MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: CONFIG.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ?? false,
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
+    COMPONENT_LOG_LEVELS: CONFIG.COMPONENT_LOG_LEVELS || {},
     EXCLUDED_SITES: CONFIG.EXCLUDED_SITES || [],
     // Proxy Settings
     PROXY_ENABLED: CONFIG.PROXY_ENABLED ?? false,
@@ -506,6 +507,11 @@ export const useSettingsStore = defineStore('settings', () => {
       if (key === 'DEBUG_MODE' && oldValue !== newValue) {
         handleDebugModeChange(Boolean(newValue))
       }
+
+      // Special handling for COMPONENT_LOG_LEVELS - sync with logging system
+      if (key === 'COMPONENT_LOG_LEVELS' && JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+        handleComponentLogLevelsChange(newValue)
+      }
     }
   }
 
@@ -524,6 +530,21 @@ export const useSettingsStore = defineStore('settings', () => {
       })
     } catch (error) {
       logger.warn('[SettingsStore] Failed to sync DEBUG_MODE with logging system:', error)
+    }
+  }
+
+  // Handle COMPONENT_LOG_LEVELS changes and sync with logging system
+  const handleComponentLogLevelsChange = async (levels) => {
+    try {
+      const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js')
+      debugModeBridge.handleComponentLogLevelsChange(levels)
+      
+      logger.info('[SettingsStore] COMPONENT_LOG_LEVELS changed and synced with logging system', {
+        levels,
+        source: 'storage_change'
+      })
+    } catch (error) {
+      logger.warn('[SettingsStore] Failed to sync COMPONENT_LOG_LEVELS with logging system:', error)
     }
   }
 

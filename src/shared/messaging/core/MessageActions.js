@@ -155,6 +155,10 @@ export class MessageActions {
   static GET_MEMORY_STATS = 'GET_MEMORY_STATS';
   static FORCE_GARBAGE_COLLECTION = 'FORCE_GARBAGE_COLLECTION';
 
+  // Debug & Logging actions
+  static DEBUG_MODE_CHANGED = 'DEBUG_MODE_CHANGED';
+  static COMPONENT_LOG_LEVELS_CHANGED = 'COMPONENT_LOG_LEVELS_CHANGED';
+
   /**
    * Get all available actions
    * @returns {Array<string>} Array of action names

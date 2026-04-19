@@ -125,14 +125,22 @@ export class ContentMessageHandler extends ResourceTracker {
           });
         }
 
+        // Register DebugModeBridge handlers
+        try {
+          const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+          const debugHandlers = debugModeBridge.getHandlerMappings();
+          for (const [action, handler] of Object.entries(debugHandlers)) {
+            messageHandler.registerHandler(action, handler);
+          }
+          this.logger.info('Registered DebugModeBridge handlers');
+        } catch (error) {
+          this.logger.warn('Failed to register DebugModeBridge handlers:', error);
+        }
+
         // Store reference to message handler
         this.messageHandler = messageHandler;
 
         this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
-        // logger.trace('Handler details:', {
-        //   hasRevertHandler: this.handlers.has('revertTranslation'),
-        //   usingContentScriptCore: !!contentScriptCore
-        // });
       } else {
         throw new Error('No valid message handler available');
       }

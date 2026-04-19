@@ -62,6 +62,7 @@ export const CONFIG = {
   APP_NAME: "Translate It",
   // --- Core Settings ---
   DEBUG_MODE: false,
+  COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",
   SOURCE_LANGUAGE: "en",

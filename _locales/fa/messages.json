@@ -977,6 +977,9 @@
   "advance_debug_mode_label": {
     "message": "حالت اشکال‌زدایی (Debug Mode)"
   },
+  "debug_section_description": {
+    "message": "فعال‌سازی لاگ‌های جزئی برای بخش‌های مختلف. این تنظیم بر سطح کلی لاگ غلبه می‌کند."
+  },
   "proxy_section_title": {
     "message": "تنظیمات پروکسی"
   },

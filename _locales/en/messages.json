@@ -977,6 +977,9 @@
   "advance_debug_mode_label": {
     "message": "Debug Mode"
   },
+  "debug_section_description": {
+    "message": "Enable detailed logging for specific components. Overrides global log level."
+  },
   "proxy_section_title": {
     "message": "Proxy Settings"
   },

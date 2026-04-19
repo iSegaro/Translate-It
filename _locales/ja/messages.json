@@ -977,6 +977,9 @@
   "advance_debug_mode_label": {
     "message": "デバッグモード"
   },
+  "debug_section_description": {
+    "message": "特定のコンポーネントの詳細なログを有効にします。グローバルのログレベルを上書きします。"
+  },
   "proxy_section_title": {
     "message": "プロキシ設定"
   },

@@ -2,13 +2,6 @@
   <section class="options-tab-content">
     <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
     
-    <div class="setting-group">
-      <BaseCheckbox
-        v-model="debugMode"
-        :label="t('advance_debug_mode_label') || 'Debug Mode'"
-      />
-    </div>
-
     <div class="setting-group vertical">
       <BaseCheckbox
         v-model="enableTranslationHistory"
@@ -172,6 +165,60 @@
         </div>
       </div>
     </div>
+
+    <!-- Debug Mode Section (Accordion Style) -->
+    <div class="setting-group debug-setting accordion-item">
+      <div class="accordion-header-wrapper">
+        <div class="checkbox-area">
+          <BaseCheckbox
+            v-model="debugMode"
+            class="debug-main-checkbox"
+          />
+          <span 
+            class="accordion-title-text"
+            :class="{ disabled: !debugMode, active: activeAccordion === 'debug' }"
+            @click="debugMode ? toggleAccordion('debug') : (debugMode = true)"
+          >
+            {{ t('advance_debug_mode_label') || 'Debug Mode' }}
+          </span>
+        </div>
+        
+        <div 
+          v-if="debugMode"
+          class="accordion-trigger-area"
+          :class="{ active: activeAccordion === 'debug' }"
+          @click="toggleAccordion('debug')"
+        >
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: activeAccordion === 'debug' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="accordion-content"
+        :class="{ open: activeAccordion === 'debug' && debugMode }"
+      >
+        <div class="accordion-inner">
+          <p class="setting-description mb-md">
+            {{ t('debug_section_description') || 'Enable detailed logging for specific components. Overrides global log level.' }}
+          </p>
+          
+          <div class="debug-grid">
+            <LogLevelItem
+              v-for="(name, key) in LOG_COMPONENTS"
+              :key="key"
+              :component-name="name"
+              :model-value="getComponentLogLevel(name)"
+              @update:model-value="updateComponentLogLevel(name, $event)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -185,6 +232,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import LogLevelItem from '../components/LogLevelItem.vue'
 
 import { useI18n } from 'vue-i18n'
 
@@ -206,10 +254,7 @@ const toggleAccordion = (name) => {
 }
 
 // Advanced settings
-const debugMode = computed({
-  get: () => settingsStore.settings?.DEBUG_MODE || false,
-  set: (value) => settingsStore.updateSettingLocally('DEBUG_MODE', value)
-})
+const debugMode = ref(settingsStore.settings?.DEBUG_MODE || false)
 
 const enableTranslationHistory = computed({
   get: () => settingsStore.settings?.ENABLE_TRANSLATION_HISTORY ?? true,
@@ -240,6 +285,7 @@ const proxyPassword = ref(settingsStore.settings?.PROXY_PASSWORD || '')
 
 // Sync with settings on mount
 onMounted(() => {
+  debugMode.value = settingsStore.settings?.DEBUG_MODE || false
   proxyEnabled.value = settingsStore.settings?.PROXY_ENABLED || false
   proxyType.value = settingsStore.settings?.PROXY_TYPE || 'http'
   proxyHost.value = settingsStore.settings?.PROXY_HOST || ''
@@ -249,6 +295,17 @@ onMounted(() => {
 })
 
 // Update settings locally when changed (like other tabs)
+watch(debugMode, (value) => {
+  if (value) {
+    // Auto-open this accordion when enabled
+    activeAccordion.value = 'debug'
+  } else if (activeAccordion.value === 'debug') {
+    // Close if it was open
+    activeAccordion.value = null
+  }
+  settingsStore.updateSettingLocally('DEBUG_MODE', value)
+})
+
 watch(proxyEnabled, (value) => {
   if (value) {
     // Auto-open this accordion when enabled
@@ -279,6 +336,17 @@ watch(proxyUsername, (value) => {
 watch(proxyPassword, (value) => {
   settingsStore.updateSettingLocally('PROXY_PASSWORD', value)
 })
+
+// Component log levels
+const getComponentLogLevel = (name) => {
+  return settingsStore.settings?.COMPONENT_LOG_LEVELS?.[name] ?? 1 // Default to WARN
+}
+
+const updateComponentLogLevel = (name, level) => {
+  const currentLevels = { ...(settingsStore.settings?.COMPONENT_LOG_LEVELS || {}) }
+  currentLevels[name] = Number(level)
+  settingsStore.updateSettingLocally('COMPONENT_LOG_LEVELS', currentLevels)
+}
 
 // Proxy test functionality
 const isTestingProxy = ref(false)
@@ -499,7 +567,7 @@ const testProxyConnection = async () => {
       gap: 12px;
       flex: 0 0 auto;
       
-      :deep(.proxy-main-checkbox) {
+      :deep(.proxy-main-checkbox), :deep(.debug-main-checkbox) {
         gap: 0 !important;
         width: auto !important;
         flex: none !important;
@@ -566,6 +634,14 @@ const testProxyConnection = async () => {
     .accordion-inner {
       min-height: 0;
       padding: 0 0 $spacing-md 0;
+
+      .debug-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: $spacing-sm;
+        margin-top: $spacing-md;
+        margin-inline-start: 28px;
+      }
     }
   }
 
@@ -837,6 +913,11 @@ const testProxyConnection = async () => {
 
 // Mobile responsive for proxy settings
 @media (max-width: #{$breakpoint-md}) {
+  .debug-grid {
+    grid-template-columns: 1fr !important;
+    margin-inline-start: 0 !important;
+  }
+
   .proxy-connection, .proxy-auth {
     flex-direction: column;
     gap: $spacing-sm;

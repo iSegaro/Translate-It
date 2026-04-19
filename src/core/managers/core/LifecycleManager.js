@@ -228,6 +228,21 @@ class LifecycleManager {
     // Register all handlers with proper action names
     const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
     
+    // Register DebugModeBridge handlers
+    try {
+      import('@/shared/logging/DebugModeBridge.js').then(({ debugModeBridge }) => {
+        const debugHandlers = debugModeBridge.getHandlerMappings();
+        for (const [action, handler] of Object.entries(debugHandlers)) {
+          this.messageHandler.registerHandler(action, handler);
+        }
+        logger.info('Registered DebugModeBridge handlers in background');
+      }).catch(err => {
+        logger.warn('Failed to load DebugModeBridge for handler registration:', err);
+      });
+    } catch (error) {
+      logger.warn('Error during DebugModeBridge registration:', error);
+    }
+    
     logger.info(`Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
   }
 

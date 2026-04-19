@@ -15,6 +15,7 @@
 import { safeConsole } from './SafeConsole.js';
 import { getScopedLogger } from './logger.js';
 import { LOG_COMPONENTS } from './logConstants.js';
+import { MessageActions } from '../messaging/core/MessageActions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'DebugModeBridge');
 
@@ -85,18 +86,22 @@ class DebugModeBridge {
       const debugMode = await this.getDebugModeFromStorage();
       this.currentDebugMode = debugMode;
 
+      // Get current component log levels from storage
+      const componentLogLevels = await this.getComponentLogLevelsFromStorage();
+
       // Apply to logging system
       await this.applyDebugMode(debugMode);
+      await this.applyComponentLogLevels(componentLogLevels);
 
       // Set up listeners for real-time updates
       this.setupStorageListener();
-      this.setupMessageListener();
 
       this.isInitialized = true;
 
       logger.info('Initialized successfully', {
         context: this.context,
-        debugMode
+        debugMode,
+        componentLogLevelsCount: Object.keys(componentLogLevels).length
       });
 
       return true;
@@ -120,7 +125,7 @@ class DebugModeBridge {
         return Boolean(result.DEBUG_MODE);
       }
     } catch {
-      logger.warn('storageManager not available, trying fallback');
+      logger.warn('storageManager not available, trying fallback for DEBUG_MODE');
     }
 
     try {
@@ -130,11 +135,39 @@ class DebugModeBridge {
         return Boolean(result.DEBUG_MODE);
       }
     } catch {
-      logger.warn('browser.storage not available');
+      logger.warn('browser.storage not available for DEBUG_MODE');
     }
 
     // Fallback to default value
     return false;
+  }
+
+  /**
+   * Get COMPONENT_LOG_LEVELS from storage with fallback
+   * @returns {Promise<Object>}
+   */
+  async getComponentLogLevelsFromStorage() {
+    try {
+      const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
+
+      if (storageManager && typeof storageManager.get === 'function') {
+        const result = await storageManager.get({ COMPONENT_LOG_LEVELS: {} });
+        return result.COMPONENT_LOG_LEVELS || {};
+      }
+    } catch {
+      logger.warn('storageManager not available, trying fallback for COMPONENT_LOG_LEVELS');
+    }
+
+    try {
+      if (typeof browser !== 'undefined' && browser.storage?.local) {
+        const result = await browser.storage.local.get({ COMPONENT_LOG_LEVELS: {} });
+        return result.COMPONENT_LOG_LEVELS || {};
+      }
+    } catch {
+      logger.warn('browser.storage not available for COMPONENT_LOG_LEVELS');
+    }
+
+    return {};
   }
 
   /**
@@ -150,9 +183,9 @@ class DebugModeBridge {
       try {
         const { setGlobalDebugOverride } = await import('./GlobalDebugState.js');
         setGlobalDebugOverride(debugMode);
-        logger.debug('Updated GlobalDebugState:', debugMode);
+        logger.debug('Updated GlobalDebugState (debugOverride):', debugMode);
       } catch (error) {
-        logger.warn('Could not update GlobalDebugState:', error);
+        logger.warn('Could not update GlobalDebugState (debugOverride):', error);
       }
 
       // Update ErrorHandler debug mode
@@ -174,6 +207,26 @@ class DebugModeBridge {
   }
 
   /**
+   * Apply component log levels to logging system
+   * @param {Object} levels - Component log levels object
+   */
+  async applyComponentLogLevels(levels) {
+    if (!levels || typeof levels !== 'object') return;
+
+    try {
+      const { setComponentLogLevel } = await import('./GlobalDebugState.js');
+      
+      Object.entries(levels).forEach(([component, level]) => {
+        setComponentLogLevel(component, level);
+      });
+      
+      logger.debug('Updated GlobalDebugState (componentLogLevels):', Object.keys(levels).length);
+    } catch (error) {
+      logger.warn('Could not update GlobalDebugState (componentLogLevels):', error);
+    }
+  }
+
+  /**
    * Set up storage change listener
    */
   setupStorageListener() {
@@ -185,6 +238,9 @@ class DebugModeBridge {
             if (changes.DEBUG_MODE !== undefined) {
               this.handleStorageChange({ DEBUG_MODE: { newValue: changes.DEBUG_MODE } });
             }
+            if (changes.COMPONENT_LOG_LEVELS !== undefined) {
+              this.handleStorageChange({ COMPONENT_LOG_LEVELS: { newValue: changes.COMPONENT_LOG_LEVELS } });
+            }
           });
         }
       }).catch(() => {
@@ -194,8 +250,10 @@ class DebugModeBridge {
       // Also set up browser.storage listener as backup
       if (typeof browser !== 'undefined' && browser.storage?.onChanged) {
         this.storageListener = (changes, areaName) => {
-          if (areaName === 'local' && changes.DEBUG_MODE !== undefined) {
-            this.handleStorageChange(changes);
+          if (areaName === 'local') {
+            if (changes.DEBUG_MODE !== undefined || changes.COMPONENT_LOG_LEVELS !== undefined) {
+              this.handleStorageChange(changes);
+            }
           }
         };
         browser.storage.onChanged.addListener(this.storageListener);
@@ -207,21 +265,27 @@ class DebugModeBridge {
 
   /**
    * Set up message listener for cross-context sync
+   * @deprecated Use getHandlerMappings() with centralized MessageHandler instead
    */
   setupMessageListener() {
-    try {
-      if (typeof browser !== 'undefined' && browser.runtime?.onMessage) {
-        this.messageListener = (message, sender, sendResponse) => {
-          if (message.action === 'DEBUG_MODE_CHANGED') {
-            this.handleDebugModeChange(message.data.debugMode);
-            sendResponse({ success: true });
-          }
-        };
-        browser.runtime.onMessage.addListener(this.messageListener);
+    // Logic moved to getHandlerMappings for centralized MessageHandler
+  }
+
+  /**
+   * Get handler mappings for centralized MessageHandler
+   * @returns {Object} Handler mappings for debug/logging actions
+   */
+  getHandlerMappings() {
+    return {
+      [MessageActions.DEBUG_MODE_CHANGED]: (message) => {
+        this.handleDebugModeChange(message.data.debugMode);
+        return { success: true };
+      },
+      [MessageActions.COMPONENT_LOG_LEVELS_CHANGED]: (message) => {
+        this.handleComponentLogLevelsChange(message.data.levels);
+        return { success: true };
       }
-    } catch (error) {
-      logger.warn('Could not setup message listener:', error);
-    }
+    };
   }
 
   /**
@@ -232,6 +296,10 @@ class DebugModeBridge {
     if (changes.DEBUG_MODE && changes.DEBUG_MODE.newValue !== this.currentDebugMode) {
       const newDebugMode = Boolean(changes.DEBUG_MODE.newValue);
       this.handleDebugModeChange(newDebugMode);
+    }
+
+    if (changes.COMPONENT_LOG_LEVELS) {
+      this.handleComponentLogLevelsChange(changes.COMPONENT_LOG_LEVELS.newValue);
     }
   }
 
@@ -252,21 +320,39 @@ class DebugModeBridge {
 
       // Broadcast to other contexts (except background script to avoid loops)
       if (this.context !== 'background') {
-        this.broadcastDebugModeChange(newDebugMode);
+        this.broadcastChange(MessageActions.DEBUG_MODE_CHANGED, { debugMode: newDebugMode });
       }
     }
   }
 
   /**
-   * Broadcast debug mode change to other contexts
-   * @param {boolean} debugMode - Debug mode value to broadcast
+   * Handle component log levels change
+   * @param {Object} levels - New component log levels object
    */
-  broadcastDebugModeChange(debugMode) {
+  handleComponentLogLevelsChange(levels) {
+    logger.info('Component log levels changed', {
+      count: levels ? Object.keys(levels).length : 0,
+      context: this.context
+    });
+
+    this.applyComponentLogLevels(levels);
+
+    if (this.context !== 'background') {
+      this.broadcastChange(MessageActions.COMPONENT_LOG_LEVELS_CHANGED, { levels });
+    }
+  }
+
+  /**
+   * Broadcast change to other contexts
+   * @param {string} action - Action name
+   * @param {Object} data - Message data
+   */
+  broadcastChange(action, data) {
     try {
       if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
         browser.runtime.sendMessage({
-          action: 'DEBUG_MODE_CHANGED',
-          data: { debugMode }
+          action,
+          data
         }).catch(() => {
           // Silently ignore errors - some contexts might not be available
         });
@@ -274,6 +360,15 @@ class DebugModeBridge {
     } catch {
       // Silently ignore broadcast errors
     }
+  }
+
+  /**
+   * Broadcast debug mode change to other contexts
+   * @deprecated Use broadcastChange instead
+   * @param {boolean} debugMode - Debug mode value to broadcast
+   */
+  broadcastDebugModeChange(debugMode) {
+    this.broadcastChange(MessageActions.DEBUG_MODE_CHANGED, { debugMode });
   }
 
   /**
