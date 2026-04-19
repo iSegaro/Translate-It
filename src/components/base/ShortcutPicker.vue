@@ -1,73 +1,64 @@
 <template>
-  <div class="shortcut-picker">
+  <div 
+    ref="pickerRef"
+    class="shortcut-picker"
+    :class="{ 'is-recording': isRecording }"
+  >
     <BaseButton
       class="shortcut-button"
       :class="{ 'recording': isRecording }"
       :disabled="disabled"
       @click="toggleRecording"
     >
-      <span v-if="!shortcut">{{ placeholder || 'Click to set shortcut' }}</span>
-      <span
-        v-else
-        class="shortcut-display"
-      >{{ formatShortcut(shortcut) }}</span>
+      <template v-if="isRecording">
+        <span 
+          v-if="currentKeys.length === 0" 
+          class="recording-placeholder"
+        >
+          {{ t('shortcut_waiting') || 'Press keys...' }}
+        </span>
+        <span 
+          v-else 
+          class="shortcut-display"
+        >
+          {{ formatShortcut(currentKeys.join('+')) }}
+        </span>
+      </template>
+      <template v-else>
+        <span v-if="!shortcut">{{ placeholder || 'Set shortcut' }}</span>
+        <span 
+          v-else 
+          class="shortcut-display"
+        >{{ formatShortcut(shortcut) }}</span>
+      </template>
     </BaseButton>
 
-    <div
-      v-if="isRecording"
-      class="recording-overlay"
+    <!-- Inline Actions when recording -->
+    <div 
+      v-if="isRecording" 
+      class="recording-actions-inline"
     >
-      <div class="recording-dialog">
-        <div class="dialog-header">
-          <h4>{{ t('shortcut_recording_title') || 'Press Your Shortcut' }}</h4>
-          <button
-            class="clear-button"
-            :disabled="currentKeys.length === 0"
-            :title="t('clear') || 'Clear'"
-            @click="clearCurrentKeys"
-          >
-            ✕
-          </button>
-        </div>
-        <div class="current-keys">
-          <span
-            v-if="currentKeys.length === 0"
-            class="placeholder"
-          >
-            {{ t('shortcut_waiting') || 'Waiting for keys...' }}
-          </span>
-          <kbd
-            v-for="key in currentKeys"
-            v-else
-            :key="key"
-            class="key-display"
-          >
-            {{ formatKey(key) }}
-          </kbd>
-        </div>
-        <p>{{ t('shortcut_recording_instruction') || 'Press the keys you want to use for this shortcut.' }}</p>
-        <div class="recording-actions">
-          <BaseButton
-            variant="secondary"
-            @click="cancelRecording"
-          >
-            {{ t('cancel') || 'Cancel' }}
-          </BaseButton>
-          <BaseButton
-            variant="primary"
-            :disabled="currentKeys.length === 0"
-            @click="confirmShortcut"
-          >
-            {{ t('confirm') || 'Confirm' }}
-          </BaseButton>
-        </div>
-      </div>
+      <button 
+        class="action-btn confirm" 
+        :disabled="currentKeys.length === 0"
+        :title="t('confirm') || 'Confirm'"
+        @click.stop="confirmShortcut"
+      >
+        ✓
+      </button>
+      <button 
+        class="action-btn cancel" 
+        :title="t('cancel') || 'Cancel'"
+        @click.stop="cancelRecording"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, nextTick } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
@@ -91,27 +82,31 @@ const emit = defineEmits(['update:modelValue'])
 const { t } = useUnifiedI18n()
 const isRecording = ref(false)
 const currentKeys = ref([])
+const pickerRef = ref(null)
+
 const shortcut = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 })
 
 const toggleRecording = () => {
-  if (props.disabled || isRecording.value) return
-  isRecording.value = true
-  currentKeys.value = []
-  document.addEventListener('keydown', handleKeyDown)
-  document.addEventListener('keyup', handleKeyUp)
+  if (props.disabled) return
+  
+  if (isRecording.value) {
+    cancelRecording()
+  } else {
+    isRecording.value = true
+    currentKeys.value = []
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('mousedown', handleOutsideClick)
+  }
 }
 
 const cancelRecording = () => {
   isRecording.value = false
   currentKeys.value = []
   removeKeyListeners()
-}
-
-const clearCurrentKeys = () => {
-  currentKeys.value = []
 }
 
 const confirmShortcut = () => {
@@ -121,17 +116,24 @@ const confirmShortcut = () => {
   cancelRecording()
 }
 
+const handleOutsideClick = (event) => {
+  if (pickerRef.value && !pickerRef.value.contains(event.target)) {
+    cancelRecording()
+  }
+}
+
 const handleKeyDown = (event) => {
   if (isRecording.value) {
     event.preventDefault()
     event.stopPropagation()
 
-    // Handle Enter key to confirm
+    // Handle Enter key to confirm only if we have keys (and it's not the only key)
     if (event.key === 'Enter') {
-      if (currentKeys.value.length > 0) {
+      const nonModifiers = currentKeys.value.filter(k => !['Ctrl', 'Alt', 'Shift', 'Cmd'].includes(k))
+      if (nonModifiers.length > 0) {
         confirmShortcut()
+        return
       }
-      return
     }
 
     // Handle Escape key to cancel
@@ -140,41 +142,24 @@ const handleKeyDown = (event) => {
       return
     }
 
-    // Handle Backspace as delete last key
-    if (event.key === 'Backspace') {
-      if (currentKeys.value.length > 0) {
-        currentKeys.value.pop() // Remove last key
-      }
-      return
-    }
+    // Build the current combination
+    const keys = []
+    
+    // Modifiers first
+    if (event.ctrlKey) keys.push('Ctrl')
+    if (event.altKey) keys.push('Alt')
+    if (event.shiftKey) keys.push('Shift')
+    if (event.metaKey) keys.push('Cmd')
 
     const key = normalizeKey(event.key)
-    if (key) {
-      const validModifiers = ['Ctrl', 'Alt', 'Shift', 'Cmd']
+    const validModifiers = ['Ctrl', 'Alt', 'Shift', 'Cmd']
+    
+    if (key && !validModifiers.includes(key)) {
+      keys.push(key)
+    }
 
-      // Only process non-modifier keys
-      if (!validModifiers.includes(key)) {
-        // Always start fresh for non-modifier keys
-        currentKeys.value = []
-
-        // Add the main key
-        currentKeys.value.push(key)
-
-        // Add any currently pressed modifier keys
-        if (event.ctrlKey) {
-          currentKeys.value.unshift('Ctrl')
-        }
-        if (event.altKey) {
-          currentKeys.value.unshift('Alt')
-        }
-        if (event.shiftKey) {
-          currentKeys.value.unshift('Shift')
-        }
-        if (event.metaKey) {
-          currentKeys.value.unshift('Cmd')
-        }
-      }
-      // Don't do anything for modifier keys alone
+    if (keys.length > 0) {
+      currentKeys.value = keys
     }
   }
 }
@@ -183,34 +168,54 @@ const handleKeyUp = (event) => {
   if (isRecording.value) {
     event.preventDefault()
     event.stopPropagation()
-    // Don't auto-confirm - wait for user to click Confirm button
+    
+    // Live update when keys are released
+    const keys = []
+    if (event.ctrlKey) keys.push('Ctrl')
+    if (event.altKey) keys.push('Alt')
+    if (event.shiftKey) keys.push('Shift')
+    if (event.metaKey) keys.push('Cmd')
+    
+    // If we were holding a non-modifier key, it stays in currentKeys until we release everything 
+    // or press a new combination. This is a common pattern for shortcut pickers.
+    const nonModifiers = currentKeys.value.filter(k => !['Ctrl', 'Alt', 'Shift', 'Cmd'].includes(k))
+    
+    if (keys.length === 0 && nonModifiers.length === 0) {
+      // Everything released
+      // We don't clear currentKeys here to allow user to see what they just pressed 
+      // before hitting Confirm or a new key
+    } else if (keys.length > 0) {
+      // Some modifiers still held
+      if (nonModifiers.length > 0) {
+        currentKeys.value = [...keys, ...nonModifiers]
+      } else {
+        currentKeys.value = keys
+      }
+    }
   }
 }
 
 const removeKeyListeners = () => {
-  document.removeEventListener('keydown', handleKeyDown)
-  document.removeEventListener('keyup', handleKeyUp)
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('keyup', handleKeyUp)
+  window.removeEventListener('mousedown', handleOutsideClick)
 }
 
 const normalizeKey = (key) => {
-  // Normalize modifier keys
   if (key === 'Control') return 'Ctrl'
   if (key === 'Meta') return 'Cmd'
   if (key === ' ') return 'Space'
+  if (key === 'Enter' || key === 'Escape' || key === 'Tab' || key === 'Backspace') return null
 
-  // Only allow valid modifier keys and printable characters
-  const validModifiers = ['Ctrl', 'Alt', 'Shift', 'Cmd']
-  const validKeys = /^[A-Za-z0-9`~!@#$%^&*()\-_=+[\]{};:'",.<>/\\|?]$/
+  // F1-F12
+  if (/^F[1-9][0-2]?$/.test(key)) return key
 
-  if (validModifiers.includes(key)) return key
-  if (validKeys.test(key) && key.length === 1) return key.toUpperCase()
   if (key.length === 1) return key.toUpperCase()
 
   return null
 }
 
 const formatKey = (key) => {
-  // Special formatting for better readability
   const keyMap = {
     'Ctrl': 'Ctrl',
     'Alt': 'Alt',
@@ -237,135 +242,110 @@ onUnmounted(() => {
 .shortcut-picker {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
   flex-shrink: 0;
   max-width: 100%;
+  transition: all 0.2s ease;
+
+  &.is-recording {
+    z-index: 10;
+  }
 }
 
 .shortcut-button {
-  min-width: 120px;
-  max-width: 180px;
-  width: 100%;
+  min-width: 130px;
+  max-width: 200px;
   padding: $spacing-xs $spacing-sm;
-  text-align: left;
+  text-align: center;
   font-family: monospace;
   font-size: $font-size-xs;
   height: 32px;
   white-space: nowrap;
   overflow: hidden;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: all 0.2s ease;
 
-  &.recording {
-    background-color: var(--color-primary);
-    color: white;
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    background-color: var(--color-surface);
   }
 
-  &.inline-picker {
-    min-width: 120px;
-    max-width: 160px;
+  &.recording {
+    border-color: var(--color-primary);
+    background-color: var(--color-active-background);
+    color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-alpha);
+    min-width: 150px;
   }
 }
 
 .shortcut-display {
-  font-weight: 500;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  display: block;
-  max-width: 100%;
 }
 
-.recording-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.recording-dialog {
-  background-color: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: $border-radius-md;
-  padding: $spacing-xl;
-  box-shadow: $shadow-lg;
-  max-width: 400px;
-  width: 90%;
-}
-
-.dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: $spacing-md;
-
-  h4 {
-    margin: 0;
-    color: var(--color-text);
-  }
-}
-
-.clear-button {
-  background: none;
-  border: none;
-  font-size: 18px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-
-  &:hover:not(:disabled) {
-    background-color: var(--color-surface);
-    color: var(--color-text);
-  }
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-}
-
-.current-keys {
-  min-height: 40px;
-  margin-bottom: $spacing-md;
-  display: flex;
-  gap: $spacing-xs;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.placeholder {
-  color: var(--color-text-secondary);
+.recording-placeholder {
   font-style: italic;
+  opacity: 0.7;
+  animation: pulse 1.5s infinite;
 }
 
-.recording-dialog p {
-  margin-bottom: $spacing-lg;
-  color: var(--color-text-secondary);
-}
-
-.key-display {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: $border-radius-sm;
-  padding: $spacing-xs $spacing-sm;
-  font-family: monospace;
-  font-size: $font-size-sm;
-  color: var(--color-text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.recording-actions {
+.recording-actions-inline {
   display: flex;
-  gap: $spacing-md;
-  justify-content: flex-end;
+  gap: 2px;
+  background-color: var(--color-surface);
+  padding: 2px;
+  border-radius: $border-radius-sm;
+  border: 1px solid var(--color-border);
+  box-shadow: $shadow-sm;
+  animation: slideIn 0.2s ease-out;
+
+  .action-btn {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: $border-radius-xs;
+    font-size: 14px;
+    transition: all 0.2s ease;
+
+    &.confirm {
+      color: var(--color-success, #28a745);
+      &:hover:not(:disabled) {
+        background-color: var(--color-success-alpha, rgba(40, 167, 69, 0.1));
+      }
+      &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+    }
+
+    &.cancel {
+      color: var(--color-error, #dc3545);
+      &:hover {
+        background-color: var(--color-error-alpha, rgba(220, 53, 69, 0.1));
+      }
+    }
+  }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-5px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 </style>
