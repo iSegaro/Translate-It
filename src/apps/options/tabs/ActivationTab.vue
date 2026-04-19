@@ -372,7 +372,10 @@
 
           <div class="setting-group sub-setting-group whole-page-trigger-group">
             <div class="trigger-modes-container">
-              <span class="trigger-label">{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
+              <span 
+                class="trigger-label"
+                :class="{ 'is-disabled': !extensionEnabled }"
+              >{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
               <div class="radio-group-horizontal">
                 <BaseRadio
                   v-model="wholePageTranslateAfterScrollStop"
@@ -390,9 +393,12 @@
                 />
               </div>
             </div>
-            
+
             <div class="delay-setting-container">
-              <span class="delay-label">{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
+              <span 
+                class="delay-label"
+                :class="{ 'is-disabled': !extensionEnabled }"
+              >{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
               <div class="number-input-container inline-delay-input">
                 <input
                   v-model.number="wholePageScrollStopDelay"
@@ -403,10 +409,12 @@
                   class="base-number-input compact-input"
                   :disabled="!extensionEnabled"
                 >
-                <span class="unit-label">{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
+                <span 
+                  class="unit-label"
+                  :class="{ 'is-disabled': !extensionEnabled }"
+                >{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
               </div>
             </div>
-            
             <span class="setting-description">
               {{ wholePageTranslateAfterScrollStop 
                 ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
@@ -642,6 +650,11 @@ const dictionaryProvider = computed({
       font-weight: 500;
       color: var(--color-text);
       min-width: 160px;
+      transition: opacity 0.2s ease;
+
+      &.is-disabled {
+        opacity: 0.6;
+      }
     }
     
     .radio-group-horizontal {
@@ -693,6 +706,11 @@ const dictionaryProvider = computed({
   .unit-label {
     font-size: 0.9em;
     color: var(--color-text-secondary);
+    transition: opacity 0.2s ease;
+
+    &.is-disabled {
+      opacity: 0.6;
+    }
   }
 
   &.inline-delay-input {
