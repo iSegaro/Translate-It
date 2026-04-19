@@ -89,14 +89,12 @@ export class BaseTranslateProvider extends BaseProvider {
       const chunkContext = `streaming-chunk-${chunkIndex + 1}/${chunks.length}`;
 
       try {
-        const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
         const statsBefore = sessionId ? statsManager.getSessionSummary(sessionId) : null;
         const charsBefore = statsBefore ? statsBefore.chars : 0;
 
         if (abortController) abortController.sessionId = sessionId;
 
-        const chunkResponse = await rateLimitManager.executeWithRateLimit(
-          this.providerName,
+        const chunkResponse = await this._executeWithRateLimit(
           (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0) }),
           chunkContext,
           priority,
@@ -133,7 +131,6 @@ export class BaseTranslateProvider extends BaseProvider {
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = this._createChunks(texts);
     const allResults = [];
-    const { rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
 
     for (let i = 0; i < chunks.length; i++) {
       if (abortController && abortController.signal.aborted) {
@@ -149,8 +146,7 @@ export class BaseTranslateProvider extends BaseProvider {
       if (abortController) abortController.sessionId = sessionId;
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-      const chunkResponse = await rateLimitManager.executeWithRateLimit(
-        this.providerName,
+      const chunkResponse = await this._executeWithRateLimit(
         (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
         chunkContext,
         priority,

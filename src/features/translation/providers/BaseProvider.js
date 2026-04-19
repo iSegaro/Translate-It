@@ -101,6 +101,23 @@ export class BaseProvider {
   }
 
   /**
+   * EXECUTE WITH RATE LIMITING - Throttles calls via RateLimitManager
+   * @protected
+   */
+  async _executeWithRateLimit(task, context = "", priority = null, options = {}) {
+    const { rateLimitManager, TranslationPriority } = await import("@/features/translation/core/RateLimitManager.js");
+    const targetPriority = priority || TranslationPriority.NORMAL;
+    
+    return await rateLimitManager.executeWithRateLimit(
+      this.providerName,
+      task,
+      context,
+      targetPriority,
+      options
+    );
+  }
+
+  /**
    * API CALL EXECUTION - Delegated to ProviderRequestEngine
    */
   async _executeApiCall(params) {

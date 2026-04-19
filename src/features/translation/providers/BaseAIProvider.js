@@ -36,7 +36,7 @@ export class BaseAIProvider extends BaseProvider {
 
     // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. JSON batching)
     if (texts.length > 1 && this.constructor.batchStrategy === 'json') {
-      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat);
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
     }
 
     // 3. Fallback to traditional sequential batching for single segments or non-JSON providers
@@ -62,7 +62,7 @@ export class BaseAIProvider extends BaseProvider {
    * Batch translation implementation (e.g. using JSON)
    * @protected
    */
-  async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null) {
+  async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
     try {
       const { systemPrompt, userText } = await this._preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId);
       
@@ -73,17 +73,24 @@ export class BaseAIProvider extends BaseProvider {
 
       // Ensure promptText is a string for the AI API
       const finalUserText = typeof userText === 'string' ? userText : JSON.stringify(userText);
+      const context = `${this.providerName.toLowerCase()}-batch-translation`;
 
-      const response = await this._callAI(systemPrompt, finalUserText, {
-        abortController,
-        messageId,
-        sessionId,
-        mode: translateMode,
-        sourceLang,
-        targetLang,
-        isBatch: true,
-        expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY
-      });
+      const response = await this._executeWithRateLimit(
+        (opts) => this._callAI(systemPrompt, finalUserText, {
+          ...opts,
+          abortController,
+          messageId,
+          sessionId,
+          mode: translateMode,
+          sourceLang,
+          targetLang,
+          isBatch: true,
+          expectedFormat: expectedFormat || ResponseFormat.JSON_ARRAY
+        }),
+        context,
+        priority,
+        { sessionId }
+      );
 
       // Stats recording is handled by ProviderRequestEngine. 
       // Orchestrators (like OptimizedJsonHandler or UnifiedService) handle the reporting.
@@ -104,22 +111,32 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     const results = [];
-    for (const text of texts) {
+    const context = `${this.providerName.toLowerCase()}-traditional-sequential`;
+
+    for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) throw new Error('Cancelled');
       
+      const text = texts[i];
       const { systemPrompt, userText } = await this._preparePromptAndText(text, sourceLang, targetLang, translateMode, null, sessionId);
       
       logger.debugLazy(() => [`[${this.providerName}] Traditional Prompt preparation complete`, { systemPrompt, userText }]);
+      const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
 
-      const response = await this._callAI(systemPrompt, userText, {
-        abortController,
-        messageId,
-        sessionId,
-        mode: translateMode,
-        sourceLang,
-        targetLang,
-        expectedFormat: expectedFormat || ResponseFormat.STRING
-      });
+      const response = await this._executeWithRateLimit(
+        (opts) => this._callAI(systemPrompt, userText, {
+          ...opts,
+          abortController,
+          messageId,
+          sessionId,
+          mode: translateMode,
+          sourceLang,
+          targetLang,
+          expectedFormat: expectedFormat || ResponseFormat.STRING
+        }),
+        chunkContext,
+        priority,
+        { sessionId }
+      );
       
       results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
     }
