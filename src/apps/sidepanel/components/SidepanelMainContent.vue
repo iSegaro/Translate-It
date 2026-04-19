@@ -11,6 +11,8 @@
         <LanguageSelector
           v-model:source-language="sourceLanguage"
           v-model:target-language="targetLanguage"
+          :provider="currentProviderLocal"
+          :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
           :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
           :swap-title="t('SIDEPANEL_SWAP_LANGUAGES_TITLE', 'جابجایی زبان‌ها')"
@@ -129,6 +131,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -144,6 +147,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 // Resource tracker for automatic cleanup
 
 // Stores
+const settingsStore = useSettingsStore()
 
 // Composables
 const { t } = useUnifiedI18n();
