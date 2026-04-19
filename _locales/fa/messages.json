@@ -1976,6 +1976,9 @@
   "language_detection_label": {
     "message": "تشخیص زبان"
   },
+  "language_detection_preferences_description": {
+    "message": "زبان اولویت را برای رسم‌الخط‌های مشترک تعیین کنید. این تنظیم مشخص می‌کند که در حالت «تشخیص خودکار»، متن شما با اولویت کدام زبان شناسایی شود (مثلا برای تشخیص صحیح زبان فارسی در میان زبان‌های مشابه)."
+  },
   "arabic_script_priority_label": {
     "message": "اولویت خط عربی"
   },
@@ -2020,11 +2023,5 @@
   },
   "nepali_language_name": {
     "message": "نپالی"
-  },
-  "devanagari_script_priority_description": {
-    "message": "انتخاب کنید که در صورت تشخیص حروف خط دواناگری (هندی، ماراتی و نپالی که حروف مشابهی دارند)، کدام زبان در اولویت قرار گیرد."
-  },
-  "arabic_script_priority_description": {
-    "message": "اولویت تشخیص خط عربی را زمانی که متن بین فارسی و عربی مبهم است، تعیین کنید."
   }
 }

@@ -1985,6 +1985,9 @@
   "language_detection_label": {
     "message": "Language Detection"
   },
+  "language_detection_preferences_description": {
+    "message": "Set the priority language for shared scripts. This determines which language is preferred during 'Auto-detect' mode (e.g., to correctly distinguish Persian from similar languages)."
+  },
   "arabic_script_priority_label": {
     "message": "Arabic Script Priority"
   },
@@ -2029,11 +2032,5 @@
   },
   "nepali_language_name": {
     "message": "Nepali"
-  },
-  "devanagari_script_priority_description": {
-    "message": "Choose which language should be prioritized when text contains Devanagari script characters (Hindi, Marathi, and Nepali use similar characters)."
-  },
-  "arabic_script_priority_description": {
-    "message": "Prioritize Arabic script detection when the script is ambiguous between Persian and Arabic."
   }
 }

@@ -1985,6 +1985,9 @@
   "language_detection_label": {
     "message": "言語検出"
   },
+  "language_detection_preferences_description": {
+    "message": "共有スクリプトの優先言語を設定します。この設定は、「自動検出」モードにおいてどの言語を優先的に識別するかを決定します（例：類似した言語の中からペルシア語を正しく検出するため）。"
+  },
   "arabic_script_priority_label": {
     "message": "アラビア文字の優先"
   },
@@ -2029,11 +2032,5 @@
   },
   "nepali_language_name": {
     "message": "ネパール語"
-  },
-  "devanagari_script_priority_description": {
-    "message": "デーヴァナーガリー文字（ヒンディー語、マラーティー語、ネパール語など）が検出された場合に、どの言語を優先するかを選択します。"
-  },
-  "arabic_script_priority_description": {
-    "message": "ペルシア語とアラビア語で文字の判別が曖昧な場合に、どちらの言語を優先するかを決定します。"
   }
 }

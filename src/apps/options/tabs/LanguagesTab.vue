@@ -41,78 +41,91 @@
       </div>
 
       <!-- Language Detection Preferences -->
-      <div class="setting-group language-pref-setting">
-        <label>{{ t('language_detection_label') || 'Language Detection Preferences' }}</label>
-        <div class="language-pref-content">
-          <label class="pref-label">
-            {{ t('arabic_script_priority_label') || 'When Arabic script is detected:' }}
-          </label>
-          <select
-            v-model="arabicScriptPreference"
-            class="pref-select"
-          >
-            <option value="fa">
-              {{ t('persian_language_name') || 'Persian' }} ({{ t('default_label') || 'Default' }})
-            </option>
-            <option value="ar">
-              {{ t('arabic_language_name') || 'Arabic' }}
-            </option>
-            <option value="ur">
-              {{ t('urdu_language_name') || 'Urdu' }}
-            </option>
-            <option value="ps">
-              {{ t('pashto_language_name') || 'Pashto' }}
-            </option>
-          </select>
-          <span class="setting-description">
-            {{ t('arabic_script_priority_description') || 'Choose which language should be prioritized when text contains Arabic script characters (Persian, Arabic, Urdu, and Pashto use similar characters).' }}
-          </span>
-        </div>
+      <div class="setting-group language-pref-setting accordion-item">
+        <button
+          class="accordion-header"
+          :class="{ active: isLanguageDetectionOpen }"
+          @click="isLanguageDetectionOpen = !isLanguageDetectionOpen"
+        >
+          <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
+          <span class="accordion-icon">{{ isLanguageDetectionOpen ? '−' : '+' }}</span>
+        </button>
 
-        <div class="language-pref-content mt-md">
-          <label class="pref-label">
-            {{ t('chinese_script_priority_label') || 'When Chinese script is detected:' }}
-          </label>
-          <select
-            v-model="chineseScriptPreference"
-            class="pref-select"
-          >
-            <option value="zh-cn">
-              {{ t('chinese_simplified_name') || 'Chinese (Simplified)' }} ({{ t('default_label') || 'Default' }})
-            </option>
-            <option value="zh-tw">
-              {{ t('chinese_traditional_name') || 'Chinese (Traditional)' }}
-            </option>
-            <option value="lzh">
-              {{ t('chinese_classical_name') || 'Chinese (Classical)' }}
-            </option>
-            <option value="yue">
-              {{ t('chinese_cantonese_name') || 'Cantonese' }}
-            </option>
-          </select>
-        </div>
+        <div
+          class="accordion-content"
+          :class="{ open: isLanguageDetectionOpen }"
+        >
+          <div class="accordion-inner">
+            <p class="setting-description mb-md">
+              {{ t('language_detection_preferences_description') || 'Choose which language should be prioritized when text contains scripts shared by multiple languages.' }}
+            </p>
 
-        <div class="language-pref-content mt-md">
-          <label class="pref-label">
-            {{ t('devanagari_script_priority_label') || 'When Devanagari script is detected:' }}
-          </label>
-          <select
-            v-model="devanagariScriptPreference"
-            class="pref-select"
-          >
-            <option value="hi">
-              {{ t('hindi_language_name') || 'Hindi' }} ({{ t('default_label') || 'Default' }})
-            </option>
-            <option value="mr">
-              {{ t('marathi_language_name') || 'Marathi' }}
-            </option>
-            <option value="ne">
-              {{ t('nepali_language_name') || 'Nepali' }}
-            </option>
-          </select>
-          <span class="setting-description">
-            {{ t('devanagari_script_priority_description') || 'Choose which language should be prioritized when text contains Devanagari script characters (Hindi, Marathi, and Nepali use similar characters).' }}
-          </span>
+            <div class="language-pref-row">
+              <label class="pref-label">
+                {{ t('arabic_script_priority_label') || 'Arabic Script:' }}
+              </label>
+              <select
+                v-model="arabicScriptPreference"
+                class="pref-select"
+              >
+                <option value="fa">
+                  {{ t('persian_language_name') || 'Persian' }} ({{ t('default_label') || 'Default' }})
+                </option>
+                <option value="ar">
+                  {{ t('arabic_language_name') || 'Arabic' }}
+                </option>
+                <option value="ur">
+                  {{ t('urdu_language_name') || 'Urdu' }}
+                </option>
+                <option value="ps">
+                  {{ t('pashto_language_name') || 'Pashto' }}
+                </option>
+              </select>
+            </div>
+
+            <div class="language-pref-row">
+              <label class="pref-label">
+                {{ t('chinese_script_priority_label') || 'Chinese Script:' }}
+              </label>
+              <select
+                v-model="chineseScriptPreference"
+                class="pref-select"
+              >
+                <option value="zh-cn">
+                  {{ t('chinese_simplified_name') || 'Chinese (Simplified)' }} ({{ t('default_label') || 'Default' }})
+                </option>
+                <option value="zh-tw">
+                  {{ t('chinese_traditional_name') || 'Chinese (Traditional)' }}
+                </option>
+                <option value="lzh">
+                  {{ t('chinese_classical_name') || 'Chinese (Classical)' }}
+                </option>
+                <option value="yue">
+                  {{ t('chinese_cantonese_name') || 'Cantonese' }}
+                </option>
+              </select>
+            </div>
+
+            <div class="language-pref-row">
+              <label class="pref-label">
+                {{ t('devanagari_script_priority_label') || 'Devanagari Script:' }}
+              </label>
+              <select
+                v-model="devanagariScriptPreference"
+                class="pref-select"
+              >
+                <option value="hi">
+                  {{ t('hindi_language_name') || 'Hindi' }} ({{ t('default_label') || 'Default' }})
+                </option>
+                <option value="mr">
+                  {{ t('marathi_language_name') || 'Marathi' }}
+                </option>
+                <option value="ne">
+                  {{ t('nepali_language_name') || 'Nepali' }}
+                </option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -180,6 +193,9 @@ const { validateLanguages: validate, getFirstError, getFirstErrorTranslated, cle
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
+
+// Accordion state
+const isLanguageDetectionOpen = ref(false)
 
 // Form values as refs
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
@@ -646,31 +662,93 @@ defineExpose({
 }
 
 .language-pref-setting {
-  margin-top: $spacing-md;
+  margin-top: $spacing-lg;
   flex-direction: column !important;
   align-items: stretch !important;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  padding: 0 !important;
+  border-radius: 0;
 
-  .language-pref-content {
+  .accordion-header {
+    width: 100%;
+    padding: $spacing-md 0;
+    background-color: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
     display: flex;
-    flex-direction: column;
-    gap: $spacing-xs;
+    justify-content: space-between;
+    align-items: center;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    transition: color $transition-base;
+
+    &:hover {
+      color: var(--color-primary);
+    }
+
+    &.active {
+      color: var(--color-primary);
+    }
+
+    .accordion-icon {
+      font-size: $font-size-lg;
+      font-weight: $font-weight-bold;
+      margin-inline-start: $spacing-sm;
+      min-width: 20px;
+      text-align: center;
+    }
+  }
+
+  .accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height $transition-slow ease-out;
+
+    &.open {
+      max-height: 1000px;
+      transition: max-height $transition-slow ease-in;
+    }
+
+    .accordion-inner {
+      padding: 0 0 $spacing-lg 0;
+
+      .mb-md {
+        margin-bottom: $spacing-md;
+      }
+    }
+  }
+
+  .language-pref-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+    margin-bottom: $spacing-sm;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
 
     .pref-label {
       font-size: $font-size-base;
-      color: var(--color-text);
-      margin-bottom: $spacing-xs;
-      font-weight: $font-weight-medium;
+      color: var(--color-text-secondary);
+      font-weight: $font-weight-normal;
+      flex: 1;
     }
 
     .pref-select {
-      width: 100%;
-      max-width: 300px;
-      padding: $spacing-sm $spacing-md;
+      flex: 0 0 200px;
+      width: 200px;
+      padding: $spacing-xs $spacing-sm;
       border: 1px solid var(--color-border);
       border-radius: $border-radius-sm;
       background-color: var(--color-background);
       color: var(--color-text);
-      font-size: $font-size-base;
+      font-size: $font-size-sm;
       cursor: pointer;
 
       &:hover {
@@ -687,7 +765,6 @@ defineExpose({
   .setting-description {
     font-size: $font-size-sm;
     color: var(--color-text-secondary);
-    margin-top: $spacing-xs;
     line-height: 1.4;
   }
 }
@@ -725,6 +802,15 @@ defineExpose({
       width: 100% !important;
       flex: none !important;
     }
+  }
+}
+
+:global(.options-layout.rtl) {
+  .language-pref-setting .accordion-header {
+    display: flex !important;
+    flex-direction: row-reverse !important;
+    justify-content: space-between !important;
+    text-align: right !important;
   }
 }
 </style>
