@@ -24,11 +24,12 @@
     </div>
 
     <!-- Proxy Settings Section (Accordion Style) -->
-    <div class="setting-group proxy-setting accordion-item">
-      <div 
-        class="accordion-header-wrapper"
-        @click="toggleAccordion('proxy')"
-      >
+    <BaseAccordion
+      :is-open="activeAccordion === 'proxy'"
+      item-class="proxy-setting"
+      @toggle="toggleAccordion('proxy')"
+    >
+      <template #header>
         <div class="checkbox-area">
           <BaseCheckbox
             v-model="proxyEnabled"
@@ -42,24 +43,9 @@
             {{ t('proxy_section_title') || 'Proxy Settings' }}
           </span>
         </div>
-        
-        <div 
-          class="accordion-trigger-area"
-          :class="{ active: activeAccordion === 'proxy' }"
-        >
-          <div 
-            class="accordion-icon-wrapper"
-            :class="{ active: activeAccordion === 'proxy' }"
-          >
-            <span class="accordion-icon">+</span>
-          </div>
-        </div>
-      </div>
+      </template>
 
-      <div
-        class="accordion-content"
-        :class="{ open: activeAccordion === 'proxy' }"
-      >
+      <template #content>
         <div class="accordion-inner">
           <p class="setting-description mb-md">
             {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
@@ -164,15 +150,16 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </BaseAccordion>
 
     <!-- Debug Mode Section (Accordion Style) -->
-    <div class="setting-group debug-setting accordion-item">
-      <div 
-        class="accordion-header-wrapper"
-        @click="toggleAccordion('debug')"
-      >
+    <BaseAccordion
+      :is-open="activeAccordion === 'debug'"
+      item-class="debug-setting"
+      @toggle="toggleAccordion('debug')"
+    >
+      <template #header>
         <div class="checkbox-area">
           <BaseCheckbox
             v-model="debugMode"
@@ -186,24 +173,9 @@
             {{ t('advance_debug_mode_label') || 'Debug Mode' }}
           </span>
         </div>
-        
-        <div 
-          class="accordion-trigger-area"
-          :class="{ active: activeAccordion === 'debug' }"
-        >
-          <div 
-            class="accordion-icon-wrapper"
-            :class="{ active: activeAccordion === 'debug' }"
-          >
-            <span class="accordion-icon">+</span>
-          </div>
-        </div>
-      </div>
+      </template>
 
-      <div
-        class="accordion-content"
-        :class="{ open: activeAccordion === 'debug' }"
-      >
+      <template #content>
         <div class="accordion-inner">
           <p class="setting-description mb-md">
             {{ t('debug_section_description') || 'Enable detailed logging for specific components. Overrides global log level.' }}
@@ -228,8 +200,8 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </BaseAccordion>
   </section>
 </template>
 
@@ -237,6 +209,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseAccordion from '@/components/base/BaseAccordion.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
@@ -546,178 +519,98 @@ const testProxyConnection = async () => {
 }
 
 // Accordion styles for proxy setting
-.accordion-item {
-  margin-top: $spacing-lg;
-  border-top: 1px solid var(--color-border);
-  padding: 0;
-  display: flex;
-  flex-direction: column !important;
-  align-items: stretch !important;
+.setting-group {
+  margin-bottom: $spacing-xl;
+}
 
-  .accordion-header-wrapper {
-    width: 100%;
-    padding: $spacing-sm 0;
-    background: transparent;
-    border: none;
+.accordion-inner {
+  padding: 0 0 $spacing-md 0;
+
+  .debug-categories {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: column;
+    gap: $spacing-xl;
+    margin-top: $spacing-md;
+    margin-inline-start: 28px;
+  }
+
+  .debug-category-group {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  .category-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
     align-items: center;
+    gap: $spacing-sm;
+    opacity: 0.7;
+    margin-bottom: $spacing-xs;
+
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--color-border-light, #eee), transparent);
+    }
+  }
+
+  .debug-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: $spacing-sm;
+  }
+}
+
+.checkbox-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  
+  :deep(.proxy-main-checkbox), :deep(.debug-main-checkbox) {
+    gap: 0 !important;
+    width: auto !important;
+    flex: none !important;
+    flex-grow: 0 !important;
+    min-width: auto !important;
+    margin: 0 !important;
+
+    .ti-checkbox__label {
+      display: none !important;
+    }
+  }
+
+  .accordion-title-text {
     cursor: pointer;
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
+    user-select: none;
+    padding: 4px 0;
     transition: color $transition-base;
 
-    &:hover {
-      color: var(--color-primary);
-
-      .accordion-icon-wrapper {
-        color: var(--color-primary);
-      }
-
-      .accordion-title-text {
-        color: var(--color-primary);
-      }
-    }
-
-    .checkbox-area {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex: 0 0 auto;
-      
-      :deep(.proxy-main-checkbox), :deep(.debug-main-checkbox) {
-        gap: 0 !important;
-        width: auto !important;
-        flex: none !important;
-        flex-grow: 0 !important;
-        min-width: auto !important;
-        margin: 0 !important;
-
-        .ti-checkbox__label {
-          display: none !important;
-        }
-      }
-
-      .accordion-title-text {
-        cursor: pointer;
-        user-select: none;
-        padding: 4px 0;
-        transition: color $transition-base;
-
-        &.active {
-          color: var(--color-primary);
-          font-weight: $font-weight-medium;
-        }
-
-        &.disabled {
-          opacity: 0.9;
-        }
-      }
-    }
-
-    .accordion-trigger-area {
-      padding: $spacing-sm $spacing-md;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-inline-end: -$spacing-md;
-      margin-inline-start: auto;
-    }
-  }
-
-  .accordion-content {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
-    opacity: 0;
-    overflow: hidden;
-    width: 100%;
-
-    &.open {
-      grid-template-rows: 1fr;
-      opacity: 1;
-    }
-
-    .accordion-inner {
-      min-height: 0;
-      padding: 0 0 $spacing-md 0;
-
-      .debug-categories {
-        display: flex;
-        flex-direction: column;
-        gap: $spacing-xl;
-        margin-top: $spacing-md;
-        margin-inline-start: 28px;
-      }
-
-      .debug-category-group {
-        display: flex;
-        flex-direction: column;
-        gap: $spacing-sm;
-      }
-
-      .category-title {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--color-text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        display: flex;
-        align-items: center;
-        gap: $spacing-sm;
-        opacity: 0.7;
-        margin-bottom: $spacing-xs;
-
-        &::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(90deg, var(--color-border-light, #eee), transparent);
-        }
-      }
-
-      .debug-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: $spacing-sm;
-      }
-    }
-  }
-
-  .accordion-icon-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    color: var(--color-text-secondary);
-
     &.active {
-      transform: rotate(45deg);
       color: var(--color-primary);
+      font-weight: $font-weight-medium;
     }
 
-    .accordion-icon {
-      font-size: 18px;
-      font-weight: 300;
-      line-height: 1;
-      pointer-events: none;
-      user-select: none;
+    &.disabled {
+      opacity: 0.9;
     }
   }
+}
 
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
-    margin-bottom: $spacing-sm;
+.setting-description {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: $spacing-sm;
 
-    &.mb-md {
-      margin-inline-start: 28px;
-    }
+  &.mb-md {
+    margin-inline-start: 28px;
   }
 }
 
