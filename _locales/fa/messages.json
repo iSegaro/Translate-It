@@ -2001,15 +2001,30 @@
     "message": "چینی (سنتی)"
   },
   "chinese_classical_name": {
-    "message": "چینی (کلاسیک)"
+    "message": "چینی (ادبی)"
   },
   "chinese_cantonese_name": {
     "message": "کانتونی"
   },
   "chinese_script_priority_label": {
-    "message": "هنگامی که خط چینی تشخیص داده شد:"
+    "message": "اولویت خط چینی"
+  },
+  "devanagari_script_priority_label": {
+    "message": "اولویت خط دواناگری"
+  },
+  "hindi_language_name": {
+    "message": "هندی"
+  },
+  "marathi_language_name": {
+    "message": "ماراتی"
+  },
+  "nepali_language_name": {
+    "message": "نپالی"
+  },
+  "devanagari_script_priority_description": {
+    "message": "انتخاب کنید که در صورت تشخیص حروف خط دواناگری (هندی، ماراتی و نپالی که حروف مشابهی دارند)، کدام زبان در اولویت قرار گیرد."
   },
   "arabic_script_priority_description": {
-    "message": "هنگامی که تشخیص بین خط فارسی و عربی دشوار است، اولویت به خط عربی داده شود."
+    "message": "اولویت تشخیص خط عربی را زمانی که متن بین فارسی و عربی مبهم است، تعیین کنید."
   }
 }

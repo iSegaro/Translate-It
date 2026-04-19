@@ -91,6 +91,29 @@
             </option>
           </select>
         </div>
+
+        <div class="language-pref-content mt-md">
+          <label class="pref-label">
+            {{ t('devanagari_script_priority_label') || 'When Devanagari script is detected:' }}
+          </label>
+          <select
+            v-model="devanagariScriptPreference"
+            class="pref-select"
+          >
+            <option value="hi">
+              {{ t('hindi_language_name') || 'Hindi' }} ({{ t('default_label') || 'Default' }})
+            </option>
+            <option value="mr">
+              {{ t('marathi_language_name') || 'Marathi' }}
+            </option>
+            <option value="ne">
+              {{ t('nepali_language_name') || 'Nepali' }}
+            </option>
+          </select>
+          <span class="setting-description">
+            {{ t('devanagari_script_priority_description') || 'Choose which language should be prioritized when text contains Devanagari script characters (Hindi, Marathi, and Nepali use similar characters).' }}
+          </span>
+        </div>
       </div>
     </template>
 
@@ -164,6 +187,7 @@ const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
 const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
 const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
 const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
+const devanagariScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi')
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -348,6 +372,12 @@ watch(arabicScriptPreference, (value) => {
 watch(chineseScriptPreference, (value) => {
   const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
   preferences['chinese-script'] = value
+  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
+})
+
+watch(devanagariScriptPreference, (value) => {
+  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
+  preferences['devanagari-script'] = value
   settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
 })
 

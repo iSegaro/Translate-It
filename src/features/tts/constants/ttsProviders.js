@@ -34,7 +34,8 @@ export const PROVIDER_CONFIGS = {
       'pl': 'pl-PL-AgnieszkaNeural', 'ro': 'ro-RO-AlinaNeural', 'hu': 'hu-HU-NoemiNeural',
       'cs': 'cs-CZ-VlastaNeural', 'sk': 'sk-SK-ViktoriaNeural', 'el': 'el-GR-AthinaNeural',
       'ja': 'ja-JP-NanamiNeural', 'ko': 'ko-KR-SunHiNeural', 'zh': 'zh-cn-XiaoxiaoNeural',
-      'hi': 'hi-IN-SwaraNeural', 'bn': 'bn-IN-TanishaNeural', 'ta': 'ta-IN-PallaviNeural',
+      'hi': 'hi-IN-SwaraNeural', 'mr': 'mr-IN-AarohiNeural', 'ne': 'ne-NP-HemkalaNeural',
+      'bn': 'bn-IN-TanishaNeural', 'ta': 'ta-IN-PallaviNeural',
       'te': 'te-IN-ShrutiNeural', 'th': 'th-TH-PremwadeeNeural', 'vi': 'vi-VN-HoaiMyNeural',
       'id': 'id-ID-GadisNeural', 'ms': 'ms-MY-LatreeNeural',
       'zh-hk': 'zh-HK-HiuGaaiNeural', 'yue': 'zh-HK-HiuMaanNeural',
@@ -54,7 +55,7 @@ export const PROVIDER_CONFIGS = {
       cleaningRegex: /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\FB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\FF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g,
       supportedLanguages: new Set([
       'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw', 'yue',
-      'ar', 'hi', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',
+      'ar', 'hi', 'ne', 'mr', 'tr', 'pl', 'nl', 'sv', 'da', 'no', 'fi', 'el', 'he', 'th',
       'vi', 'id', 'ms', 'tl', 'uk', 'cs', 'sk', 'hu', 'ro', 'bg', 'hr', 'sl',
       'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'az', 'be', 'ka',
       'hy', 'ne', 'si', 'my', 'km', 'lo', 'gu', 'ta', 'te', 'kn', 'ml', 'pa',

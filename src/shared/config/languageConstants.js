@@ -184,6 +184,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "zh": "zh",
     "fa": "fa",
     "ps": "fa", // Pashto fallback
+    "mr": "hi", // Marathi fallback to Hindi
+    "ne": "ne",
     "ur": "ur",
     "iw": "he",
     "jw": "jv",
@@ -230,6 +232,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "farsi": "fa",
     "persian": "fa",
     "ps": "fa",
+    "mr": "hi",
+    "ne": "hi",
     "ur": "ur",
     "filipino": "fil",
     "finnish": "fi",
@@ -276,6 +280,8 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'zh-tw': 'ZH-HANT',
     'ps': 'FA',
     'ur': 'FA',
+    'mr': 'HI',
+    'ne': 'HI',
   },
 
   // DeepL Beta Languages (require enable_beta_languages parameter)
@@ -287,7 +293,7 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'ha': 'HA', 'he': 'HE', 'hi': 'HI', 'ig': 'IG', 'ga': 'GA', 'jv': 'JV', 'pam': 'PAM', 
     'kk': 'KK', 'gom': 'GOM', 'kmr': 'KMR', 'ckb': 'CKB', 'ky': 'KY', 'la': 'LA', 
     'ln': 'LN', 'lmo': 'LMO', 'lb': 'LB', 'mk': 'MK', 'mai': 'MAI', 'mg': 'MG', 'ms': 'MS', 
-    'ml': 'ML', 'mt': 'MT', 'mi': 'MI', 'mr': 'MR', 'mn': 'MN', 'ne': 'NE', 'oc': 'OC', 
+    'ml': 'ML', 'mt': 'MT', 'mi': 'MI', 'mr': 'HI', 'mn': 'MN', 'ne': 'HI', 'oc': 'OC', 
     'om': 'OM', 'pag': 'PAG', 'ps': 'PS', 'fa': 'FA', 'pa': 'PA', 'qu': 'QU', 'sa': 'SA', 
     'sr': 'SR', 'st': 'ST', 'scn': 'SCN', 'su': 'SU', 'sw': 'SW', 'tg': 'TG', 'ta': 'TA', 
     'tt': 'TT', 'te': 'TE', 'ts': 'TS', 'tn': 'TN', 'tk': 'TK', 'ur': 'UR', 'uz': 'UZ', 
@@ -349,7 +355,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
   // Yandex Translate - based on provided list
   yandex: [
     'ace', 'af', 'sq', 'ar', 'an', 'hy', 'as', 'ay', 'az', 'ba', 'eu', 'be', 'bn', 'bho', 'bs', 'br', 'bg', 'my', 'yue', 'ca', 'ceb', 'zh-cn', 'hr', 'cs', 'da', 'prs', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'gl', 'ka', 'de', 'el', 'gn', 'gu', 'ht', 'ha', 'he', 'hi', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'pam', 'kk', 'gom', 'ko',
-    'ru', 'fa'
+    'ru', 'fa', 'ne'
   ],
 
   // Browser API - uses Chrome's built-in translation (from BrowserAPI.js langNameToCodeMap)
@@ -387,7 +393,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     'ace', 'af', 'an', 'as', 'ay', 'az', 'ba', 'be', 'bho', 'bn', 'br', 'bs', 'ca',
     'ceb', 'ckb', 'cy', 'eo', 'eu', 'fa', 'ga', 'gl', 'gn', 'gom', 'gu', 'ha', 'hi',
     'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ky', 'la', 'lb', 'lmo',
-    'ln', 'mai', 'mg', 'mi', 'mk', 'mn', 'mr', 'ms', 'mt', 'my', 'ne', 'oc', 'pag',
+    'ln', 'mai', 'mg', 'mi', 'mk', 'mn', 'ms', 'mt', 'my', 'oc', 'pag',
     'pam', 'prs', 'ps', 'qu', 'sa', 'scn', 'sq', 'sr', 'su', 'sw', 'ta', 'te', 'tg',
     'tk', 'tl', 'tn', 'ts', 'tt', 'ur', 'uz', 'wo', 'xh', 'yue', 'yi', 'zu', 'om',
     'pa', 'st', 'sn'

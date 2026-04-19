@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, isChineseScriptText, detectChineseScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, isChineseScriptText, detectChineseScriptLanguage, detectDevanagariScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -129,10 +129,11 @@ export class LanguageSwappingService {
     // Get user language detection preferences
     const preferences = await getLanguageDetectionPreferencesAsync();
 
-    // Detect language with user preferences (Arabic and Chinese scripts)
+    // Detect language with user preferences (Arabic, Chinese, and Devanagari scripts)
     const arabicDetected = detectArabicScriptLanguage(text, preferences);
     const chineseDetected = detectChineseScriptLanguage(text, preferences);
-    const detectedLanguage = getCanonicalCode(arabicDetected || chineseDetected);
+    const devanagariDetected = detectDevanagariScriptLanguage(text, preferences);
+    const detectedLanguage = getCanonicalCode(arabicDetected || chineseDetected || devanagariDetected);
 
     // Only swap languages if:
     // 1. Text script is recognized (detectedLanguage exists) AND

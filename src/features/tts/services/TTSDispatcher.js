@@ -4,7 +4,7 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { detectTextLanguage, areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
-import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
+import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES, isDevanagariScriptText, detectDevanagariScriptLanguage, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
@@ -59,9 +59,13 @@ export class TTSDispatcher {
             
             const isTargetChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(targetLanguage);
             const isDetectedChineseScript = CHINESE_SCRIPT_LANGUAGES.includes(detected);
+
+            const isTargetDevanagariScript = DEVANAGARI_SCRIPT_LANGUAGES.includes(targetLanguage);
+            const isDetectedDevanagariScript = DEVANAGARI_SCRIPT_LANGUAGES.includes(detected);
             
             const isScriptMismatch = (isTargetArabicScript !== isDetectedArabicScript) || 
-                                     (isTargetChineseScript !== isDetectedChineseScript);
+                                     (isTargetChineseScript !== isDetectedChineseScript) ||
+                                     (isTargetDevanagariScript !== isDetectedDevanagariScript);
             
             // Only override if there is a fundamental script mismatch (e.g. user selected 'en' but text is Arabic)
             if (isScriptMismatch && !areLanguagesSimilar(targetLanguage, detected)) {
@@ -169,7 +173,11 @@ export class TTSDispatcher {
     const chineseScriptLanguage = detectChineseScriptLanguage(sample, preferences);
     if (chineseScriptLanguage) return chineseScriptLanguage;
 
-    // 3. East Asian Script Analysis (Fallback for JA/KO)
+    // 3. Devanagari Script Analysis with user preferences
+    const devanagariScriptLanguage = detectDevanagariScriptLanguage(sample, preferences);
+    if (devanagariScriptLanguage) return devanagariScriptLanguage;
+
+    // 4. East Asian Script Analysis (Fallback for JA/KO)
     if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
     if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
 

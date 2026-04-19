@@ -37,6 +37,11 @@ export const ARABIC_SCRIPT_LANGUAGES = ['fa', 'ar', 'ur', 'ps'];
 export const CHINESE_SCRIPT_LANGUAGES = ['zh-cn', 'zh-tw', 'lzh', 'yue'];
 
 /**
+ * Devanagari script language codes for centralized management
+ */
+export const DEVANAGARI_SCRIPT_LANGUAGES = ['hi', 'mr', 'ne'];
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -182,4 +187,39 @@ export const detectChineseScriptLanguage = (text, preferences = {}) => {
 
   // 3. Final Default
   return 'zh-cn';
+};
+/**
+ * Check if text contains Devanagari characters (Hindi, Marathi, Nepali)
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains Devanagari characters
+ */
+export const isDevanagariScriptText = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  // Devanagari Unicode range (U+0900 to U+097F)
+  return /[\u0900-\u097F]/.test(text);
+};
+
+/**
+ * Detect language for Devanagari script text with user preferences
+ * @param {string} text - Text to analyze
+ * @param {Object} preferences - User language detection preferences
+ * @returns {string|null} Language code ('hi', 'mr', 'ne') or null
+ */
+export const detectDevanagariScriptLanguage = (text, preferences = {}) => {
+  if (!text || !isDevanagariScriptText(text)) return null;
+
+  // 1. Language-specific unique markers
+  
+  // Marathi unique characters: ळ (U+0933)
+  const marathiMarkers = /[\u0933]/;
+  if (marathiMarkers.test(text)) return 'mr';
+
+  // 2. Use user preference for ambiguous text
+  const userPreference = preferences['devanagari-script'];
+  if (userPreference && DEVANAGARI_SCRIPT_LANGUAGES.includes(userPreference)) {
+    return userPreference;
+  }
+
+  // 3. Final Default
+  return 'hi';
 };

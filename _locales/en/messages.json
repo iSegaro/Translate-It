@@ -2016,7 +2016,22 @@
     "message": "Cantonese"
   },
   "chinese_script_priority_label": {
-    "message": "When Chinese script is detected:"
+    "message": "Chinese Script Priority"
+  },
+  "devanagari_script_priority_label": {
+    "message": "Devanagari Script Priority"
+  },
+  "hindi_language_name": {
+    "message": "Hindi"
+  },
+  "marathi_language_name": {
+    "message": "Marathi"
+  },
+  "nepali_language_name": {
+    "message": "Nepali"
+  },
+  "devanagari_script_priority_description": {
+    "message": "Choose which language should be prioritized when text contains Devanagari script characters (Hindi, Marathi, and Nepali use similar characters)."
   },
   "arabic_script_priority_description": {
     "message": "Prioritize Arabic script detection when the script is ambiguous between Persian and Arabic."
