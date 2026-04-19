@@ -97,7 +97,9 @@ export class OpenAIProvider extends BaseAIProvider {
     super._validateConfig(config, requiredFields, context);
   }
 
-  async translateImage(base64Image, _sourceLang, targetLang) {
+  async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
+    const { abortController, sessionId } = options;
+
     const [apiKeys, apiUrl, model, promptBase] = await Promise.all([
       getOpenAIApiKeysAsync(),
       getOpenAIApiUrlAsync(),
@@ -140,6 +142,8 @@ export class OpenAIProvider extends BaseAIProvider {
       charCount: AITextProcessor.calculatePayloadChars(messages),
       extractResponse: (data) => data?.choices?.[0]?.message?.content,
       context: `${this.providerName.toLowerCase()}-image-translation`,
+      abortController,
+      sessionId,
       updateApiKey: (newKey, options) => {
         options.headers.Authorization = `Bearer ${newKey}`;
       }

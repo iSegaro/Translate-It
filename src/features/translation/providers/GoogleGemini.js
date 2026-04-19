@@ -165,7 +165,9 @@ export class GeminiProvider extends BaseAIProvider {
     }
   }
 
-  async translateImage(base64Image, _sourceLang, targetLang) {
+  async _translateImageInternal(base64Image, _sourceLang, targetLang, options = {}) {
+    const { abortController, sessionId } = options;
+
     const [apiKeys, model, rawApiUrl, promptBase] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
@@ -203,6 +205,8 @@ export class GeminiProvider extends BaseAIProvider {
       charCount: AITextProcessor.calculatePayloadChars(requestBody.contents),
       extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
       context: `${this.providerName.toLowerCase()}-image-translation`,
+      abortController,
+      sessionId,
       updateApiKey: (newKey, options) => {
         const urlObj = new URL(options.url);
         urlObj.searchParams.set('key', newKey);

@@ -44,6 +44,29 @@ export class BaseAIProvider extends BaseProvider {
   }
 
   /**
+   * Entry point for image translation with rate limiting
+   */
+  async translateImage(base64Image, sourceLang, targetLang, options = {}) {
+    const { priority, sessionId } = options;
+    const context = `${this.providerName.toLowerCase()}-image-translation`;
+
+    return await this._executeWithRateLimit(
+      (opts) => this._translateImageInternal(base64Image, sourceLang, targetLang, { ...opts, ...options }),
+      context,
+      priority,
+      { sessionId }
+    );
+  }
+
+  /**
+   * Abstract method for internal image translation logic
+   * @protected
+   */
+  async _translateImageInternal() {
+    throw new Error(`translateImage not supported by ${this.providerName}`);
+  }
+
+  /**
    * Determine if streaming should be used for this request
    */
   _shouldUseStreaming(texts, messageId, engine, translateMode) {
