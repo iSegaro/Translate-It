@@ -78,6 +78,8 @@
           v-model:source-language="sourceLang"
           v-model:target-language="targetLang"
           compact
+          :provider="currentProvider"
+          :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           :source-title="t('popup_source_language_title') || 'Source'"
           :target-title="t('popup_target_language_title') || 'Target'"
           :swap-title="t('popup_swap_languages_title') || 'Swap'"
@@ -147,6 +149,8 @@ import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+import LanguageSelector from '@/components/shared/LanguageSelector.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
 const mobileStore = useMobileStore()
