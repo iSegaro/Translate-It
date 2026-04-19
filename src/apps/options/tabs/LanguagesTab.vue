@@ -2,6 +2,35 @@
   <section class="options-tab-content">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
 
+    <!-- API Settings Section (Moved to Top) -->
+    <div class="api-settings-section">
+      <div class="setting-group">
+        <label>{{ t('translation_api_label') || 'API Choice' }}</label>
+        <ProviderSelector 
+          v-model="selectedProvider" 
+          mode="button"
+          :is-global="false"
+        />
+      </div>
+
+      <div class="provider-settings">
+        <div
+          v-if="selectedProviderInfo && !providerSettingsComponent"
+          class="api-info"
+        >
+          <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
+          <p class="setting-description">
+            {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
+          </p>
+        </div>
+
+        <component :is="providerSettingsComponent" />
+      </div>
+    </div>
+
+    <!-- Separator for Language section -->
+    <div class="section-separator" />
+
     <div
       v-if="!isLoaded"
       class="loading-message"
@@ -247,36 +276,6 @@
       class="validation-error"
     >
       {{ validationError }}
-    </div>
-
-    <!-- Separator for API Settings section -->
-    <div class="section-separator" />
-
-    <!-- API Settings Section -->
-    <div class="api-settings-section">
-
-      <div class="setting-group">
-        <label>{{ t('translation_api_label') || 'API Choice' }}</label>
-        <ProviderSelector 
-          v-model="selectedProvider" 
-          mode="button"
-          :is-global="false"
-        />
-      </div>
-
-      <div class="provider-settings">
-        <div
-          v-if="selectedProviderInfo && !providerSettingsComponent"
-          class="api-info"
-        >
-          <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-          <p class="setting-description">
-            {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
-          </p>
-        </div>
-
-        <component :is="providerSettingsComponent" />
-      </div>
     </div>
   </section>
 </template>
@@ -660,7 +659,7 @@ defineExpose({
 
 // API Settings Section
 .api-settings-section {
-  margin-top: $spacing-xl;
+  margin-top: 0;
 
   .provider-settings {
     margin-top: $spacing-lg;
