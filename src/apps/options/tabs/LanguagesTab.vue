@@ -196,9 +196,12 @@ const filteredSourceLanguages = computed(() => {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
     providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
     mappingKey = 'DEEPL';
-  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+  } else if (providerKey.includes('google')) {
     providerKey = 'google';
     mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'LINGVA';
   } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
     providerKey = 'bing';
     mappingKey = 'BING';
@@ -243,9 +246,12 @@ const filteredTargetLanguages = computed(() => {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
     providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
     mappingKey = 'DEEPL';
-  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+  } else if (providerKey.includes('google')) {
     providerKey = 'google';
     mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'LINGVA';
   } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
     providerKey = 'bing';
     mappingKey = 'BING';

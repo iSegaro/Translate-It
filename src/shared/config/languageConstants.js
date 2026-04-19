@@ -124,6 +124,15 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     "ve": "ve", "vec": "vec", "war": "war", "wol": "wol", "sah": "sah"
   },
 
+  // Lingva Translate (Google Proxy) - Needs specific codes
+  LINGVA: {
+    ...LANGUAGE_NAME_TO_CODE_MAP,
+    "zh-cn": "zh",
+    "zh-tw": "zh_HANT",
+    "lzh": "zh",
+    "yue": "zh", // Lingva/Google Cantonese fallback
+  },
+
   // Bing Translate Language Codes
   BING: {
     auto: "auto-detect",

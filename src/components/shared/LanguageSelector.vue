@@ -160,9 +160,12 @@ const availableLanguages = computed(() => {
   if (providerKey.includes('deepl')) {
     providerKey = props.beta ? 'deepl_beta' : 'deepl';
     mappingKey = 'DEEPL';
-  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+  } else if (providerKey.includes('google')) {
     providerKey = 'google';
     mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'LINGVA';
   } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
     providerKey = 'bing';
     mappingKey = 'BING';
