@@ -195,6 +195,58 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     cy: "cy", xh: "xh", yi: "yi"
   },
 
+  // Browser Translation API (Chrome Local)
+  BROWSER: {
+    "afrikaans": "af",
+    "albanian": "sq",
+    "arabic": "ar",
+    "azerbaijani": "az",
+    "belarusian": "be",
+    "bengali": "bn",
+    "bulgarian": "bg",
+    "catalan": "ca",
+    "chinese (simplified)": "zh",
+    "zh-cn": "zh",
+    "chinese": "zh",
+    "croatian": "hr",
+    "czech": "cs",
+    "danish": "da",
+    "dutch": "nl",
+    "english": "en",
+    "estonian": "et",
+    "farsi": "fa",
+    "persian": "fa",
+    "filipino": "fil",
+    "finnish": "fi",
+    "french": "fr",
+    "german": "de",
+    "greek": "el",
+    "hebrew": "he",
+    "hindi": "hi",
+    "hungarian": "hu",
+    "indonesian: ": "id",
+    "italian": "it",
+    "japanese": "ja",
+    "korean": "ko",
+    "latvian": "lv",
+    "lithuanian": "lt",
+    "malay": "ms",
+    "norwegian": "no",
+    "polish": "pl",
+    "portuguese": "pt",
+    "romanian": "ro",
+    "russian": "ru",
+    "serbian": "sr",
+    "slovak": "sk",
+    "slovenian": "sl",
+    "spanish": "es",
+    "swedish: ": "sv",
+    "thai": "th",
+    "turkish": "tr",
+    "ukrainian": "uk",
+    "vietnamese": "vi"
+  },
+
   // DeepL Translate Language Codes (UPPERCASE)
   // Standard languages
   DEEPL: {
@@ -287,7 +339,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
   // Using canonical codes for matching
   // Note: Provider might be 'browser', 'browserapi', or 'BrowserAPI' depending on context
   browserapi: [
-    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl',
+    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh-cn', 'hr', 'cs', 'da', 'nl',
     'en', 'et', 'fa', 'fil', 'fi', 'fr', 'de', 'el', 'he', 'hi', 'hu', 'id', 'it',
     'ja', 'ko', 'lv', 'lt', 'ms', 'no', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl',
     'es', 'sv', 'th', 'tr', 'uk', 'vi'
@@ -295,7 +347,7 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
 
   // Alias for 'browser' (in case provider name is different)
   browser: [
-    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl',
+    'af', 'sq', 'ar', 'az', 'be', 'bn', 'bg', 'ca', 'zh-cn', 'hr', 'cs', 'da', 'nl',
     'en', 'et', 'fa', 'fil', 'fi', 'fr', 'de', 'el', 'he', 'hi', 'hu', 'id', 'it',
     'ja', 'ko', 'lv', 'lt', 'ms', 'no', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl',
     'es', 'sv', 'th', 'tr', 'uk', 'vi'

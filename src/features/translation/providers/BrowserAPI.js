@@ -11,63 +11,13 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
-import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { 
+  getProviderLanguageCode,
+  getCanonicalCode 
+} from "@/shared/config/languageConstants.js";
 import browser from 'webextension-polyfill';
 
-
-
 const TEXT_DELIMITER = "\n\n---\n\n";
-
-// Language code mapping for browser Translation API (BCP 47 format)
-const langNameToCodeMap = {
-  afrikaans: "af",
-  albanian: "sq", 
-  arabic: "ar",
-  azerbaijani: "az",
-  belarusian: "be",
-  bengali: "bn",
-  bulgarian: "bg",
-  catalan: "ca",
-  "chinese (simplified)": "zh",
-  chinese: "zh",
-  croatian: "hr",
-  czech: "cs",
-  danish: "da",
-  dutch: "nl",
-  english: "en",
-  estonian: "et",
-  farsi: "fa",
-  persian: "fa",
-  filipino: "fil",
-  finnish: "fi", 
-  french: "fr",
-  german: "de",
-  greek: "el",
-  hebrew: "he",
-  hindi: "hi",
-  hungarian: "hu",
-  indonesian: "id",
-  italian: "it",
-  japanese: "ja",
-  korean: "ko",
-  latvian: "lv",
-  lithuanian: "lt",
-  malay: "ms",
-  norwegian: "no",
-  polish: "pl",
-  portuguese: "pt",
-  romanian: "ro",
-  russian: "ru",
-  serbian: "sr",
-  slovak: "sk",
-  slovenian: "sl",
-  spanish: "es",
-  swedish: "sv",
-  thai: "th",
-  turkish: "tr",
-  ukrainian: "uk",
-  vietnamese: "vi",
-};
 
 export class browserTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -120,11 +70,6 @@ export class browserTranslateProvider extends BaseTranslateProvider {
   }
 
 
-  /**
-   * Convert language name to BCP 47 code
-   * @param {string} lang - Language name or code
-   * @returns {string} - BCP 47 language code
-   */
   _getLangCode(lang) {
     if (!lang || typeof lang !== "string") return "en";
     // AUTO_DETECT_VALUE should not reach this function - handled separately
@@ -132,8 +77,7 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       logger.warn('WARNING: AUTO_DETECT_VALUE reached _getLangCode - this should be handled earlier');
       return "en";
     }
-    const lowerCaseLang = lang.toLowerCase();
-    return langNameToCodeMap[lowerCaseLang] || lowerCaseLang;
+    return getProviderLanguageCode(lang, 'BROWSER');
   }
 
 

@@ -169,6 +169,9 @@ const availableLanguages = computed(() => {
   } else if (providerKey.includes('yandex')) {
     providerKey = 'yandex';
     mappingKey = 'YANDEX';
+  } else if (providerKey.includes('browser')) {
+    providerKey = 'browserapi';
+    mappingKey = 'BROWSER'; 
   }
 
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
