@@ -46,6 +46,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :class="{ 'ti-open-upward': isUpward }"
       :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
@@ -158,6 +159,7 @@
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
+      :class="{ 'ti-open-upward': isUpward }"
       :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
       @click.stop
     >
@@ -793,8 +795,19 @@ const toggleDropdown = () => {
         const spaceBelow = containerRect.bottom - rect.bottom;
         const spaceAbove = rect.top - containerRect.top;
         
-        // If space below is less than 250px and there's more space above, open upwards
-        isUpward.value = spaceBelow < 250 && spaceAbove > spaceBelow;
+        /**
+         * SMART DROP DIRECTION
+         * Only enable smart direction calculation for non-global (settings/manual) contexts
+         * to avoid unexpected UX shifts in stable toolbars like Popup or Sidepanel
+         * where downward is expected unless critical.
+         */
+        const isOptionsPage = window.location.href.includes('options.html');
+        if (isOptionsPage || !props.isGlobal) {
+          isUpward.value = spaceBelow < 250 && spaceAbove > spaceBelow;
+        } else {
+          // In Popup/Sidepanel, only open upward if bottom space is extremely tight (< 100px)
+          isUpward.value = spaceBelow < 100 && spaceAbove > spaceBelow;
+        }
 
         const availableHeight = isUpward.value 
           ? spaceAbove - 16 // Space above within container
