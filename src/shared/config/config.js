@@ -246,6 +246,16 @@ export const CONFIG = {
   AI_CONTEXT_TRANSLATION_ENABLED: true, // ارسال کانتکست (عنوان صفحه، تیتر بخش) به پرووایدرهای هوشمند
   AI_CONVERSATION_HISTORY_ENABLED: true, // ارسال تاریخچه ترجمه‌های قبلی برای حفظ استایل (مخصوص Select Element)
   BILINGUAL_TRANSLATION: false, // ترجمه دوطرفه: اگر متن ورودی به زبان مقصد بود، آن را به زبان مبدا ترجمه کن
+  BILINGUAL_TRANSLATION_MODES: {
+    [TranslationMode.Popup_Translate]: true,
+    [TranslationMode.Sidepanel_Translate]: true,
+    [TranslationMode.Select_Element]: true,
+    [TranslationMode.Field]: true,
+    [TranslationMode.Selection]: true, // WindowsManager
+    [TranslationMode.Page]: false,     // Default disabled for whole page to prevent checkerboarding
+    [TranslationMode.Dictionary_Translation]: true,
+    [TranslationMode.ScreenCapture]: true
+  },
 
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
@@ -1107,6 +1117,13 @@ export const getBilingualTranslationEnabledAsync = async () => {
   return getSettingValueAsync(
     "BILINGUAL_TRANSLATION",
     CONFIG.BILINGUAL_TRANSLATION
+  );
+};
+
+export const getBilingualTranslationModesAsync = async () => {
+  return getSettingValueAsync(
+    "BILINGUAL_TRANSLATION_MODES",
+    CONFIG.BILINGUAL_TRANSLATION_MODES
   );
 };
 

@@ -43,7 +43,7 @@ export class ProviderCoordinator {
         targetLang,
         originalSource,
         originalTarget,
-        { providerName }
+        { providerName, mode: translateMode }
       );
 
       logger.debug(`[Coordinator] Language swap result: ${swappedSource} → ${swappedTarget}`);

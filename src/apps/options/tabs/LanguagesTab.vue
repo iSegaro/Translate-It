@@ -37,6 +37,38 @@
           <span class="setting-description">
             {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
           </span>
+
+          <!-- Granular Bilingual Modes -->
+          <div
+            v-if="bilingualTranslation"
+            class="bilingual-modes"
+          >
+            <BaseCheckbox
+              v-model="bilingualTranslationModes[TranslationMode.Selection]"
+              :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
+              class="mode-checkbox"
+            />
+            <BaseCheckbox
+              v-model="bilingualTranslationModes[TranslationMode.Select_Element]"
+              :label="t('bilingual_mode_select_element_label') || 'Select Element'"
+              class="mode-checkbox"
+            />
+            <BaseCheckbox
+              v-model="bilingualTranslationModes[TranslationMode.Field]"
+              :label="t('bilingual_mode_field_label') || 'Text Fields'"
+              class="mode-checkbox"
+            />
+            <BaseCheckbox
+              v-model="bilingualTranslationModes[TranslationMode.Popup_Translate]"
+              :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
+              class="mode-checkbox"
+            />
+            <BaseCheckbox
+              v-model="bilingualTranslationModes[TranslationMode.Page]"
+              :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
+              class="mode-checkbox"
+            />
+          </div>
         </div>
       </div>
 
@@ -175,6 +207,7 @@ import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
+import { TranslationMode } from '@/shared/config/config.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -200,6 +233,7 @@ const isLanguageDetectionOpen = ref(false)
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
 const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
 const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
+const bilingualTranslationModes = ref({ ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) })
 const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
 const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
 const devanagariScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi')
@@ -360,6 +394,7 @@ onMounted(async () => {
   sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
   targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'fa'
   bilingualTranslation.value = settingsStore.settings?.BILINGUAL_TRANSLATION ?? false
+  bilingualTranslationModes.value = { ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) }
   // Validate on mount to show error if languages are the same
   await validateLanguages()
 })
@@ -374,8 +409,52 @@ watch(targetLanguage, (value) => {
   validateLanguages()
 })
 watch(bilingualTranslation, (value) => {
+  // UX Improvement: If user turns ON the master switch but all visible modes are OFF,
+  // enable some logical defaults so the feature isn't "dead".
+  if (value) {
+    const visibleModes = [
+      TranslationMode.Selection,
+      TranslationMode.Select_Element,
+      TranslationMode.Field,
+      TranslationMode.Popup_Translate,
+      TranslationMode.Page
+    ];
+    const anyVisibleEnabled = visibleModes.some(mode => bilingualTranslationModes.value[mode] === true);
+    
+    if (!anyVisibleEnabled) {
+      bilingualTranslationModes.value[TranslationMode.Selection] = true;
+      bilingualTranslationModes.value[TranslationMode.Popup_Translate] = true;
+      bilingualTranslationModes.value[TranslationMode.Sidepanel_Translate] = true;
+      bilingualTranslationModes.value[TranslationMode.Select_Element] = true;
+      bilingualTranslationModes.value[TranslationMode.Field] = true;
+    }
+  }
   settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
 })
+
+watch(bilingualTranslationModes, (newModes) => {
+  // UX Improvement: If user unchecks ALL visible modes while the master switch is ON,
+  // automatically turn OFF the master switch since it has no effect.
+  const visibleModes = [
+    TranslationMode.Selection,
+    TranslationMode.Select_Element,
+    TranslationMode.Field,
+    TranslationMode.Popup_Translate,
+    TranslationMode.Page
+  ];
+  const anyVisibleEnabled = visibleModes.some(mode => newModes[mode] === true);
+
+  if (!anyVisibleEnabled && bilingualTranslation.value) {
+    bilingualTranslation.value = false;
+  }
+  
+  // Also keep Sidepanel in sync with Popup for consistency
+  if (newModes[TranslationMode.Popup_Translate] !== undefined) {
+    newModes[TranslationMode.Sidepanel_Translate] = newModes[TranslationMode.Popup_Translate];
+  }
+  
+  settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', { ...newModes })
+}, { deep: true })
 
 // Language Detection Preferences
 watch(arabicScriptPreference, (value) => {
@@ -657,6 +736,22 @@ defineExpose({
     color: var(--color-text-secondary);
     margin-inline-start: 32px; // Align with checkbox label
     line-height: 1.4;
+  }
+
+  .bilingual-modes {
+    margin-top: $spacing-sm;
+    margin-inline-start: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    .mode-checkbox {
+      margin-bottom: 0;
+      
+      :deep(.checkbox-label) {
+        font-size: $font-size-sm;
+      }
+    }
   }
 }
 

@@ -1976,6 +1976,21 @@
   "bilingual_translation_description": {
     "message": "If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto)."
   },
+  "bilingual_mode_selection_label": {
+    "message": "Text Selection (WindowsManager)"
+  },
+  "bilingual_mode_select_element_label": {
+    "message": "Select Element"
+  },
+  "bilingual_mode_field_label": {
+    "message": "Text Fields"
+  },
+  "bilingual_mode_popup_label": {
+    "message": "Popup & Sidepanel"
+  },
+  "bilingual_mode_page_label": {
+    "message": "Whole Page Translation"
+  },
   "enable_translation_history_label": {
     "message": "Enable Translation History"
   },

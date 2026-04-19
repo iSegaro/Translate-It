@@ -1967,6 +1967,21 @@
   "bilingual_translation_description": {
     "message": "اگر زبان متن شناسایی شده با زبان مقصد یکی باشد، به طور خودکار به زبان مبدا (یا انگلیسی در صورت خودکار بودن مبدا) ترجمه می‌شود."
   },
+  "bilingual_mode_selection_label": {
+    "message": "انتخاب متن (WindowsManager)"
+  },
+  "bilingual_mode_select_element_label": {
+    "message": "انتخاب المان (Select Element)"
+  },
+  "bilingual_mode_field_label": {
+    "message": "فیلدهای متنی"
+  },
+  "bilingual_mode_popup_label": {
+    "message": "پاپ‌آپ و سایدپنل"
+  },
+  "bilingual_mode_page_label": {
+    "message": "ترجمه کل صفحه"
+  },
   "enable_translation_history_label": {
     "message": "فعال‌سازی تاریخچه ترجمه"
   },

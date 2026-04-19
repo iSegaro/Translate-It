@@ -120,6 +120,16 @@ function getDefaultSettings() {
     AI_CONTEXT_TRANSLATION_ENABLED: CONFIG.AI_CONTEXT_TRANSLATION_ENABLED ?? true,
     AI_CONVERSATION_HISTORY_ENABLED: CONFIG.AI_CONVERSATION_HISTORY_ENABLED ?? true,
     BILINGUAL_TRANSLATION: CONFIG.BILINGUAL_TRANSLATION ?? false,
+    BILINGUAL_TRANSLATION_MODES: CONFIG.BILINGUAL_TRANSLATION_MODES || {
+      [TranslationMode.Popup_Translate]: true,
+      [TranslationMode.Sidepanel_Translate]: true,
+      [TranslationMode.Select_Element]: true,
+      [TranslationMode.Field]: true,
+      [TranslationMode.Selection]: true,
+      [TranslationMode.Page]: false,
+      [TranslationMode.Dictionary_Translation]: true,
+      [TranslationMode.ScreenCapture]: true
+    },
     translationHistory: []
   };
 }

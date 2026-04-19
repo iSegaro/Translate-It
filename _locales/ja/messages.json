@@ -1961,6 +1961,21 @@
   "bilingual_translation_description": {
     "message": "検出された言語が翻訳先言語と一致する場合、自動的に翻訳元言語（翻訳元が自動の場合は英語）へ翻訳します。"
   },
+  "bilingual_mode_selection_label": {
+    "message": "テキスト選択 (WindowsManager)"
+  },
+  "bilingual_mode_select_element_label": {
+    "message": "要素選択 (Select Element)"
+  },
+  "bilingual_mode_field_label": {
+    "message": "テキストフィールド"
+  },
+  "bilingual_mode_popup_label": {
+    "message": "ポップアップ & サイドパネル"
+  },
+  "bilingual_mode_page_label": {
+    "message": "ページ全体の翻訳"
+  },
   "ai_optimization_section_title": {
     "message": "AIの最適化"
   },

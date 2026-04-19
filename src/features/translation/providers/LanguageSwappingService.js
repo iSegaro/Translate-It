@@ -3,7 +3,7 @@ import { isPersianText, isArabicScriptText, detectArabicScriptLanguage, isChines
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBilingualTranslationEnabledAsync, getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
+import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
 import { LANGUAGE_NAME_TO_CODE_MAP, getCanonicalCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
@@ -62,10 +62,13 @@ export class LanguageSwappingService {
   }
 
   static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi', options = {}) {
-    const { providerName = 'LanguageSwapping', useRegexFallback = true } = options;
+    const { providerName = 'LanguageSwapping', useRegexFallback = true, mode } = options;
 
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
+      const bilingualModes = await getBilingualTranslationModesAsync();
+      const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
+
       const detectionResult = await browser.i18n.detectLanguage(text);
 
       // Get user language detection preferences for accurate script detection
@@ -89,7 +92,7 @@ export class LanguageSwappingService {
         // Only swap when source is AUTO to respect user's explicit source choice.
         const accurateLangCode = getCanonicalCode(accurateDetectedLang || detectedLangCode);
 
-        const shouldSwap = bilingualEnabled && accurateLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
+        const shouldSwap = bilingualEnabled && isModeEnabled && accurateLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
 
         if (shouldSwap) {
            let newTargetLang;
@@ -100,18 +103,18 @@ export class LanguageSwappingService {
              newTargetLang = "en";
            }
 
-           logger.debug(`${providerName}: Bilingual swap applied. Detected ${accurateLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+           logger.debug(`${providerName}: Bilingual swap applied for mode ${mode}. Detected ${accurateLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         }
 
         // No language swapping needed or allowed
       } else if (useRegexFallback) {
-        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
+        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode);
       }
     } catch (error) {
       logger.error(`${providerName}: Language detection failed:`, error);
       if (useRegexFallback) {
-        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName);
+        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode);
       }
     }
 
@@ -119,12 +122,14 @@ export class LanguageSwappingService {
     return [sourceLang, targetLang];
   }
 
-  static async _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName) {
+  static async _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode) {
     const targetNorm = this._normalizeLangValue(targetLang);
     const sourceNorm = this._normalizeLangValue(sourceLang);
     const targetLangCode = getCanonicalCode(targetNorm);
 
     const bilingualEnabled = await getBilingualTranslationEnabledAsync();
+    const bilingualModes = await getBilingualTranslationModesAsync();
+    const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
 
     // Get user language detection preferences
     const preferences = await getLanguageDetectionPreferencesAsync();
@@ -138,11 +143,13 @@ export class LanguageSwappingService {
     // Only swap languages if:
     // 1. Text script is recognized (detectedLanguage exists) AND
     // 2. Bilingual is enabled AND
-    // 3. Detected language matches target language (meaning text is already in target language) AND
-    // 4. Source is AUTO (only apply swap when auto-detect is selected)
+    // 3. Mode flag is enabled AND
+    // 4. Detected language matches target language (meaning text is already in target language) AND
+    // 5. Source is AUTO (only apply swap when auto-detect is selected)
     if (
       detectedLanguage &&
       bilingualEnabled &&
+      isModeEnabled &&
       detectedLanguage === targetLangCode &&
       sourceNorm === AUTO_DETECT_VALUE
     ) {
@@ -155,7 +162,7 @@ export class LanguageSwappingService {
         newTargetLang = "en";
       }
 
-      logger.debug(`${providerName}: Regex fallback swap: ${targetLang} → ${newTargetLang} (detected: ${detectedLanguage})`);
+      logger.debug(`${providerName}: Regex fallback swap for mode ${mode}: ${targetLang} → ${newTargetLang} (detected: ${detectedLanguage})`);
       return [targetNorm, newTargetLang];
     }
 
