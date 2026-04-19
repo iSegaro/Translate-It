@@ -17,15 +17,6 @@ export class OpenRouterProvider extends BaseAIProvider {
   static type = "ai";
   static description = "OpenRouter Multi-Model API";
   static displayName = "OpenRouter";
-  static reliableJsonMode = true;
-  static supportsDictionary = true;
-
-  static supportsStreaming = true; 
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 25;
-  static maxComplexity = 200; // Further reduced for stability with strict/unstable free models
-
-  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.OPENROUTER);

@@ -20,16 +20,6 @@ export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
   static description = "Google Gemini AI";
   static displayName = "Google Gemini";
-  static reliableJsonMode = true;
-  static supportsDictionary = true;
-
-  static supportsStreaming = true;
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 30;
-  static maxComplexity = 500;
-  static supportsImageTranslation = true;
-
-  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.GEMINI);

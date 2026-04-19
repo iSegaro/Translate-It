@@ -4,6 +4,11 @@
  */
 
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { 
+  getProviderStreaming, 
+  getProviderBatching,
+  getProviderFeatures
+} from "@/features/translation/core/ProviderConfigurations.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
@@ -17,9 +22,25 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
-  static supportsStreaming = true;
-  static batchStrategy = 'json'; // default to JSON batching for AI
-  static supportsDictionary = false;
+
+  /**
+   * Configuration Getters - Unified with ProviderConfigurations.js
+   */
+  get supportsStreaming() {
+    return getProviderStreaming(this.providerName).enabled;
+  }
+
+  get batchingConfig() {
+    return getProviderBatching(this.providerName);
+  }
+
+  get batchStrategy() {
+    return this.batchingConfig.strategy || 'json';
+  }
+
+  get supportsImageTranslation() {
+    return getProviderFeatures(this.providerName).supportsImageTranslation;
+  }
 
   constructor(providerName) {
     super(providerName);
@@ -30,12 +51,12 @@ export class BaseAIProvider extends BaseProvider {
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     // 1. Try streaming if supported and beneficial
-    if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
+    if (this.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
 
     // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. JSON batching)
-    if (texts.length > 1 && this.constructor.batchStrategy === 'json') {
+    if (texts.length > 1 && this.batchStrategy === 'json') {
       return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
     }
 
@@ -75,7 +96,7 @@ export class BaseAIProvider extends BaseProvider {
       return false;
     }
 
-    return this.constructor.supportsStreaming && 
+    return this.supportsStreaming && 
            messageId && 
            engine && 
            (texts.length > 1 || AITextProcessor.getTotalComplexity(texts) > 100);

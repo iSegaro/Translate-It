@@ -18,16 +18,6 @@ export class CustomProvider extends BaseAIProvider {
   static type = "ai";
   static description = "Custom OpenAI-compatible API";
   static displayName = "Custom AI";
-  static reliableJsonMode = true;
-  static supportsDictionary = true;
-
-  static supportsStreaming = true; 
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 20;
-  static maxComplexity = 350;
-  static supportsImageTranslation = true; 
-
-  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.CUSTOM);

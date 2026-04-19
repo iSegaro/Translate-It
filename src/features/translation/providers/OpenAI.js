@@ -17,18 +17,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'OpenAI');
 
 export class OpenAIProvider extends BaseAIProvider {
   static type = "ai";
-  static description = "OpenAI GPT models";
-  static displayName = "OpenAI";
-  static reliableJsonMode = true;
-  static supportsDictionary = true;
-
-  static supportsStreaming = true; 
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 25;
-  static maxComplexity = 400;
-  static supportsImageTranslation = true;
-
-  static batchStrategy = 'json';
+  static description = "OpenAI's GPT models (GPT-4, GPT-3.5)";
+  static displayName = "OpenAI GPT";
 
   constructor() {
     super(ProviderNames.OPENAI);

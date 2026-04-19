@@ -18,15 +18,6 @@ export class DeepSeekProvider extends BaseAIProvider {
   static type = "ai";
   static description = "DeepSeek AI models";
   static displayName = "DeepSeek";
-  static reliableJsonMode = true;
-  static supportsDictionary = true;
-
-  static supportsStreaming = true; 
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 25;
-  static maxComplexity = 400;
-
-  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.DEEPSEEK);
