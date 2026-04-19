@@ -369,14 +369,16 @@ export class browserTranslateProvider extends BaseTranslateProvider {
    * @param {string} targetLang - Target language
    * @param {string} translateMode - Translation mode
    * @param {AbortController} abortController - Cancellation controller
-   * @param {number} _retryAttempt - Current retry attempt (unused)
-   * @param {number} _chunkIndex - Current chunk index (unused)
-   * @param {number} _totalChunks - Total number of chunks (unused)
-   * @param {HTMLElement} _blockContainer - Container for context (unused)
-   * @param {string} _sessionId - Session identifier (unused)
+   * @param {number} retryAttempt - Current retry attempt
+   * @param {number} segmentCount - Number of segments in this chunk
+   * @param {number} chunkIndex - Current chunk index
+   * @param {number} totalChunks - Total number of chunks
+   * @param {Object} options - Additional options
    * @returns {Promise<string[]>} - Translated texts for this chunk
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, _retryAttempt, _chunkIndex, _totalChunks, _blockContainer, _sessionId) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
+    logger.debug(`[BrowserAPI] Translating chunk ${chunkIndex + 1}/${totalChunks} (${segmentCount} segments, attempt ${retryAttempt + 1})`, { translateMode, ...options });
+
     // Check API availability first
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
