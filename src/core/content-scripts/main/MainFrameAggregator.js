@@ -84,13 +84,14 @@ export class MainFrameAggregator {
     if (pageEventBus) {
       const action = overrideAction || this.MessageActions.PAGE_TRANSLATE_PROGRESS;
       const payload = {
+        isAggregated: true,
+        ...extraData,
+        // Override with aggregated values to ensure they are not overwritten by frame-specific data
         translatedCount: status.translatedCount,
         totalCount: status.totalCount,
         isAutoTranslating: status.isAutoTranslating,
         isTranslating: status.isTranslating,
-        status: status.isTranslating ? 'translating' : 'idle',
-        isAggregated: true,
-        ...extraData
+        status: status.isTranslating ? 'translating' : 'idle'
       };
 
       // Special handling for completion events

@@ -85,8 +85,16 @@ export class MainFrameCoordinator {
         // Generic page events (NEW: forwards all events from IFrame)
         if (type === 'TRANSLATE_IT_PAGE_EVENT' && action) {
           logger.debug(`Processing TRANSLATE_IT_PAGE_EVENT: action=${action}, data=`, data);
+          
           // Update frame data based on action type
-          if (action === this.MessageActions.PAGE_TRANSLATE_PROGRESS) {
+          if (action === this.MessageActions.PAGE_TRANSLATE_START) {
+            this.aggregator.updateFrameData(frameId, {
+              ...data,
+              isTranslating: true,
+              status: 'translating'
+            });
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_START, data);
+          } else if (action === this.MessageActions.PAGE_TRANSLATE_PROGRESS) {
             this.aggregator.updateFrameData(frameId, data);
             this.aggregator.emitAggregateProgress();
           } else if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE) {
@@ -111,10 +119,9 @@ export class MainFrameCoordinator {
               isTranslating: false,
               status: 'idle'
             });
-            // Emit to PageEventBus so content app receives iframe data
-            if (pageEventBus) {
-              pageEventBus.emit(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
-            }
+            // Emit aggregated progress so UI state is updated correctly across all contexts
+            // This prevents iframe data from directly overwriting main frame state
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
           } else if (action === this.MessageActions.PAGE_RESTORE_COMPLETE) {
             // Clear frame data on restore to ensure clean state
             this.aggregator.updateFrameData(frameId, {
@@ -127,6 +134,13 @@ export class MainFrameCoordinator {
             });
             // Emit aggregated restore complete to update UI state
             this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_RESTORE_COMPLETE, data);
+          } else if (action === this.MessageActions.PAGE_TRANSLATE_ERROR) {
+            this.aggregator.updateFrameData(frameId, {
+              ...data,
+              isTranslating: false,
+              status: 'error'
+            });
+            this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_TRANSLATE_ERROR, data);
           }
           return;
         }
@@ -157,10 +171,8 @@ export class MainFrameCoordinator {
             isTranslating: false,
             status: 'idle'
           });
-          // Emit to PageEventBus so content app receives iframe data
-          if (pageEventBus) {
-            pageEventBus.emit(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
-          }
+          // Emit aggregated progress so UI state is updated correctly
+          this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
           return;
         }
 

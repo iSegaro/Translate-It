@@ -163,6 +163,15 @@ export async function handlePageTranslation(message, sender) {
           )
         );
         
+        // 1. Check for an aggregated response (usually from the top frame)
+        // This response already contains consolidated stats from all frames
+        const aggregatedResponse = statusResponses.find(r => r && r.success && r.isAggregated);
+        if (aggregatedResponse) {
+          logger.debug('Returning aggregated translation status from main frame');
+          return aggregatedResponse;
+        }
+
+        // 2. Fallback: Aggregate manually if no aggregated response was found
         const bestResponse = statusResponses.find(r => r && (r.isTranslating || r.isAutoTranslating || r.isTranslated)) || 
                            statusResponses.find(r => r && r.success) || 
                            { success: false, error: 'No active translation found' };

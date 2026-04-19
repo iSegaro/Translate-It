@@ -73,6 +73,14 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_PROGRESS, (detail) => {
       logger.debug('PAGE_TRANSLATE_PROGRESS received:', detail);
+      
+      // If we are in a context with an aggregator (main frame), prioritize aggregated messages
+      // to avoid UI "jumping" between iframe-specific and aggregated progress
+      const isMainFrame = window.self === window.top;
+      if (isMainFrame && !detail.isAggregated && mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.IDLE) {
+        return;
+      }
+
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
 
@@ -95,6 +103,12 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_IDLE, (detail) => {
       logger.debug('PAGE_TRANSLATE_IDLE received:', detail);
+
+      const isMainFrame = window.self === window.top;
+      if (isMainFrame && !detail.isAggregated) {
+        return;
+      }
+
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
 
@@ -111,7 +125,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
       // Skip empty/invalid completion messages - they might come from iframes or initialization
-      if (!detail || (detail.translatedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating)) {
+      // BUT: process if it is aggregated as it represents the whole page state
+      if (!detail.isAggregated && (!detail || (detail.translatedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating))) {
         logger.debug('Skipping empty PAGE_TRANSLATE_COMPLETE message:', detail);
         return;
       }
@@ -153,8 +168,9 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       const currentState = mobileStore.pageTranslationData;
 
       // Skip empty messages if we already have active/valid translation state
-      // This prevents iframe messages from overwriting main frame translation data
-      if (!hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
+      // This prevents individual iframe messages from overwriting main frame translation data
+      // BUT: Allow aggregated messages to pass through as they represent the whole page state
+      if (!detail.isAggregated && !hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
         logger.debug('Skipping empty auto-restore message, keeping current state:', currentState);
         return;
       }

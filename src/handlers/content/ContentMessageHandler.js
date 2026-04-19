@@ -706,7 +706,8 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // 1. PRIORITY: If we are in the top frame, use the aggregated status from index-main
     if (window === window.top && typeof window.getGlobalPageTranslationStatus === 'function') {
-      return window.getGlobalPageTranslationStatus();
+      const status = window.getGlobalPageTranslationStatus();
+      return { ...status, isAggregated: true };
     }
 
     // 2. FALLBACK: Use local manager status (for iframes or if aggregator is missing)
