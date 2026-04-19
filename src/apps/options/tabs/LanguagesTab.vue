@@ -53,14 +53,18 @@
             :class="{ active: activeAccordion === 'bilingual' }"
             @click="toggleAccordion('bilingual')"
           >
-            <span class="accordion-icon">{{ activeAccordion === 'bilingual' ? '−' : '+' }}</span>
+            <div 
+              class="accordion-icon-wrapper"
+              :class="{ active: activeAccordion === 'bilingual' }"
+            >
+              <span class="accordion-icon">+</span>
+            </div>
           </div>
         </div>
 
         <div
-          v-if="bilingualTranslation"
           class="accordion-content"
-          :class="{ open: activeAccordion === 'bilingual' }"
+          :class="{ open: activeAccordion === 'bilingual' && bilingualTranslation }"
         >
           <div class="accordion-inner">
             <p class="setting-description mb-md">
@@ -106,7 +110,12 @@
           @click="toggleAccordion('detection')"
         >
           <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
-          <span class="accordion-icon">{{ activeAccordion === 'detection' ? '−' : '+' }}</span>
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: activeAccordion === 'detection' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
         </button>
 
         <div
@@ -781,6 +790,10 @@ defineExpose({
 
     &:hover {
       color: var(--color-primary);
+
+      .accordion-icon-wrapper {
+        color: var(--color-primary);
+      }
     }
 
     &.active {
@@ -837,38 +850,56 @@ defineExpose({
     .accordion-trigger-area {
       padding: $spacing-sm $spacing-md; // Compact padding
       cursor: pointer;
-      color: var(--color-text-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: color $transition-base;
       margin-inline-end: -$spacing-md;
 
-      &:hover, &.active {
-        color: var(--color-primary);
-      }
-
-      .accordion-icon {
-        font-size: $font-size-base;
-        font-weight: $font-weight-bold;
-        pointer-events: none;
+      &:hover {
+        .accordion-icon-wrapper {
+          color: var(--color-primary);
+        }
       }
     }
   }
 
   .accordion-content {
-    max-height: 0;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    transition: max-height $transition-slow ease-out;
     width: 100%;
 
     &.open {
-      max-height: 800px;
-      transition: max-height $transition-slow ease-in;
+      grid-template-rows: 1fr;
     }
 
     .accordion-inner {
+      min-height: 0;
       padding: 0 0 $spacing-md 0;
+    }
+  }
+
+  .accordion-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--color-text-secondary);
+
+    &.active {
+      transform: rotate(45deg);
+      color: var(--color-primary);
+    }
+
+    .accordion-icon {
+      font-size: 18px;
+      font-weight: 300; // Thinner looks more professional
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
     }
   }
 
