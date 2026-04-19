@@ -265,7 +265,7 @@ const handleTranslate = async () => {
   logger.debug("Translation button clicked", { provider: currentProviderLocal.value });
   
   if (!canTranslate.value) {
-    logger.warn("Translation blocked - canTranslate is false");
+    logger.debug("Translation skipped - input is empty or invalid");
     return;
   }
   
