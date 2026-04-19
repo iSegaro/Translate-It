@@ -3,6 +3,24 @@
  * Provides singleton pattern for shared debug state across all logger instances
  */
 
+import { LOG_COMPONENTS } from './logConstants.js';
+
+// Initialize component log levels from constants
+const initialComponentLogLevels = Object.values(LOG_COMPONENTS).reduce((acc, component) => {
+  acc[component] = 1; // Default to WARN
+  return acc;
+}, {});
+
+/**
+ * MANUAL OVERRIDES (Development Only)
+ * You can manually override specific component log levels here.
+ * Note: Values saved in storage (via Options page) will take precedence.
+ * 
+ * Example:
+ * initialComponentLogLevels[LOG_COMPONENTS.TRANSLATION] = 3; // DEBUG
+ * initialComponentLogLevels[LOG_COMPONENTS.CORE] = 2;        // INFO
+ */
+
 // Global state shared by all logger instances
 const globalState = {
   // Global log level
@@ -13,57 +31,7 @@ const globalState = {
 
   // Component-specific log levels
   // 0: ERROR, 1: WARN, 2: INFO, 3: DEBUG
-  componentLogLevels: {
-    // Core
-    Background: 1,
-    Content: 1,
-    Core: 1,
-
-    // UI
-    UI: 1,
-    Popup: 1,
-    Options: 1,
-    Sidepanel: 1,
-    ContentApp: 1,
-    
-    // Features
-    Windows: 1,
-    ElementSelection: 1,
-    TextFieldInteraction: 1,
-    TextActions: 1,
-    TextSelection: 1,
-    Translation: 1,
-    PageTranslation: 1,
-    Shortcuts: 1,
-    Exclusion: 1,
-    Capture: 1,
-    ScreenCapture: 1,
-    Subtitle: 1,
-    TTS: 1,
-    Mobile: 1,
-    DesktopFab: 1,
-
-    // Services/Utilities
-    Browser: 1,
-    Config: 1,
-    Error: 1,
-    Framework: 1,
-    I18n: 1,
-    IFrame: 1,
-    Memory: 1,
-    Messaging: 1,
-    Notifications: 1,
-    Proxy: 1,
-    Providers: 1,
-    Text: 1,
-    Utils: 1,
-    
-    // Data/Configuration
-    History: 1,
-    Legacy: 1,
-    Settings: 1,
-    Storage: 1,
-  },
+  componentLogLevels: initialComponentLogLevels,
 
   // Shared LRU cache for all loggers
   sharedLogLevelCache: new Map(),
