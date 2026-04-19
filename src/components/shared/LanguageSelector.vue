@@ -70,6 +70,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { CONFIG } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 
 // Import adjacent SCSS
 import './LanguageSelector.scss'
@@ -85,6 +86,14 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: 'en'
+  },
+  provider: {
+    type: String,
+    default: ''
+  },
+  beta: {
+    type: Boolean,
+    default: false
   },
   disabled: {
     type: Boolean,
@@ -141,8 +150,38 @@ const targetLanguage = computed({
 })
 
 const availableLanguages = computed(() => {
-  // Return cached languages if available, otherwise show loading indicator
-  return languages.allLanguages.value || []
+  const all = languages.allLanguages.value || [];
+  if (!props.provider) return all;
+
+  // Resolve effective keys
+  let providerKey = props.provider.toLowerCase();
+  let mappingKey = 'GOOGLE';
+  
+  if (providerKey.includes('deepl')) {
+    providerKey = props.beta ? 'deepl_beta' : 'deepl';
+    mappingKey = 'DEEPL';
+  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
+    providerKey = 'bing';
+    mappingKey = 'BING';
+  } else if (providerKey.includes('yandex')) {
+    providerKey = 'yandex';
+    mappingKey = 'YANDEX';
+  }
+
+  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
+  if (!supportedCodes) return all;
+
+  // Filter languages: check if the provider-specific code for this language is supported
+  return all.filter(lang => {
+    // 1. Get the code this provider uses for this language
+    const providerCode = getProviderLanguageCode(lang.code, mappingKey);
+    
+    // 2. Check if that code (or the original) is in the supported list
+    return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
+  });
 })
 
 const targetLanguages = computed(() => {

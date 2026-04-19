@@ -55,6 +55,8 @@
             <LanguageSelector
               v-model:source-language="sourceLanguage"
               v-model:target-language="targetLanguage"
+              :provider="currentProvider"
+              :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
               :source-title="t('popup_source_language_title') || 'زبان مبدا'"
               :target-title="t('popup_target_language_title') || 'زبان مقصد'"
               :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"

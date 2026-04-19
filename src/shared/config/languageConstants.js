@@ -250,7 +250,7 @@ const CANONICAL_CODE_MAP = {
 
   // Filipino/Tagalog variations
   'fil': 'fil',
-  'tl': 'fil',
+  'tl': 'tl',
 };
 
 /**
@@ -279,8 +279,8 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
 
   // Yandex Translate - based on provided list
   yandex: [
-    'ru', 'fa', 'en', 'abq', 'ab', 'af', 'sq', 'am', 'ar', 'hy', 'az', 'ba', 'eu', 'be', 'bn', 'bs', 'bg', 'my', 'bua', 'ca', 'ceb', 'zh', 'cv', 'hr', 'cs', 'da', 'nl', 'sjn', 'emj', 'myv', 'eo', 'et', 'fi', 'fr', 'gl', 'glt', 'ka', 'de', 'el', 'gu', 'ht', 'he', 'mrj', 'hi', 'hu', 'is', 'id', 'ga', 'it', 'ja', 'jv', 'kbd', 'kn', 'krc', 'kk', 'kazlat', 'km', 'kv', 'ko', 'ky', 'lo', 'la', 'lv', 'lt', 'lb',
-    'mk', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'ne', 'pl', 'pt', 'pa', 'ro', 'ru', 'gd', 'sr', 'si', 'sk', 'sl', 'es', 'su', 'sw', 'sv', 'tg', 'ta', 'te', 'th', 'tr', 'uk', 'ur', 'uz', 'vi', 'cy', 'xh', 'yi'
+    'ace', 'af', 'sq', 'ar', 'an', 'hy', 'as', 'ay', 'az', 'ba', 'eu', 'be', 'bn', 'bho', 'bs', 'br', 'bg', 'my', 'yue', 'ca', 'ceb', 'zh-cn', 'hr', 'cs', 'da', 'prs', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'gl', 'ka', 'de', 'el', 'gn', 'gu', 'ht', 'ha', 'he', 'hi', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'pam', 'kk', 'gom', 'ko',
+    'ru', 'fa'
   ],
 
   // Browser API - uses Chrome's built-in translation (from BrowserAPI.js langNameToCodeMap)
