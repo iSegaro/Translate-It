@@ -2,7 +2,7 @@
 
 The extension uses a **unified, strictly filtered** logging system for structured, environment-aware logging across all components.
 
-**API Status:** 100% Modern - Zero Legacy Code - Layer-Aware Filtering
+**API Status:** Layer-Aware Filtering
 **Filter Status:** Level-based (0-3) - No environment bypasses
 
 ## Quick Start
@@ -57,10 +57,10 @@ logger.debug(`Complex State: ${JSON.stringify(heavyObject)}`)
 
 ## Maintenance & Extension (How-to)
 
-### How to change Log Levels permanently
-To change the default verbosity of a component or the entire app:
+### How to change Log Levels permanently (Defaults)
+To change the default verbosity of the entire app:
 1.  **Open**: `src/shared/logging/GlobalDebugState.js`
-2.  **Edit**: `componentLogLevels` object for specific components, or `globalLogLevel` for the entire app.
+2.  **Edit**: `globalLogLevel` or the mapping logic in `initialComponentLogLevels`.
     - `0`: Errors only
     - `1`: Warnings (Production Default)
     - `2`: Info (User Journeys)
@@ -69,13 +69,20 @@ To change the default verbosity of a component or the entire app:
 ### How to add a new Component
 1.  **Open**: `src/shared/logging/logConstants.js`
 2.  **Add**: A new key to the `LOG_COMPONENTS` object.
-3.  **Register**: (Optional) Add a default level for it in `GlobalDebugState.js`.
+3.  **Result**: The system **automatically** registers the new component, initializes its level in `GlobalDebugState`, and adds it to the **Options Page UI**.
 
 ---
 
-## Debugging & Runtime Control
+## 🛠 Runtime Control & UI Configuration
 
-You can change log levels in real-time via the browser console:
+### 1. Options Page (Recommended)
+Developers can now manage log levels via a responsive UI:
+- **Location**: `Options Page` -> `Advance Tab` -> `Debug Mode (Accordion)`.
+- **Features**: Toggle global Debug Mode and set granular levels for every component defined in `LOG_COMPONENTS`.
+- **Sync**: Changes are broadcasted to all contexts (Background, Content, Sidepanel) in real-time via `DebugModeBridge`.
+
+### 2. Browser Console
+You can still change log levels via the console for quick testing:
 
 ```javascript
 // 1. Inspect current levels
