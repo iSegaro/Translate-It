@@ -27,65 +27,91 @@
         />
       </div>
 
-      <!-- Bilingual Translation Setting -->
-      <div class="setting-group bilingual-setting">
-        <div class="bilingual-content">
-          <BaseCheckbox
-            v-model="bilingualTranslation"
-            :label="t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)'"
-          />
-          <span class="setting-description">
-            {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
-          </span>
-
-          <!-- Granular Bilingual Modes -->
-          <div
+      <!-- Bilingual Translation Setting (Accordion Style) -->
+      <div class="setting-group bilingual-setting accordion-item">
+        <div class="accordion-header-wrapper">
+          <div class="checkbox-area">
+            <!-- Small Checkbox only with specific class -->
+            <BaseCheckbox
+              v-model="bilingualTranslation"
+              class="bilingual-main-checkbox"
+            />
+            <!-- Clickable Title Text with smart logic -->
+            <span 
+              class="accordion-title-text"
+              :class="{ disabled: !bilingualTranslation, active: activeAccordion === 'bilingual' }"
+              @click="bilingualTranslation ? toggleAccordion('bilingual') : (bilingualTranslation = true)"
+            >
+              {{ t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)' }}
+            </span>
+          </div>
+          
+          <!-- Right Side: Manual Toggle Icon -->
+          <div 
             v-if="bilingualTranslation"
-            class="bilingual-modes"
+            class="accordion-trigger-area"
+            :class="{ active: activeAccordion === 'bilingual' }"
+            @click="toggleAccordion('bilingual')"
           >
-            <BaseCheckbox
-              v-model="bilingualTranslationModes[TranslationMode.Selection]"
-              :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
-              class="mode-checkbox"
-            />
-            <BaseCheckbox
-              v-model="bilingualTranslationModes[TranslationMode.Select_Element]"
-              :label="t('bilingual_mode_select_element_label') || 'Select Element'"
-              class="mode-checkbox"
-            />
-            <BaseCheckbox
-              v-model="bilingualTranslationModes[TranslationMode.Field]"
-              :label="t('bilingual_mode_field_label') || 'Text Fields'"
-              class="mode-checkbox"
-            />
-            <BaseCheckbox
-              v-model="bilingualTranslationModes[TranslationMode.Popup_Translate]"
-              :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
-              class="mode-checkbox"
-            />
-            <BaseCheckbox
-              v-model="bilingualTranslationModes[TranslationMode.Page]"
-              :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
-              class="mode-checkbox"
-            />
+            <span class="accordion-icon">{{ activeAccordion === 'bilingual' ? '−' : '+' }}</span>
+          </div>
+        </div>
+
+        <div
+          v-if="bilingualTranslation"
+          class="accordion-content"
+          :class="{ open: activeAccordion === 'bilingual' }"
+        >
+          <div class="accordion-inner">
+            <p class="setting-description mb-md">
+              {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
+            </p>
+
+            <div class="bilingual-modes-list">
+              <BaseCheckbox
+                v-model="bilingualTranslationModes[TranslationMode.Selection]"
+                :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
+                class="mode-checkbox"
+              />
+              <BaseCheckbox
+                v-model="bilingualTranslationModes[TranslationMode.Select_Element]"
+                :label="t('bilingual_mode_select_element_label') || 'Select Element'"
+                class="mode-checkbox"
+              />
+              <BaseCheckbox
+                v-model="bilingualTranslationModes[TranslationMode.Field]"
+                :label="t('bilingual_mode_field_label') || 'Text Fields'"
+                class="mode-checkbox"
+              />
+              <BaseCheckbox
+                v-model="bilingualTranslationModes[TranslationMode.Popup_Translate]"
+                :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
+                class="mode-checkbox"
+              />
+              <BaseCheckbox
+                v-model="bilingualTranslationModes[TranslationMode.Page]"
+                :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
+                class="mode-checkbox"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Language Detection Preferences -->
+      <!-- Language Detection Preferences (Accordion Style) -->
       <div class="setting-group language-pref-setting accordion-item">
         <button
           class="accordion-header"
-          :class="{ active: isLanguageDetectionOpen }"
-          @click="isLanguageDetectionOpen = !isLanguageDetectionOpen"
+          :class="{ active: activeAccordion === 'detection' }"
+          @click="toggleAccordion('detection')"
         >
           <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
-          <span class="accordion-icon">{{ isLanguageDetectionOpen ? '−' : '+' }}</span>
+          <span class="accordion-icon">{{ activeAccordion === 'detection' ? '−' : '+' }}</span>
         </button>
 
         <div
           class="accordion-content"
-          :class="{ open: isLanguageDetectionOpen }"
+          :class="{ open: activeAccordion === 'detection' }"
         >
           <div class="accordion-inner">
             <p class="setting-description mb-md">
@@ -226,8 +252,16 @@ const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
 const { t } = useI18n()
 
-// Accordion state
-const isLanguageDetectionOpen = ref(false)
+// Accordion state management
+const activeAccordion = ref(null) // 'bilingual' or 'detection'
+
+const toggleAccordion = (name) => {
+  if (activeAccordion.value === name) {
+    activeAccordion.value = null
+  } else {
+    activeAccordion.value = name
+  }
+}
 
 // Form values as refs
 const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
@@ -428,7 +462,14 @@ watch(bilingualTranslation, (value) => {
       bilingualTranslationModes.value[TranslationMode.Select_Element] = true;
       bilingualTranslationModes.value[TranslationMode.Field] = true;
     }
+
+    // Auto-open this accordion and close others when enabled
+    activeAccordion.value = 'bilingual';
+  } else if (activeAccordion.value === 'bilingual') {
+    // Close if it was open
+    activeAccordion.value = null;
   }
+  
   settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
 })
 
@@ -716,64 +757,23 @@ defineExpose({
   }
 }
 
-.bilingual-setting {
-  margin-top: $spacing-md;
-  flex-direction: column !important;
-  align-items: stretch !important;
-
-  .bilingual-content {
-    display: flex;
-    flex-direction: column;
-    gap: $spacing-xs;
-
-    :deep(.base-checkbox) {
-      margin-bottom: 0;
-    }
-  }
-
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    margin-inline-start: 32px; // Align with checkbox label
-    line-height: 1.4;
-  }
-
-  .bilingual-modes {
-    margin-top: $spacing-sm;
-    margin-inline-start: 32px;
-    display: flex;
-    flex-direction: column;
-    gap: $spacing-xs;
-
-    .mode-checkbox {
-      margin-bottom: 0;
-      
-      :deep(.checkbox-label) {
-        font-size: $font-size-sm;
-      }
-    }
-  }
-}
-
-.language-pref-setting {
-  margin-top: $spacing-lg;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  border: none;
+.accordion-item {
+  margin-top: $spacing-xs; // Compact margin
   border-top: 1px solid var(--color-border);
-  padding: 0 !important;
-  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column !important;
+  align-items: stretch !important;
 
-  .accordion-header {
+  .accordion-header-wrapper, .accordion-header {
     width: 100%;
-    padding: $spacing-md 0;
-    background-color: transparent;
+    padding: $spacing-sm 0; // Compact padding
+    background: transparent;
     border: none;
-    text-align: left;
-    cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: pointer;
     font-size: $font-size-base;
     font-weight: $font-weight-medium;
     color: var(--color-text);
@@ -786,13 +786,73 @@ defineExpose({
     &.active {
       color: var(--color-primary);
     }
+  }
 
-    .accordion-icon {
-      font-size: $font-size-lg;
-      font-weight: $font-weight-bold;
-      margin-inline-start: $spacing-sm;
-      min-width: 20px;
-      text-align: center;
+  // Special header for bilingual (checkbox + trigger)
+  .accordion-header-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+
+    .checkbox-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 16px; // Very small gap between checkbox and text
+      
+      :deep(.bilingual-main-checkbox) {
+        gap: 0 !important; // Force remove internal gap
+        width: auto !important;
+        flex: none !important;
+        margin: 0 !important;
+
+        .ti-checkbox__label {
+          display: none !important; // Completely remove label space
+        }
+      }
+
+      .accordion-title-text {
+        flex: 1;
+        cursor: pointer;
+        user-select: none;
+        padding: 4px 0;
+        transition: color $transition-base;
+
+        &:hover {
+          color: var(--color-primary);
+        }
+
+        &.active {
+          color: var(--color-primary);
+          font-weight: $font-weight-medium;
+        }
+
+        &.disabled {
+          opacity: 0.9;
+        }
+      }
+    }
+
+    .accordion-trigger-area {
+      padding: $spacing-sm $spacing-md; // Compact padding
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color $transition-base;
+      margin-inline-end: -$spacing-md;
+
+      &:hover, &.active {
+        color: var(--color-primary);
+      }
+
+      .accordion-icon {
+        font-size: $font-size-base;
+        font-weight: $font-weight-bold;
+        pointer-events: none;
+      }
     }
   }
 
@@ -800,17 +860,40 @@ defineExpose({
     max-height: 0;
     overflow: hidden;
     transition: max-height $transition-slow ease-out;
+    width: 100%;
 
     &.open {
-      max-height: 1000px;
+      max-height: 800px;
       transition: max-height $transition-slow ease-in;
     }
 
     .accordion-inner {
-      padding: 0 0 $spacing-lg 0;
+      padding: 0 0 $spacing-md 0;
+    }
+  }
 
-      .mb-md {
-        margin-bottom: $spacing-md;
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    margin-bottom: $spacing-sm;
+
+    &.mb-md {
+      margin-inline-start: 28px;
+    }
+  }
+
+  .bilingual-modes-list {
+    margin-inline-start: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs; // Compact gap between modes
+
+    .mode-checkbox {
+      margin-bottom: 0;
+      
+      :deep(.checkbox-label) {
+        font-size: $font-size-sm;
       }
     }
   }
@@ -821,45 +904,23 @@ defineExpose({
     align-items: center;
     justify-content: space-between;
     gap: $spacing-md;
-    margin-bottom: $spacing-sm;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
+    margin-bottom: $spacing-xs; // Compact vertical gap
 
     .pref-label {
-      font-size: $font-size-base;
+      font-size: $font-size-sm; // Slightly smaller label
       color: var(--color-text-secondary);
-      font-weight: $font-weight-normal;
       flex: 1;
     }
 
     .pref-select {
-      flex: 0 0 200px;
-      width: 200px;
-      padding: $spacing-xs $spacing-sm;
+      flex: 0 0 180px; // Slightly narrower select
+      padding: 4px $spacing-sm; // Tighter padding
       border: 1px solid var(--color-border);
       border-radius: $border-radius-sm;
       background-color: var(--color-background);
       color: var(--color-text);
       font-size: $font-size-sm;
-      cursor: pointer;
-
-      &:hover {
-        border-color: var(--color-border-hover);
-      }
-
-      &:focus {
-        outline: 2px solid var(--color-primary);
-        border-color: var(--color-primary);
-      }
     }
-  }
-
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
   }
 }
 
