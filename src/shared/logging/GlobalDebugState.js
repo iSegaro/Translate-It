@@ -3,17 +3,6 @@
  * Provides singleton pattern for shared debug state across all logger instances
  */
 
-// Development environment detection - extension compatible
-const isDevelopment = typeof __IS_DEVELOPMENT__ !== 'undefined' ? __IS_DEVELOPMENT__ :
-  (() => {
-    try {
-      return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "development";
-    } catch {
-      // Fallback for extension environments
-      return false;
-    }
-  })();
-
 // Global state shared by all logger instances
 const globalState = {
   // Global log level
