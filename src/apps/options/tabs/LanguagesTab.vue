@@ -148,7 +148,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { useI18n } from 'vue-i18n'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode } from '@/shared/config/languageConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 
@@ -188,42 +188,37 @@ const filteredSourceLanguages = computed(() => {
     return [autoOption, ...languages]
   }
 
-  // DeepL with beta toggle
-  if (provider === 'deepl') {
+  // Resolve effective provider and mapping keys
+  let providerKey = provider.toLowerCase();
+  let mappingKey = 'GOOGLE';
+  
+  if (providerKey.includes('deepl')) {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
-    const supportedCodes = betaEnabled
-      ? PROVIDER_SUPPORTED_LANGUAGES.deepl_beta
-      : PROVIDER_SUPPORTED_LANGUAGES.deepl
-
-    const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => getCanonicalCode(code))
-    )
-
-    const filtered = languages.filter(lang => {
-      if (lang.code === 'auto') return true
-      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
-    })
-
-    return [autoOption, ...filtered]
+    providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
+    mappingKey = 'DEEPL';
+  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
+    providerKey = 'bing';
+    mappingKey = 'BING';
+  } else if (providerKey.includes('yandex')) {
+    providerKey = 'yandex';
+    mappingKey = 'YANDEX';
+  } else if (providerKey.includes('browser')) {
+    providerKey = 'browserapi';
+    mappingKey = 'BROWSER';
   }
 
-  // Other providers with specific language support
-  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
-  if (supportedCodes && supportedCodes.length > 0) {
-    const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => getCanonicalCode(code))
-    )
+  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
+  if (!supportedCodes) return [autoOption, ...languages];
 
-    const filtered = languages.filter(lang => {
-      if (lang.code === 'auto') return true
-      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
-    })
+  const filtered = languages.filter(lang => {
+    const providerCode = getProviderLanguageCode(lang.code, mappingKey);
+    return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
+  })
 
-    return [autoOption, ...filtered]
-  }
-
-  // Fallback: return all languages
-  return [autoOption, ...languages]
+  return [autoOption, ...filtered]
 })
 
 const filteredTargetLanguages = computed(() => {
@@ -240,36 +235,35 @@ const filteredTargetLanguages = computed(() => {
     return languages
   }
 
-  // DeepL with beta toggle
-  if (provider === 'deepl') {
+  // Resolve effective provider and mapping keys
+  let providerKey = provider.toLowerCase();
+  let mappingKey = 'GOOGLE';
+  
+  if (providerKey.includes('deepl')) {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
-    const supportedCodes = betaEnabled
-      ? PROVIDER_SUPPORTED_LANGUAGES.deepl_beta
-      : PROVIDER_SUPPORTED_LANGUAGES.deepl
-
-    const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => getCanonicalCode(code))
-    )
-
-    return languages.filter(lang => {
-      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
-    })
+    providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
+    mappingKey = 'DEEPL';
+  } else if (providerKey.includes('google') || providerKey.includes('lingva')) {
+    providerKey = 'google';
+    mappingKey = 'GOOGLE';
+  } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
+    providerKey = 'bing';
+    mappingKey = 'BING';
+  } else if (providerKey.includes('yandex')) {
+    providerKey = 'yandex';
+    mappingKey = 'YANDEX';
+  } else if (providerKey.includes('browser')) {
+    providerKey = 'browserapi';
+    mappingKey = 'BROWSER';
   }
 
-  // Other providers with specific language support
-  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[provider]
-  if (supportedCodes && supportedCodes.length > 0) {
-    const normalizedSupportedCodes = new Set(
-      supportedCodes.map(code => getCanonicalCode(code))
-    )
+  const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
+  if (!supportedCodes) return languages;
 
-    return languages.filter(lang => {
-      return normalizedSupportedCodes.has(getCanonicalCode(lang.code))
-    })
-  }
-
-  // Fallback: return all languages
-  return languages
+  return languages.filter(lang => {
+    const providerCode = getProviderLanguageCode(lang.code, mappingKey);
+    return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
+  })
 })
 
 // Watch for provider changes and validate selected languages
