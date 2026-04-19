@@ -450,9 +450,6 @@
     "message": "فعال‌سازی ترجمه روی انتخاب متن"
   },
   "translate_on_text_selection_description": {
-    "message": "امکان فعال شدن ترجمه به‌صورت خودکار یا با آیکون پس از انتخاب متن در صفحه را فراهم می‌کند."
-  },
-  "translate_on_text_selection_description": {
     "message": "امکان فعال‌سازی ترجمه به صورت خودکار یا از طریق آیکون پس از انتخاب متن در صفحه."
   },
   "mobile_dashboard_page_label": {
