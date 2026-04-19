@@ -195,6 +195,50 @@
           </div>
         </div>
       </div>
+
+      <!-- AI Optimization (Accordion Style) -->
+      <div class="setting-group ai-optimization-setting accordion-item">
+        <button
+          class="accordion-header"
+          :class="{ active: activeAccordion === 'ai' }"
+          @click="toggleAccordion('ai')"
+        >
+          <span>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
+          <div 
+            class="accordion-icon-wrapper"
+            :class="{ active: activeAccordion === 'ai' }"
+          >
+            <span class="accordion-icon">+</span>
+          </div>
+        </button>
+
+        <div
+          class="accordion-content"
+          :class="{ open: activeAccordion === 'ai' }"
+        >
+          <div class="accordion-inner">
+            <div class="setting-group vertical">
+              <BaseCheckbox
+                v-model="aiContextEnabled"
+                :label="t('ai_context_translation_label') || 'Smart Context Understanding'"
+              />
+              <p class="setting-description mb-md">
+                {{ t('ai_context_translation_description') }}
+              </p>
+            </div>
+
+            <div class="setting-group vertical">
+              <BaseCheckbox
+                v-model="aiHistoryEnabled"
+                :label="t('ai_conversation_history_label') || 'Conversation Memory'"
+              />
+              <p class="setting-description mb-md">
+                {{ t('ai_conversation_history_description') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- Validation errors -->
@@ -280,6 +324,17 @@ const bilingualTranslationModes = ref({ ...(settingsStore.settings?.BILINGUAL_TR
 const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
 const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
 const devanagariScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi')
+
+// AI Optimization settings
+const aiContextEnabled = computed({
+  get: () => settingsStore.settings?.SMART_CONTEXT_TRANSLATION_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('SMART_CONTEXT_TRANSLATION_ENABLED', value)
+})
+
+const aiHistoryEnabled = computed({
+  get: () => settingsStore.settings?.AI_CONVERSATION_HISTORY_ENABLED ?? true,
+  set: (value) => settingsStore.updateSettingLocally('AI_CONVERSATION_HISTORY_ENABLED', value)
+})
 
 // ========== Provider-Specific Language Filtering ==========
 /**
@@ -752,6 +807,25 @@ defineExpose({
     margin-bottom: 0;
     flex: 1;
     white-space: nowrap;
+  }
+
+  &.vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-xs;
+    margin-bottom: $spacing-sm;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    label {
+      min-width: auto;
+    }
+
+    .setting-description {
+      margin-inline-start: 28px;
+    }
   }
   
   .language-dropdown,
