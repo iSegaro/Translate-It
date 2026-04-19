@@ -143,7 +143,6 @@
 
     <!-- API Settings Section -->
     <div class="api-settings-section">
-      <h3>{{ t('api_section_title') || 'Translation API' }}</h3>
 
       <div class="setting-group">
         <label>{{ t('translation_api_label') || 'API Choice' }}</label>
@@ -156,7 +155,7 @@
 
       <div class="provider-settings">
         <div
-          v-if="selectedProviderInfo"
+          v-if="selectedProviderInfo && !providerSettingsComponent"
           class="api-info"
         >
           <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
