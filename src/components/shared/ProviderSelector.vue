@@ -12,7 +12,7 @@
         type="submit"
         class="ti-translate-main-area"
         :title="t('popup_translate_button_title') || 'ترجمه'"
-        :disabled="isTranslating || disabled"
+        :disabled="disabled"
         @click="handleTranslate"
         @keydown="handleKeydown"
       >
