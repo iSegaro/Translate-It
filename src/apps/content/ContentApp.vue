@@ -234,32 +234,3 @@ onUnmounted(() => {
 
 logger.debug('ContentApp script setup executed (Modular Architecture).');
 </script>
-
-<style>
-/* Since this is in a Shadow DOM, these styles are completely isolated. */
-.content-app-container {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2147483647 !important;
-  pointer-events: none !important;
-  display: block !important;
-  overflow: visible !important;
-}
-
-/* Individual components inside will override this (e.g., toaster, toolbars) */
-.content-app-container > * {
-  pointer-events: all !important; /* Re-enable pointer events for children */
-}
-
-/* CRITICAL: Toast text direction for RTL/LTR support */
-/* Direction is set based on extension locale (IsRTL from getTranslationString) via inline styles */
-/* Do NOT use !important rules that would override inline styles */
-[data-sonner-toast] {
-  /* direction and text-align removed to allow inline styles to work */
-}
-
-/* Also target the content div inside toast */
-[data-sonner-toast] > div[data-content] > div {
-  /* direction and text-align removed to allow inline styles to work */
-}
-</style>
