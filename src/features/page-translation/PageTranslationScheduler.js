@@ -365,13 +365,21 @@ export class PageTranslationScheduler extends ResourceTracker {
         return;
       }
 
-      if (!result?.success) {
+      // Detect failure or Soft-Failure with error details
+      if (!result?.success || result?.hasError) {
         const rawErrorMessage = result?.error || '';
         const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
           ? new Error(rawErrorMessage || 'Extension context invalidated')
           : new Error(rawErrorMessage || 'Batch translation failed');
 
+        // Preserve error details from Soft-Failure for better categorization
+        if (result?.errorType) batchError.type = result.errorType;
+        if (result?.isFatal) batchError.isFatal = true;
+
         await this._handleBatchError(batchError, batch);
+        
+        // If it was a Soft-Failure (success: true but with error), we still want to resolve with original text
+        // Note: _handleBatchError already does this, but we return here to skip normal processing
         return;
       }
 

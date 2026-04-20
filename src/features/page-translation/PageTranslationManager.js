@@ -336,10 +336,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.isAutoTranslating = false;
     this.isFatalErrorHandling = false;
 
-    // Check if cancellation is already handled to avoid loop
-    if (!this._isCancelling) {
-      this.cancelTranslation();
-    }
+    // CRITICAL: Stop further translation without restoring the page.
+    // This ensures already translated parts remain visible.
+    this.stopAutoTranslation().catch(() => {});
 
     // Use centralized ErrorHandler to manage notification and logging
     ErrorHandler.getInstance().handle(error, {
