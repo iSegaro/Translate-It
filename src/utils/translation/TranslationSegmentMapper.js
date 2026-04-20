@@ -68,10 +68,12 @@ export class TranslationSegmentMapper {
       result[nonEmptyOriginals[0].id] = translatedText.trim();
       return result;
     }
-
     // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
     try {
-      return this.splitByWordRatio(translatedText, originalSegments, providerName);
+      // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
+      // to avoid them appearing as "words" in the output segments.
+      const cleanedText = this.removeAllDelimiters(translatedText, delimiter);
+      return this.splitByWordRatio(cleanedText, originalSegments, providerName);
     } catch (error) {
       logger.warn(`[${providerName}] Smart splitting failed:`, error);
       // Absolute fallback: first segment gets everything, others get original
@@ -80,7 +82,43 @@ export class TranslationSegmentMapper {
   }
 
   /**
-   * Split translated text based on word boundaries and length ratios.
+   * Utility to remove all known delimiter patterns from text before fallback splitting
+   * @param {string} text - The text to clean
+   * @param {string} primaryDelimiter - The primary delimiter used in the current request
+   * @returns {string} - Cleaned text
+   */
+  static removeAllDelimiters(text, primaryDelimiter) {
+    if (!text) return "";
+
+    let cleaned = text;
+
+    // 1. Remove standard and common alternative delimiters
+    const delimitersToRemove = [
+      primaryDelimiter,
+      '[[---]]',
+      '\n---\n',
+      '---',
+      '\n\n'
+    ];
+
+    for (const delim of delimitersToRemove) {
+      if (!delim || delim.trim() === '') continue;
+      // Escape for regex
+      const escaped = delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.split(new RegExp(escaped, 'g')).join(' ');
+    }
+
+    // 2. Remove any corrupted bracket patterns [[...]] which are the main source of artifacts
+    const bracketPattern = /\[\[[\s\.\-\—\–\…ـ]+\]\]/g;
+    cleaned = cleaned.replace(bracketPattern, ' ');
+
+    // 3. Normalize whitespace (reduces multiple spaces/newlines to single space)
+    return cleaned.replace(/\s+/g, ' ').trim();
+  }
+
+/**
+* Split translated text based on word boundaries and length ratios.
+...
    * Prevents "half-word" splitting like "س ا ۸ عت" by respecting word boundaries.
    * @private
    */

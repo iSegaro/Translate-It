@@ -204,7 +204,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           // We normalize these back to the standard delimiter so the Coordinator can split correctly.
           if (chunkTexts.length > 1) {
             // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
-            const corruptedDelimiterRegex = /\[\[[\s\.\-\—\–\…ـ]+\]\]/g;
+            // Including optional surrounding whitespace to prevent double newlines and ensure clean replacement
+            const corruptedDelimiterRegex = /\s*\[\[[\s\.\-\—\–\…ـ]+\]\]\s*/g;
             const sanitizedText = targetText.replace(corruptedDelimiterRegex, TRANSLATION_CONSTANTS.TEXT_DELIMITER);
             return sanitizedText;
           }
