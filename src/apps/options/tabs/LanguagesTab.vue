@@ -359,7 +359,7 @@ const currentOptimizationLevel = computed({
   set: (value) => {
     const providerLevels = { ...(settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS || {}) }
     providerLevels[selectedProvider.value] = value
-    settingsStore.updateSettingAndPersist('PROVIDER_OPTIMIZATION_LEVELS', providerLevels)
+    settingsStore.updateSettingLocally('PROVIDER_OPTIMIZATION_LEVELS', providerLevels)
   }
 })
 
