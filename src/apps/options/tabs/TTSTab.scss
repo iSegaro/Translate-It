@@ -30,17 +30,20 @@
 
 .setting-item {
   display: flex !important;
-  justify-content: space-between !important;
+  justify-content: space-between !important; // فاصله بین متن و سوییچ
   align-items: center !important;
   margin-bottom: $spacing-xs !important;
+  max-width: 450px !important; // محدود کردن عرض هر ردیف (این کلید حل مشکل است)
   gap: $spacing-md !important;
   
   label {
     font-size: $font-size-base !important;
     font-weight: $font-weight-medium !important;
     color: var(--color-text) !important;
-    flex: 1 !important;
+    flex: 1 !important; // اجازه دادن به متن برای گرفتن فضای باقی‌مانده در محدوده ۴۵۰ پیکسل
+    margin: 0 !important;
     cursor: pointer !important;
+    min-width: 0 !important; // خنثی کردن استایل مزاحم
   }
 }
 
@@ -137,7 +140,7 @@
     border-radius: 10px !important;
     cursor: pointer !important;
     transition: all $transition-base !important;
-    
+
     &:hover {
       filter: brightness(0.95) !important;
     }
