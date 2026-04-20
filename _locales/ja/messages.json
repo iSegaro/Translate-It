@@ -497,9 +497,6 @@
   "mobile_selection_copied_message": {
     "message": "翻訳結果をクリップボードにコピーしました"
   },
-  "mobile_page_dashboard_btn": {
-    "message": "ダッシュボード"
-  },
   "mobile_page_error_encountered": {
     "message": "エラーが発生しました"
   },
@@ -550,9 +547,6 @@
   },
   "mobile_fab_alt": {
     "message": "翻訳"
-  },
-  "mobile_back_button_alt": {
-    "message": "戻る"
   },
   "mobile_close_button_alt": {
     "message": "閉じる"
@@ -634,9 +628,6 @@
   },
   "mobile_input_no_result_error": {
     "message": "翻訳結果が見つかりませんでした。もう一度お試しください。"
-  },
-  "mobile_input_default_error": {
-    "message": "翻訳に失敗しました。"
   },
   "mobile_input_copied_message": {
     "message": "コピーしました"
@@ -1556,9 +1547,6 @@
   "SELECT_ELEMENT_CANCEL": {
     "message": "キャンセル"
   },
-  "SELECT_ELEMENT_REVERT": {
-    "message": "元に戻す"
-  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingvaは長いテキストで失敗する可能性があります。"
   },
@@ -1567,12 +1555,6 @@
   },
   "click_to_set_shortcut": {
     "message": "クリックしてショートカットを設定"
-  },
-  "shortcut_recording_title": {
-    "message": "ショートカットを押してください"
-  },
-  "shortcut_recording_instruction": {
-    "message": "使用したいキーを押してください。"
   },
   "shortcut_waiting": {
     "message": "キー入力を待機中..."
@@ -1958,6 +1940,21 @@
   "whole_page_scroll_stop_delay_unit": {
     "message": "ミリ秒"
   },
+  "ai_optimization_section_title": {
+    "message": "AIの最適化"
+  },
+  "ai_context_translation_label": {
+    "message": "スマートな文脈理解"
+  },
+  "ai_context_translation_description": {
+    "message": "ページのメタデータ（タイトル、セクション）をAIモデルに送信します。これにより、短いテキストや曖昧なテキストの翻訳精度が向上します。（DeepLでは常に有効です）"
+  },
+  "ai_conversation_history_label": {
+    "message": "会話メモリ"
+  },
+  "ai_conversation_history_description": {
+    "message": "同じセッション内の以前の翻訳の短いメモリを維持します。要素選択モードでの一貫したスタイルに不可欠です。"
+  },
   "bilingual_translation_label": {
     "message": "双方向翻訳 (言語の自動入れ替え)"
   },
@@ -2017,21 +2014,6 @@
   },
   "optimization_description_traditional": {
     "message": "リクエストの安定性と翻訳速度のバランスを調整します。"
-  },
-  "ai_optimization_section_title": {
-    "message": "AIの最適化"
-  },
-  "ai_context_translation_label": {
-    "message": "スマートな文脈理解"
-  },
-  "ai_context_translation_description": {
-    "message": "ページのメタデータ（タイトル、セクション）をAIモデルに送信します。これにより、短いテキストや曖昧なテキストの翻訳精度が向上します。（DeepLでは常に有効です）"
-  },
-  "ai_conversation_history_label": {
-    "message": "会話メモリ"
-  },
-  "ai_conversation_history_description": {
-    "message": "同じセッション内の以前の翻訳の短いメモリを維持します。要素選択モードでの一貫したスタイルに不可欠です。"
   },
   "enable_translation_history_label": {
     "message": "翻訳履歴を有効にする"

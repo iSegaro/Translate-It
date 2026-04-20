@@ -497,9 +497,6 @@
   "mobile_selection_copied_message": {
     "message": "Translation copied to clipboard"
   },
-  "mobile_page_dashboard_btn": {
-    "message": "Dashboard"
-  },
   "mobile_page_error_encountered": {
     "message": "Error Encountered"
   },
@@ -550,9 +547,6 @@
   },
   "mobile_fab_alt": {
     "message": "Translate"
-  },
-  "mobile_back_button_alt": {
-    "message": "Back"
   },
   "mobile_close_button_alt": {
     "message": "Close"
@@ -634,9 +628,6 @@
   },
   "mobile_input_no_result_error": {
     "message": "No translation found. Please try again."
-  },
-  "mobile_input_default_error": {
-    "message": "Translation failed."
   },
   "mobile_input_copied_message": {
     "message": "Copied"
@@ -1556,9 +1547,6 @@
   "SELECT_ELEMENT_CANCEL": {
     "message": "Cancel"
   },
-  "SELECT_ELEMENT_REVERT": {
-    "message": "Revert"
-  },
   "LINGVA_WPT_WARNING": {
     "message": "Lingva may fail on long texts."
   },
@@ -1567,12 +1555,6 @@
   },
   "click_to_set_shortcut": {
     "message": "Click to set shortcut"
-  },
-  "shortcut_recording_title": {
-    "message": "Press Your Shortcut"
-  },
-  "shortcut_recording_instruction": {
-    "message": "Press the keys you want to use for this shortcut."
   },
   "shortcut_waiting": {
     "message": "Waiting for keys..."

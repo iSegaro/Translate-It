@@ -497,9 +497,6 @@
   "mobile_selection_copied_message": {
     "message": "ترجمه در حافظه کپی شد"
   },
-  "mobile_page_dashboard_btn": {
-    "message": "داشبورد"
-  },
   "mobile_page_error_encountered": {
     "message": "خطایی رخ داد"
   },
@@ -550,9 +547,6 @@
   },
   "mobile_fab_alt": {
     "message": "ترجمه"
-  },
-  "mobile_back_button_alt": {
-    "message": "بازگشت"
   },
   "mobile_close_button_alt": {
     "message": "بستن"
@@ -634,9 +628,6 @@
   },
   "mobile_input_no_result_error": {
     "message": "ترجمه‌ای یافت نشد. دوباره تلاش کنید."
-  },
-  "mobile_input_default_error": {
-    "message": "ترجمه با خطا مواجه شد."
   },
   "mobile_input_copied_message": {
     "message": "کپی شد"
@@ -1166,11 +1157,21 @@
   "popup_open_side_panel_title": {
     "message": "پنل کناری"
   },
-  "page_translation_btn_translate": { "message": "ترجمه صفحه" },
-  "page_translation_btn_stop": { "message": "توقف ترجمه" },
-  "page_translation_btn_restore": { "message": "بازگشت به اصلی" },
-  "sync_page_label": { "message": "همگام صفحه" },
-  "sync_element_label": { "message": "همگام المان" },
+  "page_translation_btn_translate": {
+    "message": "ترجمه صفحه"
+  },
+  "page_translation_btn_stop": {
+    "message": "توقف ترجمه"
+  },
+  "page_translation_btn_restore": {
+    "message": "بازگشت به اصلی"
+  },
+  "sync_page_label": {
+    "message": "همگام صفحه"
+  },
+  "sync_element_label": {
+    "message": "همگام المان"
+  },
   "api_key_show": {
     "message": "نمایش"
   },
@@ -1399,7 +1400,9 @@
   "ERRORS_BROWSER_API_UNAVAILABLE": {
     "message": "سرویس ترجمه کروم (Built-in) در دسترس نیست. این قابلیت به کروم ۱۳۸ یا بالاتر نیاز دارد."
   },
-  "ERRORS_API_KEY_MISSING": { "message": "کلید API وارد نشده است." },
+  "ERRORS_API_KEY_MISSING": {
+    "message": "کلید API وارد نشده است."
+  },
   "ERRORS_API_KEY_INVALID": {
     "message": "کلید API نامعتبر یا غیرمجاز است."
   },
@@ -1451,7 +1454,7 @@
   "ERRORS_PAGE_TRANSLATION_STOPPED": {
     "message": "{error}"
   },
-  "ERRORS_USER_CANCELLED": { 
+  "ERRORS_USER_CANCELLED": {
     "message": "ترجمه توسط کاربر لغو شد."
   },
   "gemini_thinking_label": {
@@ -1544,9 +1547,6 @@
   "SELECT_ELEMENT_CANCEL": {
     "message": "کنسل"
   },
-  "SELECT_ELEMENT_REVERT": {
-    "message": "بازگشت"
-  },
   "LINGVA_WPT_WARNING": {
     "message": "سرویس Lingva ممکن است در متن‌های طولانی دچار خطا شود."
   },
@@ -1555,12 +1555,6 @@
   },
   "click_to_set_shortcut": {
     "message": "برای تنظیم میانبر کلیک کنید"
-  },
-  "shortcut_recording_title": {
-    "message": "میانبر خود را فشار دهید"
-  },
-  "shortcut_recording_instruction": {
-    "message": "کلیدهایی که می‌خواهید برای این میانبر استفاده کنید را فشار دهید."
   },
   "shortcut_waiting": {
     "message": "منتظر فشردن کلیدها..."
