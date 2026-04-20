@@ -89,6 +89,46 @@
   }
 }
 
+/* Icon Only Mode Styles (Used in Sidepanel Toolbar) */
+.ti-provider-icon-only-container {
+  position: relative !important;
+  display: inline-flex !important;
+  overflow: visible !important;
+
+  &.ti-dropdown-open {
+    z-index: 1000 !important;
+  }
+
+  /* For vertical toolbar icons, we often want the menu to open to the side */
+  .ti-provider-dropdown-menu {
+    left: 100% !important; /* Open to the right of the icon */
+    right: auto !important;
+    top: 0 !important;
+    margin-left: 10px !important;
+    margin-top: 0 !important;
+
+    &.ti-open-upward {
+      top: auto !important;
+      bottom: 0 !important;
+    }
+  }
+}
+
+.ti-provider-icon-button {
+  padding: 6px !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color $transition-base !important;
+
+  &:hover { background-color: var(--color-surface) !important; }
+  &.ti-active { background-color: var(--color-primary-alpha) !important; }
+}
+
 /* Common Provider Icon Logic */
 .ti-api-provider-icon {
   width: 16px !important;
@@ -121,11 +161,11 @@ img.ti-dropdown-arrow,
   &.rotated { transform: rotate(180deg) !important; }
 }
 
-/* Provider Dropdown Menu */
+/* Provider Dropdown Menu Base Styles */
 .ti-provider-dropdown-menu {
   position: absolute !important;
   top: 100% !important;
-  right: 0 !important; /* CRITICAL FIX: Align to right side */
+  right: 0 !important; /* Default: Align to right side */
   left: auto !important;
   margin-top: 4px !important;
   background: var(--color-surface) !important;
@@ -224,9 +264,17 @@ img.ti-dropdown-arrow,
   .ti-provider-button span { text-align: right !important; }
   
   .ti-sync-row { flex-direction: row-reverse !important; }
+  
+  /* In RTL, icon-only menu should open to the left side */
+  .ti-provider-icon-only-container .ti-provider-dropdown-menu {
+    left: auto !important;
+    right: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 10px !important;
+  }
 }
 
-/* Mobile/Popup Context specific */
+/* Context-specific adjustments for Popup */
 :global(.popup-wrapper) {
   .ti-split-translate-button { height: 28px !important; }
   .ti-translate-main-area span { font-size: 12px !important; }
