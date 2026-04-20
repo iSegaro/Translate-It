@@ -1,3 +1,5 @@
+@use "@/assets/styles/base/variables" as *;
+
 /* TTS Button specific styles (extracted from TTSButton.vue) */
 .ti-tts-button {
   /* No additional styling needed - BaseActionButton handles it */
