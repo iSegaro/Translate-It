@@ -91,7 +91,7 @@ Our maintenance scripts automatically protect dynamic keys. Avoid using these pr
 
 | Command | Description |
 | :--- | :--- |
-| `pnpm i18n:sync` | Checks if all languages have the same keys as English. |
+| `pnpm i18n:sync:status` | Checks if all languages have the same keys as English. |
 | `pnpm i18n:sync:fix` | Adds missing keys to all languages and sorts them by English reference. |
 | `pnpm i18n:check` | Identifies orphaned keys that are no longer used in the code. |
 | `pnpm i18n:check:fix` | Removes unused keys from English and syncs all languages automatically. |
