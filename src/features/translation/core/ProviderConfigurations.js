@@ -548,6 +548,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit',
       characterLimit: 5000,
+      optimalSize: 40, // Base segment limit for Edge
       maxChunksPerBatch: 100, // Increased from 20 to 100 - Edge API supports large batches
       delimiter: null // Uses JSON array
     },
@@ -712,17 +713,31 @@ function applyOptimizationLevel(config, level) {
   // Subsequent Delay: Level 1 (x2), Level 5 (x0.5)
   const delayMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
   result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
+  
+  // Scale Batching Delays if present
+  if (result.batching.delayBetweenRequests) {
+    result.batching.delayBetweenRequests = Math.round(config.batching.delayBetweenRequests * delayMultipliers[safeLevel]);
+  }
 
   // 2. Scale Batching (Speed vs Cost)
+  const sizeMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
+
   if (config.batching.strategy === 'smart') {
     // AI Strategy: Level 1 (Large batches = Cheaper), Level 5 (Small batches = Faster streaming)
-    const sizeMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
     result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
     result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * sizeMultipliers[safeLevel]));
   } else if (config.batching.strategy === 'character_limit') {
     // Traditional: Level 1 (Large chunks), Level 5 (Small chunks)
     const charMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
     result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * charMultipliers[safeLevel]));
+    
+    // Also scale segment limits for traditional providers if they exist
+    if (config.batching.optimalSize) {
+      result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
+    }
+    if (config.batching.maxChunksPerBatch) {
+      result.batching.maxChunksPerBatch = Math.max(2, Math.round(config.batching.maxChunksPerBatch * sizeMultipliers[safeLevel]));
+    }
   }
 
   return result;

@@ -29,12 +29,16 @@ export class OptimizedJsonHandler {
 
     try {
       const segments = typeof text === 'string' ? JSON.parse(text) : text;
-      const providerConfig = (await import('@/features/translation/core/ProviderConfigurations.js')).getProviderConfiguration(providerInstance.providerName);
+      const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+      const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+      
+      const level = await getProviderOptimizationLevelAsync(providerInstance.providerName);
+      const providerConfig = getProviderConfiguration(providerInstance.providerName, level);
       
       const batches = engine.createIntelligentBatches(
         segments, 
         providerConfig?.batching?.optimalSize || 25, 
-        providerConfig?.batching?.maxChars || 5000
+        providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
       );
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments`);

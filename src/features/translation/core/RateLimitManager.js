@@ -6,6 +6,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -125,13 +126,7 @@ export class RateLimitManager {
    */
   async executeWithRateLimit(providerName, task, context = "", priority = TranslationPriority.NORMAL, options = {}) {
     // Resolve registry ID to name if necessary
-    let name = providerName;
-    try {
-      const { registryIdToName } = await import("@/features/translation/providers/ProviderConstants.js");
-      name = registryIdToName(providerName) || providerName;
-    } catch {
-      // Fallback to raw providerName
-    }
+    const name = registryIdToName(providerName) || providerName;
 
     const state = await this._initializeProviderWithLevel(name);
     

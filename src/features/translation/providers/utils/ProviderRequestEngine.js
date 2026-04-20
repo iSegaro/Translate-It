@@ -150,6 +150,11 @@ export const ProviderRequestEngine = {
           textPreview = String(payload.text).substring(0, 100);
         } else if (payload.q) {
           textPreview = Array.isArray(payload.q) ? payload.q[0].substring(0, 100) : payload.q.substring(0, 100);
+        } else if (Array.isArray(payload) && payload.length > 0) {
+          // Handle Microsoft Edge array format [{ Text: "..." }] or raw arrays
+          const firstItem = payload[0];
+          textPreview = (firstItem?.Text || firstItem?.text || (typeof firstItem === 'string' ? firstItem : ''))
+            .substring(0, 100);
         }
       }
 

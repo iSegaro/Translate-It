@@ -1,5 +1,5 @@
 // src/config.js
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { ProviderRegistryIds, nameToRegistryId } from '@/features/translation/providers/ProviderConstants.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -1144,7 +1144,10 @@ export const getLanguageDetectionPreferencesAsync = async () => {
  */
 export const getProviderOptimizationLevelAsync = async (providerName) => {
   try {
+    const registryId = nameToRegistryId(providerName) || providerName.toLowerCase();
+    
     const levels = await getSettingValueAsync("PROVIDER_OPTIMIZATION_LEVELS", CONFIG.PROVIDER_OPTIMIZATION_LEVELS);
+    if (levels && levels[registryId]) return parseInt(levels[registryId]);
     if (levels && levels[providerName]) return parseInt(levels[providerName]);
     
     // Fallback to global setting
