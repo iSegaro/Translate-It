@@ -765,30 +765,42 @@ function applyOptimizationLevel(config, level) {
   }
 
   // 2. Scale Batching (Speed vs Cost)
-  const sizeMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
+  const isAIStrategy = config.batching.strategy === 'smart' || config.batching.strategy === 'json';
 
-  if (config.batching.strategy === 'smart') {
-    // AI Strategy: Level 1 (Large batches = Cheaper), Level 5 (Small batches = Faster streaming)
-    result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
-    result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * sizeMultipliers[safeLevel]));
+  if (isAIStrategy) {
+    // AI Strategy: 
+    // Level 1 (Economy): Large batches (multiplier 2.0x-2.5x) -> Minimizes Context/System Prompt overhead (Cost Efficient)
+    // Level 5 (Turbo): Small batches (multiplier 0.3x-0.5x) -> Faster streaming/UI updates (Speed Efficient)
+    const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
+    const multiplier = aiSizeMultipliers[safeLevel];
+
+    result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * multiplier));
+    result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * multiplier));
+    
+    // Scale singleBatchThreshold as well for AI
+    if (result.batching.singleBatchThreshold) {
+      result.batching.singleBatchThreshold = Math.max(5, Math.round(config.batching.singleBatchThreshold * multiplier));
+    }
   } else if (config.batching.strategy === 'character_limit') {
-    // Traditional: Level 1 (Large chunks), Level 5 (Small chunks)
-    const charMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
-    result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * charMultipliers[safeLevel]));
+    // Traditional: Level 1 (Economy/Stability) -> Large chunks, Level 5 (Turbo) -> Small chunks
+    const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
+    const multiplier = sizeMultipliers[safeLevel];
+
+    result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * multiplier));
     
     // GUARDRAIL: Only scale down maxChunksPerBatch for levels > 3 if the base value is high.
     // For traditional providers, we want to maintain at least 25 segments per request 
     // to avoid the 'Double Fragmentation' issue with the Scheduler.
     if (config.batching.maxChunksPerBatch) {
-      const multiplier = safeLevel > 3 ? Math.max(0.8, sizeMultipliers[safeLevel]) : sizeMultipliers[safeLevel];
+      const chunkMultiplier = safeLevel > 3 ? Math.max(0.8, multiplier) : multiplier;
       const minSafeSegments = 25;
       
-      const newMaxChunks = Math.round(config.batching.maxChunksPerBatch * multiplier);
+      const newMaxChunks = Math.round(config.batching.maxChunksPerBatch * chunkMultiplier);
       result.batching.maxChunksPerBatch = Math.max(minSafeSegments, newMaxChunks);
     }
     
     if (config.batching.optimalSize) {
-      result.batching.optimalSize = Math.max(15, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
+      result.batching.optimalSize = Math.max(15, Math.round(config.batching.optimalSize * multiplier));
     }
   }
 

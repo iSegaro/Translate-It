@@ -419,25 +419,27 @@ export class PageTranslationScheduler extends ResourceTracker {
       this.settings.maxConcurrentFlushes = providerConfig.rateLimit.maxConcurrent;
     }
 
-    // Dynamic Chunk Size Scaling for Progressive UI Updates
-    // Traditional providers (Bing/Google/Edge) are slow per-request, so we keep chunks SMALL 
-    // to ensure the UI updates every few seconds (Progressive Feel).
-    // AI providers can handle larger chunks (50-100) more efficiently.
-    let baseChunkSize = isAI ? 50 : 15; 
+    // Dynamic Chunk Size Scaling (Optimization Level Alignment)
+    // Level 1 (Economy): Large chunks (50-80 segments) -> Minimizes token overhead/system prompt repeats.
+    // Level 5 (Turbo): Small chunks (10-15 segments) -> Faster initial translation and UI updates.
     
+    // Traditional providers (Bing/Google/Edge)
     const chunkMultipliers = {
-      1: 0.6, // ~10 segments
-      2: 0.8, // ~12 segments
-      3: 1.0, // ~15 segments
-      4: 1.3, // ~20 segments
-      5: 1.6  // ~25 segments (Max for traditional to keep it progressive)
+      1: 2.0, // Large chunks for stability/economy
+      2: 1.5, 
+      3: 1.0, // Balanced
+      4: 0.7, 
+      5: 0.4  // Small chunks for fast progressive updates
     };
-    
+
+    let baseChunkSize = isAI ? 50 : 25; 
     let chunkSize = Math.floor(baseChunkSize * (chunkMultipliers[level] || 1));
     
-    // For AI, we can afford larger chunks for better context and fewer messages
+    // Special Scaling for AI (More aggressive for cost/context)
     if (isAI) {
-      chunkSize = level >= 4 ? 100 : (level >= 3 ? 60 : 30);
+      // Level 1: 80 segments (Very efficient), Level 5: 15 segments (Very fast updates)
+      const aiChunks = { 1: 80, 2: 50, 3: 30, 4: 20, 5: 15 };
+      chunkSize = aiChunks[level] || 30;
     }
 
     return {
