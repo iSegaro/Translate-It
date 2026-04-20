@@ -42,7 +42,8 @@ export class DeepSeekProvider extends BaseAIProvider {
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
     const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
-    logger.info(`[DeepSeek] Model: ${model || 'deepseek-chat'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
+    const activeModel = model || "deepseek-chat";
+    logger.info(`[DeepSeek] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
@@ -53,11 +54,14 @@ export class DeepSeekProvider extends BaseAIProvider {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "deepseek-chat",
+        model: activeModel,
         messages: messages,
+        temperature: 0.1,
         max_tokens: 4096,
-        // DeepSeek supports JSON Mode
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        // DeepSeek supports JSON Mode for structured data
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
+          response_format: { type: "json_object" } 
+        })
       }),
     };
 
