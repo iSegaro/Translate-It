@@ -1,0 +1,177 @@
+.ti-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--border-radius-base) !important;
+  font-family: inherit !important;
+  font-weight: var(--font-weight-medium) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all var(--transition-base) !important;
+  position: relative !important;
+  white-space: nowrap !important;
+  
+  &:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 2px var(--color-primary), 0 0 0 4px rgba(25, 118, 210, 0.1) !important;
+  }
+  
+  &--disabled {
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+  }
+  
+  &--loading {
+    cursor: wait !important;
+  }
+  
+  &--full-width {
+    width: 100% !important;
+  }
+}
+
+/* Sizes */
+.ti-btn--xs {
+  padding: 4px 8px !important;
+  font-size: var(--font-size-xs) !important;
+  
+  &.ti-btn--icon-only {
+    padding: 4px !important;
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+
+.ti-btn--sm {
+  padding: 6px 12px !important;
+  font-size: var(--font-size-sm) !important;
+  
+  &.ti-btn--icon-only {
+    padding: 6px !important;
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+
+.ti-btn--md {
+  padding: 8px 16px !important;
+  font-size: var(--font-size-base) !important;
+  
+  &.ti-btn--icon-only {
+    padding: 8px !important;
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+
+.ti-btn--lg {
+  padding: 12px 20px !important;
+  font-size: var(--font-size-md) !important;
+  
+  &.ti-btn--icon-only {
+    padding: 12px !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
+/* Variants */
+.ti-btn--primary {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+  border-color: var(--color-primary) !important;
+
+  &:hover:not(.ti-btn--disabled) {
+    background-color: var(--color-primary-dark) !important;
+    border-color: var(--color-primary-dark) !important;
+  }
+
+  &:active:not(.ti-btn--disabled) {
+    transform: translateY(1px) !important;
+  }
+}
+
+.ti-btn--secondary {
+  background-color: var(--color-secondary) !important;
+  color: white !important;
+  border-color: var(--color-secondary) !important;
+
+  &:hover:not(.ti-btn--disabled) {
+    background-color: var(--color-secondary-dark) !important;
+    border-color: var(--color-secondary-dark) !important;
+  }
+
+  &:active:not(.ti-btn--disabled) {
+    transform: translateY(1px) !important;
+  }
+}
+
+.ti-btn--outline {
+  background-color: transparent !important;
+  color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+
+  &:hover:not(.ti-btn--disabled) {
+    background-color: var(--color-primary) !important;
+    color: white !important;
+  }
+
+  &:active:not(.ti-btn--disabled) {
+    transform: translateY(1px) !important;
+  }
+}
+
+.ti-btn--ghost {
+  background-color: transparent !important;
+  color: var(--color-text) !important;
+  border-color: transparent !important;
+
+  &:hover:not(.ti-btn--disabled) {
+    background-color: var(--color-surface) !important;
+  }
+
+  &:active:not(.ti-btn--disabled) {
+    transform: translateY(1px) !important;
+  }
+}
+
+.ti-btn--danger {
+  background-color: var(--color-error) !important;
+  color: white !important;
+  border-color: var(--color-error) !important;
+
+  &:hover:not(.ti-btn--disabled) {
+    background-color: #d32f2f !important;
+    border-color: #d32f2f !important;
+  }
+
+  &:active:not(.ti-btn--disabled) {
+    transform: translateY(1px) !important;
+  }
+}
+
+/* Icon positioning */
+.ti-btn--icon-right {
+  flex-direction: row-reverse !important;
+}
+
+.ti-btn__icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  filter: var(--icon-filter) !important;
+}
+
+.ti-btn__text {
+  flex: 1 !important;
+  text-align: center !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .ti-btn {
+    min-height: 44px !important; /* Touch target size */
+  }
+}

@@ -1,0 +1,118 @@
+.ti-textarea-wrapper {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+
+  &--disabled {
+    opacity: 0.6 !important;
+  }
+
+  &--loading {
+    .ti-textarea {
+      color: transparent !important;
+    }
+  }
+}
+
+.ti-textarea {
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-base) !important;
+  font-family: inherit !important;
+  font-size: var(--font-size-base) !important;
+  line-height: 1.5 !important;
+  color: var(--color-text) !important;
+  background-color: var(--color-background) !important;
+  transition: all var(--transition-base) !important;
+  box-sizing: border-box !important;
+
+  &::placeholder {
+    color: var(--color-text-disabled) !important;
+  }
+
+  &[dir="ltr"]::placeholder {
+    direction: rtl !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+  }
+
+  &:focus {
+    outline: none !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1) !important;
+  }
+
+  &:disabled {
+    background-color: var(--color-surface) !important;
+    cursor: not-allowed !important;
+  }
+
+  &--readonly {
+    background-color: var(--color-surface) !important;
+    cursor: default !important;
+  }
+
+  &--password {
+    /* CSS-only password masking - supported in all modern browsers */
+    /* Chrome/Edge: native, Firefox 119+, Safari: native */
+    -webkit-text-security: disc !important;
+    /* Standard property (future-proof when standardized) */
+    text-security: disc !important;
+  }
+
+  &--resize-none {
+    resize: none !important;
+  }
+
+  &--resize-both {
+    resize: both !important;
+  }
+
+  &--resize-horizontal {
+    resize: horizontal !important;
+  }
+
+  &--resize-vertical {
+    resize: vertical !important;
+  }
+}
+
+.ti-textarea__toggle-visibility {
+  position: relative !important;
+  align-self: flex-end !important;
+  margin-bottom: 4px !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.6 !important;
+  transition: opacity var(--transition-base) !important;
+
+  &:hover {
+    opacity: 1 !important;
+  }
+
+  &:disabled {
+    cursor: not-allowed !important;
+  }
+
+  .toggle-visibility-icon {
+    display: block !important;
+    pointer-events: none !important;
+    width: 16px !important;
+    height: 16px !important;
+    object-fit: contain !important;
+  }
+}
+
+.ti-textarea__loading {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 1 !important;
+}

@@ -35,38 +35,3 @@ defineProps({
 
 defineEmits(['update:modelValue'])
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/base/variables" as *;
-
-.ti-checkbox {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  cursor: pointer;
-  font-size: $font-size-base;
-  margin: 0;
-  
-  input[type="checkbox"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  
-  .ti-checkbox__label {
-    flex: 1;
-    color: var(--color-text);
-  }
-  
-  &--disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    
-    input[type="checkbox"] {
-      cursor: not-allowed;
-    }
-  }
-}
-</style>
