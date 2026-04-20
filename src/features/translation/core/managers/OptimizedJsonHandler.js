@@ -41,18 +41,18 @@ export class OptimizedJsonHandler {
         providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
       );
 
-      logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments`);
+      logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency enabled)`);
 
-      for (let i = 0; i < batches.length; i++) {
-        if (engine.isCancelled(messageId)) break;
+      const batchPromises = batches.map(async (batch, i) => {
+        if (engine.isCancelled(messageId)) return;
 
-        const batch = batches[i];
-        
+        // Still respect intelligent delay for the start of each promise to prevent instant burst
         if (i > 0) {
           const delay = this._calculateDelay(batch, i, batches.length, providerConfig);
-          if (delay > 0) {
-            logger.debug(`[JsonHandler] Intelligent delay: ${delay}ms (batch: ${i + 1}/${batches.length})`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+          // If we have concurrency, we can reduce the inter-batch delay significantly
+          const concurrencyAwareDelay = providerConfig.rateLimit.maxConcurrent > 1 ? Math.min(delay, 100) : delay;
+          if (concurrencyAwareDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
           }
         }
 
@@ -77,6 +77,7 @@ export class OptimizedJsonHandler {
           );
 
           const mappedResults = this._mapResults(batch, translatedBatch);
+          // Sequential streaming is handled inside _streamResults to maintain UI order
           await this._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
@@ -92,13 +93,12 @@ export class OptimizedJsonHandler {
           logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
           hasErrors = true;
           lastError = batchError;
+          // Stream empty/original results on failure to keep progress moving
           await this._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
-          if (i === 0 || isFatalError(batchError)) {
-            await this._sendStreamError(tabId, messageId, batchError, targetLanguage);
-            throw batchError;
-          }
         }
-      }
+      });
+
+      await Promise.all(batchPromises);
 
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
 

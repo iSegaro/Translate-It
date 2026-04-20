@@ -597,9 +597,10 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 4000,
-      maxChunksPerBatch: 5,
-      delimiter: null // Uses JSON POST
+      characterLimit: 1500, // Safe for GET URL lengths
+      optimalSize: 15,      // Base segment limit
+      maxChunksPerBatch: 30,
+      delimiter: null // Uses JSON POST in config, but GET in provider (provider overrides)
     },
     streaming: {
       enabled: true,
@@ -702,13 +703,17 @@ function applyOptimizationLevel(config, level) {
   const result = { ...config, rateLimit: { ...config.rateLimit }, batching: { ...config.batching } };
 
   // 1. Scale Rate Limits
-  // Concurrent requests: Level 1 (x0.5), Level 5 (x1.5) capped by safety bounds
-  const concurrentMultipliers = { 1: 0.5, 2: 0.8, 3: 1, 4: 1.2, 5: 1.5 };
+  // Concurrent requests: Level 1 (x0.5), Level 5 (x2.0)
+  const concurrentMultipliers = { 1: 0.5, 2: 0.8, 3: 1, 4: 1.5, 5: 2.0 };
   result.rateLimit.maxConcurrent = Math.max(1, Math.round(config.rateLimit.maxConcurrent * concurrentMultipliers[safeLevel]));
 
-  // Guardrails: Never allow more than 1 for Bing, or 5 for others unless specifically defined
-  if (config.rateLimit.maxConcurrent === 1) result.rateLimit.maxConcurrent = 1;
-  else result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 8);
+  // Guardrails: Scale with safety
+  if (config.rateLimit.maxConcurrent > 1) {
+    result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 10);
+  } else if (safeLevel >= 4) {
+    // For providers with base 1 (like Lingva), Level 4-5 allows 2 concurrent requests
+    result.rateLimit.maxConcurrent = 2;
+  }
 
   // Subsequent Delay: Level 1 (x2), Level 5 (x0.5)
   const delayMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
