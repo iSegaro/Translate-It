@@ -247,28 +247,23 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         const minChunkSize = providerConfig?.batching?.minChunkSize || 100;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
 
-        logger.debug(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}`);
+        logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);
 
-        // For BingApiError (Status 400), we MUST reduce chunk size as it often means the request was too large or complex
+        // For BingApiError (Status 400), we MUST reduce chunk size as it often means the request was too large, 
+        // complex, or had language detection issues (like the 'ny' detection bug).
         if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
-          // Calculate new chunk size with exponential backoff
-          const reductionFactor = Math.pow(2, retryAttempt + 1);
+          // Calculate new chunk size - halving it is usually the most effective way to bypass Bing's 400 errors
           const newChunkSize = Math.max(
-            Math.ceil(chunkTexts.length / reductionFactor),
-            minChunkSize
+            Math.ceil(chunkTexts.length / 2),
+            1 // Safety minimum
           );
 
-          // Retrying with smaller chunks
+          logger.info(`[Bing] Retrying with smaller chunks (Size: ${newChunkSize}) due to ${error.name}`);
 
           try {
-            // Split into smaller chunks and retry while preserving order
             const results = [];
-            const subChunkCount = Math.ceil(chunkTexts.length / newChunkSize);
-
             for (let i = 0; i < chunkTexts.length; i += newChunkSize) {
               const subChunk = chunkTexts.slice(i, i + newChunkSize);
-              const subChunkIndex = Math.floor(i / newChunkSize);
-
               const subResults = await this._translateChunk(
                 subChunk,
                 sourceLang,
@@ -277,45 +272,23 @@ export class BingTranslateProvider extends BaseTranslateProvider {
                 abortController,
                 retryAttempt + 1,
                 segmentCount,
-                subChunkIndex,
-                subChunkCount,
+                0, // Index reset for sub-chunks
+                0, // Total reset
                 options
               );
-
-              // Place results in correct position
               results.push(...subResults);
-
-              // Add delay between retries to avoid rate limiting
-              if (i + newChunkSize < chunkTexts.length) {
-                await new Promise(resolve => setTimeout(resolve, 1000 * (retryAttempt + 1)));
-              }
             }
-
-            // Retry successful
             return results;
-
           } catch (retryError) {
-            logger.error(`[Bing] Retry attempt ${retryAttempt + 1} failed:`, retryError);
-            // Continue to throw the original error
+            logger.error(`[Bing] Adaptive chunking failed for ${error.name}:`, retryError.message);
           }
         }
 
-        // If we've exhausted retries or can't split further, throw a properly typed error
-        const finalError = new Error(
-          error.name === 'BingHtmlResponseError'
-            ? 'Bing consistently returned HTML instead of JSON'
-            : `Bing JSON parsing consistently failed after ${retryAttempt + 1} attempts`
-        );
-        finalError.name = error.name;
-        finalError.type = error.name === 'BingHtmlResponseError'
-          ? ErrorTypes.HTML_RESPONSE_ERROR
-          : ErrorTypes.JSON_PARSING_ERROR;
-        finalError.context = context;
-        finalError.chunkSize = chunkTexts.length;
-        finalError.retryAttempt = retryAttempt;
-        finalError.segmentCount = segmentCount;
-
-        throw finalError;
+        // CRITICAL FINAL FALLBACK: If we've exhausted retries or can't split further, 
+        // return the original text for THIS chunk instead of throwing.
+        // This prevents one bad chunk from breaking the entire page translation.
+        logger.error(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
+        return chunkTexts;
       }
 
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
