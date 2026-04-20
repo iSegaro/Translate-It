@@ -59,11 +59,16 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     const context = `${this.providerName.toLowerCase()}-translate-chunk${retryAttempt > 0 ? `-retry-${retryAttempt}` : ''}`;
     const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const providerConfig = getProviderConfiguration(this.providerName);
+    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+    
+    // Fetch user's preferred optimization level using the standard async utility
+    const optimizationLevel = await getProviderOptimizationLevelAsync(this.providerName);
+    
+    const providerConfig = getProviderConfiguration(this.providerName, optimizationLevel);
 
     // Add key info log for translation start
     if (retryAttempt === 0) {
-      logger.info(`[Bing] Starting translation: ${chunkTexts.join(' ').length} chars`);
+      logger.info(`[Bing] Starting translation: ${chunkTexts.join(' ').length} chars (Level: ${optimizationLevel})`);
     }
 
     try {

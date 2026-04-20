@@ -128,8 +128,18 @@ export class RateLimitManager {
     // Resolve registry ID to name if necessary
     const name = registryIdToName(providerName) || providerName;
 
+    // Refresh state and configuration to ensure we're using the latest optimization level
     const state = await this._initializeProviderWithLevel(name);
     
+    // CRITICAL: Always re-fetch level to handle real-time setting changes between levels (e.g. 5 to 1)
+    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+    const currentLevel = await getProviderOptimizationLevelAsync(name);
+    
+    // Update config if it's different from what's in state (or always for safety during debug)
+    const latestConfig = getProviderConfiguration(name, currentLevel);
+    state.config = { ...state.config, ...latestConfig.rateLimit };
+
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
       const error = new Error(`Circuit breaker open for ${name}. Too many failures.`);

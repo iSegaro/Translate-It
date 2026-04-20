@@ -703,20 +703,41 @@ function applyOptimizationLevel(config, level) {
   const result = { ...config, rateLimit: { ...config.rateLimit }, batching: { ...config.batching } };
 
   // 1. Scale Rate Limits
-  // Concurrent requests: Level 1 (x0.5), Level 5 (x2.0)
-  const concurrentMultipliers = { 1: 0.5, 2: 0.8, 3: 1, 4: 1.5, 5: 2.0 };
-  result.rateLimit.maxConcurrent = Math.max(1, Math.round(config.rateLimit.maxConcurrent * concurrentMultipliers[safeLevel]));
-
-  // Guardrails: Scale with safety
-  if (config.rateLimit.maxConcurrent > 1) {
-    result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 10);
-  } else if (safeLevel >= 4) {
-    // For providers with base 1 (like Lingva), Level 4-5 allows 2 concurrent requests
-    result.rateLimit.maxConcurrent = 2;
+  // Concurrent requests multipliers: Level 1 (0.4), Level 2 (0.7), Level 3 (1.0), Level 4 (1.5), Level 5 (2.0)
+  // We use floor for levels < 3 to be more conservative and ceil for levels > 3 to be more aggressive
+  const concurrentMultipliers = { 1: 0.4, 2: 0.7, 3: 1, 4: 1.5, 5: 2.0 };
+  const baseConcurrent = config.rateLimit.maxConcurrent;
+  
+  if (safeLevel < 3) {
+    result.rateLimit.maxConcurrent = Math.max(1, Math.floor(baseConcurrent * concurrentMultipliers[safeLevel]));
+  } else if (safeLevel > 3) {
+    result.rateLimit.maxConcurrent = Math.max(baseConcurrent, Math.ceil(baseConcurrent * concurrentMultipliers[safeLevel]));
   }
 
-  // Subsequent Delay: Level 1 (x2), Level 5 (x0.5)
-  const delayMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
+  // Scale Burst Limit if it exists, using the same logic
+  if (config.rateLimit.burstLimit) {
+    const baseBurst = config.rateLimit.burstLimit;
+    if (safeLevel < 3) {
+      result.rateLimit.burstLimit = Math.max(1, Math.floor(baseBurst * concurrentMultipliers[safeLevel]));
+    } else if (safeLevel > 3) {
+      result.rateLimit.burstLimit = Math.max(baseBurst, Math.ceil(baseBurst * concurrentMultipliers[safeLevel]));
+    }
+  }
+
+  // Guardrails: Scale with safety
+  if (result.rateLimit.maxConcurrent > 1) {
+    result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 12);
+  } else if (safeLevel >= 4) {
+    result.rateLimit.maxConcurrent = 2;
+  }
+  
+  // Ensure burstLimit doesn't exceed maxConcurrent
+  if (result.rateLimit.burstLimit > result.rateLimit.maxConcurrent) {
+    result.rateLimit.burstLimit = result.rateLimit.maxConcurrent;
+  }
+
+  // Subsequent Delay multipliers: Level 1 (2.5), Level 2 (1.5), Level 3 (1.0), Level 4 (0.7), Level 5 (0.4)
+  const delayMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.7, 5: 0.4 };
   result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
   
   // Scale Batching Delays if present
