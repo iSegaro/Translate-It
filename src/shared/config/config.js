@@ -244,6 +244,8 @@ export const CONFIG = {
   PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching & key abbreviation)
 
   // --- AI Optimization Settings ---
+  OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
+  PROVIDER_OPTIMIZATION_LEVELS: {}, // Per-provider level overrides { Gemini: 5, OpenAI: 2 }
   AI_CONTEXT_TRANSLATION_ENABLED: true, // ارسال کانتکست (عنوان صفحه، تیتر بخش) به پرووایدرهای هوشمند
   AI_CONVERSATION_HISTORY_ENABLED: true, // ارسال تاریخچه ترجمه‌های قبلی برای حفظ استایل (مخصوص Select Element)
   BILINGUAL_TRANSLATION: false, // ترجمه دوطرفه: اگر متن ورودی به زبان مقصد بود، آن را به زبان مبدا ترجمه کن
@@ -1133,6 +1135,23 @@ export const getLanguageDetectionPreferencesAsync = async () => {
     "LANGUAGE_DETECTION_PREFERENCES",
     CONFIG.LANGUAGE_DETECTION_PREFERENCES
   );
+};
+
+/**
+ * Get optimization level for a specific provider (1-5)
+ * @param {string} providerName 
+ * @returns {Promise<number>}
+ */
+export const getProviderOptimizationLevelAsync = async (providerName) => {
+  try {
+    const levels = await getSettingValueAsync("PROVIDER_OPTIMIZATION_LEVELS", CONFIG.PROVIDER_OPTIMIZATION_LEVELS);
+    if (levels && levels[providerName]) return parseInt(levels[providerName]);
+    
+    // Fallback to global setting
+    return await getSettingValueAsync("OPTIMIZATION_LEVEL", CONFIG.OPTIMIZATION_LEVEL);
+  } catch (error) {
+    return CONFIG.OPTIMIZATION_LEVEL;
+  }
 };
 
 // --- Whole Page Translation Settings Getters (NEW) ---

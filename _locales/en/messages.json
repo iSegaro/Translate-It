@@ -1994,6 +1994,45 @@
   "bilingual_mode_page_label": {
     "message": "Whole Page Translation"
   },
+  "optimization_level_label": {
+    "message": "Optimization Level"
+  },
+  "optimization_level_1": {
+    "message": "Level 1"
+  },
+  "optimization_level_2": {
+    "message": "Level 2"
+  },
+  "optimization_level_3": {
+    "message": "Level 3"
+  },
+  "optimization_level_4": {
+    "message": "Level 4"
+  },
+  "optimization_level_5": {
+    "message": "Level 5"
+  },
+  "opt_economy": {
+    "message": "Economy"
+  },
+  "opt_stable": {
+    "message": "Stable"
+  },
+  "opt_balanced": {
+    "message": "Balanced"
+  },
+  "opt_turbo": {
+    "message": "Turbo"
+  },
+  "opt_fast": {
+    "message": "Fast"
+  },
+  "optimization_description_ai": {
+    "message": "Adjust balance between translation cost (tokens) and streaming speed."
+  },
+  "optimization_description_traditional": {
+    "message": "Adjust balance between request stability and translation speed."
+  },
   "enable_translation_history_label": {
     "message": "Enable Translation History"
   },

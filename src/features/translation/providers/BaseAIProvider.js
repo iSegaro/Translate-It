@@ -15,7 +15,7 @@ import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
-import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -24,22 +24,26 @@ export class BaseAIProvider extends BaseProvider {
   static isAI = true;
 
   /**
-   * Configuration Getters - Unified with ProviderConfigurations.js
+   * Configuration Resolvers - Unified with ProviderConfigurations.js and User Levels
    */
-  get supportsStreaming() {
-    return getProviderStreaming(this.providerName).enabled;
+  async getSupportsStreaming() {
+    const level = await getProviderOptimizationLevelAsync(this.providerName);
+    return getProviderStreaming(this.providerName, level).enabled;
   }
 
-  get batchingConfig() {
-    return getProviderBatching(this.providerName);
+  async getBatchingConfig(mode = null) {
+    const level = await getProviderOptimizationLevelAsync(this.providerName);
+    return getProviderBatching(this.providerName, mode, level);
   }
 
-  get batchStrategy() {
-    return this.batchingConfig.strategy || 'json';
+  async getBatchStrategy(mode = null) {
+    const config = await this.getBatchingConfig(mode);
+    return config.strategy || 'json';
   }
 
-  get supportsImageTranslation() {
-    return getProviderFeatures(this.providerName).supportsImageTranslation;
+  async getSupportsImageTranslation() {
+    const level = await getProviderOptimizationLevelAsync(this.providerName);
+    return getProviderFeatures(this.providerName, level).supportsImageTranslation;
   }
 
   constructor(providerName) {
@@ -50,13 +54,16 @@ export class BaseAIProvider extends BaseProvider {
    * Enhanced batch translation with streaming support
    */
   async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    const supportsStreaming = await this.getSupportsStreaming();
+    const batchStrategy = await this.getBatchStrategy(translateMode);
+
     // 1. Try streaming if supported and beneficial
-    if (this.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
+    if (supportsStreaming && await this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
 
     // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. JSON batching)
-    if (texts.length > 1 && this.batchStrategy === 'json') {
+    if (texts.length > 1 && batchStrategy === 'json') {
       return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
     }
 
@@ -90,13 +97,14 @@ export class BaseAIProvider extends BaseProvider {
   /**
    * Determine if streaming should be used for this request
    */
-  _shouldUseStreaming(texts, messageId, engine, translateMode) {
+  async _shouldUseStreaming(texts, messageId, engine, translateMode) {
     // Disable internal AI streaming for Select Element or Page modes 
     if (translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page) {
       return false;
     }
 
-    return this.supportsStreaming && 
+    const supportsStreaming = await this.getSupportsStreaming();
+    return supportsStreaming && 
            messageId && 
            engine && 
            (texts.length > 1 || AITextProcessor.getTotalComplexity(texts) > 100);

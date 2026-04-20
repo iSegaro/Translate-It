@@ -44,12 +44,32 @@ export class RateLimitManager {
    */
   async reloadConfigurations() {
     this.providerStates.clear();
-    const { PROVIDER_CONFIGURATIONS } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const { PROVIDER_CONFIGURATIONS, getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
     
-    Object.entries(PROVIDER_CONFIGURATIONS).forEach(([name, config]) => {
-      // Map PROVIDER_CONFIGURATIONS.rateLimit to what we need
-      this._initializeProvider(name, config.rateLimit);
-    });
+    for (const [name, _baseConfig] of Object.entries(PROVIDER_CONFIGURATIONS)) {
+      const level = await getProviderOptimizationLevelAsync(name);
+      const optimizedConfig = getProviderConfiguration(name, level);
+      this._initializeProvider(name, optimizedConfig.rateLimit);
+    }
+  }
+
+  /**
+   * Initialize or get provider state
+   * Optimized to fetch configuration dynamically if not present
+   */
+  async _initializeProviderWithLevel(providerName) {
+    if (this.providerStates.has(providerName)) {
+      return this.providerStates.get(providerName);
+    }
+
+    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+
+    const level = await getProviderOptimizationLevelAsync(providerName);
+    const optimizedConfig = getProviderConfiguration(providerName, level);
+    
+    return this._initializeProvider(providerName, optimizedConfig.rateLimit);
   }
 
   /**
@@ -113,7 +133,7 @@ export class RateLimitManager {
       // Fallback to raw providerName
     }
 
-    const state = this._initializeProvider(name);
+    const state = await this._initializeProviderWithLevel(name);
     
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {

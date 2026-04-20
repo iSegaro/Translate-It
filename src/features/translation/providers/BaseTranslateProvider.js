@@ -55,7 +55,26 @@ export class BaseTranslateProvider extends BaseProvider {
    * Check if texts need chunking
    */
   _needsChunking(texts) {
-    return TraditionalTextProcessor.needsChunking(texts, this.constructor.chunkingStrategy, this.constructor.characterLimit, this.constructor.maxChunksPerBatch);
+    return texts.length > 1 || this._calculateTraditionalCharCount(texts) > 2000;
+  }
+
+  /**
+   * Configuration Resolvers - Unified with ProviderConfigurations.js and User Levels
+   */
+  async getBatchingConfig(mode = null) {
+    const { getProviderOptimizationLevelAsync } = await import("@/shared/config/config.js");
+    const { getProviderBatching } = await import("@/features/translation/core/ProviderConfigurations.js");
+    const level = await getProviderOptimizationLevelAsync(this.providerName);
+    return getProviderBatching(this.providerName, mode, level);
+  }
+
+  /**
+   * Create chunks for translation (Respecting Optimization Level)
+   * @protected
+   */
+  async _createChunks(texts) {
+    const config = await this.getBatchingConfig();
+    return TraditionalTextProcessor.createChunks(texts, this.providerName, config.strategy, config.characterLimit, config.maxChunksPerBatch);
   }
 
   /**
@@ -75,7 +94,7 @@ export class BaseTranslateProvider extends BaseProvider {
       } catch { /* ignore */ }
     }
     
-    const chunks = this._createChunks(texts);
+    const chunks = await this._createChunks(texts);
     const allResults = [];
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
@@ -122,14 +141,10 @@ export class BaseTranslateProvider extends BaseProvider {
     return allResults;
   }
 
-  _createChunks(texts) {
-    return TraditionalTextProcessor.createChunks(texts, this.providerName, this.constructor.chunkingStrategy, this.constructor.characterLimit, this.constructor.maxChunksPerBatch);
-  }
-
   async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
     logger.debug(`[${this.providerName}] Starting traditional batch translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
-    const chunks = this._createChunks(texts);
+    const chunks = await this._createChunks(texts);
     const allResults = [];
 
     for (let i = 0; i < chunks.length; i++) {

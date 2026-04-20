@@ -19,6 +19,42 @@
             :key="selectedProvider"
             class="provider-settings"
           >
+            <!-- Optimization Level Section (Visible for all providers) -->
+            <div class="optimization-control-area">
+              <div class="opt-control-group">
+                <div class="label-with-value">
+                  <label class="opt-label">{{ t('optimization_level_label') || 'Optimization Level' }}</label>
+                  <span class="level-badge" :class="'level-' + currentOptimizationLevel">
+                    {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                  </span>
+                </div>
+                
+                <div class="slider-wrapper">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="5" 
+                    v-model.number="currentOptimizationLevel"
+                    class="ti-range-slider"
+                  />
+                  <div class="slider-labels">
+                    <span>{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                    <span>{{ t('opt_balanced') || 'Balanced' }}</span>
+                    <span>{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                  </div>
+                </div>
+                
+                <p class="opt-description">
+                  {{ isAIProvider 
+                      ? t('optimization_description_ai') || 'Adjust balance between translation cost (tokens) and streaming speed.' 
+                      : t('optimization_description_traditional') || 'Adjust balance between request stability and translation speed.' 
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div class="section-separator mini" />
+
             <div
               v-if="selectedProviderInfo && !providerSettingsComponent"
               class="api-info"
@@ -309,6 +345,23 @@ const aiContextEnabled = computed({
 const aiHistoryEnabled = computed({
   get: () => settingsStore.settings?.AI_CONVERSATION_HISTORY_ENABLED ?? true,
   set: (value) => settingsStore.updateSettingLocally('AI_CONVERSATION_HISTORY_ENABLED', value)
+})
+
+// Provider Optimization Level (Per-provider)
+const currentOptimizationLevel = computed({
+  get: () => {
+    const providerLevels = settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS || {}
+    return providerLevels[selectedProvider.value] || settingsStore.settings?.OPTIMIZATION_LEVEL || 3
+  },
+  set: (value) => {
+    const providerLevels = { ...(settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS || {}) }
+    providerLevels[selectedProvider.value] = value
+    settingsStore.updateSettingAndPersist('PROVIDER_OPTIMIZATION_LEVELS', providerLevels)
+  }
+})
+
+const isAIProvider = computed(() => {
+  return ['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value)
 })
 
 // ========== Provider-Specific Language Filtering ==========
@@ -636,6 +689,122 @@ defineExpose({
 // API Settings Section
 .api-settings-section {
   margin-top: 0;
+
+  .optimization-control-area {
+    margin-bottom: $spacing-lg;
+    background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.03));
+    padding: $spacing-md;
+    border-radius: $border-radius-base;
+    border: 1px solid var(--color-border-light, var(--color-border));
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
+
+    .opt-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .label-with-value {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: $spacing-sm;
+      width: 100%;
+      box-sizing: border-box;
+
+      .opt-label {
+        font-weight: $font-weight-medium;
+        font-size: $font-size-base;
+        color: var(--color-text);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+    }
+
+    .level-badge {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: $font-weight-bold;
+      padding: 2px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--color-background-soft);
+      border: 1px solid var(--color-border);
+      white-space: nowrap;
+
+      &.level-1 { color: #4caf50; border-color: rgba(76, 175, 80, 0.4); background: rgba(76, 175, 80, 0.1); }
+      &.level-2 { color: #8bc34a; border-color: rgba(139, 195, 74, 0.4); background: rgba(139, 195, 74, 0.1); }
+      &.level-3 { color: var(--color-primary); border-color: var(--color-primary-light, var(--color-primary)); background: var(--color-primary-soft, rgba(var(--color-primary-rgb), 0.1)); }
+      &.level-4 { color: #ff9800; border-color: rgba(255, 152, 0, 0.4); background: rgba(255, 152, 0, 0.1); }
+      &.level-5 { color: #f44336; border-color: rgba(244, 67, 54, 0.4); background: rgba(244, 67, 54, 0.1); }
+    }
+
+    .slider-wrapper {
+      margin: $spacing-sm 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .ti-range-slider {
+      -webkit-appearance: none;
+      display: block;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--color-border);
+      outline: none;
+      margin: 0 0 $spacing-xs 0;
+      padding: 0;
+
+      &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        cursor: pointer;
+        border: 2px solid var(--color-background);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: transform 0.1s ease;
+
+        &:hover { transform: scale(1.1); }
+      }
+    }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      padding: 0 2px;
+      box-sizing: border-box;
+    }
+
+    .opt-description {
+      margin: $spacing-xs 0 0 0;
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+      font-style: italic;
+      opacity: 0.8;
+    }
+  }
+
+  .section-separator.mini {
+    margin: $spacing-md 0;
+    opacity: 0.5;
+  }
 
   .provider-settings-container {
     display: grid;

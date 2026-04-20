@@ -668,23 +668,64 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   }
 };
-
 /**
  * Get configuration for a specific provider
  * @param {string} providerName - Name of the provider
+ * @param {number} level - Optimization level (1-5, default 3)
  * @returns {object} - Provider configuration
  */
-export function getProviderConfiguration(providerName) {
+export function getProviderConfiguration(providerName, level = 3) {
   // Normalize provider name (handle case variations)
   const normalizedName = normalizeProviderName(providerName);
-  
-  const config = PROVIDER_CONFIGURATIONS[normalizedName];
-  if (!config) {
+
+  const baseConfig = PROVIDER_CONFIGURATIONS[normalizedName];
+  if (!baseConfig) {
     logger.warn(`[ProviderConfigurations] No configuration found for provider: ${providerName}, using Custom defaults`);
-    return PROVIDER_CONFIGURATIONS.Custom;
+    return applyOptimizationLevel(PROVIDER_CONFIGURATIONS.Custom, level);
   }
-  
-  return config;
+
+  return applyOptimizationLevel(baseConfig, level);
+}
+
+/**
+ * Apply optimization level (1-5) to a provider's base configuration
+ * Level 1: Stability/Economy (Lower concurrency, larger batches for AI, higher delays for traditional)
+ * Level 3: Balanced (Default)
+ * Level 5: Turbo (Higher concurrency, smaller batches for faster UX, lower delays)
+ * @private
+ */
+function applyOptimizationLevel(config, level) {
+  const safeLevel = Math.max(1, Math.min(5, level));
+  if (safeLevel === 3) return config; // Already optimized for level 3
+
+  const result = { ...config, rateLimit: { ...config.rateLimit }, batching: { ...config.batching } };
+
+  // 1. Scale Rate Limits
+  // Concurrent requests: Level 1 (x0.5), Level 5 (x1.5) capped by safety bounds
+  const concurrentMultipliers = { 1: 0.5, 2: 0.8, 3: 1, 4: 1.2, 5: 1.5 };
+  result.rateLimit.maxConcurrent = Math.max(1, Math.round(config.rateLimit.maxConcurrent * concurrentMultipliers[safeLevel]));
+
+  // Guardrails: Never allow more than 1 for Bing, or 5 for others unless specifically defined
+  if (config.rateLimit.maxConcurrent === 1) result.rateLimit.maxConcurrent = 1;
+  else result.rateLimit.maxConcurrent = Math.min(result.rateLimit.maxConcurrent, 8);
+
+  // Subsequent Delay: Level 1 (x2), Level 5 (x0.5)
+  const delayMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
+  result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
+
+  // 2. Scale Batching (Speed vs Cost)
+  if (config.batching.strategy === 'smart') {
+    // AI Strategy: Level 1 (Large batches = Cheaper), Level 5 (Small batches = Faster streaming)
+    const sizeMultipliers = { 1: 2.0, 2: 1.5, 3: 1, 4: 0.7, 5: 0.5 };
+    result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
+    result.batching.maxComplexity = Math.max(100, Math.round(config.batching.maxComplexity * sizeMultipliers[safeLevel]));
+  } else if (config.batching.strategy === 'character_limit') {
+    // Traditional: Level 1 (Large chunks), Level 5 (Small chunks)
+    const charMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
+    result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * charMultipliers[safeLevel]));
+  }
+
+  return result;
 }
 
 /**
@@ -742,10 +783,11 @@ function normalizeProviderName(providerName) {
 /**
  * Get rate limit configuration for a provider
  * @param {string} providerName - Provider name
+ * @param {number} level - Optimization level
  * @returns {object} - Rate limit configuration
  */
-export function getProviderRateLimit(providerName) {
-  const config = getProviderConfiguration(providerName);
+export function getProviderRateLimit(providerName, level = 3) {
+  const config = getProviderConfiguration(providerName, level);
   return config.rateLimit;
 }
 
@@ -753,10 +795,11 @@ export function getProviderRateLimit(providerName) {
  * Get batching configuration for a provider
  * @param {string} providerName - Provider name
  * @param {string} translateMode - Translation mode (optional)
+ * @param {number} level - Optimization level
  * @returns {object} - Batching configuration
  */
-export function getProviderBatching(providerName, translateMode = null) {
-  const config = getProviderConfiguration(providerName);
+export function getProviderBatching(providerName, translateMode = null, level = 3) {
+  const config = getProviderConfiguration(providerName, level);
 
   if (!translateMode || !config.batching.modeOverrides || !config.batching.modeOverrides[translateMode]) {
     return config.batching;
@@ -772,30 +815,33 @@ export function getProviderBatching(providerName, translateMode = null) {
 /**
  * Get streaming configuration for a provider
  * @param {string} providerName - Provider name
+ * @param {number} level - Optimization level
  * @returns {object} - Streaming configuration
  */
-export function getProviderStreaming(providerName) {
-  const config = getProviderConfiguration(providerName);
+export function getProviderStreaming(providerName, level = 3) {
+  const config = getProviderConfiguration(providerName, level);
   return config.streaming;
 }
 
 /**
  * Get error handling configuration for a provider
  * @param {string} providerName - Provider name
+ * @param {number} level - Optimization level
  * @returns {object} - Error handling configuration
  */
-export function getProviderErrorHandling(providerName) {
-  const config = getProviderConfiguration(providerName);
+export function getProviderErrorHandling(providerName, level = 3) {
+  const config = getProviderConfiguration(providerName, level);
   return config.errorHandling;
 }
 
 /**
  * Get provider features/capabilities
  * @param {string} providerName - Provider name
+ * @param {number} level - Optimization level
  * @returns {object} - Provider features
  */
-export function getProviderFeatures(providerName) {
-  const config = getProviderConfiguration(providerName);
+export function getProviderFeatures(providerName, level = 3) {
+  const config = getProviderConfiguration(providerName, level);
   return config.features;
 }
 
