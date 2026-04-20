@@ -198,6 +198,17 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
+          // COMPREHENSIVE DELIMITER SANITIZATION
+          // Bing often corrupts the delimiter [[---]] by changing dashes to ellipses, 
+          // long dashes, or adding spaces (e.g., [[...]], [[…-]], [[ — ]]).
+          // We normalize these back to the standard delimiter so the Coordinator can split correctly.
+          if (chunkTexts.length > 1) {
+            // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
+            const corruptedDelimiterRegex = /\[\[[\s\.\-\—\–\…ـ]+\]\]/g;
+            const sanitizedText = targetText.replace(corruptedDelimiterRegex, TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+            return sanitizedText;
+          }
+
           // Return raw text string. Coordinator will handle robust splitting for multiple segments.
           return targetText;
         },
