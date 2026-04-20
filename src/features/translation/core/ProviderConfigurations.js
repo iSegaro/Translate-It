@@ -54,7 +54,10 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true,
       chunkSize: 'adaptive', // Adapt chunk size based on complexity
@@ -101,7 +104,10 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true,
       chunkSize: 'fixed', // Fixed chunk sizes work well
@@ -152,7 +158,10 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -201,7 +210,10 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true, // Most models support streaming
       chunkSize: 'adaptive',
@@ -244,7 +256,10 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -643,7 +658,10 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      strategy: 'json'
+    },
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',

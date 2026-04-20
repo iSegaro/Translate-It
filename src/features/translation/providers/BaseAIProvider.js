@@ -62,8 +62,8 @@ export class BaseAIProvider extends BaseProvider {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
 
-    // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. JSON batching)
-    if (texts.length > 1 && batchStrategy === 'json') {
+    // 2. If not streaming but multiple segments exist, use the provider's batch strategy (e.g. smart JSON batching)
+    if (texts.length > 1 && (batchStrategy === 'json' || batchStrategy === 'smart')) {
       return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
     }
 
