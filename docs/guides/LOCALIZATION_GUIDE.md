@@ -44,7 +44,8 @@ If you are comfortable using the terminal, we have some tools to make things eas
 
 1. **Sync Keys**: Run `pnpm run i18n:sync` to see if there are any new English words that need translation.
 2. **Auto-Add Missing Keys**: Run `pnpm run i18n:sync:fix` to automatically add any missing keys from English to your language file.
-3. **Clean Up**: After you finish translating, run `pnpm run i18n:purge [your-language-code]` to remove the "UNTRANSLATED" notes.
+3. **Remove Unused Keys**: Run `pnpm run i18n:check:fix` to identify and remove keys that are no longer used in the source code (this keeps the project clean).
+4. **Clean Up Notes**: After you finish translating, run `pnpm run i18n:purge [your-language-code]` to remove the "UNTRANSLATED" notes.
 
 ---
 
