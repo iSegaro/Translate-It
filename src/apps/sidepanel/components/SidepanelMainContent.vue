@@ -125,6 +125,7 @@
 </template>
 
 <script setup>
+import './SidepanelMainContent.scss'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'

@@ -31,6 +31,7 @@
 </template>
 
 <script setup>
+import './SidepanelApiDropdown.scss'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useApiProvider } from '@/composables/shared/useApiProvider.js'
 import { useUI } from '@/composables/ui/useUI.js'

@@ -59,6 +59,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
+import './ShortcutPicker.scss'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 

@@ -88,6 +88,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import './TTSTab.scss'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'

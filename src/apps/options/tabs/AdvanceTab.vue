@@ -208,6 +208,7 @@
 </template>
 
 <script setup>
+import './AdvanceTab.scss'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'

@@ -31,6 +31,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import './BaseButton.scss'
 import LoadingSpinner from './LoadingSpinner.vue'
 
 const props = defineProps({

@@ -433,6 +433,7 @@
 </template>
 
 <script setup>
+import './ActivationTab.scss'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'

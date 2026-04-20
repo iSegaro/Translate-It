@@ -1,660 +1,233 @@
 /* src/components/shared/ProviderSelector.scss */
 @use "@/assets/styles/base/variables" as *;
-@use "@/assets/styles/base/mixins" as *;
 
 /* Split Button Styles */
 .ti-split-translate-button-container {
   position: relative !important;
   flex-shrink: 0 !important;
-  overflow: visible !important;
+  display: flex !important;
+  align-items: center !important;
 
   &.ti-dropdown-open {
-    z-index: 1000 !important; // لایه بالا برای غلبه بر المان‌های مجاور
+    z-index: 1000 !important;
   }
 }
 
 .ti-split-translate-button {
   background: none !important;
-  border: 1px solid var(--header-border-color, #dee2e6) !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: $border-radius-sm !important;
   display: flex !important;
   align-items: center !important;
   padding: 0 !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease !important;
-  flex-shrink: 0 !important;
-  position: relative !important;
   overflow: hidden !important;
   height: 32px !important;
+  box-sizing: border-box !important;
 
-  &:hover {
-    border-color: var(--language-select-border-color, #adb5bd) !important;
-  }
-
-  &:disabled {
-    cursor: not-allowed !important;
-    opacity: 0.6 !important;
-  }
+  &:hover { border-color: var(--color-primary) !important; }
 }
 
 .ti-translate-main-area {
   display: flex !important;
   align-items: center !important;
-  gap: 4px !important;
-  padding: 4px 6px !important;
-  flex: 1 !important;
-  transition: background-color 0.2s ease !important;
+  gap: 6px !important;
+  padding: 0 8px !important;
   height: 100% !important;
-  box-sizing: border-box !important;
   background: none !important;
   border: none !important;
-  color: var(--text-color, #212529) !important;
+  color: var(--color-text) !important;
+  cursor: pointer !important;
 
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-    
-    .ti-api-provider-icon {
-      opacity: var(--icon-hover-opacity, 1) !important;
-    }
-  }
-
-  span {
-    color: var(--text-color, inherit) !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-}
-
-.ti-api-provider-icon {
-  width: 14px !important;
-  height: 14px !important;
-  max-width: 14px !important;
-  max-height: 14px !important;
-  opacity: var(--icon-opacity, 0.8) !important;
-  transition: opacity 0.2s ease-in-out !important;
-  object-fit: contain !important;
-
-  &.ti-invert-dark {
-    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
-      filter: invert(1) brightness(1.8) !important;
-    }
-  }
+  span { font-size: 13px !important; font-weight: 500 !important; }
 }
 
 .ti-provider-dropdown-area {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 4px 3px !important;
-  border-left: 1px solid var(--primary-color, #007bff) !important;
-  transition: background-color 0.2s ease !important;
-  cursor: pointer !important;
-  width: 20px !important;
-  flex-shrink: 0 !important;
+  border-left: 1px solid var(--color-border) !important;
+  width: 24px !important;
   height: 100% !important;
-  box-sizing: border-box !important;
+  cursor: pointer !important;
   background: none !important;
 
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-  }
-
-  &.ti-active {
-    background-color: var(--language-controls-bg-color, rgba(0, 123, 255, 0.1)) !important;
-    
-    .ti-dropdown-arrow {
-      transform: rotate(180deg) !important;
-    }
-  }
+  &:hover { background-color: var(--color-surface) !important; }
+  &.ti-active { background-color: var(--color-primary-alpha) !important; }
 }
 
-/* Regular Button Styles */
+/* Regular Button Styles (Used in Tabs/Options) */
 .ti-provider-button-container {
   position: relative !important;
-  overflow: visible !important;
-  width: auto !important; // Removed 100% to allow natural width
+  width: 250px !important;
+  flex-shrink: 0 !important;
 
-  &.ti-dropdown-open {
-    z-index: 1000 !important;
-  }
-
-  .ti-provider-dropdown-menu {
-    left: auto !important;
-    right: 0 !important;
-    width: 100% !important;
-    min-width: 200px !important;
-  }
-}
-
-/* Mobile Mode Styles */
-.ti-provider-mobile-container {
-  position: relative !important;
-  overflow: visible !important;
-  width: 100% !important;
-
-  &.ti-dropdown-open {
-    z-index: 1000 !important;
-  }
-
-  .ti-provider-mobile-button {
+  .ti-provider-button {
     display: flex !important;
     align-items: center !important;
+    justify-content: space-between !important;
     gap: 8px !important;
-    padding: 8px 12px !important;
-    background: var(--ti-mobile-btn-bg, #f8f9fa) !important;
-    border: 1px solid var(--ti-mobile-border, #dee2e6) !important;
-    border-radius: 12px !important;
-    min-height: 46px !important;
-    height: auto !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    font-size: 14px !important;
-    color: var(--ti-mobile-text, #212529) !important;
+    padding: 0 12px !important;
+    background: var(--color-background) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: $border-radius-base !important;
+    color: var(--color-text) !important;
     width: 100% !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
+    height: 40px !important;
+    cursor: pointer !important;
 
-    &:active {
-      background: var(--ti-mobile-header-border, rgba(0, 0, 0, 0.05)) !important;
-      transform: scale(0.98) !important;
-    }
-
-    .ti-api-provider-icon {
-      width: 20px !important;
-      height: 20px !important;
-    }
+    &:hover { border-color: var(--color-primary) !important; }
+    &.ti-active { border-color: var(--color-primary) !important; }
 
     span {
       flex: 1 !important;
       text-align: left !important;
+      font-size: 14px !important;
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: ellipsis !important;
-      font-weight: 600 !important;
-    }
-
-    .dropdown-arrow {
-      width: 10px !important;
-      height: 10px !important;
-      &.rotated {
-        transform: rotate(180deg) !important;
-      }
-    }
-  }
-
-  .ti-provider-dropdown-menu {
-    left: 0 !important; // CRITICAL: Align with left edge for mobile
-    right: auto !important;
-    width: 100% !important;
-    min-width: 200px !important;
-    border-radius: 12px !important;
-    margin-top: 8px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
-    border: 1px solid var(--ti-mobile-border, #dee2e6) !important;
-
-    &.ti-open-upward {
-      top: auto !important;
-      bottom: 100% !important;
-      margin-top: 0 !important;
-      margin-bottom: 8px !important;
-    }
-  }
-
-  .ti-dropdown-item {
-    padding: 12px 16px !important;
-    
-    img {
-      width: 20px !important;
-      height: 20px !important;
-    }
-
-    span {
-      font-size: 15px !important;
     }
   }
 }
 
-.ti-provider-button {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 8px 12px !important;
-  background: var(--bg-color, #ffffff) !important;
-  border: 1px solid var(--header-border-color, #dee2e6) !important;
-  border-radius: 4px !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
-  font-size: 14px !important;
-  color: var(--text-color, #212529) !important;
-  width: 100% !important;
-
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-  }
-
-  &.ti-active {
-    background-color: var(--language-controls-bg-color, rgba(0, 123, 255, 0.1)) !important;
-  }
-
-  span {
-    flex: 1 !important;
-    text-align: left !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  &:focus {
-    outline: none !important;
-    border-color: var(--color-primary, #007bff) !important;
-    box-shadow: 0 0 0 3px var(--language-controls-bg-color, rgba(0, 123, 255, 0.15)) !important;
-  }
-
-  .dropdown-arrow.rotated {
-    transform: rotate(180deg) !important;
-  }
-}
-
-/* Icon Only Mode Styles */
-.ti-provider-icon-only-container {
-  position: relative !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  overflow: visible !important;
-
-  &.ti-dropdown-open {
-    z-index: 1000 !important;
-  }
-
-  .ti-provider-dropdown-menu {
-    left: 100% !important;
-    right: auto !important;
-    top: 0 !important;
-    margin-left: 4px !important;
-    margin-top: 0 !important;
-
-    &.ti-open-upward {
-      top: auto !important;
-      bottom: 0 !important;
-    }
-  }
-}
-
-.ti-provider-icon-button {
-  @include toolbar-button-minimal;
-
-  &.ti-active {
-    .ti-provider-icon-only {
-      opacity: 1 !important;
-      filter: none !important;
-    }
-  }
-}
-
-.ti-provider-icon-only {
-  width: 18px !important;
-  height: 18px !important;
+/* Common Provider Icon Logic */
+.ti-api-provider-icon {
+  width: 16px !important;
+  height: 16px !important;
   object-fit: contain !important;
-  opacity: var(--icon-opacity, 0.8) !important;
-  transition: opacity 0.2s ease-in-out !important;
+  flex-shrink: 0 !important;
 
   &.ti-invert-dark {
-    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
+    :global(.theme-dark) &, :global(.is-dark) & {
       filter: invert(1) brightness(1.8) !important;
     }
   }
 }
 
-/* Compact Select Styles */
-.ti-provider-compact-container {
-  width: 100% !important;
+/* CRITICAL FIX: Target the arrow classes directly on the element */
+.ti-dropdown-arrow, 
+.dropdown-arrow, 
+img.ti-dropdown-arrow, 
+.ti-inline-icon.ti-dropdown-arrow {
+  width: 10px !important;
+  height: 10px !important;
+  min-width: 10px !important;
+  min-height: 10px !important;
+  max-width: 10px !important;
+  max-height: 10px !important;
   display: block !important;
-}
+  transition: transform 0.2s ease !important;
+  object-fit: contain !important;
 
-.ti-provider-select {
-  width: 100% !important;
-  height: 46px !important;
-  border-radius: 12px !important;
-  border: 1px solid var(--ti-mobile-border, #d0ebff) !important;
-  background-color: var(--ti-mobile-btn-bg, #ffffff) !important;
-  padding: 0 35px 0 12px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: var(--ti-mobile-text, #1c7ed6) !important;
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  outline: none !important;
-  cursor: pointer !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
-  background-repeat: no-repeat !important;
-  background-position: right 12px center !important;
-  background-size: 16px !important;
-  transition: all 0.2s ease !important;
-  
-  // Default Arrow (Light)
-  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23868e96%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E') !important;
-
-  &.is-dark {
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23adb5bd%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E') !important;
-  }
-}
-
-/* Common Styles */
-.ti-dropdown-arrow {
-  width: 6px !important;
-  height: 4px !important;
-  opacity: var(--icon-opacity, 0.8) !important;
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease !important;
-  filter: var(--icon-filter, none) !important;
-  pointer-events: none !important;
-}
-
-/* Disabled state styles */
-.is-disabled {
-  opacity: 0.6 !important;
-  pointer-events: none !important;
-  cursor: not-allowed !important;
-
-  * {
-    cursor: not-allowed !important;
-  }
-}
-
-button:disabled, select:disabled {
-  cursor: not-allowed !important;
-  opacity: 0.6 !important;
+  &.rotated { transform: rotate(180deg) !important; }
 }
 
 /* Provider Dropdown Menu */
 .ti-provider-dropdown-menu {
   position: absolute !important;
   top: 100% !important;
-  left: 0 !important;
-  margin-top: 2px !important;
-  background: var(--bg-color, white) !important;
-  border: 1px solid var(--header-border-color, #dee2e6) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
-  z-index: 10 !important;
-  min-width: 12rem !important; // Responsive width based on font size
-  max-width: 85vw !important; // Prevent horizontal overflow on small screens
+  right: 0 !important; /* CRITICAL FIX: Align to right side */
+  left: auto !important;
+  margin-top: 4px !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: $border-radius-base !important;
+  box-shadow: $shadow-lg !important;
+  z-index: 2147483647 !important;
+  min-width: 220px !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
-  filter: none !important;
 
   &.ti-open-upward {
     top: auto !important;
     bottom: 100% !important;
     margin-top: 0 !important;
     margin-bottom: 4px !important;
-    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.2) !important;
   }
 }
 
 .ti-provider-dropdown-list {
+  max-height: 300px !important;
   overflow-y: auto !important;
-  flex: 1 1 auto !important; // Allows the list to grow and shrink properly
   width: 100% !important;
-  min-height: 0 !important; // CRITICAL for flex-shrink to work in Firefox/Chrome
 
-  &::-webkit-scrollbar {
-    width: 6px !important;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent !important;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1) !important;
-    border-radius: 3px !important;
-  }
+  &::-webkit-scrollbar { width: 4px !important; }
+  &::-webkit-scrollbar-thumb { background: var(--color-border) !important; border-radius: 2px !important; }
 }
 
 .ti-dropdown-item {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  padding: 8px 12px !important;
+  gap: 10px !important;
+  padding: 10px 14px !important;
   cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
-  border-bottom: 1px solid var(--header-border-color, #dee2e6) !important;
+  color: var(--color-text) !important;
+  border-bottom: 1px solid var(--color-border-light, var(--color-border)) !important;
 
-  &:last-child {
-    border-bottom: none !important;
-  }
+  &:last-child { border-bottom: none !important; }
+  &:hover, &.is-focused { background-color: var(--color-primary-alpha) !important; }
+  &.ti-active { background-color: var(--color-primary-alpha) !important; color: var(--color-primary) !important; font-weight: 600 !important; }
 
-  &:hover,
-  &.is-focused {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-    opacity: 1 !important;
-  }
-
-  &.ti-active {
-    background-color: var(--language-controls-bg-color, rgba(0, 123, 255, 0.1)) !important;
-    font-weight: 500 !important;
-  }
-
-  img {
-    width: 16px !important;
-    height: 16px !important;
-    max-width: 16px !important;
-    max-height: 16px !important;
-    opacity: var(--icon-opacity, 0.8) !important;
-    object-fit: contain !important;
-    flex-shrink: 0 !important;
-
-    &.ti-invert-dark {
-      :is(.theme-dark, .is-dark) & {
-        filter: invert(1) brightness(1.8) !important;
-      }
-    }
-  }
-
-  span {
-    color: var(--text-color, #212529) !important;
-    font-size: 14px !important;
-    white-space: nowrap !important;
-  }
+  img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
+  span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
-/* Ephemeral Sync Footer Styles */
+/* Ephemeral Sync Footer */
 .ti-provider-dropdown-footer {
-  position: relative !important; // Changed from sticky to relative
-  bottom: auto !important;
-  background-color: var(--color-surface, #ffffff) !important;
-  border-top: 1px solid var(--color-border, #e5e7eb) !important;
+  background-color: var(--color-background) !important;
+  border-top: 1px solid var(--color-border) !important;
   padding: 6px !important;
   display: flex !important;
   flex-direction: row !important;
   gap: 6px !important;
-  z-index: 10 !important;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05) !important;
-  flex: 0 0 auto !important;
 }
 
 .ti-sync-row {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 4px !important;
-  padding: 6px 8px !important;
-  border-radius: 4px !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease !important;
-  flex: 1 !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 6px !important;
+  border-radius: $border-radius-sm !important;
   border: 1px solid transparent !important;
-  background: none !important;
+  background: var(--color-surface) !important;
   cursor: pointer !important;
-  color: var(--color-text-muted, #6b7280) !important;
+  flex: 1 !important;
+  color: var(--color-text-secondary) !important;
   
-  &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
-    color: var(--color-primary, #3b82f6) !important;
-    
-    .ti-sync-icon {
-      color: var(--color-primary, #3b82f6) !important;
-    }
-  }
-  
+  &:hover { background-color: var(--color-primary-alpha) !important; }
   &.is-active {
-    background-color: var(--color-primary-subtle, #eef6ff) !important;
-    border-color: var(--color-primary-light, #d1e9ff) !important;
-    color: var(--color-primary, #3b82f6) !important;
-    font-weight: 600 !important;
-    
-    .ti-sync-icon {
-      color: var(--color-primary, #3b82f6) !important;
-    }
+    background-color: var(--color-primary-alpha) !important;
+    border-color: var(--color-primary-light) !important;
+    color: var(--color-primary) !important;
   }
 }
 
 .ti-sync-info {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  font-size: 11px !important;
-  white-space: nowrap !important;
-}
-
-.ti-sync-icon {
-  font-size: 12px !important;
-  color: var(--color-text-muted, #9ca3af) !important;
-  transition: color 0.2s ease !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  span { white-space: nowrap !important; }
 }
 
 .ti-sync-provider-icon {
   width: 12px !important;
   height: 12px !important;
-  object-fit: contain !important;
-  opacity: 0.8 !important;
-  flex-shrink: 0 !important;
-
-  &.ti-invert-dark {
-    :where(.theme-dark, .is-dark, [data-theme="dark"]) & {
-      filter: invert(1) brightness(1.8) !important;
-    }
-  }
+  opacity: 0.7 !important;
 }
 
-/* Responsive adjustments using Media Queries */
-@media (max-width: 480px) {
-  .ti-split-translate-button {
-    height: 44px !important;
-    min-width: 140px !important;
-  }
-
-  .ti-translate-main-area span {
-    font-size: 16px !important;
-  }
-
-  .ti-api-provider-icon {
-    width: 20px !important;
-    height: 20px !important;
-  }
-
-  .ti-provider-dropdown-area {
-    width: 40px !important;
-  }
-
-  .ti-dropdown-item {
-    padding: 12px 16px !important;
-    
-    span { font-size: 16px !important; }
-    img { width: 20px !important; height: 20px !important; }
-  }
-
-  .ti-sync-info span { font-size: 14px !important; }
-  .ti-sync-icon { font-size: 16px !important; }
-  .ti-sync-provider-icon { width: 16px !important; height: 16px !important; }
-}
-
-/* Context-specific adjustments */
-.popup-wrapper {
-  .ti-split-translate-button-container {
-    min-width: 110px !important;
-    flex: none !important;
-  }
-
-  .ti-split-translate-button {
-    height: 28px !important;
-    width: 100% !important;
-    align-self: center !important;
-  }
-
-  .ti-translate-main-area {
-    padding: 0 4px !important;
-    
-    span { font-size: 13px !important; }
-  }
-
-  .ti-api-provider-icon {
-    width: 12px !important;
-    height: 12px !important;
-  }
-
-  .ti-provider-dropdown-area {
-    width: 18px !important;
-  }
-}
-
-.sidepanel-wrapper {
-  .ti-provider-dropdown-menu {
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    right: auto !important;
-    min-width: 180px !important;
-  }
-
-  .ti-split-translate-button {
-    height: 28px !important;
-    min-width: 100px !important;
-    border-radius: 3px !important;
-    align-self: center !important;
-    background-color: var(--bg-color, #ffffff) !important;
-    border: 1px solid var(--primary-color, #007bff) !important;
-  }
-
-  .ti-translate-main-area {
-    padding: 0 0 0 5px !important;
-    span { font-size: 13px !important; }
-  }
-
-  .ti-api-provider-icon {
-    width: 12px !important;
-    height: 12px !important;
-  }
-
-  .ti-provider-dropdown-area {
-    width: 18px !important;
-  }
-
-  .ti-split-translate-button-container {
-    max-width: 150px !important;
-    align-self: flex-start !important;
-  }
-}
-
-/* RTL adjustments */
-:is([dir="rtl"], html[dir="rtl"]) {
-  .ti-provider-dropdown-area {
-    border-left: none !important;
-    border-right: 1px solid var(--primary-color, #007bff) !important;
-  }
-
-  .ti-provider-dropdown-menu {
-    left: auto !important;
-    right: 0 !important;
-  }
-
-  .sidepanel-wrapper .ti-translate-main-area {
-    padding: 0 5px 0 0 !important;
-  }
+/* RTL Support */
+:global(.rtl) {
+  .ti-provider-dropdown-area { border-left: none !important; border-right: 1px solid var(--color-border) !important; }
+  .ti-provider-dropdown-menu { left: 0 !important; right: auto !important; }
+  .ti-provider-button span { text-align: right !important; }
   
-  .ti-provider-icon-only-container .ti-provider-dropdown-menu {
-    left: auto !important;
-    right: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 4px !important;
-  }
+  .ti-sync-row { flex-direction: row-reverse !important; }
+}
+
+/* Mobile/Popup Context specific */
+:global(.popup-wrapper) {
+  .ti-split-translate-button { height: 28px !important; }
+  .ti-translate-main-area span { font-size: 12px !important; }
 }

@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
+import './PageTranslationTooltip.scss'
 import { ref, nextTick, computed } from 'vue';
 import { pageEventBus, PAGE_TRANSLATION_EVENTS } from '@/core/PageEventBus.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';

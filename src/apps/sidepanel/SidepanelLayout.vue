@@ -32,6 +32,7 @@
 </template>
 
 <script setup>
+import './SidepanelLayout.scss'
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { onMounted, onUnmounted, ref, watch } from 'vue';

@@ -100,6 +100,7 @@
 </template>
 
 <script setup>
+import './ContentApp.scss'
 import { onUnmounted, defineAsyncComponent } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';

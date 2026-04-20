@@ -76,6 +76,7 @@
 </template>
 
 <script setup>
+import './OptionsSidebar.scss'
 import { ref, computed, onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import ThemeSelector from './components/ThemeSelector.vue'

@@ -463,14 +463,50 @@
   }
 }
 
-:global(.options-layout.rtl) {
-  .language-pref-setting .accordion-header {
-    display: flex !important;
-    flex-direction: row-reverse !important;
-    justify-content: space-between !important;
-    text-align: right !important;
+// Accordion Custom Overrides
+.api-settings-accordion,
+.bilingual-setting,
+.language-pref-setting,
+.ai-optimization-setting {
+  border-top: 1px solid var(--color-border) !important;
+  margin-top: $spacing-md !important;
+
+  :deep(.accordion-header) {
+    padding: $spacing-md 0 !important;
+    
+    .header-content {
+      font-weight: $font-weight-medium !important;
+      font-size: $font-size-base !important;
+      color: var(--color-text) !important;
     }
   }
+
+  &.is-open {
+    :deep(.accordion-header) {
+      color: var(--color-primary) !important;
+    }
+  }
+}
+
+// Special case for the first accordion to avoid double borders
+.api-settings-accordion {
+  border-top: none !important;
+  margin-top: 0 !important;
+}
+
+:global(.rtl) {
+  .base-accordion {
+    .accordion-header {
+      flex-direction: row-reverse !important;
+      text-align: right !important;
+
+      .trigger-area {
+        margin-inline-end: 0 !important;
+        margin-inline-start: -$spacing-md !important;
+      }
+    }
+  }
+}
 
   // Transitions for provider settings
   .fade-slide-enter-active,

@@ -34,6 +34,7 @@
 </template>
 
 <script setup>
+import './SidepanelApp.scss'
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation'

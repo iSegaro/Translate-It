@@ -1,0 +1,241 @@
+@use "@/assets/styles/base/variables" as *;
+
+.interface-locale-selector {
+  width: 100%;
+  position: relative;
+}
+
+/* Common Styles */
+.locale-flag-image {
+  width: 18px;
+  height: 14px;
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.locale-name {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+/* Dropdown Mode Styles */
+.dropdown-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  outline: none;
+  transition: all var(--transition-base);
+
+  &:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-surface);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+}
+
+.current-locale-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.dropdown-arrow-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrow-icon {
+  width: 10px;
+  height: 6px;
+  opacity: 0.6;
+  transition: transform var(--transition-base);
+  filter: var(--icon-filter);
+
+  &.is-open {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  padding: 4px;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: background-color var(--transition-fast);
+  color: var(--color-text);
+
+  &:hover {
+    background-color: var(--color-surface);
+  }
+
+  &.selected {
+    background-color: var(--color-active-background, #e8f0fe);
+    color: var(--color-active-text, #1967d2);
+    font-weight: var(--font-weight-medium);
+  }
+
+  :root.theme-dark &.selected,
+  .theme-dark &.selected {
+    background-color: var(--color-active-background, #1a365d);
+    color: var(--color-active-text, white);
+  }
+}
+
+/* List Mode Styles */
+.locale-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+}
+
+.locale-list-item {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  transition: background-color var(--transition-fast);
+  color: var(--color-text);
+
+  &:hover {
+    background-color: var(--color-background-hover, rgba(0,0,0,0.05));
+  }
+
+  &.selected {
+    background-color: var(--color-active-background, #e8f0fe);
+    color: var(--color-active-text, #1967d2);
+    font-weight: var(--font-weight-medium);
+  }
+
+  :root.theme-dark &.selected,
+  .theme-dark &.selected {
+    background-color: var(--color-active-background, #1a365d);
+    color: var(--color-active-text, white);
+  }
+}
+
+/* RTL Support */
+.is-rtl {
+  &.list {
+    .locale-list-item {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+  }
+
+  &.dropdown {
+    .dropdown-item {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+    .current-locale-content {
+      flex-direction: row-reverse;
+    }
+  }
+}
+
+/* Tablet responsive: make it fit in the header when in dropdown mode */
+@media (max-width: #{$breakpoint-lg}) {
+  .interface-locale-selector {
+    width: fit-content !important;
+    margin-inline-start: auto; /* Push to end in flex containers if needed */
+  }
+
+  .dropdown {
+    /* In mobile header, we keep layout consistent regardless of RTL */
+    .dropdown-toggle-btn {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      min-width: 110px; // Reduced from 130px for a more compact look
+      width: auto !important; // Allow content-based width
+      height: 36px;
+      border: none;
+      background: transparent;
+      display: flex !important;
+      justify-content: space-between !important;
+      flex-direction: row !important; /* Force LTR direction for button layout */
+
+      &:hover {
+        background: rgba(var(--color-primary-rgb), 0.1);
+      }
+    }
+
+    .current-locale-content {
+      flex-direction: row !important;
+    }
+
+    .selected-locale-name {
+      font-size: var(--font-size-sm);
+    }
+
+    .dropdown-menu {
+      // In mobile header, it will match the button width via left:0, right:0
+      min-width: 100% !important;
+      width: 100% !important;
+      left: 0 !important;
+      right: 0 !important;
+      overflow-x: hidden !important;
+    }
+
+    .dropdown-item {
+      max-width: 100% !important;
+      overflow: hidden !important;
+      
+      .locale-name {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+    }
+  }
+}
+
+/* Transition */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}

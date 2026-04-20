@@ -16,6 +16,7 @@
 </template>
 
 <script setup>
+import './LanguageDropdown.scss'
 defineProps({
   modelValue: {
     type: String,

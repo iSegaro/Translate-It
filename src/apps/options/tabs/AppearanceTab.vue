@@ -29,6 +29,7 @@
 </template>
 
 <script setup>
+import './AppearanceTab.scss'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import FontSelector from '@/components/feature/FontSelector.vue'

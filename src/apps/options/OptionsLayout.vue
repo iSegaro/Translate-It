@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
+import './OptionsLayout.scss'
 import OptionsSidebar from "./OptionsSidebar.vue";
 import OptionsNavigation from "@/components/layout/OptionsNavigation.vue";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";

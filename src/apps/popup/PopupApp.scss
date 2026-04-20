@@ -81,37 +81,34 @@
   font-weight: 500;
 }
 
-.language-controls {
-  display: grid;
-  grid-template-columns: max-content 1fr; /* Allow button to take natural width */
-  align-items: center;
-  padding: 4px 12px;
-  gap: 12px;
+.popup-content-container .language-controls {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 6px 10px !important;
+  gap: 8px !important;
   background: var(--language-controls-bg-color);
-  min-height: 48px;
-  box-sizing: border-box;
-  width: 100%;
-  overflow: visible;
+  min-height: 40px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  overflow: visible !important;
 }
 
-.language-controls > :first-child {
-  min-width: 110px;
+.popup-content-container .language-controls > :first-child {
+  flex-shrink: 0 !important;
 }
 
-.language-controls > :last-child {
-  min-width: 0;
-  width: 100%;
+.popup-content-container .language-controls > :last-child {
+  flex: 1 !important;
+  min-width: 0 !important;
 }
 
-/* On very narrow screens, switch to two rows */
+/* Maintain single row even on small screens for the main popup controls */
 @media (max-width: 340px) {
-  .language-controls {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 8px;
-  }
-  .language-controls > :first-child {
-    max-width: none;
-    width: 100%;
+  .popup-content-container .language-controls {
+    gap: 4px !important;
+    padding: 4px 6px !important;
   }
 }

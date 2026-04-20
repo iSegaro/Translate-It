@@ -1,76 +1,80 @@
-@use "@/assets/styles/base/variables" as *;
-
 .setting-group {
+  margin-bottom: $spacing-md !important;
+  
   label {
-    margin-bottom: $spacing-sm;
-    display: block;
+    margin-bottom: $spacing-sm !important;
+    display: block !important;
+    font-weight: $font-weight-medium !important;
+    color: var(--color-text) !important;
   }
 }
 
 .setting-description {
   &.export-info {
-    flex-basis: auto;
-    padding-inline-start: 0;
+    flex-basis: auto !important;
+    padding-inline-start: 0 !important;
+    margin-bottom: $spacing-md !important;
   }
 
   &.import-warning {
-    flex-basis: auto;
-    padding-inline-start: 0;
-    color: var(--color-warning);
+    flex-basis: auto !important;
+    padding-inline-start: 0 !important;
+    color: var(--color-warning) !important;
+    margin-top: $spacing-md !important;
   }
 }
 
 .export-controls-row,
 .import-controls-row {
-  display: flex;
-  align-items: center;
-  gap: $spacing-base;
-  width: 100%;
-  flex-wrap: wrap;
+  display: flex !important;
+  align-items: center !important;
+  gap: $spacing-base !important;
+  width: 100% !important;
+  flex-wrap: wrap !important;
 }
 
 .export-password-input,
 .import-password-input {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 !important;
+  min-width: 200px !important;
 }
 
 .export-button,
 .import-button {
-  flex-shrink: 0;
-  white-space: nowrap;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
 }
 
 .file-input {
-  width: 100%;
-  padding: $spacing-sm;
-  border: $border-width $border-style var(--color-border);
-  border-radius: $border-radius-base;
-  background-color: var(--color-background);
-  color: var(--color-text);
-  font-size: $font-size-sm;
+  width: 100% !important;
+  padding: $spacing-sm !important;
+  border: $border-width $border-style var(--color-border) !important;
+  border-radius: $border-radius-base !important;
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
+  font-size: $font-size-sm !important;
   
   &:focus {
-    outline: none;
-    border-color: var(--color-primary);
+    outline: none !important;
+    border-color: var(--color-primary) !important;
   }
 }
 
 .status-message {
-  padding: $spacing-base $spacing-md;
-  border-radius: $border-radius-base;
-  margin-top: $spacing-lg;
-  font-size: $font-size-sm;
-  font-weight: $font-weight-medium;
+  padding: $spacing-base $spacing-md !important;
+  border-radius: $border-radius-base !important;
+  margin-top: $spacing-lg !important;
+  font-size: $font-size-sm !important;
+  font-weight: $font-weight-medium !important;
   
   &.status-success {
-    background-color: var(--color-success);
-    color: white;
+    background-color: var(--color-success) !important;
+    color: white !important;
   }
   
   &.status-error {
-    background-color: var(--color-error);
-    color: white;
+    background-color: var(--color-error) !important;
+    color: white !important;
   }
 }
 
@@ -78,18 +82,18 @@
 @media (max-width: #{$breakpoint-md}) {
   .export-controls-row,
   .import-controls-row {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: column !important;
+    align-items: stretch !important;
     
     .export-password-input,
     .import-password-input {
-      min-width: auto;
-      width: 100%;
+      min-width: auto !important;
+      width: 100% !important;
     }
     
     .export-button,
     .import-button {
-      width: 100%;
+      width: 100% !important;
     }
   }
 }

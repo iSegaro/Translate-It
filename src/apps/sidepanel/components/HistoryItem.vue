@@ -37,6 +37,7 @@
 </template>
 
 <script setup>
+import './HistoryItem.scss'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
 const { t } = useUnifiedI18n()

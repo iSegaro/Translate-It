@@ -1,48 +1,48 @@
-@use "@/assets/styles/base/variables" as *;
-
 .setting-group {
   .setting-description {
-    margin: 0 0 $spacing-lg 0;
+    margin: 0 0 $spacing-lg 0 !important;
   }
 }
 
 .font-settings {
-  background-color: var(--color-surface);
-  border: $border-width $border-style var(--color-border);
-  border-radius: $border-radius-base;
-  padding: $spacing-md;
-  margin-bottom: $spacing-lg;
+  background-color: var(--color-surface) !important;
+  border: $border-width $border-style var(--color-border) !important;
+  border-radius: $border-radius-base !important;
+  padding: $spacing-md !important;
+  margin-bottom: $spacing-lg !important;
 
   h3 {
-    margin: 0 0 $spacing-sm 0;
-    padding: 0;
-    border: none;
-    color: var(--color-text);
+    margin: 0 0 $spacing-sm 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    color: var(--color-text) !important;
+    font-size: $font-size-lg !important;
+    font-weight: $font-weight-medium !important;
   }
 }
 
 .setting-row {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  margin-bottom: $spacing-sm;
+  display: flex !important;
+  align-items: center !important;
+  gap: $spacing-md !important;
+  margin-bottom: $spacing-sm !important;
 
   .setting-label {
-    font-weight: 600;
-    color: var(--color-text);
-    min-width: 150px;
+    font-weight: 600 !important;
+    color: var(--color-text) !important;
+    min-width: 150px !important;
   }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .font-settings {
-    padding: $spacing-sm;
+    padding: $spacing-sm !important;
   }
 
   .setting-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: $spacing-sm;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: $spacing-sm !important;
   }
 }

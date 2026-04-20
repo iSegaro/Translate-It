@@ -152,6 +152,7 @@
 </template>
 
 <script setup>
+import './SidepanelHistory.scss'
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useUI } from '@/composables/ui/useUI.js'

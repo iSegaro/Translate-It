@@ -1,29 +1,32 @@
 .language-dropdown {
-  width: 100%;
-  padding: 6px 24px 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
-  font-size: var(--font-size-sm);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  cursor: pointer;
-  appearance: auto !important; /* Force native appearance on mobile for better positioning */
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-base) !important;
+  font-size: var(--font-size-sm) !important;
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
+  cursor: pointer !important;
+  appearance: auto !important;
   -webkit-appearance: auto !important;
+  transition: all var(--transition-base) !important;
+  box-sizing: border-box !important;
   
   &:focus {
-    outline: none;
-    border-color: var(--color-primary);
+    outline: none !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1) !important;
   }
   
   &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background-color: var(--color-surface);
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+    background-color: var(--color-surface) !important;
   }
 }
 
-/* RTL support - reverse padding and text alignment */
-:global(.extension-options.rtl) .language-dropdown {
-  text-align: right;
-  padding: 6px 8px 6px 24px;
+/* RTL support - general handling for standard extension options */
+:global(.rtl) .language-dropdown {
+  text-align: right !important;
+  direction: rtl !important;
 }

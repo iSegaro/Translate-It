@@ -40,3 +40,7 @@
     </div>
   </div>
 </template>
+
+<script setup>
+import './AdvancedSettings.scss'
+</script>

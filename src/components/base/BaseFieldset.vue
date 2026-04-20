@@ -11,6 +11,7 @@
 </template>
 
 <script setup>
+import './BaseFieldset.scss'
 defineProps({
   legend: {
     type: String,

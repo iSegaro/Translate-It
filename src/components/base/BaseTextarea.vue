@@ -54,6 +54,7 @@
 
 <script setup>
 import { computed, ref, nextTick } from 'vue'
+import './BaseTextarea.scss'
 import LoadingSpinner from './LoadingSpinner.vue'
 import eyeIcon from '@/icons/ui/eye-open.svg?url'
 import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'

@@ -81,6 +81,7 @@
 </template>
 
 <script setup>
+import './PopupApp.scss'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'

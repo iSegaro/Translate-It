@@ -1,99 +1,97 @@
-@use "@/assets/styles/base/variables" as *;
-
 .prompt-label-with-button {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  width: 100%;
-  max-width: 100%;
-  margin-bottom: $spacing-sm;
-  box-sizing: border-box;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: baseline !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-bottom: $spacing-sm !important;
+  box-sizing: border-box !important;
   /* Match the 1px padding of the input container for perfect alignment */
-  padding: 0 1px;
+  padding: 0 1px !important;
   
   span {
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
-    flex: 1;
-    min-width: 0;
+    font-size: $font-size-base !important;
+    font-weight: $font-weight-medium !important;
+    color: var(--color-text) !important;
+    flex: 1 !important;
+    min-width: 0 !important;
   }
 }
 
 .button-inline {
-  padding: $spacing-xs $spacing-sm;
-  font-size: $font-size-xs;
-  font-weight: $font-weight-semibold;
-  border: $border-width $border-style var(--color-primary);
-  background-color: transparent;
-  color: var(--color-primary);
-  border-radius: $border-radius-base;
-  cursor: pointer;
-  transition: all $transition-base;
-  flex-shrink: 0;
-  margin-inline-start: $spacing-sm;
-  white-space: nowrap;
+  padding: $spacing-xs $spacing-sm !important;
+  font-size: $font-size-xs !important;
+  font-weight: $font-weight-semibold !important;
+  border: $border-width $border-style var(--color-primary) !important;
+  background-color: transparent !important;
+  color: var(--color-primary) !important;
+  border-radius: $border-radius-base !important;
+  cursor: pointer !important;
+  transition: all $transition-base !important;
+  flex-shrink: 0 !important;
+  margin-inline-start: $spacing-sm !important;
+  white-space: nowrap !important;
   
   &:hover {
-    background-color: var(--color-primary);
-    color: white;
+    background-color: var(--color-primary) !important;
+    color: white !important;
   }
 }
 
 .prompt-template-input {
-  width: 100%;
-  margin-bottom: $spacing-lg;
+  width: 100% !important;
+  margin-bottom: $spacing-lg !important;
   /* Fix for border being cut off in RTL due to overflow:hidden on container */
-  padding: 1px;
-  box-sizing: border-box;
+  padding: 1px !important;
+  box-sizing: border-box !important;
   
-  :deep(textarea) {
-    font-family: inherit;
-    line-height: 1.6;
-    background-color: var(--input-bg-color, var(--color-background));
-    color: var(--input-text-color, var(--color-text));
-    min-height: 280px;
+  .ti-textarea {
+    font-family: inherit !important;
+    line-height: 1.6 !important;
+    background-color: var(--input-bg-color, var(--color-background)) !important;
+    color: var(--input-text-color, var(--color-text)) !important;
+    min-height: 280px !important;
     
     &.highlight-on-reset {
-      animation: strong-highlight 1s ease-out;
+      animation: strong-highlight 1s ease-out !important;
     }
   }
 }
 
 .prompt-template-help {
-  max-width: 90%;
-  margin: $spacing-lg auto 0;
-  background-color: var(--tab-button-active-bg, var(--color-surface));
-  border: $border-width $border-style var(--color-border);
-  border-radius: $border-radius-md;
-  padding: $spacing-md;
-  font-size: $font-size-xs;
-  color: var(--color-text-secondary);
+  max-width: 90% !important;
+  margin: $spacing-lg auto 0 !important;
+  background-color: var(--tab-button-active-bg, var(--color-surface)) !important;
+  border: $border-width $border-style var(--color-border) !important;
+  border-radius: $border-radius-md !important;
+  padding: $spacing-md !important;
+  font-size: $font-size-xs !important;
+  color: var(--color-text-secondary) !important;
   
   p {
-    margin: 0 0 $spacing-base 0;
+    margin: 0 0 $spacing-base 0 !important;
   }
   
   ul {
-    padding-inline-start: $spacing-lg;
-    margin: 0;
+    padding-inline-start: $spacing-lg !important;
+    margin: 0 !important;
   }
   
   li {
-    margin-bottom: $spacing-xs;
+    margin-bottom: $spacing-xs !important;
   }
   
   code {
-    background-color: var(--color-border);
-    color: var(--color-text);
-    padding: 3px 6px;
-    border-radius: $border-radius-sm;
-    font-family: monospace;
+    background-color: var(--color-border) !important;
+    color: var(--color-text) !important;
+    padding: 3px 6px !important;
+    border-radius: $border-radius-sm !important;
+    font-family: monospace !important;
   }
   
   .lang-name {
-    font-style: italic;
-    color: var(--color-text);
+    font-style: italic !important;
+    color: var(--color-text) !important;
   }
 }
 
@@ -120,8 +118,8 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .prompt-label-with-button {
-    flex-direction: column;
-    align-items: stretch;
-    gap: $spacing-sm;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: $spacing-sm !important;
   }
 }

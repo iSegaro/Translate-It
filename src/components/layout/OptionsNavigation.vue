@@ -29,6 +29,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import './OptionsNavigation.scss'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'

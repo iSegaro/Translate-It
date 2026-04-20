@@ -14,6 +14,7 @@
 </template>
 
 <script setup>
+import './LogLevelItem.scss'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 
 defineProps({

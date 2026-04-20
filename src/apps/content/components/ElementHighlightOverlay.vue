@@ -21,6 +21,7 @@
 </template>
 
 <script setup>
+import './ElementHighlightOverlay.scss'
 import { ref, computed, onMounted } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';

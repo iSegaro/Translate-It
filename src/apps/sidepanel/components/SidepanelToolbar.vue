@@ -89,7 +89,7 @@
 </template>
 
 <script setup>
-
+import './SidepanelToolbar.scss'
 import { computed } from 'vue';
 import { useSelectElementTranslation, useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';

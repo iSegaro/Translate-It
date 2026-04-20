@@ -51,6 +51,7 @@
 </template>
 
 <script setup>
+import './PromptTab.scss'
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'

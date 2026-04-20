@@ -39,6 +39,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import './IconButton.scss'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Props

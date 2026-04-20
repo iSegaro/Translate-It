@@ -1,290 +1,294 @@
-@use "@/assets/styles/base/variables" as *;
-
 .setting-row {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  width: 100%;
+  display: flex !important;
+  align-items: center !important;
+  gap: $spacing-md !important;
+  width: 100% !important;
 
   .setting-label {
-    font-weight: 600;
-    color: var(--color-text);
-    min-width: 150px;
+    font-weight: 600 !important;
+    color: var(--color-text) !important;
+    min-width: 150px !important;
   }
 
   .shortcut-picker-animated-wrapper {
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    max-width: 0;
-    opacity: 0;
-    transform: translateX(-10px) scale(0.95);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-    flex-shrink: 0;
+    display: flex !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    transform: translateX(-10px) scale(0.95) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    pointer-events: none !important;
+    flex-shrink: 0 !important;
 
     &.open {
-      max-width: 300px;
-      opacity: 1;
-      transform: translateX(0) scale(1);
-      pointer-events: auto;
-      margin-inline-start: $spacing-xs; // Small extra gap when open
+      max-width: 400px !important;
+      opacity: 1 !important;
+      transform: translateX(0) scale(1) !important;
+      pointer-events: auto !important;
+      margin-inline-start: $spacing-sm !important;
+    }
+
+    .inline-picker {
+      width: auto !important;
+      min-width: 150px !important;
     }
   }
 }
 
 .whole-page-trigger-group {
-  margin-top: $spacing-md;
+  margin-top: $spacing-md !important;
 
   .trigger-modes-container, .delay-setting-container {
-    display: flex;
-    align-items: center;
-    gap: $spacing-md;
-    margin-bottom: $spacing-sm;
+    display: flex !important;
+    align-items: center !important;
+    gap: $spacing-md !important;
+    margin-bottom: $spacing-sm !important;
     
     .trigger-label, .delay-label {
-      font-size: $font-size-sm;
-      font-weight: 500;
-      color: var(--color-text);
-      min-width: 160px;
-      transition: opacity 0.2s ease;
+      font-size: $font-size-sm !important;
+      font-weight: 500 !important;
+      color: var(--color-text) !important;
+      min-width: 160px !important;
+      transition: opacity 0.2s ease !important;
 
       &.is-disabled {
-        opacity: 0.6;
+        opacity: 0.6 !important;
       }
     }
     
     .radio-group-horizontal {
-      display: flex;
-      align-items: center;
-      gap: $spacing-xl;
+      display: flex !important;
+      align-items: center !important;
+      gap: $spacing-xl !important;
     }
   }
 
   .delay-setting-container {
-    margin-top: $spacing-xs;
+    margin-top: $spacing-xs !important;
   }
 }
 
 .number-input-container {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
+  display: flex !important;
+  align-items: center !important;
+  gap: $spacing-xs !important;
 
   .base-number-input {
-    width: 80px;
-    padding: 6px 10px;
-    border-radius: $border-radius-sm;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-surface);
-    color: var(--color-text);
-    font-family: inherit;
-    font-size: 0.95em;
-    outline: none;
-    transition: border-color 0.2s;
+    width: 80px !important;
+    padding: 6px 10px !important;
+    border-radius: $border-radius-sm !important;
+    border: 1px solid var(--color-border) !important;
+    background-color: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    font-family: inherit !important;
+    font-size: 0.95em !important;
+    outline: none !important;
+    transition: border-color 0.2s !important;
 
     &:focus {
-      border-color: var(--color-primary);
+      border-color: var(--color-primary) !important;
     }
 
     &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+      opacity: 0.6 !important;
+      cursor: not-allowed !important;
     }
 
     &.compact-input {
-      width: 65px;
-      padding: 3px 6px;
-      height: 26px;
-      text-align: center;
+      width: 65px !important;
+      padding: 3px 6px !important;
+      height: 26px !important;
+      text-align: center !important;
     }
   }
 
   .unit-label {
-    font-size: 0.9em;
-    color: var(--color-text-secondary);
-    transition: opacity 0.2s ease;
+    font-size: 0.9em !important;
+    color: var(--color-text-secondary) !important;
+    transition: opacity 0.2s ease !important;
 
     &.is-disabled {
-      opacity: 0.6;
+      opacity: 0.6 !important;
     }
   }
 
   &.inline-delay-input {
-    margin-inline-start: $spacing-xs;
+    margin-inline-start: $spacing-xs !important;
   }
 }
 
 .inline-setting-content {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: $spacing-xs;
-  color: var(--color-text);
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: $spacing-xs !important;
+  color: var(--color-text) !important;
 }
 
 .setting-row-with-provider {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-md;
-  width: 100%;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: $spacing-md !important;
+  width: 100% !important;
+  flex-wrap: wrap !important;
 
   .mode-provider-container {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-    width: 250px; // Increased from 180px to match other dropdowns
+    display: flex !important;
+    align-items: center !important;
+    gap: $spacing-sm !important;
+    width: 280px !important;
 
     .mode-provider-label {
-      font-size: $font-size-xs;
-      color: var(--color-text-secondary);
-      white-space: nowrap;
-      transition: opacity 0.2s;
+      font-size: $font-size-xs !important;
+      color: var(--color-text-secondary) !important;
+      white-space: nowrap !important;
+      transition: opacity 0.2s !important;
 
       &.is-disabled {
-        opacity: 0.6;
+        opacity: 0.6 !important;
       }
     }
 
     :deep(.ti-provider-button-container) {
-      flex: 1;
-      min-width: 0;
+      flex: 1 !important;
+      min-width: 0 !important;
 
       .ti-provider-button {
         width: 100% !important;
-        padding: 6px 10px !important; // Slightly more compact padding for these rows
+        padding: 6px 10px !important;
       }
     }
   }
 }
 
 .shortcut-setting {
-  width: 100%;
-  margin-top: $spacing-md;
-  padding: $spacing-md;
-  background-color: var(--color-surface);
-  border-radius: $border-radius-sm;
-  border: 1px solid var(--color-border);
+  width: 100% !important;
+  margin-top: $spacing-md !important;
+  padding: $spacing-md !important;
+  background-color: var(--color-surface) !important;
+  border-radius: $border-radius-sm !important;
+  border: 1px solid var(--color-border) !important;
 
   .shortcut-label {
-    display: block;
-    font-size: $font-size-sm;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
-    margin-bottom: $spacing-sm;
+    display: block !important;
+    font-size: $font-size-sm !important;
+    font-weight: $font-weight-medium !important;
+    color: var(--color-text) !important;
+    margin-bottom: $spacing-sm !important;
   }
 }
 
 .shortcut-setting-compact {
-  width: 100%;
-  margin-top: $spacing-sm;
-  margin-inline-start: $spacing-lg;
-  display: flex;
-  align-items: center;
+  width: 100% !important;
+  margin-top: $spacing-sm !important;
+  margin-inline-start: $spacing-lg !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 .setting-description {
-  padding-inline-start: $spacing-xl;
-  margin-top: $spacing-xs;
+  padding-inline-start: $spacing-xl !important;
+  margin-top: $spacing-xs !important;
 }
 
 .sub-options-group {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
-              opacity 0.2s ease, 
-              margin 0.25s ease, 
-              padding 0.25s ease;
-  opacity: 0;
-  overflow: hidden;
-  margin-inline-start: $spacing-md;
-  border-inline-start: 2px solid transparent; // Animated border color
+  display: grid !important;
+  grid-template-rows: 0fr !important;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              opacity 0.25s ease, 
+              margin 0.3s ease !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  margin-inline-start: $spacing-md !important;
+  border-inline-start: 2px solid transparent !important;
 
   &.open {
-    grid-template-rows: 1fr;
-    opacity: 1;
-    margin-top: $spacing-base;
-    border-inline-start-color: var(--color-border);
+    grid-template-rows: 1fr !important;
+    opacity: 1 !important;
+    margin-top: $spacing-base !important;
+    margin-bottom: $spacing-md !important;
+    border-inline-start-color: var(--color-border) !important;
   }
 
   .sub-options-inner {
-    min-height: 0;
-    padding-inline-start: $spacing-lg;
-    padding-top: $spacing-base;
-    padding-bottom: $spacing-xs;
+    min-height: 0 !important;
+    padding-inline-start: $spacing-lg !important;
+    padding-top: $spacing-base !important;
+    padding-bottom: $spacing-xs !important;
   }
   
   .radio-group {
-    display: flex;
-    align-items: center;
-    gap: $spacing-xl;
-    margin-bottom: $spacing-base;
+    display: flex !important;
+    align-items: center !important;
+    gap: $spacing-xl !important;
+    margin-bottom: $spacing-base !important;
 
     &.ui-mode-radio-group {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      align-items: stretch;
-      gap: $spacing-lg;
-      width: 100%;
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr) !important;
+      align-items: stretch !important;
+      gap: $spacing-lg !important;
+      width: 100% !important;
 
       .radio-label-content {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.2;
+        display: flex !important;
+        flex-direction: column !important;
+        line-height: 1.2 !important;
 
         .label-title {
-          font-weight: 500;
-          color: var(--color-text);
-          display: block;
+          font-weight: 500 !important;
+          color: var(--color-text) !important;
+          display: block !important;
         }
 
         .label-description {
-          font-size: 0.85em;
-          color: var(--color-text-secondary);
-          display: block;
-          margin-top: 2px;
+          font-size: 0.85em !important;
+          color: var(--color-text-secondary) !important;
+          display: block !important;
+          margin-top: 2px !important;
         }
       }
     }
   }
   
   .sub-setting-group {
-    margin-inline-start: $spacing-lg;
-    padding-inline-start: $spacing-md;
-    border-inline-start: 2px solid var(--color-border);
+    margin-inline-start: $spacing-lg !important;
+    padding-inline-start: $spacing-md !important;
+    border-inline-start: 2px solid var(--color-border) !important;
   }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .setting-row, .setting-row-with-provider {
-    flex-direction: column;
-    align-items: stretch;
-    gap: $spacing-sm;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: $spacing-sm !important;
   }
 
   .setting-description {
-    padding-inline-start: 0;
+    padding-inline-start: 0 !important;
   }
   
   .sub-options-group {
-    padding-inline-start: $spacing-base;
-    margin-inline-start: $spacing-sm;
+    padding-inline-start: $spacing-base !important;
+    margin-inline-start: $spacing-sm !important;
     
     .radio-group {
-      flex-direction: column;
-      align-items: stretch;
-      gap: $spacing-base;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: $spacing-base !important;
 
       &.ui-mode-radio-group {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
       }
     }
     
     .sub-setting-group {
-      margin-inline-start: $spacing-base;
-      padding-inline-start: $spacing-sm;
+      margin-inline-start: $spacing-base !important;
+      padding-inline-start: $spacing-sm !important;
     }
   }
 }

@@ -316,6 +316,7 @@
 </template>
 
 <script setup>
+import './LanguagesTab.scss'
 import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useValidation } from '@/core/validation.js'

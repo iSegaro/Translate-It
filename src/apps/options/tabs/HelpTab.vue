@@ -66,6 +66,7 @@
 </template>
 
 <script setup>
+import './HelpTab.scss'
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'

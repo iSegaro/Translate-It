@@ -38,6 +38,7 @@
 </template>
 
 <script setup>
+import './OptionsApp.scss'
 import { ref, onMounted, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'

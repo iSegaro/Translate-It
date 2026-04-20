@@ -84,6 +84,7 @@
 </template>
 
 <script setup>
+import './ImportExportTab.scss'
 import { ref } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'

@@ -59,6 +59,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import './BaseInput.scss'
 import BaseButton from './BaseButton.vue'
 
 const props = defineProps({

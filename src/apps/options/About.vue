@@ -30,6 +30,7 @@
 </template>
 
 <script setup>
+import './About.scss'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'

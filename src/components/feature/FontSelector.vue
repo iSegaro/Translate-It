@@ -153,6 +153,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import './FontSelector.scss'
 import { CONFIG } from '@/shared/config/config.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { systemFontDetector } from '@/shared/fonts/SystemFontDetector.js'

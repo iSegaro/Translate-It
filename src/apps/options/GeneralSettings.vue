@@ -100,6 +100,7 @@
 </template>
 
 <script setup>
+import './GeneralSettings.scss'
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'

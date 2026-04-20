@@ -40,6 +40,7 @@
 </template>
 
 <script setup>
+import './BaseAccordion.scss';
 /**
  * BaseAccordion Component
  * A reusable, accessible accordion with smooth height transitions using CSS Grid.

@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-
+import './ApiProviderItem.scss'
 const props = defineProps({
   item: {
     type: Object,
