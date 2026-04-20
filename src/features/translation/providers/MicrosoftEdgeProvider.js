@@ -12,9 +12,13 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'MicrosoftEdge');
 
-// Source:
-// https://github.com/translate-tools/core/blob/master/src/translators/MicrosoftTranslator/index.ts
-
+/**
+ * Microsoft Edge Translation Provider
+ * Uses the internal Edge translation API endpoints
+ * 
+ * Source Reference:
+ * https://github.com/translate-tools/core/blob/master/src/translators/MicrosoftTranslator/index.ts
+ */
 export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   static type = "translate";
   static displayName = "Microsoft Edge";
@@ -27,8 +31,13 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
     super(ProviderNames.MICROSOFT_EDGE);
   }
 
+  /**
+   * Normalize language code for Microsoft's API
+   * @param {string} lang - Language code
+   * @returns {string|null} - Normalized code or null for auto-detection
+   */
   _getLangCode(lang) {
-    if (!lang || lang === AUTO_DETECT_VALUE) return ""; // Let Edge auto-detect
+    if (!lang || lang === AUTO_DETECT_VALUE) return null; // Signal auto-detection
     
     // Normalize to base code (e.g., 'en-US' -> 'en') unless it's a special Microsoft code
     const baseCode = typeof lang === 'string' ? lang.split('-')[0].toLowerCase() : lang;
@@ -40,7 +49,9 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Fetch Microsoft Edge auth token
+   * Fetch Microsoft Edge auth token with caching and expiry management
+   * @param {AbortController} abortController - Controller for cancellation
+   * @returns {Promise<string>} - Auth token
    */
   async _getAuthToken(abortController) {
     // Return cached token if still valid (with 30s buffer)
@@ -116,53 +127,78 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
     const token = await this._getAuthToken(abortController);
     
     const sl = this._getLangCode(sourceLang);
-    const tl = this._getLangCode(targetLang);
+    const tl = this._getLangCode(targetLang) || 'fa';
 
     const translateUrl = await getMicrosoftEdgeTranslateUrlAsync();
-    const url = new URL(translateUrl);
-    url.searchParams.set("api-version", "3.0");
-    if (sl) url.searchParams.set("from", sl);
-    url.searchParams.set("to", tl);
-    url.searchParams.set("includeSentenceLength", "true");
+    
+    /**
+     * Internal helper to execute the request with a specific source language
+     * @param {string|null} currentSource - Language code to use for 'from' param
+     */
+    const performRequest = async (currentSource) => {
+      const url = new URL(translateUrl);
+      url.searchParams.set("api-version", "3.0");
+      
+      // CRITICAL: Omit 'from' parameter completely for auto-detection or if rejected.
+      if (currentSource && currentSource !== "auto-detect") {
+        url.searchParams.set("from", currentSource);
+      }
+      
+      url.searchParams.set("to", tl);
+      url.searchParams.set("includeSentenceLength", "true");
 
-    // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
-    const body = chunkTexts.map(text => ({ Text: text }));
+      // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
+      const body = chunkTexts.map(text => ({ Text: text }));
+      const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
-
-    return this._executeRequest({
-      url: url.toString(),
-      fetchOptions: {
-        method: "POST",
-        mode: 'cors',
-        credentials: 'include',
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Accept": "*/*",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-          "Priority": "u=1, i"
+      return await this._executeRequest({
+        url: url.toString(),
+        fetchOptions: {
+          method: "POST",
+          mode: 'cors',
+          credentials: 'include',
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Priority": "u=1, i"
+          },
+          body: JSON.stringify(body)
         },
-        body: JSON.stringify(body)
-      },
-      extractResponse: (data) => {
-        if (!data?.[0]?.translations) {
-          logger.error('[Edge] Unexpected API response format:', data);
-          return chunkTexts.map(() => "");
-        }
-        
-        // Match anylang logic: Join multiple translation segments if present
-        return data.map(item => {
-          if (!item.translations || !Array.isArray(item.translations)) return "";
-          return item.translations.map(t => t.text).join(' ');
-        });
-      },
-      context: 'edge-translate-chunk',
-      abortController,
-      charCount: this._calculateTraditionalCharCount(chunkTexts),
-      sessionId: options.sessionId,
-      originalCharCount: options.originalCharCount || originalCharCount
-    });
+        extractResponse: (data) => {
+          if (!data?.[0]?.translations) {
+            logger.error('[Edge] Unexpected API response format:', data);
+            return chunkTexts.map(() => "");
+          }
+          
+          // Match anylang logic: Join multiple translation segments if present
+          return data.map(item => {
+            if (!item.translations || !Array.isArray(item.translations)) return "";
+            return item.translations.map(t => t.text).join(' ');
+          });
+        },
+        context: 'edge-translate-chunk',
+        abortController,
+        charCount: this._calculateTraditionalCharCount(chunkTexts),
+        sessionId: options.sessionId,
+        originalCharCount: options.originalCharCount || originalCharCount
+      });
+    };
+
+    try {
+      return await performRequest(sl);
+    } catch (error) {
+      // IF EDGE REJECTS THE SOURCE LANGUAGE (HTTP 400), RETRY ONCE WITHOUT THE 'FROM' PARAMETER
+      // This provides extreme stability when the detected language code is not accepted by the API.
+      if (error.message?.includes('The source language is not valid') && sl) {
+        logger.warn(`[Edge] Language '${sl}' rejected. Retrying with auto-detection...`);
+        return await performRequest(null);
+      }
+      throw error;
+    }
   }
 }
+
+export default MicrosoftEdgeProvider;
