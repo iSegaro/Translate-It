@@ -151,24 +151,3 @@ const retryLoading = () => {
   }, 100)
 };
 </script>
-
-<style scoped>
-.extension-options {
-  width: 100vw;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start !important; /* This was the key fix */
-  background-color: var(--color-background) !important;
-  box-sizing: border-box;
-  padding: 10px; /* Restored small padding for better aesthetics */
-}
-
-.extension-options.rtl {
-  direction: rtl;
-  
-  .loading-container {
-    text-align: right;
-  }
-}
-</style>
