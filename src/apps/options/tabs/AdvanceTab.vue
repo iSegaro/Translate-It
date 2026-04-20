@@ -187,7 +187,9 @@
               :key="catId"
               class="debug-category-group"
             >
-              <h4 class="category-title">{{ category.label }}</h4>
+              <h4 class="category-title">
+                {{ category.label }}
+              </h4>
               <div class="debug-grid">
                 <LogLevelItem
                   v-for="name in category.components"

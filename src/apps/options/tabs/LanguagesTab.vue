@@ -24,19 +24,22 @@
               <div class="opt-control-group">
                 <div class="label-with-value">
                   <label class="opt-label">{{ t('optimization_level_label') || 'Optimization Level' }}</label>
-                  <span class="level-badge" :class="'level-' + currentOptimizationLevel">
+                  <span
+                    class="level-badge"
+                    :class="'level-' + currentOptimizationLevel"
+                  >
                     {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
                   </span>
                 </div>
                 
                 <div class="slider-wrapper">
                   <input 
+                    v-model.number="currentOptimizationLevel" 
                     type="range" 
                     min="1" 
-                    max="5" 
-                    v-model.number="currentOptimizationLevel"
+                    max="5"
                     class="ti-range-slider"
-                  />
+                  >
                   <div class="slider-labels">
                     <span>{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
                     <span>{{ t('opt_balanced') || 'Balanced' }}</span>
@@ -46,8 +49,8 @@
                 
                 <p class="opt-description">
                   {{ isAIProvider 
-                      ? t('optimization_description_ai') || 'Adjust balance between translation cost (tokens) and streaming speed.' 
-                      : t('optimization_description_traditional') || 'Adjust balance between request stability and translation speed.' 
+                    ? t('optimization_description_ai') || 'Adjust balance between translation cost (tokens) and streaming speed.' 
+                    : t('optimization_description_traditional') || 'Adjust balance between request stability and translation speed.' 
                   }}
                 </p>
               </div>

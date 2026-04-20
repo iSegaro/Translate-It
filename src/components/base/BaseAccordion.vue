@@ -1,5 +1,8 @@
 <template>
-  <div class="base-accordion" :class="{ 'is-open': isOpen, [itemClass]: !!itemClass }">
+  <div
+    class="base-accordion"
+    :class="{ 'is-open': isOpen, [itemClass]: !!itemClass }"
+  >
     <!-- Header Section -->
     <div 
       class="accordion-header" 
@@ -14,7 +17,10 @@
 
       <div class="trigger-area">
         <slot name="trigger">
-          <div class="icon-wrapper" :class="{ 'is-active': isOpen }">
+          <div
+            class="icon-wrapper"
+            :class="{ 'is-active': isOpen }"
+          >
             <span class="icon">+</span>
           </div>
         </slot>
@@ -22,9 +28,12 @@
     </div>
 
     <!-- Collapsible Content Section -->
-    <div class="accordion-body" :class="{ 'is-open': isOpen, [bodyClass]: !!bodyClass }">
+    <div
+      class="accordion-body"
+      :class="{ 'is-open': isOpen, [bodyClass]: !!bodyClass }"
+    >
       <div class="body-inner">
-        <slot name="content"></slot>
+        <slot name="content" />
       </div>
     </div>
   </div>
