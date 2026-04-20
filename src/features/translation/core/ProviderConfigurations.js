@@ -290,8 +290,8 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: 3900, // Google's character limit
-      maxChunksPerBatch: 10,
-      delimiter: '\n\n---\n\n' // Google's reliable delimiter
+      maxChunksPerBatch: 100, // Increased for efficiency
+      delimiter: '\n[[---]]\n' // Standard resilient delimiter
     },
     streaming: {
       enabled: true, // Enable streaming for real-time chunk translation
@@ -340,7 +340,7 @@ export const PROVIDER_CONFIGURATIONS = {
       strategy: 'character_limit',
       characterLimit: 5000,
       maxChunksPerBatch: 15,
-      delimiter: '\n\n---\n\n'
+      delimiter: '\n[[---]]\n'
     },
     streaming: {
       enabled: true,
@@ -491,8 +491,8 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: 4000, // Conservative limit for Bing
-      maxChunksPerBatch: 5,
-      delimiter: '\n\n---\n\n', // Similar to Google
+      maxChunksPerBatch: 10, // Increased for efficiency
+      delimiter: '\n[[---]]\n', // Standard resilient delimiter
       adaptiveChunking: true, // Enable adaptive chunking for errors
       minChunkSize: 100, // Minimum chunk size for retry
       maxRetries: 3 // Maximum retry attempts
@@ -572,7 +572,7 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsImageTranslation: false,
-      supportsBatchRequests: true,
+      supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
       reliableJsonMode: true,
       supportsDictionary: false
@@ -620,7 +620,7 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     features: {
       supportsImageTranslation: false,
-      supportsBatchRequests: true,
+      supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
       supportsDictionary: false
@@ -670,6 +670,7 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   }
 };
+
 /**
  * Get configuration for a specific provider
  * @param {string} providerName - Name of the provider
@@ -757,12 +758,19 @@ function applyOptimizationLevel(config, level) {
     const charMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
     result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * charMultipliers[safeLevel]));
     
-    // Also scale segment limits for traditional providers if they exist
-    if (config.batching.optimalSize) {
-      result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
-    }
+    // GUARDRAIL: Only scale down maxChunksPerBatch for levels > 3 if the base value is high.
+    // For traditional providers, we want to maintain at least 25 segments per request 
+    // to avoid the 'Double Fragmentation' issue with the Scheduler.
     if (config.batching.maxChunksPerBatch) {
-      result.batching.maxChunksPerBatch = Math.max(2, Math.round(config.batching.maxChunksPerBatch * sizeMultipliers[safeLevel]));
+      const multiplier = safeLevel > 3 ? Math.max(0.8, sizeMultipliers[safeLevel]) : sizeMultipliers[safeLevel];
+      const minSafeSegments = 25;
+      
+      const newMaxChunks = Math.round(config.batching.maxChunksPerBatch * multiplier);
+      result.batching.maxChunksPerBatch = Math.max(minSafeSegments, newMaxChunks);
+    }
+    
+    if (config.batching.optimalSize) {
+      result.batching.optimalSize = Math.max(15, Math.round(config.batching.optimalSize * sizeMultipliers[safeLevel]));
     }
   }
 

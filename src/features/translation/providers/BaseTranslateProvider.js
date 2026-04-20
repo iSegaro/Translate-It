@@ -147,6 +147,8 @@ export class BaseTranslateProvider extends BaseProvider {
     const chunks = await this._createChunks(texts);
     const allResults = [];
 
+    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
+
     for (let i = 0; i < chunks.length; i++) {
       if (abortController && abortController.signal.aborted) {
         const cancelError = new Error('Translation cancelled by user');
@@ -168,20 +170,39 @@ export class BaseTranslateProvider extends BaseProvider {
         { sessionId }
       );
 
-      // Handle different response formats (Array, results object, or raw String)
-      let chunkResults;
-      if (Array.isArray(chunkResponse)) {
-        chunkResults = chunkResponse;
-      } else if (chunkResponse?.results && Array.isArray(chunkResponse.results)) {
-        chunkResults = chunkResponse.results;
-      } else if (typeof chunkResponse === 'string') {
-        chunkResults = [chunkResponse];
+      // Handle different response formats and CRITICAL: Split joined strings back into segments
+      let chunkResults = [];
+      const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
+
+      // Normalize chunkResponse to an array for consistent processing
+      const responseArray = Array.isArray(chunkResponse) ? chunkResponse : [chunkResponse];
+      
+      if (responseArray.length === chunk.texts.length) {
+        // IDEAL CASE: Provider returned exactly what we asked for
+        chunkResults = responseArray;
       } else {
-        chunkResults = chunk.texts.map(() => '');
+        // MISMATCH CASE: Provider did internal splitting or merged segments
+        // Join everything and let the SegmentMapper redistribute it correctly
+        const joinedResult = responseArray
+          .map(r => (typeof r === 'string' ? r : (r?.text || '')))
+          .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+
+        chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+          joinedResult,
+          chunk.texts,
+          TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+          this.providerName
+        );
       }
 
       allResults.push(...chunkResults);
     }
+    
+    // Final safety check: if somehow we still have a mismatch, log it
+    if (allResults.length !== texts.length) {
+      logger.warn(`[${this.providerName}] Final batch result count mismatch! Expected ${texts.length}, got ${allResults.length}`);
+    }
+
     return allResults;
   }
 

@@ -402,18 +402,50 @@ export class PageTranslationScheduler extends ResourceTracker {
       this.settings.targetLanguage = await getTargetLanguageAsync();
     }
 
+    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+
     const providerRegistryId = this.settings.translationApi;
     const targetLanguage = this.settings.targetLanguage;
     
     const providerName = registryIdToName(providerRegistryId);
+    const level = await getProviderOptimizationLevelAsync(providerName);
+    const providerConfig = getProviderConfiguration(providerName, level);
+
     const isAI = isProviderType(providerName, ProviderTypes.AI);
+
+    // Sync concurrency settings with optimization level
+    if (providerConfig.rateLimit) {
+      this.settings.maxConcurrentFlushes = providerConfig.rateLimit.maxConcurrent;
+    }
+
+    // Dynamic Chunk Size Scaling for Progressive UI Updates
+    // Traditional providers (Bing/Google/Edge) are slow per-request, so we keep chunks SMALL 
+    // to ensure the UI updates every few seconds (Progressive Feel).
+    // AI providers can handle larger chunks (50-100) more efficiently.
+    let baseChunkSize = isAI ? 50 : 15; 
+    
+    const chunkMultipliers = {
+      1: 0.6, // ~10 segments
+      2: 0.8, // ~12 segments
+      3: 1.0, // ~15 segments
+      4: 1.3, // ~20 segments
+      5: 1.6  // ~25 segments (Max for traditional to keep it progressive)
+    };
+    
+    let chunkSize = Math.floor(baseChunkSize * (chunkMultipliers[level] || 1));
+    
+    // For AI, we can afford larger chunks for better context and fewer messages
+    if (isAI) {
+      chunkSize = level >= 4 ? 100 : (level >= 3 ? 60 : 30);
+    }
 
     return {
       providerRegistryId,
       targetLanguage,
-      chunkSize: this.settings.chunkSize,
+      chunkSize: Math.max(chunkSize, 5), // Ensure at least 5 segments per batch
       lazyLoading: this.settings.lazyLoading,
-      maxChars: isAI ? CONFIG.WHOLE_PAGE_AI_MAX_CHARS : CONFIG.WHOLE_PAGE_MAX_CHARS
+      maxChars: isAI ? (providerConfig.batching?.maxBatchSizeChars || CONFIG.WHOLE_PAGE_AI_MAX_CHARS) : (providerConfig.batching?.characterLimit || CONFIG.WHOLE_PAGE_MAX_CHARS)
     };
   }
 

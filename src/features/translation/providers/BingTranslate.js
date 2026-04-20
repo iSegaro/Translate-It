@@ -21,14 +21,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
-  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING;
-  static CHUNK_SIZE = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING; 
+  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING;
+  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING;
 
   // BaseTranslateProvider capabilities
   static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.BING;
   static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.BING;
-  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING; // Bing's character limit - reduced for reliability
-  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING; // Bing's chunk size - reduced for reliability
 
   constructor() {
     super(ProviderNames.BING_TRANSLATE);
@@ -53,7 +51,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
    * @param {number} chunkIndex - Index of this chunk in the batch
    * @param {number} totalChunks - Total number of chunks in the batch
    * @param {Object} options - Additional options (sessionId, originalCharCount)
-   * @returns {Promise<string[]>} - Translated texts for this chunk
+   * @returns {Promise<string>} - Translated raw string for this chunk
    */
    async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
 
@@ -68,34 +66,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     // Add key info log for translation start
     if (retryAttempt === 0) {
-      logger.info(`[Bing] Starting translation: ${chunkTexts.join(' ').length} chars (Level: ${optimizationLevel})`);
+      logger.info(`[Bing] Starting translation: ${chunkTexts.reduce((s, t) => s + (t?.length || 0), 0)} chars (Level: ${optimizationLevel})`);
     }
 
     try {
-      // Validate chunk size before processing
-      if (chunkTexts.length > this.constructor.maxChunksPerBatch) {
-        logger.info(`[Bing] Chunk too large (${chunkTexts.length} > ${this.constructor.maxChunksPerBatch}), splitting`);
-        // Split into smaller sub-chunks and preserve order
-        const results = [];
-        for (let i = 0; i < chunkTexts.length; i += this.constructor.maxChunksPerBatch) {
-          const subChunk = chunkTexts.slice(i, i + this.constructor.maxChunksPerBatch);
-          const subResults = await this._translateChunk(
-            subChunk,
-            sourceLang,
-            targetLang,
-            translateMode,
-            abortController,
-            retryAttempt,
-            segmentCount,
-            Math.floor(i / this.constructor.maxChunksPerBatch),
-            Math.ceil(chunkTexts.length / this.constructor.maxChunksPerBatch),
-            options
-          );
-          results.push(...subResults);
-        }
-        return results;
-      }
-      
       // Get Bing access token
       const tokenData = await this._getBingAccessToken(abortController);
       
@@ -112,7 +86,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       if (textToTranslate.length > this.constructor.characterLimit) {
         logger.info(`[Bing] Text too long (${textToTranslate.length} chars, limit is ${this.constructor.characterLimit}), splitting`);
 
-        // Scenario A: Multiple chunks - split the array
+        // Scenario A: Multiple segments - split the array
         if (chunkTexts.length > 1) {
           const midPoint = Math.ceil(chunkTexts.length / 2);
           const firstHalf = chunkTexts.slice(0, midPoint);
@@ -121,9 +95,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
           const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
 
-          return [...firstResults, ...secondResults];
+          // Return joined string using delimiter
+          return [firstResults, secondResults].join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
         } 
-        // Scenario B: Single chunk but too long - split the string itself
+        // Scenario B: Single node but too long - split the string itself
         else if (chunkTexts.length === 1) {
           const singleText = chunkTexts[0];
           const parts = this._splitSingleLongString(singleText, this.constructor.characterLimit);
@@ -133,10 +108,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           const translatedParts = [];
           for (const part of parts) {
             const res = await this._translateChunk([part], sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
-            translatedParts.push(res[0]);
+            translatedParts.push(res);
           }
 
-          return [translatedParts.join(' ')];
+          return translatedParts.join(' ');
         }
       }
 

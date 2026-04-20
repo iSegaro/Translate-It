@@ -16,15 +16,17 @@ export const ResponseFormat = {
 
 export const TRANSLATION_CONSTANTS = {
   // Standard delimiter for separating text segments in batch translation
-  TEXT_DELIMITER: '\n\n---\n\n',
+  // Updated to match TranslationSegmentMapper for consistent splitting
+  TEXT_DELIMITER: '\n[[---]]\n',
 
   // Alternative delimiters for fallback splitting
   ALTERNATIVE_DELIMITERS: [
-    '\n\n---\n',    // Missing newline
-    '\n---\n\n',    // Missing newline on other side
-    '---',         // Just the separator
-    '\n\n',        // Double newlines
-    '\n',         // Single newlines (last resort)
+    '[[---]]',
+    '\n\n---\n\n',
+    '\n---\n',
+    '---',
+    '\n\n',
+    '\n',
   ],
 
   // Provider-specific character limits

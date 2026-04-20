@@ -41,9 +41,25 @@ export class OptimizedJsonHandler {
         providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
       );
 
-      logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency enabled)`);
+      logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
 
-      const batchPromises = batches.map(async (batch, i) => {
+      const self = this;
+      
+      // Determine execution strategy based on concurrency limit
+      if (providerConfig.rateLimit.maxConcurrent <= 1) {
+        // STRATEGY: SEQUENTIAL (Level 1/Stability)
+        // Execute one by one to minimize memory footprint and prevent queue flooding
+        for (let i = 0; i < batches.length; i++) {
+          await processBatch(batches[i], i);
+        }
+      } else {
+        // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
+        // Run batches in parallel, but RateLimitManager will ultimately throttle them
+        const batchPromises = batches.map((batch, i) => processBatch(batch, i));
+        await Promise.all(batchPromises);
+      }
+
+      async function processBatch(batch, i) {
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
             const abortError = new Error('Translation task cancelled');
@@ -56,10 +72,10 @@ export class OptimizedJsonHandler {
         try {
           checkCancellation();
 
-          // Still respect intelligent delay for the start of each promise
-          if (i > 0) {
-            const delay = this._calculateDelay(batch, i, batches.length, providerConfig);
-            const concurrencyAwareDelay = providerConfig.rateLimit.maxConcurrent > 1 ? Math.min(delay, 100) : delay;
+          // Intelligent delay for non-sequential execution
+          if (i > 0 && providerConfig.rateLimit.maxConcurrent > 1) {
+            const delay = self._calculateDelay(batch, i, batches.length, providerConfig);
+            const concurrencyAwareDelay = Math.min(delay, 100);
             if (concurrencyAwareDelay > 0) {
               await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
             }
@@ -71,7 +87,7 @@ export class OptimizedJsonHandler {
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
 
-          const translatedBatch = await this._performBatchCall(
+          const translatedBatch = await self._performBatchCall(
             providerInstance, 
             batch, 
             sourceLanguage, 
@@ -88,8 +104,8 @@ export class OptimizedJsonHandler {
 
           checkCancellation();
 
-          const mappedResults = this._mapResults(batch, translatedBatch);
-          await this._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
+          const mappedResults = self._mapResults(batch, translatedBatch);
+          await self._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -109,11 +125,9 @@ export class OptimizedJsonHandler {
           hasErrors = true;
           lastError = batchError;
           // Stream empty/original results on failure to keep progress moving
-          await this._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
+          await self._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
         }
-      });
-
-      await Promise.all(batchPromises);
+      }
 
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
 
