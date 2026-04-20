@@ -1,0 +1,49 @@
+.element-highlight-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 2147483646 !important; /* Just below the main container */
+}
+
+.highlight-element {
+  position: absolute !important;
+  outline: 3px solid #ff8800 !important;
+  outline-offset: 2px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  z-index: 2147483646 !important;
+}
+
+.highlight-element:hover {
+  outline: 4px solid #ff5500 !important;
+  outline-offset: 1px !important;
+}
+
+.highlight-tooltip {
+  position: absolute !important;
+  top: -30px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background-color: #333 !important;
+  color: white !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+.highlight-tooltip::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: -4px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-left: 4px solid transparent !important;
+  border-right: 4px solid transparent !important;
+  border-top: 4px solid #333 !important;
+}
