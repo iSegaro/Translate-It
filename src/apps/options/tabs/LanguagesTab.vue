@@ -41,11 +41,17 @@
                     class="ti-range-slider"
                   >
                   <div class="slider-labels">
-                    <span>{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                    <span class="slider-tick">|</span>
-                    <span>{{ t('opt_balanced') || 'Balanced' }}</span>
-                    <span class="slider-tick">|</span>
-                    <span>{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                    <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                    <span 
+                      class="slider-tick" 
+                      @click="currentOptimizationLevel = 2"
+                    >|</span>
+                    <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                    <span 
+                      class="slider-tick" 
+                      @click="currentOptimizationLevel = 4"
+                    >|</span>
+                    <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
                   </div>
                 </div>
                 
@@ -795,10 +801,27 @@ defineExpose({
       padding: 0 2px;
       box-sizing: border-box;
 
+      span {
+        cursor: pointer;
+        user-select: none;
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--color-primary);
+        }
+
+        &.active {
+          color: var(--color-primary);
+          font-weight: $font-weight-bold;
+        }
+      }
+
       .slider-tick {
         opacity: 0.6;
         font-weight: 500;
         transform: translateY(-1px);
+        padding: 0 8px; // Increase hit area
+        margin: 0 -8px; // Offset padding to maintain alignment
       }
     }
 
