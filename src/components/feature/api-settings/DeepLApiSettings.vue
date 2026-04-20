@@ -161,7 +161,3 @@ const tierDescription = computed(() => {
     'Pro API endpoint with higher limits based on your subscription. Uses api.deepl.com'
 })
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/components/api-settings-common" as *;
-</style>

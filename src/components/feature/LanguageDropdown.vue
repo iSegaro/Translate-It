@@ -42,35 +42,3 @@ const handleChange = (event) => {
   emit('update:modelValue', event.target.value)
 }
 </script>
-
-<style scoped>
-.language-dropdown {
-  width: 100%;
-  padding: 6px 24px 6px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
-  font-size: var(--font-size-sm);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  cursor: pointer;
-  appearance: auto !important; /* Force native appearance on mobile for better positioning */
-  -webkit-appearance: auto !important;
-  
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background-color: var(--color-surface);
-  }
-}
-
-/* RTL support - reverse padding and text alignment */
-:global(.extension-options.rtl) .language-dropdown {
-  text-align: right;
-  padding: 6px 8px 6px 24px;
-}
-</style>

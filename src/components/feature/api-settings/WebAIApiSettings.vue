@@ -54,7 +54,3 @@ const webAIApiModel = computed({
   set: (value) => settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
 })
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/components/api-settings-common" as *;
-</style>

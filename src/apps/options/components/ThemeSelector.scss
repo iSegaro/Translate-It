@@ -1,0 +1,97 @@
+@use "@/assets/styles/base/variables" as *;
+
+.theme-selector-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: $spacing-xs 0;
+}
+
+.theme-cycle-btn {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  background: transparent;
+  border: none;
+  border-radius: $border-radius-lg;
+  padding: $spacing-sm $spacing-lg;
+  cursor: pointer;
+  transition: all $transition-base;
+  min-width: 140px;
+  justify-content: flex-start;
+
+  &:hover {
+    background: var(--color-surface);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.theme-img-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  transition: filter $transition-base;
+}
+
+// Ensure icon visibility in dark mode (if PNGs have dark lines/fills)
+:root.theme-dark .theme-img-icon,
+.theme-dark .theme-img-icon {
+  filter: invert(0.9) brightness(1.5);
+}
+
+.theme-btn-label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* Transition for icon change */
+.theme-fade-enter-active,
+.theme-fade-leave-active {
+  transition: all 0.25s ease;
+}
+
+.theme-fade-enter-from,
+.theme-fade-leave-to {
+  opacity: 0;
+  transform: rotate(-30deg) scale(0.8);
+}
+
+// Responsive adjustments for sidebar header
+@media (max-width: #{$breakpoint-lg}) {
+  .theme-selector-container {
+    width: auto;
+    padding: 0;
+  }
+
+  .theme-cycle-btn {
+    min-width: auto;
+    padding: $spacing-xs $spacing-sm;
+    gap: $spacing-xs;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+
+    &:hover {
+      background: rgba(var(--color-primary-rgb), 0.1);
+    }
+  }
+
+  .theme-btn-label {
+    display: none; /* Hide label in condensed header mode */
+  }
+}

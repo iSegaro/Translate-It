@@ -1,0 +1,184 @@
+@use "@/assets/styles/base/variables" as *;
+
+.tts-tab {
+  padding: $spacing-md !important;
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+.tab-header {
+  margin-bottom: $spacing-xl !important;
+  
+  h2 {
+    margin: 0 0 $spacing-sm 0 !important;
+    font-size: $font-size-xl !important;
+    font-weight: $font-weight-medium !important;
+    color: var(--color-text) !important;
+  }
+  
+  p {
+    margin: 0 !important;
+    font-size: $font-size-sm !important;
+    color: var(--color-text-secondary) !important;
+  }
+}
+
+.setting-group {
+  margin-bottom: $spacing-xl !important;
+  max-width: 100% !important;
+}
+
+.setting-item {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: $spacing-xs !important;
+  gap: $spacing-md !important;
+  
+  label {
+    font-size: $font-size-base !important;
+    font-weight: $font-weight-medium !important;
+    color: var(--color-text) !important;
+    flex: 1 !important;
+    cursor: pointer !important;
+  }
+}
+
+.setting-control {
+  flex-shrink: 0 !important;
+}
+
+.setting-description {
+  font-size: $font-size-sm !important;
+  color: var(--color-text-secondary) !important;
+  margin-top: $spacing-xs !important;
+  line-height: 1.5 !important;
+  max-width: 90% !important;
+}
+
+.section-divider {
+  border: 0 !important;
+  border-top: $border-width $border-style var(--color-border) !important;
+  margin: $spacing-xl 0 !important;
+  opacity: 0.6 !important;
+}
+
+.select-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
+  
+  &::after {
+    content: '▾' !important;
+    position: absolute !important;
+    right: $spacing-md !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    color: var(--color-text-secondary) !important;
+    pointer-events: none !important;
+    font-size: 1.2em !important;
+  }
+  
+  .theme-select {
+    width: 100% !important;
+    padding: $spacing-sm $spacing-md !important;
+    padding-right: $spacing-xl !important;
+    font-size: $font-size-sm !important;
+    font-family: inherit !important;
+    color: var(--color-text) !important;
+    background-color: var(--color-surface) !important;
+    border: $border-width $border-style var(--color-border) !important;
+    border-radius: $border-radius-base !important;
+    appearance: none !important;
+    cursor: pointer !important;
+    transition: all $transition-base !important;
+    
+    &:hover {
+      border-color: var(--color-primary) !important;
+      background-color: var(--color-background) !important;
+    }
+    
+    &:focus {
+      outline: none !important;
+      border-color: var(--color-primary) !important;
+      box-shadow: 0 0 0 3px var(--color-primary-alpha) !important;
+    }
+  }
+}
+
+.toggle-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  
+  .toggle-input {
+    display: none !important;
+    
+    &:checked + .toggle-label {
+      background-color: var(--color-primary) !important;
+      
+      &::after {
+        transform: translateX(18px) !important;
+      }
+    }
+    
+    &:disabled + .toggle-label {
+      opacity: 0.5 !important;
+      cursor: not-allowed !important;
+    }
+  }
+  
+  .toggle-label {
+    position: relative !important;
+    display: inline-block !important;
+    width: 38px !important;
+    height: 20px !important;
+    background-color: var(--color-border) !important;
+    border-radius: 10px !important;
+    cursor: pointer !important;
+    transition: all $transition-base !important;
+    
+    &:hover {
+      filter: brightness(0.95) !important;
+    }
+    
+    &::after {
+      content: '' !important;
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 16px !important;
+      height: 16px !important;
+      background-color: white !important;
+      border-radius: 50% !important;
+      transition: transform $transition-base !important;
+      box-shadow: $shadow-sm !important;
+    }
+  }
+}
+
+// Tablet responsive
+@media (max-width: #{$breakpoint-lg}) {
+  .setting-item {
+    gap: $spacing-sm !important;
+  }
+}
+
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .setting-item {
+    flex-wrap: wrap !important;
+    
+    label {
+      min-width: 150px !important;
+    }
+  }
+  
+  .select-wrapper {
+    max-width: 100% !important;
+  }
+  
+  .setting-description {
+    max-width: 100% !important;
+  }
+}

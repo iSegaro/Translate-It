@@ -125,7 +125,3 @@ const testKeys = async (providerName) => {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/components/api-settings-common" as *;
-</style>

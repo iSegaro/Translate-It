@@ -1,0 +1,244 @@
+@use "@/assets/styles/base/mixins" as *;
+
+.sidepanel-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+}
+
+.language-controls {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  margin: 0;
+  gap: 12px;
+  background: var(--language-controls-bg-color);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100; /* Increased to ensure dropdowns appear above translation form toolbars */
+}
+
+/* Wide layout: Translate button alongside language selectors */
+.language-controls--wide {
+  flex-direction: column;
+}
+
+.language-controls--wide .language-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.language-controls--wide .translate-button-inline {
+  flex: 1;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.language-controls--wide .inline-clear-btn {
+  margin-right: auto;
+}
+
+.language-controls--wide .translate-button-inline :deep(.provider-selector) {
+  min-width: auto;
+  max-width: none;
+}
+
+.language-selector-row {
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  position: relative;
+  z-index: 110;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 8px;
+}
+
+.language-selector-row :deep(.language-controls) {
+  width: 100%;
+  max-width: calc(100% - 16px);
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px;
+  padding: 8px 0;
+  margin: 0;
+  background: transparent;
+  height: auto;
+  justify-content: flex-start;
+  flex-wrap: nowrap !important;
+}
+
+.language-selector-row :deep(.language-select) {
+  flex: 1 1 auto !important;
+  min-width: 70px;
+  max-width: 120px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+/* In wide layout, make language selects slightly smaller to make room for Translate button */
+.language-controls--wide .language-selector-row :deep(.language-select) {
+  max-width: 100px !important;
+  min-width: 65px;
+}
+
+.language-selector-row :deep(.swap-button) {
+  flex: 0 0 32px !important;
+  width: 32px;
+  height: 32px;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  z-index: 120 !important;
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  box-sizing: border-box !important;
+}
+
+.language-selector-row :deep(.swap-button img) {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.translate-button-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 105;
+  min-height: 40px;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 0 8px;
+}
+
+.center-spacer {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.end-spacer {
+  width: 20px; /* Same as clear button width to keep Translate perfectly centered */
+}
+
+.translate-button-row :deep(.provider-selector) {
+  min-width: auto;
+}
+
+.ti-icon-button {
+  @include toolbar-button-minimal;
+}
+
+.ti-toolbar-icon {
+  width: 16px;
+  height: 16px;
+  opacity: var(--icon-opacity, 0.6);
+  filter: var(--icon-filter);
+  transition: opacity 0.2s ease-in-out;
+}
+
+.ti-icon-button:hover .ti-toolbar-icon {
+  opacity: var(--icon-hover-opacity, 1);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.translation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  flex: 1;
+}
+
+/* Sidepanel-specific adjustments (similar to popup) */
+.translation-form :deep(.textarea-container) {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-textarea-background);
+  padding: 5px;
+  margin: 6px 12px;
+}
+
+.translation-form :deep(.translation-textarea) {
+  min-height: 120px;
+  max-height: 200px;
+  font-size: 13px;
+  padding: 42px 8px 8px 8px;
+}
+
+
+.output-container {
+  margin: 6px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+
+.translation-form :deep(.result-content) {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  font-size: 13px;
+  height: 100%;
+  margin: 6px 12px;
+}
+
+.translation-form :deep(.translation-textarea) {
+  min-height: 120px;
+  max-height: 200px;
+  font-size: 13px;
+  padding: 42px 8px 8px 8px;
+}
+
+
+.output-container {
+  margin: 6px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+
+.translation-form :deep(.result-content) {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  font-size: 13px;
+  height: 100%;
+}

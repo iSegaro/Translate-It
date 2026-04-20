@@ -45,38 +45,3 @@ defineProps({
 
 defineEmits(['update:modelValue'])
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/base/variables" as *;
-
-.base-radio {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  cursor: pointer;
-  font-size: $font-size-base;
-  margin: 0;
-  
-  input[type="radio"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  
-  .radio-label {
-    flex: 1;
-    color: var(--color-text);
-  }
-  
-  &.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    
-    input[type="radio"] {
-      cursor: not-allowed;
-    }
-  }
-}
-</style>

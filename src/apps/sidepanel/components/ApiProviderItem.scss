@@ -1,0 +1,81 @@
+@use "@/assets/styles/base/variables" as *;
+
+.provider-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm;
+  border-radius: $border-radius-sm;
+  cursor: pointer;
+  transition: all $transition-fast;
+  background-color: transparent;
+  border: 1px solid transparent;
+
+  &:hover {
+    background-color: var(--color-background);
+    border-color: var(--color-border);
+  }
+
+  &.active {
+    background-color: var(--color-primary);
+    color: white;
+    cursor: default;
+
+    .provider-name {
+      color: white;
+    }
+
+    .active-indicator {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .provider-icon img {
+      // Theme-aware filtering for better visibility on colored background
+      // Light theme: brightness(1.4) contrast(1.8) saturate(0.8) - enhances visibility while preserving colors
+      // Dark theme: brightness(0.1) invert(1) brightness(1.2) contrast(1.5) - creates white icons for dark backgrounds
+      filter: var(--provider-icon-active-filter, brightness(1.4) contrast(1.8) saturate(0.8));
+      // Theme-aware shadow for better definition
+      box-shadow: var(--provider-icon-active-shadow, 0 1px 3px rgba(0, 0, 0, 0.2));
+      border-radius: 2px;
+      transition: all 0.2s ease;
+    }
+  }
+}
+
+.provider-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.provider-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0; // Allow text truncation
+
+  .provider-name {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .active-indicator {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-weight: $font-weight-normal;
+  }
+}

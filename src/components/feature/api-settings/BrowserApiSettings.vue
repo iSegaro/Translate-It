@@ -21,31 +21,3 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 </script>
-
-<style lang="scss" scoped>
-@use "@/assets/styles/components/api-settings-common" as *;
-
-.browser-api-requirements {
-  margin-top: $spacing-md;
-  padding-left: $spacing-md;
-  border-left: 2px solid var(--color-border);
-  
-  p {
-    margin-bottom: $spacing-xs;
-    font-size: $font-size-sm;
-    color: var(--color-text);
-  }
-  
-  ul {
-    list-style: disc;
-    padding-left: $spacing-lg;
-    margin: 0;
-    
-    li {
-      font-size: $font-size-xs;
-      color: var(--color-text-secondary);
-      margin-bottom: $spacing-xs;
-    }
-  }
-}
-</style>

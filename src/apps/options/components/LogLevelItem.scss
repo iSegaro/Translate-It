@@ -1,0 +1,94 @@
+@use "@/assets/styles/base/variables" as *;
+
+.log-level-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-xs $spacing-sm;
+  background: var(--color-background-soft);
+  border-radius: $border-radius-sm;
+  gap: $spacing-md;
+  transition: background 0.2s ease;
+
+  &:hover {
+    filter: brightness(0.95);
+  }
+
+  // Level Colors
+  &.level-0 { // Error
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    .component-name { color: #dc2626; }
+  }
+
+  &.level-1 { // Warn
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    .component-name { color: #d97706; }
+  }
+
+  &.level-2 { // Info
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    .component-name { color: #2563eb; }
+  }
+
+  &.level-3 { // Debug
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    .component-name { color: #7c3aed; }
+  }
+
+  .component-name {
+    font-size: $font-size-sm;
+    color: var(--color-text);
+    font-weight: $font-weight-medium;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-level-select {
+    min-width: 60px;
+    max-width: 75px;
+    
+    // Target the select directly and ensure arrow visibility
+    &.log-level-select {
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+      padding-right: 2em !important;
+      padding-left: $spacing-xs !important;
+      font-size: $font-size-sm !important;
+      background-color: var(--color-background) !important;
+      
+      // Re-state the arrow icon to ensure it's not lost during styling
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+      background-position: right 6px center !important;
+      background-repeat: no-repeat !important;
+      background-size: 1.2em 1.2em !important;
+      
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+    }
+  }
+}
+
+// Dark mode arrow
+[data-theme='dark'], .theme-dark {
+  .log-level-select.log-level-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+}
+
+// Mobile responsiveness
+@media (max-width: 600px) {
+  .log-level-item {
+    padding: $spacing-sm;
+
+    .component-name {
+      white-space: normal;
+    }
+  }
+}

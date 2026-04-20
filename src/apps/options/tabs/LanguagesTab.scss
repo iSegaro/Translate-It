@@ -1,0 +1,489 @@
+@use "@/assets/styles/base/variables" as *;
+
+// API Settings Section
+.api-settings-section {
+  margin-top: 0;
+
+  .optimization-control-area {
+    margin-bottom: $spacing-lg;
+    background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.03));
+    padding: $spacing-md;
+    border-radius: $border-radius-base;
+    border: 1px solid var(--color-border-light, var(--color-border));
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
+
+    .opt-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .label-with-value {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: $spacing-sm;
+      width: 100%;
+      box-sizing: border-box;
+
+      .opt-label {
+        font-weight: $font-weight-medium;
+        font-size: $font-size-base;
+        color: var(--color-text);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+    }
+
+    .level-badge {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: $font-weight-bold;
+      padding: 2px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--color-background-soft);
+      border: 1px solid var(--color-border);
+      white-space: nowrap;
+
+      &.level-1 { color: #4caf50; border-color: rgba(76, 175, 80, 0.4); background: rgba(76, 175, 80, 0.1); }
+      &.level-2 { color: #8bc34a; border-color: rgba(139, 195, 74, 0.4); background: rgba(139, 195, 74, 0.1); }
+      &.level-3 { color: var(--color-primary); border-color: var(--color-primary-light, var(--color-primary)); background: var(--color-primary-soft, rgba(var(--color-primary-rgb), 0.1)); }
+      &.level-4 { color: #ff9800; border-color: rgba(255, 152, 0, 0.4); background: rgba(255, 152, 0, 0.1); }
+      &.level-5 { color: #f44336; border-color: rgba(244, 67, 54, 0.4); background: rgba(244, 67, 54, 0.1); }
+    }
+
+    .slider-wrapper {
+      margin: $spacing-sm 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .ti-range-slider {
+      -webkit-appearance: none;
+      display: block;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--color-border);
+      outline: none;
+      margin: 0 0 $spacing-xs 0;
+      padding: 0;
+
+      &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        cursor: pointer;
+        border: 2px solid var(--color-background);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: transform 0.1s ease;
+
+        &:hover { transform: scale(1.1); }
+      }
+    }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      padding: 0 2px;
+      box-sizing: border-box;
+
+      span {
+        cursor: pointer;
+        user-select: none;
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--color-primary);
+        }
+
+        &.active {
+          color: var(--color-primary);
+          font-weight: $font-weight-bold;
+        }
+      }
+
+      .slider-tick {
+        opacity: 0.6;
+        font-weight: 500;
+        transform: translateY(-1px);
+        padding: 0 8px; // Increase hit area
+        margin: 0 -8px; // Offset padding to maintain alignment
+      }
+    }
+
+    .opt-description {
+      margin: $spacing-xs 0 0 0;
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+      font-style: italic;
+      opacity: 0.8;
+    }
+  }
+
+  .section-separator.mini {
+    margin: $spacing-md 0;
+    opacity: 0.5;
+  }
+
+  .provider-settings-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    margin-top: $spacing-lg;
+    overflow: hidden;
+  }
+
+  .provider-settings {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: fit-content;
+  }
+
+  .api-info {
+    padding: $spacing-md;
+    background-color: var(--color-background);
+    border-radius: $border-radius-base;
+    margin-bottom: $spacing-lg;
+
+    h3 {
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      margin: 0 0 $spacing-sm 0;
+      padding: 0;
+      border: none;
+      color: var(--color-text);
+    }
+
+    .setting-description {
+      font-size: $font-size-sm;
+      color: var(--color-text-secondary);
+      margin: 0;
+    }
+  }
+
+  // --- Alignment for API Settings ---
+  
+  .provider-settings {
+    // Make all provider settings stacked (Label top, Input bottom)
+    :deep(.setting-group):not(.api-key-info) {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      width: 100% !important;
+      gap: 4px !important; // Consistent tight gap
+
+      label {
+        flex: 0 0 auto !important;
+        margin-bottom: 0 !important;
+        width: 100% !important;
+      }
+
+      // All inputs/selects should be full width to be consistent with API Key field
+      .ti-select, 
+      .ti-input, 
+      .ti-provider-select,
+      .tier-select,
+      .formality-select,
+      .api-key-input-wrapper {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .setting-description:not(.api-key-info *) {
+        flex: 0 0 100%;
+        margin-top: 0;
+        opacity: 0.8;
+      }
+    }
+
+    // Fix for API Key Info row (ensure it stays inline/row)
+    :deep(.api-key-info) {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-md !important;
+
+      .setting-description {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        display: inline !important;
+      }
+
+      .api-link {
+        margin: 0 $spacing-xs;
+      }
+    }
+
+    // Special handling for the API Key label row
+    :deep(.label-with-toggle) {
+      display: grid !important;
+      grid-template-columns: 1fr auto !important; 
+      align-items: center !important;
+      width: 100% !important;
+      gap: $spacing-md !important;
+      margin-bottom: 0 !important;
+
+      label {
+        margin: 0 !important;
+        min-width: 0 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .toggle-visibility-button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important; // Fixed button size
+        height: 32px !important;
+        padding: 0 !important;
+        background: none !important;
+        border: none !important;
+        margin: 0 !important;
+        cursor: pointer;
+        opacity: 0.7;
+
+        &:hover {
+          opacity: 1;
+        }
+
+        .toggle-icon {
+          width: 16px;
+          height: 16px;
+          display: block;
+          transition: filter var(--transition-base, 0.2s);
+
+          // Invert icon color in dark mode (from black to white/light gray)
+          :root.theme-dark &,
+          .theme-dark & {
+            filter: invert(1) brightness(1.5);
+          }
+        }
+      }
+    }
+  }
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  
+  label {
+    margin-bottom: 0;
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  &.vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-xs;
+    margin-bottom: $spacing-sm;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    label {
+      min-width: auto;
+    }
+
+    .setting-description {
+      margin-inline-start: 28px;
+    }
+  }
+  
+  .language-dropdown,
+  :deep(.ti-provider-button-container) {
+    flex: 0 0 250px !important;
+    width: 250px !important;
+    height: auto;
+
+    .ti-provider-button {
+      width: 100% !important;
+    }
+  }
+}
+
+.accordion-inner {
+  padding: 0 0 $spacing-md 0;
+}
+
+.checkbox-area {
+  display: flex;
+  align-items: center;
+  gap: 16px; // Very small gap between checkbox and text
+  
+  :deep(.bilingual-main-checkbox) {
+    gap: 0 !important; // Force remove internal gap
+    width: auto !important;
+    flex: none !important;
+    margin: 0 !important;
+
+    .ti-checkbox__label {
+      display: none !important; // Completely remove label space
+    }
+  }
+
+  .accordion-title-text {
+    flex: 1;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+    transition: color $transition-base;
+
+    &.active {
+      color: var(--color-primary);
+      font-weight: $font-weight-medium;
+    }
+
+    &.disabled {
+      opacity: 0.9;
+    }
+  }
+}
+
+.setting-description {
+  font-size: $font-size-sm;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: $spacing-sm;
+
+  &.mb-md {
+    margin-inline-start: 28px;
+  }
+}
+
+.bilingual-modes-list {
+  margin-inline-start: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs; // Compact gap between modes
+
+  .mode-checkbox {
+    margin-bottom: 0;
+    
+    :deep(.checkbox-label) {
+      font-size: $font-size-sm;
+    }
+  }
+}
+
+.language-pref-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  margin-bottom: $spacing-xs; // Compact vertical gap
+
+  .pref-label {
+    font-size: $font-size-sm; // Slightly smaller label
+    color: var(--color-text-secondary);
+    flex: 1;
+  }
+
+  .pref-select {
+    flex: 0 0 250px;
+    width: 250px;
+    padding: 6px $spacing-sm;
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-sm;
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-size: $font-size-sm;
+    cursor: pointer;
+
+    &:focus {
+      border-color: var(--color-primary);
+      outline: none;
+    }
+  }
+}
+
+.font-settings {
+  flex-direction: column;
+  align-items: stretch;
+  border-top: 2px solid var(--color-border);
+  margin-top: $spacing-xl;
+  padding-top: $spacing-lg;
+  
+  h3 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-medium;
+    margin: 0 0 $spacing-base 0;
+    color: var(--color-text);
+  }
+}
+
+// Tablet & Mobile responsive
+@media (max-width: #{$breakpoint-lg}) {
+  .setting-group {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: $spacing-sm !important;
+    
+    label {
+      min-width: auto !important;
+      margin-bottom: $spacing-xs !important;
+    }
+    
+    .language-dropdown,
+    :deep(.ti-provider-button-container) {
+      min-width: auto !important;
+      width: 100% !important;
+      flex: none !important;
+    }
+  }
+}
+
+:global(.options-layout.rtl) {
+  .language-pref-setting .accordion-header {
+    display: flex !important;
+    flex-direction: row-reverse !important;
+    justify-content: space-between !important;
+    text-align: right !important;
+    }
+  }
+
+  // Transitions for provider settings
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+  }
+
+  .fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+  }
