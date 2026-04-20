@@ -753,6 +753,7 @@ function normalizeProviderName(providerName) {
     'webai': ProviderNames.WEBAI,
     'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
     'google-translate': ProviderNames.GOOGLE_TRANSLATE,
+    'googletranslatev2': ProviderNames.GOOGLE_TRANSLATE_V2,
     'googlev2': ProviderNames.GOOGLE_TRANSLATE_V2,
     'google-v2': ProviderNames.GOOGLE_TRANSLATE_V2,
     'google-robust': ProviderNames.GOOGLE_TRANSLATE_V2,

@@ -15,6 +15,7 @@ export const TraditionalTextProcessor = {
   createChunks(texts, providerName, strategy, charLimit, maxChunksPerBatch) {
     const chunks = [];
     const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
+    const safeMaxChunks = maxChunksPerBatch || 50; // Defensive default
 
     if (strategy === 'character_limit') {
       let currentChunk = [];
@@ -23,7 +24,7 @@ export const TraditionalTextProcessor = {
       for (const text of texts) {
         const effectiveLength = text.length + (currentChunk.length > 0 ? delimiterLength : 0);
         const wouldExceedCharLimit = currentChunk.length > 0 && currentCharCount + effectiveLength > charLimit;
-        const wouldExceedSegmentLimit = currentChunk.length >= maxChunksPerBatch;
+        const wouldExceedSegmentLimit = currentChunk.length >= safeMaxChunks;
 
         if (wouldExceedCharLimit || wouldExceedSegmentLimit) {
           chunks.push({ texts: currentChunk, charCount: currentCharCount });
@@ -40,8 +41,8 @@ export const TraditionalTextProcessor = {
         chunks.push({ texts: currentChunk, charCount: currentCharCount });
       }
     } else {
-      for (let i = 0; i < texts.length; i += maxChunksPerBatch) {
-        const chunkTexts = texts.slice(i, i + maxChunksPerBatch);
+      for (let i = 0; i < texts.length; i += safeMaxChunks) {
+        const chunkTexts = texts.slice(i, i + safeMaxChunks);
         const rawChars = chunkTexts.reduce((sum, text) => sum + text.length, 0);
         const delimitersCount = Math.max(0, chunkTexts.length - 1);
         chunks.push({ texts: chunkTexts, charCount: rawChars + (delimitersCount * delimiterLength) });
