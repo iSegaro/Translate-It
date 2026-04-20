@@ -1152,7 +1152,7 @@ export const getProviderOptimizationLevelAsync = async (providerName) => {
     
     // Fallback to global setting
     return await getSettingValueAsync("OPTIMIZATION_LEVEL", CONFIG.OPTIMIZATION_LEVEL);
-  } catch (error) {
+  } catch {
     return CONFIG.OPTIMIZATION_LEVEL;
   }
 };

@@ -7,7 +7,6 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';

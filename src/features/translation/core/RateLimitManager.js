@@ -48,7 +48,7 @@ export class RateLimitManager {
     const { PROVIDER_CONFIGURATIONS, getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
     const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
     
-    for (const [name, _baseConfig] of Object.entries(PROVIDER_CONFIGURATIONS)) {
+    for (const name of Object.keys(PROVIDER_CONFIGURATIONS)) {
       const level = await getProviderOptimizationLevelAsync(name);
       const optimizedConfig = getProviderConfiguration(name, level);
       this._initializeProvider(name, optimizedConfig.rateLimit);

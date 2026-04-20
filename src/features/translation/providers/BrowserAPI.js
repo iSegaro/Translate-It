@@ -8,8 +8,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { 
   getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
@@ -134,7 +132,9 @@ export class browserTranslateProvider extends BaseTranslateProvider {
   /**
    * Implementation of the chunk translation using Browser API
    */
-  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
+  async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks) {
+    logger.debug(`Translating chunk ${chunkIndex + 1}/${totalChunks} (segments: ${segmentCount}, retry: ${retryAttempt})`);
+    
     // Check API availability
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
