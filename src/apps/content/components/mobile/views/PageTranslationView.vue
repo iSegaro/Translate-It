@@ -42,16 +42,11 @@
       <!-- Primary Action Pill (Centered) -->
       <button 
         class="ti-m-header-primary-btn"
-        :style="{
-          background: primaryAction.bgColor,
-          border: primaryAction.border + ' !important',
-          color: primaryAction.textColor + ' !important'
-        }"
+        :data-status="pageTranslationData.status === 'error' ? 'error' : (pageTranslationData.isTranslating || pageTranslationData.isAutoTranslating ? 'translating' : (pageTranslationData.isTranslated ? 'translated' : 'ready'))"
         @click.stop="primaryAction.handler"
       >
         <img 
           :src="primaryAction.icon" 
-          :style="{ filter: primaryAction.iconFilter }"
         >
         {{ primaryAction.label }}
       </button>

@@ -99,20 +99,11 @@
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-  width: 45% !important; /* اختصاص ۳۵ درصد از عرض هدر به دکمه */
-  min-width: 110px !important; /* حداقل عرض برای جا شدن متن در گوشی‌های کوچک */
-  max-width: 150px !important; /* حداکثر عرض برای جلوگیری از کشیده شدن در گوشی‌های بزرگ */
+  width: 45% !important; 
+  min-width: 110px !important; 
+  max-width: 150px !important; 
   flex-shrink: 0 !important;
-  border: none !important;
   z-index: 2 !important;
-
-  span {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    flex: 1 !important;
-    text-align: center !important;
-  }
 
   img {
     width: 10px !important;
@@ -120,8 +111,40 @@
     object-fit: contain !important;
   }
 
+  /* Status-based Styling */
+  &[data-status='ready'] {
+    background: var(--ti-mobile-accent) !important;
+    color: white !important;
+    border: none !important;
+    img { filter: brightness(0) invert(1) !important; }
+  }
+
+  &[data-status='translating'] {
+    background: var(--ti-mobile-warning-bg) !important;
+    color: var(--ti-mobile-warning) !important;
+    border: 1px solid var(--ti-mobile-warning-bg) !important;
+    img { filter: invert(38%) sepia(88%) saturate(1212%) hue-rotate(335deg) brightness(98%) contrast(98%) !important; }
+    
+    /* If it's auto-translating (we don't have a separate data-status but could add one if needed) */
+    /* For now, using a general warning filter as in the original code */
+  }
+
+  &[data-status='translated'] {
+    background: var(--ti-mobile-card-bg) !important;
+    color: var(--ti-mobile-text-secondary) !important;
+    border: 1px solid var(--ti-mobile-border) !important;
+    img { filter: var(--ti-mobile-icon-filter) !important; }
+  }
+
+  &[data-status='error'] {
+    background: var(--ti-mobile-error) !important;
+    color: white !important;
+    border: none !important;
+    img { filter: brightness(0) invert(1) !important; }
+  }
+
   &:active {
-    transform: translate(-50%, -50%) scale(0.96) !important; /* حفظ مرکزیت در هنگام انیمیشن */
+    transform: translate(-50%, -50%) scale(0.96) !important;
     opacity: 0.9 !important;
   }
 }
