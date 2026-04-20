@@ -1,51 +1,53 @@
 /**
- * Translation Constants
- * Shared constants used across translation providers
+ * Translation Constants (Legacy Proxy)
+ * 
+ * CRITICAL: This file is a proxy to ProviderConfigurations.js which is now 
+ * the Single Source of Truth for all translation settings.
+ * 
+ * New code should import directly from:
+ * '@/features/translation/core/ProviderConfigurations.js'
  */
+
+import { 
+  ResponseFormat as NewResponseFormat, 
+  DEFAULT_TEXT_DELIMITER,
+  ALTERNATIVE_DELIMITERS,
+  STREAMING_THRESHOLDS as NewStreamingThresholds,
+  HISTORY_CHARACTER_LIMITS as NewHistoryLimits,
+  BASE_CHARACTER_LIMITS,
+  BASE_MAX_CHUNKS_PER_BATCH
+} from '@/features/translation/core/ProviderConfigurations.js';
+
+// Re-export ResponseFormat for backward compatibility
+export const ResponseFormat = NewResponseFormat;
 
 /**
- * Expected format of the translation response.
- * Used to enforce strict contracts between orchestrators and providers.
+ * TRANSLATION_CONSTANTS
+ * Legacy object maintained for backward compatibility.
+ * All values now pull from the central ProviderConfigurations.
  */
-export const ResponseFormat = {
-  STRING: 'STRING',           // Plain text (Popup, Selection, single segments)
-  JSON_ARRAY: 'JSON_ARRAY',   // Array of strings (Standard AI Batching)
-  JSON_OBJECT: 'JSON_OBJECT', // Array of objects with IDs (Select Element, Page Translation)
-  AUTO: 'AUTO'                // Heuristic-based fallback (legacy)
-};
-
 export const TRANSLATION_CONSTANTS = {
-  // Standard delimiter for separating text segments in batch translation
-  // Updated to match TranslationSegmentMapper for consistent splitting
-  TEXT_DELIMITER: '\n[[---]]\n',
+  // Delimiters
+  TEXT_DELIMITER: DEFAULT_TEXT_DELIMITER,
+  ALTERNATIVE_DELIMITERS: ALTERNATIVE_DELIMITERS,
 
-  // Alternative delimiters for fallback splitting
-  ALTERNATIVE_DELIMITERS: [
-    '[[---]]',
-    '\n\n---\n\n',
-    '\n---\n',
-    '---',
-    '\n\n',
-    '\n',
-  ],
-
-  // Provider-specific character limits
+  // Character limits (Baseline values)
   CHARACTER_LIMITS: {
-    GOOGLE: 5000,
-    BING: 1000,
-    YANDEX: 10000,
-    DEEPL: 10000,
+    GOOGLE: BASE_CHARACTER_LIMITS.GOOGLE,
+    BING: BASE_CHARACTER_LIMITS.BING,
+    YANDEX: BASE_CHARACTER_LIMITS.YANDEX,
+    DEEPL: BASE_CHARACTER_LIMITS.DEEPL,
   },
 
-  // Provider-specific batch sizes (max segments per request)
+  // Batch sizes (Baseline values)
   MAX_CHUNKS_PER_BATCH: {
-    GOOGLE: 150,
-    BING: 10,
-    YANDEX: 100,
-    DEEPL: 150, 
+    GOOGLE: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE,
+    BING: BASE_MAX_CHUNKS_PER_BATCH.BING,
+    YANDEX: BASE_MAX_CHUNKS_PER_BATCH.YANDEX,
+    DEEPL: BASE_MAX_CHUNKS_PER_BATCH.DEEPL, 
   },
 
-  // Dictionary support flags
+  // Capability flags (Static defaults for legacy code)
   SUPPORTS_DICTIONARY: {
     GOOGLE: true,
     BING: false,
@@ -53,15 +55,13 @@ export const TRANSLATION_CONSTANTS = {
     DEEPL: false,
   },
 
-  // Reliable mode flags
   RELIABLE_JSON_MODE: {
     GOOGLE: false,
-    BING: false,
-    YANDEX: false,
+    BING: true,
+    YANDEX: true,
     DEEPL: false,
   },
 
-  // Streaming support flags
   SUPPORTS_STREAMING: {
     GOOGLE: true,
     BING: true,
@@ -69,7 +69,6 @@ export const TRANSLATION_CONSTANTS = {
     DEEPL: true,
   },
 
-  // Chunking strategies
   CHUNKING_STRATEGIES: {
     GOOGLE: 'character_limit',
     BING: 'character_limit',
@@ -77,15 +76,9 @@ export const TRANSLATION_CONSTANTS = {
     DEEPL: 'character_limit',
   },
 
-  // Thresholds for deciding when to use streaming
-  STREAMING_THRESHOLDS: {
-    AI: 500,
-    TRADITIONAL: 2000,
-  },
+  // Thresholds
+  STREAMING_THRESHOLDS: NewStreamingThresholds,
 
-  // Character limits for conversation history to optimize tokens
-  HISTORY_CHARACTER_LIMITS: {
-    AI: 300,      // Max characters per history message for AI providers
-    DEEPL: 150,   // Max characters for DeepL context snippets
-  }
+  // History limits
+  HISTORY_CHARACTER_LIMITS: NewHistoryLimits
 };

@@ -9,6 +9,71 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderConfigurations');
 
+/**
+ * Expected format of the translation response.
+ * Used to enforce strict contracts between orchestrators and providers.
+ */
+export const ResponseFormat = {
+  STRING: 'STRING',           // Plain text (Popup, Selection, single segments)
+  JSON_ARRAY: 'JSON_ARRAY',   // Array of strings (Standard AI Batching)
+  JSON_OBJECT: 'JSON_OBJECT', // Array of objects with IDs (Select Element, Page Translation)
+  AUTO: 'AUTO'                // Heuristic-based fallback (legacy)
+};
+
+/**
+ * Standard delimiter for separating text segments in batch translation.
+ * Using a resilient pattern that traditional providers are less likely to merge.
+ */
+export const DEFAULT_TEXT_DELIMITER = '\n[[---]]\n';
+
+/**
+ * Alternative delimiters for fallback splitting when the standard delimiter fails.
+ */
+export const ALTERNATIVE_DELIMITERS = [
+  '[[---]]',
+  '\n\n---\n\n',
+  '\n---\n',
+  '---',
+  '\n\n',
+  '\n',
+];
+
+/**
+ * Thresholds for deciding when to use streaming (in characters)
+ */
+export const STREAMING_THRESHOLDS = {
+  AI: 500,
+  TRADITIONAL: 2000,
+};
+
+/**
+ * Character limits for conversation history to optimize tokens
+ */
+export const HISTORY_CHARACTER_LIMITS = {
+  AI: 300,      // Max characters per history message for AI providers
+  DEEPL: 150,   // Max characters for DeepL context snippets
+};
+
+/**
+ * Baseline Character Limits for traditional providers
+ */
+export const BASE_CHARACTER_LIMITS = {
+  GOOGLE: 5000,
+  BING: 4000,
+  YANDEX: 10000,
+  DEEPL: 10000,
+};
+
+/**
+ * Baseline Max Segments per request
+ */
+export const BASE_MAX_CHUNKS_PER_BATCH = {
+  GOOGLE: 150,
+  BING: 10,
+  YANDEX: 100,
+  DEEPL: 150,
+};
+
 const UNIFIED_AI_BATCHING_CONFIG = {
   strategy: 'smart',
   optimalSize: 20,
@@ -304,9 +369,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit', // Use character-based chunking
-      characterLimit: 3900, // Google's character limit
-      maxChunksPerBatch: 100, // Increased for efficiency
-      delimiter: '\n[[---]]\n' // Standard resilient delimiter
+      characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE,
+      delimiter: DEFAULT_TEXT_DELIMITER // Standard resilient delimiter
     },
     streaming: {
       enabled: true, // Enable streaming for real-time chunk translation
@@ -353,9 +418,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 5000,
-      maxChunksPerBatch: 15,
-      delimiter: '\n[[---]]\n'
+      characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
+      maxChunksPerBatch: 15, // V2 has smaller segment limit per request
+      delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
       enabled: true,
@@ -402,8 +467,8 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit', // Use character-based chunking
-      characterLimit: 10000, // Yandex's character limit
-      maxChunksPerBatch: 8,
+      characterLimit: BASE_CHARACTER_LIMITS.YANDEX,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.YANDEX,
       delimiter: null // Yandex uses array format
     },
     streaming: {
@@ -431,7 +496,7 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
-      supportsDictionary: false // Yandex doesn't support dictionary
+      supportsDictionary: true // Yandex supports dictionary
     }
   },
 
@@ -453,8 +518,8 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit', // Use character-based chunking
-      characterLimit: 10000, // DeepL's character limit
-      maxChunksPerBatch: 8,
+      characterLimit: BASE_CHARACTER_LIMITS.DEEPL,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.DEEPL,
       delimiter: null // DeepL uses array format
     },
     streaming: {
@@ -505,9 +570,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit', // Use character-based chunking
-      characterLimit: 4000, // Conservative limit for Bing
-      maxChunksPerBatch: 10, // Increased for efficiency
-      delimiter: '\n[[---]]\n', // Standard resilient delimiter
+      characterLimit: BASE_CHARACTER_LIMITS.BING,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.BING,
+      delimiter: DEFAULT_TEXT_DELIMITER, // Standard resilient delimiter
       adaptiveChunking: true, // Enable adaptive chunking for errors
       minChunkSize: 100, // Minimum chunk size for retry
       maxRetries: 3 // Maximum retry attempts
@@ -608,7 +673,7 @@ export const PROVIDER_CONFIGURATIONS = {
       strategy: 'character_limit',
       characterLimit: 10000,
       maxChunksPerBatch: 50,
-      delimiter: '\n[[---]]\n'
+      delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
       enabled: false, // Local API is atomic

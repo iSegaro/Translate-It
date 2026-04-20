@@ -6,6 +6,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { DEFAULT_TEXT_DELIMITER, ALTERNATIVE_DELIMITERS } from '@/features/translation/core/ProviderConfigurations.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SegmentMapper');
 
@@ -14,7 +15,7 @@ export class TranslationSegmentMapper {
    * Standard delimiter for separating text segments.
    * Using a more resilient pattern that traditional providers are less likely to merge.
    */
-  static STANDARD_DELIMITER = '\n[[---]]\n';
+  static STANDARD_DELIMITER = DEFAULT_TEXT_DELIMITER;
 
   /**
    * Enhanced mapping: attempt to reconstruct original segments from translated text
@@ -42,15 +43,7 @@ export class TranslationSegmentMapper {
     if (segments.length === originalSegments.length) return segments;
 
     // 2. Try alternative common delimiters
-    const alternatives = [
-      '[[---]]',
-      '\n---\n',
-      '---',
-      '\n\n',
-      '\n'
-    ];
-
-    for (const altDelim of alternatives) {
+    for (const altDelim of ALTERNATIVE_DELIMITERS) {
       const testSegments = translatedText.split(altDelim);
       if (testSegments.length === originalSegments.length) {
         logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
@@ -92,14 +85,13 @@ export class TranslationSegmentMapper {
 
     let cleaned = text;
 
-    // 1. Remove standard and common alternative delimiters
-    const delimitersToRemove = [
+    // 1. Remove standard, primary, and common alternative delimiters
+    // Use a Set to ensure unique patterns and filter out empty/null values
+    const delimitersToRemove = new Set([
       primaryDelimiter,
-      '[[---]]',
-      '\n---\n',
-      '---',
-      '\n\n'
-    ];
+      DEFAULT_TEXT_DELIMITER,
+      ...ALTERNATIVE_DELIMITERS
+    ]);
 
     for (const delim of delimitersToRemove) {
       if (!delim || delim.trim() === '') continue;
