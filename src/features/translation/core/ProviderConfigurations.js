@@ -274,7 +274,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Google Translate - Free translation service settings
   GoogleTranslate: {
     rateLimit: {
-      maxConcurrent: 2, // Moderate concurrent requests
+      maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
       subsequentDelay: 100, // Fast requests for free service
@@ -323,7 +323,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Google Translate V2 - Robust translation service settings
   GoogleTranslateV2: {
     rateLimit: {
-      maxConcurrent: 2,
+      maxConcurrent: 4,
       delayBetweenRequests: 0,
       initialDelay: 0,
       subsequentDelay: 200,
@@ -372,7 +372,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Yandex Translate - Free translation service settings
   YandexTranslate: {
     rateLimit: {
-      maxConcurrent: 2, // Moderate concurrent requests
+      maxConcurrent: 4, // Moderate concurrent requests
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
       subsequentDelay: 150, // Slightly slower than Google for subsequent requests
@@ -475,7 +475,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Bing Translate - Microsoft translation service settings
   BingTranslate: {
     rateLimit: {
-      maxConcurrent: 1, // Conservative due to HTML response issues
+      maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
       subsequentDelay: 2000, // 2 seconds between subsequent requests
@@ -532,7 +532,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Microsoft Edge - Official Edge Browser translation service
   MicrosoftEdge: {
     rateLimit: {
-      maxConcurrent: 2,
+      maxConcurrent: 4,
       delayBetweenRequests: 0,
       initialDelay: 0,
       subsequentDelay: 200,
@@ -582,7 +582,7 @@ export const PROVIDER_CONFIGURATIONS = {
   // Lingva - Open-source Google Translate front-end settings
   Lingva: {
     rateLimit: {
-      maxConcurrent: 1, // Conservative for public instances
+      maxConcurrent: 3, // Conservative for public instances
       delayBetweenRequests: 0,
       initialDelay: 0,
       subsequentDelay: 500,
