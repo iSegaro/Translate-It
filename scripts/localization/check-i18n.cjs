@@ -30,7 +30,7 @@ const safePrefixes = [
   'history_', 'SIDEPANEL_', 'options_', 'popup_', 'window_', 'action_',
   'help_', 'activation_', 'prompt_', 'api_', 'gemini_', 'openai_', 
   'deepseek_', 'openrouter_', 'webai_', 'lingva_', 'deepl_', 'custom_', 
-  'browser_', 'proxy_', 'theme_', 'font_', 'whole_page_'
+  'browser_', 'proxy_', 'theme_', 'font_', 'whole_page_', 'optimization_level_'
 ];
 
 const safeSpecificKeys = [
@@ -92,7 +92,7 @@ if (unusedKeys.length === 0) {
     console.log('✅ EN locale cleaned. Now running sync script to update other languages...');
     
     try {
-      execSync(`node ${path.join(projectRoot, 'scripts/sync-i18n.cjs')} --fix`, { stdio: 'inherit' });
+      execSync(`node ${path.join(__dirname, 'sync-i18n.cjs')} --fix`, { stdio: 'inherit' });
     } catch (e) {
       console.error('❌ Failed to sync after check. Please run sync-i18n.cjs --fix manually.');
     }
