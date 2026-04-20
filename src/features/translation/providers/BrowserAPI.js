@@ -1,4 +1,4 @@
-// src/providers/core/browserTranslateProvider.js
+// src/features/translation/providers/BrowserAPI.js
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -8,7 +8,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { TranslationMode } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { 
@@ -17,19 +16,12 @@ import {
 import { ProviderNames } from "./ProviderConstants.js";
 import browser from 'webextension-polyfill';
 
-const TEXT_DELIMITER = "\n\n---\n\n";
-
 export class browserTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
   static description = "Browser native translation";
   static displayName = "Browser API";
 
-  // Browser API doesn't support traditional streaming, so disable it
-  static supportsStreaming = false;
-  static characterLimit = 10000; // Higher limit for browser API
   static detector = null;
-  static reliableJsonMode = true;
-  static supportsDictionary = false;
   static translators = {};
 
   constructor() {
@@ -51,36 +43,10 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     );
   }
 
-  /**
-   * Check if JSON mode is being used
-   * @param {Object} obj - Object to check
-   * @returns {boolean} - True if specific JSON format
-   */
-  _isSpecificTextJsonFormat(obj) {
-    return (
-      Array.isArray(obj) &&
-      obj.length > 0 &&
-      obj.every(
-        (item) =>
-          typeof item === "object" &&
-          item !== null &&
-          typeof item.text === "string"
-      )
-    );
-  }
-
-
   _getLangCode(lang) {
     if (!lang || typeof lang !== "string") return "en";
-    // AUTO_DETECT_VALUE should not reach this function - handled separately
-    if (lang === AUTO_DETECT_VALUE) {
-      logger.warn('WARNING: AUTO_DETECT_VALUE reached _getLangCode - this should be handled earlier');
-      return "en";
-    }
     return getProviderLanguageCode(lang, 'BROWSER');
   }
-
-
 
   /**
    * Detect language using browser Language Detector API
@@ -112,31 +78,20 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       logger.warn('LanguageDetector failed, falling back to browser.i18n.detectLanguage');
     }
 
-    // Fallback to browser.i18n.detectLanguage (available in all Chrome versions)
+    // Fallback to browser.i18n.detectLanguage
     try {
-      logger.debug(`[${this.providerName}] Trying browser.i18n.detectLanguage with text: "${text.substring(0, 50)}..."`);
       const detectionResult = await browser.i18n.detectLanguage(text);
-      logger.info('browser.i18n.detectLanguage result:', detectionResult);
-      
       if (detectionResult?.languages && detectionResult.languages.length > 0) {
         const detectedLang = detectionResult.languages[0].language.split("-")[0];
-        logger.info(`Language detected using browser.i18n.detectLanguage: ${detectedLang}`);
         return detectedLang;
-      } else {
-        logger.info('browser.i18n.detectLanguage result empty');
       }
     } catch (error) {
       logger.error('browser.i18n.detectLanguage failed:', error);
     }
 
     // Final fallback to regex detection
-    logger.debug('Using regex fallback for language detection');
-    // Use internal regex fallback from centralized service
     const fallbackResult = await LanguageSwappingService._applyRegexFallback(text, 'auto', 'fa', 'English', 'Farsi', 'BrowserAPI');
-    if (fallbackResult[0] !== 'auto' || fallbackResult[1] !== 'fa') {
-      return "fa";
-    }
-    return "en"; // Default to English
+    return fallbackResult[0] !== 'auto' ? fallbackResult[0] : "en";
   }
 
   /**
@@ -165,15 +120,10 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       throw err;
     }
 
-    // Create new translator with progress monitoring
+    // Create new translator
     const translator = await globalThis.Translator.create({
       sourceLanguage: sourceLang,
-      targetLanguage: targetLang,
-      monitor(monitor) {
-        monitor.addEventListener("downloadprogress", () => {
-          logger.debug('Language pack download');
-        });
-      },
+      targetLanguage: targetLang
     });
 
     // Cache the translator
@@ -181,215 +131,18 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     return translator;
   }
 
-  async translate(text, sourceLang, targetLang, options = {}) {
-    logger.info(`[BrowserAPI] Starting translation: ${text.length} chars`);
-    
-    // Extract mode from options if it's an object, or use it as mode if it's a string (legacy/compatibility)
-    const translateMode = typeof options === 'string' ? options : (options?.mode || null);
-
-    // Check API availability first
-    if (!this._isAPIAvailable()) {
-      const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
-      err.type = ErrorTypes.BROWSER_API_UNAVAILABLE;
-      err.context = `${this.providerName.toLowerCase()}-api-unavailable`;
-      
-      // Let ErrorHandler handle it centrally
-      await ErrorHandler.getInstance().handle(err, {
-        context: 'browser-api-availability',
-        showToast: true
-      });
-      throw err;
-    }
-
-    if (this._isSameLanguage(sourceLang, targetLang)) return null;
-
-    // اگر در Field mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (translateMode === TranslationMode.Field) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
-
-    // اگر در Subtitle mode هستیم، پس از language detection، sourceLang را auto-detect قرار می‌دهیم
-    if (translateMode === TranslationMode.Subtitle) {
-      sourceLang = AUTO_DETECT_VALUE;
-    }
-
-    // --- Language Code Conversion ---
-    // For browserTranslateProvider, we need to handle AUTO_DETECT_VALUE differently
-    // than GoogleTranslateProvider because browser API works with specific language codes
-    let sourceLanguageCode, targetLanguageCode;
-    
-    if (sourceLang === AUTO_DETECT_VALUE) {
-      // When auto-detect is requested, detect the language first
-      try {
-        sourceLanguageCode = await this._detectLanguage(text, sourceLang);
-      } catch (error) {
-        logger.error('Language detection error:', error);
-        sourceLanguageCode = "en"; // fallback
-      }
-    } else {
-      // Use provided source language
-      sourceLanguageCode = this._getLangCode(sourceLang);
-    }
-
-    // Convert target language to proper code
-    targetLanguageCode = this._getLangCode(targetLang);
-
-    // Language swapping logic similar to Google Translate
-    if (sourceLanguageCode === targetLanguageCode) {
-      [sourceLanguageCode, targetLanguageCode] = [targetLanguageCode, sourceLanguageCode];
-    }
-
-    // Skip if same language after detection
-    if (sourceLanguageCode === targetLanguageCode) {
-      return text;
-    }
-
-    // --- JSON Mode Detection ---
-    let isJsonMode = false;
-    let originalJsonStruct;
-    let textsToTranslate = [text];
-
-    try {
-      const parsed = JSON.parse(text);
-      if (this._isSpecificTextJsonFormat(parsed)) {
-        isJsonMode = true;
-        originalJsonStruct = parsed;
-        textsToTranslate = originalJsonStruct.map((item) => item.text);
-      }
-    } catch {
-      // Not a valid JSON, proceed in plain text mode.
-    }
-
-    // --- Translation Process ---
-    try {
-      const translator = await this._getTranslator(sourceLanguageCode, targetLanguageCode);
-      
-      let translatedResults;
-      if (isJsonMode) {
-        // Translate each text part separately
-        translatedResults = [];
-        for (const textPart of textsToTranslate) {
-          const result = await translator.translate(textPart);
-          translatedResults.push(result);
-        }
-      } else {
-        // Translate single text or joined text
-        const textToTranslate = textsToTranslate.join(TEXT_DELIMITER);
-        const result = await translator.translate(textToTranslate);
-        translatedResults = [result];
-      }
-
-      // --- Response Processing ---
-      if (isJsonMode) {
-        if (translatedResults.length !== originalJsonStruct.length) {
-          logger.error('JSON reconstruction failed due to segment mismatch.');
-          return translatedResults.join(" "); // Fallback to joined text
-        }
-        
-        const translatedJson = originalJsonStruct.map((item, index) => ({
-          ...item,
-          text: translatedResults[index]?.trim() || "",
-        }));
-        return JSON.stringify(translatedJson, null, 2);
-      } else {
-        if (textsToTranslate.length > 1) {
-          // Handle delimiter-separated text using the standard robust split
-          const parts = await this._robustSplit(translatedResults[0], textsToTranslate);
-          
-          if (parts.length === textsToTranslate.length) {
-            return parts.join("");
-          }
-        }
-        const finalResult = translatedResults[0];
-        logger.info(`[BrowserAPI] Translation completed successfully`);
-        return finalResult;
-      }
-    } catch (error) {
-      // Check if this is a user cancellation (should be handled silently)
-      const errorType = matchErrorToType(error);
-      if (errorType === ErrorTypes.USER_CANCELLED || errorType === ErrorTypes.TRANSLATION_CANCELLED) {
-        // Log user cancellation at debug level only
-        logger.debug(`[BrowserAPI] Translation cancelled by user`);
-        throw error; // Re-throw without ErrorHandler processing
-      }
-
-      // Enhanced error handling with specific context
-      if (error.message?.includes("Translation not available")) {
-        error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
-        error.context = `${this.providerName.toLowerCase()}-language-unavailable`;
-      } else if (error.message?.includes("insufficient")) {
-        error.type = ErrorTypes.API;
-        error.context = `${this.providerName.toLowerCase()}-insufficient-resources`;
-      } else {
-        error.type = ErrorTypes.API;
-        error.context = `${this.providerName.toLowerCase()}-translation-error`;
-      }
-
-      logger.error('Translation error:', error);
-      // Let ErrorHandler automatically detect and handle all error types
-      await ErrorHandler.getInstance().handle(error, {
-        context: 'browser-api-translation'
-      });
-      throw error;
-    }
-  }
-
   /**
-   * Clean up resources
-   * @static
-   */
-  static cleanup() {
-    // Clean up detector
-    if (this.detector) {
-      try {
-        this.detector.destroy();
-      } catch {
-        logger.error('Error destroying detector:');
-      }
-      this.detector = null;
-    }
-
-    // Clean up all translators
-    for (const key in this.translators) {
-      if (this.translators[key]) {
-        try {
-          this.translators[key].destroy();
-        } catch {
-          logger.error(`Error destroying translator ${key}`);
-        }
-        delete this.translators[key];
-      }
-    }
-  }
-
-  /**
-   * Translate a chunk of texts using Browser Translation API
-   * @param {string[]} chunkTexts - Texts in this chunk to translate
-   * @param {string} sourceLang - Source language
-   * @param {string} targetLang - Target language
-   * @param {string} translateMode - Translation mode
-   * @param {AbortController} abortController - Cancellation controller
-   * @param {number} retryAttempt - Current retry attempt
-   * @param {number} segmentCount - Number of segments in this chunk
-   * @param {number} chunkIndex - Current chunk index
-   * @param {number} totalChunks - Total number of chunks
-   * @param {Object} options - Additional options
-   * @returns {Promise<string[]>} - Translated texts for this chunk
+   * Implementation of the chunk translation using Browser API
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
-    logger.debug(`[BrowserAPI] Translating chunk ${chunkIndex + 1}/${totalChunks} (${segmentCount} segments, attempt ${retryAttempt + 1})`, { translateMode, ...options });
-
-    // Check API availability first
+    // Check API availability
     if (!this._isAPIAvailable()) {
       const err = new Error("Chrome Translation API not available. Requires Chrome 138+");
       err.type = ErrorTypes.BROWSER_API_UNAVAILABLE;
-      err.context = `${this.providerName.toLowerCase()}-api-unavailable`;
-      
-      // Error will be caught and handled by central system
       throw err;
     }
 
-    // Convert language codes
+    // Detect source language if needed
     const sourceLanguageCode = sourceLang === AUTO_DETECT_VALUE
       ? await this._detectLanguage(chunkTexts.join(' '), sourceLang)
       : this._getLangCode(sourceLang);
@@ -401,7 +154,6 @@ export class browserTranslateProvider extends BaseTranslateProvider {
     // Translate each text in the chunk
     const results = [];
     for (const text of chunkTexts) {
-      // Check for cancellation
       if (abortController?.signal.aborted) {
         const error = new Error('Translation cancelled');
         error.name = 'AbortError';
@@ -412,20 +164,37 @@ export class browserTranslateProvider extends BaseTranslateProvider {
         const result = await translator.translate(text);
         results.push(result);
       } catch (error) {
-        logger.error(`[BrowserAPI] Chunk translation failed for text: ${text.slice(0, 50)}...`, error);
-        // Return original text on failure to maintain chunk structure
-        results.push(text);
+        logger.error(`[BrowserAPI] Chunk translation failed for segment`, error);
+        results.push(text); // Fallback to original
       }
     }
 
-    logger.debug(`[BrowserAPI] Chunk translated: ${chunkTexts.length} texts`);
     return results;
   }
 
   /**
-   * Reset session context (override parent method)
+   * Clean up resources
+   */
+  static cleanup() {
+    if (this.detector) {
+      try { this.detector.destroy(); } catch { /* ignore */ }
+      this.detector = null;
+    }
+
+    for (const key in this.translators) {
+      if (this.translators[key]) {
+        try { this.translators[key].destroy(); } catch { /* ignore */ }
+        delete this.translators[key];
+      }
+    }
+  }
+
+  /**
+   * Reset session context
    */
   resetSessionContext() {
     browserTranslateProvider.cleanup();
   }
 }
+
+export default browserTranslateProvider;

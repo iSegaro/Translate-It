@@ -594,6 +594,43 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Browser API - Chrome's built-in translation (Local)
+  BrowserAPI: {
+    rateLimit: {
+      maxConcurrent: 5, // High for local processing
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 0,
+      burstLimit: 10,
+      burstWindow: 1000
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 10000,
+      maxChunksPerBatch: 50,
+      delimiter: '\n[[---]]\n'
+    },
+    streaming: {
+      enabled: false, // Local API is atomic
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: ['api_unavailable', 'language_not_supported'],
+      retryStrategies: {
+        'api_unavailable': { delay: 0, temporary: false },
+        'language_not_supported': { delay: 0, temporary: false }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: false,
+      supportsBatchRequests: true,
+      supportsThinking: false,
+      reliableJsonMode: true
+    }
+  },
+
   // Lingva - Open-source Google Translate front-end settings
   Lingva: {
     rateLimit: {
