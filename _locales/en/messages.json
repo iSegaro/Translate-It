@@ -1977,7 +1977,7 @@
     "message": "Whole Page Translation"
   },
   "optimization_level_label": {
-    "message": "Optimization Level"
+    "message": "Translation Strategy (Speed vs. Cost)"
   },
   "optimization_level_1": {
     "message": "Level 1"
@@ -2010,10 +2010,10 @@
     "message": "Fast"
   },
   "optimization_description_ai": {
-    "message": "Adjust balance between translation cost (tokens) and streaming speed."
+    "message": "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates."
   },
   "optimization_description_traditional": {
-    "message": "Adjust balance between request stability and translation speed."
+    "message": "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting."
   },
   "enable_translation_history_label": {
     "message": "Enable Translation History"

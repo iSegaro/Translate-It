@@ -23,7 +23,7 @@
             <div class="optimization-control-area">
               <div class="opt-control-group">
                 <div class="label-with-value">
-                  <label class="opt-label">{{ t('optimization_level_label') || 'Optimization Level' }}</label>
+                  <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
                   <span
                     class="level-badge"
                     :class="'level-' + currentOptimizationLevel"
@@ -57,8 +57,8 @@
                 
                 <p class="opt-description">
                   {{ isAIProvider 
-                    ? t('optimization_description_ai') || 'Adjust balance between translation cost (tokens) and streaming speed.' 
-                    : t('optimization_description_traditional') || 'Adjust balance between request stability and translation speed.' 
+                    ? t('optimization_description_ai') || "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates." 
+                    : t('optimization_description_traditional') || "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting." 
                   }}
                 </p>
               </div>

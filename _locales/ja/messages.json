@@ -1977,7 +1977,7 @@
     "message": "ページ全体の翻訳"
   },
   "optimization_level_label": {
-    "message": "最適化レベル"
+    "message": "翻訳戦略 (速度 vs コスト)"
   },
   "optimization_level_1": {
     "message": "レベル 1"
@@ -2010,10 +2010,10 @@
     "message": "高速"
   },
   "optimization_description_ai": {
-    "message": "翻訳コスト（トークン）とストリーミング速度のバランスを調整します。"
+    "message": "「エコノミー」でトークン効率を最大化するか、「ターボ」で最速のUI更新を実現するかを選択します。"
   },
   "optimization_description_traditional": {
-    "message": "リクエストの安定性と翻訳速度のバランスを調整します。"
+    "message": "API使用量とIPの安定性を翻訳速度とバランスさせます。効率を高めることでリクエスト頻度を抑え、レート制限を防ぎます。"
   },
   "enable_translation_history_label": {
     "message": "翻訳履歴を有効にする"
