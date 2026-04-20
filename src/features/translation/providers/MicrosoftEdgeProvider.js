@@ -28,8 +28,15 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
-    if (lang === AUTO_DETECT_VALUE) return "";
-    return getProviderLanguageCode(lang, 'BING') || lang;
+    if (!lang || lang === AUTO_DETECT_VALUE) return ""; // Let Edge auto-detect
+    
+    // Normalize to base code (e.g., 'en-US' -> 'en') unless it's a special Microsoft code
+    const baseCode = typeof lang === 'string' ? lang.split('-')[0].toLowerCase() : lang;
+    
+    const mappedCode = getProviderLanguageCode(lang, 'BING') || 
+                       getProviderLanguageCode(baseCode, 'BING');
+                       
+    return mappedCode || baseCode;
   }
 
   /**
