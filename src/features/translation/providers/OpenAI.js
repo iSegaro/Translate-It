@@ -43,7 +43,8 @@ export class OpenAIProvider extends BaseAIProvider {
     this._validateConfig({ apiKey }, ["apiKey"], `${this.providerName.toLowerCase()}-translation`);
 
     const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
-    logger.info(`[OpenAI] Model: ${model || 'gpt-3.5-turbo'}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
+    const activeModel = model || "gpt-4o-mini";
+    logger.info(`[OpenAI] Model: ${activeModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     const { messages } = await AIConversationHelper.getConversationMessages(sessionId, this.providerName, userText, systemPrompt, options.mode);
 
@@ -54,11 +55,14 @@ export class OpenAIProvider extends BaseAIProvider {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || "gpt-4o-mini",
+        model: activeModel,
         messages: messages,
+        temperature: 0.1,
         max_tokens: 4096,
-        // Enforce JSON Mode if requested by contract
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        // Enforce JSON Mode for both Object and Batch (Array) contracts
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
+          response_format: { type: "json_object" } 
+        })
       }),
     };
 
