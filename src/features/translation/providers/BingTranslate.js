@@ -21,6 +21,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   static bingBaseUrl = "https://www.bing.com/ttranslatev3";
   static bingTokenUrl = "https://www.bing.com/translator";
   static bingAccessToken = null;
+
+  // BaseTranslateProvider capabilities (Default values)
+  // NOTE: Character limits and chunk sizes are now dynamically managed 
+  // by ProviderConfigurations.js based on the active Optimization Level.
   static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.BING;
   static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.BING;
 
@@ -83,8 +87,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       const tl = this._getLangCode(targetLang);
 
       // Additional size validation - be more strict with Bing's limits
-      if (textToTranslate.length > this.constructor.characterLimit) {
-        logger.info(`[Bing] Text too long (${textToTranslate.length} chars, limit is ${this.constructor.characterLimit}), splitting`);
+      const effectiveCharLimit = providerConfig.batching?.characterLimit || this.constructor.characterLimit;
+      
+      if (textToTranslate.length > effectiveCharLimit) {
+        logger.info(`[Bing] Text too long (${textToTranslate.length} chars, limit is ${effectiveCharLimit}), splitting`);
 
         // Scenario A: Multiple segments - split the array
         if (chunkTexts.length > 1) {
@@ -101,7 +107,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         // Scenario B: Single node but too long - split the string itself
         else if (chunkTexts.length === 1) {
           const singleText = chunkTexts[0];
-          const parts = this._splitSingleLongString(singleText, this.constructor.characterLimit);
+          const parts = this._splitSingleLongString(singleText, effectiveCharLimit);
 
           logger.info(`[Bing] Single long node split into ${parts.length} parts`);
 

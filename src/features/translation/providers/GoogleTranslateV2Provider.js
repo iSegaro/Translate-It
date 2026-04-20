@@ -33,7 +33,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   static displayName = "Google Translate";
   static reliableJsonMode = false;
   static supportsDictionary = true;
-  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;
+
+  // BaseTranslateProvider capabilities (Default values)
+  // NOTE: Character limits and chunk sizes are now dynamically managed 
+  // by ProviderConfigurations.js based on the active Optimization Level.
+  static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.GOOGLE;
+  static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.GOOGLE;
+  static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.GOOGLE;
+  static maxChunksPerBatch = TRANSLATION_CONSTANTS.MAX_CHUNKS_PER_BATCH.GOOGLE;
 
   constructor() {
     super(ProviderNames.GOOGLE_TRANSLATE_V2);

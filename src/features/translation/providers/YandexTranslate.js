@@ -21,9 +21,10 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
   static supportsDictionary = TRANSLATION_CONSTANTS.SUPPORTS_DICTIONARY.YANDEX;
   static mainUrl = "https://translate.yandex.net/api/v1/tr.json/translate";
   static detectUrl = "https://translate.yandex.net/api/v1/tr.json/detect";
-  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.YANDEX;
   
-  // BaseTranslateProvider capabilities
+  // BaseTranslateProvider capabilities (Default values)
+  // NOTE: Character limits and chunk sizes are now dynamically managed 
+  // by ProviderConfigurations.js based on the active Optimization Level.
   static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.YANDEX;
   static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.YANDEX;
   static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.YANDEX;

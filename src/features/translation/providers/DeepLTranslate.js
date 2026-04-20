@@ -28,9 +28,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   static description = "AI-powered translation by DeepL";
   static reliableJsonMode = false;
   static supportsDictionary = false;
-  static CHAR_LIMIT = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.DEEPL;
 
-  // BaseTranslateProvider capabilities
+  // BaseTranslateProvider capabilities (Default values)
+  // NOTE: Character limits and chunk sizes are now dynamically managed 
+  // by ProviderConfigurations.js based on the active Optimization Level.
   static supportsStreaming = TRANSLATION_CONSTANTS.SUPPORTS_STREAMING.DEEPL;
   static chunkingStrategy = TRANSLATION_CONSTANTS.CHUNKING_STRATEGIES.DEEPL;
   static characterLimit = TRANSLATION_CONSTANTS.CHARACTER_LIMITS.DEEPL;
