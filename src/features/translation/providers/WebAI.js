@@ -1,13 +1,13 @@
-// src/core/providers/WebAIProvider.js
+// src/features/translation/providers/WebAI.js
 import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.js";
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
 } from "@/shared/config/config.js";
-import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 
@@ -17,16 +17,6 @@ export class WebAIProvider extends BaseAIProvider {
   static type = "ai";
   static description = "WebAI service";
   static displayName = "WebAI";
-  static reliableJsonMode = false;
-  static supportsDictionary = true;
-  
-  static supportsStreaming = true; 
-  static preferredBatchStrategy = 'smart';
-  static optimalBatchSize = 25; 
-  static maxComplexity = 400;
-  static supportsImageTranslation = false; 
-  
-  static batchStrategy = 'json';
 
   constructor() {
     super(ProviderNames.WEBAI);
@@ -46,31 +36,32 @@ export class WebAIProvider extends BaseAIProvider {
 
     this._validateConfig({ apiUrl, apiModel }, ["apiUrl", "apiModel"], `${this.providerName.toLowerCase()}-translation`);
 
-    logger.info(`[WebAI] Using model: ${apiModel}`);
+    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
+    logger.info(`[WebAI] Model: ${apiModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
 
     // WebAI uses a single prompt string instead of separate messages
-    const fullPrompt = isBatch 
-      ? `${systemPrompt}\n\nJSON data to translate:\n${userText}`
-      : await buildPrompt(userText, options.sourceLang, options.targetLang, options.mode, this.constructor.type);
+    // We combine the system prompt and user text into a final message
+    const finalMessage = `${systemPrompt}\n\nText to translate:\n${userText}`;
 
     const fetchOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: fullPrompt,
+        message: finalMessage,
         model: apiModel,
         images: [],
         max_tokens: 4096,
-        reset_session: this.shouldResetSession(),
-        // Enforce JSON if requested
-        ...(expectedFormat === ResponseFormat.JSON_OBJECT && { response_format: { type: "json_object" } })
+        // Enforce JSON Mode for both Object and Batch (Array) contracts
+        ...((expectedFormat === ResponseFormat.JSON_OBJECT || expectedFormat === ResponseFormat.JSON_ARRAY) && { 
+          response_format: { type: "json_object" } 
+        })
       }),
     };
 
     const result = await this._executeRequest({
       url: apiUrl,
       fetchOptions,
-      charCount: AITextProcessor.calculatePayloadChars(fetchOptions.body),
+      charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => typeof data.response === "string" ? data.response : undefined,
       context: `${this.providerName.toLowerCase()}-translation`,
@@ -78,8 +69,12 @@ export class WebAIProvider extends BaseAIProvider {
       sessionId
     });
 
-    this.storeSessionContext({ model: apiModel, lastUsed: Date.now() });
+    if (sessionId && result) {
+      await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
+    }
     
     return result;
   }
 }
+
+export default WebAIProvider;
