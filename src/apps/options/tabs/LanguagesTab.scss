@@ -286,47 +286,56 @@
   }
 }
 
-.setting-group {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-md;
-  
-  label {
-    margin-bottom: 0;
-    flex: 1;
-    white-space: nowrap;
-  }
-
-  &.vertical {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: $spacing-xs;
-    margin-bottom: $spacing-sm;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-    
-    label {
-      min-width: auto;
-    }
-
-    .setting-description {
-      margin-inline-start: 28px;
-    }
-  }
-  
-  .language-dropdown,
-  :deep(.ti-provider-button-container) {
-    flex: 0 0 250px !important;
-    width: 250px !important;
-    height: auto;
-
-    .ti-provider-button {
+.languages-tab {
+  .setting-group {
+    &:not(.vertical) {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: $spacing-md !important;
       width: 100% !important;
+      max-width: 650px !important;
+      margin-bottom: $spacing-sm !important;
+      
+      label {
+        margin-bottom: 0 !important;
+        flex: 1 !important;
+        white-space: nowrap !important;
+        cursor: pointer !important;
+      }
+
+      .language-dropdown,
+      :deep(.ti-provider-button-container) {
+        flex: 0 0 250px !important;
+        width: 250px !important;
+        height: auto !important;
+
+        .ti-provider-button {
+          width: 100% !important;
+        }
+      }
+    }
+
+    &.vertical {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-sm !important;
+
+      &:last-child {
+        margin-bottom: 0 !important;
+      }
+      
+      label {
+        min-width: auto !important;
+      }
+
+      .setting-description {
+        margin-inline-start: 28px !important;
+      }
     }
   }
 }
@@ -443,15 +452,15 @@
 }
 
 // Tablet & Mobile responsive
-@media (max-width: #{$breakpoint-lg}) {
-  .setting-group {
+@media (max-width: #{$breakpoint-md}) {
+  .setting-group:not(.vertical) {
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: $spacing-sm !important;
+    gap: $spacing-xs !important;
     
     label {
       min-width: auto !important;
-      margin-bottom: $spacing-xs !important;
+      margin-bottom: 2px !important;
     }
     
     .language-dropdown,

@@ -1,5 +1,5 @@
 <template>
-  <section class="options-tab-content">
+  <section class="options-tab-content languages-tab">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
 
     <div
@@ -15,6 +15,7 @@
           v-model="sourceLanguage"
           :languages="filteredSourceLanguages"
           type="source"
+          class="language-dropdown"
         />
       </div>
 
@@ -24,6 +25,7 @@
           v-model="targetLanguage"
           :languages="filteredTargetLanguages"
           type="target"
+          class="language-dropdown"
         />
       </div>
 
