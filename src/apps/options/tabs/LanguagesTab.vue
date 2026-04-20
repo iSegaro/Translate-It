@@ -42,7 +42,9 @@
                   >
                   <div class="slider-labels">
                     <span>{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                    <span class="slider-tick">|</span>
                     <span>{{ t('opt_balanced') || 'Balanced' }}</span>
+                    <span class="slider-tick">|</span>
                     <span>{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
                   </div>
                 </div>
@@ -792,6 +794,12 @@ defineExpose({
       color: var(--color-text-secondary);
       padding: 0 2px;
       box-sizing: border-box;
+
+      .slider-tick {
+        opacity: 0.6;
+        font-weight: 500;
+        transform: translateY(-1px);
+      }
     }
 
     .opt-description {
