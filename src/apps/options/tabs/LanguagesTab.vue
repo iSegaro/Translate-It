@@ -2,89 +2,6 @@
   <section class="options-tab-content">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
 
-    <!-- API Settings Section (Moved to Top) -->
-    <div class="api-settings-section">
-      <div class="setting-group">
-        <label>{{ t('translation_api_label') || 'API Choice' }}</label>
-        <ProviderSelector 
-          v-model="selectedProvider" 
-          mode="button"
-          :is-global="false"
-        />
-      </div>
-
-      <div class="provider-settings-container">
-        <Transition name="fade-slide">
-          <div 
-            :key="selectedProvider"
-            class="provider-settings"
-          >
-            <!-- Optimization Level Section (Visible for all providers) -->
-            <div class="optimization-control-area">
-              <div class="opt-control-group">
-                <div class="label-with-value">
-                  <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                  <span
-                    class="level-badge"
-                    :class="'level-' + currentOptimizationLevel"
-                  >
-                    {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                  </span>
-                </div>
-                
-                <div class="slider-wrapper">
-                  <input 
-                    v-model.number="currentOptimizationLevel" 
-                    type="range" 
-                    min="1" 
-                    max="5"
-                    class="ti-range-slider"
-                  >
-                  <div class="slider-labels">
-                    <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                    <span 
-                      class="slider-tick" 
-                      @click="currentOptimizationLevel = 2"
-                    >|</span>
-                    <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                    <span 
-                      class="slider-tick" 
-                      @click="currentOptimizationLevel = 4"
-                    >|</span>
-                    <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
-                  </div>
-                </div>
-                
-                <p class="opt-description">
-                  {{ isAIProvider 
-                    ? t('optimization_description_ai') || "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates." 
-                    : t('optimization_description_traditional') || "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting." 
-                  }}
-                </p>
-              </div>
-            </div>
-
-            <div class="section-separator mini" />
-
-            <div
-              v-if="selectedProviderInfo && !providerSettingsComponent"
-              class="api-info"
-            >
-              <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-              <p class="setting-description">
-                {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
-              </p>
-            </div>
-
-            <component :is="providerSettingsComponent" />
-          </div>
-        </Transition>
-      </div>
-    </div>
-
-    <!-- Separator for Language section -->
-    <div class="section-separator" />
-
     <div
       v-if="!isLoaded"
       class="loading-message"
@@ -109,6 +26,102 @@
           type="target"
         />
       </div>
+
+      <div class="section-separator" />
+
+      <!-- API Settings Accordion -->
+      <BaseAccordion
+        :is-open="activeAccordion === 'api'"
+        item-class="api-settings-accordion"
+        @toggle="toggleAccordion('api')"
+      >
+        <template #header>
+          <span>{{ t('translation_api_label') || 'API Choice & Provider Settings' }}</span>
+        </template>
+
+        <template #content>
+          <div class="accordion-inner">
+            <div class="api-settings-section">
+              <div class="setting-group">
+                <label>{{ t('translation_api_label') || 'API Choice' }}</label>
+                <ProviderSelector 
+                  v-model="selectedProvider" 
+                  mode="button"
+                  :is-global="false"
+                />
+              </div>
+
+              <div class="provider-settings-container">
+                <Transition name="fade-slide">
+                  <div 
+                    :key="selectedProvider"
+                    class="provider-settings"
+                  >
+                    <!-- Optimization Level Section (Visible for all providers) -->
+                    <div class="optimization-control-area">
+                      <div class="opt-control-group">
+                        <div class="label-with-value">
+                          <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
+                          <span
+                            class="level-badge"
+                            :class="'level-' + currentOptimizationLevel"
+                          >
+                            {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                          </span>
+                        </div>
+                        
+                        <div class="slider-wrapper">
+                          <input 
+                            v-model.number="currentOptimizationLevel" 
+                            type="range" 
+                            min="1" 
+                            max="5"
+                            class="ti-range-slider"
+                          >
+                          <div class="slider-labels">
+                            <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                            <span 
+                              class="slider-tick" 
+                              @click="currentOptimizationLevel = 2"
+                            >|</span>
+                            <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                            <span 
+                              class="slider-tick" 
+                              @click="currentOptimizationLevel = 4"
+                            >|</span>
+                            <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                          </div>
+                        </div>
+                        
+                        <p class="opt-description">
+                          {{ isAIProvider 
+                            ? t('optimization_description_ai') || "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates." 
+                            : t('optimization_description_traditional') || "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting." 
+                          }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="section-separator mini" />
+
+                    <div
+                      v-if="selectedProviderInfo && !providerSettingsComponent"
+                      class="api-info"
+                    >
+                      <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
+                      <p class="setting-description">
+                        {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
+                      </p>
+                    </div>
+
+                    <component :is="providerSettingsComponent" />
+                  </div>
+                </Transition>
+              </div>
+            </div>
+          </div>
+        </template>
+      </BaseAccordion>
 
       <!-- Bilingual Translation Setting (Accordion Style) -->
       <BaseAccordion
