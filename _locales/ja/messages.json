@@ -1979,6 +1979,45 @@
   "bilingual_mode_page_label": {
     "message": "ページ全体の翻訳"
   },
+  "optimization_level_label": {
+    "message": "最適化レベル"
+  },
+  "optimization_level_1": {
+    "message": "レベル 1"
+  },
+  "optimization_level_2": {
+    "message": "レベル 2"
+  },
+  "optimization_level_3": {
+    "message": "レベル 3"
+  },
+  "optimization_level_4": {
+    "message": "レベル 4"
+  },
+  "optimization_level_5": {
+    "message": "レベル 5"
+  },
+  "opt_economy": {
+    "message": "エコノミー"
+  },
+  "opt_stable": {
+    "message": "安定"
+  },
+  "opt_balanced": {
+    "message": "バランス"
+  },
+  "opt_turbo": {
+    "message": "ターボ"
+  },
+  "opt_fast": {
+    "message": "高速"
+  },
+  "optimization_description_ai": {
+    "message": "翻訳コスト（トークン）とストリーミング速度のバランスを調整します。"
+  },
+  "optimization_description_traditional": {
+    "message": "リクエストの安定性と翻訳速度のバランスを調整します。"
+  },
   "ai_optimization_section_title": {
     "message": "AIの最適化"
   },
