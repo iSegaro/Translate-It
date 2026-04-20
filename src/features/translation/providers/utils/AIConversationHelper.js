@@ -207,6 +207,10 @@ export const AIConversationHelper = {
       getAIContextTranslationEnabledAsync()
     ]);
 
+    const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
+    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
+    const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+
     let promptTemplate;
 
     if (isBatch) {
@@ -223,7 +227,7 @@ export const AIConversationHelper = {
       }
         
       if (useFollowup) {
-        promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetLang}.`;
+        promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetName}.`;
       }
     } else {
       promptTemplate = await buildPrompt("$_{TEXT}", sourceLang, targetLang, translateMode, providerType);
@@ -232,10 +236,6 @@ export const AIConversationHelper = {
     if (!promptTemplate.includes("$_{TEXT}")) {
       promptTemplate += "\n\nText to translate:\n$_{TEXT}";
     }
-
-    const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
-    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
-    const targetName = getLanguageNameFromCode(targetLang) || targetLang;
 
     // Resolve instructions from template even for AI batch prompts
     const promptInstructionsTemplate = sourceLang === 'auto' 
@@ -295,7 +295,8 @@ export const AIConversationHelper = {
     return {
       systemPrompt: resultPrompt,
       userText
-    };  },
+    };
+  },
 
   /**
    * Helper to get conversation messages for AI providers
