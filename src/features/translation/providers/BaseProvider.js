@@ -108,13 +108,25 @@ export class BaseProvider {
     const { rateLimitManager, TranslationPriority } = await import("@/features/translation/core/RateLimitManager.js");
     const targetPriority = priority || TranslationPriority.NORMAL;
     
-    return await rateLimitManager.executeWithRateLimit(
+    // Pre-check
+    if (options.abortController?.signal?.aborted) {
+      throw new Error('Task aborted before execution');
+    }
+
+    const result = await rateLimitManager.executeWithRateLimit(
       this.providerName,
       task,
       context,
       targetPriority,
       options
     );
+
+    // Post-check
+    if (options.abortController?.signal?.aborted) {
+      throw new Error('Task aborted during execution');
+    }
+
+    return result;
   }
 
   /**

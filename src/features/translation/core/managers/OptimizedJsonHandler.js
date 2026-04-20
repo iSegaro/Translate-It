@@ -44,19 +44,29 @@ export class OptimizedJsonHandler {
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency enabled)`);
 
       const batchPromises = batches.map(async (batch, i) => {
-        if (engine.isCancelled(messageId)) return;
-
-        // Still respect intelligent delay for the start of each promise to prevent instant burst
-        if (i > 0) {
-          const delay = this._calculateDelay(batch, i, batches.length, providerConfig);
-          // If we have concurrency, we can reduce the inter-batch delay significantly
-          const concurrencyAwareDelay = providerConfig.rateLimit.maxConcurrent > 1 ? Math.min(delay, 100) : delay;
-          if (concurrencyAwareDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
+        const checkCancellation = () => {
+          if (engine.isCancelled(messageId) || abortController.signal.aborted) {
+            const abortError = new Error('Translation task cancelled');
+            abortError.name = 'AbortError';
+            abortError.isCancelled = true;
+            throw abortError;
           }
-        }
+        };
 
         try {
+          checkCancellation();
+
+          // Still respect intelligent delay for the start of each promise
+          if (i > 0) {
+            const delay = this._calculateDelay(batch, i, batches.length, providerConfig);
+            const concurrencyAwareDelay = providerConfig.rateLimit.maxConcurrent > 1 ? Math.min(delay, 100) : delay;
+            if (concurrencyAwareDelay > 0) {
+              await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
+            }
+          }
+
+          checkCancellation();
+
           const statsBefore = statsManager.getSessionSummary(sessionId);
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
@@ -76,8 +86,9 @@ export class OptimizedJsonHandler {
             sender
           );
 
+          checkCancellation();
+
           const mappedResults = this._mapResults(batch, translatedBatch);
-          // Sequential streaming is handled inside _streamResults to maintain UI order
           await this._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
@@ -90,6 +101,10 @@ export class OptimizedJsonHandler {
           }
           
         } catch (batchError) {
+          if (batchError.name === 'AbortError' || batchError.isCancelled) {
+            return; // Exit silently on cancellation
+          }
+          
           logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
           hasErrors = true;
           lastError = batchError;

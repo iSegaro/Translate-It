@@ -140,20 +140,42 @@ export class RateLimitManager {
     const startTime = Date.now();
 
     return new Promise((resolve, reject) => {
+      const abortSignal = options.abortController?.signal;
+
+      // Ensure priority is valid
+      const targetPriority = [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].includes(priority)
+        ? priority : TranslationPriority.NORMAL;
+
       const request = { 
         task, 
         resolve, 
         reject, 
         context, 
-        priority, 
+        priority: targetPriority, 
         options, // Store metadata for stats
         enqueuedAt: startTime 
       };
-      
-      // Ensure priority is valid
-      const targetPriority = [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].includes(priority)
-        ? priority : TranslationPriority.NORMAL;
 
+      // Handle early cancellation while in queue
+      if (abortSignal) {
+        const onAbort = () => {
+          // Find and remove from queue if still there
+          const queue = state.queues[targetPriority];
+          const index = queue.indexOf(request);
+          if (index !== -1) {
+            queue.splice(index, 1);
+            reject(new Error('Request aborted while in queue'));
+          }
+        };
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+        
+        // If already aborted
+        if (abortSignal.aborted) {
+          reject(new Error('Request aborted before enqueuing'));
+          return;
+        }
+      }
+      
       state.queues[targetPriority].push(request);
       this._processQueue(name);
     });
