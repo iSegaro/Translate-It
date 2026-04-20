@@ -1,15 +1,18 @@
 /* src/components/shared/ProviderSelector.scss */
 @use "@/assets/styles/base/variables" as *;
 
-/* Split Button Styles */
+/* 1. Base Container Styles */
 .ti-split-translate-button-container {
   position: relative !important;
   flex-shrink: 0 !important;
   display: flex !important;
   align-items: center !important;
+  &.ti-dropdown-open { z-index: 1000 !important; }
 
-  &.ti-dropdown-open {
-    z-index: 1000 !important;
+  /* Split mode (Popup/Sidepanel) always opens to the right */
+  .ti-provider-dropdown-menu {
+    left: 0 !important;
+    right: auto !important;
   }
 }
 
@@ -23,7 +26,6 @@
   overflow: hidden !important;
   height: 32px !important;
   box-sizing: border-box !important;
-
   &:hover { border-color: var(--color-primary) !important; }
 }
 
@@ -37,7 +39,6 @@
   border: none !important;
   color: var(--color-text) !important;
   cursor: pointer !important;
-
   span { font-size: 13px !important; font-weight: 500 !important; }
 }
 
@@ -50,16 +51,21 @@
   height: 100% !important;
   cursor: pointer !important;
   background: none !important;
-
   &:hover { background-color: var(--color-surface) !important; }
   &.ti-active { background-color: var(--color-primary-alpha) !important; }
 }
 
-/* Regular Button Styles (Used in Tabs/Options) */
+/* 2. Regular Button Mode (Used in Tabs/Options) */
 .ti-provider-button-container {
   position: relative !important;
   width: 250px !important;
   flex-shrink: 0 !important;
+
+  /* Button mode (Options Tabs) always opens to the left to avoid overflow */
+  .ti-provider-dropdown-menu {
+    right: 0 !important;
+    left: auto !important;
+  }
 
   .ti-provider-button {
     display: flex !important;
@@ -74,43 +80,25 @@
     width: 100% !important;
     height: 40px !important;
     cursor: pointer !important;
-
     &:hover { border-color: var(--color-primary) !important; }
-    &.ti-active { border-color: var(--color-primary) !important; }
-
-    span {
-      flex: 1 !important;
-      text-align: left !important;
-      font-size: 14px !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-    }
+    .ti-api-provider-icon { width: 18px !important; height: 18px !important; }
+    span { flex: 1 !important; text-align: left !important; font-size: 14px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   }
 }
 
-/* Icon Only Mode Styles (Used in Sidepanel Toolbar) */
+/* 3. Icon Only Mode Styles (Sidepanel Toolbar) */
 .ti-provider-icon-only-container {
   position: relative !important;
   display: inline-flex !important;
   overflow: visible !important;
+  &.ti-dropdown-open { z-index: 1000 !important; }
 
-  &.ti-dropdown-open {
-    z-index: 1000 !important;
-  }
-
-  /* For vertical toolbar icons, we often want the menu to open to the side */
   .ti-provider-dropdown-menu {
-    left: 100% !important; /* Open to the right of the icon */
+    left: 100% !important; /* Open to the side */
     right: auto !important;
     top: 0 !important;
     margin-left: 10px !important;
     margin-top: 0 !important;
-
-    &.ti-open-upward {
-      top: auto !important;
-      bottom: 0 !important;
-    }
   }
 }
 
@@ -124,50 +112,51 @@
   align-items: center !important;
   justify-content: center !important;
   transition: background-color $transition-base !important;
-
   &:hover { background-color: var(--color-surface) !important; }
   &.ti-active { background-color: var(--color-primary-alpha) !important; }
 }
 
-/* Common Provider Icon Logic */
-.ti-api-provider-icon {
-  width: 16px !important;
-  height: 16px !important;
+.ti-provider-icon-only {
+  width: 18px !important;
+  height: 18px !important;
   object-fit: contain !important;
-  flex-shrink: 0 !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.2s ease-in-out !important;
 
   &.ti-invert-dark {
-    :global(.theme-dark) &, :global(.is-dark) & {
-      filter: invert(1) brightness(1.8) !important;
-    }
+    :global(.theme-dark) &, :global(.is-dark) & { filter: invert(1) brightness(1.8) !important; }
   }
 }
 
-/* CRITICAL FIX: Target the arrow classes directly on the element */
+/* 4. Common Elements */
+.ti-api-provider-icon {
+  width: 16px !important; height: 16px !important;
+  object-fit: contain !important; flex-shrink: 0 !important;
+  &.ti-invert-dark {
+    :global(.theme-dark) &, :global(.is-dark) & { filter: invert(1) brightness(1.8) !important; }
+  }
+}
+
 .ti-dropdown-arrow, 
 .dropdown-arrow, 
 img.ti-dropdown-arrow, 
 .ti-inline-icon.ti-dropdown-arrow {
-  width: 10px !important;
+  width: 10px !important; 
   height: 10px !important;
   min-width: 10px !important;
   min-height: 10px !important;
   max-width: 10px !important;
   max-height: 10px !important;
-  display: block !important;
+  display: block !important; 
   transition: transform 0.2s ease !important;
   object-fit: contain !important;
-
   &.rotated { transform: rotate(180deg) !important; }
 }
 
-/* Provider Dropdown Menu Base Styles */
+/* 5. Dropdown Menu Base Styles */
 .ti-provider-dropdown-menu {
   position: absolute !important;
   top: 100% !important;
-  right: 0 !important; /* Default: Align to right side */
-  left: auto !important;
-  margin-top: 4px !important;
   background: var(--color-surface) !important;
   border: 1px solid var(--color-border) !important;
   border-radius: $border-radius-base !important;
@@ -177,70 +166,45 @@ img.ti-dropdown-arrow,
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
+  margin-top: 4px !important;
 
-  &.ti-open-upward {
-    top: auto !important;
-    bottom: 100% !important;
-    margin-top: 0 !important;
-    margin-bottom: 4px !important;
-  }
+  &.ti-open-upward { top: auto !important; bottom: 100% !important; margin-top: 0 !important; margin-bottom: 4px !important; }
 }
 
 .ti-provider-dropdown-list {
   max-height: 300px !important;
   overflow-y: auto !important;
   width: 100% !important;
-
   &::-webkit-scrollbar { width: 4px !important; }
   &::-webkit-scrollbar-thumb { background: var(--color-border) !important; border-radius: 2px !important; }
 }
 
 .ti-dropdown-item {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  padding: 10px 14px !important;
-  cursor: pointer !important;
-  color: var(--color-text) !important;
+  display: flex !important; align-items: center !important;
+  gap: 10px !important; padding: 10px 14px !important;
+  cursor: pointer !important; color: var(--color-text) !important;
   border-bottom: 1px solid var(--color-border-light, var(--color-border)) !important;
-
   &:last-child { border-bottom: none !important; }
   &:hover, &.is-focused { background-color: var(--color-primary-alpha) !important; }
   &.ti-active { background-color: var(--color-primary-alpha) !important; color: var(--color-primary) !important; font-weight: 600 !important; }
-
   img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
   span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
-/* Ephemeral Sync Footer */
 .ti-provider-dropdown-footer {
   background-color: var(--color-background) !important;
   border-top: 1px solid var(--color-border) !important;
-  padding: 6px !important;
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 6px !important;
+  padding: 8px !important;
+  display: flex !important; flex-direction: row !important; gap: 6px !important;
 }
 
 .ti-sync-row {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  padding: 6px !important;
-  border-radius: $border-radius-sm !important;
-  border: 1px solid transparent !important;
-  background: var(--color-surface) !important;
-  cursor: pointer !important;
-  flex: 1 !important;
-  color: var(--color-text-secondary) !important;
-  
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  gap: 6px !important; padding: 6px !important; border-radius: $border-radius-sm !important;
+  border: 1px solid transparent !important; background: var(--color-surface) !important;
+  cursor: pointer !important; flex: 1 !important; color: var(--color-text-secondary) !important;
   &:hover { background-color: var(--color-primary-alpha) !important; }
-  &.is-active {
-    background-color: var(--color-primary-alpha) !important;
-    border-color: var(--color-primary-light) !important;
-    color: var(--color-primary) !important;
-  }
+  &.is-active { background-color: var(--color-primary-alpha) !important; border-color: var(--color-primary-light) !important; color: var(--color-primary) !important; }
 }
 
 .ti-sync-info {
@@ -251,30 +215,40 @@ img.ti-dropdown-arrow,
   span { white-space: nowrap !important; }
 }
 
+.ti-sync-icon {
+  font-size: 12px !important;
+  color: inherit !important;
+}
+
 .ti-sync-provider-icon {
   width: 12px !important;
   height: 12px !important;
   opacity: 0.7 !important;
+  object-fit: contain !important;
 }
 
-/* RTL Support */
+/* 6. RTL Support */
 :global(.rtl) {
   .ti-provider-dropdown-area { border-left: none !important; border-right: 1px solid var(--color-border) !important; }
-  .ti-provider-dropdown-menu { left: 0 !important; right: auto !important; }
   .ti-provider-button span { text-align: right !important; }
-  
   .ti-sync-row { flex-direction: row-reverse !important; }
-  
-  /* In RTL, icon-only menu should open to the left side */
+
+  /* In RTL Options Page, Button mode should still align so it doesn't exit frame */
+  .ti-provider-button-container .ti-provider-dropdown-menu {
+    left: 0 !important;
+    right: auto !important;
+  }
+
+  /* RTL Sidebar/Icon only opens to LEFT */
   .ti-provider-icon-only-container .ti-provider-dropdown-menu {
     left: auto !important;
     right: 100% !important;
-    margin-left: 0 !important;
     margin-right: 10px !important;
+    margin-left: 0 !important;
   }
 }
 
-/* Context-specific adjustments for Popup */
+/* 7. Final Polish for Popup */
 :global(.popup-wrapper) {
   .ti-split-translate-button { height: 28px !important; }
   .ti-translate-main-area span { font-size: 12px !important; }
