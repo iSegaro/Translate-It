@@ -93,16 +93,31 @@ export class UnifiedModeCoordinator {
       return {
         success: true,
         translatedText: JSON.stringify(finalResults),
-        actualCharCount: totalOriginalChars, // Approximate or get from stats if needed
+        actualCharCount: totalOriginalChars,
         originalCharCount: totalOriginalChars,
         error: null
       };
     } catch (error) {
-      logger.error(`[UnifiedCoordinator] Page translation failed:`, error.message);
+      const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+      const errorType = matchErrorToType(error);
+      const isFatal = isFatalError(error);
+
+      // Log the specific failure
+      logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
+      
+      const fallbackResults = segments.map(s => ({ text: s }));
+      
+      // We return success: true to keep already translated content on the page,
+      // but we pass error details so the Scheduler can trigger user notifications for FATAL errors.
       return {
-        success: false,
-        translatedText: JSON.stringify(segments.map(s => ({ text: s }))),
-        error: error.message
+        success: true, 
+        translatedText: JSON.stringify(fallbackResults),
+        actualCharCount: 0,
+        originalCharCount: totalOriginalChars,
+        hasError: true,
+        error: error.message,
+        errorType: errorType,
+        isFatal: isFatal
       };
     } finally {
       translationEngine.lifecycleRegistry.unregisterRequest(messageId);
