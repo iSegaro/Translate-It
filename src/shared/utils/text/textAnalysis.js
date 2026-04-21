@@ -28,8 +28,9 @@ export function isSingleWordOrShortPhrase(text) {
 
 /**
  * Arabic script language codes for centralized management
+ * Includes major languages using the Arabic script family
  */
-export const ARABIC_SCRIPT_LANGUAGES = ['fa', 'ar', 'ur', 'ps'];
+export const ARABIC_SCRIPT_LANGUAGES = ['fa', 'ar', 'ur', 'ps', 'sd', 'ku', 'ckb', 'ug'];
 
 /**
  * Chinese script language codes for centralized management

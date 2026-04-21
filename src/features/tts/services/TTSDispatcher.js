@@ -4,10 +4,10 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
-import { isArabicScriptText, detectArabicScriptLanguage, ARABIC_SCRIPT_LANGUAGES, isChineseScriptText, detectChineseScriptLanguage, CHINESE_SCRIPT_LANGUAGES, detectDevanagariScriptLanguage, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
+import { ARABIC_SCRIPT_LANGUAGES, CHINESE_SCRIPT_LANGUAGES, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
-import { getLanguageDetectionPreferencesAsync } from '@/shared/config/config.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import storageCore from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSDispatcher');
@@ -38,8 +38,7 @@ export class TTSDispatcher {
 
       // 2. Proactive Language Detection (Context-aware)
       if (isExplicitAuto || globalAutoDetectEnabled) {
-        const preferences = await getLanguageDetectionPreferencesAsync();
-        const detected = await TTSDispatcher._detectLanguage(text, preferences);
+        const detected = await LanguageDetectionService.detect(text);
         
         if (detected) {
           // Rule 1: Always override if user explicitly asked for 'auto'
@@ -114,8 +113,7 @@ export class TTSDispatcher {
           
           // Check if Google is at least allowed before trying recovery
           if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.GOOGLE)) {
-            const preferences = await getLanguageDetectionPreferencesAsync();
-            const redetected = await TTSDispatcher._detectLanguage(text, preferences);
+            const redetected = await LanguageDetectionService.detect(text);
             
             // Apply similar language logic here too
             const shouldSwitch = redetected && 
@@ -153,67 +151,5 @@ export class TTSDispatcher {
       return { success: false, error: error.message };
     }
   }
-
-  /**
-   * High-Precision Language Detection with Script Validation
-   * @param {string} text - Text to analyze
-   * @param {Object} preferences - User language detection preferences
-   * @returns {string|null} Detected language code or null
-   */
-  static async _detectLanguage(text, preferences = {}) {
-    if (!text || !text.trim()) return null;
-
-    const sample = text.trim();
-
-    // 1. Arabic Script Analysis with user preferences
-    const arabicScriptLanguage = detectArabicScriptLanguage(sample, preferences);
-    if (arabicScriptLanguage) return arabicScriptLanguage;
-
-    // 2. Chinese Script Analysis with user preferences
-    const chineseScriptLanguage = detectChineseScriptLanguage(sample, preferences);
-    if (chineseScriptLanguage) return chineseScriptLanguage;
-
-    // 3. Devanagari Script Analysis with user preferences
-    const devanagariScriptLanguage = detectDevanagariScriptLanguage(sample, preferences);
-    if (devanagariScriptLanguage) return devanagariScriptLanguage;
-
-    // 4. East Asian Script Analysis (Fallback for JA/KO)
-    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
-    if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
-
-    // 3: Specific Latin Diacritics (Instant markers for short strings)
-    if (/[ß]/.test(sample)) return 'de'; // German unique
-    if (/[ñ]/.test(sample)) return 'es'; // Spanish unique
-    if (/[ç]/.test(sample)) {
-      if (/[ığşİ]/i.test(sample)) return 'tr'; // Turkish markers
-      return 'fr'; // Fallback to French for ç
-    }
-    if (/[åøæ]/.test(sample)) return 'no'; // Nordic languages
-
-
-    // 4. Native Browser API with validation
-    try {
-      const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-      const result = await browserAPI.i18n.detectLanguage(sample);
-      if (result && result.languages && result.languages.length > 0) {
-        const top = result.languages[0];
-        if (result.isReliable || top.percentage > 15) {
-          const lang = top.language.split('-')[0].toLowerCase();
-          
-          if (lang === 'ko' && !/[\uAC00-\uD7AF]/.test(sample)) return 'en';
-          if (lang === 'ja' && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(sample)) return 'en';
-          if (lang === 'zh' && !isChineseScriptText(sample)) return 'en';
-          if ((lang === 'fa' || lang === 'ar') && !isArabicScriptText(sample)) return 'en';
-          
-          return lang;
-        }
-      }
-    } catch {
-      // ignore native errors
-    }
-    
-    if (/[а-яё]/i.test(sample)) return 'ru';
-    
-    return null;
-  }
 }
+

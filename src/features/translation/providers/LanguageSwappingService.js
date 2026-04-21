@@ -1,9 +1,9 @@
 import browser from 'webextension-polyfill';
-import { detectArabicScriptLanguage, detectChineseScriptLanguage, detectDevanagariScriptLanguage } from "@/shared/utils/text/textAnalysis.js";
+import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
+import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } from "@/shared/config/config.js";
 import { LANGUAGE_NAME_TO_CODE_MAP, getCanonicalCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
@@ -23,101 +23,10 @@ export class LanguageSwappingService {
   }
 
   /**
-   * Get detected language for a text using a multi-layered approach:
-   * 1. Deterministic: Unique script markers (e.g., 'پ' for Persian)
-   * 2. Statistical: Browser i18n API
-   * 3. Heuristic: Script-based defaults and User preferences
-   * 
-   * The order of layers is dynamically adjusted based on text length to optimize accuracy.
+   * Get detected language for a text using the centralized service
    */
   static async getDetectedLanguage(text) {
-    if (!text || typeof text !== 'string') return null;
-    
-    try {
-      const preferences = await getLanguageDetectionPreferencesAsync();
-      const textLength = text.trim().length;
-      
-      // Threshold for when statistical detection (Browser API) becomes highly reliable
-      const STATISTICAL_RELIABILITY_THRESHOLD = 60;
-      const isLongText = textLength > STATISTICAL_RELIABILITY_THRESHOLD;
-
-      // Helper for Layer 1: Deterministic Detection
-      const getDeterministicResult = () => {
-        const arabic = detectArabicScriptLanguage(text, preferences, { useDefaults: false });
-        if (arabic) return arabic;
-        
-        const chinese = detectChineseScriptLanguage(text, preferences, { useDefaults: false });
-        if (chinese) return chinese;
-        
-        const devanagari = detectDevanagariScriptLanguage(text, preferences, { useDefaults: false });
-        if (devanagari) return devanagari;
-        
-        return null;
-      };
-
-      // Helper for Layer 2: Statistical Detection
-      const getStatisticalResult = async () => {
-        const result = await browser.i18n.detectLanguage(text);
-        if (result?.isReliable && result.languages.length > 0) {
-          return getCanonicalCode(result.languages[0].language);
-        }
-        return null;
-      };
-
-      // Helper for Layer 3: Heuristic Fallback
-      const getHeuristicResult = () => {
-        const arabic = detectArabicScriptLanguage(text, preferences, { useDefaults: true });
-        if (arabic) return arabic;
-        
-        const chinese = detectChineseScriptLanguage(text, preferences, { useDefaults: true });
-        if (chinese) return chinese;
-        
-        return null;
-      };
-
-      // --- DYNAMIC FLOW EXECUTION ---
-
-      if (isLongText) {
-        // For long text: Layer 2 (Statistical) -> Layer 1 (Deterministic) -> Layer 3 (Heuristic)
-        const statistical = await getStatisticalResult();
-        if (statistical) {
-          logger.debug(`[LanguageSwappingService] Long text detection - Statistical: ${statistical}`);
-          return statistical;
-        }
-
-        const deterministic = getDeterministicResult();
-        if (deterministic) {
-          logger.debug(`[LanguageSwappingService] Long text detection - Deterministic: ${deterministic}`);
-          return deterministic;
-        }
-      } else {
-        // For short text: Layer 1 (Deterministic) -> Layer 2 (Statistical) -> Layer 3 (Heuristic)
-        const deterministic = getDeterministicResult();
-        if (deterministic) {
-          logger.debug(`[LanguageSwappingService] Short text detection - Deterministic: ${deterministic}`);
-          return deterministic;
-        }
-
-        const statistical = await getStatisticalResult();
-        if (statistical) {
-          logger.debug(`[LanguageSwappingService] Short text detection - Statistical: ${statistical}`);
-          return statistical;
-        }
-      }
-
-      // Final fallback for both cases
-      const heuristic = getHeuristicResult();
-      if (heuristic) {
-        logger.debug(`[LanguageSwappingService] Final heuristic fallback: ${heuristic}`);
-        return heuristic;
-      }
-
-      logger.debug(`[LanguageSwappingService] Could not detect language reliably`);
-      return null;
-    } catch (error) {
-      logger.error(`[LanguageSwappingService] Error getting detected language:`, error);
-      return null;
-    }
+    return await LanguageDetectionService.detect(text);
   }
 
   static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi', options = {}) {
