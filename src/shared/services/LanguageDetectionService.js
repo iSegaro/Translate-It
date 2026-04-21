@@ -97,12 +97,29 @@ export class LanguageDetectionService {
               // If text is Arabic script but API detected a non-Arabic script language, it's a false positive.
               if (isTextArabic && !isResultArabic) return null;
               
-              // Validation 3: Trust Filter for Short Strings
-              // If it's a short string and API detects a language not officially recognized in our constants,
-              // we treat it as unreliable to let Layer 3 (User Prefs/Defaults) decide.
-              const isOfficiallySupported = !!LANGUAGE_CODE_TO_NAME_MAP[lang];
-              if (textLength < 25 && isResultArabic && !isOfficiallySupported) {
-                logger.debug(`[LanguageDetectionService] Unrecognized detection '${lang}' for short string. Passing to heuristics.`);
+              // Validation 3: Dynamic Trust Filter for Short/Unreliable Strings
+              // For short strings, the browser API is often probabilistic but not certain (isReliable: false).
+              // We only trust these "guesses" if they align with the user's context.
+              if (textLength < 25 && !result.isReliable) {
+                const uiLang = browser.i18n.getUILanguage().split('-')[0].toLowerCase();
+                const targetLang = preferences.targetLanguage ? getCanonicalCode(preferences.targetLanguage) : null;
+                
+                // The "Dynamic Trust Set" consists of languages the user is actually likely to encounter:
+                // 1. User's UI Language
+                // 2. User's chosen Target Language
+                // 3. English (The global bridge for Latin script)
+                const DYNAMIC_TRUST_SET = new Set([uiLang, targetLang, 'en'].filter(Boolean));
+                
+                if (!DYNAMIC_TRUST_SET.has(lang)) {
+                  logger.debug(`[LanguageDetectionService] Statistical guess '${lang}' rejected for short string (not in user context).`);
+                  return null;
+                }
+              }
+
+              // Validation 4: Final SSOT Check
+              // Ensure the language is actually known to the extension constants.
+              if (!LANGUAGE_CODE_TO_NAME_MAP[lang]) {
+                logger.debug(`[LanguageDetectionService] Unrecognized language code '${lang}' rejected.`);
                 return null;
               }
               
