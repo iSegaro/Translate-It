@@ -228,6 +228,41 @@ export class ProxyManager {
   }
 
   /**
+   * Test direct internet connection (no proxy)
+   * @param {string} testUrl - URL to test against
+   * @returns {Promise<boolean>}
+   */
+  async testDirectConnection(testUrl = 'https://httpbin.org/ip') {
+    const startTime = Date.now();
+    try {
+      this.logger.info('[Proxy] Testing direct connection (no proxy)...');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
+
+      if (response.ok) {
+        this.logger.info(`[Proxy] Direct connection successful (${duration}ms)`);
+        return true;
+      } else {
+        this.logger.warn(`[Proxy] Direct connection failed: HTTP ${response.status} (${duration}ms)`);
+        return false;
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.warn(`[Proxy] Direct connection failed: ${error.message} (${duration}ms)`);
+      return false;
+    }
+  }
+
+  /**
    * Test proxy connection
    * @param {string} testUrl - URL to test against (optional)
    * @returns {Promise<boolean>}
@@ -237,8 +272,8 @@ export class ProxyManager {
 
     // This method is specifically for testing proxy connection
     if (!this.isEnabled()) {
-      this.logger.warn('Proxy test called but proxy is not enabled');
-      return false;
+      this.logger.debug('Proxy test called but proxy is not enabled, attempting direct test');
+      return this.testDirectConnection(testUrl);
     }
 
     // Test proxy connection

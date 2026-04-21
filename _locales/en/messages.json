@@ -1007,11 +1007,20 @@
   "proxy_test_success": {
     "message": "Proxy connection successful!"
   },
+  "direct_test_success": {
+    "message": "Direct connection successful!"
+  },
   "proxy_test_failed": {
     "message": "Proxy connection failed. Check your settings."
   },
+  "direct_test_failed": {
+    "message": "Direct connection failed. Please check your internet."
+  },
   "proxy_test_error": {
     "message": "Test failed with an error."
+  },
+  "proxy_not_enabled": {
+    "message": "Please enable proxy first to test connection."
   },
   "proxy_warning_title": {
     "message": "Browser Extension Limitation"

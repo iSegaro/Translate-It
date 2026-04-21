@@ -1005,13 +1005,22 @@
     "message": "تست اتصال پروکسی"
   },
   "proxy_test_success": {
-    "message": "اتصال پروکسی موفقیت‌آمیز بود!"
+    "message": "اتصال پروکسی با موفقیت برقرار شد!"
+  },
+  "direct_test_success": {
+    "message": "اتصال مستقیم با موفقیت برقرار شد!"
   },
   "proxy_test_failed": {
     "message": "اتصال پروکسی ناموفق. تنظیمات را بررسی کنید."
   },
+  "direct_test_failed": {
+    "message": "اتصال مستقیم ناموفق. لطفا اینترنت خود را بررسی کنید."
+  },
   "proxy_test_error": {
     "message": "تست با خطا مواجه شد."
+  },
+  "proxy_not_enabled": {
+    "message": "لطفاً ابتدا پروکسی را فعال کنید تا بتوانید اتصال را تست کنید."
   },
   "proxy_warning_title": {
     "message": "محدودیت افزونه مرورگر"

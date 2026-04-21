@@ -1007,11 +1007,20 @@
   "proxy_test_success": {
     "message": "プロキシ接続に成功しました！"
   },
+  "direct_test_success": {
+    "message": "直接接続に成功しました！"
+  },
   "proxy_test_failed": {
     "message": "プロキシ接続に失敗しました。設定を確認してください。"
   },
+  "direct_test_failed": {
+    "message": "直接接続に失敗しました。インターネット接続を確認してください。"
+  },
   "proxy_test_error": {
     "message": "エラーが発生しました。"
+  },
+  "proxy_not_enabled": {
+    "message": "接続をテストするには、まずプロキシを有効にしてください。"
   },
   "proxy_warning_title": {
     "message": "ブラウザ拡張機能の制限"

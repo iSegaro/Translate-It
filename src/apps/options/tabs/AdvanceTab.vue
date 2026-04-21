@@ -347,6 +347,7 @@ const proxyTypeOptions = [
 ]
 
 const canTestProxy = computed(() => {
+  if (!proxyEnabled.value) return true
   return proxyHost.value && proxyPort.value && proxyType.value
 })
 
@@ -379,48 +380,51 @@ const testProxyConnection = async () => {
     // Import the proxy manager
     const { proxyManager } = await import('@/shared/proxy/ProxyManager.js')
 
-    // If proxy is not enabled, show appropriate message
-    if (!proxyEnabled.value) {
-      testResult.value = {
-        success: false,
-        message: t('proxy_not_enabled') || 'Please enable proxy first to test connection.'
-      }
-      return
+    // If proxy is enabled, update proxy configuration
+    if (proxyEnabled.value) {
+      proxyManager.setConfig({
+        enabled: proxyEnabled.value,
+        type: proxyType.value,
+        host: proxyHost.value,
+        port: proxyPort.value,
+        auth: {
+          username: proxyUsername.value,
+          password: proxyPassword.value
+        }
+      })
+    } else {
+      // Ensure manager knows it's disabled for this test
+      proxyManager.setConfig({ enabled: false })
     }
 
-    // Update proxy configuration
-    proxyManager.setConfig({
-      enabled: proxyEnabled.value,
-      type: proxyType.value,
-      host: proxyHost.value,
-      port: proxyPort.value,
-      auth: {
-        username: proxyUsername.value,
-        password: proxyPassword.value
-      }
-    })
-
-    // Test the connection
+    // Test the connection (it will automatically use direct test if proxy is disabled)
     const success = await proxyManager.testConnection()
 
-    const successMessage = success
-      ? (t('proxy_test_success') || 'Proxy connection successful!')
-      : (t('proxy_test_failed') || 'Proxy connection failed. Check your settings.')
+    let successMessage = ''
+    let failureMessage = ''
+
+    if (proxyEnabled.value) {
+      successMessage = t('proxy_test_success') || 'Proxy connection successful!'
+      failureMessage = t('proxy_test_failed') || 'Proxy connection failed. Check your settings.'
+    } else {
+      successMessage = t('direct_test_success') || 'Direct connection successful!'
+      failureMessage = t('direct_test_failed') || 'Direct connection failed. Please check your internet.'
+    }
 
     testResult.value = {
       success,
-      message: successMessage
+      message: success ? successMessage : failureMessage
     }
 
     if (success) {
-      logger.operation('Proxy test completed successfully', {
-        proxyEnabled: proxyEnabled.value,
-        proxyType: proxyType.value
+      logger.operation('Connection test completed successfully', {
+        mode: proxyEnabled.value ? 'proxy' : 'direct',
+        proxyType: proxyEnabled.value ? proxyType.value : 'none'
       })
     } else {
-      logger.warn('Proxy test failed', {
-        proxyEnabled: proxyEnabled.value,
-        proxyType: proxyType.value
+      logger.warn('Connection test failed', {
+        mode: proxyEnabled.value ? 'proxy' : 'direct',
+        proxyType: proxyEnabled.value ? proxyType.value : 'none'
       })
     }
 
