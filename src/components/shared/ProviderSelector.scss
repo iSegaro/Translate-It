@@ -117,25 +117,24 @@
   &.ti-active { background-color: var(--color-primary-alpha) !important; }
 }
 
+/* 4. Common Elements */
+.ti-invert-dark {
+  :root.theme-dark &, :root.is-dark &, .theme-dark &, .is-dark & { 
+    filter: invert(1) brightness(2) !important; 
+  }
+}
+
+.ti-api-provider-icon {
+  width: 16px !important; height: 16px !important;
+  object-fit: contain !important; flex-shrink: 0 !important;
+}
+
 .ti-provider-icon-only {
   width: 18px !important;
   height: 18px !important;
   object-fit: contain !important;
   opacity: 0.8 !important;
   transition: opacity 0.2s ease-in-out !important;
-
-  &.ti-invert-dark {
-    :global(.theme-dark) &, :global(.is-dark) & { filter: invert(1) brightness(1.8) !important; }
-  }
-}
-
-/* 4. Common Elements */
-.ti-api-provider-icon {
-  width: 16px !important; height: 16px !important;
-  object-fit: contain !important; flex-shrink: 0 !important;
-  &.ti-invert-dark {
-    :global(.theme-dark) &, :global(.is-dark) & { filter: invert(1) brightness(1.8) !important; }
-  }
 }
 
 .ti-dropdown-arrow, 
