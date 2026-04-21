@@ -17,6 +17,7 @@
 .setting-row {
   display: flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
   gap: $spacing-md !important;
   width: 100% !important;
 
@@ -29,6 +30,7 @@
   .shortcut-picker-animated-wrapper {
     display: flex !important;
     align-items: center !important;
+    justify-content: flex-end !important;
     overflow: hidden !important;
     max-width: 0 !important;
     opacity: 0 !important;
@@ -38,17 +40,17 @@
     flex-shrink: 0 !important;
 
     &.open {
-      max-width: 400px !important;
+      max-width: 220px !important;
+      width: 100% !important;
       opacity: 1 !important;
       transform: translateX(0) scale(1) !important;
       pointer-events: auto !important;
       margin-inline-start: $spacing-sm !important;
-      overflow: visible !important; // اجازه نمایش دکمه‌های مطلق
+      overflow: visible !important;
     }
 
     .inline-picker {
       width: auto !important;
-      min-width: 150px !important;
     }
   }
 }
