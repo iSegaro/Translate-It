@@ -51,7 +51,7 @@ The central orchestrator for all detection requests. It manages the dynamic flow
 Contains low-level Unicode range analysis and script-specific detection functions. It differentiates between "Definitive Markers" (using `useDefaults: false`) and "Heuristic Guessing" (using `useDefaults: true`).
 
 ### 3. `languageConstants.js` (The Validator)
-Provides the project's official language list (`LANGUAGE_CODE_TO_NAME_MAP`). It acts as the "Source of Truth" for the **Trust Filter**, ensuring we don't adopt obscure browser detections for short strings.
+Provides the project's official language list (`LANGUAGE_CODE_TO_NAME_MAP`). It acts as the "Source of Truth" (SSOT) for the **Trust Filter**, ensuring we don't adopt obscure browser detections unless they are recognized by the extension.
 
 ---
 
@@ -70,16 +70,21 @@ Uses specialized Regex to find characters unique to specific languages.
 | **Chinese** | `們 國 學 會 這` (Traditional) | `zh-tw` |
 | **Devanagari**| `ळ` (Marathi-unique) | `mr` |
 | **Latin** | `ß` (German), `ñ` (Spanish), `å ø æ` (Nordic) | `de`, `es`, `no` |
+| **Latin** | `è ì ò ù` (Italian) | `it` |
+| **Latin** | `ã õ` (Portuguese) | `pt` |
+| **Latin** | `êëîïûùôç` (French unique markers) | `fr` |
 | **Latin** | `ç` + `ığşİ` (Turkish) | `tr` |
-| **Cyrillic** | `а-яё` | `ru` |
+| **Cyrillic** | `а-яё` (Russian), `ґєії` (Ukrainian) | `ru`, `uk` |
 | **CJK Range** | Hiragana/Katakana (Japanese), Hangul (Korean) | `ja`, `ko` |
 
+*Note: Common markers like `é, è, à` are intentionally skipped in the French deterministic layer to allow the Statistical Layer to provide higher precision for ambiguous Latin strings (e.g., distinguishing French from Italian or Acehnese).*
+
 ### 2. Statistical Layer (Browser API)
-Utilizes `browser.i18n.detectLanguage`. Results are only accepted if `isReliable` is true and they pass the internal validation logic.
+Utilizes `browser.i18n.detectLanguage`. Results are validated against the internal Trust Filter.
 
 ### 3. Heuristic Layer (Fallbacks)
-The safety net for ambiguous strings (e.g., "سلام"):
-- **User Preferences**: Consults `storage.local` for user priorities.
+The safety net for ambiguous strings:
+- **User Preferences**: Consults `storage.local`.
 - **Script Defaults**: Arabic script defaults to `fa`, Devanagari defaults to `hi`, Chinese defaults to `zh-cn`.
 
 ---
@@ -87,49 +92,55 @@ The safety net for ambiguous strings (e.g., "سلام"):
 ## Technical Details
 
 ### 1. Statistical Reliability Threshold (60 chars)
-Statistical models require context (words/density) to be accurate. 
-- Below **60 chars**, a single "Smoking Gun" character is considered more reliable than an API's probability score.
-- Above **60 chars**, the API is prioritized as it can better identify the "dominant" language in mixed-content nodes.
+- Below **60 chars**, deterministic markers (Layer 1) are prioritized.
+- Above **60 chars**, the Browser API is prioritized.
 
 ### 2. Trust Filter (Dynamic Context Validation)
-To prevent misidentification of short/ambiguous strings (e.g., detecting "hello" as Serbian `sr`), the system implements a **Context-Aware Trust Filter**:
+To prevent misidentification of short strings (e.g., "hello" as Serbian `sr`), the system implements a **Context-Aware Trust Filter**:
 
-- **Reliability Check**: If the Browser API's result is marked as `isReliable: false`, the filter is activated for strings shorter than 25 characters.
-- **Dynamic Trust Set**: The system dynamically constructs a set of "Expected Languages" based on:
-    1. **User's UI Locale**: The language of the extension's interface.
-    2. **Active Target Language**: The language the user is currently translating into.
-    3. **Global Bridge (en)**: English is always trusted for Latin script.
-- **Validation**: If the detected language is not in this **Dynamic Trust Set**, the result is rejected as "unreliable," and the system falls back to Layer 3 (Heuristics).
+- **Dynamic Trust Set**: A set of languages deemed "safe" to accept for short strings:
+    1. **User's Context**: UI Language + Active Target Language.
+    2. **Global Trusted Set**: Managed in `languageConstants.js` as `GLOBAL_TRUSTED_LANGUAGES`. Includes major world languages and explicitly supported minor languages.
+- **Confidence Bypass**: If a detection has a confidence score **> 80%**, it bypasses the Trust Set restriction, allowing for accurate detection of niche languages.
+- **Validation**: If a result fails both checks, it is rejected, and the system falls back to Heuristics.
 
-### 3. Script/Result Consistency
-Every statistical result is cross-checked against the text's physical script family. For example, if the API returns 'en' for a text containing Arabic characters, the result is automatically discarded. This prevents logic crashes in downstream services like TTS which expect specific voice engines for specific scripts.
+### 3. Detection vs. Provider Support (Philosophy)
+The system separates **Detection** from **Execution**:
+- We aim to detect the *actual* language as accurately as possible (e.g., detecting `ace` for Acehnese).
+- If the chosen **Translation Provider** does not support that specific code, the `ProviderCoordinator` handles the fallback (usually by retrying with `auto` or using a phonetic mapping for TTS).
 
 ---
 
 ## Development Guide
 
 ### How to use in a new module
-Always import the centralized service. Do NOT use `textAnalysis.js` directly for detection.
 ```javascript
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
-
 const detectedLang = await LanguageDetectionService.detect(someText);
 ```
 
-### How to add a new Language Marker
-1.  **Engine Update**: Open `src/shared/utils/text/textAnalysis.js` and add the unique Unicode characters to the relevant regex.
-2.  **SSOT Registration**: ensure the language code is in `LANGUAGE_NAME_TO_CODE_MAP` in `languageConstants.js`.
-3.  **Service Integration**: Open `src/shared/services/LanguageDetectionService.js` and add the new check in `getDeterministicResult`.
+### How to add a new Language Marker (Internal)
+1.  **Engine Update**: Update `src/shared/utils/text/textAnalysis.js` regex.
+2.  **Service Integration**: Update `getDeterministicResult` in `LanguageDetectionService.js`.
+
+### How to add a new Language (Full Support)
+If you want to add support for a language previously unknown to the extension:
+
+1.  **SSOT Registration**: Add the language code and name to `LANGUAGE_NAME_TO_CODE_MAP` in `src/shared/config/languageConstants.js`. **(Critical: Without this, detection will be rejected by Validation 4).**
+2.  **Provider Mapping**: Add the code to the relevant provider lists in `PROVIDER_SUPPORTED_LANGUAGES` (e.g., `google`, `bing`, `yandex`).
+3.  **Trust Expansion**: Add the code to `GLOBAL_TRUSTED_LANGUAGES` in `src/shared/config/languageConstants.js`.
+4.  **TTS Mapping (Optional)**: If the language lacks a native voice but uses a similar script (e.g., Acehnese using Latin), add a mapping to `TTSLanguageService.js` (e.g., `ace -> en`).
 
 ---
 
 ## Key Files
 
 -   **`src/shared/services/LanguageDetectionService.js`**: The central orchestrator (Brain).
--   **`src/shared/utils/text/textAnalysis.js`**: Low-level Unicode analysis (Engine).
--   **`src/shared/config/languageConstants.js`**: Official supported languages (Source of Truth).
+-   **`src/shared/utils/text/textAnalysis.js`**: Unicode analysis (Engine).
+-   **`src/shared/config/languageConstants.js`**: Source of Truth for all language codes.
 -   **`src/features/tts/services/TTSDispatcher.js`**: Consumer for audio synthesis.
 -   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
+-   **`src/features/tts/services/TTSLanguageService.js`**: Phonetic mappings and fallback logic.
 
 ---
 **Last Updated**: April 21, 2026
