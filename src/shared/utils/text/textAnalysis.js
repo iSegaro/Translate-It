@@ -250,28 +250,32 @@ export const detectLatinScriptLanguage = (text) => {
   // German: ä, ö, ü, ß
   if (/[ßäöüÄÖÜ]/.test(sample)) return 'de';
   
-  // Spanish: ñ, inverted punctuation, specific accents
-  if (/[ñÁÉÍÓÚáéíóú¿¡]/.test(sample)) return 'es';
+  // Spanish: ñ, inverted punctuation (¿, ¡)
+  if (/[ñ¿¡]/.test(sample)) return 'es';
   
+  // Portuguese specific (tilde)
+  if (/[ãõÃÕ]/.test(sample)) return 'pt';
+
+  // Italian specific (grave accents on vowels are common, especially at end)
+  if (/[èìòùÈÌÒÙ]/.test(sample)) return 'it';
+
   // French / Standard Latin variants
-  // Checks for circumflex and other markers
-  if (/[êëîïûàâôçÊËÎÏÛÀÂÔÇ]/.test(sample)) {
-    // Turkish overlap check (Turkish uses ç but also specific markers)
+  // Only use highly unique markers for deterministic French
+  // Common accents like é, è, à are skipped here to allow statistical layer to decide
+  if (/[êëîïûùôçÊËÎÏÛÙÔÇ]/.test(sample)) {
+    // Turkish overlap check
     if (/[ığşİ]/.test(sample)) return 'tr';
+    // Vietnamese overlap check
+    if (/[đĐ₫]/.test(sample)) return 'vi';
     return 'fr'; 
   }
-  
-  // Portuguese: tilde nasal vowels
-  if (/[ãõÃÕ]/.test(sample)) return 'pt';
-  
-  // Italian: grave accents on vowels (common at end of words)
-  if (/[ìòùÈÉÌÒÙ]/.test(sample)) return 'it';
   
   // Nordic languages
   if (/[åøæÅØÆ]/.test(sample)) return 'no';
   
-  // Cyrillic (Russian)
+  // Cyrillic (Russian/Ukrainian)
   if (/[а-яё]/i.test(sample)) return 'ru';
+  if (/[ґєії]/.test(sample)) return 'uk';
 
   return null;
 };
