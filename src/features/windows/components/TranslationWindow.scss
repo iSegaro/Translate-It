@@ -55,12 +55,14 @@
     user-select: none !important;
     flex-shrink: 0 !important; // Don't allow header to shrink
     touch-action: none !important; // Prevent scrolling/gestures on header
+    overflow: visible !important; 
   }
 
   .ti-header-actions {
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
+    overflow: visible !important;
   }
 
   .ti-header-close {

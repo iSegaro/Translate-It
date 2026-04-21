@@ -113,11 +113,28 @@
   &.ti-dropdown-open { z-index: 1000 !important; }
 
   .ti-provider-dropdown-menu {
-    left: 100% !important; /* Open to the side */
+    left: 100% !important; /* Open to the side by default for Sidepanel */
     right: auto !important;
     top: 0 !important;
     margin-left: 10px !important;
     margin-top: 0 !important;
+  }
+
+  /* Specific override for floating WindowsManager header */
+  &.ti-window-provider-selector {
+    .ti-provider-dropdown-menu {
+      left: 0 !important;   /* Align with icon in windows */
+      top: 100% !important; /* Open downward by default */
+      margin-left: 0 !important;
+      margin-top: 4px !important;
+
+      &.ti-open-upward {
+        top: auto !important;
+        bottom: 100% !important;
+        margin-top: 0 !important;
+        margin-bottom: 4px !important;
+      }
+    }
   }
 }
 
@@ -190,7 +207,7 @@ img.ti-dropdown-arrow,
 }
 
 .ti-provider-dropdown-list {
-  max-height: 300px !important;
+  max-height: inherit !important;
   overflow-y: auto !important;
   width: 100% !important;
   &::-webkit-scrollbar { width: 4px !important; }

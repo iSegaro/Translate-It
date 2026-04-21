@@ -801,39 +801,39 @@ const toggleDropdown = () => {
     nextTick(() => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
-        
-        // Find the nearest scrollable container or sheet content that might clip us
+        const isFloatingWindow = selectorRef.value.closest('.ti-window');
         const container = selectorRef.value.closest('.ti-m-sheet-content, .ti-window-body');
-        const containerRect = container ? container.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+        
+        // For floating windows, we ignore the window boundary and use the viewport
+        // This allows the dropdown to "pop out" of the window
+        const useViewport = !container || isFloatingWindow;
+        const containerRect = useViewport 
+          ? { top: 0, bottom: window.innerHeight } 
+          : container.getBoundingClientRect();
         
         const spaceBelow = containerRect.bottom - rect.bottom;
         const spaceAbove = rect.top - containerRect.top;
         
-        /**
-         * SMART DROP DIRECTION
-         * Only enable smart direction calculation for non-global (settings/manual) contexts
-         * to avoid unexpected UX shifts in stable toolbars like Popup or Sidepanel
-         * where downward is expected unless critical.
-         */
         const isOptionsPage = window.location.href.includes('options.html');
-        if (isOptionsPage || !props.isGlobal) {
-          isUpward.value = spaceBelow < 250 && spaceAbove > spaceBelow;
+
+        if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
+          // For floating windows, prioritize downward unless space is very tight
+          // But if we flip, ensure we have a decent threshold
+          const flipThreshold = isFloatingWindow ? 180 : 250;
+          isUpward.value = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
         } else {
-          // In Popup/Sidepanel, only open upward if bottom space is extremely tight (< 100px)
           isUpward.value = spaceBelow < 100 && spaceAbove > spaceBelow;
         }
 
         const availableHeight = isUpward.value 
-          ? spaceAbove - 16 // Space above within container
-          : spaceBelow - 16; // Space below within container
+          ? spaceAbove - 40 // More margin for upward menus
+          : spaceBelow - 40;
         
-        // Detect if we are in an Extension Popup or Sidepanel
-        const isPopupOrSidepanel = props.isGlobal || window.innerWidth < 600;
+        // Large limit for desktop floating windows
+        const maxLimit = isFloatingWindow ? 650 : (props.isGlobal ? 400 : 550);
         
-        // Use a smarter limit
-        const maxLimit = isPopupOrSidepanel ? 400 : 600;
-        
-        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(150, availableHeight))}px`;
+        // Final height calculation
+        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(300, availableHeight))}px`;
       }
       scrollToFocused();
     });
