@@ -1,50 +1,52 @@
 <template>
-  <section class="options-tab-content">
-    <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
-    
-    <div class="setting-group prompt-template-group">
-      <div class="prompt-label-with-button">
-        <span>{{ t('prompt_template_label') || 'Prompt Template' }}</span>
-        <button
-          type="button"
-          class="button-inline"
-          @click="resetPrompt"
-        >
-          {{ t('prompt_reset_button') || 'Reset' }}
-        </button>
-      </div>
+  <section class="options-tab-content prompt-tab">
+    <div class="settings-container">
+      <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
       
-      <BaseTextarea
-        v-model="promptTemplate"
-        :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
-        :rows="10"
-        class="prompt-template-input"
-        dir="ltr"
-      />
+      <div class="setting-group prompt-template-group vertical">
+        <div class="prompt-label-with-button">
+          <span class="setting-label">{{ t('prompt_template_label') || 'Prompt Template' }}</span>
+          <button
+            type="button"
+            class="button-inline"
+            @click="resetPrompt"
+          >
+            {{ t('prompt_reset_button') || 'Reset' }}
+          </button>
+        </div>
+        
+        <BaseTextarea
+          v-model="promptTemplate"
+          :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
+          :rows="10"
+          class="prompt-template-input"
+          dir="ltr"
+        />
 
-      <!-- Validation error -->
-      <div
-        v-if="validationError"
-        class="validation-error"
-      >
-        {{ validationError }}
-      </div>
+        <!-- Validation error -->
+        <div
+          v-if="validationError"
+          class="validation-error"
+        >
+          {{ validationError }}
+        </div>
 
-      <div class="prompt-template-help">
-        <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
-        <ul>
-          <li>
-            <code dir="ltr">${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
-            <span class="lang-name">({{ sourceLanguageName }})</span>
-          </li>
-          <li>
-            <code dir="ltr">${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
-            <span class="lang-name">({{ targetLanguageName }})</span>
-          </li>
-          <li>
-            <code dir="ltr">${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
-          </li>
-        </ul>
+        <div class="prompt-template-help">
+          <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
+          <ul>
+            <li>
+              <code dir="ltr">${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
+              <span class="lang-name">({{ sourceLanguageName }})</span>
+            </li>
+            <li>
+              <code dir="ltr">${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
+              <span class="lang-name">({{ targetLanguageName }})</span>
+            </li>
+            <li>
+              <code dir="ltr">${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </section>

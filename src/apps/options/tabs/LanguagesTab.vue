@@ -2,13 +2,14 @@
   <section class="options-tab-content languages-tab">
     <h2>{{ t('languages_section_title') || 'Languages' }}</h2>
 
-    <div
-      v-if="!isLoaded"
-      class="loading-message"
-    >
-      Loading languages...
-    </div>
-    <template v-else>
+    <div class="settings-container">
+      <div
+        v-if="!isLoaded"
+        class="loading-message"
+      >
+        Loading languages...
+      </div>
+      <template v-else>
       <div class="setting-group">
         <label>{{ t('source_language_label') || 'Source Language' }}</label>
         <LanguageDropdown
@@ -313,6 +314,7 @@
       class="validation-error"
     >
       {{ validationError }}
+    </div>
     </div>
   </section>
 </template>

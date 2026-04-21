@@ -1,9 +1,10 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <section class="options-tab-content">
-    <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
-    
-    <div class="accordion">
+  <section class="options-tab-content help-tab">
+    <div class="settings-container">
+      <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
+      
+      <div class="accordion">
       <!-- Shortcut Help Section -->
       <div class="accordion-item">
         <button 
@@ -62,9 +63,9 @@
         </div>
       </div>
     </div>
-  </section>
-</template>
-
+    </div>
+    </section>
+    </template>
 <script setup>
 import './HelpTab.scss'
 import { ref, computed, watch, nextTick, onMounted } from 'vue'

@@ -1,30 +1,32 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <div class="about-page">
-    <h2 class="page-title">
-      {{ t('about_section_title') || 'What\'s New' }}
-    </h2>
-    
-    <div class="changelog-container">
-      <div
-        v-if="isLoadingChangelog"
-        class="loading-changelog"
-      >
-        {{ t('options_changelog_loading') || 'Loading changelog...' }}
+  <div class="options-tab-content about-page">
+    <div class="settings-container">
+      <h2 class="page-title">
+        {{ t('about_section_title') || 'What\'s New' }}
+      </h2>
+      
+      <div class="changelog-container">
+        <div
+          v-if="isLoadingChangelog"
+          class="loading-changelog"
+        >
+          {{ t('options_changelog_loading') || 'Loading changelog...' }}
+        </div>
+        <div
+          v-else-if="changelogError"
+          class="error-changelog"
+        >
+          {{ t('options_changelog_error') || 'Failed to load changelog.' }}
+        </div>
+        <!-- Safe: Content is sanitized with DOMPurify -->
+        <div
+          v-else
+          ref="changelogContent"
+          class="changelog-content"
+          v-html="sanitizedChangelog"
+        />
       </div>
-      <div
-        v-else-if="changelogError"
-        class="error-changelog"
-      >
-        {{ t('options_changelog_error') || 'Failed to load changelog.' }}
-      </div>
-      <!-- Safe: Content is sanitized with DOMPurify -->
-      <div
-        v-else
-        ref="changelogContent"
-        class="changelog-content"
-        v-html="sanitizedChangelog"
-      />
     </div>
   </div>
 </template>

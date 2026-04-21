@@ -1,127 +1,143 @@
 @use "@/assets/styles/base/variables" as *;
 
-.prompt-label-with-button {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: baseline !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-bottom: $spacing-sm !important;
-  box-sizing: border-box !important;
-  /* Match the 1px padding of the input container for perfect alignment */
-  padding: 0 1px !important;
-  
-  span {
-    font-size: $font-size-base !important;
-    font-weight: $font-weight-medium !important;
-    color: var(--color-text) !important;
-    flex: 1 !important;
-    min-width: 0 !important;
+.prompt-tab {
+  .settings-container {
+    max-width: 650px;
+    width: 100%;
   }
-}
 
-.button-inline {
-  padding: $spacing-xs $spacing-sm !important;
-  font-size: $font-size-xs !important;
-  font-weight: $font-weight-semibold !important;
-  border: $border-width $border-style var(--color-primary) !important;
-  background-color: transparent !important;
-  color: var(--color-primary) !important;
-  border-radius: $border-radius-base !important;
-  cursor: pointer !important;
-  transition: all $transition-base !important;
-  flex-shrink: 0 !important;
-  margin-inline-start: $spacing-sm !important;
-  white-space: nowrap !important;
-  
-  &:hover {
-    background-color: var(--color-primary) !important;
-    color: white !important;
+  .prompt-template-group {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    margin-top: $spacing-lg;
+
+    .prompt-label-with-button {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+
+      .setting-label {
+        font-weight: $font-weight-medium;
+        color: var(--color-text);
+      }
+
+      .button-inline {
+        padding: 4px 12px;
+        font-size: $font-size-xs;
+        background: var(--color-background-alt);
+        border: 1px solid var(--color-border);
+        border-radius: $border-radius-sm;
+        cursor: pointer;
+        transition: all $transition-base;
+
+        &:hover {
+          background: var(--color-background-hover);
+          border-color: var(--color-text-secondary);
+        }
+      }
+    }
+
+    .prompt-template-input {
+      width: 100%;
+      
+      :deep(textarea) {
+        font-family: monospace;
+        font-size: $font-size-sm;
+        line-height: 1.6;
+        padding: $spacing-md;
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: $border-radius-base;
+        resize: vertical;
+        transition: border-color $transition-base, box-shadow $transition-base;
+
+        &:focus {
+          border-color: var(--color-primary);
+          box-shadow: 0 0 0 2px var(--color-primary-alpha);
+          outline: none;
+        }
+
+        &.highlight-on-reset {
+          animation: highlight-pulse 0.8s ease-out;
+        }
+      }
+    }
   }
-}
 
-.prompt-template-input {
-  width: 100% !important;
-  margin-bottom: $spacing-lg !important;
-  /* Fix for border being cut off in RTL due to overflow:hidden on container */
-  padding: 1px !important;
-  box-sizing: border-box !important;
-  
-  .ti-textarea {
-    font-family: inherit !important;
-    line-height: 1.6 !important;
-    background-color: var(--input-bg-color, var(--color-background)) !important;
-    color: var(--input-text-color, var(--color-text)) !important;
-    min-height: 280px !important;
-    
-    &.highlight-on-reset {
-      animation: strong-highlight 1s ease-out !important;
+  .validation-error {
+    padding: $spacing-sm $spacing-md;
+    background-color: var(--color-error-alpha);
+    color: var(--color-error);
+    border-radius: $border-radius-sm;
+    font-size: $font-size-sm;
+    border-inline-start: 4px solid var(--color-error);
+  }
+
+  .prompt-template-help {
+    margin-top: $spacing-lg;
+    padding: $spacing-md;
+    background-color: var(--color-background-alt);
+    border-radius: $border-radius-base;
+    border: 1px solid var(--color-border-light);
+
+    p {
+      font-size: $font-size-sm;
+      font-weight: $font-weight-medium;
+      color: var(--color-text);
+      margin-bottom: $spacing-sm;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-xs;
+
+      li {
+        font-size: $font-size-xs;
+        color: var(--color-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: $spacing-xs;
+        flex-wrap: wrap;
+
+        code {
+          background-color: var(--color-surface);
+          padding: 2px 6px;
+          border-radius: 4px;
+          border: 1px solid var(--color-border);
+          color: var(--color-primary);
+          font-weight: $font-weight-bold;
+        }
+
+        .lang-name {
+          opacity: 0.7;
+          font-style: italic;
+        }
+      }
     }
   }
 }
 
-.prompt-template-help {
-  max-width: 90% !important;
-  margin: $spacing-lg auto 0 !important;
-  background-color: var(--tab-button-active-bg, var(--color-surface)) !important;
-  border: $border-width $border-style var(--color-border) !important;
-  border-radius: $border-radius-md !important;
-  padding: $spacing-md !important;
-  font-size: $font-size-xs !important;
-  color: var(--color-text-secondary) !important;
-  
-  p {
-    margin: 0 0 $spacing-base 0 !important;
-  }
-  
-  ul {
-    padding-inline-start: $spacing-lg !important;
-    margin: 0 !important;
-  }
-  
-  li {
-    margin-bottom: $spacing-xs !important;
-  }
-  
-  code {
-    background-color: var(--color-border) !important;
-    color: var(--color-text) !important;
-    padding: 3px 6px !important;
-    border-radius: $border-radius-sm !important;
-    font-family: monospace !important;
-  }
-  
-  .lang-name {
-    font-style: italic !important;
-    color: var(--color-text) !important;
-  }
-}
-
-// Animation for reset button feedback
-@keyframes strong-highlight {
-  0% {
-    background-color: var(--input-bg-color, var(--color-background));
-  }
-  30% {
-    background-color: var(--tab-button-active-bg, var(--color-surface));
-    border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 8px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
-  }
-  70% {
-    background-color: var(--tab-button-active-bg, var(--color-surface));
-    border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 8px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
-  }
-  100% {
-    background-color: var(--input-bg-color, var(--color-background));
-  }
+@keyframes highlight-pulse {
+  0% { box-shadow: 0 0 0 0 var(--color-primary-alpha); }
+  50% { box-shadow: 0 0 0 8px var(--color-primary-alpha); }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .prompt-label-with-button {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: $spacing-sm !important;
+  .prompt-tab {
+    .prompt-template-help {
+      padding: $spacing-sm;
+      
+      li {
+        line-height: 1.6;
+      }
+    }
   }
 }

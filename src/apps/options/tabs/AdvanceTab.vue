@@ -1,209 +1,211 @@
 <template>
-  <section class="options-tab-content">
-    <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
-    
-    <div class="setting-group vertical">
-      <BaseCheckbox
-        v-model="enableTranslationHistory"
-        :label="t('enable_translation_history_label') || 'Enable Translation History'"
-      />
-      <p class="setting-description">
-        {{ t('enable_translation_history_description') || 'Save translations in history.' }}
-      </p>
-    </div>
+  <section class="options-tab-content advance-tab">
+    <div class="settings-container">
+      <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
+      
+      <div class="setting-group vertical">
+        <BaseCheckbox
+          v-model="enableTranslationHistory"
+          :label="t('enable_translation_history_label') || 'Enable Translation History'"
+        />
+        <p class="setting-description">
+          {{ t('enable_translation_history_description') || 'Save translations in history.' }}
+        </p>
+      </div>
 
-    <div class="setting-group">
-      <label>{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
-      <BaseTextarea
-        v-model="excludedSites"
-        :rows="3"
-        placeholder="example.com, anotherdomain.org"
-        dir="ltr"
-        class="excluded-sites-input"
-      />
-    </div>
+      <div class="setting-group vertical">
+        <label class="setting-label">{{ t('excluded_sites_label') || 'Exclude these sites (comma separated)' }}</label>
+        <BaseTextarea
+          v-model="excludedSites"
+          :rows="3"
+          placeholder="example.com, anotherdomain.org"
+          dir="ltr"
+          class="excluded-sites-input"
+        />
+      </div>
 
-    <!-- Proxy Settings Section (Accordion Style) -->
-    <BaseAccordion
-      :is-open="activeAccordion === 'proxy'"
-      item-class="proxy-setting"
-      @toggle="toggleAccordion('proxy')"
-    >
-      <template #header>
-        <div class="checkbox-area">
-          <BaseCheckbox
-            v-model="proxyEnabled"
-            class="proxy-main-checkbox"
-            @click.stop
-          />
-          <span 
-            class="accordion-title-text"
-            :class="{ active: activeAccordion === 'proxy' }"
-          >
-            {{ t('proxy_section_title') || 'Proxy Settings' }}
-          </span>
-        </div>
-      </template>
-
-      <template #content>
-        <div class="accordion-inner">
-          <p class="setting-description mb-md">
-            {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
-          </p>
-          
-          <div class="setting-group">
-            <label>{{ t('proxy_type_label') || 'Proxy Type' }}</label>
-            <BaseSelect
-              v-model="proxyType"
-              :options="proxyTypeOptions"
-              class="proxy-select"
+      <!-- Proxy Settings Section (Accordion Style) -->
+      <BaseAccordion
+        :is-open="activeAccordion === 'proxy'"
+        item-class="proxy-setting"
+        @toggle="toggleAccordion('proxy')"
+      >
+        <template #header>
+          <div class="checkbox-area">
+            <BaseCheckbox
+              v-model="proxyEnabled"
+              class="proxy-main-checkbox"
+              @click.stop
             />
-          </div>
-
-          <div class="setting-group proxy-connection">
-            <div class="proxy-input-group">
-              <label>{{ t('proxy_host_label') || 'Host' }}</label>
-              <BaseInput
-                v-model="proxyHost"
-                placeholder="proxy.example.com"
-                dir="ltr"
-                class="proxy-input"
-              />
-            </div>
-
-            <div class="proxy-input-group">
-              <label>{{ t('proxy_port_label') || 'Port' }}</label>
-              <BaseInput
-                v-model="proxyPort"
-                type="number"
-                placeholder="8080"
-                min="1"
-                max="65535"
-                dir="ltr"
-                class="proxy-input proxy-port"
-              />
-            </div>
-          </div>
-
-          <div class="setting-group proxy-auth">
-            <div class="proxy-input-group">
-              <label>{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
-              <BaseInput
-                v-model="proxyUsername"
-                placeholder=""
-                dir="ltr"
-                class="proxy-input"
-              />
-            </div>
-
-            <div class="proxy-input-group">
-              <label>{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
-              <BaseInput
-                v-model="proxyPassword"
-                type="password"
-                placeholder=""
-                dir="ltr"
-                class="proxy-input"
-              />
-            </div>
-          </div>
-
-          <div class="setting-group proxy-test">
-            <div class="test-container">
-              <button
-                :disabled="isTestingProxy || !canTestProxy"
-                :class="['test-button', testResultClass]"
-                @click="testProxyConnection"
-              >
-                <span
-                  v-if="isTestingProxy"
-                  class="button-content"
-                >
-                  <div class="spinner" />
-                  {{ t('proxy_testing') || 'Testing...' }}
-                </span>
-                <span
-                  v-else
-                  class="button-content"
-                >
-                  <svg
-                    class="test-icon"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
-                  </svg>
-                  {{ testButtonText }}
-                </span>
-              </button>
-
-              <div
-                v-if="testResult"
-                :class="['test-result', testResult.success ? 'success' : 'error']"
-              >
-                {{ testResult.message }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </BaseAccordion>
-
-    <!-- Debug Mode Section (Accordion Style) -->
-    <BaseAccordion
-      :is-open="activeAccordion === 'debug'"
-      item-class="debug-setting"
-      @toggle="toggleAccordion('debug')"
-    >
-      <template #header>
-        <div class="checkbox-area">
-          <BaseCheckbox
-            v-model="debugMode"
-            class="debug-main-checkbox"
-            @click.stop
-          />
-          <span 
-            class="accordion-title-text"
-            :class="{ active: activeAccordion === 'debug' }"
-          >
-            {{ t('advance_debug_mode_label') || 'Debug Mode' }}
-          </span>
-        </div>
-      </template>
-
-      <template #content>
-        <div class="accordion-inner">
-          <p class="setting-description mb-md">
-            {{ t('debug_section_description') || 'Enable detailed logging for specific components. Overrides global log level.' }}
-          </p>
-          
-          <div class="debug-categories">
-            <div 
-              v-for="(category, catId) in LOG_CATEGORIES" 
-              :key="catId"
-              class="debug-category-group"
+            <span 
+              class="accordion-title-text"
+              :class="{ active: activeAccordion === 'proxy' }"
             >
-              <h4 class="category-title">
-                {{ category.label }}
-              </h4>
-              <div class="debug-grid">
-                <LogLevelItem
-                  v-for="name in category.components"
-                  :key="name"
-                  :component-name="name"
-                  :model-value="getComponentLogLevel(name)"
-                  @update:model-value="updateComponentLogLevel(name, $event)"
+              {{ t('proxy_section_title') || 'Proxy Settings' }}
+            </span>
+          </div>
+        </template>
+
+        <template #content>
+          <div class="accordion-inner">
+            <p class="setting-description mb-md">
+              {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
+            </p>
+            
+            <div class="setting-group horizontal">
+              <label class="setting-label">{{ t('proxy_type_label') || 'Proxy Type' }}</label>
+              <BaseSelect
+                v-model="proxyType"
+                :options="proxyTypeOptions"
+                class="proxy-select"
+              />
+            </div>
+
+            <div class="setting-group proxy-connection">
+              <div class="proxy-input-group">
+                <label class="setting-label">{{ t('proxy_host_label') || 'Host' }}</label>
+                <BaseInput
+                  v-model="proxyHost"
+                  placeholder="proxy.example.com"
+                  dir="ltr"
+                  class="proxy-input"
+                />
+              </div>
+
+              <div class="proxy-input-group">
+                <label class="setting-label">{{ t('proxy_port_label') || 'Port' }}</label>
+                <BaseInput
+                  v-model="proxyPort"
+                  type="number"
+                  placeholder="8080"
+                  min="1"
+                  max="65535"
+                  dir="ltr"
+                  class="proxy-input proxy-port"
                 />
               </div>
             </div>
+
+            <div class="setting-group proxy-auth">
+              <div class="proxy-input-group">
+                <label class="setting-label">{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
+                <BaseInput
+                  v-model="proxyUsername"
+                  placeholder=""
+                  dir="ltr"
+                  class="proxy-input"
+                />
+              </div>
+
+              <div class="proxy-input-group">
+                <label class="setting-label">{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
+                <BaseInput
+                  v-model="proxyPassword"
+                  type="password"
+                  placeholder=""
+                  dir="ltr"
+                  class="proxy-input"
+                />
+              </div>
+            </div>
+
+            <div class="setting-group proxy-test">
+              <div class="test-container">
+                <button
+                  :disabled="isTestingProxy || !canTestProxy"
+                  :class="['test-button', testResultClass]"
+                  @click="testProxyConnection"
+                >
+                  <span
+                    v-if="isTestingProxy"
+                    class="button-content"
+                  >
+                    <div class="spinner" />
+                    {{ t('proxy_testing') || 'Testing...' }}
+                  </span>
+                  <span
+                    v-else
+                    class="button-content"
+                  >
+                    <svg
+                      class="test-icon"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
+                    </svg>
+                    {{ testButtonText }}
+                  </span>
+                </button>
+
+                <div
+                  v-if="testResult"
+                  :class="['test-result', testResult.success ? 'success' : 'error']"
+                >
+                  {{ testResult.message }}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </template>
-    </BaseAccordion>
+        </template>
+      </BaseAccordion>
+
+      <!-- Debug Mode Section (Accordion Style) -->
+      <BaseAccordion
+        :is-open="activeAccordion === 'debug'"
+        item-class="debug-setting"
+        @toggle="toggleAccordion('debug')"
+      >
+        <template #header>
+          <div class="checkbox-area">
+            <BaseCheckbox
+              v-model="debugMode"
+              class="debug-main-checkbox"
+              @click.stop
+            />
+            <span 
+              class="accordion-title-text"
+              :class="{ active: activeAccordion === 'debug' }"
+            >
+              {{ t('advance_debug_mode_label') || 'Debug Mode' }}
+            </span>
+          </div>
+        </template>
+
+        <template #content>
+          <div class="accordion-inner">
+            <p class="setting-description mb-md">
+              {{ t('debug_section_description') || 'Enable detailed logging for specific components. Overrides global log level.' }}
+            </p>
+            
+            <div class="debug-categories">
+              <div 
+                v-for="(category, catId) in LOG_CATEGORIES" 
+                :key="catId"
+                class="debug-category-group"
+              >
+                <h4 class="category-title">
+                  {{ category.label }}
+                </h4>
+                <div class="debug-grid">
+                  <LogLevelItem
+                    v-for="name in category.components"
+                    :key="name"
+                    :component-name="name"
+                    :model-value="getComponentLogLevel(name)"
+                    @update:model-value="updateComponentLogLevel(name, $event)"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </BaseAccordion>
+    </div>
   </section>
 </template>
 

@@ -1,101 +1,118 @@
 @use "@/assets/styles/base/variables" as *;
 
-.setting-group {
-  margin-bottom: $spacing-md !important;
-  
-  label {
-    margin-bottom: $spacing-sm !important;
-    display: block !important;
-    font-weight: $font-weight-medium !important;
-    color: var(--color-text) !important;
+.import-export-tab {
+  .settings-container {
+    max-width: 650px;
+    width: 100%;
+  }
+
+  .setting-group {
+    margin-bottom: $spacing-lg;
+
+    &.vertical {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+
+      .setting-label {
+        font-weight: $font-weight-medium;
+        color: var(--color-text);
+      }
+    }
+  }
+
+  .setting-description {
+    font-size: $font-size-sm;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0;
+
+    &.export-info, &.import-warning {
+      background: var(--color-background-alt);
+      padding: $spacing-md;
+      border-radius: $border-radius-base;
+      border-inline-start: 4px solid var(--color-primary);
+    }
+
+    &.import-warning {
+      border-inline-start-color: var(--color-warning, #f59e0b);
+    }
+  }
+
+  .export-controls-row, .import-controls-row {
+    display: flex;
+    gap: $spacing-md;
+    align-items: center;
+
+    .export-password-input, .import-password-input {
+      flex: 1;
+    }
+
+    .export-button, .import-button {
+      flex-shrink: 0;
+    }
+  }
+
+  .file-input {
+    width: 100%;
+    padding: $spacing-sm;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-sm;
+    font-size: $font-size-sm;
+    cursor: pointer;
+
+    &::-webkit-file-upload-button {
+      background: var(--color-background-alt);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      padding: 4px 12px;
+      margin-inline-end: $spacing-md;
+      cursor: pointer;
+      
+      &:hover {
+        background: var(--color-background-hover);
+      }
+    }
+  }
+
+  .status-message {
+    margin-top: $spacing-xl;
+    padding: $spacing-md;
+    border-radius: $border-radius-base;
+    font-size: $font-size-sm;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+
+    &.status-success {
+      background-color: var(--color-success-alpha);
+      color: var(--color-success);
+      border: 1px solid var(--color-success);
+    }
+
+    &.status-error {
+      background-color: var(--color-error-alpha);
+      color: var(--color-error);
+      border: 1px solid var(--color-error);
+    }
   }
 }
 
-.setting-description {
-  &.export-info {
-    flex-basis: auto !important;
-    padding-inline-start: 0 !important;
-    margin-bottom: $spacing-md !important;
-  }
-
-  &.import-warning {
-    flex-basis: auto !important;
-    padding-inline-start: 0 !important;
-    color: var(--color-warning) !important;
-    margin-top: $spacing-md !important;
-  }
-}
-
-.export-controls-row,
-.import-controls-row {
-  display: flex !important;
-  align-items: center !important;
-  gap: $spacing-base !important;
-  width: 100% !important;
-  flex-wrap: wrap !important;
-}
-
-.export-password-input,
-.import-password-input {
-  flex: 1 !important;
-  min-width: 200px !important;
-}
-
-.export-button,
-.import-button {
-  flex-shrink: 0 !important;
-  white-space: nowrap !important;
-}
-
-.file-input {
-  width: 100% !important;
-  padding: $spacing-sm !important;
-  border: $border-width $border-style var(--color-border) !important;
-  border-radius: $border-radius-base !important;
-  background-color: var(--color-background) !important;
-  color: var(--color-text) !important;
-  font-size: $font-size-sm !important;
-  
-  &:focus {
-    outline: none !important;
-    border-color: var(--color-primary) !important;
-  }
-}
-
-.status-message {
-  padding: $spacing-base $spacing-md !important;
-  border-radius: $border-radius-base !important;
-  margin-top: $spacing-lg !important;
-  font-size: $font-size-sm !important;
-  font-weight: $font-weight-medium !important;
-  
-  &.status-success {
-    background-color: var(--color-success) !important;
-    color: white !important;
-  }
-  
-  &.status-error {
-    background-color: var(--color-error) !important;
-    color: white !important;
-  }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .export-controls-row,
-  .import-controls-row {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    
-    .export-password-input,
-    .import-password-input {
-      min-width: auto !important;
-      width: 100% !important;
-    }
-    
-    .export-button,
-    .import-button {
-      width: 100% !important;
+  .import-export-tab {
+    .export-controls-row, .import-controls-row {
+      flex-direction: column;
+      align-items: stretch;
+      
+      .export-button, .import-button {
+        width: 100%;
+      }
     }
   }
 }

@@ -1,84 +1,86 @@
 <template>
-  <section class="options-tab-content">
-    <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
+  <section class="options-tab-content import-export-tab">
+    <div class="settings-container">
+      <h2>{{ t('import_export_section_title') || 'Import/Export Settings' }}</h2>
 
-    <!-- Export Settings -->
-    <BaseFieldset :legend="t('import_export_export_title') || 'Export Settings'">
-      <div class="setting-group">
-        <p class="setting-description export-info">
-          {{ t('export_settings_description') || 'Export your current settings to a JSON file for backup or sharing.' }}
-        </p>
-      </div>
-      
-      <div class="setting-group">
-        <label>{{ t('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
-        <div class="export-controls-row">
-          <BaseInput
-            v-model="exportPassword"
-            type="password"
-            :placeholder="t('export_password_placeholder') || 'Create a strong password to protect your API keys'"
-            class="export-password-input"
-          />
-          <BaseButton
-            :loading="isExporting"
-            class="export-button"
-            @click="exportSettings"
-          >
-            {{ t('export_settings_button') || 'Export Settings' }}
-          </BaseButton>
+      <!-- Export Settings -->
+      <BaseFieldset :legend="t('import_export_export_title') || 'Export Settings'">
+        <div class="setting-group vertical">
+          <p class="setting-description export-info">
+            {{ t('export_settings_description') || 'Export your current settings to a JSON file for backup or sharing.' }}
+          </p>
         </div>
-      </div>
-    </BaseFieldset>
+        
+        <div class="setting-group vertical">
+          <label class="setting-label">{{ t('export_password_label') || '🔐 Export Password (Recommended for Security)' }}</label>
+          <div class="export-controls-row">
+            <BaseInput
+              v-model="exportPassword"
+              type="password"
+              :placeholder="t('export_password_placeholder') || 'Create a strong password to protect your API keys'"
+              class="export-password-input"
+            />
+            <BaseButton
+              :loading="isExporting"
+              class="export-button"
+              @click="exportSettings"
+            >
+              {{ t('export_settings_button') || 'Export Settings' }}
+            </BaseButton>
+          </div>
+        </div>
+      </BaseFieldset>
 
-    <!-- Import Settings -->
-    <BaseFieldset :legend="t('import_export_import_title') || 'Import Settings'">
-      <div class="setting-group">
-        <label>{{ t('import_settings_label') || 'Import from file' }}</label>
-        <input 
-          ref="importFileInput"
-          type="file" 
-          accept=".json"
-          class="file-input"
-          @change="handleFileSelect"
+      <!-- Import Settings -->
+      <BaseFieldset :legend="t('import_export_import_title') || 'Import Settings'">
+        <div class="setting-group vertical">
+          <label class="setting-label">{{ t('import_settings_label') || 'Import from file' }}</label>
+          <input 
+            ref="importFileInput"
+            type="file" 
+            accept=".json"
+            class="file-input"
+            @change="handleFileSelect"
+          >
+        </div>
+        
+        <div
+          v-if="showPasswordField"
+          class="setting-group vertical"
         >
-      </div>
-      
-      <div
-        v-if="showPasswordField"
-        class="setting-group"
-      >
-        <label>{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
-        <div class="import-controls-row">
-          <BaseInput
-            v-model="importPassword"
-            type="password"
-            :placeholder="t('import_password_placeholder') || 'Enter the password used during export'"
-            class="import-password-input"
-            @keydown.enter="importSettings"
-          />
-          <BaseButton
-            :loading="isImporting"
-            class="import-button"
-            @click="importSettings"
-          >
-            {{ t('import_settings_button') || 'Import Settings' }}
-          </BaseButton>
+          <label class="setting-label">{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
+          <div class="import-controls-row">
+            <BaseInput
+              v-model="importPassword"
+              type="password"
+              :placeholder="t('import_password_placeholder') || 'Enter the password used during export'"
+              class="import-password-input"
+              @keydown.enter="importSettings"
+            />
+            <BaseButton
+              :loading="isImporting"
+              class="import-button"
+              @click="importSettings"
+            >
+              {{ t('import_settings_button') || 'Import Settings' }}
+            </BaseButton>
+          </div>
         </div>
-      </div>
-      
-      <div class="setting-group">
-        <p class="setting-description import-warning">
-          {{ t('import_settings_description') || 'Importing will overwrite your current settings. The page will reload after a successful import.' }}
-        </p>
-      </div>
-    </BaseFieldset>
+        
+        <div class="setting-group vertical">
+          <p class="setting-description import-warning">
+            {{ t('import_settings_description') || 'Importing will overwrite your current settings. The page will reload after a successful import.' }}
+          </p>
+        </div>
+      </BaseFieldset>
 
-    <!-- Status messages -->
-    <div
-      v-if="statusMessage"
-      :class="`status-message status-${statusType}`"
-    >
-      {{ statusMessage }}
+      <!-- Status messages -->
+      <div
+        v-if="statusMessage"
+        :class="`status-message status-${statusType}`"
+      >
+        {{ statusMessage }}
+      </div>
     </div>
   </section>
 </template>

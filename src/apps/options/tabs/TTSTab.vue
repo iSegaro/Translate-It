@@ -1,9 +1,10 @@
 <template>
   <div class="tab-content tts-tab">
-    <div class="tab-header">
-      <h2>{{ t('tts_tab_title') || 'Text-to-Speech' }}</h2>
-      <p>{{ t('tts_tab_desc') || 'Configure voice settings and pronunciation engines.' }}</p>
-    </div>
+    <div class="settings-container">
+      <div class="tab-header">
+        <h2>{{ t('tts_tab_title') || 'Text-to-Speech' }}</h2>
+        <p>{{ t('tts_tab_desc') || 'Configure voice settings and pronunciation engines.' }}</p>
+      </div>
 
     <!-- Engine Selection -->
     <div class="setting-group">
@@ -82,6 +83,7 @@
       <div class="setting-description">
         {{ t('tts_autodetect_desc') || 'Automatically detect the actual language of the text. If the selected engine fails to pronounce the text, it will attempt to identify the correct language and try again.' }}
       </div>
+    </div>
     </div>
   </div>
 </template>

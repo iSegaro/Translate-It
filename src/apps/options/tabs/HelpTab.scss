@@ -1,159 +1,138 @@
 @use "@/assets/styles/base/variables" as *;
 
-.accordion {
-  .accordion-item {
-    border: $border-width $border-style var(--color-border);
-    border-radius: $border-radius-base;
-    margin-bottom: $spacing-base;
-    overflow: hidden;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
+.help-tab {
+  .settings-container {
+    max-width: 650px;
+    width: 100%;
   }
 
-  .accordion-header {
-    width: 100%;
-    padding: $spacing-md $spacing-lg;
-    background-color: var(--color-surface);
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
-    transition: background-color $transition-base, color $transition-base;
+  h2 {
+    margin-bottom: $spacing-xl;
+  }
 
-    &:hover {
-      background-color: var(--tab-button-hover-bg, #f1f3f4);
-      
-      .accordion-icon-wrapper {
-        color: var(--color-primary);
+  .accordion {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    .accordion-item {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-base;
+      overflow: hidden;
+      transition: all $transition-base;
+
+      &:hover {
+        border-color: var(--color-text-secondary);
       }
     }
 
-    &.active {
-      background-color: var(--tab-button-active-bg, #e8f0fe);
-      color: var(--tab-button-active-color, var(--color-primary));
+    .accordion-header {
+      width: 100%;
+      padding: $spacing-md $spacing-lg;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      color: var(--color-text);
+      transition: all $transition-base;
+
+      &.active {
+        background-color: var(--color-background-alt);
+        color: var(--color-primary);
+      }
+
+      .accordion-icon-wrapper {
+        font-size: 20px;
+        transition: transform 0.3s ease;
+        line-height: 1;
+
+        &.active {
+          transform: rotate(45deg);
+          color: var(--color-primary);
+        }
+      }
     }
-  }
 
-  .accordion-icon-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    color: var(--color-text-secondary);
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease;
+      background-color: var(--color-surface);
 
-    &.active {
-      transform: rotate(45deg);
-      color: var(--color-primary);
-    }
-
-    .accordion-icon {
-      font-size: 18px;
-      font-weight: 300;
-      line-height: 1;
-      pointer-events: none;
-      user-select: none;
-    }
-  }
-
-  .accordion-content {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
-    opacity: 0;
-    overflow: hidden;
-    background-color: var(--color-background);
-
-    &.open {
-      grid-template-rows: 1fr;
-      opacity: 1;
+      &.open {
+        max-height: 2000px; // Large enough for content
+        border-top: 1px solid var(--color-border-light);
+      }
     }
 
     .accordion-inner {
-      min-height: 0;
       padding: $spacing-lg;
-
-      .markdown-content {
-        :deep(p) {
-          margin: 0 0 $spacing-base 0;
-          line-height: 1.6;
-          color: var(--color-text);
-        }
-
-        :deep(ol), :deep(ul) {
-          margin: 0 0 $spacing-md 0;
-          padding-inline-start: $spacing-xl;
-
-          li {
-            margin-bottom: $spacing-sm;
-            line-height: 1.5;
-            color: var(--color-text);
-
-            strong {
-              color: var(--color-text);
-              font-weight: $font-weight-semibold;
-            }
-          }
-        }
-
-        :deep(hr) {
-          border: none;
-          border-top: $border-width $border-style var(--color-border);
-          margin: $spacing-lg 0;
-        }
-
-        :deep(h2), :deep(h3), :deep(h4) {
-          font-size: $font-size-md;
-          font-weight: $font-weight-semibold;
-          margin: $spacing-lg 0 $spacing-sm 0;
-          color: var(--color-text);
-
-          &:first-child {
-            margin-top: 0;
-          }
-        }
-
-        :deep(a) {
-          color: var(--color-primary);
-          text-decoration: none;
-          font-weight: $font-weight-medium;
-
-          &:hover {
-            text-decoration: underline;
-          }
-        }
-
-        :deep(strong) {
-          color: var(--color-text);
-          font-weight: $font-weight-semibold;
-        }
-
-        :deep(code) {
-          background-color: var(--color-surface);
-          padding: 2px 4px;
-          border-radius: 3px;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 0.9em;
-          color: var(--color-text);
-        }
-      }
     }
+  }
+
+  .markdown-content {
+    font-size: $font-size-sm;
+    color: var(--color-text);
+    line-height: 1.6;
+
+    h2 {
+      font-size: $font-size-base;
+      font-weight: $font-weight-bold;
+      margin: $spacing-lg 0 $spacing-sm;
+      color: var(--color-text);
+      
+      &:first-child { margin-top: 0; }
+    }
+
+    p { margin-bottom: $spacing-md; }
+
+    ul, ol {
+      margin-bottom: $spacing-md;
+      padding-inline-start: $spacing-xl;
+      
+      li { margin-bottom: $spacing-xs; }
+    }
+
+    code {
+      background-color: var(--color-background-alt);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: var(--color-primary);
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--color-border-light);
+      margin: $spacing-xl 0;
+    }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+      
+      &:hover { text-decoration: underline; }
+    }
+
+    strong { font-weight: $font-weight-bold; }
   }
 }
 
-:global(.options-layout.rtl) {
-  .accordion-header {
-    display: flex !important;
-    flex-direction: row-reverse !important; /* Reverse the order of elements */
-    justify-content: space-between !important; /* Ensure proper spacing */
-    text-align: right !important; /* Align text to the right */
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .help-tab {
+    .accordion-header {
+      padding: $spacing-md;
+    }
+    
+    .accordion-inner {
+      padding: $spacing-md;
+    }
   }
 }
