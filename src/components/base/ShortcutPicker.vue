@@ -17,19 +17,42 @@
         >
           {{ t('shortcut_waiting') || 'Press keys...' }}
         </span>
-        <span 
+        <div 
           v-else 
           class="shortcut-display"
         >
-          {{ formatShortcut(currentKeys.join('+')) }}
-        </span>
+          <template 
+            v-for="(key, index) in currentKeys" 
+            :key="index"
+          >
+            <span class="kbd-key">{{ formatKey(key) }}</span>
+            <span 
+              v-if="index < currentKeys.length - 1" 
+              class="shortcut-separator"
+            >+</span>
+          </template>
+        </div>
       </template>
       <template v-else>
-        <span v-if="!shortcut">{{ placeholder || 'Set shortcut' }}</span>
         <span 
+          v-if="!shortcut" 
+          class="recording-placeholder"
+        >{{ placeholder || t('set_shortcut_placeholder') || 'Click to set shortcut' }}</span>
+        <div 
           v-else 
           class="shortcut-display"
-        >{{ formatShortcut(shortcut) }}</span>
+        >
+          <template 
+            v-for="(key, index) in shortcut.split('+')" 
+            :key="index"
+          >
+            <span class="kbd-key">{{ formatKey(key) }}</span>
+            <span 
+              v-if="index < shortcut.split('+').length - 1" 
+              class="shortcut-separator"
+            >+</span>
+          </template>
+        </div>
       </template>
     </BaseButton>
 

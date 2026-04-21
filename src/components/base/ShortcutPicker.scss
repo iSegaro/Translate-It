@@ -4,7 +4,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: $spacing-xs;
+  gap: $spacing-sm;
   flex-shrink: 0;
   max-width: 100%;
   transition: all 0.2s ease;
@@ -15,74 +15,122 @@
 }
 
 .shortcut-button {
-  min-width: 130px;
-  max-width: 200px;
-  padding: $spacing-xs $spacing-sm;
-  text-align: center;
-  font-family: monospace;
-  font-size: $font-size-xs;
-  height: 32px;
-  white-space: nowrap;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  transition: all 0.2s ease;
+  min-width: 140px;
+  max-width: 250px;
+  padding: 4px $spacing-sm !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: 34px !important;
+  background-color: var(--color-background-alt, var(--color-surface)) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: $border-radius-base !important;
+  cursor: pointer !important;
+  transition: all $transition-base !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 
   &:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    background-color: var(--color-surface);
+    border-color: var(--color-text-secondary) !important;
+    background-color: var(--color-background) !important;
+  }
+
+  &:focus, &:focus-visible {
+    outline: none !important;
+    border-color: var(--color-text-secondary) !important;
+    background-color: var(--color-background-alt, var(--color-surface)) !important;
+    box-shadow: 0 0 0 2px var(--color-border-light, rgba(0, 0, 0, 0.05)) !important;
   }
 
   &.recording {
-    border-color: var(--color-primary);
-    background-color: var(--color-active-background);
-    color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-alpha);
-    min-width: 150px;
+    border-color: var(--color-text) !important;
+    background-color: var(--color-background) !important;
+    box-shadow: 0 0 0 2px var(--color-border) !important;
+    
+    .recording-placeholder {
+      color: var(--color-text) !important;
+      font-weight: 500;
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 
 .shortcut-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+// استایل کلیدهای کیبورد (KBD)
+:deep(.kbd-key) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 11px;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1), inset 0 1px 0 #fff;
+  text-transform: uppercase;
+
+  :root.theme-dark &, .theme-dark & {
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+    background-color: var(--color-surface);
+  }
+}
+
+.shortcut-separator {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
 }
 
 .recording-placeholder {
-  font-style: italic;
-  opacity: 0.7;
-  animation: pulse 1.5s infinite;
+  font-size: $font-size-xs;
+  color: var(--color-text-secondary);
+  animation: soft-pulse 1.8s infinite ease-in-out;
 }
 
 .recording-actions-inline {
   display: flex;
-  gap: 2px;
-  background-color: var(--color-surface);
-  padding: 2px;
-  border-radius: $border-radius-sm;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--color-background);
   border: 1px solid var(--color-border);
-  box-shadow: $shadow-sm;
+  border-radius: $border-radius-base;
+  box-shadow: $shadow-md;
   animation: slideIn 0.2s ease-out;
 
   .action-btn {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: none;
+    border: 1px solid transparent;
     background: transparent;
     cursor: pointer;
-    border-radius: $border-radius-xs;
-    font-size: 14px;
+    border-radius: $border-radius-sm;
+    font-size: 12px;
     transition: all 0.2s ease;
 
     &.confirm {
-      color: var(--color-success, #28a745);
+      color: var(--color-success);
       &:hover:not(:disabled) {
-        background-color: var(--color-success-alpha, rgba(40, 167, 69, 0.1));
+        background-color: var(--color-success-alpha);
+        border-color: var(--color-success);
       }
       &:disabled {
         opacity: 0.3;
@@ -91,21 +139,22 @@
     }
 
     &.cancel {
-      color: var(--color-error, #dc3545);
+      color: var(--color-text-secondary);
       &:hover {
-        background-color: var(--color-error-alpha, rgba(220, 53, 69, 0.1));
+        background-color: var(--color-background-hover);
+        color: var(--color-error);
       }
     }
   }
 }
 
-@keyframes pulse {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
+@keyframes soft-pulse {
+  0% { opacity: 0.6; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.6; transform: scale(0.98); }
 }
 
 @keyframes slideIn {
-  from { transform: translateX(-5px); opacity: 0; }
+  from { transform: translateX(-8px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
