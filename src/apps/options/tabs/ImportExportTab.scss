@@ -7,16 +7,20 @@
   }
 
   .setting-group {
-    margin-bottom: $spacing-lg;
+    margin-bottom: $spacing-xl;
+    width: 100%;
 
     &.vertical {
       display: flex;
       flex-direction: column;
-      gap: $spacing-sm;
+      gap: $spacing-xs;
+      width: 100%;
 
       .setting-label {
         font-weight: $font-weight-medium;
         color: var(--color-text);
+        font-size: $font-size-sm;
+        margin-bottom: 2px;
       }
     }
   }
@@ -43,13 +47,20 @@
     display: flex;
     gap: $spacing-md;
     align-items: center;
+    width: 100%;
+    margin-top: $spacing-xs;
 
     .export-password-input, .import-password-input {
       flex: 1;
+
+      .ti-input-wrapper {
+        width: 100%;
+      }
     }
 
     .export-button, .import-button {
       flex-shrink: 0;
+      min-width: 140px;
     }
   }
 
