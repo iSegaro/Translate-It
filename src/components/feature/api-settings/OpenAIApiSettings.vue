@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="openai-settings">
     <h3>{{ t('openai_api_settings_title') || 'OpenAI API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">

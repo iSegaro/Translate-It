@@ -20,7 +20,7 @@
       border: 1px solid var(--color-border-light, var(--color-border));
       box-sizing: border-box;
       width: 100%;
-      max-width: 100%;
+      max-width: var(--input-max-width, 620px);
       overflow: hidden;
       display: block;
 
@@ -147,6 +147,49 @@
     max-width: 100%;
     overflow: visible;
     box-sizing: border-box;
+
+    // Force vertical layout for settings inside providers
+    :deep(.setting-group),
+    .optimization-control-area {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-lg;
+    }
+
+    :deep(.setting-group) {
+      // Direct labels or labels inside wrappers should be full width
+      label,
+      .label-with-toggle {
+        width: 100% !important;
+        flex: none !important;
+        margin-bottom: $spacing-xs;
+      }
+
+      // Dropdowns and inputs inside providers should be consistent
+      .tier-select,
+      .formality-select,
+      .model-select,
+      .api-url-input,
+      .api-key-input-wrapper {
+        width: 100% !important;
+        max-width: var(--input-max-width, 620px);
+        flex: none !important;
+      }
+    }
+
+    // Keep api-key-info horizontally aligned as it contains text and links
+    :deep(.setting-group.api-key-info) {
+      flex-direction: row !important;
+      flex-wrap: wrap;
+      align-items: center !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-sm;
+
+      .setting-description {
+        margin: 0;
+      }
+    }
   }
 
   .provider-settings {
@@ -155,6 +198,13 @@
     box-sizing: border-box;
     display: block;
     overflow: hidden;
+
+    h3 {
+      font-size: $font-size-base;
+      font-weight: $font-weight-bold;
+      margin-bottom: $spacing-sm;
+      color: var(--color-text);
+    }
   }
 
   // --- Specific style for Bilingual Setting ---

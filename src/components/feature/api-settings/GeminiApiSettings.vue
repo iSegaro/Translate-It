@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="gemini-settings">
     <h3>{{ t('gemini_api_settings_title') || 'Gemini API Settings' }}</h3>
     <div class="setting-group api-key-info">
       <span class="setting-description">

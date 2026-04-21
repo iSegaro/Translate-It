@@ -6,27 +6,37 @@
 }
 
 .setting-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-xs;
   margin-bottom: $spacing-lg;
+  width: 100%;
 
   &:last-child {
     margin-bottom: 0;
   }
-}
-
-.label-with-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: $spacing-sm;
-  gap: $spacing-sm;
 
   label {
-    margin-bottom: 0;
-    flex: 1;
-    font-size: $font-size-base;
-    font-weight: $font-weight-medium;
-    color: var(--color-text);
+    width: auto !important;
+    flex: 1 !important;
+    max-width: none !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  }
+
+  .label-with-toggle {
+  display: flex;
+  flex-direction: row !important;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xs;
+  gap: $spacing-sm;
+  width: 100%;
+  max-width: var(--input-max-width, 620px);
 
   .toggle-visibility-button {
     background: none;
@@ -58,6 +68,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  max-width: var(--input-max-width, 620px);
 
   .api-key-textarea {
     width: 100%;
@@ -77,6 +89,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+    margin-top: $spacing-xs;
   }
 
   .test-keys-button {
@@ -89,9 +104,15 @@
     cursor: pointer;
     white-space: nowrap;
     transition: background-color var(--transition-base, 0.2s);
+    font-weight: $font-weight-medium;
+    font-size: $font-size-sm;
 
     &:hover:not(:disabled) {
       background-color: var(--color-primary-dark, #1565c0);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(1px);
     }
 
     &:disabled {
@@ -108,16 +129,21 @@
   .test-result {
     padding: 8px 12px;
     border-radius: var(--border-radius-base, 4px);
-    font-size: 14px;
+    font-size: $font-size-sm;
+    flex: 1 1 200px;
+    line-height: 1.4;
+    word-break: break-word;
 
     &.success {
-      background-color: var(--color-success-bg, #e8f5e9);
+      background-color: var(--color-success-bg, rgba(76, 175, 80, 0.1));
       color: var(--color-success-text, #2e7d32);
+      border: 1px solid var(--color-success-border, rgba(76, 175, 80, 0.2));
     }
 
     &.error {
-      background-color: var(--color-error-bg, #ffebee);
+      background-color: var(--color-error-bg, rgba(244, 67, 54, 0.1));
       color: var(--color-error-text, #c62828);
+      border: 1px solid var(--color-error-border, rgba(244, 67, 54, 0.2));
     }
   }
 }

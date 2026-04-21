@@ -37,7 +37,7 @@
         class="tier-select"
         :style="rtlSelectStyle"
       />
-      <span class="setting-description">{{ tierDescription }}</span>
+      <p class="setting-description">{{ tierDescription }}</p>
     </div>
 
     <div class="setting-group">
@@ -45,9 +45,9 @@
         v-model="deeplBetaLanguagesEnabled"
         :label="t('deepl_beta_languages_label') || 'Enable Beta Languages'"
       />
-      <span class="setting-description">
+      <p class="setting-description">
         {{ t('deepl_beta_languages_description') || 'Enable support for beta languages. Beta languages do not support formality settings.' }}
-      </span>
+      </p>
     </div>
 
     <div class="setting-group">
@@ -59,9 +59,9 @@
         :style="rtlSelectStyle"
         :disabled="deeplBetaLanguagesEnabled"
       />
-      <span class="setting-description">
+      <p class="setting-description">
         {{ t('deepl_formality_description') || 'Control the formality level of translations. Some languages may not support all options.' }}
-      </span>
+      </p>
     </div>
   </div>
 </template>

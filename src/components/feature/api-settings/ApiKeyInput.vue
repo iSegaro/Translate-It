@@ -1,6 +1,6 @@
 <template>
   <div class="api-key-section">
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <div class="label-with-toggle">
         <label>{{ label }}</label>
         <button
