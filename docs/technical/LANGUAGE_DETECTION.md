@@ -2,115 +2,134 @@
 
 ## Overview
 
-The **Language Detection System** is a high-precision, multi-layered architecture designed to identify the language of a given text. It is specifically optimized to distinguish between languages with similar scripts (e.g., Persian vs. Arabic) and to handle both short user inputs and large-scale web content translation.
+The **Language Detection System** is a centralized, high-precision architecture designed to identify the language of any text across the extension (Translation, TTS, and UI Swapping). It uses a hybrid approach that combines deterministic script analysis with statistical models, dynamically adjusting its strategy based on text length and project-wide language constants.
 
-**Architecture Status**: Production Ready (Hybrid & Context-Aware)
-**Key Metrics**: 100% deterministic for unique script markers, optimized statistical analysis for long texts.
-
----
-
-## The Philosophy: Precision over Probability
-
-The system is built on the principle that **Deterministic Evidence** (unique characters) should always outweigh **Statistical Guessing**, especially for short strings where browser APIs often fail.
-
-1.  **Certainty First**: If a text contains the character "گ", it is Persian. No statistical model is needed to confirm this.
-2.  **Context Sensitivity**: The reliability of detection methods changes with text length. Statistical models (Browser API) get better as text grows longer, while character-based detection is instant and reliable even for single words.
-3.  **Graceful Degradation**: When certainty and statistics fail, the system falls back to user preferences and script-based defaults.
+**Architecture Status**: Unified & Production Ready  
+**Single Source of Truth**: `LanguageDetectionService.js`  
+**Key Metrics**: 100% deterministic for unique script markers, trust-filtered for short strings.
 
 ---
 
-## Architecture
+## 🏗 Architecture & Flow
 
-The system follows a **Dynamic Three-Layer Flow** that reorders itself based on the input length.
+The system follows a **Dynamic Three-Layer Flow** that reorders itself based on the input length to maximize accuracy.
 
+### Dynamic Flow Diagram
 ```
-[ Input Text ]
-      │
-      ▼
-[ Length Check ] ─── (Threshold: 60 chars) ───┐
-      │                                       │
-      ▼ (Short Text)                          ▼ (Long Text)
-┌──────────────────────────┐            ┌──────────────────────────┐
-│ 1. Deterministic Layer   │            │ 1. Statistical Layer     │
-│    (Unique Markers)      │            │    (Browser i18n API)    │
-└─────────────┬────────────┘            └─────────────┬────────────┘
-              │                                       │
-┌─────────────▼────────────┐            ┌─────────────▼────────────┐
-│ 2. Statistical Layer     │            │ 2. Deterministic Layer   │
-│    (Browser i18n API)    │            │    (Unique Markers)      │
-└─────────────┬────────────┘            └─────────────┬────────────┘
-              │                                       │
-              └───────────────┬───────────────────────┘
+       [ Input Text ]
+             │
+             ▼
+      [ Length Check ] ─── (Threshold: 60 chars) ───┐
+             │                                      │
+      ▼ (Short Text)                         ▼ (Long Text)
+┌──────────────────────────┐           ┌──────────────────────────┐
+│ 1. Deterministic Layer   │           │ 1. Statistical Layer     │
+│    (Unique Markers)      │           │    (Browser i18n API)    │
+└─────────────┬────────────┘           └─────────────┬────────────┘
+              │                                     │
+┌─────────────▼────────────┐           ┌─────────────▼────────────┐
+│ 2. Statistical Layer     │           │ 2. Deterministic Layer   │
+│    (Browser i18n API)    │           │    (Unique Markers)      │
+└─────────────┬────────────┘           └─────────────┬────────────┘
+              │                                     │
+              └───────────────┬─────────────────────┘
                               ▼
                 ┌──────────────────────────┐
                 │ 3. Heuristic Layer       │
-                │    (User Prefs/Defaults) │
+                │    (User Prefs / Defaults)│
                 └──────────────────────────┘
 ```
 
 ---
 
-## Detection Layers
+## Core Components
 
-### 1. Deterministic Layer (Unique Markers)
-This layer uses regular expressions to find "Smoking Gun" characters that exist in only one language within a script family.
-- **Arabic Script**: Distinguishes **Persian** (`پ چ ژ گ ک ی`), **Arabic** (`ة ي ك ى`), **Urdu** (`ٹ ڈ ڑ`), and **Pashto**.
-- **Chinese Script**: Distinguishes **Simplified** (`们 国`) from **Traditional** (`們 國`).
-- **Devanagari Script**: Distinguishes **Marathi** (`ळ`) from **Hindi**.
+### 1. `LanguageDetectionService.js` (The Brain)
+The central orchestrator for all detection requests. It manages the dynamic flow logic, threshold checks, and asynchronous coordination between the script engine and Browser APIs. All other services (TTS, Translation) **must** use this service to ensure consistency.
 
-### 2. Statistical Layer (Browser API)
-Utilizes `browser.i18n.detectLanguage`. 
-- **Reliability Check**: Only accepts the result if the API marks it as `isReliable: true`.
-- **Strength**: Excellent for European languages and long, mixed-content paragraphs.
+### 2. `textAnalysis.js` (The Engine)
+Contains low-level Unicode range analysis and script-specific detection functions. It differentiates between "Definitive Markers" (using `useDefaults: false`) and "Heuristic Guessing" (using `useDefaults: true`).
 
-### 3. Heuristic Layer (Fallbacks)
-The safety net for ambiguous strings (e.g., "سلام").
-- **User Preferences**: Consults `storage.local` for user-defined priorities (e.g., "Always prefer Persian for Arabic script").
-- **Script Defaults**: Uses the most likely language for a script if no other data is available.
+### 3. `languageConstants.js` (The Validator)
+Provides the project's official language list (`LANGUAGE_CODE_TO_NAME_MAP`). It acts as the "Source of Truth" for the **Trust Filter**, ensuring we don't adopt obscure browser detections for short strings.
 
 ---
 
-## Core Components
+## 🔍 Detection Layers & Supported Markers
 
-### 1. `LanguageSwappingService.js` (The Orchestrator)
-- **Method**: `getDetectedLanguage(text)`
-- **Role**: Coordinates the layers, handles the length-based logic, and manages the asynchronous flow between script analysis and Browser APIs.
+### 1. Deterministic Layer (The "Smoking Gun")
+Uses specialized Regex to find characters unique to specific languages.
 
-### 2. `textAnalysis.js` (The Engine)
-- **Method**: `detectArabicScriptLanguage`, `detectChineseScriptLanguage`, etc.
-- **Role**: Contains the "Low-Level" یونیکد analysis logic. It has a `useDefaults` toggle to separate "Definitive Detection" from "Heuristic Guessing".
+| Script Family | Language Markers | Detected Code |
+| :--- | :--- | :--- |
+| **Arabic** | `پ چ ژ گ ک ی` (Persian-specific) | `fa` |
+| **Arabic** | `ة ي ك ى` (Arabic-specific) | `ar` |
+| **Arabic** | `ٹ ڈ ڑ ں ہ ے` (Urdu-specific) | `ur` |
+| **Arabic** | `ښ څ ډ ړ ږ ښ ګ` (Pashto-specific) | `ps` |
+| **Chinese** | `们 国 学 会 这` (Simplified) | `zh-cn` |
+| **Chinese** | `們 國 學 會 這` (Traditional) | `zh-tw` |
+| **Devanagari**| `ळ` (Marathi-unique) | `mr` |
+| **Latin** | `ß` (German), `ñ` (Spanish), `å ø æ` (Nordic) | `de`, `es`, `no` |
+| **Latin** | `ç` + `ığşİ` (Turkish) | `tr` |
+| **Cyrillic** | `а-яё` | `ru` |
+| **CJK Range** | Hiragana/Katakana (Japanese), Hangul (Korean) | `ja`, `ko` |
+
+### 2. Statistical Layer (Browser API)
+Utilizes `browser.i18n.detectLanguage`. Results are only accepted if `isReliable` is true and they pass the internal validation logic.
+
+### 3. Heuristic Layer (Fallbacks)
+The safety net for ambiguous strings (e.g., "سلام"):
+- **User Preferences**: Consults `storage.local` for user priorities.
+- **Script Defaults**: Arabic script defaults to `fa`, Devanagari defaults to `hi`, Chinese defaults to `zh-cn`.
 
 ---
 
 ## Technical Details
 
-### Length-Based Optimization
-The system uses a `STATISTICAL_RELIABILITY_THRESHOLD = 60`.
-- **Why 60?** Statistical models typically require enough "context" (words/bigrams) to be accurate. Below this threshold, a single unique character is a much stronger signal than a probability score.
+### 1. Statistical Reliability Threshold (60 chars)
+Statistical models require context (words/density) to be accurate. 
+- Below **60 chars**, a single "Smoking Gun" character is considered more reliable than an API's probability score.
+- Above **60 chars**, the API is prioritized as it can better identify the "dominant" language in mixed-content nodes.
 
-### Usage in Swapping Logic
-The detection system is the heart of **Bilingual Swapping**. If the detected source language matches the user's target language, the system automatically swaps the target to a fallback (e.g., English) to ensure the user always gets a meaningful translation.
+### 2. Trust Filter (Dynamic Context Validation)
+To prevent misidentification of short/ambiguous strings (e.g., detecting "hello" as Serbian `sr`), the system implements a **Context-Aware Trust Filter**:
+
+- **Reliability Check**: If the Browser API's result is marked as `isReliable: false`, the filter is activated for strings shorter than 25 characters.
+- **Dynamic Trust Set**: The system dynamically constructs a set of "Expected Languages" based on:
+    1. **User's UI Locale**: The language of the extension's interface.
+    2. **Active Target Language**: The language the user is currently translating into.
+    3. **Global Bridge (en)**: English is always trusted for Latin script.
+- **Validation**: If the detected language is not in this **Dynamic Trust Set**, the result is rejected as "unreliable," and the system falls back to Layer 3 (Heuristics).
+
+### 3. Script/Result Consistency
+Every statistical result is cross-checked against the text's physical script family. For example, if the API returns 'en' for a text containing Arabic characters, the result is automatically discarded. This prevents logic crashes in downstream services like TTS which expect specific voice engines for specific scripts.
 
 ---
 
 ## Development Guide
 
-### Adding a New Language Marker
-1. Open `src/shared/utils/text/textAnalysis.js`.
-2. Find the relevant script detection function.
-3. Add the unique Unicode characters to the `ExclusiveChars` regex.
-4. Ensure the language code is added to the constants at the top of the file.
+### How to use in a new module
+Always import the centralized service. Do NOT use `textAnalysis.js` directly for detection.
+```javascript
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
-### Adjusting Thresholds
-If you notice that long mixed-language pages are being misidentified, consider lowering the `STATISTICAL_RELIABILITY_THRESHOLD` in `LanguageSwappingService.js`.
+const detectedLang = await LanguageDetectionService.detect(someText);
+```
+
+### How to add a new Language Marker
+1.  **Engine Update**: Open `src/shared/utils/text/textAnalysis.js` and add the unique Unicode characters to the relevant regex.
+2.  **SSOT Registration**: ensure the language code is in `LANGUAGE_NAME_TO_CODE_MAP` in `languageConstants.js`.
+3.  **Service Integration**: Open `src/shared/services/LanguageDetectionService.js` and add the new check in `getDeterministicResult`.
 
 ---
 
 ## Key Files
 
-- `src/features/translation/providers/LanguageSwappingService.js`: Main detection entry point.
-- `src/shared/utils/text/textAnalysis.js`: Character-level detection logic.
-- `src/shared/config/languageConstants.js`: Language code mappings and canonical names.
+-   **`src/shared/services/LanguageDetectionService.js`**: The central orchestrator (Brain).
+-   **`src/shared/utils/text/textAnalysis.js`**: Low-level Unicode analysis (Engine).
+-   **`src/shared/config/languageConstants.js`**: Official supported languages (Source of Truth).
+-   **`src/features/tts/services/TTSDispatcher.js`**: Consumer for audio synthesis.
+-   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
 
 ---
 **Last Updated**: April 21, 2026
