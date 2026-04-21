@@ -42,10 +42,14 @@ export class TTSDispatcher {
       let targetLanguage = language;
 
       // 2. Proactive Language Detection (Context-aware)
-      // ... (rest of detection logic)
-      if (isExplicitAuto || globalAutoDetectEnabled) {
+      // Only perform proactive detection if:
+      // a) Language is explicitly 'auto'
+      // b) OR 'Smart Detection' is enabled and we DON'T have a valid language yet
+      const shouldDetect = isExplicitAuto || (globalAutoDetectEnabled && !targetLanguage);
+
+      if (shouldDetect) {
         const detected = await LanguageDetectionService.detect(text);
-        
+
         if (detected) {
           // Rule 1: Always override if user explicitly asked for 'auto'
           if (isExplicitAuto) {

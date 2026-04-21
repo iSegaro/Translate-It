@@ -139,12 +139,26 @@ export class TranslationEngine {
       sender: sender
     });
 
+    // Use actual detected language from provider if available, otherwise fallback to initial detection
+    let actualSourceLang = sourceLanguage;
+    if (sourceLanguage === 'auto' || !sourceLanguage) {
+      if (providerInstance.lastDetectedLanguage) {
+        actualSourceLang = providerInstance.lastDetectedLanguage;
+        // Reset for next request
+        providerInstance.lastDetectedLanguage = null;
+      } else {
+        const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+        const detected = await LanguageSwappingService.getDetectedLanguage(text);
+        if (detected) actualSourceLang = detected;
+      }
+    }
+
     return {
       success: true,
       translatedText: result,
       streaming: typeof result === 'object' && result?.streaming, // Coordinator might return status object
       provider,
-      sourceLanguage,
+      sourceLanguage: actualSourceLang,
       targetLanguage,
       originalText: text,
       timestamp: Date.now(),

@@ -54,6 +54,12 @@ export function useUnifiedTranslation(context = 'popup') {
     () => Boolean(sourceText.value?.trim()) && !isTranslating.value
   );
 
+  /**
+   * Returns the actual language detected by the provider/service during the last translation.
+   * This is used to bypass redundant language detection in TTS.
+   */
+  const detectedSourceLanguage = computed(() => lastTranslation.value?.sourceLanguage || AUTO_DETECT_VALUE);
+
   // --- Language Management ---
   const resetLanguagesToDefaults = async () => {
     try {
@@ -84,6 +90,16 @@ export function useUnifiedTranslation(context = 'popup') {
   watch(targetLanguage, (newVal) => {
     if (newVal) {
       translationStore.uiTargetLanguage = newVal;
+    }
+  });
+
+  // Reset translation state when source text changes to ensure fresh detection for TTS
+  watch(sourceText, (newVal, oldVal) => {
+    if (newVal !== oldVal) {
+      lastTranslation.value = null;
+      if (translatedText.value) {
+        translatedText.value = "";
+      }
     }
   });
 
@@ -341,6 +357,7 @@ export function useUnifiedTranslation(context = 'popup') {
     isTranslating,
     hasTranslation,
     canTranslate,
+    detectedSourceLanguage,
     lastTranslation,
     // Error management
     translationError: errorManager.errorMessage,

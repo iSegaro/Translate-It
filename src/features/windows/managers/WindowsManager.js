@@ -415,8 +415,8 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.showMobileSheet({
         text: selectedText,
         translation: translationResult.translatedText,
-        sourceLang: translationResult.sourceLanguage || 'auto',
-        targetLang: translationResult.targetLanguage,
+        sourceLanguage: translationResult.sourceLanguage || 'auto',
+        targetLanguage: translationResult.targetLanguage,
         isLoading: false
       });
       
@@ -746,6 +746,7 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
+        sourceLanguage: translationResult.sourceLanguage || 'auto',
         provider: translationResult.provider
       });
       
@@ -920,6 +921,7 @@ export class WindowsManager extends ResourceTracker {
         initialSize: 'normal',
         isLoading: false,
         initialTranslatedText: translationResult.translatedText,
+        sourceLanguage: translationResult.sourceLanguage || 'auto',
         targetLanguage: translationResult.targetLanguage,
         provider: translationResult.provider
       });

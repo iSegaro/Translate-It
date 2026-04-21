@@ -9,7 +9,7 @@
       v-model="sourceText"
       :placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
       :language="currentSourceLanguage"
-      :source-language="currentSourceLanguage"
+      :source-language="detectedSourceLanguage"
       :rows="2"
       :tabindex="1"
       :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
@@ -103,17 +103,17 @@ const translationResultRef = ref(null)
 
 // State from composables
 const {
-  sourceText,
-  translatedText,
-  isTranslating,
-  translationError,
-  errorType,
-  canTranslate,
-  triggerTranslation,
-  clearTranslation,
-  loadLastTranslation
+sourceText,
+translatedText,
+isTranslating,
+translationError,
+errorType,
+canTranslate,
+detectedSourceLanguage,
+triggerTranslation,
+clearTranslation,
+loadLastTranslation
 } = translation
-
 // Local state
 const lastTranslation = ref(null)
 

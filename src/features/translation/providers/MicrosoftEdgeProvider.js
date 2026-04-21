@@ -173,6 +173,12 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => "");
           }
           
+          // Capture detected language from metadata if available
+          if (data[0].detectedLanguage?.language) {
+            this.lastDetectedLanguage = data[0].detectedLanguage.language;
+            logger.debug(`[Edge] API detected source language: ${this.lastDetectedLanguage}`);
+          }
+          
           // Match anylang logic: Join multiple translation segments if present
           return data.map(item => {
             if (!item.translations || !Array.isArray(item.translations)) return "";

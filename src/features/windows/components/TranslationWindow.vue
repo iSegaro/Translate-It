@@ -66,7 +66,7 @@
         </button>
         <TTSButton
           :text="currentTTSText"
-          language="auto"
+          :language="currentTTSLang"
           size="sm"
           variant="secondary"
           class="ti-smart-tts-btn"
@@ -186,6 +186,7 @@ const props = defineProps({
   needsSettings: { type: Boolean, default: false },
   initialSize: { type: String, default: 'normal' }, 
   targetLanguage: { type: String, default: 'auto' }, 
+  sourceLanguage: { type: String, default: 'auto' },
   provider: { type: String, default: '' } 
 });
 
@@ -219,6 +220,7 @@ const hasTTSContent = computed(() => {
 });
 
 const currentTTSText = computed(() => ttsMode.value === 'original' ? originalText.value || '' : translatedText.value || '');
+const currentTTSLang = computed(() => ttsMode.value === 'original' ? props.sourceLanguage : props.targetLanguage);
 
 const getOriginalButtonTitle = computed(() => showOriginal.value ? t('window_hide_original') : t('window_show_original'));
 
