@@ -102,7 +102,8 @@ async function sync() {
     const extraKeys = currentKeys.filter(k => !refKeys.includes(k));
 
     if (missingKeys.length > 0) {
-      console.log(`❌ Missing ${missingKeys.length} keys.`);
+      console.log(`❌ Missing ${missingKeys.length} keys:`);
+      missingKeys.forEach(k => console.log(`   - ${k}`));
       totalIssues += missingKeys.length;
       
       if (shouldFix) {
@@ -113,7 +114,9 @@ async function sync() {
     }
 
     if (extraKeys.length > 0) {
-      console.log(`⚠️ Extra ${extraKeys.length} keys (not in reference).`);
+      console.log(`⚠️ Extra ${extraKeys.length} keys (not in reference):`);
+      extraKeys.forEach(k => console.log(`   - ${k}`));
+      totalIssues += extraKeys.length;
       if (shouldFix) {
         extraKeys.forEach(k => delete data[k]);
       }
