@@ -29,7 +29,7 @@
       @test="testKeys"
     />
 
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('deepl_api_tier_label') || 'API Tier' }}</label>
       <BaseSelect
         v-model="deeplApiTier"
@@ -40,7 +40,7 @@
       <p class="setting-description">{{ tierDescription }}</p>
     </div>
 
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <BaseCheckbox
         v-model="deeplBetaLanguagesEnabled"
         :label="t('deepl_beta_languages_label') || 'Enable Beta Languages'"
@@ -51,7 +51,7 @@
       </p>
     </div>
 
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('deepl_formality_label') || 'Translation Formality' }}</label>
       <BaseSelect
         v-model="deeplFormality"
