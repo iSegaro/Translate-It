@@ -154,16 +154,36 @@
       flex-direction: column !important;
       align-items: flex-start !important;
       gap: $spacing-xs !important;
-      margin-bottom: $spacing-lg;
+      margin-bottom: $spacing-xl !important; // Increased margin for better separation between groups
     }
 
     :deep(.setting-group) {
-      // Direct labels or labels inside wrappers should be full width
+      // Allow all types of labels to wrap and show full text
       label,
-      .label-with-toggle {
+      .label-with-toggle,
+      .ti-checkbox__label,
+      .ti-radio__label {
         width: 100% !important;
         flex: none !important;
+        margin-bottom: 2px !important;
+        white-space: normal !important;
+        text-overflow: clip !important;
+        overflow: visible !important;
+        display: block !important;
+        line-height: 1.4 !important;
+      }
+
+      // Checkbox specific alignment
+      .ti-checkbox,
+      .base-checkbox {
         margin-bottom: $spacing-xs;
+        display: flex;
+        align-items: flex-start;
+        gap: $spacing-sm;
+
+        .ti-checkbox__label {
+          margin-bottom: 0 !important;
+        }
       }
 
       // Dropdowns and inputs inside providers should be consistent
@@ -175,6 +195,17 @@
         width: 100% !important;
         max-width: var(--input-max-width, 620px);
         flex: none !important;
+        margin-bottom: $spacing-xs;
+      }
+
+      // Improve description styling for better hierarchy
+      .setting-description {
+        margin-top: 0 !important;
+        font-size: $font-size-xs !important;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        max-width: var(--input-max-width, 620px);
+        display: block;
       }
     }
 
@@ -290,7 +321,7 @@
     font-size: $font-size-sm;
     color: var(--color-text-secondary);
     line-height: 1.5;
-    margin: 0;
+    margin: 0 0 $spacing-xs 0;
 
     &.mb-md {
       margin-bottom: $spacing-md;

@@ -56,9 +56,9 @@
         :disabled="!isThinkingControllable"
         :label="t('gemini_thinking_label') || 'Enable Thinking Mode'"
       />
-      <span class="setting-description">
+      <p class="setting-description">
         {{ t('gemini_thinking_description') || thinkingDescription }}
-      </span>
+      </p>
     </div>
   </div>
 </template>
