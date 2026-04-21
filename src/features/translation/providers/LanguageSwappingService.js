@@ -23,34 +23,57 @@ export class LanguageSwappingService {
   }
 
   /**
-   * Get detected language for a text without performing swap
-   * Used to provide accurate source language when source='auto'
+   * Get detected language for a text using a multi-layered approach:
+   * 1. Deterministic: Unique script markers (e.g., 'پ' for Persian)
+   * 2. Statistical: Browser i18n API
+   * 3. Heuristic: Script-based defaults and User preferences
    */
   static async getDetectedLanguage(text) {
     try {
       const preferences = await getLanguageDetectionPreferencesAsync();
 
-      // 1. Try Arabic script detection with preferences
-      const arabicDetected = detectArabicScriptLanguage(text, preferences);
-      if (arabicDetected) {
-        logger.debug(`[LanguageSwappingService] Detected Arabic script language: ${arabicDetected}`);
-        return arabicDetected;
+      // LAYER 1: Deterministic Detection (Unique Markers)
+      // We check for unique characters that definitively identify a language.
+      const arabicUnique = detectArabicScriptLanguage(text, preferences, { useDefaults: false });
+      if (arabicUnique) {
+        logger.debug(`[LanguageSwappingService] Deterministic detection (Arabic script): ${arabicUnique}`);
+        return arabicUnique;
       }
 
-      // 2. Try Chinese script detection with preferences
-      const chineseDetected = detectChineseScriptLanguage(text, preferences);
-      if (chineseDetected) {
-        logger.debug(`[LanguageSwappingService] Detected Chinese script language: ${chineseDetected}`);
-        return chineseDetected;
+      const chineseUnique = detectChineseScriptLanguage(text, preferences, { useDefaults: false });
+      if (chineseUnique) {
+        logger.debug(`[LanguageSwappingService] Deterministic detection (Chinese script): ${chineseUnique}`);
+        return chineseUnique;
       }
 
-      // 3. Fallback to browser API detection
+      const devanagariUnique = detectDevanagariScriptLanguage(text, preferences, { useDefaults: false });
+      if (devanagariUnique) {
+        logger.debug(`[LanguageSwappingService] Deterministic detection (Devanagari script): ${devanagariUnique}`);
+        return devanagariUnique;
+      }
+
+      // LAYER 2: Statistical Detection (Browser API)
+      // Use the browser's language detection for general cases or ambiguous short strings.
       const detectionResult = await browser.i18n.detectLanguage(text);
       if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
         const mainDetection = detectionResult.languages[0];
         const detectedLangCode = getCanonicalCode(mainDetection.language);
-        logger.debug(`[LanguageSwappingService] Fallback detected language (browser API): ${detectedLangCode}`);
+        logger.debug(`[LanguageSwappingService] Statistical detection (Browser API): ${detectedLangCode}`);
         return detectedLangCode;
+      }
+
+      // LAYER 3: Heuristic Fallback (Preferences & Defaults)
+      // If everything else fails or is unreliable, use script detection with preferences/defaults.
+      const arabicFallback = detectArabicScriptLanguage(text, preferences, { useDefaults: true });
+      if (arabicFallback) {
+        logger.debug(`[LanguageSwappingService] Heuristic fallback (Arabic script): ${arabicFallback}`);
+        return arabicFallback;
+      }
+
+      const chineseFallback = detectChineseScriptLanguage(text, preferences, { useDefaults: true });
+      if (chineseFallback) {
+        logger.debug(`[LanguageSwappingService] Heuristic fallback (Chinese script): ${chineseFallback}`);
+        return chineseFallback;
       }
 
       logger.debug(`[LanguageSwappingService] Could not detect language reliably`);
@@ -69,30 +92,18 @@ export class LanguageSwappingService {
       const bilingualModes = await getBilingualTranslationModesAsync();
       const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
 
-      const detectionResult = await browser.i18n.detectLanguage(text);
+      const accurateDetectedLang = await this.getDetectedLanguage(text);
 
-      // Get user language detection preferences for accurate script detection
-      const preferences = await getLanguageDetectionPreferencesAsync();
-      
-      const arabicDetected = detectArabicScriptLanguage(text, preferences);
-      const chineseDetected = detectChineseScriptLanguage(text, preferences);
-      const accurateDetectedLang = arabicDetected || chineseDetected;
-
-      if (detectionResult?.isReliable && detectionResult.languages.length > 0) {
-        const mainDetection = detectionResult.languages[0];
-        const detectedLangCode = getCanonicalCode(mainDetection.language);
-
+      if (accurateDetectedLang) {
+        const detectedLangCode = getCanonicalCode(accurateDetectedLang);
         const targetNorm = this._normalizeLangValue(targetLang);
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = getCanonicalCode(targetNorm);
 
         // --- BILINGUAL & AUTO-SWAP LOGIC ---
         // BILINGUAL_TRANSLATION is the master switch.
-        // Use accurate script detection (Arabic/Chinese) for bilingual logic.
         // Only swap when source is AUTO to respect user's explicit source choice.
-        const accurateLangCode = getCanonicalCode(accurateDetectedLang || detectedLangCode);
-
-        const shouldSwap = bilingualEnabled && isModeEnabled && accurateLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
+        const shouldSwap = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
 
         if (shouldSwap) {
            let newTargetLang;
@@ -103,7 +114,7 @@ export class LanguageSwappingService {
              newTargetLang = "en";
            }
 
-           logger.debug(`${providerName}: Bilingual swap applied for mode ${mode}. Detected ${accurateLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+           logger.debug(`${providerName}: Bilingual swap applied for mode ${mode}. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         }
 
@@ -131,14 +142,9 @@ export class LanguageSwappingService {
     const bilingualModes = await getBilingualTranslationModesAsync();
     const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
 
-    // Get user language detection preferences
-    const preferences = await getLanguageDetectionPreferencesAsync();
-
-    // Detect language with user preferences (Arabic, Chinese, and Devanagari scripts)
-    const arabicDetected = detectArabicScriptLanguage(text, preferences);
-    const chineseDetected = detectChineseScriptLanguage(text, preferences);
-    const devanagariDetected = detectDevanagariScriptLanguage(text, preferences);
-    const detectedLanguage = getCanonicalCode(arabicDetected || chineseDetected || devanagariDetected);
+    // Detect language using the centralized multi-layered approach
+    const detectedLanguageRaw = await this.getDetectedLanguage(text);
+    const detectedLanguage = getCanonicalCode(detectedLanguageRaw);
 
     // Only swap languages if:
     // 1. Text script is recognized (detectedLanguage exists) AND

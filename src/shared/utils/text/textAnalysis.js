@@ -72,9 +72,11 @@ export const isArabicScriptText = (text) => {
  * Detect language for Arabic script text with user preferences
  * @param {string} text - Text to analyze
  * @param {Object} preferences - User language detection preferences
+ * @param {Object} options - Detection options
+ * @param {boolean} options.useDefaults - Whether to return a default language if no unique markers found
  * @returns {string|null} Language code ('fa', 'ar', 'ur', 'ps') or null if not Arabic script
  */
-export const detectArabicScriptLanguage = (text, preferences = {}) => {
+export const detectArabicScriptLanguage = (text, preferences = {}, options = { useDefaults: true }) => {
   if (!text || typeof text !== 'string') return null;
 
   // Check if it's Arabic script
@@ -90,15 +92,16 @@ export const detectArabicScriptLanguage = (text, preferences = {}) => {
   const pashtoExclusiveChars = /[\u0672\u0675\u0681\u0685\u0692\u069A\u06BC\u06CD\u06D0]/;
   if (pashtoExclusiveChars.test(text)) return 'ps';
 
-  // Persian-specific (not present in standard Arabic):
-  // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF), ک (U+06A9 - Persian Kaf), ی (U+06CC - Persian Yeh)
+  // Persian-specific (پ، چ، ژ، گ، ک فارسی، ی فارسی)
   const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
   if (persianExclusiveChars.test(text)) return 'fa';
 
-  // Arabic-specific (not standard in Persian/Urdu/Pashto):
-  // ة (U+0629), ي (U+064A - Arabic Yeh), ك (U+0643 - Arabic Kaf), ى (U+0649 - Alef Maksura)
+  // Arabic-specific (ة، ي عربی، ك عربی، ى)
   const arabicExclusiveChars = /[\u0629\u064A\u0643\u0649]/;
   if (arabicExclusiveChars.test(text)) return 'ar';
+
+  // If no unique markers found and we don't want defaults, return null to allow other layers to decide
+  if (!options.useDefaults) return null;
 
   // 2. Use user preference for ambiguous text (like "سلام")
   const userPreference = preferences['arabic-script'];
@@ -162,22 +165,25 @@ export const isChineseScriptText = (text) => {
  * Detect specific Chinese variant with user preferences
  * @param {string} text - Text to analyze
  * @param {Object} preferences - User language detection preferences
+ * @param {Object} options - Detection options
+ * @param {boolean} options.useDefaults - Whether to return a default language if no unique markers found
  * @returns {string|null} Language code ('zh-cn', 'zh-tw', 'lzh', 'yue') or null
  */
-export const detectChineseScriptLanguage = (text, preferences = {}) => {
+export const detectChineseScriptLanguage = (text, preferences = {}, options = { useDefaults: true }) => {
   if (!text || !isChineseScriptText(text)) return null;
 
   // 1. Heuristic: Unique Markers for Traditional vs Simplified
 
-  // Traditional Chinese unique markers (Commonly used characters that were simplified)
-  // 們 (men), 國 (guo), 學 (xue), 會 (hui), 這 (zhe)
+  // Traditional Chinese unique markers
   const traditionalMarkers = /[\u5011\u570B\u5B78\u6703\u9019]/;
   if (traditionalMarkers.test(text)) return 'zh-tw';
 
   // Simplified Chinese unique markers
-  // 们 (men), 国 (guo), 学 (xue), 会 (hui), 这 (zhe)
   const simplifiedMarkers = /[\u4EEC\u56FD\u5B66\u4F1A\u8FD9]/;
   if (simplifiedMarkers.test(text)) return 'zh-cn';
+
+  // If no unique markers found and we don't want defaults, return null
+  if (!options.useDefaults) return null;
 
   // 2. Use user preference for ambiguous text
   const userPreference = preferences['chinese-script'];
@@ -203,9 +209,11 @@ export const isDevanagariScriptText = (text) => {
  * Detect language for Devanagari script text with user preferences
  * @param {string} text - Text to analyze
  * @param {Object} preferences - User language detection preferences
+ * @param {Object} options - Detection options
+ * @param {boolean} options.useDefaults - Whether to return a default language if no unique markers found
  * @returns {string|null} Language code ('hi', 'mr', 'ne') or null
  */
-export const detectDevanagariScriptLanguage = (text, preferences = {}) => {
+export const detectDevanagariScriptLanguage = (text, preferences = {}, options = { useDefaults: true }) => {
   if (!text || !isDevanagariScriptText(text)) return null;
 
   // 1. Language-specific unique markers
@@ -213,6 +221,9 @@ export const detectDevanagariScriptLanguage = (text, preferences = {}) => {
   // Marathi unique characters: ळ (U+0933)
   const marathiMarkers = /[\u0933]/;
   if (marathiMarkers.test(text)) return 'mr';
+
+  // If no unique markers found and we don't want defaults, return null
+  if (!options.useDefaults) return null;
 
   // 2. Use user preference for ambiguous text
   const userPreference = preferences['devanagari-script'];
