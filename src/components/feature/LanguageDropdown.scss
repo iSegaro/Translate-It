@@ -2,33 +2,34 @@
 
 .language-dropdown {
   width: 100%;
-  padding: 8px 12px !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius-base) !important;
-  font-size: var(--font-size-sm) !important;
-  background-color: var(--color-background) !important;
-  color: var(--color-text) !important;
-  cursor: pointer !important;
-  appearance: auto !important;
-  -webkit-appearance: auto !important;
-  transition: all var(--transition-base) !important;
-  box-sizing: border-box !important;
-  
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-base);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+  transition: all var(--transition-base);
+  box-sizing: border-box;
+
   &:focus {
-    outline: none !important;
-    border-color: var(--color-primary) !important;
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1) !important;
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
   }
-  
+
   &:disabled {
-    opacity: 0.6 !important;
-    cursor: not-allowed !important;
-    background-color: var(--color-surface) !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--color-surface);
   }
 }
 
 /* RTL support - general handling for standard extension options */
 :global(.rtl) .language-dropdown {
-  text-align: right !important;
-  direction: rtl !important;
+  text-align: right;
+  direction: rtl;
 }
+

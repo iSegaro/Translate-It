@@ -244,11 +244,10 @@
   // --- Common alignment for all top-level setting groups ---
   .setting-group {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: $spacing-md;
     margin-bottom: $spacing-md;
-    width: 100%;
+    width: calc(100% - 28px);
+    margin-inline-start: 28px;
+    box-sizing: border-box;
 
     &.vertical {
       flex-direction: column;
@@ -256,21 +255,29 @@
       gap: $spacing-xs;
 
       .setting-description {
-        margin-inline-start: 28px;
+        margin-top: $spacing-xs;
       }
     }
 
     &:not(.vertical) {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: $spacing-lg;
+
       label {
-        flex: 1;
+        flex: 0 0 220px;
+        width: 220px;
         font-weight: $font-weight-medium;
         margin-bottom: 0;
+        white-space: nowrap;
       }
 
       .language-dropdown,
       :deep(.ti-provider-button-container) {
-        flex: 0 0 250px;
-        width: 250px;
+        flex: 0 0 200px;
+        width: 200px;
+        min-width: 200px;
       }
     }
   }
@@ -279,15 +286,27 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .languages-tab {
+    .setting-group {
+      margin-inline-start: 0;
+      width: 100%;
+    }
+
     .setting-group:not(.vertical) {
       flex-direction: column;
       align-items: flex-start;
       gap: $spacing-xs;
 
+      label {
+        width: 100%;
+        flex: none;
+        white-space: normal;
+      }
+
       .language-dropdown,
       :deep(.ti-provider-button-container) {
         width: 100%;
         flex: none;
+        min-width: 0;
       }
     }
 
@@ -295,9 +314,17 @@
       flex-direction: column;
       align-items: flex-start;
       gap: $spacing-xs;
+      margin-inline-start: 0;
+      width: 100%;
+
+      .pref-label {
+        width: 100%;
+        flex: none;
+      }
 
       .pref-select {
         width: 100%;
+        flex: none;
       }
     }
   }
