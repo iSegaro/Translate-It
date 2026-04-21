@@ -8,6 +8,7 @@
 
   .setting-group {
     margin-bottom: $spacing-xl;
+    width: 100%;
 
     &.vertical {
       display: flex;
@@ -18,6 +19,36 @@
       .setting-label {
         font-weight: $font-weight-medium;
         color: var(--color-text);
+        margin-bottom: $spacing-xs;
+      }
+    }
+
+    &.horizontal-aligned {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: $spacing-md !important;
+      margin-bottom: $spacing-md !important;
+      width: auto !important; // Changed from 100% to auto to prevent overflow
+      box-sizing: border-box !important;
+
+      .setting-label {
+        flex: 0 0 125px !important;
+        width: 125px !important;
+        font-weight: $font-weight-medium !important;
+        color: var(--color-text) !important;
+        font-size: $font-size-sm !important;
+        margin: 0 !important;
+      }
+
+      .input-container {
+        flex: 1 !important;
+        max-width: 350px !important;
+      }
+
+      .proxy-input, 
+      .proxy-select {
+        width: 100% !important;
       }
     }
 
@@ -91,7 +122,8 @@
   .accordion-inner {
     padding: $spacing-sm 0 $spacing-md 0;
     
-    .setting-description {
+    .setting-description,
+    .setting-group {
       margin-inline-start: 28px;
     }
   }
@@ -108,20 +140,21 @@
     .proxy-input-group {
       flex: 1;
       display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: $spacing-sm;
-      min-width: 200px;
+      flex-direction: column; // Changed to column for perfect alignment
+      align-items: flex-start;
+      gap: $spacing-xs;
+      min-width: 220px;
 
       .setting-label {
         font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
         color: var(--color-text);
-        white-space: nowrap;
-        min-width: 80px;
+        white-space: normal;
+        margin-bottom: 2px;
       }
 
       .proxy-input {
-        flex: 1;
+        width: 100% !important;
       }
     }
 
@@ -133,12 +166,16 @@
 
   .proxy-test {
     margin-top: $spacing-lg;
-    margin-inline-start: 28px;
+    margin-inline-start: 0; // Remove margin to allow true centering
+    width: 100%;
 
     .test-container {
       display: flex;
+      flex-direction: column; // Stack button and result vertically for better look
       align-items: center;
-      gap: $spacing-base;
+      justify-content: center;
+      gap: $spacing-sm;
+      width: 100%;
     }
 
     .test-button {
@@ -228,13 +265,21 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .advance-tab {
-    .setting-group.horizontal {
+    .setting-group.horizontal,
+    .setting-group.horizontal-aligned {
       flex-direction: column;
       align-items: flex-start;
       gap: $spacing-xs;
 
+      .setting-label {
+        width: 100%;
+        flex: none;
+      }
+
+      .input-container,
       .proxy-select {
         width: 100%;
+        max-width: none;
         flex: none;
       }
     }

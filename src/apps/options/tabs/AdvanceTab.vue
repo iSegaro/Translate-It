@@ -52,18 +52,20 @@
               {{ t('proxy_section_description') || 'Configure proxy settings for providers with geographical restrictions (e.g., Gemini from Iran)' }}
             </p>
             
-            <div class="setting-group horizontal">
+            <div class="setting-group horizontal-aligned">
               <label class="setting-label">{{ t('proxy_type_label') || 'Proxy Type' }}</label>
-              <BaseSelect
-                v-model="proxyType"
-                :options="proxyTypeOptions"
-                class="proxy-select"
-              />
+              <div class="input-container">
+                <BaseSelect
+                  v-model="proxyType"
+                  :options="proxyTypeOptions"
+                  class="proxy-select"
+                />
+              </div>
             </div>
 
-            <div class="setting-group proxy-connection">
-              <div class="proxy-input-group">
-                <label class="setting-label">{{ t('proxy_host_label') || 'Host' }}</label>
+            <div class="setting-group horizontal-aligned">
+              <label class="setting-label">{{ t('proxy_host_label') || 'Host' }}</label>
+              <div class="input-container">
                 <BaseInput
                   v-model="proxyHost"
                   placeholder="proxy.example.com"
@@ -71,9 +73,11 @@
                   class="proxy-input"
                 />
               </div>
+            </div>
 
-              <div class="proxy-input-group">
-                <label class="setting-label">{{ t('proxy_port_label') || 'Port' }}</label>
+            <div class="setting-group horizontal-aligned">
+              <label class="setting-label">{{ t('proxy_port_label') || 'Port' }}</label>
+              <div class="input-container">
                 <BaseInput
                   v-model="proxyPort"
                   type="number"
@@ -86,9 +90,9 @@
               </div>
             </div>
 
-            <div class="setting-group proxy-auth">
-              <div class="proxy-input-group">
-                <label class="setting-label">{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
+            <div class="setting-group horizontal-aligned">
+              <label class="setting-label">{{ t('proxy_username_label') || 'Username (Optional)' }}</label>
+              <div class="input-container">
                 <BaseInput
                   v-model="proxyUsername"
                   placeholder=""
@@ -96,9 +100,11 @@
                   class="proxy-input"
                 />
               </div>
+            </div>
 
-              <div class="proxy-input-group">
-                <label class="setting-label">{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
+            <div class="setting-group horizontal-aligned">
+              <label class="setting-label">{{ t('proxy_password_label') || 'Password (Optional)' }}</label>
+              <div class="input-container">
                 <BaseInput
                   v-model="proxyPassword"
                   type="password"
