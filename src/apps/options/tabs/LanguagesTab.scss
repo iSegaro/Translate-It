@@ -386,6 +386,8 @@
       display: flex;
       flex-direction: column;
       gap: $spacing-xs;
+      padding-inline-start: 32px; // Indent to show visual hierarchy
+      margin-top: $spacing-sm;
     }
   }
 
