@@ -1,5 +1,19 @@
 @use "@/assets/styles/base/variables" as *;
 
+.activation-tab {
+  max-width: 650px !important;
+  width: 100% !important;
+  display: block !important;
+
+  :deep(.base-fieldset) {
+    max-width: 650px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+  }
+}
+
 .setting-row {
   display: flex !important;
   align-items: center !important;
@@ -235,9 +249,9 @@
 
     &.ui-mode-radio-group {
       display: grid !important;
-      grid-template-columns: repeat(3, 1fr) !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important; // استفاده از minmax برای جلوگیری از بیرون زدگی
       align-items: stretch !important;
-      gap: $spacing-lg !important;
+      gap: $spacing-md !important;
       width: 100% !important;
 
       .radio-label-content {

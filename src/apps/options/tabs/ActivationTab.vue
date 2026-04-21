@@ -1,5 +1,5 @@
 <template>
-  <section class="options-tab-content">
+  <section class="options-tab-content activation-tab">
     <h2>{{ t('translation_activation_section_title') || 'Translation Activation Methods' }}</h2>
 
     <!-- Extension Enable/Disable -->
