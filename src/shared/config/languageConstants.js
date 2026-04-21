@@ -102,6 +102,19 @@ export const LANGUAGE_CODE_TO_NAME_MAP = Object.fromEntries(
   Object.entries(LANGUAGE_NAME_TO_CODE_MAP).map(([name, code]) => [code, name])
 );
 
+/**
+ * Languages that are considered "Global Favorites" or "Commonly Encountered".
+ * Used by the LanguageDetectionService to filter out unreliable statistical guesses
+ * for short strings.
+ */
+export const GLOBAL_TRUSTED_LANGUAGES = [
+  // Major World Languages (High population/usage)
+  'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh-cn', 'ja', 'ko', 'tr', 'id', 'ms', 'hi',
+  'ar', 'fa', 'ur', 'bn', 'vi', 'th', 'pl', 'uk', 'nl', 'sv', 'no', 'fi', 'el', 'he',
+  // Specific supported variants and minor languages with high reliable detection
+  'ml', 'ta', 'te', 'kn', 'mr', 'ne', 'my', 'km', 'lo', 'am', 'hy', 'ka', 'ace', 'gd'
+];
+
 // Provider-specific language code mappings
 export const PROVIDER_LANGUAGE_MAPPINGS = {
   // Google Translate Language Codes

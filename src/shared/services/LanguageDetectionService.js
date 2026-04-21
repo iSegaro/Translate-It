@@ -11,11 +11,18 @@ import {
   DEVANAGARI_SCRIPT_LANGUAGES
 } from "@/shared/utils/text/textAnalysis.js";
 import { getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
-import { getCanonicalCode, LANGUAGE_CODE_TO_NAME_MAP } from "@/shared/config/languageConstants.js";
+import { 
+  getCanonicalCode, 
+  LANGUAGE_CODE_TO_NAME_MAP,
+  GLOBAL_TRUSTED_LANGUAGES 
+} from "@/shared/config/languageConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageDetectionService');
+
+// Pre-create the trusted set for O(1) lookups
+const GLOBAL_TRUSTED_SET = new Set(GLOBAL_TRUSTED_LANGUAGES);
 
 /**
  * Centralized Language Detection Service
@@ -94,19 +101,19 @@ export class LanguageDetectionService {
               
               // Validation 3: Dynamic Trust Filter for Short/Unreliable Strings
               // For short strings, the browser API is often probabilistic but not certain (isReliable: false).
-              // We only trust these "guesses" if they align with the user's context.
+              // We only trust these "guesses" if they align with the user's context or are common global languages.
               if (textLength < 25 && !result.isReliable) {
                 const uiLang = browser.i18n.getUILanguage().split('-')[0].toLowerCase();
                 const targetLang = preferences.targetLanguage ? getCanonicalCode(preferences.targetLanguage) : null;
                 
-                // The "Dynamic Trust Set" consists of languages the user is actually likely to encounter:
-                // 1. User's UI Language
-                // 2. User's chosen Target Language
-                // 3. English (The global bridge for Latin script)
-                const DYNAMIC_TRUST_SET = new Set([uiLang, targetLang, 'en'].filter(Boolean));
-                
-                if (!DYNAMIC_TRUST_SET.has(lang)) {
-                  logger.debug(`[LanguageDetectionService] Statistical guess '${lang}' rejected for short string (not in user context).`);
+                // If the guess is not in our user context or global trust set, 
+                // we only accept it if it's high confidence (percentage > 80)
+                const isInUserContext = uiLang === lang || targetLang === lang;
+                const isGloballyTrusted = GLOBAL_TRUSTED_SET.has(lang);
+                const isHighConfidence = top.percentage > 80;
+
+                if (!isInUserContext && !isGloballyTrusted && !isHighConfidence) {
+                  logger.debug(`[LanguageDetectionService] Statistical guess '${lang}' rejected for short string (not in user/global context and low confidence).`);
                   return null;
                 }
               }
