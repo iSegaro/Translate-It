@@ -273,9 +273,11 @@ export const detectLatinScriptLanguage = (text) => {
   // Nordic languages
   if (/[åøæÅØÆ]/.test(sample)) return 'no';
   
-  // Cyrillic (Russian/Ukrainian)
-  if (/[а-яё]/i.test(sample)) return 'ru';
+  // Cyrillic (Ukrainian/Russian)
+  // Check Ukrainian specific markers first
   if (/[ґєії]/.test(sample)) return 'uk';
+  // Fallback to Russian for general Cyrillic
+  if (/[а-яё]/i.test(sample)) return 'ru';
 
   return null;
 };
