@@ -91,6 +91,7 @@ import BaseActionButton from '@/features/text-actions/components/BaseActionButto
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSButton')
 
@@ -179,13 +180,25 @@ const ttsButtonClasses = computed(() => [
 ])
 
 const buttonTitle = computed(() => {
+  // Get readable language name if it's not 'auto'
+  const displayLang = props.language && props.language !== 'auto' 
+    ? getLanguageNameFromCode(props.language) 
+    : '';
+  
+  // Capitalize first letter (e.g., 'english', 'persian')
+  const langName = displayLang 
+    ? displayLang.charAt(0).toUpperCase() + displayLang.slice(1) 
+    : '';
+    
+  const langSuffix = langName ? ` (${langName})` : '';
+
   switch (effectiveState.value) {
     case 'idle':
-      return t('action_speak_text')
+      return t('action_speak_text') + langSuffix
     case 'loading':
       return t('window_loading_alt')
     case 'playing':
-      return t('action_stop_speaking')
+      return t('action_stop_speaking') + langSuffix
     case 'error':
       // Try to get localized message from errorType key
       if (tts.errorType.value) {
