@@ -40,7 +40,7 @@
       >
         <template #header>
           <div class="accordion-header-layout">
-            <span>{{ t('translation_api_label') || 'API Choice & Provider Settings' }}</span>
+            <span>{{ t('translation_api_label') || 'Service' }}</span>
             <div 
               class="header-selector-wrapper"
               @click.stop
