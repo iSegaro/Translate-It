@@ -16,10 +16,10 @@ The system uses a layered approach to separate UI interaction, logic routing, an
 
 ```
 [ UI Components ] 
-(TTSButton.vue / ActionToolbar)
+(TTSButton.vue - Standardized across all contexts)
        │
        ▼
-[ useTTSSmart.js ] ──► (Manages local UI state: idle, loading, playing, error)
+[ useTTSSmart.js ] ──► (Independent instance-level state: idle, loading, playing, error)
        │
        ▼ (MessageActions.GOOGLE_TTS_SPEAK)
        │
@@ -37,7 +37,7 @@ The system uses a layered approach to separate UI interaction, logic routing, an
                     │
                     ▼
 [ TTSStateManager.js ] ──► [ Offscreen Document (Chrome) / Direct Audio (Firefox) ]
-(Lifecycle Manager)           (Persistent environment, stop-only logic)
+(Lifecycle & Broadcast)       (Persistent environment, stop-only logic)
 ```
 
 ---
@@ -55,10 +55,11 @@ The central intelligence of the system. It intercepts all speech requests and pe
 - **Engine Resolution**: Decides between Google or Edge based on user preference and native language support.
 - **Smart Recovery**: Handles Edge failures (e.g., 0-byte audio) by triggering re-detection and falling back to the alternative engine.
 
-### 3. `TTSStateManager.js` (Unified State)
+### 3. `TTSStateManager.js` (Unified State & Targeted Broadcast)
 Manages the shared state across all handlers:
+- **Targeted Broadcast**: Implements a `broadcastStatus` mechanism that notifies ONLY the initiating tab (all its frames/Shadow DOM) and internal extension contexts (Popup/Sidepanel). This improves performance by reducing unnecessary cross-tab traffic while ensuring UI synchronization in complex environments.
 - **Offscreen Persistence**: Controls the lifecycle of the Offscreen document. Uses `stopAudioOnly()` instead of closing the document to eliminate latency.
-- **Sender Tracking**: Ensures completion events are routed back to the correct requester.
+- **Status Mapping**: Translates internal engine events into unified statuses: `completed`, `error`, `stopped`, and `idle`.
 
 ### 4. `EdgeTTSClient.js` (Neural Worker)
 A **logic-only** client for Microsoft Edge TTS:
@@ -104,12 +105,15 @@ When searching for a voice, the system follows this priority:
 ## Lifecycle & State Management
 
 ### Optimized UI Reactivity
-- **Instant Feedback**: The `useTTSSmart.js` composable clears previous error states at the start of each call, ensuring the UI always reacts to retries.
+- **Instance-Level Scoping**: Each call to `useTTSSmart.js` creates an independent state. This allows multiple TTS buttons on the same page to operate without unwanted synchronization.
+- **Broadcast Synchronization**: UI components listen for `GOOGLE_TTS_ENDED` broadcasts to stay in sync with the background state, even if they didn't initiate the request.
+- **Instant Feedback**: The composable clears previous error states at the start of each call, ensuring the UI always reacts to retries.
 - **Background Initialization**: `LifecycleManager.js` triggers a background voice list update on startup if the 24-hour cache has expired.
 
 ### Reliable Messaging
+- **Proactive Error Notification**: `TTSDispatcher` notifies the state manager immediately upon logical failures (Circuit Breaker, Unsupported Language) before network calls are made.
 - **Response Validation**: Handlers verify the `success` field from the Offscreen document.
-- **Failure Propagation**: Technical failures (like `synthesis-failed` or `Circuit Breaker OPEN`) are bubbled up to the UI button immediately.
+- **Failure Propagation**: Technical failures (like `synthesis-failed` or `Circuit Breaker OPEN`) are bubbled up to the UI button immediately via the broadcast channel.
 
 ---
 
