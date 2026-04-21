@@ -76,11 +76,13 @@
   }
 
   .prompt-template-help {
-    margin-top: $spacing-lg;
+    margin-top: $spacing-xl;
     padding: $spacing-md;
     background-color: var(--color-background-alt);
     border-radius: $border-radius-base;
     border: 1px solid var(--color-border-light);
+    align-self: center; // Centers the box itself
+    box-sizing: border-box;
 
     p {
       font-size: $font-size-sm;
