@@ -395,6 +395,10 @@
   .language-pref-setting {
     margin-top: $spacing-md;
     
+    .accordion-inner {
+      padding-inline-start: 32px !important; // Match bilingual indentation
+    }
+    
     .language-pref-row {
       display: flex;
       align-items: center;
@@ -415,6 +419,10 @@
   // AI Optimization
   .ai-optimization-setting {
     margin-top: $spacing-md;
+
+    .accordion-inner {
+      padding-inline-start: 32px !important; // Match other accordions indentation
+    }
   }
 
   .section-separator {
