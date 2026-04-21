@@ -45,7 +45,9 @@ export class TTSLanguageService {
       'lzh': 'zh-tw', // Classical Chinese -> Traditional Chinese (for pronunciation)
       'yue': 'zh-hk', // Cantonese -> Hong Kong (for Edge TTS compatibility)
       'ps': 'ps',     // Pashto (Edge supports it)
-      'ur': 'ur'      // Urdu (Edge supports it)
+      'ur': 'ur',     // Urdu (Edge supports it)
+      'gd': 'en',     // Scottish Gaelic -> English fallback
+      'ace': 'en'     // Acehnese -> English fallback
     };
 
     const mapped = ttsMappings[lang];
