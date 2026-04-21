@@ -210,66 +210,33 @@
               <label class="pref-label">
                 {{ t('arabic_script_priority_label') || 'Arabic Script:' }}
               </label>
-              <select
+              <BaseSelect
                 v-model="arabicScriptPreference"
+                :options="arabicScriptOptions"
                 class="pref-select"
-              >
-                <option value="fa">
-                  {{ t('persian_language_name') || 'Persian' }} ({{ t('default_label') || 'Default' }})
-                </option>
-                <option value="ar">
-                  {{ t('arabic_language_name') || 'Arabic' }}
-                </option>
-                <option value="ur">
-                  {{ t('urdu_language_name') || 'Urdu' }}
-                </option>
-                <option value="ps">
-                  {{ t('pashto_language_name') || 'Pashto' }}
-                </option>
-              </select>
+              />
             </div>
 
             <div class="language-pref-row">
               <label class="pref-label">
                 {{ t('chinese_script_priority_label') || 'Chinese Script:' }}
               </label>
-              <select
+              <BaseSelect
                 v-model="chineseScriptPreference"
+                :options="chineseScriptOptions"
                 class="pref-select"
-              >
-                <option value="zh-cn">
-                  {{ t('chinese_simplified_name') || 'Chinese (Simplified)' }} ({{ t('default_label') || 'Default' }})
-                </option>
-                <option value="zh-tw">
-                  {{ t('chinese_traditional_name') || 'Chinese (Traditional)' }}
-                </option>
-                <option value="lzh">
-                  {{ t('chinese_classical_name') || 'Chinese (Classical)' }}
-                </option>
-                <option value="yue">
-                  {{ t('chinese_cantonese_name') || 'Cantonese' }}
-                </option>
-              </select>
+              />
             </div>
 
             <div class="language-pref-row">
               <label class="pref-label">
                 {{ t('devanagari_script_priority_label') || 'Devanagari Script:' }}
               </label>
-              <select
+              <BaseSelect
                 v-model="devanagariScriptPreference"
+                :options="devanagariScriptOptions"
                 class="pref-select"
-              >
-                <option value="hi">
-                  {{ t('hindi_language_name') || 'Hindi' }} ({{ t('default_label') || 'Default' }})
-                </option>
-                <option value="mr">
-                  {{ t('marathi_language_name') || 'Marathi' }}
-                </option>
-                <option value="ne">
-                  {{ t('nepali_language_name') || 'Nepali' }}
-                </option>
-              </select>
+              />
             </div>
           </div>
         </template>
@@ -332,6 +299,7 @@ import { TranslationMode } from '@/shared/config/config.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseAccordion from '@/components/base/BaseAccordion.vue'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
@@ -350,6 +318,26 @@ const { t } = useI18n()
 
 // Accordion state management
 const activeAccordion = ref(null) // 'bilingual' or 'detection'
+
+const arabicScriptOptions = computed(() => [
+  { value: 'fa', label: `${t('persian_language_name') || 'Persian'} (${t('default_label') || 'Default'})` },
+  { value: 'ar', label: t('arabic_language_name') || 'Arabic' },
+  { value: 'ur', label: t('urdu_language_name') || 'Urdu' },
+  { value: 'ps', label: t('pashto_language_name') || 'Pashto' }
+])
+
+const chineseScriptOptions = computed(() => [
+  { value: 'zh-cn', label: `${t('chinese_simplified_name') || 'Chinese (Simplified)'} (${t('default_label') || 'Default'})` },
+  { value: 'zh-tw', label: t('chinese_traditional_name') || 'Chinese (Traditional)' },
+  { value: 'lzh', label: t('chinese_classical_name') || 'Chinese (Classical)' },
+  { value: 'yue', label: t('chinese_cantonese_name') || 'Cantonese' }
+])
+
+const devanagariScriptOptions = computed(() => [
+  { value: 'hi', label: `${t('hindi_language_name') || 'Hindi'} (${t('default_label') || 'Default'})` },
+  { value: 'mr', label: t('marathi_language_name') || 'Marathi' },
+  { value: 'ne', label: t('nepali_language_name') || 'Nepali' }
+])
 
 const toggleAccordion = (name) => {
   if (activeAccordion.value === name) {
