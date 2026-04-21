@@ -1,4 +1,9 @@
-import { ref, computed } from "vue";
+/**
+ * useTTSSmart - Independent Text-to-Speech composable.
+ * Each instance of this composable maintains its own state, allowing multiple
+ * buttons to exist in the same page without unwanted synchronization.
+ */
+import { ref, computed, onUnmounted } from "vue";
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -11,24 +16,55 @@ import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
-const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'error'
-const currentTTSId = ref(null);
-const errorMessage = ref('');
-const errorType = ref('');
-const progress = ref(0);
-const lastText = ref('');
-const lastLanguage = ref('auto');
-const isProcessing = ref(false);
-
+/**
+ * Independent TTS Controller
+ */
 export function useTTSSmart() {
+  // Instance-level state - Every call to useTTSSmart() gets its own refs
+  const ttsState = ref('idle'); // 'idle' | 'loading' | 'playing' | 'error'
+  const currentTTSId = ref(null);
+  const errorMessage = ref('');
+  const errorType = ref('');
+  const progress = ref(0);
+  const lastText = ref('');
+  const lastLanguage = ref('auto');
+  const isProcessing = ref(false);
+
   const isPlaying = computed(() => ttsState.value === 'playing');
   const isLoading = computed(() => ttsState.value === 'loading');
-
   const canStop = computed(() => ttsState.value === 'playing');
   const isError = computed(() => ttsState.value === 'error');
 
+  /**
+   * Generates a unique ID for each TTS request to track it across contexts.
+   */
   const generateTTSId = () => `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  /**
+   * Handle completion or error of a TTS request
+   */
+  const handleTTSResult = (status, errorData = null) => {
+    if (status === 'completed' || status === 'stopped' || status === 'interrupted' || status === 'idle') {
+      ttsState.value = 'idle';
+      currentTTSId.value = null;
+      progress.value = (status === 'completed' || status === 'idle') ? 100 : 0;
+      errorMessage.value = '';
+      errorType.value = '';
+      
+      if (status === 'completed' || status === 'idle') {
+        setTimeout(() => { if (ttsState.value === 'idle') progress.value = 0; }, 1000);
+      }
+    } else if (status === 'error') {
+      ttsState.value = 'error';
+      errorMessage.value = errorData?.error || 'TTS failed';
+      errorType.value = errorData?.errorType || '';
+      progress.value = 0;
+    }
+  };
+
+  /**
+   * Starts a speech request
+   */
   const speak = async (text, lang = "auto") => {
     if (!text || !text.trim()) {
       logger.warn("[useTTSSmart] No text provided for TTS");
@@ -43,32 +79,27 @@ export function useTTSSmart() {
     try {
       isProcessing.value = true;
       
-      // Reset state to ensure failure is seen as "new" even for the same text
-      lastText.value = '';
+      // Reset local state for the new request
       errorMessage.value = '';
+      errorType.value = '';
       progress.value = 0;
       
+      // Stop any other active TTS globally before starting this one
       await stopAll();
 
       ttsState.value = 'loading';
       currentTTSId.value = generateTTSId();
       
-      // Only resolve language if it's not 'auto'. 
-      // We want to pass 'auto' directly to the background dispatcher.
       let language = lang;
       if (lang !== 'auto' && lang !== 'unknown') {
         const { getLanguageCodeForTTS } = await utilsFactory.getI18nUtils();
         language = await getLanguageCodeForTTS(lang) || "en";
       }
       
-      logger.info(`[useTTSSmart] Starting TTS: ${text.length} chars in ${language}`);
-
-      // Clean the text for TTS (e.g., strip markdown, handle dictionary mode)
       const cleanText = SimpleMarkdown.getCleanTranslation(text);
-      
-      logger.debug(`[useTTSSmart] Final TTS text: "${cleanText.trim()}"`);
+      lastText.value = text;
+      lastLanguage.value = lang;
 
-      // The dispatcher in background will handle routing to Google or Edge and language fallbacks
       const message = {
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
@@ -92,26 +123,20 @@ export function useTTSSmart() {
         throw err;
       }
 
+      // If we reach here, Background has successfully started or queued the request
       ttsState.value = 'playing';
-      progress.value = 0;
-
-      startCompletionTimeout();
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'tts:speak');
       } else {
-        logger.error("[useTTSSmart] TTS failed:", error);
+        logger.error("[useTTSSmart] TTS start failed:", error);
       }
       
-      lastText.value = text;
-      lastLanguage.value = lang;
-      currentTTSId.value = null; // Clear ID on error
-      
-      ttsState.value = 'error';
-      errorMessage.value = error.message || 'TTS failed';
-      errorType.value = error.errorType || '';
-      progress.value = 0;
+      handleTTSResult('error', { 
+        error: error.message, 
+        errorType: error.errorType 
+      });
       
       return false;
     } finally {
@@ -119,190 +144,102 @@ export function useTTSSmart() {
     }
   };
 
+  /**
+   * Stops the current instance's TTS request
+   */
   const stop = async () => {
-    if (!canStop.value && ttsState.value !== 'loading') {
-      return true;
-    }
+    if (ttsState.value === 'idle') return true;
 
     try {
       const message = {
         action: MessageActions.TTS_STOP,
         data: { ttsId: currentTTSId.value },
-        context: 'tts-smart',
-        messageId: `tts-stop-${currentTTSId.value || 'all'}`
+        context: 'tts-smart'
       };
       
       await sendMessage(message);
-
-      if (completionTimeout) {
-        clearTimeout(completionTimeout);
-        completionTimeout = null;
-      }
-
-      ttsState.value = 'idle';
-      currentTTSId.value = null;
-      progress.value = 0;
-      errorMessage.value = '';
-      errorType.value = '';
-      
+      handleTTSResult('stopped');
       return true;
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'tts:stop');
-      } else {
-        await ErrorHandler.getInstance().handle(error, {
-          type: ErrorTypes.TTS,
-          context: 'useTTSSmart-stop',
-          showToast: false,
-          showInUI: false
-        });
-      }
-      
-      ttsState.value = 'idle';
-      currentTTSId.value = null;
-      progress.value = 0;
-      errorMessage.value = '';
-      errorType.value = '';
+      logger.error("[useTTSSmart] Stop failed:", error);
+      handleTTSResult('idle');
       return true;
     }
   };
 
+  /**
+   * Stops ALL TTS requests globally
+   */
   const stopAll = async () => {
     try {
       const message = {
         action: MessageActions.TTS_STOP,
         data: {},
-        context: 'tts-smart',
-        messageId: `tts-stop-all-${Date.now()}`
+        context: 'tts-smart'
       };
       
       await sendMessage(message);
-
-      if (completionTimeout) {
-        clearTimeout(completionTimeout);
-        completionTimeout = null;
-      }
-
-      ttsState.value = 'idle';
-      currentTTSId.value = null;
-      progress.value = 0;
-      errorMessage.value = '';
-      isProcessing.value = false;
-
       return true;
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'tts:stop-all');
-      } else {
-        await ErrorHandler.getInstance().handle(error, {
-          type: ErrorTypes.TTS,
-          context: 'useTTSSmart-stopAll',
-          showToast: false,
-          showInUI: false
-        });
-      }
-      
-      if (completionTimeout) {
-        clearTimeout(completionTimeout);
-        completionTimeout = null;
-      }
-      
-      ttsState.value = 'idle';
-      currentTTSId.value = null;
-      progress.value = 0;
-      isProcessing.value = false;
+      logger.debug("[useTTSSmart] Global stop failed (expected if none playing)");
       return true;
     }
   };
 
-  const retry = async () => {
-    if (ttsState.value === 'error' && lastText.value) {
-      ttsState.value = 'idle';
-      errorMessage.value = '';
-      errorType.value = '';
-      
-      logger.info(`[useTTSSmart] Retrying TTS: ${lastText.value.length} chars`);
-      return await speak(lastText.value, lastLanguage.value);
-    }
-    return false;
-  };
-
-  const getErrorType = () => errorType.value;
-
-  const clearError = () => {
-    if (ttsState.value === 'error') {
-      ttsState.value = 'idle';
-      errorMessage.value = '';
-      errorType.value = '';
-      lastText.value = '';
-      lastLanguage.value = 'auto';
-      currentTTSId.value = null;
-      return true;
-    }
-    return false;
-  };
-
-  const getStatus = async () => {
-    try {
-      const message = {
-        action: MessageActions.GOOGLE_TTS_GET_STATUS,
-        data: { ttsId: currentTTSId.value },
-        context: 'tts-smart',
-        messageId: `tts-status-${currentTTSId.value || 'unknown'}`
-      };
-      
-      const response = await sendMessage(message);
-
-      const serverStatus = response?.status || 'idle';
-      
-      // Map 'paused' to 'playing' or 'idle' since we removed 'paused' locally
-      let mappedStatus = serverStatus;
-      if (serverStatus === 'paused') mappedStatus = 'playing';
-
-      if (mappedStatus !== ttsState.value && mappedStatus !== 'error') {
-        ttsState.value = mappedStatus;
-      }
-
-      return { 
-        local: ttsState.value, 
-        server: serverStatus,
-        synced: mappedStatus === ttsState.value 
-      };
-    } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'tts:get-status');
-      } else {
-        logger.error("[useTTSSmart] Failed to get TTS status:", error);
-      }
-      return { local: ttsState.value, server: 'error', synced: false };
-    }
-  };
-
+  /**
+   * Toggle between Speak and Stop
+   */
   const toggle = async (text, lang = "auto") => {
-    switch (ttsState.value) {
-      case 'idle':
-      case 'error':
-        return await speak(text, lang);
-      case 'loading':
-      case 'playing':
-        return await stop();
-      default:
-        logger.warn("[useTTSSmart] Unknown state for toggle:", ttsState.value);
-        return await stop();
+    if (isPlaying.value || isLoading.value) {
+      return await stop();
+    }
+    return await speak(text, lang);
+  };
+
+  /**
+   * Message listener for this specific instance.
+   * Only reacts to events matching the currentTTSId.
+   */
+  const messageListener = (message) => {
+    if (message.action !== MessageActions.GOOGLE_TTS_ENDED) return;
+
+    const status = message.status || message.reason || 'completed';
+    const msgId = message.ttsId;
+
+    // 1. Precise Match: Sync with ID-specific messages
+    if (msgId && msgId === currentTTSId.value) {
+      handleTTSResult(status, message.error ? { error: message.error, errorType: message.errorType } : null);
+    }
+    
+    // 2. Loose Match: If a broadcast arrives with null ID but this instance is waiting/active
+    // This handles cases where ID was lost in background but the failure is still relevant.
+    else if (!msgId && (isPlaying.value || isLoading.value)) {
+      if (status === 'error') {
+        handleTTSResult('error', { error: message.error, errorType: message.errorType });
+      } else {
+        handleTTSResult('interrupted');
+      }
     }
   };
 
-  const isAvailable = () => true;
+  const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+  if (browserAPI?.runtime?.onMessage) {
+    browserAPI.runtime.onMessage.addListener(messageListener);
+  }
+
+  // Cleanup listener when the component using this instance is unmounted
+  onUnmounted(() => {
+    if (browserAPI?.runtime?.onMessage) {
+      browserAPI.runtime.onMessage.removeListener(messageListener);
+    }
+  });
 
   return { 
     speak, 
     stop, 
     stopAll,
-    retry,
     toggle, 
-    getStatus,
-    clearError,
-    getErrorType,
+    clearError: () => handleTTSResult('idle'),
     ttsState,
     currentTTSId,
     errorMessage,
@@ -313,52 +250,7 @@ export function useTTSSmart() {
     canStop,
     isError,
     isPlaying, 
-    isLoading, 
-    isAvailable 
+    isLoading,
+    isAvailable: () => true
   };
-}
-
-let completionTimeout = null;
-
-const startCompletionTimeout = () => {
-  if (completionTimeout) {
-    clearTimeout(completionTimeout);
-  }
-
-  completionTimeout = setTimeout(() => {
-    if (ttsState.value === 'playing') {
-      handleTTSCompletion();
-    }
-    completionTimeout = null;
-  }, 30000);
-};
-
-const handleTTSCompletion = () => {
-  if (ttsState.value === 'playing') {
-    ttsState.value = 'idle';
-    currentTTSId.value = null;
-    progress.value = 100;
-    errorMessage.value = '';
-    errorType.value = '';
-    
-    setTimeout(() => {
-      if (ttsState.value === 'idle') {
-        progress.value = 0;
-      }
-    }, 1000);
-  }
-};
-
-const browserAPI = typeof browser !== "undefined" ? browser : chrome;
-if (browserAPI?.runtime) {
-  browserAPI.runtime.onMessage.addListener((message) => {
-    if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
-      if (completionTimeout) {
-        clearTimeout(completionTimeout);
-        completionTimeout = null;
-      }
-
-      handleTTSCompletion();
-    }
-  });
 }

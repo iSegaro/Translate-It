@@ -57,11 +57,14 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     const isSupported = config.supportedLanguages.has(targetLanguage.split('-')[0].toLowerCase()) || 
                         config.supportedLanguages.has(targetLanguage.toLowerCase());
 
+    const ttsId = message.data?.ttsId || overrideLanguage?.ttsId || null;
+
     if (!isSupported) {
       logger.warn(`[GoogleTTS] Unsupported language: ${targetLanguage}`);
       return {
         success: false,
         error: `Language '${targetLanguage}' is not supported by Google TTS`,
+        errorType: 'ERRORS_NOT_SUPPORTED',
         unsupportedLanguage: true
       };
     }
@@ -82,7 +85,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     // 5. Set Shared State
     ttsStateManager.lastTTSText = text;
     ttsStateManager.lastTTSLanguage = targetLanguage;
-    ttsStateManager.currentTTSId = message.data?.ttsId || null;
+    ttsStateManager.currentTTSId = ttsId;
     ttsStateManager.currentTTSSender = sender;
     
     ttsStateManager.currentTTSRequest = (async () => {

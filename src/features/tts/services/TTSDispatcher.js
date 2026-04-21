@@ -10,12 +10,17 @@ import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js'
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import storageCore from '@/shared/storage/core/StorageCore.js';
 
+import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSDispatcher');
 
 export class TTSDispatcher {
   static async dispatchTTSRequest(message, sender) {
     try {
-      const { text, language } = message.data || {};
+      const { text, language, ttsId } = message.data || {};
+      
+      // Update state manager with the current ID so it knows what to notify
+      ttsStateManager.currentTTSId = ttsId;
 
       // 1. Get user settings using StorageCore
       const settings = await storageCore.get({
@@ -37,6 +42,7 @@ export class TTSDispatcher {
       let targetLanguage = language;
 
       // 2. Proactive Language Detection (Context-aware)
+      // ... (rest of detection logic)
       if (isExplicitAuto || globalAutoDetectEnabled) {
         const detected = await LanguageDetectionService.detect(text);
         
@@ -93,11 +99,15 @@ export class TTSDispatcher {
           resolution.engine = otherEngine;
         } else {
           // Both engines blocked!
-          return { success: false, error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+          const errorInfo = { error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+          await ttsStateManager.notifyTTSEnded('error', errorInfo);
+          return { success: false, ...errorInfo };
         }
       } else if (!isEngineAllowed) {
         // Primary engine blocked and fallback is disabled
-        return { success: false, error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+        const errorInfo = { error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
+        await ttsStateManager.notifyTTSEnded('error', errorInfo);
+        return { success: false, ...errorInfo };
       }
 
       logger.info(`[TTSDispatcher] Final dispatch: engine=${resolution.engine}, lang=${resolution.language}`);
@@ -145,9 +155,18 @@ export class TTSDispatcher {
         throw new Error(`Unsupported TTS engine: ${resolution.engine}`);
       }
 
+      // If finally it failed, notify listeners
+      if (response && !response.success) {
+        await ttsStateManager.notifyTTSEnded('error', { 
+          error: response.error, 
+          errorType: response.errorType 
+        });
+      }
+
       return response;
     } catch (error) {
       logger.error('[TTSDispatcher] Dispatch critical failure:', error);
+      await ttsStateManager.notifyTTSEnded('error', { error: error.message });
       return { success: false, error: error.message };
     }
   }

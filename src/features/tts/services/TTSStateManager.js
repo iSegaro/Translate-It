@@ -106,9 +106,59 @@ class TTSStateManager {
   }
 
   /**
+   * Broadcast TTS status to relevant extension contexts.
+   * This uses a "Targeted Broadcast" approach:
+   * 1. If initiated from a tab, only that tab receives the message (all frames/Shadow DOM).
+   * 2. All internal contexts (popup, sidepanel) receive the message for global sync.
+   * 
+   * @param {string} status - The new TTS status ('idle', 'playing', 'error', etc.)
+   * @param {Object} data - Additional data to include in the broadcast
+   */
+  async broadcastStatus(status, data = {}) {
+    try {
+      const browserAPI = await initializebrowserAPI();
+      const message = {
+        action: MessageActions.GOOGLE_TTS_ENDED, // Use ENDED as the primary status update action
+        source: 'background',
+        status: status, // 'completed', 'error', 'stopped', 'interrupted'
+        ttsId: this.currentTTSId,
+        ...data
+      };
+
+      // 1. Targeted Tab Broadcast: Only send to the originating tab
+      // This ensures all frames and Shadow DOM in THAT tab are updated.
+      if (this.currentTTSSender?.tab?.id) {
+        try {
+          // Sending to tabId without frameId ensures ALL frames in that tab receive it
+          await browserAPI.tabs.sendMessage(this.currentTTSSender.tab.id, message);
+          logger.debug(`Targeted broadcast sent to tab: ${this.currentTTSSender.tab.id}`);
+        } catch (err) {
+          logger.debug('Targeted tab broadcast failed (tab might be closed):', err.message);
+        }
+      }
+
+      // 2. Internal Context Broadcast: Always notify popup and sidepanel
+      // This is efficient and keeps extension-wide UI in sync.
+      await browserAPI.runtime.sendMessage(message).catch(() => {});
+      
+      logger.debug(`Broadcasted TTS status: ${status} for ID: ${this.currentTTSId}`);
+    } catch (err) {
+      logger.debug('Broadcast failed:', err.message);
+    }
+  }
+
+  /**
    * Notify the requester that TTS has ended
    */
-  async notifyTTSEnded(reason = 'completed') {
+  async notifyTTSEnded(reason = 'completed', errorData = null) {
+    const status = reason === 'error' ? 'error' : 'idle';
+    
+    // Always broadcast status for independent UI updates
+    await this.broadcastStatus(status, { 
+      reason, 
+      ...(errorData || {}) 
+    });
+
     if (!this.currentTTSSender) return;
 
     try {
@@ -117,10 +167,12 @@ class TTSStateManager {
         action: MessageActions.GOOGLE_TTS_ENDED,
         source: 'background',
         reason: reason,
-        ttsId: this.currentTTSId
+        status: status,
+        ttsId: this.currentTTSId,
+        ...(errorData || {})
       };
 
-      if (this.currentTTSSender.tab?.id) {
+      if (this.currentTTSSender?.tab?.id) {
         // Send to the specific tab and frame that requested it
         const options = {};
         if (this.currentTTSSender.frameId !== undefined) {
@@ -132,7 +184,7 @@ class TTSStateManager {
         await browserAPI.runtime.sendMessage({
           ...message,
           targetContext: 'popup-sidepanel'
-        });
+        }).catch(() => {});
       }
       logger.debug(`Notified sender of TTS ${reason}`);
     } catch (err) {
