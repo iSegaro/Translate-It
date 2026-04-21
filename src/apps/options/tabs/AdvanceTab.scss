@@ -100,23 +100,34 @@
   .proxy-connection, 
   .proxy-auth {
     display: flex;
-    gap: $spacing-base;
+    flex-wrap: wrap;
+    gap: $spacing-lg;
     margin-bottom: $spacing-md;
+    margin-inline-start: 28px;
 
     .proxy-input-group {
       flex: 1;
       display: flex;
-      flex-direction: column;
-      gap: $spacing-xs;
+      flex-direction: row;
+      align-items: center;
+      gap: $spacing-sm;
+      min-width: 200px;
 
       .setting-label {
-        font-size: $font-size-xs;
-        color: var(--color-text-secondary);
+        font-size: $font-size-sm;
+        color: var(--color-text);
+        white-space: nowrap;
+        min-width: 80px;
+      }
+
+      .proxy-input {
+        flex: 1;
       }
     }
 
     .proxy-port {
-      max-width: 100px;
+      max-width: 140px;
+      min-width: 100px;
     }
   }
 
