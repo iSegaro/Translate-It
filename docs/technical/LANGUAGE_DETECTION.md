@@ -2,43 +2,55 @@
 
 ## Overview
 
-The **Language Detection System** is a centralized, high-precision architecture designed to identify the language of any text across the extension (Translation, TTS, and UI Swapping). It uses a hybrid approach that combines deterministic script analysis with statistical models, dynamically adjusting its strategy based on text length and project-wide language constants.
+The **Language Detection System** is a centralized, high-precision architecture designed to identify the language of any text across the extension. It follows a **"Detection Inheritance"** philosophy, where detection results from powerful translation providers (Google, DeepL, Edge, etc.) are captured and reused across the system to eliminate redundant processing and maximize accuracy.
 
-**Architecture Status**: Unified & Production Ready  
-**Single Source of Truth**: `LanguageDetectionService.js`  
-**Key Metrics**: 100% deterministic for unique script markers, trust-filtered for short strings.
+**Single Source of Truth**: `LanguageDetectionService.js`
 
 ---
 
 ## 🏗 Architecture & Flow
 
-The system follows a **Dynamic Three-Layer Flow** that reorders itself based on the input length to maximize accuracy.
+The system follows a **Hierarchical Priority Flow**. Before invoking internal detection layers, it checks for inherited metadata.
 
 ### Dynamic Flow Diagram
 ```
-       [ Input Text ]
-             │
-             ▼
-      [ Length Check ] ─── (Threshold: 60 chars) ───┐
-             │                                      │
-      ▼ (Short Text)                         ▼ (Long Text)
-┌──────────────────────────┐           ┌──────────────────────────┐
-│ 1. Deterministic Layer   │           │ 1. Statistical Layer     │
-│    (Unique Markers)      │           │    (Browser i18n API)    │
-└─────────────┬────────────┘           └─────────────┬────────────┘
-              │                                     │
-┌─────────────▼────────────┐           ┌─────────────▼────────────┐
-│ 2. Statistical Layer     │           │ 2. Deterministic Layer   │
-│    (Browser i18n API)    │           │    (Unique Markers)      │
-└─────────────┬────────────┘           └─────────────┬────────────┘
-              │                                     │
-              └───────────────┬─────────────────────┘
-                              ▼
-                ┌──────────────────────────┐
-                │ 3. Heuristic Layer       │
-                │    (User Prefs / Defaults)│
-                └──────────────────────────┘
+           [ Input Text ]
+                 │
+                 ▼
+    ┌──────────────────────────┐
+    │ Layer 0: Inherited?      │─── (Yes) ──▶ [ Use Inherited Lang ]
+    │ (AuthSource Metadata)    │
+    └────────────┬─────────────┘
+                 │
+                (No)
+                 │
+                 ▼
+          [ Length Check ] ─── (Threshold: 60 chars) ───┐
+                 │                                      │
+          ▼ (Short Text)                         ▼ (Long Text)
+    ┌──────────────────────────┐           ┌──────────────────────────┐
+    │ 1. Deterministic Layer   │           │ 1. Statistical Layer     │
+    │    (Unique Markers)      │           │    (Browser i18n API)    │
+    └─────────────┬────────────┘           └─────────────┬────────────┘
+                  │                                     │
+    ┌─────────────▼────────────┐           ┌─────────────▼────────────┐
+    │ 2. Statistical Layer     │           │ 2. Deterministic Layer   │
+    │    (Browser i18n API)    │           │    (Unique Markers)      │
+    └─────────────┬────────────┘           └─────────────┬────────────┘
+                  │                                     │
+                  └───────────────┬─────────────────────┘
+                                  ▼
+                    ┌──────────────────────────┐
+                    │ 3. Heuristic Layer       │
+                    │    (User Prefs / Defaults)│
+                    └──────────────────────────┘
 ```
+
+### Priority Hierarchy
+1.  **Layer 0: Inherited Detection (AuthSource)**: If the text was just processed by a translation provider, its detected language is passed through the messaging chain. This is the **most authoritative** source.
+2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
+3.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
+4.  **Layer 3: Heuristic Layer**: Fallbacks based on user preferences and script defaults.
 
 ---
 

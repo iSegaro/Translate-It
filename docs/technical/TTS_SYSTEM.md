@@ -88,11 +88,13 @@ Handles the dynamic aspects of Microsoft Edge voices:
 
 ## Smart Language Detection & Voice Selection
 
-### Multi-tiered Detection
-The system uses a tiered strategy (`_detectLanguage`) for language identification:
-1.  **Script Markers**: Unambiguous detection for languages like Persian (`پ چ ژ گ`), Arabic (`ة`), or Japanese (`Hiragana`).
-2.  **Encoding Check**: Differentiates between identical looking characters (e.g., Persian `ی` vs Arabic `ي`).
-3.  **Script Validation**: Cross-checks Browser API results against character sets to prevent false positives on short strings.
+### Detection Inheritance (Optimization)
+To minimize latency and prevent "Short Text Detection" warnings, the TTS system prioritizes inherited detection data:
+1.  **Inheritance Bypass**: If the UI component (e.g., `TTSButton`) provides an explicit `sourceLanguage` (inherited from a previous translation), the `TTSDispatcher` **bypasses** all internal detection logic.
+2.  **Reset-on-Change Safety**: The system implements a "Reset-on-Change" rule. If the source text is modified in the UI, the inherited language is reset to `auto`, forcing a fresh detection to prevent stale voice selection.
+
+### Internal Multi-tiered Detection (Fallback)
+If no inherited language is available, the system uses its tiered strategy (`_detectLanguage`):
 
 ### Dialect Matching Logic
 When searching for a voice, the system follows this priority:
