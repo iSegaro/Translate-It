@@ -93,13 +93,11 @@ export function useUnifiedTranslation(context = 'popup') {
     }
   });
 
-  // Reset translation state when source text changes to ensure fresh detection for TTS
+  // Reset lastTranslation when source text changes to ensure fresh detection for TTS
+  // We keep translatedText as-is to prevent immediate UI clearing (better UX)
   watch(sourceText, (newVal, oldVal) => {
     if (newVal !== oldVal) {
       lastTranslation.value = null;
-      if (translatedText.value) {
-        translatedText.value = "";
-      }
     }
   });
 
