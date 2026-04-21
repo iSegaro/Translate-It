@@ -18,6 +18,7 @@
 </template>
 
 <script setup>
+import './BaseCheckbox.scss'
 defineProps({
   modelValue: {
     type: Boolean,

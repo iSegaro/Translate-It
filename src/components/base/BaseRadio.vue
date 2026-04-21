@@ -20,6 +20,7 @@
 </template>
 
 <script setup>
+import './BaseRadio.scss'
 defineProps({
   modelValue: {
     type: [String, Number, Boolean],

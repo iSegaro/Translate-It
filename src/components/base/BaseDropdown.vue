@@ -44,6 +44,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import './BaseDropdown.scss'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 const props = defineProps({

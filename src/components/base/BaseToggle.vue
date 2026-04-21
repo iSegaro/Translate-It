@@ -15,6 +15,7 @@
 </template>
 
 <script setup>
+import './BaseToggle.scss'
 defineProps({
   modelValue: {
     type: Boolean,

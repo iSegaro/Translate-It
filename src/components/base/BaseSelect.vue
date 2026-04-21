@@ -17,6 +17,7 @@
 </template>
 
 <script setup>
+import './BaseSelect.scss'
 defineOptions({
   inheritAttrs: false
 })
