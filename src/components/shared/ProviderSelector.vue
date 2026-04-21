@@ -802,10 +802,13 @@ const toggleDropdown = () => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
         const isFloatingWindow = selectorRef.value.closest('.ti-window');
-        const container = selectorRef.value.closest('.ti-m-sheet-content, .ti-window-body');
         
-        // For floating windows, we ignore the window boundary and use the viewport
-        // This allows the dropdown to "pop out" of the window
+        // Mobile-specific sheet container detection
+        const mobileContainer = selectorRef.value.closest('.ti-m-sheet-content');
+        const sidepanelContainer = selectorRef.value.closest('.ti-sidepanel-container');
+        const container = mobileContainer || sidepanelContainer || selectorRef.value.closest('.ti-window-body');
+        
+        // For floating windows or when outside a specific container, use viewport
         const useViewport = !container || isFloatingWindow;
         const containerRect = useViewport 
           ? { top: 0, bottom: window.innerHeight } 
@@ -816,9 +819,12 @@ const toggleDropdown = () => {
         
         const isOptionsPage = window.location.href.includes('options.html');
 
-        if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
+        if (props.mode === 'mobile') {
+          // On mobile, downward is almost always preferred to avoid sheet header clipping
+          // Only go upward if space below is less than 220px and space above is significant
+          isUpward.value = spaceBelow < 220 && spaceAbove > spaceBelow;
+        } else if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
           // For floating windows, prioritize downward unless space is very tight
-          // But if we flip, ensure we have a decent threshold
           const flipThreshold = isFloatingWindow ? 180 : 250;
           isUpward.value = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
         } else {
@@ -826,14 +832,14 @@ const toggleDropdown = () => {
         }
 
         const availableHeight = isUpward.value 
-          ? spaceAbove - 40 // More margin for upward menus
-          : spaceBelow - 40;
+          ? spaceAbove - 20
+          : spaceBelow - 20;
         
-        // Large limit for desktop floating windows
-        const maxLimit = isFloatingWindow ? 650 : (props.isGlobal ? 400 : 550);
+        // Large limit for desktop floating windows, smaller for mobile
+        const maxLimit = isFloatingWindow ? 650 : (props.mode === 'mobile' ? 350 : (props.isGlobal ? 400 : 550));
         
         // Final height calculation
-        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(300, availableHeight))}px`;
+        dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(250, availableHeight))}px`;
       }
       scrollToFocused();
     });

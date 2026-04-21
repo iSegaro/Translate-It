@@ -283,7 +283,54 @@ img.ti-dropdown-arrow,
   }
 }
 
-/* 7. Final Polish for Popup */
+/* 7. Mobile Mode (Bottom Sheets) */
+.ti-provider-mobile-container {
+  position: relative !important;
+  width: 100% !important;
+
+  .ti-provider-mobile-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    padding: 0 12px !important;
+    background: var(--color-background) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: 12px !important;
+    color: var(--color-text) !important;
+    width: 100% !important;
+    height: 46px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+
+    &:active { background-color: var(--color-surface) !important; }
+
+    .ti-api-provider-icon { width: 18px !important; height: 18px !important; flex-shrink: 0 !important; }
+    
+    span { 
+      flex: 1 !important; 
+      text-align: left !important; 
+      font-size: 14px !important; 
+      font-weight: 600 !important;
+      white-space: nowrap !important; 
+      overflow: hidden !important; 
+      text-overflow: ellipsis !important; 
+    }
+
+    .dropdown-arrow { flex-shrink: 0 !important; margin-left: auto !important; }
+  }
+
+  .ti-provider-dropdown-menu {
+    width: 100% !important;
+    min-width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* 8. Final Polish for Popup */
 :global(.popup-wrapper) {
   .ti-split-translate-button { height: 28px !important; }
   .ti-translate-main-area span { font-size: 12px !important; }
