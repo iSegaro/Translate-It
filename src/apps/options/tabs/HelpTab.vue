@@ -4,65 +4,45 @@
     <div class="settings-container">
       <h2>{{ t('help_section_title') || 'Help & Documentation' }}</h2>
       
-      <div class="accordion">
-      <!-- Shortcut Help Section -->
-      <div class="accordion-item">
-        <button 
-          class="accordion-header"
-          :class="{ active: openAccordion === 'shortcut' }"
-          @click="toggleAccordion('shortcut')"
+      <div class="accordion-group">
+        <!-- Shortcut Help Section -->
+        <BaseAccordion
+          :is-open="openAccordion === 'shortcut'"
+          @toggle="toggleAccordion('shortcut')"
         >
-          <span>{{ t('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
-          <div 
-            class="accordion-icon-wrapper"
-            :class="{ active: openAccordion === 'shortcut' }"
-          >
-            <span class="accordion-icon">+</span>
-          </div>
-        </button>
-        <div 
-          class="accordion-content"
-          :class="{ open: openAccordion === 'shortcut' }"
+          <template #header>
+            <span>{{ t('help_shortcut_title') || 'Keyboard Shortcuts & Usage' }}</span>
+          </template>
+          <template #content>
+            <div class="accordion-inner">
+              <!-- Safe: Content is sanitized with DOMPurify -->
+              <div
+                class="markdown-content"
+                v-html="sanitizedShortcutHelp"
+              />
+            </div>
+          </template>
+        </BaseAccordion>
+        
+        <!-- API Keys Help Section -->
+        <BaseAccordion
+          :is-open="openAccordion === 'apiKeys'"
+          @toggle="toggleAccordion('apiKeys')"
         >
-          <div class="accordion-inner">
-            <!-- Safe: Content is sanitized with DOMPurify -->
-            <div
-              class="markdown-content"
-              v-html="sanitizedShortcutHelp"
-            />
-          </div>
-        </div>
+          <template #header>
+            <span>{{ t('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
+          </template>
+          <template #content>
+            <div class="accordion-inner">
+              <!-- Safe: Content is sanitized with DOMPurify -->
+              <div
+                class="markdown-content"
+                v-html="sanitizedApiKeysHelp"
+              />
+            </div>
+          </template>
+        </BaseAccordion>
       </div>
-      
-      <!-- API Keys Help Section -->
-      <div class="accordion-item">
-        <button 
-          class="accordion-header"
-          :class="{ active: openAccordion === 'apiKeys' }"
-          @click="toggleAccordion('apiKeys')"
-        >
-          <span>{{ t('help_api_keys_title') || 'API Keys & Translation Providers' }}</span>
-          <div 
-            class="accordion-icon-wrapper"
-            :class="{ active: openAccordion === 'apiKeys' }"
-          >
-            <span class="accordion-icon">+</span>
-          </div>
-        </button>
-        <div 
-          class="accordion-content"
-          :class="{ open: openAccordion === 'apiKeys' }"
-        >
-          <div class="accordion-inner">
-            <!-- Safe: Content is sanitized with DOMPurify -->
-            <div
-              class="markdown-content"
-              v-html="sanitizedApiKeysHelp"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
     </div>
     </section>
     </template>
@@ -70,6 +50,7 @@
 import './HelpTab.scss'
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BaseAccordion from '@/components/base/BaseAccordion.vue'
 import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
 import DOMPurify from 'dompurify'
 import { getScopedLogger } from '@/shared/logging/logger.js'

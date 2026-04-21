@@ -10,69 +10,28 @@
     margin-bottom: $spacing-xl;
   }
 
-  .accordion {
+  .accordion-group {
     display: flex;
     flex-direction: column;
     gap: $spacing-md;
 
-    .accordion-item {
+    // Standard accordion overrides if needed
+    :deep(.base-accordion) {
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: $border-radius-base;
       overflow: hidden;
-      transition: all $transition-base;
+      transition: border-color $transition-base;
 
       &:hover {
         border-color: var(--color-text-secondary);
       }
     }
+  }
 
-    .accordion-header {
-      width: 100%;
-      padding: $spacing-md $spacing-lg;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: $font-size-base;
-      font-weight: $font-weight-medium;
-      color: var(--color-text);
-      transition: all $transition-base;
-
-      &.active {
-        background-color: var(--color-background-alt);
-        color: var(--color-primary);
-      }
-
-      .accordion-icon-wrapper {
-        font-size: 20px;
-        transition: transform 0.3s ease;
-        line-height: 1;
-
-        &.active {
-          transform: rotate(45deg);
-          color: var(--color-primary);
-        }
-      }
-    }
-
-    .accordion-content {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out, padding 0.3s ease;
-      background-color: var(--color-surface);
-
-      &.open {
-        max-height: 2000px; // Large enough for content
-        border-top: 1px solid var(--color-border-light);
-      }
-    }
-
-    .accordion-inner {
-      padding: $spacing-lg;
-    }
+  .accordion-inner {
+    padding: $spacing-lg;
+    background-color: var(--color-surface);
   }
 
   .markdown-content {
