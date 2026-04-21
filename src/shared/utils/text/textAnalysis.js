@@ -235,3 +235,43 @@ export const detectDevanagariScriptLanguage = (text, preferences = {}, options =
   // 3. Final Default
   return 'hi';
 };
+
+/**
+ * Detect language for Latin script text using unique character markers (Diacritics)
+ * Highly reliable for short strings containing these specific characters.
+ * 
+ * @param {string} text - Text to analyze
+ * @returns {string|null} Language code or null
+ */
+export const detectLatinScriptLanguage = (text) => {
+  if (!text || typeof text !== 'string') return null;
+  const sample = text.trim();
+
+  // German: ä, ö, ü, ß
+  if (/[ßäöüÄÖÜ]/.test(sample)) return 'de';
+  
+  // Spanish: ñ, inverted punctuation, specific accents
+  if (/[ñÁÉÍÓÚáéíóú¿¡]/.test(sample)) return 'es';
+  
+  // French / Standard Latin variants
+  // Checks for circumflex and other markers
+  if (/[êëîïûàâôçÊËÎÏÛÀÂÔÇ]/.test(sample)) {
+    // Turkish overlap check (Turkish uses ç but also specific markers)
+    if (/[ığşİ]/.test(sample)) return 'tr';
+    return 'fr'; 
+  }
+  
+  // Portuguese: tilde nasal vowels
+  if (/[ãõÃÕ]/.test(sample)) return 'pt';
+  
+  // Italian: grave accents on vowels (common at end of words)
+  if (/[ìòùÈÉÌÒÙ]/.test(sample)) return 'it';
+  
+  // Nordic languages
+  if (/[åøæÅØÆ]/.test(sample)) return 'no';
+  
+  // Cyrillic (Russian)
+  if (/[а-яё]/i.test(sample)) return 'ru';
+
+  return null;
+};

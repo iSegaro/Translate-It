@@ -3,6 +3,7 @@ import {
   detectArabicScriptLanguage, 
   detectChineseScriptLanguage, 
   detectDevanagariScriptLanguage,
+  detectLatinScriptLanguage,
   isArabicScriptText,
   isChineseScriptText,
   ARABIC_SCRIPT_LANGUAGES,
@@ -56,19 +57,13 @@ export class LanguageDetectionService {
         const devanagari = detectDevanagariScriptLanguage(sample, preferences, { useDefaults: false });
         if (devanagari) return devanagari;
 
+        // Latin & Cyrillic Script markers (Enhanced European support)
+        const latinVariant = detectLatinScriptLanguage(sample);
+        if (latinVariant) return latinVariant;
+
         // Japanese/Korean specific ranges
         if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
         if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
-
-        // Unique Latin markers (Useful for short strings)
-        if (/[ß]/.test(sample)) return 'de'; // German unique
-        if (/[ñ]/.test(sample)) return 'es'; // Spanish unique
-        if (/[ç]/.test(sample)) {
-          if (/[ığşİ]/i.test(sample)) return 'tr'; // Turkish markers
-          return 'fr'; // Fallback to French for ç
-        }
-        if (/[åøæ]/.test(sample)) return 'no'; // Nordic languages
-        if (/[а-яё]/i.test(sample)) return 'ru'; // Cyrillic/Russian
 
         return null;
       };
