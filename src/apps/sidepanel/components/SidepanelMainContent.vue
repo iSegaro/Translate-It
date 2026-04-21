@@ -87,7 +87,7 @@
         v-model="sourceText"
         :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Type Here')"
         :language="currentSourceLanguage"
-        :source-language="detectedSourceLanguage"
+        :detected-source-language="detectedSourceLanguage"
         :rows="6"
         :tabindex="1"
         :copy-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"

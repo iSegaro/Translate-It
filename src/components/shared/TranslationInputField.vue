@@ -6,7 +6,7 @@
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
       :text="modelValue"
-      :language="sourceLanguage"
+      :language="detectedSourceLanguage || language"
       mode="input"
       :show-copy="true"
       :show-tts="true"
@@ -97,10 +97,10 @@ const props = defineProps({
     type: String,
     default: 'Paste'
   },
-  // Language for TTS
-  sourceLanguage: {
+  // Language for TTS (inherited from translation)
+  detectedSourceLanguage: {
     type: String,
-    default: 'auto'
+    default: undefined
   },
   // Auto-translate on paste
   autoTranslateOnPaste: {

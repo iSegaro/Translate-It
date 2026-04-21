@@ -9,7 +9,7 @@
       v-model="sourceText"
       :placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
       :language="currentSourceLanguage"
-      :source-language="detectedSourceLanguage"
+      :detected-source-language="detectedSourceLanguage"
       :rows="2"
       :tabindex="1"
       :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
