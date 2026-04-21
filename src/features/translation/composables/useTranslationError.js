@@ -56,13 +56,19 @@ export function useTranslationError(context = 'unknown') {
       clearError()
       return
     }
+
+    // Identify and ignore user cancellation errors
+    const errorTypeValue = matchErrorToType(error)
+    if (errorTypeValue === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+      logger.debug(`[${context}] Silently ignoring user cancellation error`);
+      return;
+    }
     
     try {
       logger.debug(`[${context}] Handling translation error:`, error)
       
       // Get error information
       const errorInfo = await getErrorForDisplay(error, context)
-      const errorTypeValue = matchErrorToType(error)
       const strategy = getErrorDisplayStrategy(context, errorTypeValue)
       
       // Update error state

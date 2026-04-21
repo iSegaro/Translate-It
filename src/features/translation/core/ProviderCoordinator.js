@@ -10,7 +10,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
@@ -132,7 +133,14 @@ export class ProviderCoordinator {
 
       return finalResult;
     } catch (error) {
-      logger.error(`[Coordinator] Execution failed for ${providerName}:`, error.message);
+      const errorType = matchErrorToType(error);
+      
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
+      } else {
+        logger.error(`[Coordinator] Execution failed for ${providerName}:`, error.message);
+      }
+
       if (isFatalError(error)) throw error;
       return Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
     }
