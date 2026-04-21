@@ -26,7 +26,6 @@
       class="ti-loading-overlay"
     >
       <LoadingSpinner
-        type="animated"
         size="lg"
       />
     </div>

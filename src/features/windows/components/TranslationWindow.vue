@@ -13,7 +13,6 @@
     @click.stop
   >
     <LoadingSpinner
-      :type="'animated'"
       size="lg"
       class="ti-loading-spinner-wrapper"
     />

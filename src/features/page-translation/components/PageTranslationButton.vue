@@ -96,7 +96,6 @@
           <LoadingSpinner
             v-if="isTranslating || isAutoTranslating"
             size="sm"
-            variant="neutral"
           />
           <PageTranslationStatus 
             :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"

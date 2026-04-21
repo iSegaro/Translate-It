@@ -8,7 +8,6 @@
     <LoadingSpinner
       v-if="loading"
       size="xs"
-      :variant="variant === 'primary' ? 'neutral' : 'primary'"
     />
     
     <span
