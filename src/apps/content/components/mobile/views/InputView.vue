@@ -95,15 +95,18 @@
             mode="mobile"
             :is-global="false"
             :show-sync="false"
+            :loading="isLoading"
+            @cancel="handleCancel"
           />
         </div>
         
         <button 
-          :disabled="isTranslateDisabled"
+          :disabled="isTranslateDisabled && !isLoading"
           class="ti-m-translate-main-btn"
-          @click="handleTranslate"
+          :class="{ 'ti-m-stop-btn': isLoading }"
+          @click="isLoading ? handleCancel() : handleTranslate()"
         >
-          {{ t('mobile_input_translate_btn') || 'Translate' }}
+          {{ isLoading ? (t('popup_stop_button_text') || 'توقف') : (t('mobile_input_translate_btn') || 'ترجمه') }}
         </button>
       </div>
     </div>
@@ -171,6 +174,7 @@ const sourceLang = ref(mobileStore.selectionData.sourceLang || settingsStore.set
 const targetLang = ref(mobileStore.selectionData.targetLang || settingsStore.settings.TARGET_LANGUAGE || 'fa')
 const currentProvider = ref(settingsStore.settings.TRANSLATION_API || 'google')
 const isLoading = ref(false)
+const currentMessageId = ref(null)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
 const isError = ref(!!mobileStore.selectionData.error)
 
@@ -218,17 +222,29 @@ const handleTranslate = async () => {
   isLoading.value = true
   isError.value = false
   
+  // Generate a unique message ID for this request
+  currentMessageId.value = `mobile-input-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
   logger.info('Manual translation requested', { 
     sourceLang: sourceLang.value, 
     targetLang: targetLang.value,
     provider: currentProvider.value,
-    textLength: inputText.value.length 
+    messageId: currentMessageId.value
   });
 
   try {
-    const payload = { text: inputText.value, sourceLanguage: sourceLang.value, targetLanguage: targetLang.value, provider: currentProvider.value, mode: TranslationMode.Mobile_Translate };
+    const payload = { 
+      text: inputText.value, 
+      sourceLanguage: sourceLang.value, 
+      targetLanguage: targetLang.value, 
+      provider: currentProvider.value, 
+      mode: TranslationMode.Mobile_Translate,
+      messageId: currentMessageId.value
+    };
+    
     const message = createMessage(MessageActions.TRANSLATE, payload);
     const response = await sendMessage(message);
+    
     if (response && response.success) {
       const translated = response.translatedText || (response.data && response.data.translatedText) || (response.result && response.result.translatedText);
       if (translated) {
@@ -239,14 +255,26 @@ const handleTranslate = async () => {
         resultText.value = t('mobile_input_no_result_error') || "No translation found.";
       }
     } else {
+      // Check if it was cancelled
+      const errorMsg = response?.error || "Translation failed.";
+      if (errorMsg.includes('cancelled') || response?.type === 'USER_CANCELLED') {
+        logger.debug('Manual translation cancelled by user');
+        return;
+      }
+
       isError.value = true;
-      const errorInfo = await getErrorForDisplay(response?.error || "Translation failed.", 'mobile-input');
+      const errorInfo = await getErrorForDisplay(errorMsg, 'mobile-input');
       logger.error('Manual translation failed', { error: errorInfo.message });
       resultText.value = errorInfo.message;
     }
   } catch (error) {
+    // Check for cancellation in exception too
+    if (error.message?.includes('cancelled') || error.type === 'USER_CANCELLED') {
+      logger.debug('Manual translation exception: cancelled');
+      return;
+    }
+
     if (ExtensionContextManager.isContextError(error)) {
-      // Close dashboard to make toast visible
       mobileStore.closeSheet();
       ExtensionContextManager.handleContextError(error, 'mobile-input:translate');
       resultText.value = t('mobile_input_context_error') || "Extension context unavailable. Please refresh the page.";
@@ -256,7 +284,25 @@ const handleTranslate = async () => {
       logger.error('Manual translation exception', { error: errorInfo.message });
       resultText.value = errorInfo.message;
     }
-  } finally { isLoading.value = false; }
+  } finally { 
+    isLoading.value = false;
+    currentMessageId.value = null;
+  }
+}
+
+const handleCancel = async () => {
+  if (!currentMessageId.value) return;
+  
+  logger.info('Cancelling manual translation:', currentMessageId.value);
+  
+  try {
+    const cancelMessage = createMessage(MessageActions.CANCEL_TRANSLATION, {
+      messageId: currentMessageId.value
+    });
+    await sendMessage(cancelMessage);
+  } catch (error) {
+    logger.error('Failed to send cancel message:', error);
+  }
 }
 
 const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message') || 'Copied', type: 'success' }) }
