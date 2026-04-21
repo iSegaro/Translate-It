@@ -40,18 +40,22 @@
 
 .whole-page-trigger-group {
   margin-top: $spacing-md !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 
   .trigger-modes-container, .delay-setting-container {
     display: flex !important;
+    flex-wrap: wrap !important; // اجازه شکستن خط در صورت کمبود جا
     align-items: center !important;
-    gap: $spacing-md !important;
+    gap: $spacing-sm $spacing-md !important;
     margin-bottom: $spacing-sm !important;
+    width: 100% !important;
     
     .trigger-label, .delay-label {
       font-size: $font-size-sm !important;
       font-weight: 500 !important;
       color: var(--color-text) !important;
-      min-width: 160px !important;
+      flex: 0 1 160px !important; // تغییر از min-width به flex برای انعطاف بیشتر
       transition: opacity 0.2s ease !important;
 
       &.is-disabled {
@@ -61,8 +65,9 @@
     
     .radio-group-horizontal {
       display: flex !important;
+      flex-wrap: wrap !important; // اجازه شکستن گزینه‌های رادیویی
       align-items: center !important;
-      gap: $spacing-xl !important;
+      gap: $spacing-md $spacing-xl !important;
     }
   }
 
@@ -140,7 +145,8 @@
     display: flex !important;
     align-items: center !important;
     gap: $spacing-sm !important;
-    width: 280px !important;
+    width: 100% !important;
+    max-width: 220px !important;
 
     .mode-provider-label {
       font-size: $font-size-xs !important;

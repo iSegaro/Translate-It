@@ -58,8 +58,9 @@
 /* 2. Regular Button Mode (Used in Tabs/Options) */
 .ti-provider-button-container {
   position: relative !important;
-  width: 250px !important;
-  flex-shrink: 0 !important;
+  width: 100% !important;
+  max-width: 250px !important;
+  flex-shrink: 1 !important;
 
   /* Button mode (Options Tabs) always opens to the left to avoid overflow */
   .ti-provider-dropdown-menu {
