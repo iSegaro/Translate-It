@@ -1,10 +1,10 @@
 <template>
-  <div>
+  <div class="deepseek-settings">
     <h3>{{ t('deepseek_api_settings_title') || 'DeepSeek API Settings' }}</h3>
-    <div class="setting-group api-key-info">
-      <span class="setting-description">
+    <div class="setting-group vertical api-key-info">
+      <p class="setting-description">
         {{ t('deepseek_api_key_info') || 'Get your DeepSeek API key from' }}
-      </span>
+      </p>
       <a
         class="api-link"
         href="https://platform.deepseek.com/api-keys"
@@ -23,7 +23,7 @@
       :test-result="testResult"
       @test="testKeys"
     />
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="deepseekApiModel"
@@ -34,7 +34,7 @@
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
-      class="setting-group"
+      class="setting-group vertical"
     >
       <label>{{ t('deepseek_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput

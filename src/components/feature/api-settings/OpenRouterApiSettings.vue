@@ -1,10 +1,10 @@
 <template>
-  <div>
+  <div class="openrouter-settings">
     <h3>{{ t('openrouter_api_settings_title') || 'OpenRouter API Settings' }}</h3>
-    <div class="setting-group api-key-info">
-      <span class="setting-description">
+    <div class="setting-group vertical api-key-info">
+      <p class="setting-description">
         {{ t('openrouter_api_key_info') || 'Get your OpenRouter API key from' }}
-      </span>
+      </p>
       <a
         class="api-link"
         href="https://openrouter.ai/settings/keys"
@@ -23,7 +23,7 @@
       :test-result="testResult"
       @test="testKeys"
     />
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="openrouterApiModel"
@@ -34,7 +34,7 @@
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
-      class="setting-group"
+      class="setting-group vertical"
     >
       <label>{{ t('openrouter_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput

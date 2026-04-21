@@ -24,7 +24,7 @@
       :test-result="testResult"
       @test="testKeys"
     />
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="openaiApiModel"
@@ -35,7 +35,7 @@
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
-      class="setting-group"
+      class="setting-group vertical"
     >
       <label>{{ t('openai_custom_model_label') || 'Custom Model Name' }}</label>
       <BaseInput

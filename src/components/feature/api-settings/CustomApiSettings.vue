@@ -1,21 +1,22 @@
 <template>
-  <div>
+  <div class="custom-settings">
     <div class="api-info">
       <h3>{{ t('custom_api_settings_title') || 'Custom OpenAI Compatible Settings' }}</h3>
       <p class="setting-description">
         {{ t('custom_api_settings_description') || 'Use any service that is compatible with the OpenAI chat completions format.' }}
       </p>
     </div>
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
         v-model="customApiUrl"
         :placeholder="t('custom_api_url_placeholder') || '(e.g., v1/chat/completions)'"
+        class="api-url-input"
         dir="ltr"
       />
-      <span class="setting-help-text">
+      <p class="setting-help-text">
         {{ t('custom_api_url_example') || 'Example:' }} https://openai.com/v1/chat/completions
-      </span>
+      </p>
     </div>
     <ApiKeyInput
       v-model="customApiKey"
@@ -26,11 +27,12 @@
       :test-result="testResult"
       @test="testKeys"
     />
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('custom_api_settings_model_label') || 'Model' }}</label>
       <BaseInput
         v-model="customApiModel"
         :placeholder="t('custom_api_model_placeholder') || 'Enter the model name'"
+        class="model-select"
         dir="ltr"
       />
     </div>

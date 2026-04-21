@@ -2,10 +2,10 @@
   <div class="deepl-settings">
     <h3>{{ t('deepl_api_settings_title') || 'DeepL API Settings' }}</h3>
 
-    <div class="setting-group api-key-info">
-      <span class="setting-description">
+    <div class="setting-group vertical api-key-info">
+      <p class="setting-description">
         {{ t('deepl_api_key_info') || 'You can get your DeepL API key from' }}
-      </span>
+      </p>
       <a
         class="api-link"
         href="https://www.deepl.com/en/your-account/keys"
@@ -14,9 +14,9 @@
       >
         {{ t('deepl_api_key_link') || 'DeepL API' }}
       </a>
-      <span class="setting-description">
+      <p class="setting-description">
         {{ t('deepl_free_api_info') || 'Free tier available with 500,000 characters/month.' }}
-      </span>
+      </p>
     </div>
 
     <ApiKeyInput

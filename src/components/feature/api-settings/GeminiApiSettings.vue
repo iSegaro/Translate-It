@@ -23,7 +23,7 @@
       :test-result="testResult"
       @test="testKeys"
     />
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
         v-model="geminiModel"
@@ -34,7 +34,7 @@
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
-      class="setting-group"
+      class="setting-group vertical"
     >
       <label>{{ t('gemini_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
@@ -43,13 +43,13 @@
         class="api-url-input"
         dir="ltr"
       />
-      <span class="setting-description">
+      <p class="setting-description">
         {{ t('gemini_custom_api_url_info') || 'Enter the complete API URL including the model name' }}
-      </span>
+      </p>
     </div>
     <div
       v-if="isThinkingSupported"
-      class="setting-group"
+      class="setting-group vertical"
     >
       <BaseCheckbox
         v-model="geminiThinking"

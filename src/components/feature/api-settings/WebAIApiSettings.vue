@@ -1,10 +1,10 @@
 <template>
-  <div>
+  <div class="webai-settings">
     <h3>{{ t('webai_api_settings_title') || 'WebAI API Settings' }}</h3>
-    <div class="setting-group api-key-info">
-      <span class="setting-description">
+    <div class="setting-group vertical api-key-info">
+      <p class="setting-description">
         {{ t('webai_api_key_info') || 'Run your API Server.' }}
-      </span>
+      </p>
       <a
         class="api-link"
         :href="REPO_URLS.WEBAI_API"
@@ -14,19 +14,21 @@
         {{ t('webai_api_key_link') || 'Get and Run your locally hosted WebAI API server.' }}
       </a>
     </div>
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('webai_api_url_label') || 'WebAI API URL' }}</label>
       <BaseInput
         v-model="webAIApiUrl"
         :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
+        class="api-url-input"
         dir="ltr"
       />
     </div>
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
       <BaseInput
         v-model="webAIApiModel"
         :placeholder="t('webai_api_model_placeholder') || 'Enter WebAI API model'"
+        class="model-select"
         dir="ltr"
       />
     </div>

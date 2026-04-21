@@ -148,8 +148,21 @@
     overflow: visible;
     box-sizing: border-box;
 
+    // Reset any internal padding that might come from provider-specific containers
+    .gemini-settings,
+    .openai-settings,
+    .deepl-settings,
+    .openrouter-settings,
+    .deepseek-settings,
+    .custom-settings {
+      padding: 0 !important;
+      margin: 0 !important;
+      display: block;
+      width: 100%;
+    }
+
     // Force vertical layout for settings inside providers
-    :deep(.setting-group),
+    .setting-group,
     .optimization-control-area {
       flex-direction: column !important;
       align-items: flex-start !important;
@@ -157,10 +170,34 @@
       margin-bottom: $spacing-xl !important; // Increased margin for better separation between groups
     }
 
-    :deep(.setting-group) {
+    .setting-group.vertical {
+      width: 100% !important;
+
+      > * {
+        width: 100% !important;
+        max-width: var(--input-max-width, 620px) !important;
+        flex: none !important;
+
+        &:not(.ti-checkbox):not(.base-checkbox):not(.label-with-toggle) {
+          display: block !important;
+        }
+      }
+
+      .ti-input-wrapper,
+      .ti-select-wrapper,
+      .ti-input,
+      .ti-select,
+      .base-input,
+      .base-select,
+      .api-key-input-wrapper {
+        width: 100% !important;
+        max-width: var(--input-max-width, 620px) !important;
+      }
+    }
+
+    .setting-group {
       // Allow all types of labels to wrap and show full text
-      label,
-      .label-with-toggle,
+      > label,
       .ti-checkbox__label,
       .ti-radio__label {
         width: 100% !important;
@@ -172,6 +209,24 @@
         display: block !important;
         line-height: 1.4 !important;
         max-width: none !important; // Remove any max-width constraints
+      }
+
+      // Label with toggle (like API Key) should ALWAYS be a flex row
+      .label-with-toggle {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        max-width: var(--input-max-width, 620px) !important;
+        margin-bottom: 2px !important;
+
+        label {
+          width: auto !important;
+          flex: 1 !important;
+          margin: 0 !important;
+          display: inline-block !important;
+        }
       }
 
       // Checkbox specific alignment - reset inherited label styles
@@ -201,9 +256,14 @@
       .model-select,
       .deepl-checkbox,
       .api-url-input,
-      .api-key-input-wrapper {
+      .api-key-input-wrapper,
+      :deep(.ti-input-wrapper),
+      :deep(.ti-input),
+      :deep(.ti-select),
+      :deep(.base-input),
+      :deep(.base-select) {
         width: 100% !important;
-        max-width: var(--input-max-width, 620px);
+        max-width: var(--input-max-width, 620px) !important;
         flex: none !important;
         margin-bottom: $spacing-xs;
       }
@@ -249,15 +309,25 @@
     }
 
     // Keep api-key-info horizontally aligned as it contains text and links
-    :deep(.setting-group.api-key-info) {
+    .setting-group.api-key-info {
+      display: flex !important;
       flex-direction: row !important;
-      flex-wrap: wrap;
+      flex-wrap: wrap !important;
       align-items: center !important;
       gap: $spacing-xs !important;
-      margin-bottom: $spacing-sm;
+      margin-bottom: $spacing-sm !important;
+      width: 100% !important;
+
+      > * {
+        width: auto !important;
+        max-width: none !important;
+        display: inline !important;
+        margin: 0 !important;
+      }
 
       .setting-description {
-        margin: 0;
+        margin: 0 !important;
+        display: inline !important;
       }
     }
   }
@@ -444,7 +514,7 @@
     display: block !important;
     overflow: hidden !important;
 
-    :deep(.setting-group),
+    .setting-group,
     .setting-group,
     .language-pref-row,
     .optimization-control-area,
