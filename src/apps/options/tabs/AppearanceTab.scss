@@ -1,50 +1,46 @@
 @use "@/assets/styles/base/variables" as *;
 
-.setting-group {
+.appearance-tab {
+  .settings-container {
+    max-width: 650px; // عرض استاندارد مشابه سایر تب‌ها
+    width: 100%;
+  }
+
+  h2 {
+    margin-bottom: $spacing-xl;
+  }
+
   .setting-description {
-    margin: 0 0 $spacing-lg 0 !important;
+    margin: 0 0 $spacing-md 0 !important;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    line-height: 1.5;
   }
-}
 
-.font-settings {
-  background-color: var(--color-surface) !important;
-  border: $border-width $border-style var(--color-border) !important;
-  border-radius: $border-radius-base !important;
-  padding: $spacing-md !important;
-  margin-bottom: $spacing-lg !important;
-
-  h3 {
-    margin: 0 0 $spacing-sm 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    color: var(--color-text) !important;
-    font-size: $font-size-lg !important;
-    font-weight: $font-weight-medium !important;
+  .font-selector-wrapper {
+    margin-top: $spacing-md;
+    padding-inline-start: $spacing-xs; // ایجاد تراز عمودی با توضیحات بالا
   }
-}
 
-.setting-row {
-  display: flex !important;
-  align-items: center !important;
-  gap: $spacing-md !important;
-  margin-bottom: $spacing-sm !important;
-
-  .setting-label {
-    font-weight: 600 !important;
-    color: var(--color-text) !important;
-    min-width: 150px !important;
+  .validation-error {
+    margin-top: $spacing-md;
+    padding: $spacing-sm;
+    background-color: var(--color-error-alpha);
+    color: var(--color-error);
+    border-radius: $border-radius-sm;
+    font-size: $font-size-sm;
   }
 }
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .font-settings {
-    padding: $spacing-sm !important;
-  }
-
-  .setting-row {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: $spacing-sm !important;
+  .appearance-tab {
+    .settings-container {
+      max-width: 100%;
+    }
+    
+    .font-selector-wrapper {
+      padding-inline-start: 0;
+    }
   }
 }

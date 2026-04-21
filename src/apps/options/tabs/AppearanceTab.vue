@@ -1,29 +1,32 @@
 <template>
-  <section class="options-tab-content">
-    <h2>{{ t('appearance_section_title') || 'Appearance' }}</h2>
-    
-    <!-- Font Settings -->
-    <div class="setting-group font-settings">
-      <h3>{{ t('font_settings_title') || 'Font Settings' }}</h3>
-      <p class="setting-description">
-        {{ t('font_settings_description') || 'Customize the font and size for translation display' }}
-      </p>
-      <FontSelector
-        ref="fontSelectorRef"
-        :font-family="fontFamily"
-        :font-size="fontSize"
-        :target-language="targetLanguage"
-        @update:font-family="updateFontFamily"
-        @update:font-size="updateFontSize"
-      />
-    </div>
-    
-    <!-- Validation errors -->
-    <div
-      v-if="validationError"
-      class="validation-error"
-    >
-      {{ validationError }}
+  <section class="options-tab-content appearance-tab">
+    <div class="settings-container">
+      <h2>{{ t('appearance_section_title') || 'Appearance' }}</h2>
+      
+      <!-- Font Settings -->
+      <BaseFieldset :legend="t('font_settings_title') || 'Font Settings'">
+        <p class="setting-description">
+          {{ t('font_settings_description') || 'Customize the font and size for translation display' }}
+        </p>
+        <div class="font-selector-wrapper">
+          <FontSelector
+            ref="fontSelectorRef"
+            :font-family="fontFamily"
+            :font-size="fontSize"
+            :target-language="targetLanguage"
+            @update:font-family="updateFontFamily"
+            @update:font-size="updateFontSize"
+          />
+        </div>
+      </BaseFieldset>
+      
+      <!-- Validation errors -->
+      <div
+        v-if="validationError"
+        class="validation-error"
+      >
+        {{ validationError }}
+      </div>
     </div>
   </section>
 </template>
@@ -32,6 +35,7 @@
 import './AppearanceTab.scss'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import FontSelector from '@/components/feature/FontSelector.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
