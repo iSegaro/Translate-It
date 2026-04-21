@@ -116,6 +116,13 @@ export class TTSDispatcher {
 
       logger.info(`[TTSDispatcher] Final dispatch: engine=${resolution.engine}, lang=${resolution.language}`);
 
+      // Notify UI immediately about the detected language for tooltip updates
+      ttsStateManager.lastTTSLanguage = resolution.language;
+      ttsStateManager.broadcastStatus('playing', { 
+        action: 'TTS_LANG_DETECTED', // Overriding default action for this specific broadcast
+        detectedSourceLanguage: resolution.language 
+      });
+
       // 4. Execution Attempt
       let response;
       if (resolution.engine === TTS_ENGINES.EDGE) {

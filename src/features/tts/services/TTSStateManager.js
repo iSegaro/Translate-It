@@ -113,15 +113,17 @@ class TTSStateManager {
    * 
    * @param {string} status - The new TTS status ('idle', 'playing', 'error', etc.)
    * @param {Object} data - Additional data to include in the broadcast
+   * @param {string} [data.action] - Optional action override (defaults to GOOGLE_TTS_ENDED)
    */
   async broadcastStatus(status, data = {}) {
     try {
       const browserAPI = await initializebrowserAPI();
       const message = {
-        action: MessageActions.GOOGLE_TTS_ENDED, // Use ENDED as the primary status update action
+        action: data.action || MessageActions.GOOGLE_TTS_ENDED, // Allow custom action override
         source: 'background',
         status: status, // 'completed', 'error', 'stopped', 'interrupted'
         ttsId: this.currentTTSId,
+        detectedSourceLanguage: this.lastTTSLanguage,
         ...data
       };
 
@@ -169,6 +171,7 @@ class TTSStateManager {
         reason: reason,
         status: status,
         ttsId: this.currentTTSId,
+        detectedSourceLanguage: this.lastTTSLanguage,
         ...(errorData || {})
       };
 

@@ -284,6 +284,23 @@ export function useUnifiedTranslation(context = 'popup') {
     await resetLanguagesToDefaults();
 
     messageListener = (message) => {
+      // 1. Handle TTS status updates to capture detected language from background
+      if (message.action === MessageActions.GOOGLE_TTS_ENDED || message.action === MessageActions.TTS_LANG_DETECTED) {
+        if (message.detectedSourceLanguage) {
+          logger.debug(`[${context}] Captured language from TTS (${message.action}): ${message.detectedSourceLanguage}`);
+          
+          // Update lastTranslation to propagate language to UI (tooltip)
+          lastTranslation.value = {
+            source: sourceText.value,
+            ...lastTranslation.value,
+            sourceLanguage: message.detectedSourceLanguage
+          };
+        }
+        // If it's just a language update, we can return early. 
+        if (message.action === MessageActions.TTS_LANG_DETECTED) return;
+      }
+
+      // 2. Handle Translation Results (Popup context)
       if (context === 'popup') {
         logger.debug(`[${context}] Message listener triggered - isTranslating: ${isTranslating.value}`);
         logger.debug(`[${context}] Raw message received:`, message);

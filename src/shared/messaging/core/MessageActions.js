@@ -78,6 +78,7 @@ export class MessageActions {
   static TTS_STOP = 'TTS_STOP';
   static GOOGLE_TTS_GET_STATUS = 'GOOGLE_TTS_GET_STATUS';
   static GOOGLE_TTS_ENDED = 'GOOGLE_TTS_ENDED';
+  static TTS_LANG_DETECTED = 'TTS_LANG_DETECTED';
   static PLAY_OFFSCREEN_AUDIO = 'playOffscreenAudio';
   static OFFSCREEN_READY = 'OFFSCREEN_READY';
   
