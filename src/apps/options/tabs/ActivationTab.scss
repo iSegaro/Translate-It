@@ -251,28 +251,35 @@
     margin-bottom: $spacing-base !important;
 
     &.ui-mode-radio-group {
-      display: grid !important;
-      grid-template-columns: repeat(3, minmax(0, 1fr)) !important; // استفاده از minmax برای جلوگیری از بیرون زدگی
-      align-items: stretch !important;
-      gap: $spacing-md !important;
+      display: flex !important;
+      justify-content: center !important;
+      flex-wrap: wrap !important;
+      align-items: flex-start !important;
+      gap: $spacing-xl !important;
       width: 100% !important;
 
-      .radio-label-content {
-        display: flex !important;
-        flex-direction: column !important;
-        line-height: 1.2 !important;
+      .base-radio {
+        flex: 0 1 auto !important;
+        min-width: 140px !important;
+        justify-content: flex-start !important;
 
-        .label-title {
-          font-weight: 500 !important;
-          color: var(--color-text) !important;
-          display: block !important;
-        }
+        .radio-label-content {
+          display: flex !important;
+          flex-direction: column !important;
+          line-height: 1.2 !important;
 
-        .label-description {
-          font-size: 0.85em !important;
-          color: var(--color-text-secondary) !important;
-          display: block !important;
-          margin-top: 2px !important;
+          .label-title {
+            font-weight: 500 !important;
+            color: var(--color-text) !important;
+            display: block !important;
+          }
+
+          .label-description {
+            font-size: 0.85em !important;
+            color: var(--color-text-secondary) !important;
+            display: block !important;
+            margin-top: 2px !important;
+          }
         }
       }
     }
