@@ -161,7 +161,8 @@ export class TranslationHandler {
         
         return { 
           translatedText: ackOrResult.translatedText,
-          targetLanguage: payload.to,
+          sourceLanguage: ackOrResult.sourceLanguage || ackOrResult.detectedSourceLanguage || payload.from,
+          targetLanguage: ackOrResult.targetLanguage || payload.to,
           provider: payload.provider
         };
       }
@@ -188,7 +189,8 @@ export class TranslationHandler {
         
         return { 
           translatedText: final.translatedText,
-          targetLanguage: payload.to,
+          sourceLanguage: final.sourceLanguage || final.detectedSourceLanguage || payload.from,
+          targetLanguage: final.targetLanguage || payload.to,
           provider: payload.provider
         }
       }
@@ -335,6 +337,7 @@ export class TranslationHandler {
       this._cleanupRequest(messageId);
       request.resolve({
         translatedText: message.data.translatedText,
+        sourceLanguage: message.data.sourceLanguage || message.data.detectedSourceLanguage,
         targetLanguage: message.data.targetLanguage
       });
       return true;

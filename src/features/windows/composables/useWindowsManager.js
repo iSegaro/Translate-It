@@ -50,19 +50,21 @@ export function useWindowsManager() {
       needsSettings: detail.needsSettings || false,
       isLoading: detail.isLoading || false,
       initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal'),
-      targetLanguage: detail.targetLanguage || detail.to || 'auto', // Add target language support
-      provider: detail.provider || '' // Add provider support
+      targetLanguage: detail.targetLanguage || detail.to || detail.tl || 'auto',
+      sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || 'auto',
+      provider: detail.provider || ''
     };
 
     if (existingWindowIndex >= 0) {
-      // Update existing window
-      translationWindows.value[existingWindowIndex] = windowData;
+      // Update existing window reactive-friendly
+      const updatedWindows = [...translationWindows.value];
+      updatedWindows[existingWindowIndex] = windowData;
+      translationWindows.value = updatedWindows;
       logger.debug('Updated existing window', detail.id);
     } else {
       // Remove other windows first (single window at a time)
-      translationWindows.value = [];
       // Add new window
-      translationWindows.value.push(windowData);
+      translationWindows.value = [windowData];
       logger.debug('Created new window', detail.id);
     }
   };
@@ -111,14 +113,20 @@ export function useWindowsManager() {
 
     const existingWindowIndex = translationWindows.value.findIndex(w => w.id === detail.id);
     if (existingWindowIndex >= 0) {
-      const existingWindow = translationWindows.value[existingWindowIndex];
+      const updatedWindows = [...translationWindows.value];
+      const existingWindow = updatedWindows[existingWindowIndex];
+      
       // Update the window data
-      translationWindows.value[existingWindowIndex] = {
+      updatedWindows[existingWindowIndex] = {
         ...existingWindow,
         ...detail,
         translatedText: detail.initialTranslatedText || detail.translatedText || existingWindow.translatedText,
+        sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || detail.detectedSourceLanguage || existingWindow.sourceLanguage,
+        targetLanguage: detail.targetLanguage || detail.to || detail.tl || existingWindow.targetLanguage,
         initialSize: detail.initialSize || existingWindow.initialSize
       };
+      
+      translationWindows.value = updatedWindows;
       logger.debug('Window updated', detail.id);
     } else {
       // Window was closed before translation completed - this is normal behavior

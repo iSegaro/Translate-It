@@ -212,6 +212,22 @@ const translatedText = computed(() => props.isError ? '' : props.initialTranslat
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
 
+// Watch for prop changes to sync internal state
+watch(() => props.selectedText, (newText) => {
+  if (newText) {
+    logger.debug('selectedText updated:', newText);
+    originalText.value = newText;
+  }
+});
+
+watch(() => props.sourceLanguage, (newLang) => {
+  logger.debug('sourceLanguage prop updated:', newLang);
+});
+
+watch(() => props.targetLanguage, (newLang) => {
+  logger.debug('targetLanguage prop updated:', newLang);
+});
+
 const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
 const hasTTSContent = computed(() => {
   const hasOriginal = showOriginal.value && originalText.value && originalText.value.trim().length > 0;

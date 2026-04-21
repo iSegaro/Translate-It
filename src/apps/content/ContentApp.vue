@@ -61,6 +61,7 @@
         :needs-settings="window.needsSettings"
         :initial-size="window.initialSize"
         :target-language="window.targetLanguage || 'auto'"
+        :source-language="window.sourceLanguage || 'auto'"
         :provider="window.provider"
         @close="onTranslationWindowClose"
         @speak="onTranslationWindowSpeak"

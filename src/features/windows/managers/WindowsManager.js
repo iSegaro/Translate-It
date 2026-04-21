@@ -747,6 +747,7 @@ export class WindowsManager extends ResourceTracker {
         isError: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
+        detectedSourceLanguage: translationResult.sourceLanguage,
         provider: translationResult.provider
       });
       
@@ -808,6 +809,8 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
+        sourceLanguage: translationResult.sourceLanguage || 'auto',
+        detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
         provider: translationResult.provider
       });
@@ -922,6 +925,7 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
+        detectedSourceLanguage: translationResult.sourceLanguage, // Explicitly pass for inheritance
         targetLanguage: translationResult.targetLanguage,
         provider: translationResult.provider
       });
