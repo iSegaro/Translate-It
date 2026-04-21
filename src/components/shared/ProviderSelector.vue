@@ -7,16 +7,22 @@
     :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
-    <div class="ti-split-translate-button">
+    <div class="ti-split-translate-button" :class="{ 'ti-is-loading': loading }">
       <button
         type="submit"
         class="ti-translate-main-area"
-        :title="t('popup_translate_button_title') || 'ترجمه'"
+        :title="loading ? (t('popup_stop_button_title') || 'توقف') : (t('popup_translate_button_title') || 'ترجمه')"
         :disabled="disabled"
         @click="handleTranslate"
         @keydown="handleKeydown"
       >
+        <Icon 
+          v-if="loading"
+          icon="fa6-solid:square" 
+          class="ti-api-provider-icon ti-stop-icon"
+        />
         <img
+          v-else
           :src="currentProviderIcon"
           alt="API Provider"
           class="ti-api-provider-icon"
@@ -486,11 +492,15 @@ const props = defineProps({
   allowDefault: {
     type: Boolean,
     default: false
+  },
+  loading: {
+    type: Boolean,
+    default: false
   }
 })
 
 // Emits
-const emit = defineEmits(['translate', 'provider-change', 'update:modelValue'])
+const emit = defineEmits(['translate', 'cancel', 'provider-change', 'update:modelValue'])
 
 // Stores
 const settingsStore = useSettingsStore()
@@ -504,7 +514,6 @@ const triggerBtnRef = ref(null)
 const dropdownMenuRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
-const isTranslating = ref(false)
 const focusedIndex = ref(-1)
 const dropdownMaxHeight = ref('400px')
 
@@ -756,24 +765,17 @@ const toggleSync = (type) => {
  * Handles the main translation button click (split mode)
  */
 const handleTranslate = () => {
-  logger.debug('Translate button clicked!', {
+  logger.debug('Translate/Stop button clicked!', {
     currentProvider: currentProvider.value,
-    isTranslating: isTranslating.value,
+    loading: props.loading,
     mode: props.mode
   })
   
-  if (isTranslating.value) {
-    logger.debug('Translation already in progress, ignoring click')
-    return
+  if (props.loading) {
+    emit('cancel')
+  } else {
+    emit('translate', { provider: currentProvider.value })
   }
-  
-  isTranslating.value = true
-  emit('translate', { provider: currentProvider.value })
-  
-  // Reset after a delay using ResourceTracker
-  tracker.trackTimeout(() => {
-    isTranslating.value = false
-  }, 1000)
 }
 
 /**

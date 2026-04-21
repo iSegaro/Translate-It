@@ -47,7 +47,9 @@
               mode="split"
               :is-global="false"
               :show-sync="true"
+              :loading="translationFormRef?.isTranslating"
               @translate="handleTranslate"
+              @cancel="handleCancel"
             />
 
             <!-- Language Selector: Handles source and target language selection -->
@@ -165,6 +167,16 @@ const handleTranslate = () => {
   const activeForm = translationFormRef.value;
   if (activeForm && typeof activeForm.triggerTranslation === 'function') {
     activeForm.triggerTranslation();
+  }
+}
+
+/**
+ * Handle cancellation requests emitted from ProviderSelector
+ */
+const handleCancel = () => {
+  const activeForm = translationFormRef.value;
+  if (activeForm && typeof activeForm.cancelTranslation === 'function') {
+    activeForm.cancelTranslation();
   }
 }
 

@@ -1106,8 +1106,8 @@
   "popup_translate_button_title": {
     "message": "翻訳"
   },
-  "popup_translate_button_alt_icon": {
-    "message": "翻訳"
+  "popup_stop_button_title": {
+    "message": "翻訳を停止"
   },
   "popup_exclude_toggle_title": {
     "message": "このサイトで有効/無効を切り替え"

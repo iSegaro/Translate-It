@@ -26,7 +26,25 @@
   overflow: hidden !important;
   height: 32px !important;
   box-sizing: border-box !important;
+  transition: border-color 0.2s ease !important;
+
   &:hover { border-color: var(--color-primary) !important; }
+
+  &.ti-is-loading {
+    border-color: var(--color-error-light, #ff4d4f) !important;
+    
+    .ti-translate-main-area {
+      color: var(--color-error, #ff4d4f) !important;
+      
+      &:hover {
+        background-color: var(--color-error-alpha, rgba(255, 77, 79, 0.1)) !important;
+      }
+    }
+
+    .ti-stop-icon {
+      font-size: 10px !important; /* Smaller than provider icons */
+    }
+  }
 }
 
 .ti-translate-main-area {

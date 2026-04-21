@@ -40,7 +40,32 @@ export function useUnifiedTranslation(context = 'popup') {
   
   const pendingRequests = ref(new Set());
   const loadingStartTime = ref(null);
+  const currentMessageId = ref(null);
   const MINIMUM_LOADING_DURATION = 100;
+
+  /**
+   * Cancels the currently active translation request.
+   */
+  const cancelTranslation = async () => {
+    if (!isTranslating.value || !currentMessageId.value) return;
+
+    logger.info(`[${context}] Cancelling translation: ${currentMessageId.value}`);
+    
+    try {
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      await sendMessage({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: { messageId: currentMessageId.value }
+      });
+
+      // Cleanup state immediately for better UX
+      isTranslating.value = false;
+      currentMessageId.value = null;
+      loadingStartTime.value = null;
+    } catch (error) {
+      logger.error(`[${context}] Failed to cancel translation:`, error);
+    }
+  };
 
   // --- Stores & Composables ---
   const settingsStore = useSettingsStore();
@@ -199,6 +224,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
     try {
       const messageId = generateMessageId(context);
+      currentMessageId.value = messageId;
       const requestData = createTranslationRequest(sourceLang, targetLang, messageId, overrideProvider);
       
       logger.debug(`[${context}] Translation request:`, requestData.data);
@@ -228,22 +254,36 @@ export function useUnifiedTranslation(context = 'popup') {
           }
         }
         isTranslating.value = false;
+        currentMessageId.value = null;
         logger.debug(`[${context}] Direct response processed successfully`);
         return true;
       } else if (response && response.success === false && response.error) {
         handleTranslationError(response.error, messageId);
         isTranslating.value = false;
+        currentMessageId.value = null;
         return false;
       } else {
         logger.warn(`[${context}] No valid response received`, response);
         isTranslating.value = false;
+        currentMessageId.value = null;
         return false;
       }
 
     } catch (error) {
-      logger.debug(`[${context}] Failed to send/process translation request:`, error.message);
-      handleTranslationError(error);
+      const { matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+      const { ErrorTypes } = await import('@/shared/error-management/ErrorTypes.js');
+      
+      const errorType = matchErrorToType(error);
+
+      if (errorType === ErrorTypes.USER_CANCELLED) {
+        logger.debug(`[${context}] Translation request was cancelled by user.`);
+      } else {
+        logger.error(`[${context}] Failed to send/process translation request: ${error.message}`);
+        handleTranslationError(error);
+      }
+      
       isTranslating.value = false;
+      currentMessageId.value = null;
       await ensureMinimumLoadingDuration();
       return false;
     }
@@ -382,6 +422,7 @@ export function useUnifiedTranslation(context = 'popup') {
     canOpenSettings: errorManager.canOpenSettings,
     // Methods
     triggerTranslation,
+    cancelTranslation,
     clearTranslation,
     loadLastTranslation,
     getRetryCallback: errorManager.getRetryCallback,

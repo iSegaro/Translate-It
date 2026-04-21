@@ -41,7 +41,9 @@
             mode="split"
             :is-global="false"
             :show-sync="true"
+            :loading="isTranslating"
             @translate="handleTranslate"
+            @cancel="cancelTranslation"
           />
         </div>
       </div>
@@ -68,7 +70,9 @@
             mode="split"
             :is-global="false"
             :show-sync="true"
+            :loading="isTranslating"
             @translate="handleTranslate"
+            @cancel="cancelTranslation"
           />
         </div>
         <div class="end-spacer" />
@@ -161,6 +165,7 @@ const {
   canTranslate,
   detectedSourceLanguage,
   triggerTranslation,
+  cancelTranslation,
   clearTranslation,
   loadLastTranslation
 } = useUnifiedTranslation('sidepanel');

@@ -111,6 +111,7 @@ errorType,
 canTranslate,
 detectedSourceLanguage,
 triggerTranslation,
+cancelTranslation,
 clearTranslation,
 loadLastTranslation
 } = translation
@@ -294,9 +295,11 @@ watch(isTranslating, (newLoading, oldLoading) => {
   }
 })
 
-// Expose methods to parent
+// Expose methods and state to parent
 defineExpose({
   triggerTranslation: handleTranslate,
-  clearFields: clearStorage
+  cancelTranslation,
+  clearFields: clearStorage,
+  isTranslating
 })
 </script>
