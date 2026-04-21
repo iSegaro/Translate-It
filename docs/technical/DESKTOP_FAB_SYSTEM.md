@@ -62,11 +62,15 @@ This composable decouples FAB logic from the visual component:
 - **State Guard**: Determines if the FAB badge should appear based on translation settings (e.g., `ON_FAB_CLICK` mode).
 - **Global Trigger**: Emits `GLOBAL_SELECTION_TRIGGER` to request translation processing.
 
-### 3. Integrated TTS Controller
-The FAB includes a dynamic TTS badge that appears when:
-- Active text is selected.
-- A manual TTS request is in progress.
-It leverages `useTTSSmart` to track global TTS states and provides instant playback/stop controls.
+### 3. Integrated Smart TTS Controller
+The FAB includes an advanced TTS badge that leverages the global `useTTSSmart` system.
+- **Auto Language Detection**: Integrates with `LanguageDetectionService` to identify the language of the selected text in real-time.
+- **Dynamic Tooltips**: Tooltips automatically update to show the target language (e.g., "Speak (English)") or the current action (e.g., "Stop (English)").
+- **Visual State Management**:
+    - **Idle**: Standard speaker icon.
+    - **Loading**: Animated SVG spinner (currentColor-aware for theme compatibility).
+    - **Playing (Stop)**: Swaps to a square "Stop" icon and turns the badge **Red** (`#fa5252`) to signal cancellation availability.
+- **Cancellation**: Users can immediately stop playback by clicking the badge during the "Playing" state.
 
 ---
 
