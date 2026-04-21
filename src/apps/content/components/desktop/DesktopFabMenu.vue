@@ -194,26 +194,46 @@
       <div 
         v-if="isTTSActive && (isHovered || isMenuOpen)" 
         class="fab-tts-badge"
-        :class="{ 'is-playing': isThisTTSActive && tts.isPlaying.value }"
-        :title="(isThisTTSActive && tts.isPlaying.value) ? t('desktop_fab_tts_stop_tooltip') : t('desktop_fab_tts_play_tooltip')"
+        :class="{ 'is-playing': ttsState === 'playing', 'is-loading': ttsState === 'loading' }"
+        :title="ttsTooltip"
         :style="{ 
           'bottom': 'calc(-1 * var(--badge-offset)) !important', 
           'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered),
-          'background-color': (isThisTTSActive && tts.isPlaying.value) ? '#fa5252 !important' : ''
+          'background-color': ttsState === 'playing' ? '#fa5252 !important' : ''
         }"
         @click.stop="handleTTS"
         @mouseenter="isTTSHovered = true"
         @mouseleave="isTTSHovered = false"
       >
-        <div
-          v-if="isThisTTSActive && tts.isLoading.value"
-          class="fab-tts-loader"
-        />
+        <!-- Loading Spinner SVG -->
+        <svg
+          v-if="ttsState === 'loading'"
+          class="fab-tts-icon ti-loading-spin"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+          <path fill="currentColor" opacity="0.5" d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+        </svg>
+
+        <!-- Stop Icon SVG -->
+        <svg
+          v-else-if="ttsState === 'playing'"
+          class="fab-tts-icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+        >
+          <path fill="white" d="M6 6h12v12H6z" />
+        </svg>
+
+        <!-- Idle Speaker Icon -->
         <img
           v-else
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
-          :style="{ filter: (isThisTTSActive && tts.isPlaying.value) ? 'brightness(0) invert(1) !important' : '' }"
+          class="fab-tts-icon"
         >
       </div>
     </Transition>
@@ -221,7 +241,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -241,6 +261,8 @@ import useFabSelection from '@/apps/content/composables/useFabSelection.js';
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
@@ -304,11 +326,7 @@ const hoveredItemIndex = ref(-1);
 // Track the specific TTS request started by this component instance
 const localTTSId = ref(null);
 const isLocalLoading = ref(false);
-
-// Check if this specific instance is currently responsible for the active TTS
-const isThisTTSActive = computed(() => {
-  return isLocalLoading.value || (!!(localTTSId.value && tts.currentTTSId.value === localTTSId.value));
-});
+const detectedLanguage = ref('auto');
 
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
@@ -317,6 +335,62 @@ const fabContainerRef = ref(null);
 let hoverTimerId = null;
 let fadeTimerId = null;
 let instabilityTimer = null;
+
+const startFadeTimer = (forceVisible = true) => {
+  if (fadeTimerId) tracker.clearTimer(fadeTimerId);
+  if (forceVisible) isFaded.value = false;
+  fadeTimerId = tracker.trackTimeout(() => {
+    isFaded.value = true;
+    fadeTimerId = null;
+  }, ANIMATION_CONFIG.IDLE_TIMEOUT);
+};
+
+// Initialize FAB selection logic
+const { pendingSelection, triggerTranslation } = useFabSelection({
+  onSelectionPending: (detail) => {
+    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled.value) {
+      startFadeTimer();
+    }
+  }
+});
+
+// Detect language whenever selection changes
+watch(() => pendingSelection.value.text, async (newText) => {
+  if (newText && newText.trim().length > 0) {
+    try {
+      const lang = await LanguageDetectionService.detect(newText);
+      if (lang) detectedLanguage.value = lang;
+    } catch (err) {
+      logger.debug('Failed to detect language for FAB TTS tooltip:', err);
+      detectedLanguage.value = 'auto';
+    }
+  } else {
+    detectedLanguage.value = 'auto';
+  }
+});
+
+// Check if this specific instance is currently responsible for the active TTS
+const isThisTTSActive = computed(() => {
+  return isLocalLoading.value || (!!(localTTSId.value && tts.currentTTSId.value === localTTSId.value));
+});
+
+const ttsState = computed(() => {
+  if (isThisTTSActive.value) return tts.ttsState.value;
+  return 'idle';
+});
+
+const ttsTooltip = computed(() => {
+  const langName = detectedLanguage.value && detectedLanguage.value !== 'auto'
+    ? getLanguageNameFromCode(detectedLanguage.value)
+    : '';
+  
+  const capitalizedLang = langName ? langName.charAt(0).toUpperCase() + langName.slice(1) : '';
+  const langSuffix = capitalizedLang ? ` (${capitalizedLang})` : '';
+
+  if (ttsState.value === 'playing') return t('desktop_fab_tts_stop_tooltip') + langSuffix;
+  if (ttsState.value === 'loading') return t('window_loading_alt');
+  return t('desktop_fab_tts_play_tooltip') + langSuffix;
+});
 
 const updateViewport = () => {
   if (typeof window === 'undefined') return;
@@ -337,24 +411,6 @@ const updateViewport = () => {
     isViewportUnstable.value = false;
     instabilityTimer = null;
   }, 250);
-};
-
-// Initialize FAB selection logic
-const { pendingSelection, triggerTranslation } = useFabSelection({
-  onSelectionPending: (detail) => {
-    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled.value) {
-      startFadeTimer();
-    }
-  }
-});
-
-const startFadeTimer = (forceVisible = true) => {
-  if (fadeTimerId) tracker.clearTimer(fadeTimerId);
-  if (forceVisible) isFaded.value = false;
-  fadeTimerId = tracker.trackTimeout(() => {
-    isFaded.value = true;
-    fadeTimerId = null;
-  }, ANIMATION_CONFIG.IDLE_TIMEOUT);
 };
 
 const handleMouseEnter = () => {
@@ -643,14 +699,14 @@ const handleRevert = async () => {
 };
 
 const handleTTS = async () => {
-  if (isThisTTSActive.value && (tts.isPlaying.value || tts.isLoading.value)) {
+  if (ttsState.value === 'playing' || ttsState.value === 'loading') {
     logger.info('Stopping TTS from Desktop FAB');
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
-    logger.info('Starting TTS from Desktop FAB');
+    logger.info('Starting TTS from Desktop FAB', { language: detectedLanguage.value });
     isLocalLoading.value = true;
     try {
-      const result = await tts.speak(pendingSelection.value.text);
+      const result = await tts.speak(pendingSelection.value.text, detectedLanguage.value);
       if (result) {
         localTTSId.value = tts.currentTTSId.value;
       }
