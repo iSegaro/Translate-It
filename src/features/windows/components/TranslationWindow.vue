@@ -64,34 +64,15 @@
             />
           </svg>
         </button>
-        <button
-          class="ti-action-btn ti-smart-tts-btn"
-          :class="{ 'ti-original-mode': ttsMode === 'original' }"
-          :disabled="!hasTTSContent || isTTSLoading"
-          :title="getEnhancedTTSButtonTitle"
-          @click.stop="handleSmartTTS"
+        <TTSButton
+          :text="currentTTSText"
+          language="auto"
+          size="sm"
+          variant="secondary"
+          class="ti-smart-tts-btn"
           @mousedown.stop
           @touchstart.stop
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            class="ti-smart-tts-icon"
-            :class="{ 'ti-original-icon': ttsMode === 'original' }"
-          >
-            <path
-              v-if="!isSpeaking"
-              fill="currentColor"
-              :d="ttsMode === 'original' ? originalTextTTSIcon : translatedTextTTSIcon"
-            />
-            <path
-              v-else
-              fill="currentColor"
-              d="M6 6h12v12H6z"
-            />
-          </svg>
-        </button>
+        />
         <button
           class="ti-action-btn"
           :class="{ 'ti-original-visible': showOriginal }"
@@ -175,6 +156,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { WindowsConfig } from '@/features/windows/managers/core/WindowsConfig.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
+import TTSButton from '@/components/shared/TTSButton.vue';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
@@ -229,17 +211,6 @@ const translatedText = computed(() => props.isError ? '' : props.initialTranslat
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
 
-// Track the specific TTS request started by this window instance
-const localTTSId = ref(null);
-
-// Check if this specific window instance is currently responsible for the active TTS
-const isThisWindowActive = computed(() => {
-  return !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value);
-});
-
-const isSpeaking = computed(() => isThisWindowActive.value && tts.ttsState.value === 'playing');
-const isTTSLoading = computed(() => isThisWindowActive.value && tts.ttsState.value === 'loading');
-
 const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
 const hasTTSContent = computed(() => {
   const hasOriginal = showOriginal.value && originalText.value && originalText.value.trim().length > 0;
@@ -249,16 +220,7 @@ const hasTTSContent = computed(() => {
 
 const currentTTSText = computed(() => ttsMode.value === 'original' ? originalText.value || '' : translatedText.value || '');
 
-const getEnhancedTTSButtonTitle = computed(() => {
-  if (!hasTTSContent.value) return t('window_tts_no_text');
-  if (isSpeaking.value) return t('window_tts_stop');
-  return ttsMode.value === 'original' ? t('window_tts_speak_original') : t('window_tts_speak_translation');
-});
-
 const getOriginalButtonTitle = computed(() => showOriginal.value ? t('window_hide_original') : t('window_show_original'));
-
-const originalTextTTSIcon = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z";
-const translatedTextTTSIcon = "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
 
 const handleRetry = () => {
   pageEventBus.emit('translation-window-retry', { id: props.id });
@@ -335,22 +297,6 @@ const handleCopy = async () => {
     logger.debug(`Text copied successfully (cleaned)`);
   } catch (error) {
     logger.error(`Failed to copy:`, error);
-  }
-};
-
-const handleSmartTTS = async () => {
-  if (!hasTTSContent.value) return;
-  try {
-    if (isSpeaking.value) {
-      await tts.stop();
-    } else {
-      const result = await tts.speak(currentTTSText.value, 'auto');
-      if (result) {
-        localTTSId.value = tts.currentTTSId.value;
-      }
-    }
-  } catch (error) {
-    logger.error(`Smart TTS failed:`, error);
   }
 };
 
