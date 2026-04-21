@@ -46,6 +46,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import './TranslationHistory.scss'
 import BaseButton from '@/components/base/BaseButton.vue'
 
 defineEmits(['retranslate', 'clear-history'])

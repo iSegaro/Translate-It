@@ -1,6 +1,7 @@
 <!-- src/components/shared/PageTranslationStatus.vue -->
 <script setup>
 import { computed } from 'vue';
+import './PageTranslationStatus.scss'
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
 

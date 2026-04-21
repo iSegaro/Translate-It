@@ -49,6 +49,7 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import "./OpenAIApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'

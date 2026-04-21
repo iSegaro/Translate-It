@@ -27,6 +27,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import "./LingvaApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'

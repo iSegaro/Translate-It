@@ -17,6 +17,7 @@
 </template>
 
 <script setup>
+import "./BrowserApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

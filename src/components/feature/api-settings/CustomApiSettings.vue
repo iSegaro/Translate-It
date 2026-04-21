@@ -39,6 +39,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import "./CustomApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'

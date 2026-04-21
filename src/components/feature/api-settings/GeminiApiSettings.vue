@@ -65,6 +65,7 @@
 
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue'
+import "./GeminiApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
