@@ -113,8 +113,12 @@ fieldset {
 
 input[type="checkbox"],
 input[type="radio"] {
-  width: auto;
-  margin-right: $spacing-sm;
+  width: 18px;
+  height: 18px;
+  margin-inline-end: $spacing-md;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  vertical-align: middle;
 }
 
 .github-icon {

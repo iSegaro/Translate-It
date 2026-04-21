@@ -3,17 +3,18 @@
 .ti-checkbox {
   display: flex !important;
   align-items: center !important;
-  gap: var(--spacing-sm) !important;
+  gap: $spacing-md !important;
   cursor: pointer !important;
-  font-size: var(--font-size-base) !important;
+  font-size: $font-size-base !important;
   margin: 0 !important;
   
   input[type="checkbox"] {
     margin: 0 !important;
-    width: 16px !important;
-    height: 16px !important;
+    width: 18px !important;
+    height: 18px !important;
     cursor: pointer !important;
     flex-shrink: 0 !important;
+    accent-color: var(--color-primary);
   }
   
   .ti-checkbox__label {
