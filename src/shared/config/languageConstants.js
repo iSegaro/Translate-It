@@ -21,13 +21,17 @@ export const UI_LOCALE_TO_CODE_MAP = UI_LOCALES.reduce((map, locale) => {
 
 // Standard language name to code mapping
 export const LANGUAGE_NAME_TO_CODE_MAP = {
+  acehnese: "ace",
   afrikaans: "af",
   albanian: "sq",
+  amharic: "am",
   arabic: "ar",
+  armenian: "hy",
   azerbaijani: "az",
   belarusian: "be",
   bengali: "bn",
   bulgarian: "bg",
+  burmese: "my",
   catalan: "ca",
   cebuano: "ceb",
   "chinese (simplified)": "zh-cn",
@@ -46,6 +50,8 @@ export const LANGUAGE_NAME_TO_CODE_MAP = {
   filipino: "fil",
   finnish: "fi",
   french: "fr",
+  "gaelic (scottish)": "gd",
+  georgian: "ka",
   german: "de",
   greek: "el",
   hebrew: "he",
@@ -56,7 +62,9 @@ export const LANGUAGE_NAME_TO_CODE_MAP = {
   japanese: "ja",
   kannada: "kn",
   kazakh: "kk",
+  khmer: "km",
   korean: "ko",
+  lao: "lo",
   latvian: "lv",
   lithuanian: "lt",
   malay: "ms",
@@ -348,12 +356,12 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
 
   // Bing Translate - languages from the provided HTML list
   bing: [
-    'ace', 'af', 'sq', 'am', 'ar', 'arz', 'ary', 'arb', 'hy', 'as', 'ast', 'az', 'ban', 'bn', 'ba', 'eu', 'bbc', 'be', 'bho', 'bik', 'brx', 'bs', 'bg', 'yue', 'ca', 'ceb', 'hne', 'lzh', 'zh-Hans', 'zh-Hant', 'co', 'hr', 'cs', 'da', 'prs', 'dv', 'doi', 'nl', 'en', 'en-GB', 'epo', 'et', 'fo', 'fj', 'fil', 'fi', 'fr', 'fr-CA', 'fy', 'fur', 'gl', 'lug', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'he', 'hil', 'hi', 'mww', 'hu', 'iba', 'is', 'ig', 'ilo', 'id', 'ikt', 'iu', 'iu-Latn', 'ga', 'it', 'jam', 'ja', 'jav', 'kea', 'kn', 'pam', 'ks', 'kk', 'km', 'rw', 'tlh-Latn', 'gom', 'ko', 'kri', 'ku', 'kmr', 'ky', 'lo', 'la', 'lv', 'lij', 'lim', 'ln', 'lt', 'lmo', 'dsb', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mr', 'mwr', 'mfe', 'min', 'mn-Cyrl', 'mn-Mong', 'my', 'mi', 'ne', 'nb', 'nno', 'nya', 'oc', 'or', 'pap', 'ps', 'fa', 'pl', 'pt', 'pt-PT', 'pa', 'pnb', 'otq', 'ro', 'run', 'ru', 'sm', 'sa', 'srd', 'sr-Cyrl', 'sr-Latn', 'st', 'nso', 'tn', 'crs', 'sn', 'scn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'ty', 'tgk', 'ta', 'tt', 'te', 'tet', 'th', 'bo', 'ti', 'tpi', 'to', 'tr', 'tk', 'uk', 'hsb', 'ur', 'ug', 'uz', 'vec', 'vi', 'war', 'cy', 'xh', 'ydd', 'yo', 'yua', 'zu'
+    'ace', 'af', 'sq', 'am', 'ar', 'arz', 'ary', 'arb', 'hy', 'as', 'ast', 'az', 'ban', 'bn', 'ba', 'eu', 'bbc', 'be', 'bho', 'bik', 'brx', 'bs', 'bg', 'yue', 'ca', 'ceb', 'hne', 'lzh', 'zh-Hans', 'zh-Hant', 'co', 'hr', 'cs', 'da', 'prs', 'dv', 'doi', 'nl', 'en', 'en-GB', 'epo', 'et', 'fo', 'fj', 'fil', 'fi', 'fr', 'fr-CA', 'fy', 'fur', 'gl', 'gd', 'lug', 'ka', 'de', 'el', 'gu', 'ht', 'ha', 'he', 'hil', 'hi', 'mww', 'hu', 'iba', 'is', 'ig', 'ilo', 'id', 'ikt', 'iu', 'iu-Latn', 'ga', 'it', 'jam', 'ja', 'jav', 'kea', 'kn', 'pam', 'ks', 'kk', 'km', 'rw', 'tlh-Latn', 'gom', 'ko', 'kri', 'ku', 'kmr', 'ky', 'lo', 'la', 'lv', 'lij', 'lim', 'ln', 'lt', 'lmo', 'dsb', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mr', 'mwr', 'mfe', 'min', 'mn-Cyrl', 'mn-Mong', 'my', 'mi', 'ne', 'nb', 'nno', 'nya', 'oc', 'or', 'pap', 'ps', 'fa', 'pl', 'pt', 'pt-PT', 'pa', 'pnb', 'otq', 'ro', 'run', 'ru', 'sm', 'sa', 'srd', 'sr-Cyrl', 'sr-Latn', 'st', 'nso', 'tn', 'crs', 'sn', 'scn', 'sd', 'si', 'sk', 'sl', 'so', 'es', 'su', 'sw', 'sv', 'ty', 'tgk', 'ta', 'tt', 'te', 'tet', 'th', 'bo', 'ti', 'tpi', 'to', 'tr', 'tk', 'uk', 'hsb', 'ur', 'ug', 'uz', 'vec', 'vi', 'war', 'cy', 'xh', 'ydd', 'yo', 'yua', 'zu'
   ],
 
   // Yandex Translate - based on provided list
   yandex: [
-    'ace', 'af', 'sq', 'ar', 'an', 'hy', 'as', 'ay', 'az', 'ba', 'eu', 'be', 'bn', 'bho', 'bs', 'br', 'bg', 'my', 'yue', 'ca', 'ceb', 'zh-cn', 'hr', 'cs', 'da', 'prs', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'gl', 'ka', 'de', 'el', 'gn', 'gu', 'ht', 'ha', 'he', 'hi', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'pam', 'kk', 'gom', 'ko',
+    'ace', 'af', 'sq', 'am', 'ar', 'an', 'hy', 'as', 'ay', 'az', 'ba', 'eu', 'be', 'bn', 'bho', 'bs', 'br', 'bg', 'my', 'yue', 'ca', 'ceb', 'zh-cn', 'hr', 'cs', 'da', 'prs', 'nl', 'en', 'eo', 'et', 'fi', 'fr', 'gl', 'gd', 'ka', 'de', 'el', 'gn', 'gu', 'ht', 'ha', 'he', 'hi', 'hu', 'is', 'ig', 'id', 'ga', 'it', 'ja', 'jv', 'pam', 'kk', 'gom', 'ko',
     'ru', 'fa', 'ne'
   ],
 
