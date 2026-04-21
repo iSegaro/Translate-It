@@ -56,27 +56,30 @@
       </template>
     </BaseButton>
 
-    <!-- Inline Actions when recording -->
-    <div 
-      v-if="isRecording" 
-      class="recording-actions-inline"
-    >
-      <button 
-        class="action-btn confirm" 
-        :disabled="currentKeys.length === 0"
-        :title="t('confirm') || 'Confirm'"
-        @click.stop="confirmShortcut"
+    <!-- Inline Actions when recording (Placed after button to appear on the trailing side) -->
+    <Transition name="actions-slide">
+      <div 
+        v-if="isRecording" 
+        class="recording-actions-inline"
       >
-        ✓
-      </button>
-      <button 
-        class="action-btn cancel" 
-        :title="t('cancel') || 'Cancel'"
-        @click.stop="cancelRecording"
-      >
-        ✕
-      </button>
-    </div>
+        <button 
+          class="action-btn confirm" 
+          :disabled="currentKeys.length === 0"
+          :title="t('confirm') || 'Confirm'"
+          @click.stop="confirmShortcut"
+        >
+          ✓
+        </button>
+        <div class="actions-divider" />
+        <button 
+          class="action-btn cancel" 
+          :title="t('cancel') || 'Cancel'"
+          @click.stop="cancelRecording"
+        >
+          ✕
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 

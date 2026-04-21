@@ -3,20 +3,17 @@
 .shortcut-picker {
   position: relative;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: $spacing-sm;
   flex-shrink: 0;
   max-width: 100%;
-  transition: all 0.2s ease;
-
-  &.is-recording {
-    z-index: 10;
-  }
+  // حذف gap چون دکمه‌ها مطلق می‌شوند
 }
 
 .shortcut-button {
-  min-width: 140px;
-  max-width: 250px;
+  width: 170px !important;
+  min-width: 170px !important;
+  max-width: 170px !important;
   padding: 4px $spacing-sm !important;
   display: flex !important;
   align-items: center !important;
@@ -46,16 +43,12 @@
     border-color: var(--color-text) !important;
     background-color: var(--color-background) !important;
     box-shadow: 0 0 0 2px var(--color-border) !important;
+    z-index: 1;
     
     .recording-placeholder {
       color: var(--color-text) !important;
       font-weight: 500;
     }
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
   }
 }
 
@@ -64,16 +57,14 @@
   align-items: center;
   gap: 4px;
   color: var(--color-text);
-  font-family: inherit;
 }
 
-// استایل کلیدهای کیبورد (KBD)
 :deep(.kbd-key) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  padding: 2px 6px;
+  min-width: 18px;
+  padding: 1px 5px;
   font-family: monospace;
   font-size: 11px;
   font-weight: 600;
@@ -91,59 +82,94 @@
   }
 }
 
-.shortcut-separator {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  opacity: 0.7;
-}
-
 .recording-placeholder {
   font-size: $font-size-xs;
   color: var(--color-text-secondary);
   animation: soft-pulse 1.8s infinite ease-in-out;
+  white-space: nowrap;
 }
 
 .recording-actions-inline {
+  position: absolute !important;
+  top: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin-top: 8px !important;
+  z-index: 100 !important;
+  
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
   background-color: var(--color-background);
   border: 1px solid var(--color-border);
-  border-radius: $border-radius-base;
-  box-shadow: $shadow-md;
-  animation: slideIn 0.2s ease-out;
+  border-radius: $border-radius-md;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  width: fit-content;
 
-  .action-btn {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    background: transparent;
-    cursor: pointer;
-    border-radius: $border-radius-sm;
-    font-size: 12px;
-    transition: all 0.2s ease;
+  .actions-divider {
+    width: 1px;
+    height: 16px;
+    background-color: var(--color-border);
+    margin: 0 2px;
+  }
+}
 
-    &.confirm {
-      color: var(--color-success);
-      &:hover:not(:disabled) {
-        background-color: var(--color-success-alpha);
-        border-color: var(--color-success);
-      }
-      &:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-      }
+/* Transitions for actions (Floating down) */
+.actions-slide-enter-active,
+.actions-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+}
+
+.actions-slide-enter-from,
+.actions-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px) scale(0.95) !important;
+}
+
+.action-btn {
+  width: 34px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  border-radius: $border-radius-sm;
+  font-size: 13px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.9);
+  }
+
+  &.confirm {
+    color: var(--color-success, #2e7d32);
+    background-color: var(--color-success-alpha, rgba(46, 125, 50, 0.05));
+    
+    &:hover:not(:disabled) {
+      background-color: var(--color-success);
+      color: white;
     }
+    
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      background: transparent;
+    }
+  }
 
-    &.cancel {
-      color: var(--color-text-secondary);
-      &:hover {
-        background-color: var(--color-background-hover);
-        color: var(--color-error);
-      }
+  &.cancel {
+    color: var(--color-text-secondary);
+    background-color: var(--color-background-alt, rgba(0, 0, 0, 0.03));
+    
+    &:hover {
+      background-color: var(--color-error, #d32f2f);
+      color: white;
     }
   }
 }
@@ -152,9 +178,4 @@
   0% { opacity: 0.6; transform: scale(0.98); }
   50% { opacity: 1; transform: scale(1); }
   100% { opacity: 0.6; transform: scale(0.98); }
-}
-
-@keyframes slideIn {
-  from { transform: translateX(-8px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
 }
