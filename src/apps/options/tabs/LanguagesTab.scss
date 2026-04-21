@@ -190,12 +190,25 @@
       .tier-select,
       .formality-select,
       .model-select,
+      .deepl-checkbox,
       .api-url-input,
       .api-key-input-wrapper {
         width: 100% !important;
         max-width: var(--input-max-width, 620px);
         flex: none !important;
         margin-bottom: $spacing-xs;
+      }
+
+      // Special styling for checkboxes that need to match dropdown width visually
+      .deepl-checkbox {
+        display: flex;
+        align-items: center;
+        padding: $spacing-sm;
+        background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02));
+        border: 1px solid var(--color-border-light, var(--color-border));
+        border-radius: $border-radius-base;
+        box-sizing: border-box;
+        min-height: 38px; // Match standard select height
       }
 
       // Improve description styling for better hierarchy

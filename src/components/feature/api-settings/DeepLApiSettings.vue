@@ -44,6 +44,7 @@
       <BaseCheckbox
         v-model="deeplBetaLanguagesEnabled"
         :label="t('deepl_beta_languages_label') || 'Enable Beta Languages'"
+        class="deepl-checkbox"
       />
       <p class="setting-description">
         {{ t('deepl_beta_languages_description') || 'Enable support for beta languages. Beta languages do not support formality settings.' }}
