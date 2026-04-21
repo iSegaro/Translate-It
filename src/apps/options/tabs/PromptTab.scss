@@ -24,17 +24,25 @@
       }
 
       .button-inline {
-        padding: 4px 12px;
+        padding: 4px 14px;
         font-size: $font-size-xs;
-        background: var(--color-background-alt);
+        background: var(--color-surface, #f5f5f5);
         border: 1px solid var(--color-border);
+        color: var(--color-text);
+        font-weight: $font-weight-medium;
         border-radius: $border-radius-sm;
         cursor: pointer;
         transition: all $transition-base;
 
         &:hover {
-          background: var(--color-background-hover);
-          border-color: var(--color-text-secondary);
+          background: var(--color-primary);
+          border-color: var(--color-primary);
+          color: white;
+          box-shadow: $shadow-sm;
+        }
+
+        &:active {
+          transform: translateY(1px);
         }
       }
     }
