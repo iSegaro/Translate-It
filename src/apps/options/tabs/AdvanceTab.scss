@@ -182,20 +182,26 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      height: 36px;
+      height: 34px; // Match shortcut button height
       padding: 0 $spacing-lg;
-      background: var(--color-primary);
-      color: white;
-      border: none;
-      border-radius: $border-radius-sm;
+      background-color: var(--color-background-alt, var(--color-surface)) !important;
+      border: 1px solid var(--color-border) !important;
+      color: var(--color-text) !important;
+      border-radius: $border-radius-base;
       font-size: $font-size-sm;
       font-weight: $font-weight-medium;
       cursor: pointer;
       transition: all $transition-base;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 
       &:hover:not(:disabled) {
-        filter: brightness(1.1);
+        border-color: var(--color-text-secondary) !important;
+        background-color: var(--color-background) !important;
         transform: translateY(-1px);
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(0);
       }
 
       &:disabled {
@@ -203,13 +209,29 @@
         cursor: not-allowed;
       }
 
-      &.success { background-color: var(--color-success); }
-      &.error { background-color: var(--color-error); }
+      &.success { 
+        border-color: var(--color-success) !important;
+        color: var(--color-success) !important;
+        background-color: var(--color-success-alpha) !important;
+      }
+      
+      &.error { 
+        border-color: var(--color-error) !important;
+        color: var(--color-error) !important;
+        background-color: var(--color-error-alpha) !important;
+      }
 
       .button-content {
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+
+      .test-icon-img {
+        display: block;
+        width: 16px !important;
+        height: 16px !important;
+        object-fit: contain;
       }
 
       .spinner {

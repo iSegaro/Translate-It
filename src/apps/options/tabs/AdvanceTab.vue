@@ -133,17 +133,13 @@
                     v-else
                     class="button-content"
                   >
-                    <svg
-                      class="test-icon"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
+                    <img
+                      :src="proxyIcon"
+                      class="test-icon-img"
+                      width="18"
+                      height="18"
+                      alt=""
                     >
-                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M8 21h3M21 16v3a2 2 0 0 1-2 2h-3M12 12l-3-3 3-3M16 8l3 3-3 3" />
-                    </svg>
                     {{ testButtonText }}
                   </span>
                 </button>
@@ -228,6 +224,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
 import LogLevelItem from '../components/LogLevelItem.vue'
+import proxyIcon from '@/icons/ui/proxy.png?url'
 
 import { useI18n } from 'vue-i18n'
 
