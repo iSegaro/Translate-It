@@ -9,6 +9,8 @@
   // API Settings Section
   .api-settings-section {
     margin-top: 0;
+    width: 100%;
+    box-sizing: border-box;
 
     .optimization-control-area {
       margin-bottom: $spacing-lg;
@@ -18,7 +20,9 @@
       border: 1px solid var(--color-border-light, var(--color-border));
       box-sizing: border-box;
       width: 100%;
+      max-width: 100%;
       overflow: hidden;
+      display: block;
 
       .opt-control-group {
         display: flex;
@@ -36,6 +40,7 @@
         gap: $spacing-sm;
         width: 100%;
         box-sizing: border-box;
+        overflow: hidden;
 
         .opt-label {
           font-weight: $font-weight-medium;
@@ -81,6 +86,7 @@
         font-size: 10px;
         color: var(--color-text-secondary);
         margin-top: 4px;
+        width: 100%;
         
         span {
           cursor: pointer;
@@ -98,6 +104,9 @@
         color: var(--color-text-secondary);
         line-height: 1.4;
         margin-top: $spacing-xs;
+        width: 100%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
       }
     }
   }
@@ -124,7 +133,7 @@
           max-width: 200px !important;
           
           .ti-provider-button {
-            height: 32px !important; // Slightly more compact for header
+            height: 32px !important;
             padding: 0 10px !important;
           }
         }
@@ -135,12 +144,17 @@
   .provider-settings-container {
     margin-top: $spacing-lg;
     width: 100%;
-    overflow: visible; // Allow validation tooltips/absolute content
+    max-width: 100%;
+    overflow: visible;
+    box-sizing: border-box;
   }
 
   .provider-settings {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    display: block;
+    overflow: hidden;
   }
 
   // --- Specific style for Bilingual Setting ---
@@ -182,7 +196,6 @@
       display: flex;
       flex-direction: column;
       gap: $spacing-xs;
-      margin-inline-start: 28px;
     }
   }
 
@@ -195,7 +208,6 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: $spacing-sm;
-      margin-inline-start: 28px;
 
       .pref-label {
         font-size: $font-size-sm;
@@ -211,15 +223,6 @@
   // AI Optimization
   .ai-optimization-setting {
     margin-top: $spacing-md;
-
-    .setting-group {
-      margin-bottom: $spacing-md;
-      margin-inline-start: 28px;
-    }
-  }
-
-  .accordion-inner {
-    padding: $spacing-sm 0 $spacing-md 0;
   }
 
   .section-separator {
@@ -266,12 +269,22 @@
   }
 
   // --- Common alignment for all top-level setting groups ---
+  .settings-container > .setting-group,
+  .settings-container > .section-separator,
+  .api-settings-accordion :deep(.ti-accordion-header),
+  .bilingual-setting :deep(.ti-accordion-header),
+  .language-pref-setting :deep(.ti-accordion-header),
+  .ai-optimization-setting :deep(.ti-accordion-header),
+  .accordion-inner {
+    margin-inline-start: 28px !important;
+    width: auto !important;
+    box-sizing: border-box !important;
+  }
+
   .setting-group {
     display: flex;
     margin-bottom: $spacing-md;
-    width: calc(100% - 28px);
-    margin-inline-start: 28px;
-    box-sizing: border-box;
+    width: 100%;
 
     &.vertical {
       flex-direction: column;
@@ -298,11 +311,31 @@
       }
 
       .language-dropdown,
-      :deep(.ti-provider-button-container) {
+      .ti-provider-button-container {
         flex: 0 0 200px;
         width: 200px;
         min-width: 200px;
       }
+    }
+  }
+
+  .accordion-inner {
+    padding: $spacing-sm 0 $spacing-md 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+
+    :deep(.setting-group),
+    .setting-group,
+    .language-pref-row,
+    .optimization-control-area,
+    .provider-settings-container,
+    .api-settings-section,
+    .provider-settings,
+    .setting-description {
+      margin-inline-start: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
     }
   }
 }
@@ -310,45 +343,55 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .languages-tab {
-    .setting-group {
-      margin-inline-start: 0;
-      width: 100%;
+    .settings-container > .setting-group,
+    .settings-container > .section-separator,
+    .api-settings-accordion :deep(.ti-accordion-header),
+    .bilingual-setting :deep(.ti-accordion-header),
+    .language-pref-setting :deep(.ti-accordion-header),
+    .ai-optimization-setting :deep(.ti-accordion-header),
+    .accordion-inner {
+      margin-inline-start: 0 !important;
+      width: 100% !important;
+    }
+    
+    .accordion-inner {
+      padding-inline-start: 0 !important;
     }
 
     .setting-group:not(.vertical) {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: $spacing-xs;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: $spacing-xs !important;
 
       label {
-        width: 100%;
-        flex: none;
-        white-space: normal;
+        width: 100% !important;
+        flex: none !important;
+        white-space: normal !important;
       }
 
       .language-dropdown,
-      :deep(.ti-provider-button-container) {
-        width: 100%;
-        flex: none;
-        min-width: 0;
+      .ti-provider-button-container {
+        width: 100% !important;
+        flex: none !important;
+        min-width: 0 !important;
       }
     }
 
     .language-pref-row {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: $spacing-xs;
-      margin-inline-start: 0;
-      width: 100%;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: $spacing-xs !important;
+      margin-inline-start: 0 !important;
+      width: 100% !important;
 
       .pref-label {
-        width: 100%;
-        flex: none;
+        width: 100% !important;
+        flex: none !important;
       }
 
       .pref-select {
-        width: 100%;
-        flex: none;
+        width: 100% !important;
+        flex: none !important;
       }
     }
   }
