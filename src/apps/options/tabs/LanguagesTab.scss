@@ -106,6 +106,30 @@
     :deep(.ti-accordion-header) {
       font-weight: $font-weight-bold;
     }
+
+    .accordion-header-layout {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding-inline-end: $spacing-md;
+      box-sizing: border-box;
+
+      .header-selector-wrapper {
+        flex: 0 0 200px;
+        width: 200px;
+        font-weight: $font-weight-normal;
+
+        :deep(.ti-provider-button-container) {
+          max-width: 200px !important;
+          
+          .ti-provider-button {
+            height: 32px !important; // Slightly more compact for header
+            padding: 0 10px !important;
+          }
+        }
+      }
+    }
   }
 
   .provider-settings-container {

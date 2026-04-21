@@ -39,21 +39,24 @@
         @toggle="toggleAccordion('api')"
       >
         <template #header>
-          <span>{{ t('translation_api_label') || 'API Choice & Provider Settings' }}</span>
+          <div class="accordion-header-layout">
+            <span>{{ t('translation_api_label') || 'API Choice & Provider Settings' }}</span>
+            <div 
+              class="header-selector-wrapper"
+              @click.stop
+            >
+              <ProviderSelector 
+                v-model="selectedProvider" 
+                mode="button"
+                :is-global="false"
+              />
+            </div>
+          </div>
         </template>
 
         <template #content>
           <div class="accordion-inner">
             <div class="api-settings-section">
-              <div class="setting-group">
-                <label>{{ t('translation_api_label') || 'API Choice' }}</label>
-                <ProviderSelector 
-                  v-model="selectedProvider" 
-                  mode="button"
-                  :is-global="false"
-                />
-              </div>
-
               <div class="provider-settings-container">
                 <Transition name="fade-slide">
                   <div 
