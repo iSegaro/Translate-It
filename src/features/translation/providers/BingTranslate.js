@@ -192,6 +192,9 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             err.name = 'BingApiError';
             throw err;
           }
+
+          // Capture detected source language from metadata if available
+          this._setDetectedLanguage(data?.[0]?.detectedLanguage?.language);
           
           const targetText = data?.[0]?.translations?.[0]?.text;
           if (typeof targetText !== 'string') {

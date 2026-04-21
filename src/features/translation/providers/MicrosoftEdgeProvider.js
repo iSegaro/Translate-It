@@ -174,10 +174,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
           }
           
           // Capture detected language from metadata if available
-          if (data[0].detectedLanguage?.language) {
-            this.lastDetectedLanguage = data[0].detectedLanguage.language;
-            logger.debug(`[Edge] API detected source language: ${this.lastDetectedLanguage}`);
-          }
+          this._setDetectedLanguage(data[0].detectedLanguage?.language);
           
           // Match anylang logic: Join multiple translation segments if present
           return data.map(item => {

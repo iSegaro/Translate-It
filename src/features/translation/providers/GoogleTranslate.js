@@ -99,6 +99,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
           return { translatedText: "", candidateText: "" };
         }
 
+        // Capture detected source language from metadata (index 2 in Google's legacy response)
+        this._setDetectedLanguage(data[2]);
+
         const translatedText = data[0].map(segment => segment[0]).join('');
         
         let candidateText = "";

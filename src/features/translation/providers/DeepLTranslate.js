@@ -417,6 +417,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(() => '');
           }
 
+          // Capture detected source language from metadata if available (using first segment)
+          this._setDetectedLanguage(data.translations[0]?.detected_source_language);
+
           // DeepL returns array of translation objects for valid texts only
           const validTranslations = data.translations.map(t => t.text || '');
 

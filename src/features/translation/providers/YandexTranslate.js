@@ -104,6 +104,12 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
           err.statusCode = data?.code;
           throw err;
         }
+
+        // Capture detected source language from 'lang' field (format: "en-fa")
+        if (data.lang && typeof data.lang === 'string') {
+          this._setDetectedLanguage(data.lang.split('-')[0]);
+        }
+
         return data.text;
       },
       context,

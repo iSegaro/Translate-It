@@ -160,6 +160,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           return { translatedText: "", candidateText: "" };
         }
 
+        // Capture detected source language if available (usually at index 2 or index 8)
+        this._setDetectedLanguage(data[2] || (data[8] && data[8][0] && data[8][0][0]));
+
         // Combine segments back
         const translatedText = data[0].map(segment => segment[0] || "").join('');
         

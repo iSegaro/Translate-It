@@ -208,5 +208,18 @@ export class BaseTranslateProvider extends BaseProvider {
 
   _calculateTraditionalCharCount(texts) { return TraditionalTextProcessor.calculateTraditionalCharCount(texts); }
   
+  /**
+   * Standardized helper to capture and log the language detected by the provider's API.
+   * This property is inherited by the TranslationEngine and used for metadata (e.g., TTS).
+   * @param {string|null|undefined} lang - The raw language code from the API response
+   * @protected
+   */
+  _setDetectedLanguage(lang) {
+    if (lang && typeof lang === 'string' && lang.trim() !== '') {
+      this.lastDetectedLanguage = lang.toLowerCase().trim();
+      logger.debug(`[${this.providerName}] API detected source language: ${this.lastDetectedLanguage}`);
+    }
+  }
+
   async _translateChunk() { throw new Error(`_translateChunk not implemented by ${this.providerName}`); }
 }
