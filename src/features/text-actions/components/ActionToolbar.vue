@@ -39,10 +39,10 @@
     <!-- Right group: Paste -->
     <div class="ti-toolbar-right">
       <span
-        v-if="showDetectedLanguageLabel"
-        class="ti-detected-language-label"
+        v-if="showLanguageLabel"
+        class="ti-language-label"
       >
-        {{ detectedLanguageName }}
+        {{ languageLabelText }}
       </span>
       <PasteButton
         v-if="showPaste"
@@ -218,16 +218,27 @@ const buttonVariant = computed(() => {
   return props.variant
 })
 
-const showDetectedLanguageLabel = computed(() => {
-  return props.detectedLanguage && 
-         props.detectedLanguage !== 'auto' && 
-         props.mode === 'input' && 
-         props.text && props.text.trim().length > 0;
+const showLanguageLabel = computed(() => {
+  if (!props.text || props.text.trim().length === 0) return false;
+
+  // Input mode: Show detected language
+  if (props.mode === 'input') {
+    return props.detectedLanguage && props.detectedLanguage !== 'auto';
+  }
+  
+  // Output mode & Sidepanel: Show target language
+  if (props.mode === 'output' || props.mode === 'sidepanel') {
+    return props.language && props.language !== 'auto';
+  }
+
+  return false;
 })
 
-const detectedLanguageName = computed(() => {
-  if (!props.detectedLanguage) return '';
-  const name = getLanguageNameFromCode(props.detectedLanguage);
+const languageLabelText = computed(() => {
+  const code = (props.mode === 'input') ? props.detectedLanguage : props.language;
+  if (!code || code === 'auto') return '';
+  
+  const name = getLanguageNameFromCode(code);
   return name ? name.charAt(0).toUpperCase() + name.slice(1) : '';
 })
 
@@ -319,7 +330,7 @@ const handleTTSStateChanged = (data) => {
   flex: 0 1 auto;
 }
 
-.ti-detected-language-label {
+.ti-language-label {
   font-size: 10px;
   color: var(--ti-color-text-secondary, #5f6368);
   background: var(--ti-color-surface-variant, #f1f3f4);
