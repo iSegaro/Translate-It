@@ -1,3 +1,4 @@
+@use "@/assets/styles/base/variables" as vars;
 @use "@/assets/styles/base/mixins" as *;
 
 .sidepanel-wrapper {
@@ -153,20 +154,55 @@
   min-width: auto;
 }
 
+/* 
+   Base Button & Icon Styles
+   ------------------------
+*/
 .ti-icon-button {
   @include toolbar-button-minimal;
+
+  &:hover:not(:disabled) {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
+  }
 }
 
 .ti-toolbar-icon {
-  width: 16px;
-  height: 16px;
-  opacity: var(--icon-opacity, 0.6);
-  filter: var(--icon-filter);
-  transition: opacity 0.2s ease-in-out;
+  width: 16px !important;
+  height: 16px !important;
+  opacity: 0.7 !important;
+  filter: var(--icon-filter, none);
+  transition: opacity 0.2s ease-in-out, filter 0.2s ease;
 }
 
 .ti-icon-button:hover .ti-toolbar-icon {
-  opacity: var(--icon-hover-opacity, 1);
+  opacity: 1 !important;
+}
+
+/* 
+   DARK THEME FIX: Clear Fields Button
+   Placing at the very end to ensure maximum priority in the cascade.
+*/
+.theme-dark,
+:root.theme-dark {
+  /* 1. Reset button level styles */
+  .ti-icon-button.row-clear-btn,
+  .ti-icon-button.inline-clear-btn {
+    filter: none !important;
+
+    &:hover:not(:disabled) {
+      background-color: #424242 !important; /* Matches window header button hover */
+    }
+
+    /* 2. Force the icon to be PURE WHITE like TTS button */
+    .ti-toolbar-icon {
+      filter: brightness(0) invert(1) !important;
+      opacity: 0.9 !important;
+    }
+
+    &:hover .ti-toolbar-icon {
+      opacity: 1 !important;
+    }
+  }
 }
 
 @keyframes spin {
