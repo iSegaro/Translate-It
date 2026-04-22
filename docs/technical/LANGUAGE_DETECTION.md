@@ -47,7 +47,7 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 ```
 
 ### Priority Hierarchy
-1.  **Layer 0: Inherited Detection (AuthSource)**: If the text was just processed by a translation provider, its detected language is passed through the messaging chain. This is the **most authoritative** source.
+1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This is the **most authoritative** source.
 2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
 3.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
 4.  **Layer 3: Heuristic Layer**: Fallbacks based on user preferences and script defaults.
@@ -57,7 +57,10 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 ## Core Components
 
 ### 1. `LanguageDetectionService.js` (The Brain)
-The central orchestrator for all detection requests. It manages the dynamic flow logic, threshold checks, and asynchronous coordination between the script engine and Browser APIs. All other services (TTS, Translation) **must** use this service to ensure consistency.
+The central orchestrator for all detection requests. It manages:
+- **Layer 0 Cache**: A dual-mode session cache storing exact text matches and URL-based script inheritance.
+- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections from translation providers.
+- **Dynamic Routing**: Adjusts layer priority based on text length and script family.
 
 ### 2. `textAnalysis.js` (The Engine)
 Contains low-level Unicode range analysis and script-specific detection functions. It differentiates between "Definitive Markers" (using `useDefaults: false`) and "Heuristic Guessing" (using `useDefaults: true`).

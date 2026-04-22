@@ -88,6 +88,13 @@ Handles the dynamic aspects of Microsoft Edge voices:
 
 ## Smart Language Detection & Voice Selection
 
+### Provider-led Detection Inheritance (Highly Accurate)
+To ensure 100% accurate pronunciation, the TTS system integrates with the translation provider's feedback loop:
+1.  **Translation Feedback**: When a provider (e.g., Google or Gemini) translates text, it identifies the source language. This verified result is registered in `LanguageDetectionService`.
+2.  **TTS Request**: When the user clicks the TTS button, the `TTSDispatcher` calls the detection service.
+3.  **Cache Hit**: The system retrieves the **verified** provider detection from the session cache (Layer 0), bypassing probabilistic internal detection.
+4.  **Perfect Pronunciation**: The TTS uses this verified code to select the exactly matching neural voice (e.g., distinguishing between Portuguese and Brazilian Portuguese if the provider specified it).
+
 ### Detection Inheritance (Optimization)
 To minimize latency and prevent "Short Text Detection" warnings, the TTS system prioritizes inherited detection data:
 1.  **Inheritance Bypass**: If the UI component (e.g., `TTSButton`) provides an explicit `sourceLanguage` (inherited from a previous translation), the `TTSDispatcher` **bypasses** all internal detection logic.
