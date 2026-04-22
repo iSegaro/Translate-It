@@ -68,8 +68,32 @@
   width: 24px !important;
   height: 100% !important;
   cursor: pointer !important;
-  background: none !important;
-  &:hover { background-color: var(--color-surface) !important; }
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  
+  /* Disable ALL hover effects for the area and everything inside it */
+  &, &:hover, &:active, &:focus {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    filter: none !important;
+    outline: none !important;
+  }
+
+  /* Target any child icons or buttons that might have their own hover */
+  * {
+    &, &:hover, &:active, &:focus {
+      background: transparent !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      filter: none !important;
+    }
+  }
+
   &.ti-active { background-color: var(--color-primary-alpha) !important; }
 }
 
