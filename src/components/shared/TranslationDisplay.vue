@@ -36,7 +36,7 @@
       <ActionToolbar
         v-show="showToolbar && hasContent && mode !== 'mobile'"
         :text="content"
-        :language="targetLanguage"
+        :language="lastTranslation?.targetLanguage || targetLanguage"
         :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
         class="ti-display-toolbar"
         :show-copy="showCopyButton"

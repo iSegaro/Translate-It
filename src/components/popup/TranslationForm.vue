@@ -8,8 +8,8 @@
       ref="sourceInputRef"
       v-model="sourceText"
       :placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
-      :language="currentSourceLanguage"
-      :detected-source-language="detectedSourceLanguage"
+      :language="actualSourceLanguage"
+      :detected-source-language="actualSourceLanguage"
       :rows="2"
       :tabindex="1"
       :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
@@ -28,8 +28,8 @@
     <TranslationDisplay
       ref="translationResultRef"
       :content="translatedText"
-      :language="currentTargetLanguage"
-      :target-language="currentTargetLanguage"
+      :language="actualTargetLanguage"
+      :target-language="actualTargetLanguage"
       :is-loading="isTranslating"
       :error="translationError"
       :error-type="errorType"
@@ -103,20 +103,20 @@ const translationResultRef = ref(null)
 
 // State from composables
 const {
-sourceText,
-translatedText,
-isTranslating,
-translationError,
-errorType,
-canTranslate,
-detectedSourceLanguage,
-triggerTranslation,
-cancelTranslation,
-clearTranslation,
-loadLastTranslation
+  sourceText,
+  translatedText,
+  isTranslating,
+  translationError,
+  errorType,
+  canTranslate,
+  detectedSourceLanguage,
+  actualSourceLanguage,
+  actualTargetLanguage,
+  lastTranslation,
+  triggerTranslation,
+  cancelTranslation,
+  clearTranslation,
 } = translation
-// Local state
-const lastTranslation = ref(null)
 
 // Watch canTranslate and emit changes to parent
 watch(canTranslate, (newValue) => {
@@ -129,27 +129,6 @@ watch(sourceText, (newValue, oldValue) => {
     logger.debug("📝 Source text changed:", { length: newValue?.length || 0, preview: newValue?.substring(0, 50) + "..." });
   }
 }, { deep: true })
-
-// Reactive language values - use props first, then fallback to settings
-const currentSourceLanguage = computed(() => {
-  // If sourceLanguage prop is provided and not auto, use it
-  if (props.sourceLanguage && props.sourceLanguage !== AUTO_DETECT_VALUE) {
-    logger.debug('[TranslationForm] Using prop sourceLanguage:', props.sourceLanguage)
-    return props.sourceLanguage
-  }
-
-  // If auto-detect is selected, keep 'auto' to let LanguageSwappingService handle detection
-  // This prevents edge cases where UI shows detected language but translation fails
-  logger.debug('[TranslationForm] Using auto source for language swapping logic')
-  return AUTO_DETECT_VALUE
-})
-
-const currentTargetLanguage = computed(() => {
-  // Use prop if available, otherwise fallback to settings
-  const lang = props.targetLanguage || settingsStore.settings.TARGET_LANGUAGE
-  logger.debug('[TranslationForm] Using targetLanguage:', lang)
-  return lang
-})
 
 // Methods
 const handleSourceInput = (_event) => {

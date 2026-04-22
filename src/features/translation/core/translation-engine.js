@@ -140,15 +140,15 @@ export class TranslationEngine {
     });
 
     // Extract values from the unified coordinator response
-    const { translatedText, detectedLanguage } = result;
+    const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;
 
     return {
       success: true,
       translatedText: translatedText,
       streaming: typeof result === 'object' && result?.streaming, 
       provider,
-      sourceLanguage: detectedLanguage || sourceLanguage, // Prioritize provider's detection
-      targetLanguage,
+      sourceLanguage: finalSourceLanguage || detectedLanguage || sourceLanguage, 
+      targetLanguage: finalTargetLanguage || targetLanguage, // Use swapped target language if available
       originalText: text,
       timestamp: Date.now(),
       mode: mode || "simple",

@@ -90,8 +90,8 @@
         ref="sourceInputRef"
         v-model="sourceText"
         :placeholder="t('SIDEPANEL_SOURCE_TEXT_PLACEHOLDER', 'Type Here')"
-        :language="currentSourceLanguage"
-        :detected-source-language="detectedSourceLanguage"
+        :language="actualSourceLanguage"
+        :detected-source-language="actualSourceLanguage"
         :rows="6"
         :tabindex="1"
         :copy-title="t('SIDEPANEL_COPY_SOURCE_TITLE_ICON', 'Copy source text')"
@@ -109,8 +109,8 @@
         <TranslationDisplay
           ref="translationResultRef"
           :content="translatedText"
-          :language="currentTargetLanguage"
-          :target-language="currentTargetLanguage"
+          :language="actualTargetLanguage"
+          :target-language="actualTargetLanguage"
           :is-loading="isTranslating"
           :error="translationError"
           :error-type="errorType"
@@ -164,6 +164,9 @@ const {
   errorType,
   canTranslate,
   detectedSourceLanguage,
+  actualSourceLanguage,
+  actualTargetLanguage,
+  lastTranslation,
   triggerTranslation,
   cancelTranslation,
   clearTranslation,

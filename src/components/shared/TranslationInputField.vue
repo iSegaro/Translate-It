@@ -6,8 +6,8 @@
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
       :text="modelValue"
-      :language="detectedSourceLanguage || language"
-      :detected-language="detectedSourceLanguage"
+      :language="lastTranslation?.sourceLanguage || detectedSourceLanguage || language"
+      :detected-language="lastTranslation?.sourceLanguage || detectedSourceLanguage"
       mode="input"
       :show-copy="true"
       :show-tts="true"

@@ -37,6 +37,8 @@ export function useUnifiedTranslation(context = 'popup') {
   const targetLanguage = ref(DEFAULT_TARGET_LANGUAGE);
   const isTranslating = ref(false);
   const lastTranslation = ref(null);
+  const actualSourceLanguage = ref(AUTO_DETECT_VALUE);
+  const actualTargetLanguage = ref(DEFAULT_TARGET_LANGUAGE);
   
   const pendingRequests = ref(new Set());
   const loadingStartTime = ref(null);
@@ -115,6 +117,15 @@ export function useUnifiedTranslation(context = 'popup') {
   watch(targetLanguage, (newVal) => {
     if (newVal) {
       translationStore.uiTargetLanguage = newVal;
+      // Also update actual language to reflect user's choice when manual selection changes
+      actualTargetLanguage.value = newVal;
+    }
+  });
+
+  // Watch for local sourceLanguage changes
+  watch(sourceLanguage, (newVal) => {
+    if (newVal) {
+      actualSourceLanguage.value = newVal;
     }
   });
 
@@ -168,6 +179,14 @@ export function useUnifiedTranslation(context = 'popup') {
   const handleTranslationSuccess = (resultData) => {
     translatedText.value = resultData.translatedText;
     errorManager.clearError();
+    
+    // Update actual languages used for TTS and labels
+    if (resultData.sourceLanguage) actualSourceLanguage.value = resultData.sourceLanguage;
+    if (resultData.targetLanguage) actualTargetLanguage.value = resultData.targetLanguage;
+
+    // Update last translation metadata
+    // We keep the actual source/target languages from the result for TTS and ActionToolbar labels
+    // but we NO LONGER update the reactive targetLanguage/sourceLanguage refs to keep the dropdowns stable.
     lastTranslation.value = {
       source: resultData.originalText || sourceText.value,
       target: resultData.translatedText,
@@ -353,7 +372,6 @@ export function useUnifiedTranslation(context = 'popup') {
           if (resultData.success === false && resultData.error) {
             handleTranslationError(resultData.error);
           } else if (resultData.success === true && resultData.translatedText !== undefined) {
-            // Handle both cases: translatedText (string) and null (same language)
             handleTranslationSuccess(resultData);
             logger.debug(`[${context}] Translation result processed - translatedText: ${resultData.translatedText}`);
           } else {
@@ -376,13 +394,13 @@ export function useUnifiedTranslation(context = 'popup') {
           if (message.data.success === false && message.data.error) {
             handleTranslationError(message.data.error);
           } else if (message.data.success === true && message.data.translatedText !== undefined) {
-            // Handle both cases: translatedText (string) and null (same language)
             handleTranslationSuccess(message.data);
           } else {
             handleTranslationError("Unexpected response format in sidepanel");
           }
         });
-      }
+        }
+
     };
 
     const messageTarget = context === 'popup' && browserAPI ? browserAPI.onMessage : browser.runtime.onMessage;
@@ -413,6 +431,8 @@ export function useUnifiedTranslation(context = 'popup') {
     hasTranslation,
     canTranslate,
     detectedSourceLanguage,
+    actualSourceLanguage,
+    actualTargetLanguage,
     lastTranslation,
     // Error management
     translationError: errorManager.errorMessage,
