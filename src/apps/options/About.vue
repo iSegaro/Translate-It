@@ -3,7 +3,7 @@
   <div class="options-tab-content about-page">
     <div class="settings-container">
       <h2 class="page-title">
-        {{ t('about_section_title') || 'What\'s New' }}
+        {{ t('about_section_title') || "What's New" }}
       </h2>
       
       <div class="changelog-container">
@@ -22,7 +22,7 @@
         <!-- Safe: Content is sanitized with DOMPurify -->
         <div
           v-else
-          ref="changelogContent"
+          ref="changelogContentRef"
           class="changelog-content"
           v-html="sanitizedChangelog"
         />
@@ -37,23 +37,30 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import browser from 'webextension-polyfill'
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About');
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-import { useI18n } from 'vue-i18n'
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About')
 
-const { t } = useI18n()
+// Composables
+const { t } = useUnifiedI18n()
 
-
+// State
 const isLoadingChangelog = ref(true)
 const changelogError = ref(false)
 const rawChangelog = ref('')
+const changelogContentRef = ref(null)
+
+// --- Computed Properties ---
 
 // Computed property for sanitized HTML
 const sanitizedChangelog = computed(() => {
   return DOMPurify.sanitize(rawChangelog.value)
 })
+
+// --- Logic ---
 
 const fetchChangelog = async () => {
   try {
@@ -65,9 +72,9 @@ const fetchChangelog = async () => {
     }
     const markdown = await response.text()
     
-    // Configure marked options for better markdown support
+    // Configure marked options
     const markedOptions = {
-      breaks: false, // Don't convert single line breaks to <br>
+      breaks: false,
       gfm: true,
       smartLists: true,
       smartypants: false,
@@ -79,46 +86,46 @@ const fetchChangelog = async () => {
 
     let html = marked(markdown, markedOptions)
 
-    // Post-process to add spacing between sections without breaking markdown
+    // Post-process to add spacing between sections
     html = html.replace(/(<h[1-6][^>]*>.*?<\/h[1-6]>)\s*(?=<h[1-6]|$)/g, '$1<br>')
 
-    // Sanitize HTML for security
+    // Update raw changelog
     rawChangelog.value = html
   } catch (error) {
-  logger.error('Error fetching changelog:', error)
+    logger.error('Error fetching changelog:', error)
     changelogError.value = true
   } finally {
     isLoadingChangelog.value = false
   }
 }
 
-// Function to add target="_blank" only to external links
+/**
+ * Adds target="_blank" and rel="noopener noreferrer" to external links
+ */
 const addTargetBlankToLinks = () => {
-  // Use a simple selector to find all links in the changelog
-  const changelogElements = document.querySelectorAll('.changelog-content')
-  changelogElements.forEach(element => {
-    const links = element.querySelectorAll('a')
-    links.forEach(link => {
-      const href = link.getAttribute('href')
-      // Only add target="_blank" to external links (not starting with #)
-      if (href && !href.startsWith('#') && !link.getAttribute('target')) {
-        link.setAttribute('target', '_blank')
-        link.setAttribute('rel', 'noopener noreferrer')
-      }
-    })
+  if (!changelogContentRef.value) return
+
+  const links = changelogContentRef.value.querySelectorAll('a')
+  links.forEach(link => {
+    const href = link.getAttribute('href')
+    // Only add target="_blank" to external links (not starting with #)
+    if (href && !href.startsWith('#') && !link.getAttribute('target')) {
+      link.setAttribute('target', '_blank')
+      link.setAttribute('rel', 'noopener noreferrer')
+    }
   })
 }
 
-// Watch for changes and process links
+// Watch for content changes and process links after DOM update
 watch(sanitizedChangelog, () => {
   nextTick(() => {
     addTargetBlankToLinks()
   })
 })
 
+// --- Lifecycle ---
+
 onMounted(() => {
   fetchChangelog()
-  // Process links after a short delay to ensure DOM is ready
-  setTimeout(addTargetBlankToLinks, 500)
 })
 </script>
