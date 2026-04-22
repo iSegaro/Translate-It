@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content.
+The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content. It uses a token-optimized, context-aware batching strategy to ensure high-quality translations while minimizing costs.
 
 ## Architecture
 
@@ -10,12 +10,14 @@ The Select Element system provides an intuitive way for users to translate conte
 User Click → SelectElementManager
      ↓
      ├─→ ElementSelector (highlighting & target detection)
-     ├─→ DomTranslatorAdapter (translation orchestration & structural extraction)
+     ├─→ DomTranslatorAdapter (orchestration & UID-based mapping)
+     │       ↓ (Unified Messaging)
+     │   Optimized JSON Handler (Background: Intelligent Batching & Streaming)
      │       ↓
-     │   Optimized JSON Handler (Batching & Mapping)
-     │       ↓
-     │   Translation via UnifiedMessaging → Provider System
-     └─→ SelectElementNotificationManager (toast notification & actions)
+     │   Translation Provider System (AI or Traditional)
+     │       ↓ (Real-time Stream)
+     │   DomTranslatorAdapter ←─ (UID Mapping & BIDI Injection)
+     └─→ SelectElementNotificationManager (toast UI & lifecycle control)
 ```
 
 ## Core Components
@@ -24,213 +26,111 @@ User Click → SelectElementManager
 **Central controller** managing the entire Select Element lifecycle.
 
 **Responsibilities:**
-- Mode Management: activate/deactivate Select Element mode
-- Event Coordination: mouse events, keyboard events, click handling
-- Cross-Frame Support: works in both main page and iframes
-- FeatureManager Integration: registered as ESSENTIAL feature
-- Resource Management: extends ResourceTracker for automatic cleanup
+- Mode Management: activate/deactivate Select Element mode.
+- Event Coordination: coordinates mouse events (hover/click) and keyboard shortcuts (ESC/Cmd+Z).
+- Cross-Frame Support: ensures seamless activation across main page and iframes.
+- State Sync: updates the UI and background about the current selection state.
 
 **Key Methods:**
 | Method | Description |
 |--------|-------------|
 | `activateSelectElementMode()` | Starts interactive selection mode |
-| `deactivate(options)` | Stops mode, optionally preserves translations |
-| `startTranslation(element)` | Initiates translation for clicked element |
-| `revertTranslations()` | Restores original text |
+| `deactivate(options)` | Stops mode, handles cleanup and translation preservation |
+| `startTranslation(element)` | Initiates translation for the selected DOM element |
 
 ### 2. ElementSelector.js
-Handles element selection and highlighting.
+Handles element selection logic and visual feedback.
 
 **Responsibilities:**
-- Mouse Events: hover highlighting with visual feedback
-- Click Prevention: stops navigation on interactive elements
-- Element Validation: smart detection of valid text elements
-- Cursor Management: crosshair cursor during activation
-
-**Configuration:**
-```javascript
-{
-  minArea: 4000,           // Minimum element size
-  maxArea: 120000,         // Maximum element size
-  minTextLength: 20,       // Minimum text characters
-  minWordCount: 3,         // Minimum word count
-  maxAncestors: 10,        // Max parent levels to check
-  highlightTimeout: 100    // Highlight clear delay (ms)
-}
-```
-
-**Key Methods:**
-| Method | Description |
-|--------|-------------|
-| `handleMouseOver(element)` | Highlights element on hover |
-| `findBestTextElement(element)` | Finds optimal translation target |
-| `preventNavigation(event)` | Blocks clicks on interactive elements |
-| `isOurElement(element)` | Detects extension UI elements |
+- Hover Highlighting: calculates and applies visual outlines to potential targets.
+- Target Validation: uses `elementHelpers` to filter out valid text-heavy elements.
+- Interaction Prevention: blocks default click behaviors (e.g., links, buttons) during mode.
 
 ### 3. DomTranslatorAdapter.js
-Orchestrates translation between background services and DOM manipulation using a token-optimized protocol.
+The **Content-Side Orchestrator**. It prepares the DOM for translation and maps results back using a resilient UID system.
 
-**Optimization Strategy:**
-Uses abbreviated JSON keys to reduce token overhead by ~75%:
-- `t`: Text content
-- `i`: Unique node ID (shortened e.g., `n1`)
-- `b`: Logical block ID (shortened e.g., `b123`)
-- `r`: Element role (tagName)
+**Key Features:**
+- **UID Mapping**: Assigns temporary `uid` (e.g., `n1`, `n2`) to each text node to ensure 1:1 mapping even if batches return out of order.
+- **Abbreviated Protocol**: Uses short JSON keys (`t`, `i`, `b`, `r`) to reduce token overhead by ~75%.
+- **Context Injection**: Extracts `contextMetadata` (page title, preceding headings) to improve AI translation quality.
+- **BIDI Marks**: Automatically injects Unicode BIDI marks (RLM/LRM) during re-insertion to prevent mixed-direction layout corruption.
 
-**Key Methods:**
-| Method | Description |
-|--------|-------------|
-| `translateElement(element, options)` | Main translation entry point |
-| `revertTranslation()` | Restores original text |
-| `hasTranslation()` | Check if translation exists |
-| `cancelTranslation()` | Cancel ongoing translation |
-
-### 4. Background: OptimizedJsonHandler.js
-Specialized strategy in the background that manages the Select Element pipeline.
+### 4. OptimizedJsonHandler.js (Background)
+The **Translation Engine** for Select Element. It manages the complexity of API calls and data flow.
 
 **Responsibilities:**
-- **Intelligent Batching**: Splits large elements into optimal chunks (~25 nodes).
-- **Adaptive Delays**: Dynamically adjusts timing between batches to avoid rate limits.
-- **Polymorphic Mapping**: Supports both abbreviated (`t`) and legacy (`text`) keys.
-- **Result Streaming**: Streams translated segments back to the tab in real-time.
+- **Intelligent Batching**: Groups text nodes by their block-level parent (`P`, `DIV`, `ARTICLE`) to preserve semantic context.
+- **Adaptive Execution**: Switches between sequential and parallel requests based on provider rate limits.
+- **Streaming Pipeline**: Streams translated results back to the content script in real-time as batches complete.
+- **Provider Agnostic**: Handles both JSON-capable AI providers and traditional delimited-string providers (via `TranslationSegmentMapper`).
 
-### 5. DomDirectionManager.js (Shared Utility)
-Manages RTL/LTR direction and text alignment. This is a **shared core utility** located in `@/utils/dom/`, used by both Select Element and Whole Page Translation systems to ensure consistent DOM behavior.
-
-**Functions:**
-| Function | Description |
-|----------|-------------|
-| `isRTL(langCode)` | Checks if language is RTL |
-| `applyElementDirection(element, targetLang)` | Applies direction/alignment to a specific container |
-| `applyNodeDirection(node, targetLang, root)` | Surgical application: finds the smallest safe container for a text node |
-| `detectDirectionFromContent(text)` | High-accuracy direction detection based on strong characters |
-
-**RTL Languages:**
-Managed centrally in `DomTranslatorConstants.js`. Includes: `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ckb`, `dv`, `ug`, `ae`, `arc`, `xh`, `zu`.
-
-### 5. DomTranslatorState.js
-Global translation state and revert logic.
-
-**Exports:**
-- `globalSelectElementState`: Shared state object
-- `revertSelectElementTranslation()`: Global revert function
-- `getSelectElementTranslationState()`: State accessor
-
-### 6. elementHelpers.js
-Utility functions for text extraction and validation.
+### 5. DomTranslatorUtils.js
+Low-level DOM utility for text extraction and analysis.
 
 **Key Functions:**
-| Function | Description |
-|----------|-------------|
-| `extractTextFromElement(element)` | Extracts text from element |
-| `hasValidTextContent(element, options)` | Validates text content |
-| `isValidTextElement(element)` | Element validation |
-| `findBestContainer(element, options)` | Finds optimal container |
+- `findClosestBlockParent(node)`: Identifies the semantic boundary for a text node.
+- `collectTextNodes(element)`: Walks the DOM and generates the structured data payload `{ node, text, uid, blockId, role }`.
+- `extractContextMetadata(element)`: Builds a semantic summary (Page + Heading + Role) for the provider.
 
-### 7. SelectElementNotificationManager.js
-Manages toast notifications for Select Element mode.
+### 6. DomDirectionManager.js (Shared Utility)
+Manages RTL/LTR direction and text alignment.
 
-**Features:**
-- Singleton pattern for single instance
-- pageEventBus integration for communication
-- Actionable buttons: Cancel and Revert
-- Cross-context support: works in all contexts and iframes
+**Key Features:**
+- **High-Accuracy Detection**: Uses strong-character analysis (not just language codes) to detect direction.
+- **Surgical Application**: `applyNodeDirection` finds the smallest safe container for a text node to apply direction without breaking parent layout.
 
-## Advanced Translation Logic
+## Optimization Strategy: Smart Logical Block Batching
 
-### 1. Smart Context Awareness
-To improve translation accuracy (especially for DeepL and LLMs), the system generates a `contextSummary` before translation:
-- **Scope**: Page Title + Nearest Heading + Element Role + Parent Tag.
-- **DeepL Integration**: Sent as a native `context` parameter (no token cost).
-- **AI Integration**: Included in the prompt metadata to improve disambiguation.
+To provide high-quality translation while remaining cost-effective, the system uses "Smart Logical Block Batching":
 
-### 2. Token-Optimized Payload
-Every Select Element request passes through an "Armor-plated" pipeline:
-- **Short IDs**: `n1`, `n2` instead of long timestamps.
-- **Key Mapping**: Automatic translation of internal `t` keys back to visible DOM updates.
-- **Resilient Error Handling**: Safely extracts error messages from complex objects to prevent crashes on non-string errors.
+1.  **Block Integrity**: Instead of a flat array of nodes, the system groups text by their closest block-level parent. This ensures a sentence split across multiple `<span>` tags is sent to the AI as a single logical unit.
+2.  **Abbreviated Keys**:
+    - `t`: Text content
+    - `i`: Node UID (e.g., `n1`)
+    - `b`: Block ID (e.g., `b12`)
+    - `r`: Tag role (e.g., `p`, `h1`)
+3.  **Context-Enriched Requests**: Sends `contextSummary` (e.g., "Page: AI News | Section: Today's Top Stories | Role: p") to AI providers to improve disambiguation.
+4.  **Real-Time Streaming**: The UI updates incrementally as each logical block is translated, reducing perceived latency.
 
-## Usage
+## Advanced Logic
 
-### Activating Select Element Mode
+### 1. Armor-plated Pipeline
+The translation pipeline is designed to be resilient:
+- **UID Resilience**: If the API response returns more or fewer items than expected, the system uses UIDs to map only valid matches back to the DOM.
+- **Format Fallback**: Handles raw strings, JSON objects, and "unified response" objects from the provider system seamlessly.
+- **Error Extraction**: Safely extracts error messages from complex provider objects to show user-friendly toasts.
 
-```javascript
-// From content script (via FeatureManager)
-const manager = window.featureManager.getFeatureHandler('selectElement');
-await manager.activateSelectElementMode();
+### 2. Provider Selection
+Select Element mode is **UI-Aware**. It follows the provider selected in the global UI (Popup/Sidepanel) by default, but can be overridden via `options.provider`.
 
-// From background script
-await sendMessage({
-  action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE
-});
-```
+## UI/UX Features
 
-### Deactivating Select Element Mode
+### Visual Feedback
+- **Hover Highlighting**: Blue outline on hoverable elements.
+- **Crosshair Cursor**: Indicates selection mode is active.
+- **Navigation Prevention**: Clicks on links/buttons don't navigate during mode.
 
-```javascript
-// Via ESC key (automatic)
-// Or programmatically:
-await manager.deactivate({ preserveTranslations: true });
-```
-
-### Reverting Translations
-
-```javascript
-const manager = window.featureManager.getFeatureHandler('selectElement');
-await manager.revertTranslations();
-```
-
-## File Structure
-
-```
-src/features/element-selection/
-├── SelectElementManager.js              # Main manager (~830 lines)
-├── SelectElementNotificationManager.js  # Notification manager (~380 lines)
-├── ElementSelectionFactory.js           # Lazy loading factory
-├── index.js                             # Feature entry point
-│
-├── core/                                # Core translation services
-│   ├── DomTranslatorAdapter.js          # Translation orchestrator (~210 lines)
-│   ├── DomTranslatorState.js            # Global state & revert
-│   ├── DomTranslatorUtils.js            # Text node collection utilities
-│   └── ElementSelector.js               # Selection & highlighting (~400 lines)
-│
-├── utils/                               # Feature-specific utilities
-│   ├── elementHelpers.js                # Text extraction & validation (~300 lines)
-│   ├── textDirection.js                 # Legacy/Fallback RTL utilities
-│   ├── timeoutCalculator.js             # Dynamic timeouts
-│   └── cleanupSelectionWindows.js       # Window cleanup
-│
-└── ... (handlers, composables, constants)
-
-src/utils/dom/                           # SHARED DOM UTILITIES
-├── DomDirectionManager.js               # Shared RTL/LTR management
-└── DomTranslatorConstants.js            # Shared translation constants
-```
+### Toast Notifications
+- **Activation Notice**: Shows when mode is activated.
+- **Translation Progress**: Updates in real-time during streaming.
+- **Action Buttons**: Cancel and Revert buttons available in the toast.
 
 ## Message Handling
 
 ### Background Script Messages
-
 | Action | Description |
 |--------|-------------|
 | `ACTIVATE_SELECT_ELEMENT_MODE` | Activate Select Element mode |
 | `DEACTIVATE_SELECT_ELEMENT_MODE` | Deactivate Select Element mode |
-| `GET_SELECT_ELEMENT_STATE` | Get current mode state |
-| `SET_SELECT_ELEMENT_STATE` | Set mode state (internal) |
+| `TRANSLATE` | Core translation request with JSON payload |
+| `TRANSLATION_STREAM_UPDATE` | Real-time streaming update to content script |
 
 ### pageEventBus Events
-
 | Event | Description |
 |-------|-------------|
 | `show-select-element-notification` | Show activation notification |
-| `update-select-element-notification` | Update notification status |
-| `dismiss-select-element-notification` | Dismiss notification |
 | `cancel-select-element-mode` | Cancel from toast button |
 | `revert-translations` | Revert from toast button |
-| `hide-translation` | Hide translation overlay |
-
-## UI/UX Features
 
 ### Visual Feedback
 - **Hover Highlighting**: Blue outline on hoverable elements
@@ -252,83 +152,73 @@ Select Element mode is **UI-Aware**. It dynamically follows the provider selecte
 ## Integration Points
 
 ### FeatureManager Integration
-```javascript
-// FeatureManager loads SelectElementManager as ESSENTIAL feature
-// Access via:
-const manager = window.featureManager.getFeatureHandler('selectElement');
-```
+Registered as an **ESSENTIAL** feature. Access via:
+`const manager = window.featureManager.getFeatureHandler('selectElement');`
 
 ### Provider System Integration
-```javascript
-// DomTranslatorAdapter uses extension's provider system
-// Supports all translation providers (Google, DeepL, OpenAI, etc.)
-```
-
-### Toast System Integration
-```javascript
-// Uses centralized NotificationManager for displaying toasts
-// Actionable buttons trigger pageEventBus events for user interactions
-```
+Uses the extension's unified provider system. Supports all providers (Google, DeepL, OpenAI, etc.) with automatic protocol switching (JSON vs Delimited).
 
 ## Configuration
 
 ### Mode Settings
-- **Simple Mode**: Direct element selection (default)
-- **Validation**: Minimum text length, element size checks
-
-### Timeouts
-- **Dynamic Timeout**: Based on text length
-- **Base Timeout**: 30 seconds
-- **Max Timeout**: 5 minutes
+- **Validation**: Minimum text length, word count, and element size checks (configured in `ElementSelector`).
+- **Timeouts**: Dynamic timeouts based on text length, managed by `timeoutCalculator`.
 
 ### Direction Handling
-- **RTL Languages**: Auto-detected from target language
-- **Language List**: ar, he, fa, ur, yi, ps, sd, ckb, dv, ug
-
-## Debugging
-
-### Get Manager Status
-```javascript
-const manager = window.featureManager.getFeatureHandler('selectElement');
-console.log(manager.getStatus());
-// { serviceActive, isProcessingClick, isInitialized, instanceId, isInIframe }
-```
-
-### Check Translation State
-```javascript
-import { getSelectElementTranslationState } from '@/features/element-selection/core/DomTranslatorState.js';
-const state = getSelectElementTranslationState();
-console.log(state.currentTranslation);
-// { element, originalHTML, originalTextNodes, targetLanguage, timestamp }
-```
+- **RTL Detection**: Managed by `DomDirectionManager` using strong-character analysis.
+- **Application**: Surgical `dir` application to prevent layout flipping on parent containers.
 
 ## Cross-Frame Communication
 
-The system handles iframe scenarios:
-
-1. **Main Frame**: Shows notifications, coordinates deactivation
-2. **Iframe**: Can trigger translations, sends deactivation requests
-3. **Communication**: Uses `window.postMessage` with `DEACTIVATE_ALL_SELECT_MANAGERS` type
+1.  **Main Frame**: Shows notifications and coordinates global deactivation.
+2.  **Iframe**: Can trigger translations independently but listens for global deactivation.
+3.  **Communication**: Uses `window.postMessage` with `DEACTIVATE_ALL_SELECT_MANAGERS` for synchronization.
 
 ## Performance
 
-### Memory Usage
-- **ResourceTracker**: Automatic cleanup of services
-- **WeakMap**: Used for storing translation state
-- **Event Listeners**: Properly removed on deactivation
+- **Memory Usage**: Uses `ResourceTracker` for automatic cleanup and `WeakMap` for translation state.
+- **Speed**: Optimized by real-time streaming and token reduction (abbreviated keys).
 
-### Translation Speed
-- **Streaming**: Real-time updates for large content
-- **Non-Streaming**: Single response for simple translations
-- **Direct**: Single provider call per translation
+## File Structure
+
+```
+src/features/element-selection/
+├── SelectElementManager.js              # Central lifecycle manager
+├── SelectElementNotificationManager.js  # Toast UI and control buttons
+│
+├── core/                                
+│   ├── DomTranslatorAdapter.js          # DOM mapping & protocol management
+│   ├── DomTranslatorUtils.js            # Structural analysis & extraction
+│   ├── ElementSelector.js               # Visual selection & filtering
+│   ├── DomTranslatorState.js            # Translation history & revert logic
+│   └── selectElementStateManager.js     # Mode state (active/inactive)
+│
+├── utils/                               
+│   ├── elementHelpers.js                # Validation & DOM walking
+│   └── timeoutCalculator.js             # Dynamic provider timeouts
+│
+└── handlers/                            # Message & event handlers
+    └── handleActivateSelectElementMode.js
+```
+
+## Debugging
+
+### Inspecting Selection State
+```javascript
+const manager = window.featureManager.getFeatureHandler('selectElement');
+console.table(manager.getStatus());
+```
+
+### Checking Active Metadata
+Set `loglevel` to `debug` to see the `contextSummary` and `textsToTranslate` payload.
 
 ## References
-
 - [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
 - [Translation Provider System](./PROVIDERS.md)
 - [Messaging System](./MessagingSystem.md)
+- [Translation Provider Logic](./TRANSLATION_PROVIDER_LOGIC.md)
 
 ---
 
-**Last Updated**: March 2026
+**Last Updated**: April 2026
