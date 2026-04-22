@@ -49,9 +49,11 @@ Centralizes all external event listeners for the system.
 - **Responsibilities**: Manages `PageEventBus` listeners (Translate, Stop, Cancel) and `storageManager` observers. It bridges external signals to internal manager actions.
 
 ### 4. PageTranslationScheduler
-The core engine for queue management and batch request dispatching.
+The core engine for queue management and batch request dispatching. It is deeply integrated with the **Optimization Levels** system.
+- **Dynamic Chunk Scaling**: Automatically adjusts the number of text segments per request based on the provider's optimization level (e.g., larger batches for "Economy" mode to save AI tokens, smaller batches for "Turbo" mode for faster progressive updates).
+- **Concurrency Control**: Synchronizes its parallel processing limits with the global `RateLimitManager` settings for the active provider.
 - **Memory Safety**: Inherits from `ResourceTracker`; automatically clears the queue on cleanup.
-- **Prioritization**: Forces immediate flush for high-priority items if capacity is reached (250 items).
+- **Prioritization**: Forces immediate flush for high-priority items if capacity is reached.
 
 ### 5. PageTranslationFiltering Engines
 Specialized engines for batch selection:
@@ -75,11 +77,17 @@ Static utilities for DOM calculations and shared system values.
 1.  **Activation**: The `Manager` uses `SettingsLoader` to fetch configuration and initializes the `EventManager`.
 2.  **Capture**: `domtranslator` is activated; the `Bridge` enqueues nodes into the `Scheduler`.
 3.  **Scheduling**:
+    - **Optimization Level Alignment**: The `Scheduler` queries the active provider's optimization level (1-5) and adjusts its internal `chunkSize` and `maxConcurrent` limits accordingly.
     - **Fluid Mode**: Automatic flushes using `FluidFilter`.
     - **On Stop Mode**: Deferred flushes triggered by `ScrollTracker` via `QueueFilter`.
 4.  **Application**: Directionality (RTL/LTR) is applied, and text is replaced in the DOM.
 
 ## Smart Features
+
+### Optimization Level Integration
+The system is "Optimization-Aware." It respects the user's preference for **Speed vs. Cost** by dynamically reconfiguring its scheduling strategy:
+- **Level 1 (Economy/Stable)**: Uses larger chunks (up to 80 segments for AI) and lower concurrency. This is highly efficient for LLMs as it reduces the frequency of System Prompt repetition and stays within IP-based rate limits for traditional providers.
+- **Level 5 (Turbo/Fast)**: Uses smaller chunks (as small as 15 segments) and higher concurrency. This provides a "progressive rendering" experience where the page translates in rapid, small bursts.
 
 ### Modular Event Management
 By isolating event handling into `PageTranslationEventManager`, the system prevents "Listener Leaks" and ensures that global signals (like conflict resolution with Select Element mode) are handled consistently.
@@ -100,10 +108,18 @@ The system is fully integrated with `ResourceTracker`. All queues, observers, an
 
 | Setting | Default | Description |
 | :--- | :--- | :--- |
-| `chunkSize` | 250 | Number of segments per API request |
+| `chunkSize` | 250 | Number of segments per API request (Base value, scaled by Optimization Level) |
 | `WHOLE_PAGE_SCROLL_STOP_DELAY` | 500ms | User-configurable debounce time after scrolling stops |
 | `VIEWPORT_BUFFER_PX` | 100px | Safety margin for batch-filling |
 | `rootMargin` | 150px | Recognition margin for node detection |
+
+---
+
+## References
+- [Optimization Levels System](./OPTIMIZATION_LEVELS.md)
+- [Translation Provider System](./PROVIDERS.md)
+- [Messaging System](./MessagingSystem.md)
+- [UI Host System](./UI_HOST_SYSTEM.md)
 
 ---
 

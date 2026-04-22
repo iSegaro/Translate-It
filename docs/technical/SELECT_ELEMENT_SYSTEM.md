@@ -160,6 +160,12 @@ Uses the extension's unified provider system. Supports all providers (Google, De
 
 ## Configuration
 
+### Settings Management
+Behavioral settings for Select Element are managed via the [Options Page](./OPTIONS_PAGE.md):
+- **Activation Tab**: Toggle the Select Element feature globally.
+- **Languages Tab**: Select the default provider and target language.
+- **Advance Tab**: Manage the **Exclusion List**. If a domain is excluded, the system will not activate on that site.
+
 ### Mode Settings
 - **Validation**: Minimum text length, word count, and element size checks (configured in `ElementSelector`).
 - **Timeouts**: Dynamic timeouts based on text length, managed by `timeoutCalculator`.
@@ -213,6 +219,7 @@ console.table(manager.getStatus());
 Set `loglevel` to `debug` to see the `contextSummary` and `textsToTranslate` payload.
 
 ## References
+- [Options Page Documentation](./OPTIONS_PAGE.md)
 - [Toast Integration System](./TOAST_INTEGRATION_SYSTEM.md)
 - [Feature Manager System](./SMART_HANDLER_REGISTRATION_SYSTEM.md)
 - [Translation Provider System](./PROVIDERS.md)
