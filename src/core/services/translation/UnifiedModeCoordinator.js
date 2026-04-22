@@ -74,7 +74,7 @@ export class UnifiedModeCoordinator {
       const sessionId = request.sessionId || data.sessionId || messageId;
       
       // Execute the whole array via Provider (Coordinator will handle chunking internally)
-      const translatedSegments = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
+      const response = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
         mode: TranslationMode.Page,
         abortController,
         messageId,
@@ -82,6 +82,11 @@ export class UnifiedModeCoordinator {
         priority,
         rawJsonPayload: true // Treat as handled structure
       });
+
+      // Extract the actual translated content from the unified response
+      const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 
+        ? response.translatedText 
+        : response;
 
       // Ensure we have an array of results that matches the input length
       const results = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];

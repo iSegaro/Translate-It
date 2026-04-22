@@ -151,7 +151,7 @@ export class OptimizedJsonHandler {
 
     // Strategy 1: AI Providers with JSON support
     if (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI) {
-      return await providerInstance.translate(
+      const response = await providerInstance.translate(
         textsToTranslate,
         source,
         target,
@@ -161,6 +161,11 @@ export class OptimizedJsonHandler {
           expectedFormat: ResponseFormat.JSON_OBJECT
         }
       );
+      
+      // Extract the actual translated content from the unified response
+      return (response && typeof response === 'object' && response.translatedText !== undefined) 
+        ? response.translatedText 
+        : response;
     } 
     
     // Strategy 2: Traditional Providers (Edge, Google, etc.)
@@ -168,12 +173,17 @@ export class OptimizedJsonHandler {
     const delimiter = TranslationSegmentMapper.STANDARD_DELIMITER;
     const joinedText = textsToTranslate.join(delimiter);
 
-    const translatedJoined = await providerInstance.translate(
+    const response = await providerInstance.translate(
       joinedText,
       source,
       target,
       { ...arguments[9], mode, abortController, messageId, sessionId, rawJsonPayload: true, expectedFormat: ResponseFormat.STRING }
     );
+
+    // Extract text from unified response
+    const translatedJoined = (response && typeof response === 'object' && response.translatedText !== undefined) 
+      ? response.translatedText 
+      : response;
 
     return TranslationSegmentMapper.mapTranslationToOriginalSegments(
       translatedJoined,
@@ -187,6 +197,11 @@ export class OptimizedJsonHandler {
     // Robust normalization: AI providers might return objects, arrays, or bridged structures
     let rawItems = [];
     let currentResults = translatedResults;
+
+    // Handle case where translatedResults is a unified response object (Safety fallback)
+    if (currentResults && typeof currentResults === 'object' && !Array.isArray(currentResults) && currentResults.translatedText !== undefined) {
+      currentResults = currentResults.translatedText;
+    }
 
     // Handle case where translatedResults is a string that looks like JSON
     if (typeof currentResults === 'string' && 

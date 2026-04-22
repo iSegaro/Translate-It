@@ -25,6 +25,11 @@ export class TranslationSegmentMapper {
       return [translatedText];
     }
 
+    // 0. Handle unified response object from ProviderCoordinator
+    if (typeof translatedText === 'object' && !Array.isArray(translatedText) && translatedText.translatedText !== undefined) {
+      translatedText = translatedText.translatedText;
+    }
+
     if (originalSegments.length <= 1) {
       return Array.isArray(translatedText) ? translatedText : [translatedText];
     }

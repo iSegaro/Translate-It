@@ -265,10 +265,15 @@ export class ProviderCoordinator {
   async _executeJsonWrapped(provider, jsonArray, sourceLang, targetLang, mode, options) {
     // Determine the best way to translate the JSON array based on provider type
     // AI providers prefer the whole array, Traditional providers usually need segments
-    const results = await provider.translate(jsonArray, sourceLang, targetLang, {
+    const response = await provider.translate(jsonArray, sourceLang, targetLang, {
       ...options,
       rawJsonPayload: true // Tell provider not to re-wrap or re-detect JSON
     });
+
+    // Extract the actual translated content from the unified response
+    const results = (response && typeof response === 'object' && response.translatedText !== undefined) 
+      ? response.translatedText 
+      : response;
 
     if (Array.isArray(results) && results.length === jsonArray.length) {
       // Re-map back to original JSON structure
