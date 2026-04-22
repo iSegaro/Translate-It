@@ -2,114 +2,133 @@
 
 ## Overview
 
-This document provides a comprehensive guide for implementing translation providers within the Translate-It system. All providers must inherit from `BaseProvider` and adhere to the Rate Limiting and Circuit Breaker patterns.
+This document provides a comprehensive guide for implementing translation providers within the Translate-It system. The architecture has evolved into a **Coordinator-led model** where providers focus on raw execution while a central orchestrator handles language logic, normalization, and response consistency.
+
+**Core Mandate**: All providers must inherit from `BaseProvider` (or its children) and adhere to the **Unified Response Contract**.
+
+---
 
 ## Architecture Overview
 
-The system is built upon **Unified Provider Discovery**:
-- **ProviderManifest**: The heart of the system. A single file containing all identities, display settings, and provider loading logic.
-- **BaseProvider / BaseAIProvider**: Base classes that coordinate translation logic, now modularized for better maintainability.
-- **Provider Utilities**: Specialized modules in `providers/utils/` that handle heavy lifting like API execution, parsing, and text processing.
-- **ProviderConstants**: Name and ID constants to prevent typos.
-- **ProviderConfigurations**: Precise technical settings (Rate Limit, Batching, Features).
-- **RateLimitManager**: Manages request rate limits (automatically populated from technical settings).
+The system is built upon a layered execution pipeline:
+
+1.  **ProviderCoordinator (Orchestrator)**: The entry point for all translation requests. It handles:
+    - Language Swapping (Bilingual Logic).
+    - Auto-detection fallbacks.
+    - Result cleaning and normalization.
+    - Unified Response generation.
+2.  **OptimizedJsonHandler**: A specialized orchestrator for complex, high-volume tasks (like Select Element) that manages intelligent batching and real-time streaming to the browser tabs.
+3.  **BaseProvider / BaseAIProvider / BaseTranslateProvider**: Modular base classes that implement provider-specific logic (JSON mode, character limits, prompt prep).
+4.  **Provider Utilities**: Specialized modules in `providers/utils/` that handle heavy lifting like API execution (`ProviderRequestEngine`), parsing (`AIResponseParser`), and text processing (`AITextProcessor`).
+5.  **ProviderManifest**: The single source of truth for provider metadata, lazy loading, and UI display settings.
+
+---
+
+## Unified Response Contract
+
+To prevent runtime crashes (like "split is not a function"), all providers (via the Coordinator) must return a **Unified Response Object**:
+
+```javascript
+{
+  translatedText: string | array,  // The actual result
+  detectedLanguage: string,       // ISO code (e.g., 'en', 'fa')
+  provider: string,               // Provider name (e.g., 'GoogleGemini')
+  sourceLanguage: string,         // Final source code used
+  targetLanguage: string          // Final target code used
+}
+```
 
 ---
 
 ## Modularized Utilities (`providers/utils/`)
 
-To prevent file bloat, core logic is delegated to these specialized helpers:
-
 ### 1. Request & Execution
-- **ProviderRequestEngine**: Centralizes API call execution, header preparation, proxy handling, and multi-key failover logic.
-- **TraditionalBatchProcessor**: Manages sequential batch processing and rate-limited execution for traditional providers.
+- **ProviderRequestEngine**: Centralizes API call execution, header preparation, proxy handling, and orchestrates the **Multi-API Key Failover** lifecycle.
+- **TraditionalBatchProcessor**: Manages character-limit chunking and sequential execution for traditional providers.
 
 ### 2. AI & Context Logic
-- **AIConversationHelper**: Handles session history, turn management, and context-enriched prompt preparation.
-- **AITextProcessor**: Manages smart batching based on complexity, placeholder protection, and sentence splitting (`Intl.Segmenter`).
-- **AIResponseParser**: Cleans AI artifacts and robustly parses JSON results from Markdown blocks.
-- **AIStreamManager**: Orchestrates real-time streaming of results for AI providers.
+- **AIConversationHelper**: Manages session history and context-enriched prompt preparation (Injecting Page Title/Headings).
+- **AITextProcessor**: Handles complexity analysis and smart segment splitting.
+- **AIResponseParser**: Robustly parses results from AI artifacts (Markdown, JSON blocks) and cleans "AI Chatter."
 
 ### 3. Traditional Provider Helpers
-- **TraditionalTextProcessor**: Handles character-limit chunking and network weight calculation for traditional services.
-- **TraditionalStreamManager**: Manages streaming lifecycle for chunk-based traditional translations.
+- **TraditionalTextProcessor**: Handles character-limit chunking and network weight calculation.
+- **TraditionalStreamManager**: Orchestrates the streaming lifecycle for chunk-based traditional translations.
 
 ---
 
-## Workflow: Adding a New Provider (Quick Start)
+## Provider Implementation Workflow
 
 ### 1. Define Constants (`ProviderConstants.js`)
 Add the constant ID and Name:
 - `ProviderNames.YOUR_PROVIDER`: The class name (e.g., `'YourTranslate'`)
 - `ProviderRegistryIds.YOUR_ID`: The registry ID (e.g., `'yourid'`)
 
-### 2. Implement the Provider Class (`providers/YourProvider.js`)
-Create a new class inheriting from `BaseTranslateProvider` or `BaseAIProvider`:
-- **Traditional**: Implement `_translateChunk(chunkTexts, ..., options = {})`.
-- **AI**: Implement `_translateSingle(text, ..., originalCharCount = 0)`.
+### 2. Implement the Provider Class
+Create a new class in `src/features/translation/providers/`:
+
+#### A. AI Providers (Inherit from `BaseAIProvider`)
+Implement `_callAI(systemPrompt, userText, options)`.
+- Use `_preparePromptAndText` for standard context injection.
+- AI providers should favor **JSON Mode** for batch requests.
+
+#### B. Traditional Providers (Inherit from `BaseTranslateProvider`)
+Implement `_translateChunk(chunkTexts, source, target, options)`.
+- Respect `characterLimit` and `maxChunksPerBatch`.
 
 ### 3. Register in the Manifest (`ProviderManifest.js`)
-Add the provider to `PROVIDER_MANIFEST`. This automatically handles UI registration, icons, and lazy loading.
+Add to `PROVIDER_MANIFEST`. This handles UI registration and icon mapping.
 
 ---
 
-## Provider Implementation Rules
+## Implementation Rules & Best Practices
 
-### 1. MANDATORY: Inherit from BaseProvider
-All providers must inherit from `BaseProvider` or its specialized children (`BaseTranslateProvider` / `BaseAIProvider`).
+### 1. Coordination Principle
+**NEVER override the `translate()` method.** 
+The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`. To implement custom logic, override `_batchTranslate` or specialized internal methods.
 
-### 2. DO NOT Override translate() Method
-Never override the `translate()` method. It handles critical coordination (Language Swapping, JSON mode, Rate Limiting). Implement only the internal `_translateChunk` or `_translateSingle` methods.
+### 2. Optimization Level Awareness
+Providers must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
+- **Level 1 (Economy)**: Large batches, low concurrency.
+- **Level 5 (Turbo)**: Small batches, high concurrency, enabled streaming.
 
-### 3. MANDATORY: Use ProviderNames constant
-Always use `ProviderNames` constants in the class constructor:
-```javascript
-constructor() {
-  super(ProviderNames.YOUR_PROVIDER);
-}
-```
+### 3. Language Normalization
+Implement `convertLanguage(code)` in your provider class to map standard ISO codes to provider-specific codes (e.g., `fa` -> `farsi` for legacy APIs).
 
-### 4. MANDATORY: Accurate Character Reporting
-Every provider must report exact network consumption. Use the delegated helpers to calculate and pass:
-- **charCount**: Total network payload (including prompts, history, delimiters).
-- **originalCharCount**: Raw length of the input text.
+### 4. Segment Mapping (The "Split" Safety)
+If your provider merges multiple text segments into a single request, you **MUST** ensure they are split back correctly.
+- AI: Use `AIResponseParser.parseBatchResult`.
+- Traditional: Use `TranslationSegmentMapper.mapTranslationToOriginalSegments`.
 
 ---
 
-## Statistics & Accurate Reporting
+## Stability, Rate Limiting & Failover
 
-The system uses **Explicit Self-Reporting**. Base classes provide helpers (via Utilities) to simplify this:
+### 1. Multi-API Key Failover
+The system supports multiple API keys per provider (stored as newline-separated strings).
+- **Automatic Rotation**: If a key fails with a "Retryable Error" (Quota Exceeded, Invalid Key, Rate Limit), the `ProviderRequestEngine` automatically switches to the next available key.
+- **Key Promotion**: Successfully used keys are "promoted" to the top of the list to ensure the fastest start for subsequent requests.
+- **Validation**: The `ApiKeyManager` provides tools to test and reorder keys, ensuring valid keys are always prioritized.
 
-### 1. Calculation Helpers
-- **Traditional**: Internal methods use `TraditionalTextProcessor.calculateTraditionalCharCount(texts)`.
-- **AI**: Internal methods use `_calculateAIPayloadChars(messages)` to sum system instructions, history, and user text.
+### 2. Priority-Based Scheduling
+Requests are queued based on their impact on UX:
+- **HIGH**: Interactive UI (Popup, Selection, Sidepanel).
+- **NORMAL**: Standard on-demand requests.
+- **LOW**: Background tasks (Whole Page Translation).
 
-### 2. Reporting Example
-When executing a request, ensure metrics are passed to the engine:
-
-```javascript
-await this._executeRequest({
-  url,
-  fetchOptions,
-  charCount: networkChars,          // From specialized processor
-  originalCharCount: originalChars, // Raw input length
-  sessionId: options.sessionId,
-  // ...
-});
-```
+### 3. Circuit Breaker
+If all available keys fail or the provider is consistently unstable, the **RateLimitManager** "opens the circuit," temporarily disabling the provider for 60 seconds to prevent wasted requests and UI lag.
 
 ---
 
-## Rate Limiting & Multi-API Key Failover
+## Services & Specialized Components
 
-- **Configuration**: Technical settings are centralized in `ProviderConfigurations.js`.
-- **Failover**: If `needsApiKey: true` is set in the manifest, the `ProviderRequestEngine` automatically switches to the next available key upon retryable errors (e.g., 429).
-
-## Summary of Optimization
-
-- **Maintainability**: Large classes are split into focused utility modules.
-- **Consistency**: Centralized parsing and request handling ensure uniform error management.
-- **Scalability**: New features (like Context Summary) can be added to utility modules without bloating the provider classes.
+- **RateLimitManager**: The core governance layer for request throttling, prioritization, and stability.
+- **ApiKeyManager**: Manages the lifecycle of API keys, failover logic, and health testing.
+- **LanguageDetectionService**: Used by the Coordinator to resolve `auto` source languages.
+- **LanguageSwappingService**: Implements Bilingual Logic (swapping based on detected input).
+- **RequestHealthMonitor**: Monitors provider success rates and triggers health-based alerts.
+- **StreamingManager**: A global registry that coordinates real-time UI updates from multiple background streams.
 
 ---
 
