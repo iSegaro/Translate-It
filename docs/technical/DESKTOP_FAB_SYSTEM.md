@@ -64,8 +64,8 @@ This composable decouples FAB logic from the visual component:
 
 ### 3. Integrated Smart TTS Controller
 The FAB includes an advanced TTS badge that leverages the global `useTTSSmart` system.
-- **Auto Language Detection**: Integrates with `LanguageDetectionService` to identify the language of the selected text in real-time.
-- **Dynamic Tooltips**: Tooltips automatically update to show the target language (e.g., "Speak (English)") or the current action (e.g., "Stop (English)").
+- **Actual Language Metadata**: Integrates with the `TranslationEngine` to identify the *actual* language used for translation. After a successful translation, it prioritizes the returned `actualSourceLanguage` for accurate TTS accents and labels, especially during Bilingual swaps.
+- **Auto Language Detection**: For initial (pre-translation) state, it uses `LanguageDetectionService` to identify the language of the selected text in real-time.
 - **Visual State Management**:
     - **Idle**: Standard speaker icon.
     - **Loading**: Animated SVG spinner (currentColor-aware for theme compatibility).

@@ -54,7 +54,7 @@ The central state manager for the touch-optimized UI. It manages:
 - **Visibility**: `isOpen`, `isFullscreen`.
 - **Navigation**: `activeView` (Dashboard, Selection, Input, etc.).
 - **Visual State**: `sheetState` (Closed, Peek, Full).
-- **Selection Data**: Synchronized with global selection events across touch interactions.
+- **Selection Data**: Synchronized with global selection events. It specifically tracks `actualSourceLanguage` and `actualTargetLanguage` from translation results to ensure the UI labels (e.g., in the header) reflect the real language pair used by the engine, regardless of the initial "Auto" setting.
 
 ### 2. Gesture Engine (`useMobileGestures.js`)
 A high-performance gesture handler optimized for low-latency touch response:
