@@ -4,55 +4,62 @@ This document defines the logic used by the system to determine which translatio
 
 ## Core Architecture
 
-The system uses a **Hierarchical Provider Selection** mechanism. Decisions are resolved centrally in `UnifiedTranslationService.js` and feature-specific managers.
+The system uses a **Hierarchical Provider Selection** mechanism combined with an **Execution Strategy** layer. Decisions are resolved centrally in `UnifiedTranslationService.js` and executed through the `ProviderCoordinator.js`.
 
 ### 1. Decision Hierarchy (The "Waterfall" Logic)
 
 When a translation request is initiated, the provider is resolved based on this priority:
 
 1.  **Direct UI Override (Highest Priority):** If the request explicitly carries a `provider` field (e.g., from Popup/Sidepanel direct translation).
-2.  **Ephemeral Sync (New):** If the user has enabled "Sync Page" or "Sync Element" in the UI dropdown. This session-based toggle forces the feature to use the currently selected UI provider, bypassing stored settings.
-3.  **Feature-Specific Setting (`MODE_PROVIDERS`):** If a specific mode (e.g., `select-element`, `page-translation-batch`) has an explicit provider set in settings (and Sync is OFF).
-4.  **Global Default (`TRANSLATION_API`):** The system-wide default provider.
+2.  **Ephemeral Sync (Smart Overrides):** 
+    - **Sync Page**: When enabled, Whole Page Translation bypasses settings and uses the UI's active provider.
+    - **Sync Element**: When enabled, Select Element mode uses the UI's active provider.
+3.  **Feature-Specific Setting (`MODE_PROVIDERS`):** Configured in Options (e.g., `select-element`, `page-translation-batch`).
+4.  **Global Default (`TRANSLATION_API`):** The fallback system-wide provider.
+
+### 2. Execution Orchestration (New)
+
+Once a provider is selected, the **ProviderCoordinator** determines the technical strategy:
+- **Language Normalization**: Maps standard codes to provider-specific ones.
+- **Optimization Awareness**: Adjusts batch sizes and concurrency based on the 1-5 level scale.
+- **Streaming Decisions**: Decides whether to use chunk-based streaming or unified JSON response.
 
 ---
 
 ## Feature-Specific Behaviors
 
 ### Select Element Mode
-*   **Behavior:** UI-Aware (Enhanced by Sync).
+*   **Behavior:** UI-Aware & Batch-Optimized.
 *   **Logic:** 
-    *   If **Sync Element** is ON: It strictly uses the UI's active provider.
-    *   If **Sync Element** is OFF: It checks `MODE_PROVIDERS['select-element']`. If set to `default` or null, it inherits the UI's active provider (legacy behavior).
+    - Uses `OptimizedJsonHandler` for batch processing.
+    - **Sync Element** allows instant switching between AI (for context) and Traditional (for speed) providers without refreshing settings.
 
 ### Whole Page Translation (WPT)
-*   **Behavior:** Settings-Driven (Syncable).
+*   **Behavior:** Throughput-Driven.
 *   **Logic:** 
-    *   If **Sync Page** is ON: It uses the UI's active provider (bypasses settings).
-    *   If **Sync Page** is OFF: It strictly follows `MODE_PROVIDERS['page-translation-batch']`.
-    *   *Reason:* Allows users to temporarily use a high-tier provider for a specific page without changing permanent settings.
+    - Uses `PageTranslationScheduler` to balance API costs vs. rendering speed.
+    - **Sync Page** is critical for users who want to use a specific AI provider (like Gemini) temporarily for complex technical pages.
 
 ### Text Selection (WindowsManager)
-*   **Behavior:** UI-Interactive (Persistent per-window).
+*   **Behavior:** Interactive & Context-Rich.
 *   **Logic:** 
-    *   **Manual Override:** If the user manually changes the provider via the dropdown in the translation window, that provider is used for all subsequent translations *within that specific window's lifecycle* (e.g., when clicking "Retry" or changing target language).
-    *   **Initial Selection:** Uses `MODE_PROVIDERS['selection-manager']` (or `selection-translation` depending on internal mapping).
-    *   **Dictionary Fallback:** If the selected text is a single word and `ENABLE_DICTIONARY` is ON, it uses `MODE_PROVIDERS['dictionary-translation']`. If no specific provider is set for dictionary mode, it falls back to the Selection provider.
-    *   **Global Default:** Uses `TRANSLATION_API` if no mode-specific provider is found.
+    - **Manual Override:** Persistent per-window lifecycle.
+    - **Smart Prompting**: The selection mode passes extra context (Headings, Page Title) to AI providers to improve accuracy.
+    - **Dictionary Fallback**: Uses `MODE_PROVIDERS['dictionary-translation']` for single words.
 
 ---
 
 ## Implementation References
 
--   **`src/shared/config/config.js`**: Contains the `CONFIG.MODE_PROVIDERS` structure and default values.
--   **`src/core/services/translation/UnifiedTranslationService.js`**: Implements `_resolveEffectiveProvider(data, context)` which handles the logic waterfall.
--   **`src/features/page-translation/PageTranslationManager.js`**: Loads settings independently for page-wide operations.
--   **`src/features/translation/composables/useTranslationModes.js`**: (Method: `toggleSelectElement`) Captures the active UI provider and passes it to the background service.
+-   **`src/shared/config/config.js`**: Defines `MODE_PROVIDERS` and default settings.
+-   **`src/features/translation/core/ProviderCoordinator.js`**: The final orchestration hub for all resolved requests.
+-   **`src/core/services/translation/UnifiedTranslationService.js`**: Handles the `_resolveEffectiveProvider` waterfall.
+-   **`src/features/translation/core/managers/OptimizedJsonHandler.js`**: Manages the batching logic for Select Element.
 
 ## Guidelines for AI Maintenance
-- **When adding a new feature:** Register its mode in `TranslationMode` (config.js) and add it to `MODE_PROVIDERS`.
-- **When modifying resolution:** Ensure that `UnifiedTranslationService` remains the "Single Source of Truth" for resolving providers to avoid inconsistent behavior across different UI hosts (Popup vs. Sidepanel).
+- **When adding a new feature:** Register its mode in `TranslationMode` (config.js) and update the resolution waterfall if it requires unique inheritance.
+- **When modifying resolution:** Ensure `UnifiedTranslationService` remains the source of truth for *selecting* the provider, while `ProviderCoordinator` remains the source of truth for *executing* it.
 
 ---
 
-**Last Updated**: March 2026
+**Last Updated**: April 2026
