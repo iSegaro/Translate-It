@@ -12,46 +12,48 @@
 
 <script setup>
 import './OptionsLayout.scss'
-import OptionsSidebar from "./OptionsSidebar.vue";
-import OptionsNavigation from "@/components/layout/OptionsNavigation.vue";
-import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
-import {
-  createLanguageTransition,
-  createThemeTransition,
-} from "@/composables/ui/useUITransition.js";
-import { useSettingsStore } from "@/features/settings/stores/settings.js";
-import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-const logger = getScopedLogger(LOG_COMPONENTS.UI, "OptionsLayout");
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { createLanguageTransition, createThemeTransition } from '@/composables/ui/useUITransition.js'
+import OptionsSidebar from './OptionsSidebar.vue'
+import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const { locale } = useUnifiedI18n();
-const settingsStore = useSettingsStore();
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout')
+
+// Stores & Composables
+const { locale } = useUnifiedI18n()
+const settingsStore = useSettingsStore()
+
+// --- UI Transitions ---
 
 // Language transition animation
 createLanguageTransition(() => locale.value, {
-  containerSelector: ".options-layout",
+  containerSelector: '.options-layout',
   onTransitionStart: (newLocale) => {
-    logger.debug("Language transition started:", newLocale);
+    logger.debug('Language transition started:', newLocale)
   },
   onTransitionMid: (newLocale) => {
-    logger.debug("Language transition mid-point:", newLocale);
+    logger.debug('Language transition mid-point:', newLocale)
   },
   onTransitionEnd: (newLocale) => {
-    logger.debug("Language transition completed:", newLocale);
-  },
-});
+    logger.debug('Language transition completed:', newLocale)
+  }
+})
 
 // Theme transition animation
 createThemeTransition(() => settingsStore.settings?.THEME, {
-  containerSelector: ".options-layout",
+  containerSelector: '.options-layout',
   onTransitionStart: (newTheme) => {
-    logger.debug("Theme transition started:", newTheme);
+    logger.debug('Theme transition started:', newTheme)
   },
   onTransitionMid: (newTheme) => {
-    logger.debug("Theme transition mid-point:", newTheme);
+    logger.debug('Theme transition mid-point:', newTheme)
   },
   onTransitionEnd: (newTheme) => {
-    logger.debug("Theme transition completed:", newTheme);
-  },
-});
+    logger.debug('Theme transition completed:', newTheme)
+  }
+})
 </script>
