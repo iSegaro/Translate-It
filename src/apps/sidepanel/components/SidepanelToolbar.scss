@@ -1,3 +1,4 @@
+@use "@/assets/styles/base/variables" as vars;
 @use "@/assets/styles/base/mixins" as *;
 
 .side-toolbar {
@@ -14,44 +15,132 @@
   position: relative;
 }
 
-.toolbar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
+/* 
+   EXTREME SPECIFICITY: Target all buttons inside side-toolbar 
+   to kill any inherited blue hover effects from UI library.
+*/
+.side-toolbar {
+  .toolbar-button,
+  .ti-provider-icon-button,
+  .ti-btn,
+  button {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    transition: background-color 0.2s ease !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
+
+    /* Light Theme: Neutral Grey Hover */
+    &:hover:not(:disabled) {
+      background-color: rgba(0, 0, 0, 0.08) !important;
+      color: inherit !important;
+      filter: none !important;
+    }
+
+    &.ti-active {
+      background-color: rgba(0, 0, 0, 0.12) !important;
+    }
+
+    /* Target inner containers of UI components */
+    .ti-btn__text,
+    .ti-btn-status-container {
+      background: transparent !important;
+      color: inherit !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+  }
 }
 
+/* 
+   DARK THEME: Explicit #424242 Override 
+*/
+.theme-dark,
+:root.theme-dark {
+  .side-toolbar {
+    .toolbar-button,
+    .ti-provider-icon-button,
+    .ti-btn,
+    button {
+      &:hover:not(:disabled) {
+        background-color: #424242 !important;
+      }
+
+      &.ti-active {
+        background-color: #555555 !important;
+      }
+
+      /* 
+         Standardize ONLY utility icons to White 
+         Leave Provider and Page Translation colored
+      */
+      &#selectElementBtn img,
+      &#revertActionBtn img,
+      &#historyBtn img,
+      &#settingsBtn img {
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.8 !important;
+      }
+
+      &:hover img {
+        opacity: 1 !important;
+      }
+
+      /* Ensure colored icons stay original */
+      .ti-provider-icon-only,
+      .ti-btn-status-container img {
+        filter: none !important;
+        opacity: 1 !important;
+      }
+    }
+  }
+}
+
+/* Icon Sizing Standardization */
+.side-toolbar img,
+.side-toolbar .toolbar-icon {
+  width: 18px !important;
+  height: 18px !important;
+  object-fit: contain !important;
+}
+
+.toolbar-group,
 .toolbar-group-bottom {
-  margin-top: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
-}
-
-.toolbar-button {
-  @include toolbar-button-minimal;
-}
-
-/* Scoped styles for toolbar icons */
-.toolbar-icon {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-  transition: filter 0.2s ease;
+  gap: 12px;
 }
 
 .toolbar-separator {
-  width: 80%;
+  width: 20px;
   height: 1px;
   background-color: var(--color-border);
-  margin: $spacing-xs 0;
+  margin: 4px 0;
+  opacity: 0.5;
 }
 
-.toolbar-page-translation {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* Specific Wrapper Fixes */
+.toolbar-page-translation,
+.ti-provider-icon-only-container {
   width: 28px;
   height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
