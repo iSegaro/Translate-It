@@ -129,7 +129,8 @@ const { t } = useUnifiedI18n()
 const { 
   sourceLanguage,
   targetLanguage,
-  clearTranslation
+  clearTranslation,
+  loadLastTranslation
 } = useUnifiedTranslation('popup');
 
 // TTS Global Manager for cross-context lifecycle management

@@ -103,6 +103,10 @@ const props = defineProps({
     type: String,
     default: undefined
   },
+  lastTranslation: {
+    type: Object,
+    default: null
+  },
   // Auto-translate on paste
   autoTranslateOnPaste: {
     type: Boolean,

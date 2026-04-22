@@ -302,6 +302,10 @@ const props = defineProps({
     type: String,
     default: "fa",
   },
+  lastTranslation: {
+    type: Object,
+    default: null
+  },
   // TTS Status for mobile toggle
   ttsStatus: {
     type: String,

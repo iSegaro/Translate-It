@@ -10,6 +10,7 @@
       :placeholder="t('popup_source_text_placeholder') || 'اینجا بنویسید'"
       :language="actualSourceLanguage"
       :detected-source-language="actualSourceLanguage"
+      :last-translation="lastTranslation"
       :rows="2"
       :tabindex="1"
       :copy-title="t('popup_copy_source_title_icon') || 'کپی'"
@@ -30,6 +31,7 @@
       :content="translatedText"
       :language="actualTargetLanguage"
       :target-language="actualTargetLanguage"
+      :last-translation="lastTranslation"
       :is-loading="isTranslating"
       :error="translationError"
       :error-type="errorType"
@@ -116,6 +118,7 @@ const {
   triggerTranslation,
   cancelTranslation,
   clearTranslation,
+  loadLastTranslation
 } = translation
 
 // Watch canTranslate and emit changes to parent
