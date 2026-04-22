@@ -161,29 +161,34 @@
 
             <div class="bilingual-modes-list">
               <BaseCheckbox
-                v-model="bilingualTranslationModes[TranslationMode.Selection]"
+                :model-value="bilingualTranslationModes[TranslationMode.Selection]"
                 :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
                 class="mode-checkbox"
+                @update:model-value="updateBilingualMode(TranslationMode.Selection, $event)"
               />
               <BaseCheckbox
-                v-model="bilingualTranslationModes[TranslationMode.Select_Element]"
+                :model-value="bilingualTranslationModes[TranslationMode.Select_Element]"
                 :label="t('bilingual_mode_select_element_label') || 'Select Element'"
                 class="mode-checkbox"
+                @update:model-value="updateBilingualMode(TranslationMode.Select_Element, $event)"
               />
               <BaseCheckbox
-                v-model="bilingualTranslationModes[TranslationMode.Field]"
+                :model-value="bilingualTranslationModes[TranslationMode.Field]"
                 :label="t('bilingual_mode_field_label') || 'Text Fields'"
                 class="mode-checkbox"
+                @update:model-value="updateBilingualMode(TranslationMode.Field, $event)"
               />
               <BaseCheckbox
-                v-model="bilingualTranslationModes[TranslationMode.Popup_Translate]"
+                :model-value="bilingualTranslationModes[TranslationMode.Popup_Translate]"
                 :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
                 class="mode-checkbox"
+                @update:model-value="updateBilingualMode(TranslationMode.Popup_Translate, $event)"
               />
               <BaseCheckbox
-                v-model="bilingualTranslationModes[TranslationMode.Page]"
+                :model-value="bilingualTranslationModes[TranslationMode.Page]"
                 :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
                 class="mode-checkbox"
+                @update:model-value="updateBilingualMode(TranslationMode.Page, $event)"
               />
             </div>
           </div>
@@ -370,15 +375,143 @@ const toggleAccordion = (name) => {
   }
 }
 
-// Form values as refs
-const sourceLanguage = ref(settingsStore.settings?.SOURCE_LANGUAGE || 'auto')
-const targetLanguage = ref(settingsStore.settings?.TARGET_LANGUAGE || 'fa')
-const bilingualTranslation = ref(settingsStore.settings?.BILINGUAL_TRANSLATION ?? false)
-const bilingualTranslationModes = ref({ ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) })
-const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
-const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
-const devanagariScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi')
-const latinScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['latin-script'] || 'en')
+// --- Settings (Computed with Getter/Setter for Clean Sync) ---
+
+const sourceLanguage = computed({
+  get: () => settingsStore.settings?.SOURCE_LANGUAGE || 'auto',
+  set: (value) => {
+    settingsStore.updateSettingLocally('SOURCE_LANGUAGE', value)
+    validateLanguages()
+  }
+})
+
+const targetLanguage = computed({
+  get: () => settingsStore.settings?.TARGET_LANGUAGE || 'fa',
+  set: (value) => {
+    settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
+    validateLanguages()
+  }
+})
+
+const bilingualTranslation = computed({
+  get: () => settingsStore.settings?.BILINGUAL_TRANSLATION ?? false,
+  set: (value) => {
+    // UX Improvement: If user turns ON the master switch but all visible modes are OFF,
+    // enable some logical defaults so the feature isn't "dead".
+    if (value) {
+      const visibleModes = [
+        TranslationMode.Selection,
+        TranslationMode.Select_Element,
+        TranslationMode.Field,
+        TranslationMode.Popup_Translate,
+        TranslationMode.Page
+      ];
+      
+      const currentModes = { ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) };
+      const anyVisibleEnabled = visibleModes.some(mode => currentModes[mode] === true);
+      
+      if (!anyVisibleEnabled) {
+        currentModes[TranslationMode.Selection] = true;
+        currentModes[TranslationMode.Popup_Translate] = true;
+        currentModes[TranslationMode.Sidepanel_Translate] = true;
+        currentModes[TranslationMode.Select_Element] = true;
+        currentModes[TranslationMode.Field] = true;
+        settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', currentModes);
+      }
+
+      // Always ensure accordion is open when checkbox is turned on
+      activeAccordion.value = 'bilingual';
+    } else if (activeAccordion.value === 'bilingual') {
+      // Close if it was open when turned off
+      activeAccordion.value = null;
+    }
+    
+    settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
+  }
+})
+
+/**
+ * Helper to update bilingual modes with sidepanel sync logic
+ */
+const updateBilingualMode = (mode, value) => {
+  const newModes = { ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) };
+  newModes[mode] = value;
+
+  // UX Improvement: If user unchecks ALL visible modes while the master switch is ON,
+  // automatically turn OFF the master switch since it has no effect.
+  const visibleModes = [
+    TranslationMode.Selection,
+    TranslationMode.Select_Element,
+    TranslationMode.Field,
+    TranslationMode.Popup_Translate,
+    TranslationMode.Page
+  ];
+  const anyVisibleEnabled = visibleModes.some(m => newModes[m] === true);
+
+  if (!anyVisibleEnabled && bilingualTranslation.value) {
+    settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', false);
+  }
+  
+  // Also keep Sidepanel in sync with Popup for consistency
+  if (mode === TranslationMode.Popup_Translate) {
+    newModes[TranslationMode.Sidepanel_Translate] = value;
+  }
+  
+  settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', newModes);
+}
+
+// Map individual modes for template binding
+const bilingualTranslationModes = computed(() => {
+  return settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {};
+});
+
+// Language Detection Preferences
+const arabicScriptPreference = computed({
+  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa',
+  set: (value) => {
+    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) };
+    preferences['arabic-script'] = value;
+    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences);
+  }
+})
+
+const chineseScriptPreference = computed({
+  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn',
+  set: (value) => {
+    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) };
+    preferences['chinese-script'] = value;
+    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences);
+  }
+})
+
+const devanagariScriptPreference = computed({
+  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi',
+  set: (value) => {
+    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) };
+    preferences['devanagari-script'] = value;
+    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences);
+  }
+})
+
+const latinScriptPreference = computed({
+  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['latin-script'] || 'en',
+  set: (value) => {
+    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) };
+    preferences['latin-script'] = value;
+    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences);
+  }
+})
+
+// ========== API Settings ==========
+// Selected provider
+const selectedProvider = computed({
+  get: () => settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2,
+  set: (newValue) => {
+    const oldValue = settingsStore.settings?.TRANSLATION_API;
+    logger.debug('🔧 API provider changed:', oldValue, '→', newValue);
+    settingsStore.updateSettingLocally('TRANSLATION_API', newValue);
+  }
+})
 
 // AI Optimization settings
 const aiContextEnabled = computed({
@@ -409,51 +542,31 @@ const isAIProvider = computed(() => {
 })
 
 // ========== Provider-Specific Language Filtering ==========
-/**
- * Filter languages based on the selected provider
- * Handles DeepL beta languages toggle automatically
- * Uses canonical code matching for providers with different code formats
- */
 const filteredSourceLanguages = computed(() => {
-  const provider = settingsStore.selectedProvider
+  const provider = selectedProvider.value
   const languages = allLanguages.value || []
-
-  // Auto-detect is always included for source
   const autoOption = { code: 'auto', name: 'Auto-Detect', promptName: 'Auto Detect' }
-
-  // If languages not loaded yet, return auto only
-  if (!languages.length) {
-    return [autoOption]
-  }
-
-  // AI providers support all languages
+  if (!languages.length) return [autoOption]
   if (['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(provider)) {
     return [autoOption, ...languages]
   }
 
-  // Resolve effective provider and mapping keys
   let providerKey = provider.toLowerCase();
   let mappingKey = 'GOOGLE';
-  
   if (providerKey.includes('deepl')) {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
     providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
     mappingKey = 'DEEPL';
   } else if (providerKey.includes('google')) {
-    providerKey = 'google';
-    mappingKey = 'GOOGLE';
+    providerKey = 'google'; mappingKey = 'GOOGLE';
   } else if (providerKey.includes('lingva')) {
-    providerKey = 'google';
-    mappingKey = 'LINGVA';
+    providerKey = 'google'; mappingKey = 'LINGVA';
   } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
-    providerKey = 'bing';
-    mappingKey = 'BING';
+    providerKey = 'bing'; mappingKey = 'BING';
   } else if (providerKey.includes('yandex')) {
-    providerKey = 'yandex';
-    mappingKey = 'YANDEX';
+    providerKey = 'yandex'; mappingKey = 'YANDEX';
   } else if (providerKey.includes('browser')) {
-    providerKey = 'browserapi';
-    mappingKey = 'BROWSER';
+    providerKey = 'browserapi'; mappingKey = 'BROWSER';
   }
 
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
@@ -463,47 +576,31 @@ const filteredSourceLanguages = computed(() => {
     const providerCode = getProviderLanguageCode(lang.code, mappingKey);
     return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
   })
-
   return [autoOption, ...filtered]
 })
 
 const filteredTargetLanguages = computed(() => {
-  const provider = settingsStore.selectedProvider
+  const provider = selectedProvider.value
   const languages = allLanguages.value || []
+  if (!languages.length) return []
+  if (['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(provider)) return languages
 
-  // If languages not loaded yet, return empty
-  if (!languages.length) {
-    return []
-  }
-
-  // AI providers support all languages
-  if (['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(provider)) {
-    return languages
-  }
-
-  // Resolve effective provider and mapping keys
   let providerKey = provider.toLowerCase();
   let mappingKey = 'GOOGLE';
-  
   if (providerKey.includes('deepl')) {
     const betaEnabled = settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true
     providerKey = betaEnabled ? 'deepl_beta' : 'deepl';
     mappingKey = 'DEEPL';
   } else if (providerKey.includes('google')) {
-    providerKey = 'google';
-    mappingKey = 'GOOGLE';
+    providerKey = 'google'; mappingKey = 'GOOGLE';
   } else if (providerKey.includes('lingva')) {
-    providerKey = 'google';
-    mappingKey = 'LINGVA';
+    providerKey = 'google'; mappingKey = 'LINGVA';
   } else if (providerKey.includes('bing') || providerKey.includes('edge')) {
-    providerKey = 'bing';
-    mappingKey = 'BING';
+    providerKey = 'bing'; mappingKey = 'BING';
   } else if (providerKey.includes('yandex')) {
-    providerKey = 'yandex';
-    mappingKey = 'YANDEX';
+    providerKey = 'yandex'; mappingKey = 'YANDEX';
   } else if (providerKey.includes('browser')) {
-    providerKey = 'browserapi';
-    mappingKey = 'BROWSER';
+    providerKey = 'browserapi'; mappingKey = 'BROWSER';
   }
 
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
@@ -515,45 +612,44 @@ const filteredTargetLanguages = computed(() => {
   })
 })
 
-// Watch for provider changes and validate selected languages
-watch(() => settingsStore.selectedProvider, (newProvider) => {
-  // Check if current source language is supported by new provider
-  const sourceSupported = filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)
-  if (!sourceSupported) {
-    // Fallback to auto or first available language
-    sourceLanguage.value = 'auto'
-    logger.debug(`Source language not supported by ${newProvider}, reset to auto`)
-  }
+const selectedProviderInfo = computed(() => findProviderById(selectedProvider.value))
 
-  // Check if current target language is supported by new provider
+const providerSettingsComponent = computed(() => {
+  const provider = selectedProvider.value;
+  switch (provider) {
+    case 'gemini': return defineAsyncComponent(() => import('@/components/feature/api-settings/GeminiApiSettings.vue'));
+    case 'deepl': return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepLApiSettings.vue'));
+    case 'browser': return defineAsyncComponent(() => import('@/components/feature/api-settings/BrowserApiSettings.vue'));
+    case 'webai': return defineAsyncComponent(() => import('@/components/feature/api-settings/WebAIApiSettings.vue'));
+    case 'lingva': return defineAsyncComponent(() => import('@/components/feature/api-settings/LingvaApiSettings.vue'));
+    case 'openai': return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenAIApiSettings.vue'));
+    case 'openrouter': return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenRouterApiSettings.vue'));
+    case 'deepseek': return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepseekApiSettings.vue'));
+    case 'custom': return defineAsyncComponent(() => import('@/components/feature/api-settings/CustomApiSettings.vue'));
+    default: return null;
+  }
+});
+
+// Watch for provider changes and validate selected languages
+watch(selectedProvider, (newProvider) => {
+  const sourceSupported = filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)
+  if (!sourceSupported) sourceLanguage.value = 'auto'
   const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
   if (!targetSupported) {
-    // Fallback to English or first available language (try different code variations)
-    const english = filteredTargetLanguages.value.find(l =>
-      l.code === 'en' || getCanonicalCode(l.code) === 'en'
-    )
+    const english = filteredTargetLanguages.value.find(l => l.code === 'en' || getCanonicalCode(l.code) === 'en')
     targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'en'
-    logger.debug(`Target language not supported by ${newProvider}, reset to`, targetLanguage.value)
   }
 })
 
 // Watch for DeepL beta toggle changes
 watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldBeta) => {
-  if (settingsStore.selectedProvider === 'deepl' && newBeta !== oldBeta) {
-    // Re-validate languages when beta toggle changes
+  if (selectedProvider.value === 'deepl' && newBeta !== oldBeta) {
     const sourceSupported = filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)
-    if (!sourceSupported) {
-      sourceLanguage.value = 'auto'
-      logger.debug('Source language not supported with new beta setting, reset to auto')
-    }
-
+    if (!sourceSupported) sourceLanguage.value = 'auto'
     const targetSupported = filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)
     if (!targetSupported) {
-      const english = filteredTargetLanguages.value.find(l =>
-        l.code === 'en' || getCanonicalCode(l.code) === 'en'
-      )
+      const english = filteredTargetLanguages.value.find(l => l.code === 'en' || getCanonicalCode(l.code) === 'en')
       targetLanguage.value = english?.code || filteredTargetLanguages.value[0]?.code || 'en'
-      logger.debug('Target language not supported with new beta setting, reset to', targetLanguage.value)
     }
   }
 })
@@ -561,142 +657,8 @@ watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (newBeta, oldB
 // Sync with settings on mount
 onMounted(async () => {
   await loadLanguages();
-  sourceLanguage.value = settingsStore.settings?.SOURCE_LANGUAGE || 'auto'
-  targetLanguage.value = settingsStore.settings?.TARGET_LANGUAGE || 'fa'
-  bilingualTranslation.value = settingsStore.settings?.BILINGUAL_TRANSLATION ?? false
-  bilingualTranslationModes.value = { ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) }
   // Validate on mount to show error if languages are the same
   await validateLanguages()
-})
-
-// Update settings when changed
-watch(sourceLanguage, (value) => {
-  settingsStore.updateSettingLocally('SOURCE_LANGUAGE', value)
-  validateLanguages()
-})
-watch(targetLanguage, (value) => {
-  settingsStore.updateSettingLocally('TARGET_LANGUAGE', value)
-  validateLanguages()
-})
-watch(bilingualTranslation, (value) => {
-  // UX Improvement: If user turns ON the master switch but all visible modes are OFF,
-  // enable some logical defaults so the feature isn't "dead".
-  if (value) {
-    const visibleModes = [
-      TranslationMode.Selection,
-      TranslationMode.Select_Element,
-      TranslationMode.Field,
-      TranslationMode.Popup_Translate,
-      TranslationMode.Page
-    ];
-    const anyVisibleEnabled = visibleModes.some(mode => bilingualTranslationModes.value[mode] === true);
-    
-    if (!anyVisibleEnabled) {
-      bilingualTranslationModes.value[TranslationMode.Selection] = true;
-      bilingualTranslationModes.value[TranslationMode.Popup_Translate] = true;
-      bilingualTranslationModes.value[TranslationMode.Sidepanel_Translate] = true;
-      bilingualTranslationModes.value[TranslationMode.Select_Element] = true;
-      bilingualTranslationModes.value[TranslationMode.Field] = true;
-    }
-
-    // Always ensure accordion is open when checkbox is turned on
-    activeAccordion.value = 'bilingual';
-  } else if (activeAccordion.value === 'bilingual') {
-    // Close if it was open when turned off
-    activeAccordion.value = null;
-  }
-  
-  settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION', value)
-})
-
-watch(bilingualTranslationModes, (newModes) => {
-  // UX Improvement: If user unchecks ALL visible modes while the master switch is ON,
-  // automatically turn OFF the master switch since it has no effect.
-  const visibleModes = [
-    TranslationMode.Selection,
-    TranslationMode.Select_Element,
-    TranslationMode.Field,
-    TranslationMode.Popup_Translate,
-    TranslationMode.Page
-  ];
-  const anyVisibleEnabled = visibleModes.some(mode => newModes[mode] === true);
-
-  if (!anyVisibleEnabled && bilingualTranslation.value) {
-    bilingualTranslation.value = false;
-  }
-  
-  // Also keep Sidepanel in sync with Popup for consistency
-  if (newModes[TranslationMode.Popup_Translate] !== undefined) {
-    newModes[TranslationMode.Sidepanel_Translate] = newModes[TranslationMode.Popup_Translate];
-  }
-  
-  settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', { ...newModes })
-}, { deep: true })
-
-// Language Detection Preferences
-watch(arabicScriptPreference, (value) => {
-  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
-  preferences['arabic-script'] = value
-  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
-})
-
-watch(chineseScriptPreference, (value) => {
-  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
-  preferences['chinese-script'] = value
-  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
-})
-
-watch(devanagariScriptPreference, (value) => {
-  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
-  preferences['devanagari-script'] = value
-  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
-})
-
-watch(latinScriptPreference, (value) => {
-  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
-  preferences['latin-script'] = value
-  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
-})
-
-// ========== API Settings ==========
-// Selected provider
-const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)
-
-const selectedProviderInfo = computed(() => {
-  return findProviderById(selectedProvider.value)
-})
-
-// Dynamically load the settings component based on the selected provider
-const providerSettingsComponent = computed(() => {
-  const provider = selectedProvider.value;
-  switch (provider) {
-    case 'gemini':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/GeminiApiSettings.vue'));
-    case 'deepl':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepLApiSettings.vue'));
-    case 'browser':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/BrowserApiSettings.vue'));
-    case 'webai':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/WebAIApiSettings.vue'));
-    case 'lingva':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/LingvaApiSettings.vue'));
-    case 'openai':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenAIApiSettings.vue'));
-    case 'openrouter':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/OpenRouterApiSettings.vue'));
-    case 'deepseek':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/DeepseekApiSettings.vue'));
-    case 'custom':
-      return defineAsyncComponent(() => import('@/components/feature/api-settings/CustomApiSettings.vue'));
-    default:
-      return null;
-  }
-});
-
-// Watch for changes in selectedProvider and update the store locally
-watch(selectedProvider, (newValue, oldValue) => {
-  logger.debug('🔧 API provider changed:', oldValue, '→', newValue)
-  settingsStore.updateSettingLocally('TRANSLATION_API', newValue)
 })
 
 // Validation
