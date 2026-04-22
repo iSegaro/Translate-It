@@ -2080,5 +2080,35 @@
   },
   "nepali_language_name": {
     "message": "نپالی"
+  },
+  "latin_script_priority_label": {
+    "message": "اولویت اسکریپت لاتین"
+  },
+  "latin_priority_none_label": {
+    "message": "خودکار"
+  },
+  "english_language_name": {
+    "message": "انگلیسی"
+  },
+  "french_language_name": {
+    "message": "فرانسوی"
+  },
+  "spanish_language_name": {
+    "message": "اسپانیایی"
+  },
+  "german_language_name": {
+    "message": "آلمانی"
+  },
+  "italian_language_name": {
+    "message": "ایتالیایی"
+  },
+  "portuguese_language_name": {
+    "message": "پرتغالی"
+  },
+  "turkish_language_name": {
+    "message": "ترکی"
+  },
+  "dutch_language_name": {
+    "message": "هلندی"
   }
 }

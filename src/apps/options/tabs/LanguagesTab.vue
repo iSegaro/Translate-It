@@ -238,6 +238,17 @@
                 class="pref-select"
               />
             </div>
+
+            <div class="language-pref-row">
+              <label class="pref-label">
+                {{ t('latin_script_priority_label') || 'Latin Script:' }}
+              </label>
+              <BaseSelect
+                v-model="latinScriptPreference"
+                :options="latinScriptOptions"
+                class="pref-select"
+              />
+            </div>
           </div>
         </template>
       </BaseAccordion>
@@ -339,6 +350,18 @@ const devanagariScriptOptions = computed(() => [
   { value: 'ne', label: t('nepali_language_name') || 'Nepali' }
 ])
 
+const latinScriptOptions = computed(() => [
+  { value: 'none', label: `${t('latin_priority_none_label') || 'Auto (Use Provider Detection)'} (${t('default_label') || 'Default'})` },
+  { value: 'en', label: t('english_language_name') || 'English' },
+  { value: 'fr', label: t('french_language_name') || 'French' },
+  { value: 'es', label: t('spanish_language_name') || 'Spanish' },
+  { value: 'de', label: t('german_language_name') || 'German' },
+  { value: 'it', label: t('italian_language_name') || 'Italian' },
+  { value: 'pt', label: t('portuguese_language_name') || 'Portuguese' },
+  { value: 'tr', label: t('turkish_language_name') || 'Turkish' },
+  { value: 'nl', label: t('dutch_language_name') || 'Dutch' }
+])
+
 const toggleAccordion = (name) => {
   if (activeAccordion.value === name) {
     activeAccordion.value = null
@@ -355,6 +378,7 @@ const bilingualTranslationModes = ref({ ...(settingsStore.settings?.BILINGUAL_TR
 const arabicScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['arabic-script'] || 'fa')
 const chineseScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['chinese-script'] || 'zh-cn')
 const devanagariScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['devanagari-script'] || 'hi')
+const latinScriptPreference = ref(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.['latin-script'] || 'en')
 
 // AI Optimization settings
 const aiContextEnabled = computed({
@@ -625,6 +649,12 @@ watch(chineseScriptPreference, (value) => {
 watch(devanagariScriptPreference, (value) => {
   const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
   preferences['devanagari-script'] = value
+  settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
+})
+
+watch(latinScriptPreference, (value) => {
+  const preferences = settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}
+  preferences['latin-script'] = value
   settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
 })
 

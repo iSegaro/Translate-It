@@ -259,15 +259,19 @@ export const detectDevanagariScriptLanguage = (text, preferences = {}, options =
 
 /**
  * Detect language for Latin script text using unique character markers (Diacritics)
- * Highly reliable for short strings containing these specific characters.
+ * or user preferences for ambiguous strings.
  * 
  * @param {string} text - Text to analyze
+ * @param {Object} preferences - User language detection preferences
+ * @param {Object} options - Detection options
+ * @param {boolean} options.useDefaults - Whether to return a default language if no unique markers found
  * @returns {string|null} Language code or null
  */
-export const detectLatinScriptLanguage = (text) => {
+export const detectLatinScriptLanguage = (text, preferences = {}, options = { useDefaults: false }) => {
   if (!text || typeof text !== 'string') return null;
   const sample = text.trim();
 
+  // 1. Deterministic Layer: Language-specific unique characters
   // German: ä, ö, ü, ß
   if (/[ßäöüÄÖÜ]/.test(sample)) return 'de';
   
@@ -282,7 +286,6 @@ export const detectLatinScriptLanguage = (text) => {
 
   // French / Standard Latin variants
   // Only use highly unique markers for deterministic French
-  // Common accents like é, è, à are skipped here to allow statistical layer to decide
   if (/[êëîïûùôçÊËÎÏÛÙÔÇ]/.test(sample)) {
     // Turkish overlap check
     if (/[ığşİ]/.test(sample)) return 'tr';
@@ -300,5 +303,18 @@ export const detectLatinScriptLanguage = (text) => {
   // Fallback to Russian for general Cyrillic
   if (/[а-яё]/i.test(sample)) return 'ru';
 
+  // --- New Logic for Layer 3 (Heuristic) ---
+  // If no unique markers found and we don't want defaults (Layer 1), return null
+  if (!options.useDefaults) return null;
+
+  // 2. Use user preference for ambiguous text (e.g., "articles")
+  const userPreference = preferences['latin-script'];
+  
+  // If user explicitly chose 'none', return null to let the translation provider decide (auto)
+  if (userPreference === 'none') return null;
+  
+  if (userPreference) return userPreference;
+
+  // 3. Final Default fallback (null means let the provider decide via 'auto')
   return null;
 };

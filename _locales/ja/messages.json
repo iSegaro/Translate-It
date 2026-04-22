@@ -2080,5 +2080,35 @@
   },
   "nepali_language_name": {
     "message": "ネパール語"
+  },
+  "latin_script_priority_label": {
+    "message": "ラテンスクリプトの優先度"
+  },
+  "latin_priority_none_label": {
+    "message": "なし (プロバイダーの検出を使用)"
+  },
+  "english_language_name": {
+    "message": "英語"
+  },
+  "french_language_name": {
+    "message": "フランス語"
+  },
+  "spanish_language_name": {
+    "message": "スペイン語"
+  },
+  "german_language_name": {
+    "message": "ドイツ語"
+  },
+  "italian_language_name": {
+    "message": "イタリア語"
+  },
+  "portuguese_language_name": {
+    "message": "ポルトガル語"
+  },
+  "turkish_language_name": {
+    "message": "トルコ語"
+  },
+  "dutch_language_name": {
+    "message": "オランダ語"
   }
 }

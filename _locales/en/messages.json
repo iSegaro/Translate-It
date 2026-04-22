@@ -2080,5 +2080,35 @@
   },
   "nepali_language_name": {
     "message": "Nepali"
+  },
+  "latin_script_priority_label": {
+    "message": "Latin Script Priority"
+  },
+  "latin_priority_none_label": {
+    "message": "Auto (Use Provider Detection)"
+  },
+  "english_language_name": {
+    "message": "English"
+  },
+  "french_language_name": {
+    "message": "French"
+  },
+  "spanish_language_name": {
+    "message": "Spanish"
+  },
+  "german_language_name": {
+    "message": "German"
+  },
+  "italian_language_name": {
+    "message": "Italian"
+  },
+  "portuguese_language_name": {
+    "message": "Portuguese"
+  },
+  "turkish_language_name": {
+    "message": "Turkish"
+  },
+  "dutch_language_name": {
+    "message": "Dutch"
   }
 }

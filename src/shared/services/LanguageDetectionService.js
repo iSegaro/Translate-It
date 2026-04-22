@@ -35,10 +35,10 @@ const GLOBAL_TRUSTED_SET = new Set(GLOBAL_TRUSTED_LANGUAGES);
 const SESSION_CACHE = new Map();
 const MAX_CACHE_SIZE = 500;
 
-// Cleanup cache when provider changes to ensure fresh detection
+// Cleanup cache when provider or detection preferences change to ensure fresh detection
 if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
   browser.storage.onChanged.addListener((changes) => {
-    if (changes.translationApi || changes.targetLanguage) {
+    if (changes.translationApi || changes.targetLanguage || changes.LANGUAGE_DETECTION_PREFERENCES) {
       logger.debug('[LanguageDetectionService] Provider/Settings changed, clearing detection cache.');
       SESSION_CACHE.clear();
     }
@@ -161,7 +161,7 @@ export class LanguageDetectionService {
         if (devanagari) return devanagari;
 
         // Latin & Cyrillic Script markers (Enhanced European support)
-        const latinVariant = detectLatinScriptLanguage(sample);
+        const latinVariant = detectLatinScriptLanguage(sample, preferences, { useDefaults: false });
         if (latinVariant) return latinVariant;
 
         // Japanese/Korean specific ranges
@@ -195,21 +195,31 @@ export class LanguageDetectionService {
               // If text is Arabic script but API detected a non-Arabic script language, it's a false positive.
               if (isTextArabic && !isResultArabic) return null;
               
-              // Validation 3: Dynamic Trust Filter for Short/Unreliable Strings
-              // For short strings, the browser API is often probabilistic but not certain (isReliable: false).
-              // We only trust these "guesses" if they align with the user's context or are common global languages.
-              if (textLength < 25 && !result.isReliable) {
+              // Validation 3: Dynamic Trust Filter for Short Strings
+              // For short strings, the browser API often makes mistakes or detects obscure languages (like 'ca' for 'articles').
+              // We only trust these detections if they are 'reliable' AND in a trusted set, or if they are in the user's context.
+              if (textLength < 25) {
                 const uiLang = browser.i18n.getUILanguage().split('-')[0].toLowerCase();
                 const targetLang = preferences.targetLanguage ? getCanonicalCode(preferences.targetLanguage) : null;
                 
-                // If the guess is not in our user context or global trust set, 
-                // we only accept it if it's high confidence (percentage > 80)
                 const isInUserContext = uiLang === lang || targetLang === lang;
                 const isGloballyTrusted = GLOBAL_TRUSTED_SET.has(lang);
-                const isHighConfidence = top.percentage > 80;
+                
+                // For short strings, we apply extreme skepticism to obscure languages.
+                // An obscure language (not in GLOBAL_TRUSTED_SET) MUST be in the User Context to be accepted.
+                // A globally trusted language (like English) is accepted if it's high confidence or reliable.
+                let isTrustworthy = false;
 
-                if (!isInUserContext && !isGloballyTrusted && !isHighConfidence) {
-                  logger.debug(`[LanguageDetectionService] Statistical guess '${lang}' rejected for short string (not in user/global context and low confidence).`);
+                if (isGloballyTrusted) {
+                  // If it's a major language (EN, FA, FR, etc.), trust it if it's reliable or high confidence
+                  isTrustworthy = result.isReliable || top.percentage > 85;
+                } else {
+                  // If it's an obscure language (like Catalan 'ca'), ONLY trust it if it's in user's active context (UI or Target)
+                  isTrustworthy = isInUserContext && (result.isReliable || top.percentage > 85);
+                }
+
+                if (!isTrustworthy) {
+                  logger.debug(`[LanguageDetectionService] Statistical guess '${lang}' rejected for short string (not globally trusted and not in user context).`);
                   return null;
                 }
               }
@@ -240,6 +250,12 @@ export class LanguageDetectionService {
 
         const devanagari = detectDevanagariScriptLanguage(sample, preferences, { useDefaults: true });
         if (devanagari) return devanagari;
+
+        // Latin Script family (e.g. "articles" follow user preference)
+        if (isLatinScriptText(sample)) {
+          const latin = detectLatinScriptLanguage(sample, preferences, { useDefaults: true });
+          if (latin) return latin;
+        }
         
         return null;
       };
@@ -259,11 +275,22 @@ export class LanguageDetectionService {
           return deterministic;
         }
       } else {
-        // Short text: Deterministic -> Statistical -> Heuristic
+        // Short text: Deterministic -> (User Priority for Latin) -> Statistical -> Heuristic
         const deterministic = getDeterministicResult();
         if (deterministic) {
           logger.debug(`[LanguageDetectionService] Short text detection - Deterministic: ${deterministic}`);
           return deterministic;
+        }
+
+        // Special handling for Latin Script Priority:
+        // If it's Latin and the user has a specific priority (NOT 'none'), apply it BEFORE statistical detection.
+        // This solves the issue where Polish or Catalan is detected for short English strings.
+        if (isLatinScriptText(sample)) {
+          const userLatinPriority = preferences['latin-script'];
+          if (userLatinPriority && userLatinPriority !== 'none') {
+            logger.debug(`[LanguageDetectionService] Applying User Latin Priority: ${userLatinPriority}`);
+            return userLatinPriority;
+          }
         }
 
         const statistical = await getStatisticalResult();
