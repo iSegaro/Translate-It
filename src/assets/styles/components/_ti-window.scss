@@ -148,7 +148,8 @@
     }
 
     // Light theme action buttons with maximum specificity
-    .ti-action-btn {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
       background-color: var(--toolbar-link-hover-bg-color, #f0f0f0);
       color: var(--text-color, #555);
 
@@ -171,7 +172,8 @@
     }
 
     // Dark theme action buttons with maximum specificity
-    .ti-action-btn {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
       background-color: var(--toolbar-link-hover-bg-color, #424242);
       color: var(--text-color, #e0e0e0);
 
@@ -324,17 +326,21 @@
 
 // Action button with increased specificity
 .ti-window .ti-action-btn,
-.ti-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--ti-action-btn-size);
-  height: var(--ti-action-btn-size);
-  border: none;
-  border-radius: var(--ti-action-btn-border-radius);
-  cursor: pointer;
+.ti-window .ti-smart-tts-btn,
+.ti-action-btn,
+.ti-smart-tts-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--ti-action-btn-size, 28px) !important;
+  height: var(--ti-action-btn-size, 28px) !important;
+  border: none !important;
+  border-radius: var(--ti-action-btn-border-radius, 6px) !important;
+  cursor: pointer !important;
   background-color: transparent;
   @include transition-fast(background-color);
+  padding: 0 !important;
+  margin: 0 !important;
 
   &:hover {
     background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.1));

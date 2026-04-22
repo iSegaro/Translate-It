@@ -22,7 +22,8 @@
       border-bottom: 1px solid #e8e8e8 !important;
     }
 
-    .ti-action-btn {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
       background-color: #f0f0f0 !important;
       color: #555 !important;
     }
@@ -39,7 +40,8 @@
       border-bottom: 1px solid #424242 !important;
     }
 
-    .ti-action-btn {
+    .ti-action-btn,
+    .ti-smart-tts-btn {
       background-color: #424242 !important;
       color: #e0e0e0 !important;
     }
@@ -113,7 +115,8 @@
   }
 
   // Buttons
-  .ti-action-btn {
+  .ti-action-btn,
+  .ti-smart-tts-btn {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -123,6 +126,8 @@
     border-radius: 6px !important;
     cursor: pointer !important;
     transition: background-color 0.2s ease !important;
+    padding: 0 !important;
+    margin: 0 !important;
 
     &:hover {
       background: rgba(255, 255, 255, 0.1) !important;
@@ -132,7 +137,9 @@
       opacity: 0.5 !important;
       cursor: not-allowed !important;
     }
+  }
 
+  .ti-action-btn {
     &.ti-original-visible {
       background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
       border: 1px solid rgba(59, 130, 246, 0.3) !important;
@@ -140,10 +147,20 @@
     }
   }
 
-  // Smart TTS Button
+  // Smart TTS Button specific overrides
   .ti-smart-tts-btn {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
     position: relative !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+
+    .ti-icon-container {
+      opacity: 1 !important;
+    }
+    
+    .ti-tts-icon {
+      opacity: 1 !important;
+    }
   }
 
   // Window Body
