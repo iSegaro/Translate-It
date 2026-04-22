@@ -60,20 +60,23 @@
   width: 100% !important;
   box-sizing: border-box !important;
 
-  .trigger-modes-container, .delay-setting-container {
+    .trigger-modes-container, .delay-setting-container {
     display: flex !important;
-    flex-wrap: wrap !important; // اجازه شکستن خط در صورت کمبود جا
-    align-items: center !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
     gap: $spacing-sm $spacing-md !important;
     margin-bottom: $spacing-sm !important;
     width: 100% !important;
+    box-sizing: border-box !important;
     
     .trigger-label, .delay-label {
       font-size: $font-size-sm !important;
       font-weight: 500 !important;
       color: var(--color-text) !important;
-      flex: 0 1 160px !important; // تغییر از min-width به flex برای انعطاف بیشتر
+      flex: 1 0 160px !important; // اجازه رشد برچسب
+      max-width: 100% !important;
       transition: opacity 0.2s ease !important;
+      margin-top: 4px !important;
 
       &.is-disabled {
         opacity: 0.6 !important;
@@ -82,9 +85,34 @@
     
     .radio-group-horizontal {
       display: flex !important;
-      flex-wrap: wrap !important; // اجازه شکستن گزینه‌های رادیویی
-      align-items: center !important;
+      flex-wrap: wrap !important;
+      align-items: flex-start !important;
       gap: $spacing-md $spacing-xl !important;
+      flex: 10 1 380px !important; // اولویت بالای شکستن خط (380px) برای جلوگیری از تداخل در زوم
+      min-width: 0 !important;
+
+      .base-radio {
+        white-space: normal !important;
+        word-break: break-word !important;
+        align-items: flex-start !important;
+        line-height: 1.4 !important;
+        max-width: 100% !important;
+        
+        :deep(.radio-label) {
+          white-space: normal !important;
+          word-break: break-word !important;
+          text-overflow: clip !important;
+          overflow: visible !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          padding-inline-end: 15px !important; // فضای امن بسیار زیاد برای موارد خاص در زوم
+        }
+
+        :deep(input[type="radio"]) {
+          margin-top: 2px !important;
+          flex-shrink: 0 !important; // جلوگیری از مچاله شدن دایره رادیو
+        }
+      }
     }
   }
 
