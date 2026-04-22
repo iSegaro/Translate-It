@@ -52,6 +52,7 @@ export function useWindowsManager() {
       initialSize: detail.initialSize || (detail.isLoading ? 'small' : 'normal'),
       targetLanguage: detail.targetLanguage || detail.to || detail.tl || 'auto',
       sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || 'auto',
+      detectedSourceLanguage: detail.detectedSourceLanguage || null,
       provider: detail.provider || ''
     };
 
@@ -121,7 +122,8 @@ export function useWindowsManager() {
         ...existingWindow,
         ...detail,
         translatedText: detail.initialTranslatedText || detail.translatedText || existingWindow.translatedText,
-        sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || detail.detectedSourceLanguage || existingWindow.sourceLanguage,
+        sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || existingWindow.sourceLanguage,
+        detectedSourceLanguage: detail.detectedSourceLanguage || detail.sourceLanguage || existingWindow.detectedSourceLanguage,
         targetLanguage: detail.targetLanguage || detail.to || detail.tl || existingWindow.targetLanguage,
         initialSize: detail.initialSize || existingWindow.initialSize
       };

@@ -7,6 +7,7 @@
     <ActionToolbar
       :text="modelValue"
       :language="detectedSourceLanguage || language"
+      :detected-language="detectedSourceLanguage"
       mode="input"
       :show-copy="true"
       :show-tts="true"

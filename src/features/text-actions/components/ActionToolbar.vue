@@ -38,6 +38,12 @@
 
     <!-- Right group: Paste -->
     <div class="ti-toolbar-right">
+      <span
+        v-if="showDetectedLanguageLabel"
+        class="ti-detected-language-label"
+      >
+        {{ detectedLanguageName }}
+      </span>
       <PasteButton
         v-if="showPaste"
         :size="buttonSize"
@@ -64,6 +70,7 @@ import PasteButton from './PasteButton.vue'
 import TTSButton from '@/components/shared/TTSButton.vue' // Updated to use the new enhanced TTSButton
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActionToolbar')
 
@@ -80,6 +87,10 @@ const props = defineProps({
   language: {
     type: String,
     default: 'auto'
+  },
+  detectedLanguage: {
+    type: String,
+    default: undefined
   },
   
   // Display control
@@ -207,6 +218,19 @@ const buttonVariant = computed(() => {
   return props.variant
 })
 
+const showDetectedLanguageLabel = computed(() => {
+  return props.detectedLanguage && 
+         props.detectedLanguage !== 'auto' && 
+         props.mode === 'input' && 
+         props.text && props.text.trim().length > 0;
+})
+
+const detectedLanguageName = computed(() => {
+  if (!props.detectedLanguage) return '';
+  const name = getLanguageNameFromCode(props.detectedLanguage);
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : '';
+})
+
 // Event Handlers
 const handleCopied = (text) => {
   logger.debug('[ActionToolbar] Text copied:', text.substring(0, 50) + '...')
@@ -293,6 +317,20 @@ const handleTTSStateChanged = (data) => {
 
 .ti-toolbar-right {
   flex: 0 1 auto;
+}
+
+.ti-detected-language-label {
+  font-size: 10px;
+  color: var(--ti-color-text-secondary, #5f6368);
+  background: var(--ti-color-surface-variant, #f1f3f4);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-right: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.8;
+  border: 1px solid var(--ti-color-border, rgba(0,0,0,0.05));
 }
 
 /* Layout variants */

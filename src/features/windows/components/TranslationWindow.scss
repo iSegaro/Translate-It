@@ -68,6 +68,34 @@
   .ti-header-close {
     display: flex !important;
     align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .ti-detected-language-label {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    text-transform: capitalize !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    line-height: 1.2 !important;
+    opacity: 0.9 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    border: 1px solid rgba(0,0,0,0.05) !important;
+    
+    // Theme-specific styles
+    .light & {
+      background-color: #f1f3f4 !important;
+      color: #5f6368 !important;
+    }
+    
+    .dark & {
+      background-color: #3c4043 !important;
+      color: #e8eaed !important;
+      border-color: rgba(255,255,255,0.1) !important;
+    }
   }
 
   // Provider Selector Overrides

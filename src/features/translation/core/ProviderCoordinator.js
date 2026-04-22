@@ -8,6 +8,7 @@ import { ProviderTypes } from "@/features/translation/providers/ProviderConstant
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
+import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
@@ -131,7 +132,32 @@ export class ProviderCoordinator {
         }
       }
 
-      return finalResult;
+      // 8. Capture Detected Language & Register Feedback
+      const detectedLanguage = provider.lastDetectedLanguage || processedSourceLang;
+      
+      // Register detection result back to the service for future hits (Layer 0)
+      // SECURITY: Only register feedback if the user's initial request was 'auto'.
+      // This prevents manual user errors from poisoning the cache.
+      const isAutoRequest = sourceLang === AUTO_DETECT_VALUE || !sourceLang;
+      
+      if (isAutoRequest && provider.lastDetectedLanguage && provider.lastDetectedLanguage !== AUTO_DETECT_VALUE) {
+        const sampleText = Array.isArray(text) ? text[0] : (typeof text === 'string' ? text : '');
+        if (sampleText) {
+          LanguageDetectionService.registerDetectionResult(sampleText, provider.lastDetectedLanguage, {
+            url: options.url,
+            tabId: options.tabId
+          });
+        }
+      }
+
+      // Return unified response object
+      return {
+        translatedText: finalResult,
+        detectedLanguage: detectedLanguage,
+        provider: providerName,
+        sourceLanguage: processedSourceLang,
+        targetLanguage: processedTargetLang
+      };
     } catch (error) {
       const errorType = matchErrorToType(error);
       

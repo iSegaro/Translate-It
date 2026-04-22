@@ -152,6 +152,27 @@ export const correctTextDirection = (element, text) => {
 };
 
 /**
+ * Check if text contains CJK characters (Chinese, Japanese, or Korean)
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains CJK script characters
+ */
+export const isCjkScriptText = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  // Ranges: CJK Unified Ideographs, Hiragana, Katakana, Hangul Syllables
+  return /[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/.test(text);
+};
+
+/**
+ * Check if text contains Latin characters
+ * @param {string} text - Text to check
+ * @returns {boolean} True if text contains Latin characters
+ */
+export const isLatinScriptText = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  return /[a-zA-Z]/.test(text);
+};
+
+/**
  * Check if text contains Chinese characters (CJK Unified Ideographs)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Chinese characters

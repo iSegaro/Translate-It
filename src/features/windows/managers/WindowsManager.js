@@ -925,7 +925,7 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
-        detectedSourceLanguage: translationResult.sourceLanguage, // Explicitly pass for inheritance
+        detectedSourceLanguage: translationResult.sourceLanguage, // Pass the actual detected language
         targetLanguage: translationResult.targetLanguage,
         provider: translationResult.provider
       });

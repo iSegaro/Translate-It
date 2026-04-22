@@ -5,6 +5,9 @@ import {
   detectDevanagariScriptLanguage,
   detectLatinScriptLanguage,
   isArabicScriptText,
+  isCjkScriptText,
+  isDevanagariScriptText,
+  isLatinScriptText,
   isChineseScriptText,
   ARABIC_SCRIPT_LANGUAGES,
   CHINESE_SCRIPT_LANGUAGES,
@@ -25,25 +28,118 @@ const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageDetectionServi
 const GLOBAL_TRUSTED_SET = new Set(GLOBAL_TRUSTED_LANGUAGES);
 
 /**
+ * Session-based detection cache (Layer 0)
+ * Stores verified detection results to avoid redundant processing.
+ * Keys are a combination of Context (URL/Tab) and Script Family.
+ */
+const SESSION_CACHE = new Map();
+const MAX_CACHE_SIZE = 500;
+
+// Cleanup cache when provider changes to ensure fresh detection
+if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
+  browser.storage.onChanged.addListener((changes) => {
+    if (changes.translationApi || changes.targetLanguage) {
+      logger.debug('[LanguageDetectionService] Provider/Settings changed, clearing detection cache.');
+      SESSION_CACHE.clear();
+    }
+  });
+}
+
+/**
  * Centralized Language Detection Service
  * Provides a multi-layered, context-aware detection flow for the entire extension.
  */
 export class LanguageDetectionService {
   /**
-   * Main detection entry point
-   * 1. Deterministic Layer (Unique Markers)
-   * 2. Statistical Layer (Browser API)
-   * 3. Heuristic Layer (Script Defaults & Preferences)
+   * Identifies the general script family of the text.
+   * Used to partition the cache by script type within the same URL.
    * 
    * @param {string} text - Text to analyze
+   * @returns {string} Script family code ('latin', 'arabic', 'cjk', 'devanagari', 'other')
+   */
+  static getScriptFamily(text) {
+    if (!text) return 'other';
+    if (isArabicScriptText(text)) return 'arabic';
+    if (isCjkScriptText(text)) return 'cjk';
+    if (isDevanagariScriptText(text)) return 'devanagari';
+    if (isLatinScriptText(text)) return 'latin';
+    return 'other';
+  }
+
+  /**
+   * Registers a verified detection result (Feedback Loop from Providers).
+   * 
+   * @param {string} text - The original text
+   * @param {string} langCode - The verified language code
+   * @param {Object} context - Optional context (url, tabId)
+   */
+  static registerDetectionResult(text, langCode, context = {}) {
+    if (!text || !langCode || langCode === 'auto') return;
+    
+    const sample = text.trim();
+    if (sample.length < 2) return;
+
+    // We cache based on (URL + ScriptFamily) for high-performance context inheritance,
+    // and also (TextHash) for exact matches in Popups/Sidepanels.
+    const scriptFamily = this.getScriptFamily(sample);
+    const lang = getCanonicalCode(langCode);
+
+    // 1. Text-specific cache (Short term, exact match)
+    if (sample.length < 500) {
+      SESSION_CACHE.set(`text:${sample}`, lang);
+    }
+
+    // 2. Contextual cache (URL-based inheritance)
+    if (context.url) {
+      const urlKey = `url:${context.url}:${scriptFamily}`;
+      SESSION_CACHE.set(urlKey, lang);
+    }
+
+    // Maintain cache size
+    if (SESSION_CACHE.size > MAX_CACHE_SIZE) {
+      const firstKey = SESSION_CACHE.keys().next().value;
+      SESSION_CACHE.delete(firstKey);
+    }
+    
+    logger.debug(`[LanguageDetectionService] Registered feedback: "${sample.substring(0, 20)}..." -> ${lang}`);
+  }
+
+  /**
+   * Main detection entry point
+   * 0. Layer 0: Session Cache (Contextual & Exact)
+   * 1. Layer 1: Deterministic Layer (Unique Markers)
+   * 2. Layer 2: Statistical Layer (Browser API)
+   * 3. Layer 3: Heuristic Layer (Script Defaults & Preferences)
+   * 
+   * @param {string} text - Text to analyze
+   * @param {Object} options - Detection options (url, tabId)
    * @returns {string|null} Detected language code
    */
-  static async detect(text) {
+  static async detect(text, options = {}) {
     if (!text || typeof text !== 'string' || !text.trim()) return null;
     
     try {
-      const preferences = await getLanguageDetectionPreferencesAsync();
       const sample = text.trim();
+      
+      // --- LAYER 0: SESSION CACHE ---
+      // Check for exact text match first
+      const exactCached = SESSION_CACHE.get(`text:${sample}`);
+      if (exactCached) {
+        logger.debug(`[LanguageDetectionService] Layer 0: Exact match cache hit: ${exactCached}`);
+        return exactCached;
+      }
+
+      // Check for URL/Script-based inheritance
+      if (options.url) {
+        const scriptFamily = this.getScriptFamily(sample);
+        const contextualCached = SESSION_CACHE.get(`url:${options.url}:${scriptFamily}`);
+        if (contextualCached) {
+          logger.debug(`[LanguageDetectionService] Layer 0: Contextual cache hit (${scriptFamily}): ${contextualCached}`);
+          return contextualCached;
+        }
+      }
+
+      const preferences = await getLanguageDetectionPreferencesAsync();
       const textLength = sample.length;
       
       // Threshold for when statistical detection (Browser API) becomes highly reliable

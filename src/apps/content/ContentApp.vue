@@ -62,6 +62,7 @@
         :initial-size="window.initialSize"
         :target-language="window.targetLanguage || 'auto'"
         :source-language="window.sourceLanguage || 'auto'"
+        :detected-source-language="window.detectedSourceLanguage"
         :provider="window.provider"
         @close="onTranslationWindowClose"
         @speak="onTranslationWindowSpeak"

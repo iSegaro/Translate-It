@@ -94,6 +94,12 @@
         </button>
       </div>
       <div class="ti-header-close">
+        <span
+          v-if="detectedLanguageName"
+          class="ti-detected-language-label"
+        >
+          {{ detectedLanguageName }}
+        </span>
         <button
           class="ti-action-btn"
           :title="t('window_close')"
@@ -166,6 +172,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
 // Import adjacent SCSS
 import './TranslationWindow.scss';
@@ -187,6 +194,7 @@ const props = defineProps({
   initialSize: { type: String, default: 'normal' }, 
   targetLanguage: { type: String, default: 'auto' }, 
   sourceLanguage: { type: String, default: 'auto' },
+  detectedSourceLanguage: { type: String, default: undefined },
   provider: { type: String, default: '' } 
 });
 
@@ -211,6 +219,13 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
+
+const detectedLanguageName = computed(() => {
+  const code = props.detectedSourceLanguage;
+  if (!code || code === 'auto') return '';
+  const name = getLanguageNameFromCode(code);
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : '';
+});
 
 // Watch for prop changes to sync internal state
 watch(() => props.selectedText, (newText) => {
