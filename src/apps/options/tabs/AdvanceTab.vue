@@ -245,8 +245,20 @@ const toggleAccordion = (name) => {
   }
 }
 
-// Advanced settings
-const debugMode = ref(settingsStore.settings?.DEBUG_MODE || false)
+// --- Advanced settings (Computed with Getter/Setter for Clean Sync) ---
+
+const debugMode = computed({
+  get: () => settingsStore.settings?.DEBUG_MODE || false,
+  set: (value) => {
+    // Debug accordion follows standard open/close behavior
+    if (value) {
+      activeAccordion.value = 'debug'
+    } else if (activeAccordion.value === 'debug') {
+      activeAccordion.value = null
+    }
+    settingsStore.updateSettingLocally('DEBUG_MODE', value)
+  }
+})
 
 const enableTranslationHistory = computed({
   get: () => settingsStore.settings?.ENABLE_TRANSLATION_HISTORY ?? true,
@@ -267,62 +279,42 @@ const excludedSites = computed({
   }
 })
 
-// Proxy settings refs synchronized with store (like other tabs)
-const proxyEnabled = ref(settingsStore.settings?.PROXY_ENABLED || false)
-const proxyType = ref(settingsStore.settings?.PROXY_TYPE || 'http')
-const proxyHost = ref(settingsStore.settings?.PROXY_HOST || '')
-const proxyPort = ref(settingsStore.settings?.PROXY_PORT || 8080)
-const proxyUsername = ref(settingsStore.settings?.PROXY_USERNAME || '')
-const proxyPassword = ref(settingsStore.settings?.PROXY_PASSWORD || '')
+// --- Proxy settings (Computed with Getter/Setter) ---
 
-// Sync with settings on mount
-onMounted(() => {
-  debugMode.value = settingsStore.settings?.DEBUG_MODE || false
-  proxyEnabled.value = settingsStore.settings?.PROXY_ENABLED || false
-  proxyType.value = settingsStore.settings?.PROXY_TYPE || 'http'
-  proxyHost.value = settingsStore.settings?.PROXY_HOST || ''
-  proxyPort.value = settingsStore.settings?.PROXY_PORT || 8080
-  proxyUsername.value = settingsStore.settings?.PROXY_USERNAME || ''
-  proxyPassword.value = settingsStore.settings?.PROXY_PASSWORD || ''
-})
-
-// Update settings locally when changed (like other tabs)
-watch(debugMode, (value) => {
-  if (value) {
-    activeAccordion.value = 'debug'
-  } else if (activeAccordion.value === 'debug') {
-    activeAccordion.value = null
+const proxyEnabled = computed({
+  get: () => settingsStore.settings?.PROXY_ENABLED || false,
+  set: (value) => {
+    // Requirement: Only open accordion on enable, do NOT close on disable
+    if (value) {
+      activeAccordion.value = 'proxy'
+    }
+    settingsStore.updateSettingLocally('PROXY_ENABLED', value)
   }
-  settingsStore.updateSettingLocally('DEBUG_MODE', value)
 })
 
-watch(proxyEnabled, (value) => {
-  if (value) {
-    activeAccordion.value = 'proxy'
-  } else if (activeAccordion.value === 'proxy') {
-    activeAccordion.value = null
-  }
-  settingsStore.updateSettingLocally('PROXY_ENABLED', value)
+const proxyType = computed({
+  get: () => settingsStore.settings?.PROXY_TYPE || 'http',
+  set: (value) => settingsStore.updateSettingLocally('PROXY_TYPE', value)
 })
 
-watch(proxyType, (value) => {
-  settingsStore.updateSettingLocally('PROXY_TYPE', value)
+const proxyHost = computed({
+  get: () => settingsStore.settings?.PROXY_HOST || '',
+  set: (value) => settingsStore.updateSettingLocally('PROXY_HOST', value)
 })
 
-watch(proxyHost, (value) => {
-  settingsStore.updateSettingLocally('PROXY_HOST', value)
+const proxyPort = computed({
+  get: () => settingsStore.settings?.PROXY_PORT || 8080,
+  set: (value) => settingsStore.updateSettingLocally('PROXY_PORT', parseInt(value) || 8080)
 })
 
-watch(proxyPort, (value) => {
-  settingsStore.updateSettingLocally('PROXY_PORT', parseInt(value) || 8080)
+const proxyUsername = computed({
+  get: () => settingsStore.settings?.PROXY_USERNAME || '',
+  set: (value) => settingsStore.updateSettingLocally('PROXY_USERNAME', value)
 })
 
-watch(proxyUsername, (value) => {
-  settingsStore.updateSettingLocally('PROXY_USERNAME', value)
-})
-
-watch(proxyPassword, (value) => {
-  settingsStore.updateSettingLocally('PROXY_PASSWORD', value)
+const proxyPassword = computed({
+  get: () => settingsStore.settings?.PROXY_PASSWORD || '',
+  set: (value) => settingsStore.updateSettingLocally('PROXY_PASSWORD', value)
 })
 
 // Component log levels
