@@ -23,9 +23,11 @@
         </a>
         <p>{{ t('description') }}</p>
       </div>
+      
       <div class="sidebar-section theme-controls">
         <ThemeSelector />
       </div>
+
       <div class="sidebar-section localization-controls">
         <h2>{{ t('localization_section_title') }}</h2>
         
@@ -39,6 +41,7 @@
           <InterfaceLocaleSelector mode="dropdown" />
         </div>
       </div>
+
       <div class="sidebar-footer">
         <a
           :href="REPO_URLS.GITHUB_MAIN"
@@ -78,27 +81,34 @@
 <script setup>
 import './OptionsSidebar.scss'
 import { ref, computed, onMounted } from 'vue'
+import browser from 'webextension-polyfill'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { REPO_URLS } from '@/shared/config/constants.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { REPO_URLS } from '@/shared/config/constants.js'
-import browser from 'webextension-polyfill'
 
-const sidebarError = ref('')
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar');
+// Logger
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar')
+
+// Composables
 const { t } = useUnifiedI18n()
+
+// State
+const sidebarError = ref('')
 const manifestVersion = ref('v0.0.0')
+
+// --- Computed Properties ---
 
 // Dynamic copyright year logic based on build time
 const copyrightYear = computed(() => {
   const startYear = 2025
-  const buildYear = __BUILD_YEAR__ || startYear
-
-  // If build year is greater than start year, show range, otherwise just start year
+  const buildYear = typeof __BUILD_YEAR__ !== 'undefined' ? __BUILD_YEAR__ : startYear
   return buildYear > startYear ? `${startYear}-${buildYear}` : `${startYear}`
 })
+
+// --- Lifecycle ---
 
 onMounted(async () => {
   try {
@@ -106,7 +116,7 @@ onMounted(async () => {
     manifestVersion.value = `v${manifest.version}`
   } catch (error) {
     logger.warn('Failed to get manifest version:', error)
-    sidebarError.value = error && error.message ? error.message : String(error)
+    sidebarError.value = error?.message || String(error)
   }
-});
+})
 </script>
