@@ -444,6 +444,8 @@ import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
+import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
@@ -578,9 +580,6 @@ const wholePageScrollStopDelay = computed({
     settingsStore.updateSettingLocally('WHOLE_PAGE_SCROLL_STOP_DELAY', value)
   }
 })
-
-import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // --- Mode Specific Providers ---
 
