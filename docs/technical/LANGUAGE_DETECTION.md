@@ -47,10 +47,11 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 ```
 
 ### Priority Hierarchy
-1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This is the **most authoritative** source.
+1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This cache is automatically invalidated when translation settings or providers change.
 2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
-3.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
-4.  **Layer 3: Heuristic Layer**: Fallbacks based on user preferences and script defaults.
+3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., detecting English "articles" as Catalan "ca").
+4.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
+5.  **Layer 3: Heuristic Layer**: Fallbacks based on script-specific defaults (e.g., Arabic defaults to `fa`).
 
 ---
 
@@ -58,8 +59,9 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 
 ### 1. `LanguageDetectionService.js` (The Brain)
 The central orchestrator for all detection requests. It manages:
-- **Layer 0 Cache**: A dual-mode session cache storing exact text matches and URL-based script inheritance.
-- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections from translation providers.
+- **Layer 0 Cache**: A dual-mode session cache storing exact text matches (`textHash`) and URL-based script inheritance (`URL + ScriptFamily`).
+- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections. It ensures `sourceLanguage` is resolved to a concrete code (e.g., `en`) even if the request was `auto`.
+- **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when the user changes the Translation Provider or Latin Priority settings.
 - **Dynamic Routing**: Adjusts layer priority based on text length and script family.
 
 ### 2. `textAnalysis.js` (The Engine)
