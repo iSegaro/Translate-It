@@ -15,7 +15,6 @@
             id="tts-engine-select"
             v-model="ttsEngine"
             class="theme-select"
-            @change="updateSettingLocally('TTS_ENGINE', $event.target.value)"
           >
             <option :value="TTS_ENGINES.GOOGLE">
               {{ t('tts_engine_google') || 'Google TTS (Standard)' }}
@@ -42,10 +41,9 @@
         <div class="setting-control toggle-wrapper">
           <input
             id="tts-fallback-toggle"
+            v-model="ttsFallbackEnabled"
             type="checkbox"
-            :checked="ttsFallbackEnabled"
             class="toggle-input"
-            @change="updateSettingLocally('TTS_FALLBACK_ENABLED', $event.target.checked)"
           >
           <label
             for="tts-fallback-toggle"
@@ -69,10 +67,9 @@
         <div class="setting-control toggle-wrapper">
           <input
             id="tts-autodetect-toggle"
+            v-model="ttsAutoDetectEnabled"
             type="checkbox"
-            :checked="ttsAutoDetectEnabled"
             class="toggle-input"
-            @change="updateSettingLocally('TTS_AUTO_DETECT_ENABLED', $event.target.checked)"
           >
           <label
             for="tts-autodetect-toggle"
