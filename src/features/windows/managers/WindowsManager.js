@@ -1194,7 +1194,11 @@ export class WindowsManager extends ResourceTracker {
             WindowsManagerEvents.updateWindow(windowId, {
               initialSize: 'normal',
               isLoading: false,
-              initialTranslatedText: result.translatedText
+              initialTranslatedText: result.translatedText,
+              sourceLanguage: result.sourceLanguage || 'auto',
+              detectedSourceLanguage: result.sourceLanguage,
+              targetLanguage: result.targetLanguage,
+              provider: result.provider
             });
           } else {
             // Translation was cancelled

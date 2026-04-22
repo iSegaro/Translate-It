@@ -25,6 +25,7 @@ export class OptimizedJsonHandler {
 
     let hasErrors = false;
     let lastError = null;
+    let detectedSourceLanguage = sourceLanguage;
 
     try {
       const segments = typeof text === 'string' ? JSON.parse(text) : text;
@@ -86,7 +87,7 @@ export class OptimizedJsonHandler {
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
 
-          const translatedBatch = await self._performBatchCall(
+          const translatedBatchResponse = await self._performBatchCall(
             providerInstance, 
             batch, 
             sourceLanguage, 
@@ -103,8 +104,18 @@ export class OptimizedJsonHandler {
 
           checkCancellation();
 
+          // Capture detected language from the first successful batch if it's currently 'auto'
+          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.sourceLanguage) {
+            detectedSourceLanguage = translatedBatchResponse.sourceLanguage;
+            logger.debug(`[JsonHandler] Captured detected source language: ${detectedSourceLanguage}`);
+          }
+
+          const translatedBatch = (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.translatedText !== undefined)
+            ? translatedBatchResponse.translatedText
+            : translatedBatchResponse;
+
           const mappedResults = self._mapResults(batch, translatedBatch);
-          await self._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage);
+          await self._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage, detectedSourceLanguage);
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -131,9 +142,9 @@ export class OptimizedJsonHandler {
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
 
       if (hasErrors) {
-        await this._sendStreamError(tabId, messageId, lastError, targetLanguage);
+        await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage);
       } else {
-        await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage);
+        await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage);
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
@@ -261,7 +272,7 @@ export class OptimizedJsonHandler {
     return baseDelay;
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage) {
     if (!tabId) return;
     const streamMessage = {
       action: MessageActions.TRANSLATION_STREAM_UPDATE,
@@ -272,6 +283,7 @@ export class OptimizedJsonHandler {
         batchIndex,
         totalBatches,
         isComplete: batchIndex === totalBatches - 1,
+        sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,
         timestamp: Date.now()
@@ -284,7 +296,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage) {
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -293,6 +305,7 @@ export class OptimizedJsonHandler {
         success: true,
         completed: true,
         provider: providerName,
+        sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,
         timestamp: Date.now()
@@ -303,7 +316,7 @@ export class OptimizedJsonHandler {
     } catch { /* ignore */ }
   }
 
-  async _sendStreamError(tabId, messageId, lastError, targetLanguage) {
+  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -311,6 +324,7 @@ export class OptimizedJsonHandler {
       data: {
         success: false,
         error: lastError ? { message: lastError.message || String(lastError), type: lastError.type || 'TRANSLATION_ERROR' } : null,
+        sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,
         timestamp: Date.now()

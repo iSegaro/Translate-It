@@ -142,12 +142,17 @@ export class TranslationEngine {
     // Extract values from the unified coordinator response
     const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;
 
+    // Resolve the final source language, prioritizing the detected one if the requested one was 'auto'
+    const resolvedSourceLanguage = (finalSourceLanguage === 'auto' || !finalSourceLanguage) 
+      ? (detectedLanguage || finalSourceLanguage || sourceLanguage) 
+      : (finalSourceLanguage || detectedLanguage || sourceLanguage);
+
     return {
       success: true,
       translatedText: translatedText,
       streaming: typeof result === 'object' && result?.streaming, 
       provider,
-      sourceLanguage: finalSourceLanguage || detectedLanguage || sourceLanguage, 
+      sourceLanguage: resolvedSourceLanguage, 
       targetLanguage: finalTargetLanguage || targetLanguage, // Use swapped target language if available
       originalText: text,
       timestamp: Date.now(),
