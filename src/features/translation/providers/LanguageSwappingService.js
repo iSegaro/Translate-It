@@ -37,6 +37,12 @@ export class LanguageSwappingService {
       const bilingualModes = await getBilingualTranslationModesAsync();
       const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
 
+      // If bilingual is disabled for this mode/globally, skip detection and return original languages
+      if (!bilingualEnabled || !isModeEnabled) {
+        return [sourceLang, targetLang];
+      }
+
+      // Detection is only needed if bilingual is active
       const accurateDetectedLang = await this.getDetectedLanguage(text);
 
       if (accurateDetectedLang) {

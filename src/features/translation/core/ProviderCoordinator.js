@@ -39,6 +39,8 @@ export class ProviderCoordinator {
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
 
+      // 1a. Apply Language Swapping (Bilingual Logic)
+      // This will only perform detection if bilingual is enabled
       const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
         sampleText,
         sourceLang,
@@ -48,22 +50,23 @@ export class ProviderCoordinator {
         { providerName, mode: translateMode }
       );
 
-      logger.debug(`[Coordinator] Language swap result: ${swappedSource} → ${swappedTarget}`);
+      processedSourceLang = swappedSource;
+      processedTargetLang = swappedTarget;
 
-      // If source is 'auto', use detected language from swap service
-      // This prevents Edge API from incorrectly detecting the source language
-      if (swappedSource === AUTO_DETECT_VALUE) {
-        const detectedLanguage = await LanguageSwappingService.getDetectedLanguage(sampleText);
+      // 1b. Auto-Detection Fallback
+      // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),
+      // we must detect the language now to provide a concrete code to the provider.
+      if (processedSourceLang === AUTO_DETECT_VALUE) {
+        const detectedLanguage = await LanguageDetectionService.detect(sampleText, { url: options.url });
         if (detectedLanguage) {
           logger.debug(`[Coordinator] Using detected source language: ${detectedLanguage} (instead of auto)`);
           processedSourceLang = detectedLanguage;
-        } else {
-          processedSourceLang = swappedSource;
         }
-      } else {
-        processedSourceLang = swappedSource;
       }
-      processedTargetLang = swappedTarget;
+
+      if (processedSourceLang !== sourceLang || processedTargetLang !== targetLang) {
+        logger.debug(`[Coordinator] Final language resolution: ${processedSourceLang} → ${processedTargetLang}`);
+      }
     } catch (e) {
       logger.warn(`[Coordinator] Language swapping failed:`, e);
     }
