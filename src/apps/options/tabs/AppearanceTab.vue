@@ -14,8 +14,8 @@
             :font-family="fontFamily"
             :font-size="fontSize"
             :target-language="targetLanguage"
-            @update:font-family="updateFontFamily"
-            @update:font-size="updateFontSize"
+            @update:font-family="fontFamily = $event"
+            @update:font-size="fontSize = $event"
           />
         </div>
       </BaseFieldset>
@@ -46,40 +46,28 @@ const settingsStore = useSettingsStore()
 const fontSelectorRef = ref(null)
 const validationError = ref('')
 
-// Font settings refs synchronized with store (like other tabs)
-const fontFamily = ref(settingsStore.settings?.TRANSLATION_FONT_FAMILY || 'auto')
-const fontSize = ref(settingsStore.settings?.TRANSLATION_FONT_SIZE || '14')
+// --- Font settings (Computed with Getter/Setter for Clean Sync) ---
 
-// Sync with settings on mount
-onMounted(() => {
-  fontFamily.value = settingsStore.settings?.TRANSLATION_FONT_FAMILY || 'auto'
-  fontSize.value = settingsStore.settings?.TRANSLATION_FONT_SIZE || '14'
+const fontFamily = computed({
+  get: () => settingsStore.settings?.TRANSLATION_FONT_FAMILY || 'auto',
+  set: (value) => {
+    validationError.value = ''
+    settingsStore.updateSettingLocally('TRANSLATION_FONT_FAMILY', value)
+    validateFonts()
+  }
+})
+
+const fontSize = computed({
+  get: () => settingsStore.settings?.TRANSLATION_FONT_SIZE || '14',
+  set: (value) => {
+    validationError.value = ''
+    settingsStore.updateSettingLocally('TRANSLATION_FONT_SIZE', value)
+    validateFonts()
+  }
 })
 
 // Get target language for font preview
 const targetLanguage = computed(() => settingsStore.settings.TARGET_LANGUAGE)
-
-// Update settings locally when changed (like other tabs)
-watch(fontFamily, (value) => {
-  settingsStore.updateSettingLocally('TRANSLATION_FONT_FAMILY', value)
-  validateFonts()
-})
-
-watch(fontSize, (value) => {
-  settingsStore.updateSettingLocally('TRANSLATION_FONT_SIZE', value)
-  validateFonts()
-})
-
-// Methods - only update local refs, store sync happens via watchers
-const updateFontFamily = (newFontFamily) => {
-  validationError.value = ''
-  fontFamily.value = newFontFamily
-}
-
-const updateFontSize = (newFontSize) => {
-  validationError.value = ''
-  fontSize.value = newFontSize
-}
 
 // Validation
 const validateFonts = () => {
