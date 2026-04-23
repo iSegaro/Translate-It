@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { getUrlExclusionKey } from '@/utils/ui/exclusion.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleSetExcludeCurrentPage');
 /**
@@ -27,9 +28,14 @@ export function handleSetExcludeCurrentPage(message, sender, sendResponse) {
     const handleExclusion = async () => {
       try {
         const urlObj = new URL(url)
-        const domain = urlObj.hostname
+        const exclusionKey = getUrlExclusionKey(url)
+
+        if (!exclusionKey) {
+          sendResponse({ success: false, error: 'Invalid URL for exclusion settings' })
+          return
+        }
         
-        logger.debug(`[handleSetExcludeCurrentPage] Setting exclusion for ${domain}: ${exclude}`)
+        logger.debug(`[handleSetExcludeCurrentPage] Setting exclusion for ${exclusionKey}: ${exclude}`)
         
         // Get current excluded sites
         const storage = await storageManager.get(['EXCLUDED_SITES'])
@@ -46,29 +52,30 @@ export function handleSetExcludeCurrentPage(message, sender, sendResponse) {
         }
         
         if (exclude) {
-          // Add domain to excluded sites if not already present
-          if (!excludedSites.includes(domain)) {
-            excludedSites.push(domain)
+          // Add exclusion key to excluded sites if not already present
+          if (!excludedSites.includes(exclusionKey)) {
+            excludedSites.push(exclusionKey)
             await storageManager.set({
               EXCLUDED_SITES: excludedSites
             })
-            logger.info(`[handleSetExcludeCurrentPage] Added ${domain} to excluded sites`)
+            logger.info(`[handleSetExcludeCurrentPage] Added ${exclusionKey} to excluded sites`)
           }
         } else {
-          // Remove domain from excluded sites
-          const updatedSites = excludedSites.filter(site => site !== domain)
+          // Remove exclusion key from excluded sites
+          const updatedSites = excludedSites.filter(site => site !== exclusionKey)
           if (updatedSites.length !== excludedSites.length) {
             await storageManager.set({
               EXCLUDED_SITES: updatedSites
             })
-            logger.info(`[handleSetExcludeCurrentPage] Removed ${domain} from excluded sites`)
+            logger.info(`[handleSetExcludeCurrentPage] Removed ${exclusionKey} from excluded sites`)
           }
         }
         
         sendResponse({ 
           success: true, 
           url, 
-          domain,
+          domain: urlObj.hostname,
+          exclusionKey,
           excluded: exclude 
         })
       } catch (error) {

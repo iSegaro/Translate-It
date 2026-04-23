@@ -11,6 +11,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'context-menu-handler'
 
 import { storageManager } from "@/shared/storage/core/StorageCore.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { getUrlExclusionKey } from "@/utils/ui/exclusion.js";
 
 // removed legacy createLogger import
 
@@ -177,20 +178,29 @@ async function handlePageExclusion(info, tab, exclude = true) {
     logger.debug(`${exclude ? "Exclude" : "Include"} page menu clicked`);
 
     const currentUrl = tab.url;
-    const domain = new URL(currentUrl).hostname;
+    const urlObj = new URL(currentUrl);
+    const exclusionKey = getUrlExclusionKey(currentUrl);
+
+    if (!exclusionKey) {
+      logger.warn("Cannot update page exclusion for invalid URL", { currentUrl });
+      return;
+    }
 
     // Get current excluded sites
     const storage = await storageManager.get(["EXCLUDED_SITES"]);
-    const excludedSites = (storage.EXCLUDED_SITES || "")
-      .split(",")
-      .filter((site) => site.trim());
+    const excludedSites = Array.isArray(storage.EXCLUDED_SITES)
+      ? storage.EXCLUDED_SITES.filter(Boolean)
+      : String(storage.EXCLUDED_SITES || "")
+          .split(",")
+          .map((site) => site.trim())
+          .filter(Boolean);
 
     if (exclude) {
-      // Add domain to excluded sites
-      if (!excludedSites.includes(domain)) {
-        excludedSites.push(domain);
+      // Add exclusion key to excluded sites
+      if (!excludedSites.includes(exclusionKey)) {
+        excludedSites.push(exclusionKey);
         await storageManager.set({
-          EXCLUDED_SITES: excludedSites.join(","),
+          EXCLUDED_SITES: excludedSites,
         });
 
         // Show notification
@@ -198,14 +208,14 @@ async function handlePageExclusion(info, tab, exclude = true) {
           type: "basic",
           iconUrl: browser.runtime.getURL("icons/extension_icon_128.png"),
           title: "Site Excluded",
-          message: `${domain} has been excluded from translation`,
+          message: `${urlObj.hostname || exclusionKey} has been excluded from translation`,
         });
       }
     } else {
-      // Remove domain from excluded sites
-      const updatedSites = excludedSites.filter((site) => site !== domain);
+      // Remove exclusion key from excluded sites
+      const updatedSites = excludedSites.filter((site) => site !== exclusionKey);
       await storageManager.set({
-        EXCLUDED_SITES: updatedSites.join(","),
+        EXCLUDED_SITES: updatedSites,
       });
 
       // Show notification
@@ -213,11 +223,11 @@ async function handlePageExclusion(info, tab, exclude = true) {
         type: "basic",
         iconUrl: browser.runtime.getURL("icons/extension_icon_128.png"),
         title: "Site Included",
-        message: `${domain} has been included for translation`,
+        message: `${urlObj.hostname || exclusionKey} has been included for translation`,
       });
     }
 
-    logger.info(`Page ${exclude ? "excluded" : "included"}: ${domain}`);
+    logger.info(`Page ${exclude ? "excluded" : "included"}: ${exclusionKey}`);
   } catch (error) {
     logger.error('Error handling page exclusion:', error);
   }

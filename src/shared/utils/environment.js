@@ -62,8 +62,8 @@ export function getExecutionContext() {
       }
     }
     
-    // Content script context (injected into web pages)
-    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    // Content script context (injected into web pages or local files)
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:' || window.location.protocol === 'file:') {
       return 'content-script';
     }
   }

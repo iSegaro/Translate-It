@@ -1,6 +1,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import { getUrlExclusionKey } from '@/utils/ui/exclusion.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleIsCurrentPageExcluded');
 /**
@@ -15,6 +16,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'handleIsCurrentPageExcluded
 async function isPageExcluded(url) {
   try {
     const urlObj = new URL(url)
+    const exclusionKey = getUrlExclusionKey(url)
     
     // Check if extension is enabled globally first
     const mainSettings = await storageManager.get({ EXTENSION_ENABLED: true });
@@ -46,11 +48,18 @@ async function isPageExcluded(url) {
         .filter(Boolean)
     }
     
-    const domain = urlObj.hostname
+    if (!exclusionKey) {
+      return true
+    }
     
-    // Check if current domain is in excluded sites list
+    // Check if current page is in excluded sites list.
+    // Web URLs use hostname matching, while local files use exact file-path matching.
     const isExcluded = excludedSites.some(site => 
-      domain === site || domain.endsWith('.' + site) || site.includes(domain)
+      exclusionKey === site ||
+      (urlObj.protocol !== 'file:' && (
+        exclusionKey.endsWith('.' + site) ||
+        site.includes(exclusionKey)
+      ))
     )
     
     return isExcluded

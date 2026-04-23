@@ -132,8 +132,8 @@ export class OptionsValidator {
     const invalidSites = [];
 
     siteList.forEach((site) => {
-      // Basic domain validation
-      if (!this.isValidDomain(site)) {
+      // Accept either regular domains or file:// entries created by page-level exclusion.
+      if (!this.isValidExcludedSiteEntry(site)) {
         invalidSites.push(site);
       }
     });
@@ -170,6 +170,17 @@ export class OptionsValidator {
     return true;
   }
 
+  // Helper method to validate exclusion entries
+  isValidExcludedSiteEntry(entry) {
+    if (!entry || typeof entry !== "string") return false;
+
+    if (entry.startsWith("file://")) {
+      return this.isValidLocalFileUrl(entry);
+    }
+
+    return this.isValidDomain(entry);
+  }
+
   // Helper method to validate domain names
   isValidDomain(domain) {
     if (!domain || typeof domain !== "string") return false;
@@ -185,6 +196,16 @@ export class OptionsValidator {
       /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
     return domainRegex.test(domain) && domain.length <= 253;
+  }
+
+  // Helper method to validate file URLs stored in exclusion settings
+  isValidLocalFileUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.protocol === "file:" && Boolean(parsedUrl.pathname);
+    } catch {
+      return false;
+    }
   }
 }
 

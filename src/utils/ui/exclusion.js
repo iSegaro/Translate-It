@@ -52,6 +52,52 @@ export const DEFAULT_EXCLUDED_TEXT_FIELDS_ICON = [
 ];
 
 /**
+ * Build a stable exclusion key for a URL.
+ * Web pages keep hostname-based exclusions, while local files use the file path.
+ *
+ * @param {string} url - URL to normalize
+ * @returns {string} Normalized exclusion key, or empty string when URL is invalid
+ */
+export function getUrlExclusionKey(url) {
+  if (!url || typeof url !== "string") return "";
+
+  try {
+    const urlObj = new URL(url);
+
+    if (urlObj.protocol === "file:") {
+      return `file://${urlObj.host}${urlObj.pathname}`;
+    }
+
+    return urlObj.hostname || "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Check whether a stored exclusion entry matches the current URL.
+ *
+ * @param {string} url - Current page URL
+ * @param {string} exclusionEntry - Stored exclusion entry
+ * @returns {boolean} True when the entry excludes the URL
+ */
+export function matchesExcludedEntry(url, exclusionEntry) {
+  if (!url || !exclusionEntry) return false;
+
+  const normalizedEntry = exclusionEntry.trim();
+  if (!normalizedEntry) return false;
+
+  const exclusionKey = getUrlExclusionKey(url);
+  if (!exclusionKey) return false;
+
+  if (normalizedEntry.startsWith("file://")) {
+    return exclusionKey === normalizedEntry;
+  }
+
+  return url.includes(normalizedEntry);
+}
+
+/**
  * بررسی می‌کند که آیا یک URL در لیست پیش‌فرض مستثنی
  * برای قابلیت نمایش آیکون ترجمه در فیلد متنی است یا خیر
  * @param {string} url - آدرس صفحه‌ای که باید بررسی شود
@@ -70,7 +116,7 @@ export function isUrlExcluded_TEXT_FIELDS_ICON(url, userExcludedSites = []) {
   }
 
   // ۲. بررسی در لیست کاربر
-  const isUserExcluded = userExcludedSites.some((site) => url.includes(site));
+  const isUserExcluded = userExcludedSites.some((site) => matchesExcludedEntry(url, site));
   if (isUserExcluded) {
     return true;
   }
@@ -96,7 +142,7 @@ export function isUrlExcluded(url, userExcludedSites = []) {
   }
 
   // ۲. بررسی در لیست کاربر
-  const isUserExcluded = userExcludedSites.some((site) => url.includes(site));
+  const isUserExcluded = userExcludedSites.some((site) => matchesExcludedEntry(url, site));
   if (isUserExcluded) {
     return true;
   }

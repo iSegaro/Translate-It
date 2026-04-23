@@ -293,7 +293,8 @@ export class TextFieldIconManager extends ResourceTracker {
     }
 
     // Protocol check
-    if (typeof window === 'undefined' || !["http:", "https:"].includes(window.location.protocol)) {
+    // Local files are supported and should follow the same text-field flow as regular web pages.
+    if (typeof window === 'undefined' || !["http:", "https:", "file:"].includes(window.location.protocol)) {
       // Skipping icon creation - Invalid protocol or no window (logged at TRACE level)
       // this.logger.trace('Skipping icon creation: Invalid protocol or no window.');
       return null;
