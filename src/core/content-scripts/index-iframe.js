@@ -56,8 +56,9 @@ if (!window.translateItContentScriptCore) {
       } catch { /* ignore */ }
 
       // 8. Load Lite Features
-      // contentMessageHandler will automatically register all needed handlers including SelectElement
-      const LITE_FEATURES = ['messaging', 'extensionContext', 'textSelection', 'contentMessageHandler'];
+      // contentMessageHandler will automatically register all needed handlers
+      // We removed 'textSelection' from here to make it truly lazy in iframes.
+      const LITE_FEATURES = ['messaging', 'extensionContext', 'contentMessageHandler'];
       
       for (const feature of LITE_FEATURES) {
         await contentScriptCore.loadFeature(feature);

@@ -57,14 +57,29 @@ export class MainFeatureLoader {
       );
     }, this.LOAD_STRATEGIES.ESSENTIAL.delay);
 
-    // Stage 3: Lazy UI features (longer delay, unless promoted)
-    setTimeout(() => {
-      Promise.all(
-        this.FEATURE_CATEGORIES.LAZY_UI.map(feature =>
-          this.loadFeature(feature, 'LAZY_UI')
-        )
-      );
-    }, this.LOAD_STRATEGIES.LAZY_UI.delay);
+    // Stage 3: Lazy UI & Stage 4: On-demand (Using Idle Deadline)
+    const scheduleIdleTask = (category, delay) => {
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(() => {
+          Promise.all(
+            this.FEATURE_CATEGORIES[category].map(feature =>
+              this.loadFeature(feature, category)
+            )
+          );
+        }, { timeout: delay + 2000 }); // Backup timeout
+      } else {
+        setTimeout(() => {
+          Promise.all(
+            this.FEATURE_CATEGORIES[category].map(feature =>
+              this.loadFeature(feature, category)
+            )
+          );
+        }, delay);
+      }
+    };
+
+    scheduleIdleTask('LAZY_UI', this.LOAD_STRATEGIES.LAZY_UI.delay);
+    scheduleIdleTask('ON_DEMAND', this.LOAD_STRATEGIES.ON_DEMAND.delay);
   }
 
   /**
