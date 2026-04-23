@@ -6,27 +6,10 @@
     width: 100%;
   }
 
-  // Robust wrapping for ALL checkboxes and radios in this tab
+  // Base components (BaseCheckbox, BaseRadio) handle their own internal alignment
   :deep(.ti-checkbox), :deep(.base-radio), :deep(.base-checkbox) {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: flex-start !important;
-    min-width: 0 !important;
-    gap: $spacing-sm !important;
-    
-    .ti-checkbox__label, .radio-label, .radio-label-content, .base-checkbox__label {
-      flex: 1 !important;
-      min-width: 0 !important;
-      white-space: normal !important;
-      word-break: break-word !important;
-      line-height: 1.4 !important;
-    }
-
-    input {
-      margin-top: 2px !important;
-      flex-shrink: 0 !important;
-    }
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   // API Settings Section
@@ -322,20 +305,16 @@
 
     .checkbox-area {
       display: flex;
-      align-items: center;
+      align-items: center; /* Use accordion header alignment */
       gap: 12px;
       flex: 1;
       
       :deep(.bilingual-main-checkbox) {
-        gap: 0 !important;
         width: auto !important;
-        flex: none !important;
-        flex-grow: 0 !important;
-        min-width: auto !important;
         margin: 0 !important;
-
-        .ti-checkbox__label {
-          display: none !important;
+        
+        .ti-checkbox {
+          padding: 0 !important;
         }
       }
 
@@ -344,6 +323,8 @@
         user-select: none;
         padding: 4px 0;
         transition: color $transition-base;
+        line-height: 1; /* Reset for better alignment */
+        transform: translateY(1px); /* Match checkbox label nudge */
 
         &.active {
           color: var(--color-primary);

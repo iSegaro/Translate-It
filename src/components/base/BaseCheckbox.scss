@@ -2,14 +2,14 @@
 
 .ti-checkbox {
   display: flex !important;
-  align-items: center !important;
+  align-items: center !important; /* Root fix: Always center icon and text */
   gap: $spacing-md !important;
   cursor: pointer !important;
   font-size: $font-size-base !important;
   margin: 0 !important;
   
   input[type="checkbox"] {
-    margin: 0 !important;
+    margin: 0 !important; /* Reset margin for centering */
     width: 18px !important;
     height: 18px !important;
     cursor: pointer !important;
@@ -20,6 +20,8 @@
   .ti-checkbox__label {
     flex: 1 !important;
     color: var(--color-text) !important;
+    line-height: 1.2 !important; /* Precise line height */
+    transform: translateY(1px) !important; /* Visual baseline correction */
   }
   
   &--disabled {

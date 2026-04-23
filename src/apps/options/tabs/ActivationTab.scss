@@ -33,51 +33,15 @@
   }
 
   /* 
-    FORCE Row Layout for ALL Checkboxes and Radios.
-    This is the core fix to prevent the label from jumping below the input.
+    The base components (BaseCheckbox, BaseRadio) now handle their own 
+    internal alignment and centering globally.
   */
   .ti-checkbox, 
   .base-radio, 
   .base-checkbox {
-    display: flex !important;
-    flex-direction: row !important; /* Always stay in a row */
-    flex-wrap: nowrap !important;   /* Never wrap the input vs label */
-    align-items: center !important; /* Changed from flex-start to center */
-    justify-content: flex-start !important;
-    min-width: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    gap: $spacing-md !important;
-    margin-bottom: 0 !important; /* Removed fixed margin-bottom to let parent gap handle spacing */
-    cursor: pointer !important;
     box-sizing: border-box !important;
-    
-    // The text container (can be a span or a div from slot)
-    .ti-checkbox__label, 
-    .radio-label, 
-    .radio-label-content, 
-    .base-checkbox__label {
-      flex: 1 !important;
-      min-width: 0 !important;
-      white-space: normal !important; /* Allow internal text wrapping */
-      word-break: break-word !important;
-      overflow-wrap: anywhere !important;
-      line-height: 1.2 !important; /* Adjusted line height for better centering */
-      display: inline-flex !important;
-      align-items: center !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      text-align: inherit !important;
-      transform: translateY(1px) !important; /* Manual nudge for perfect alignment */
-    }
-
-    // Fixed size and alignment for the actual input dot/box
-    input {
-      margin: 0 !important; /* Removed top margin */
-      flex: 0 0 16px !important; /* Don't grow or shrink the input */
-      width: 16px !important;
-      height: 16px !important;
-    }
   }
 }
 
@@ -86,12 +50,11 @@
 */
 .rtl .activation-tab {
   .ti-checkbox, .base-radio, .base-checkbox {
-    flex-direction: row !important; /* Keep as row, direction:rtl handles the order */
+    flex-direction: row !important;
   }
 
   .fab-mode-select-wrapper .compact-select {
     background-position: left 6px center !important;
-    /* Removed padding overrides because padding-inline-* already handles RTL correctly */
   }
 }
 
@@ -192,7 +155,7 @@
     width: 100% !important;
 
     &.trigger-modes-container {
-      margin-bottom: $spacing-xl !important; /* Extra space below radio buttons */
+      margin-bottom: $spacing-xl !important;
     }
     
     .delay-label {
@@ -202,9 +165,6 @@
       max-width: 100% !important;
       margin-top: 0 !important;
       &.is-disabled { opacity: 0.6 !important; }
-    }
-
-    .delay-label {
       flex: none !important;
       min-width: 0 !important;
       align-self: center !important;
@@ -215,45 +175,31 @@
       flex-wrap: wrap !important;
       align-items: center !important;
       justify-content: center !important;
-      gap: $spacing-md 48px !important; /* Increased horizontal gap significantly */
+      gap: $spacing-md 48px !important;
       flex: none !important;
       min-width: 0 !important;
 
       .base-radio {
-        max-width: 100% !important;
         width: auto !important;
-        min-width: max-content !important; /* Force container to fit text width */
-        align-items: center !important; /* Center icon and text vertically */
+        min-width: max-content !important;
         white-space: nowrap !important;
         overflow: visible !important;
-        gap: 4px !important; /* Further reduced gap for maximum compactness */
-
-        input {
-          margin: 0 !important; /* Remove top margin to ensure perfect centering */
-        }
+        gap: 4px !important;
 
         .radio-label, .radio-label-content {
-          white-space: nowrap !important;
-          flex: none !important;
-          padding-inline: 12px !important; /* Padding on both sides for safety */
-          overflow: visible !important;
-          line-height: 1 !important; /* Reset line height for precise centering */
-          display: inline-flex !important;
-          align-items: center !important;
-          transform: translateY(1px) !important; /* Manual nudge for perfect alignment */
+          padding-inline: 12px !important;
         }
       }
     }
 
     &.delay-setting-container {
-      align-items: center !important;
-      justify-content: flex-start !important; /* Move to the start of the line */
+      justify-content: flex-start !important;
       gap: $spacing-sm !important;
     }
   }
 
   .setting-description {
-    text-align: start !important; /* Align description to the start */
+    text-align: start !important;
     padding-inline-start: 0 !important;
     width: 100% !important;
   }
@@ -353,7 +299,7 @@
   &.open {
     grid-template-rows: 1fr !important;
     opacity: 1 !important;
-    margin-top: $spacing-md !important; /* Space from the checkbox/label above */
+    margin-top: $spacing-md !important;
     margin-bottom: 0 !important;
     border-inline-start-color: var(--color-border) !important;
   }
@@ -361,13 +307,13 @@
   .sub-options-inner {
     min-height: 0 !important;
     padding-inline-start: $spacing-lg !important;
-    padding-top: $spacing-xs !important; /* Small top padding for internal items */
+    padding-top: $spacing-xs !important;
     padding-bottom: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: $spacing-sm !important; /* Space between internal items */
+    gap: $spacing-sm !important;
   }
   
   .radio-group {
@@ -376,25 +322,13 @@
     align-items: center !important;
     justify-content: center !important;
     gap: $spacing-xl !important;
-    margin-bottom: $spacing-xl !important; /* Increased margin for better separation */
+    margin-bottom: $spacing-xl !important;
     flex-wrap: wrap !important;
     width: 100% !important;
 
     .base-radio {
       width: auto !important;
       max-width: none !important;
-      align-items: center !important;
-
-      input {
-        margin: 0 !important;
-      }
-
-      .radio-label, .radio-label-content {
-        line-height: 1 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        transform: translateY(1px) !important;
-      }
     }
   }
 }

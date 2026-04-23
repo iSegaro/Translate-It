@@ -1,32 +1,35 @@
 @use "@/assets/styles/base/variables" as *;
 
 .base-radio {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  cursor: pointer;
-  font-size: $font-size-base;
-  margin: 0;
+  display: flex !important;
+  align-items: center !important; /* Root fix: Always center icon and text */
+  gap: $spacing-sm !important;
+  cursor: pointer !important;
+  font-size: $font-size-base !important;
+  margin: 0 !important;
   
   input[type="radio"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
+    margin: 0 !important; /* Reset margin for centering */
+    width: 16px !important;
+    height: 16px !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    accent-color: var(--color-primary);
   }
   
   .radio-label {
-    flex: 1;
-    color: var(--color-text);
+    flex: 1 !important;
+    color: var(--color-text) !important;
+    line-height: 1.2 !important; /* Precise line height */
+    transform: translateY(1px) !important; /* Visual baseline correction */
   }
   
   &.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
     
     input[type="radio"] {
-      cursor: not-allowed;
+      cursor: not-allowed !important;
     }
   }
 }

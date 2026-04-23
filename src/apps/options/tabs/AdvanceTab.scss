@@ -91,18 +91,17 @@
   // Accordion Section Styles
   .checkbox-area {
     display: flex;
-    align-items: center;
+    align-items: center; /* Use accordion header alignment */
     gap: 12px;
     flex: 1;
     
     :deep(.proxy-main-checkbox), 
     :deep(.debug-main-checkbox) {
-      gap: 0 !important;
       width: auto !important;
       margin: 0 !important;
-
-      .ti-checkbox__label {
-        display: none !important;
+      
+      .ti-checkbox {
+        padding: 0 !important;
       }
     }
 
@@ -112,6 +111,8 @@
       padding: 4px 0;
       font-weight: $font-weight-medium;
       transition: color $transition-base;
+      line-height: 1; /* Reset for better alignment */
+      transform: translateY(1px); /* Match checkbox label nudge */
 
       &.active {
         color: var(--color-primary);
@@ -126,6 +127,12 @@
     .setting-group {
       margin-inline-start: 28px;
     }
+  }
+
+  // Common checkbox/radio alignment in this tab
+  :deep(.ti-checkbox), :deep(.base-radio), :deep(.base-checkbox) {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   // Proxy Connection & Auth
