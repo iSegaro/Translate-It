@@ -49,7 +49,7 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 ### Priority Hierarchy
 1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This cache is automatically invalidated when translation settings or providers change.
 2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
-3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., detecting English "articles" as Catalan "ca").
+3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., detecting English "articles" as Catalan "ca"). Only whitelisted Latin priority codes are accepted.
 4.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
 5.  **Layer 3: Heuristic Layer**: Fallbacks based on script-specific defaults (e.g., Arabic defaults to `fa`).
 
@@ -102,6 +102,7 @@ Utilizes `browser.i18n.detectLanguage`. Results are validated against the intern
 ### 3. Heuristic Layer (Fallbacks)
 The safety net for ambiguous strings:
 - **User Preferences**: Consults `storage.local`.
+- **Latin Priority Validation**: Latin priority is limited to the curated UI whitelist (`en`, `fr`, `es`, `de`, `it`, `pt`, `tr`, `nl`). The special value `none` keeps provider-side auto detection enabled for ambiguous Latin strings.
 - **Script Defaults**: Arabic script defaults to `fa`, Devanagari defaults to `hi`, Chinese defaults to `zh-cn`.
 
 ---
