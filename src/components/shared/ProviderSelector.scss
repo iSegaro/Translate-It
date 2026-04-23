@@ -123,7 +123,19 @@
     height: 40px !important;
     cursor: pointer !important;
     &:hover { border-color: var(--color-primary) !important; }
+    
     .ti-api-provider-icon { width: 18px !important; height: 18px !important; }
+    
+    /* Disable hover effects for the arrow icon button inside */
+    .dropdown-arrow, .ti-dropdown-arrow {
+      &, &:hover, &:active, &:focus, * {
+        background: transparent !important;
+        background-color: transparent !important;
+        filter: none !important;
+        box-shadow: none !important;
+      }
+    }
+
     span { 
       flex: 1 !important; 
       text-align: start !important; 
