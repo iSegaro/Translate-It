@@ -42,17 +42,15 @@ export const fabUiStyles = import.meta.glob([
 ], { query: '?inline', import: 'default', eager: true });
 
 // 3. Sheet UI styles (Mobile Sheet feature - available on all platforms)
-const sheetUiStyles = import.meta.glob([
+// We export this so Mobile Components can load it only when needed
+export const sheetUiStyles = import.meta.glob([
   '@/apps/content/components/mobile/**/*.scss', 
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// Combine only core and sheet styles initially. 
-// FAB styles will be injected by the FAB component itself.
-const allComponentStyles = [
-  ...Object.values(sharedStyles),
-  ...Object.values(sheetUiStyles)
-].join('\n');
+// Combine ONLY shared styles initially. 
+// Features (FAB/Sheet) will inject their own styles when they mount.
+const allComponentStyles = Object.values(sharedStyles).join('\n');
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyVueApp');
 

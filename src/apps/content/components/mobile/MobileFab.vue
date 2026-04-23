@@ -110,6 +110,24 @@ const updateViewport = () => {
 };
 
 onMounted(async () => {
+  // Inject Sheet-specific styles lazily into shadow root
+  try {
+    const { sheetUiStyles } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+    if (sheetUiStyles) {
+      const sheetCss = Object.values(sheetUiStyles).join('\n');
+      const hostId = window === window.top ? 'translate-it-ui-main' : 'translate-it-ui-iframe';
+      const host = document.getElementById(hostId);
+      if (host?.shadowRoot && !host.shadowRoot.getElementById('vue-sheet-specific-styles')) {
+        const style = document.createElement('style');
+        style.id = 'vue-sheet-specific-styles';
+        style.textContent = sheetCss;
+        host.shadowRoot.appendChild(style);
+      }
+    }
+  } catch (error) {
+    console.warn('[MobileFab] Failed to inject lazy styles:', error);
+  }
+
   if (typeof window !== 'undefined') {
     tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
     tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
