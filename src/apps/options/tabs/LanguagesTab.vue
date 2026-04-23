@@ -10,297 +10,297 @@
         Loading languages...
       </div>
       <template v-else>
-      <div class="setting-group">
-        <label>{{ t('source_language_label') || 'Source Language' }}</label>
-        <LanguageDropdown
-          v-model="sourceLanguage"
-          :languages="filteredSourceLanguages"
-          type="source"
-          class="language-dropdown"
-        />
-      </div>
+        <div class="setting-group">
+          <label>{{ t('source_language_label') || 'Source Language' }}</label>
+          <LanguageDropdown
+            v-model="sourceLanguage"
+            :languages="filteredSourceLanguages"
+            type="source"
+            class="language-dropdown"
+          />
+        </div>
 
-      <div class="setting-group">
-        <label>{{ t('target_language_label') || 'Target Language' }}</label>
-        <LanguageDropdown
-          v-model="targetLanguage"
-          :languages="filteredTargetLanguages"
-          type="target"
-          class="language-dropdown"
-        />
-      </div>
+        <div class="setting-group">
+          <label>{{ t('target_language_label') || 'Target Language' }}</label>
+          <LanguageDropdown
+            v-model="targetLanguage"
+            :languages="filteredTargetLanguages"
+            type="target"
+            class="language-dropdown"
+          />
+        </div>
 
-      <div class="section-separator" />
+        <div class="section-separator" />
 
-      <!-- API Settings Accordion -->
-      <BaseAccordion
-        :is-open="activeAccordion === 'api'"
-        item-class="api-settings-accordion"
-        @toggle="toggleAccordion('api')"
-      >
-        <template #header>
-          <div class="accordion-header-layout">
-            <span>{{ t('translation_api_label') || 'Service' }}</span>
-            <div 
-              class="header-selector-wrapper"
-              @click.stop
-            >
-              <ProviderSelector 
-                v-model="selectedProvider" 
-                mode="button"
-                :is-global="false"
-              />
-            </div>
-          </div>
-        </template>
-
-        <template #content>
-          <div class="accordion-inner">
-            <div class="api-settings-section">
-              <div class="provider-settings-container">
-                <Transition name="fade-slide">
-                  <div 
-                    :key="selectedProvider"
-                    class="provider-settings"
-                  >
-                    <!-- Optimization Level Section (Visible for all providers) -->
-                    <div class="optimization-control-area">
-                      <div class="opt-control-group">
-                        <div class="label-with-value">
-                          <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                          <span
-                            class="level-badge"
-                            :class="'level-' + currentOptimizationLevel"
-                          >
-                            {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                          </span>
-                        </div>
-                        
-                        <div class="slider-wrapper">
-                          <input 
-                            v-model.number="currentOptimizationLevel" 
-                            type="range" 
-                            min="1" 
-                            max="5"
-                            class="ti-range-slider"
-                          >
-                          <div class="slider-labels">
-                            <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                            <span 
-                              class="slider-tick" 
-                              @click="currentOptimizationLevel = 2"
-                            >|</span>
-                            <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                            <span 
-                              class="slider-tick" 
-                              @click="currentOptimizationLevel = 4"
-                            >|</span>
-                            <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
-                          </div>
-                        </div>
-                        
-                        <p class="opt-description">
-                          {{ isAIProvider 
-                            ? t('optimization_description_ai') || "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates." 
-                            : t('optimization_description_traditional') || "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting." 
-                          }}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="section-separator mini" />
-
-                    <div
-                      v-if="selectedProviderInfo && !providerSettingsComponent"
-                      class="api-info"
-                    >
-                      <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-                      <p class="setting-description">
-                        {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
-                      </p>
-                    </div>
-
-                    <component :is="providerSettingsComponent" />
-                  </div>
-                </Transition>
+        <!-- API Settings Accordion -->
+        <BaseAccordion
+          :is-open="activeAccordion === 'api'"
+          item-class="api-settings-accordion"
+          @toggle="toggleAccordion('api')"
+        >
+          <template #header>
+            <div class="accordion-header-layout">
+              <span>{{ t('translation_api_label') || 'Service' }}</span>
+              <div 
+                class="header-selector-wrapper"
+                @click.stop
+              >
+                <ProviderSelector 
+                  v-model="selectedProvider" 
+                  mode="button"
+                  :is-global="false"
+                />
               </div>
             </div>
-          </div>
-        </template>
-      </BaseAccordion>
+          </template>
 
-      <!-- Bilingual Translation Setting (Accordion Style) -->
-      <BaseAccordion
-        :is-open="activeAccordion === 'bilingual'"
-        item-class="bilingual-setting"
-        @toggle="toggleAccordion('bilingual')"
-      >
-        <template #header>
-          <div class="checkbox-area">
-            <!-- Small Checkbox only with specific class -->
-            <BaseCheckbox
-              v-model="bilingualTranslation"
-              class="bilingual-main-checkbox"
-              @click.stop
-            />
-            <!-- Clickable Title Text with smart logic -->
-            <span 
-              class="accordion-title-text"
-              :class="{ active: activeAccordion === 'bilingual' }"
-            >
-              {{ t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)' }}
-            </span>
-          </div>
-        </template>
+          <template #content>
+            <div class="accordion-inner">
+              <div class="api-settings-section">
+                <div class="provider-settings-container">
+                  <Transition name="fade-slide">
+                    <div 
+                      :key="selectedProvider"
+                      class="provider-settings"
+                    >
+                      <!-- Optimization Level Section (Visible for all providers) -->
+                      <div class="optimization-control-area">
+                        <div class="opt-control-group">
+                          <div class="label-with-value">
+                            <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
+                            <span
+                              class="level-badge"
+                              :class="'level-' + currentOptimizationLevel"
+                            >
+                              {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                            </span>
+                          </div>
+                        
+                          <div class="slider-wrapper">
+                            <input 
+                              v-model.number="currentOptimizationLevel" 
+                              type="range" 
+                              min="1" 
+                              max="5"
+                              class="ti-range-slider"
+                            >
+                            <div class="slider-labels">
+                              <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                              <span 
+                                class="slider-tick" 
+                                @click="currentOptimizationLevel = 2"
+                              >|</span>
+                              <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                              <span 
+                                class="slider-tick" 
+                                @click="currentOptimizationLevel = 4"
+                              >|</span>
+                              <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                            </div>
+                          </div>
+                        
+                          <p class="opt-description">
+                            {{ isAIProvider 
+                              ? t('optimization_description_ai') || "Choose between 'Economy' to maximize token efficiency, or 'Turbo' for the fastest possible UI updates." 
+                              : t('optimization_description_traditional') || "Balance your API usage and IP stability against translation speed. Higher efficiency reduces request frequency to prevent rate-limiting." 
+                            }}
+                          </p>
+                        </div>
+                      </div>
 
-        <template #content>
-          <div class="accordion-inner">
-            <p class="setting-description mb-md">
-              {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
-            </p>
+                      <div class="section-separator mini" />
 
-            <div class="bilingual-modes-list">
-              <BaseCheckbox
-                :model-value="bilingualTranslationModes[TranslationMode.Selection]"
-                :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
-                class="mode-checkbox"
-                @update:model-value="updateBilingualMode(TranslationMode.Selection, $event)"
-              />
-              <BaseCheckbox
-                :model-value="bilingualTranslationModes[TranslationMode.Select_Element]"
-                :label="t('bilingual_mode_select_element_label') || 'Select Element'"
-                class="mode-checkbox"
-                @update:model-value="updateBilingualMode(TranslationMode.Select_Element, $event)"
-              />
-              <BaseCheckbox
-                :model-value="bilingualTranslationModes[TranslationMode.Field]"
-                :label="t('bilingual_mode_field_label') || 'Text Fields'"
-                class="mode-checkbox"
-                @update:model-value="updateBilingualMode(TranslationMode.Field, $event)"
-              />
-              <BaseCheckbox
-                :model-value="bilingualTranslationModes[TranslationMode.Popup_Translate]"
-                :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
-                class="mode-checkbox"
-                @update:model-value="updateBilingualMode(TranslationMode.Popup_Translate, $event)"
-              />
-              <BaseCheckbox
-                :model-value="bilingualTranslationModes[TranslationMode.Page]"
-                :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
-                class="mode-checkbox"
-                @update:model-value="updateBilingualMode(TranslationMode.Page, $event)"
-              />
+                      <div
+                        v-if="selectedProviderInfo && !providerSettingsComponent"
+                        class="api-info"
+                      >
+                        <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
+                        <p class="setting-description">
+                          {{ t(selectedProviderInfo.descriptionKey) || selectedProviderInfo.name }}
+                        </p>
+                      </div>
+
+                      <component :is="providerSettingsComponent" />
+                    </div>
+                  </Transition>
+                </div>
+              </div>
             </div>
-          </div>
-        </template>
-      </BaseAccordion>
+          </template>
+        </BaseAccordion>
 
-      <!-- Language Detection Preferences (Accordion Style) -->
-      <BaseAccordion
-        :is-open="activeAccordion === 'detection'"
-        item-class="language-pref-setting"
-        @toggle="toggleAccordion('detection')"
-      >
-        <template #header>
-          <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
-        </template>
-
-        <template #content>
-          <div class="accordion-inner">
-            <p class="setting-description mb-md">
-              {{ t('language_detection_preferences_description') || 'Choose which language should be prioritized when text contains scripts shared by multiple languages.' }}
-            </p>
-
-            <div class="language-pref-row">
-              <label class="pref-label">
-                {{ t('arabic_script_priority_label') || 'Arabic Script:' }}
-              </label>
-              <BaseSelect
-                v-model="arabicScriptPreference"
-                :options="arabicScriptOptions"
-                class="pref-select"
-              />
-            </div>
-
-            <div class="language-pref-row">
-              <label class="pref-label">
-                {{ t('chinese_script_priority_label') || 'Chinese Script:' }}
-              </label>
-              <BaseSelect
-                v-model="chineseScriptPreference"
-                :options="chineseScriptOptions"
-                class="pref-select"
-              />
-            </div>
-
-            <div class="language-pref-row">
-              <label class="pref-label">
-                {{ t('devanagari_script_priority_label') || 'Devanagari Script:' }}
-              </label>
-              <BaseSelect
-                v-model="devanagariScriptPreference"
-                :options="devanagariScriptOptions"
-                class="pref-select"
-              />
-            </div>
-
-            <div class="language-pref-row">
-              <label class="pref-label">
-                {{ t('latin_script_priority_label') || 'Latin Script:' }}
-              </label>
-              <BaseSelect
-                v-model="latinScriptPreference"
-                :options="latinScriptOptions"
-                class="pref-select"
-              />
-            </div>
-          </div>
-        </template>
-      </BaseAccordion>
-
-      <!-- AI Optimization (Accordion Style) -->
-      <BaseAccordion
-        :is-open="activeAccordion === 'ai'"
-        item-class="ai-optimization-setting"
-        @toggle="toggleAccordion('ai')"
-      >
-        <template #header>
-          <span>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
-        </template>
-
-        <template #content>
-          <div class="accordion-inner">
-            <div class="setting-group vertical">
+        <!-- Bilingual Translation Setting (Accordion Style) -->
+        <BaseAccordion
+          :is-open="activeAccordion === 'bilingual'"
+          item-class="bilingual-setting"
+          @toggle="toggleAccordion('bilingual')"
+        >
+          <template #header>
+            <div class="checkbox-area">
+              <!-- Small Checkbox only with specific class -->
               <BaseCheckbox
-                v-model="aiContextEnabled"
-                :label="t('ai_context_translation_label') || 'Smart Context Understanding'"
+                v-model="bilingualTranslation"
+                class="bilingual-main-checkbox"
+                @click.stop
               />
+              <!-- Clickable Title Text with smart logic -->
+              <span 
+                class="accordion-title-text"
+                :class="{ active: activeAccordion === 'bilingual' }"
+              >
+                {{ t('bilingual_translation_label') || 'Bilingual Translation (Swap Language)' }}
+              </span>
+            </div>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
               <p class="setting-description mb-md">
-                {{ t('ai_context_translation_description') }}
+                {{ t('bilingual_translation_description') || 'If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto).' }}
               </p>
-            </div>
 
-            <div class="setting-group vertical">
-              <BaseCheckbox
-                v-model="aiHistoryEnabled"
-                :label="t('ai_conversation_history_label') || 'Conversation Memory'"
-              />
+              <div class="bilingual-modes-list">
+                <BaseCheckbox
+                  :model-value="bilingualTranslationModes[TranslationMode.Selection]"
+                  :label="t('bilingual_mode_selection_label') || 'Text Selection (WindowsManager)'"
+                  class="mode-checkbox"
+                  @update:model-value="updateBilingualMode(TranslationMode.Selection, $event)"
+                />
+                <BaseCheckbox
+                  :model-value="bilingualTranslationModes[TranslationMode.Select_Element]"
+                  :label="t('bilingual_mode_select_element_label') || 'Select Element'"
+                  class="mode-checkbox"
+                  @update:model-value="updateBilingualMode(TranslationMode.Select_Element, $event)"
+                />
+                <BaseCheckbox
+                  :model-value="bilingualTranslationModes[TranslationMode.Field]"
+                  :label="t('bilingual_mode_field_label') || 'Text Fields'"
+                  class="mode-checkbox"
+                  @update:model-value="updateBilingualMode(TranslationMode.Field, $event)"
+                />
+                <BaseCheckbox
+                  :model-value="bilingualTranslationModes[TranslationMode.Popup_Translate]"
+                  :label="t('bilingual_mode_popup_label') || 'Popup & Sidepanel'"
+                  class="mode-checkbox"
+                  @update:model-value="updateBilingualMode(TranslationMode.Popup_Translate, $event)"
+                />
+                <BaseCheckbox
+                  :model-value="bilingualTranslationModes[TranslationMode.Page]"
+                  :label="t('bilingual_mode_page_label') || 'Whole Page Translation'"
+                  class="mode-checkbox"
+                  @update:model-value="updateBilingualMode(TranslationMode.Page, $event)"
+                />
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+
+        <!-- Language Detection Preferences (Accordion Style) -->
+        <BaseAccordion
+          :is-open="activeAccordion === 'detection'"
+          item-class="language-pref-setting"
+          @toggle="toggleAccordion('detection')"
+        >
+          <template #header>
+            <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
               <p class="setting-description mb-md">
-                {{ t('ai_conversation_history_description') }}
+                {{ t('language_detection_preferences_description') || 'Choose which language should be prioritized when text contains scripts shared by multiple languages.' }}
               </p>
-            </div>
-          </div>
-        </template>
-      </BaseAccordion>
-    </template>
 
-    <!-- Validation errors -->
-    <div
-      v-if="validationError"
-      class="validation-error"
-    >
-      {{ validationError }}
-    </div>
+              <div class="language-pref-row">
+                <label class="pref-label">
+                  {{ t('arabic_script_priority_label') || 'Arabic Script:' }}
+                </label>
+                <BaseSelect
+                  v-model="arabicScriptPreference"
+                  :options="arabicScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">
+                  {{ t('chinese_script_priority_label') || 'Chinese Script:' }}
+                </label>
+                <BaseSelect
+                  v-model="chineseScriptPreference"
+                  :options="chineseScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">
+                  {{ t('devanagari_script_priority_label') || 'Devanagari Script:' }}
+                </label>
+                <BaseSelect
+                  v-model="devanagariScriptPreference"
+                  :options="devanagariScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">
+                  {{ t('latin_script_priority_label') || 'Latin Script:' }}
+                </label>
+                <BaseSelect
+                  v-model="latinScriptPreference"
+                  :options="latinScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+
+        <!-- AI Optimization (Accordion Style) -->
+        <BaseAccordion
+          :is-open="activeAccordion === 'ai'"
+          item-class="ai-optimization-setting"
+          @toggle="toggleAccordion('ai')"
+        >
+          <template #header>
+            <span>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="aiContextEnabled"
+                  :label="t('ai_context_translation_label') || 'Smart Context Understanding'"
+                />
+                <p class="setting-description mb-md">
+                  {{ t('ai_context_translation_description') }}
+                </p>
+              </div>
+
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="aiHistoryEnabled"
+                  :label="t('ai_conversation_history_label') || 'Conversation Memory'"
+                />
+                <p class="setting-description mb-md">
+                  {{ t('ai_conversation_history_description') }}
+                </p>
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+      </template>
+
+      <!-- Validation errors -->
+      <div
+        v-if="validationError"
+        class="validation-error"
+      >
+        {{ validationError }}
+      </div>
     </div>
   </section>
 </template>

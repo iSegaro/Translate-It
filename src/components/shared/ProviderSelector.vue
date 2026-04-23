@@ -7,7 +7,10 @@
     :class="{ 'ti-dropdown-open': isDropdownOpen, 'is-disabled': disabled }"
     v-bind="$attrs"
   >
-    <div class="ti-split-translate-button" :class="{ 'ti-is-loading': loading }">
+    <div
+      class="ti-split-translate-button"
+      :class="{ 'ti-is-loading': loading }"
+    >
       <button
         type="submit"
         class="ti-translate-main-area"

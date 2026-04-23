@@ -37,7 +37,9 @@
         class="tier-select"
         :style="rtlSelectStyle"
       />
-      <p class="setting-description">{{ tierDescription }}</p>
+      <p class="setting-description">
+        {{ tierDescription }}
+      </p>
     </div>
 
     <div class="setting-group vertical">

@@ -44,8 +44,8 @@
         </BaseAccordion>
       </div>
     </div>
-    </section>
-    </template>
+  </section>
+</template>
 <script setup>
 import './HelpTab.scss'
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
