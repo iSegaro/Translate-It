@@ -56,34 +56,30 @@
 import './PromptTab.scss'
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
 import { useValidation } from '@/core/validation.js'
 import { CONFIG } from '@/shared/config/config.js'
+
+// Components
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import { useI18n } from 'vue-i18n'
 
 const settingsStore = useSettingsStore()
+const { t } = useUnifiedI18n()
+const logger = { debug: (...args) => console.debug('[PromptTab]', ...args) } // Simple logger for this tab
+const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
-const { t } = useI18n()
 
-// Validation
+// Validation State
 const validationErrorKey = ref('')
+const validationError = computed(() => validationErrorKey.value ? getFirstErrorTranslated('promptTemplate', t) : '')
 
-// Reactive translated validation error
-const validationError = computed(() => {
-  if (!validationErrorKey.value) return ''
-  return getFirstErrorTranslated('promptTemplate', t) || ''
-})
-
-// Prompt template
-const promptTemplate = computed({
-  get: () => settingsStore.settings?.PROMPT_TEMPLATE || DEFAULT_PROMPT,
-  set: async (value) => {
-    settingsStore.updateSettingLocally('PROMPT_TEMPLATE', value)
-    await validatePrompt()
-  }
+// Prompt template setting
+const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT, {
+  onChanged: () => validatePrompt()
 })
 
 // Language names for help text
@@ -94,14 +90,7 @@ const targetLanguageName = computed(() => settingsStore.settings?.TARGET_LANGUAG
 const validatePrompt = async () => {
   clearErrors()
   const isValid = await validate(promptTemplate.value)
-
-  if (!isValid) {
-    // Get the error key (not translated) for reactive translation
-    validationErrorKey.value = getFirstError('promptTemplate') || ''
-  } else {
-    validationErrorKey.value = ''
-  }
-
+  validationErrorKey.value = isValid ? '' : (getFirstError('promptTemplate') || '')
   return isValid
 }
 

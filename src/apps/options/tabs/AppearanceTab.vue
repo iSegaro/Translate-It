@@ -33,51 +33,44 @@
 
 <script setup>
 import './AppearanceTab.scss'
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+
+// Components
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import FontSelector from '@/components/feature/FontSelector.vue'
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 
-const { t } = useUnifiedI18n()
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AppearanceTab')
 const settingsStore = useSettingsStore()
+const { t } = useUnifiedI18n()
+const { createSetting } = useTabSettings(settingsStore, logger)
 
 // Refs
 const fontSelectorRef = ref(null)
 const validationError = ref('')
 
-// --- Font settings (Computed with Getter/Setter for Clean Sync) ---
+// --- Settings ---
 
-const fontFamily = computed({
-  get: () => settingsStore.settings?.TRANSLATION_FONT_FAMILY || 'auto',
-  set: (value) => {
-    validationError.value = ''
-    settingsStore.updateSettingLocally('TRANSLATION_FONT_FAMILY', value)
-    validateFonts()
-  }
+const fontFamily = createSetting('TRANSLATION_FONT_FAMILY', 'auto', {
+  onChanged: () => validateFonts()
 })
 
-const fontSize = computed({
-  get: () => settingsStore.settings?.TRANSLATION_FONT_SIZE || '14',
-  set: (value) => {
-    validationError.value = ''
-    settingsStore.updateSettingLocally('TRANSLATION_FONT_SIZE', value)
-    validateFonts()
-  }
+const fontSize = createSetting('TRANSLATION_FONT_SIZE', '14', {
+  onChanged: () => validateFonts()
 })
 
 // Get target language for font preview
-const targetLanguage = computed(() => settingsStore.settings.TARGET_LANGUAGE)
+const targetLanguage = computed(() => settingsStore.settings?.TARGET_LANGUAGE || 'en')
 
-// Validation
+// Validation logic
 const validateFonts = () => {
   if (fontSelectorRef.value?.validate) {
     const isValid = fontSelectorRef.value.validate()
-    if (!isValid) {
-      validationError.value = t('font_validation_failed') || 'Font settings validation failed'
-    } else {
-      validationError.value = ''
-    }
+    validationError.value = isValid ? '' : (t('font_validation_failed') || 'Font settings validation failed')
   }
 }
 </script>

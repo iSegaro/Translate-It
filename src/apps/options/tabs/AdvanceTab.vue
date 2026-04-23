@@ -24,7 +24,7 @@
         />
       </div>
 
-      <!-- Proxy Settings Section (Accordion Style) -->
+      <!-- Proxy Settings Section -->
       <BaseAccordion
         :is-open="activeAccordion === 'proxy'"
         item-class="proxy-setting"
@@ -156,7 +156,7 @@
         </template>
       </BaseAccordion>
 
-      <!-- Debug Mode Section (Accordion Style) -->
+      <!-- Debug Mode Section -->
       <BaseAccordion
         :is-open="activeAccordion === 'debug'"
         item-class="debug-setting"
@@ -213,251 +213,110 @@
 
 <script setup>
 import './AdvanceTab.scss'
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
+import proxyIcon from '@/icons/ui/proxy.png?url'
+
+// Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseAccordion from '@/components/base/BaseAccordion.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
-import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
 import LogLevelItem from '../components/LogLevelItem.vue'
-import proxyIcon from '@/icons/ui/proxy.png?url'
 
-import { useI18n } from 'vue-i18n'
-
-const settingsStore = useSettingsStore()
-const { handleError } = useErrorHandler()
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AdvanceTab')
+const settingsStore = useSettingsStore()
+const { t } = useUnifiedI18n()
+const { handleError } = useErrorHandler()
+const { createSetting } = useTabSettings(settingsStore, logger)
 
-const { t } = useI18n()
-
-// Accordion state management
+// Accordion state
 const activeAccordion = ref(null)
-
 const toggleAccordion = (name) => {
-  if (activeAccordion.value === name) {
-    activeAccordion.value = null
-  } else {
-    activeAccordion.value = name
-  }
+  activeAccordion.value = activeAccordion.value === name ? null : name
 }
 
-// --- Advanced settings (Computed with Getter/Setter for Clean Sync) ---
+// --- Settings ---
 
-const debugMode = computed({
-  get: () => settingsStore.settings?.DEBUG_MODE || false,
-  set: (value) => {
-    // Debug accordion follows standard open/close behavior
-    if (value) {
-      activeAccordion.value = 'debug'
-    } else if (activeAccordion.value === 'debug') {
-      activeAccordion.value = null
-    }
-    settingsStore.updateSettingLocally('DEBUG_MODE', value)
+const enableTranslationHistory = createSetting('ENABLE_TRANSLATION_HISTORY', true)
+
+const excludedSites = createSetting('EXCLUDED_SITES', [], {
+  transformGet: (v) => Array.isArray(v) ? v.join(', ') : v,
+  transformSet: (v) => v.split(',').map(s => s.trim()).filter(Boolean)
+})
+
+const debugMode = createSetting('DEBUG_MODE', false, {
+  onChanged: (val) => {
+    if (val) activeAccordion.value = 'debug'
+    else if (activeAccordion.value === 'debug') activeAccordion.value = null
   }
 })
 
-const enableTranslationHistory = computed({
-  get: () => settingsStore.settings?.ENABLE_TRANSLATION_HISTORY ?? true,
-  set: (value) => settingsStore.updateSettingLocally('ENABLE_TRANSLATION_HISTORY', value)
+const proxyEnabled = createSetting('PROXY_ENABLED', false, {
+  onChanged: (val) => { if (val) activeAccordion.value = 'proxy' }
 })
 
-const excludedSites = computed({
-  get: () => {
-    const sites = settingsStore.settings?.EXCLUDED_SITES || []
-    return Array.isArray(sites) ? sites.join(', ') : sites
-  },
-  set: (value) => {
-    const sites = value
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-    settingsStore.updateSettingLocally('EXCLUDED_SITES', sites)
-  }
+const proxyType = createSetting('PROXY_TYPE', 'http')
+const proxyHost = createSetting('PROXY_HOST', '')
+const proxyPort = createSetting('PROXY_PORT', 8080, {
+  transformSet: (v) => parseInt(v) || 8080
 })
+const proxyUsername = createSetting('PROXY_USERNAME', '')
+const proxyPassword = createSetting('PROXY_PASSWORD', '')
 
-// --- Proxy settings (Computed with Getter/Setter) ---
-
-const proxyEnabled = computed({
-  get: () => settingsStore.settings?.PROXY_ENABLED || false,
-  set: (value) => {
-    // Requirement: Only open accordion on enable, do NOT close on disable
-    if (value) {
-      activeAccordion.value = 'proxy'
-    }
-    settingsStore.updateSettingLocally('PROXY_ENABLED', value)
-  }
-})
-
-const proxyType = computed({
-  get: () => settingsStore.settings?.PROXY_TYPE || 'http',
-  set: (value) => settingsStore.updateSettingLocally('PROXY_TYPE', value)
-})
-
-const proxyHost = computed({
-  get: () => settingsStore.settings?.PROXY_HOST || '',
-  set: (value) => settingsStore.updateSettingLocally('PROXY_HOST', value)
-})
-
-const proxyPort = computed({
-  get: () => settingsStore.settings?.PROXY_PORT || 8080,
-  set: (value) => settingsStore.updateSettingLocally('PROXY_PORT', parseInt(value) || 8080)
-})
-
-const proxyUsername = computed({
-  get: () => settingsStore.settings?.PROXY_USERNAME || '',
-  set: (value) => settingsStore.updateSettingLocally('PROXY_USERNAME', value)
-})
-
-const proxyPassword = computed({
-  get: () => settingsStore.settings?.PROXY_PASSWORD || '',
-  set: (value) => settingsStore.updateSettingLocally('PROXY_PASSWORD', value)
-})
-
-// Component log levels
-const getComponentLogLevel = (name) => {
-  return settingsStore.settings?.COMPONENT_LOG_LEVELS?.[name] ?? 1 // Default to WARN
-}
-
+// Component Log Levels
+const getComponentLogLevel = (name) => settingsStore.settings?.COMPONENT_LOG_LEVELS?.[name] ?? 1
 const updateComponentLogLevel = (name, level) => {
   const currentLevels = { ...(settingsStore.settings?.COMPONENT_LOG_LEVELS || {}) }
   currentLevels[name] = Number(level)
   settingsStore.updateSettingLocally('COMPONENT_LOG_LEVELS', currentLevels)
 }
 
-// Proxy test functionality
+// --- Proxy Test Logic ---
+
 const isTestingProxy = ref(false)
 const testResult = ref(null)
-
 const proxyTypeOptions = [
   { value: 'http', label: 'HTTP' },
   { value: 'https', label: 'HTTPS' },
   { value: 'socks', label: 'SOCKS' }
 ]
 
-const canTestProxy = computed(() => {
-  if (!proxyEnabled.value) return true
-  return proxyHost.value && proxyPort.value && proxyType.value
-})
-
-const testResultClass = computed(() => {
-  if (!testResult.value) return ''
-  return testResult.value.success ? 'success' : 'error'
-})
-
-const testButtonText = computed(() => {
-  if (!proxyEnabled.value) {
-    return t('proxy_test_direct') || 'Test Direct Connection'
-  }
-  return t('proxy_test_proxy') || 'Test Proxy Connection'
-})
+const canTestProxy = computed(() => !proxyEnabled.value || (proxyHost.value && proxyPort.value && proxyType.value))
+const testResultClass = computed(() => testResult.value?.success ? 'success' : 'error')
+const testButtonText = computed(() => proxyEnabled.value ? t('proxy_test_proxy') : t('proxy_test_direct'))
 
 const testProxyConnection = async () => {
   if (isTestingProxy.value) return
-
   isTestingProxy.value = true
   testResult.value = null
 
-  logger.debug('Starting proxy connection test', {
-    proxyEnabled: proxyEnabled.value,
-    proxyType: proxyType.value,
-    proxyHost: proxyHost.value,
-    proxyPort: proxyPort.value
-  })
-
   try {
-    // Import the proxy manager
     const { proxyManager } = await import('@/shared/proxy/ProxyManager.js')
+    proxyManager.setConfig({
+      enabled: proxyEnabled.value,
+      type: proxyType.value,
+      host: proxyHost.value,
+      port: proxyPort.value,
+      auth: { username: proxyUsername.value, password: proxyPassword.value }
+    })
 
-    // If proxy is enabled, update proxy configuration
-    if (proxyEnabled.value) {
-      proxyManager.setConfig({
-        enabled: proxyEnabled.value,
-        type: proxyType.value,
-        host: proxyHost.value,
-        port: proxyPort.value,
-        auth: {
-          username: proxyUsername.value,
-          password: proxyPassword.value
-        }
-      })
-    } else {
-      // Ensure manager knows it's disabled for this test
-      proxyManager.setConfig({ enabled: false })
-    }
-
-    // Test the connection (it will automatically use direct test if proxy is disabled)
     const success = await proxyManager.testConnection()
-
-    let successMessage = ''
-    let failureMessage = ''
-
-    if (proxyEnabled.value) {
-      successMessage = t('proxy_test_success') || 'Proxy connection successful!'
-      failureMessage = t('proxy_test_failed') || 'Proxy connection failed. Check your settings.'
-    } else {
-      successMessage = t('direct_test_success') || 'Direct connection successful!'
-      failureMessage = t('direct_test_failed') || 'Direct connection failed. Please check your internet.'
-    }
-
     testResult.value = {
       success,
-      message: success ? successMessage : failureMessage
+      message: success 
+        ? (proxyEnabled.value ? t('proxy_test_success') : t('direct_test_success'))
+        : (proxyEnabled.value ? t('proxy_test_failed') : t('direct_test_failed'))
     }
-
-    if (success) {
-      logger.operation('Connection test completed successfully', {
-        mode: proxyEnabled.value ? 'proxy' : 'direct',
-        proxyType: proxyEnabled.value ? proxyType.value : 'none'
-      })
-    } else {
-      logger.warn('Connection test failed', {
-        mode: proxyEnabled.value ? 'proxy' : 'direct',
-        proxyType: proxyEnabled.value ? proxyType.value : 'none'
-      })
-    }
-
   } catch (error) {
-    logger.error('Proxy test error', {
-      error: error.message,
-      proxyEnabled: proxyEnabled.value,
-      proxyType: proxyType.value
-    })
-
-    // Use error handler for consistent error processing
-    await handleError(error, {
-      context: 'proxy-connection-test',
-      showToast: false,  // We handle UI feedback ourselves
-      metadata: {
-        proxyType: proxyType.value,
-        proxyHost: proxyHost.value,
-        proxyPort: proxyPort.value
-      }
-    })
-
-    let errorMessage = t('proxy_test_error') || 'Test failed with an error.'
-
-    // Check for specific error types
-    if (error.message.includes('Invalid proxy hostname format') ||
-        error.message.includes('Hostname cannot be just a number')) {
-      errorMessage = t('proxy_host_invalid') || 'Invalid hostname. Please enter a valid domain name or IP address.'
-    } else if (error.message.includes('configuration validation failed')) {
-      errorMessage = t('proxy_config_invalid') || 'Invalid proxy configuration. Please check your settings.'
-    } else if (error.message.includes('Unsupported proxy type')) {
-      errorMessage = t('proxy_type_unsupported') || 'Unsupported proxy type. Please select HTTP, HTTPS, or SOCKS.'
-    } else if (error.message.includes('SOCKS proxy is not supported')) {
-      errorMessage = t('proxy_socks_unsupported') || 'SOCKS proxy is not supported in browser extensions. Please use HTTP or HTTPS proxy instead.'
-    } else if (error.message.includes('HTTPS through HTTP proxy is not supported')) {
-      errorMessage = t('proxy_https_via_http_unsupported') || 'HTTPS through HTTP proxy is not supported. Please use HTTPS proxy for HTTPS URLs.'
-    }
-
-    testResult.value = {
-      success: false,
-      message: errorMessage
-    }
+    await handleError(error, { context: 'proxy-connection-test', showToast: false })
+    testResult.value = { success: false, message: t('proxy_test_error') || error.message }
   } finally {
     isTestingProxy.value = false
   }

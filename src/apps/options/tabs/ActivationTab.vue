@@ -33,35 +33,19 @@
           <div class="sub-options-inner">
             <div class="radio-group ui-mode-radio-group">
               <BaseRadio
+                v-for="mode in mobileModeOptions"
+                :key="mode.value"
                 v-model="mobileUiMode"
-                :value="MOBILE_CONSTANTS.UI_MODE.AUTO"
+                :value="mode.value"
                 name="mobileUiMode"
                 :disabled="!extensionEnabled"
               >
                 <div class="radio-label-content">
-                  <span class="label-title">{{ t('mobile_ui_mode_auto') }}</span>
-                </div>
-              </BaseRadio>
-              <BaseRadio
-                v-model="mobileUiMode"
-                :value="MOBILE_CONSTANTS.UI_MODE.MOBILE"
-                name="mobileUiMode"
-                :disabled="!extensionEnabled"
-              >
-                <div class="radio-label-content">
-                  <span class="label-title">{{ t('mobile_ui_mode_mobile') }}</span>
-                  <span class="label-description">{{ t('mobile_ui_mode_mobile_desc') }}</span>
-                </div>
-              </BaseRadio>
-              <BaseRadio
-                v-model="mobileUiMode"
-                :value="MOBILE_CONSTANTS.UI_MODE.DESKTOP"
-                name="mobileUiMode"
-                :disabled="!extensionEnabled"
-              >
-                <div class="radio-label-content">
-                  <span class="label-title">{{ t('mobile_ui_mode_desktop') }}</span>
-                  <span class="label-description">{{ t('mobile_ui_mode_desktop_desc') }}</span>
+                  <span class="label-title">{{ mode.label }}</span>
+                  <span 
+                    v-if="mode.desc" 
+                    class="label-description"
+                  >{{ mode.desc }}</span>
                 </div>
               </BaseRadio>
             </div>
@@ -305,7 +289,7 @@
       </div>
     </BaseFieldset>
 
-    <!-- Whole Page Translation (NEW) -->
+    <!-- Whole Page Translation -->
     <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
       <div class="setting-group">
         <div class="setting-row-with-provider">
@@ -432,191 +416,84 @@
 <script setup>
 import './ActivationTab.scss'
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
-import BaseRadio from '@/components/base/BaseRadio.vue'
-import BaseFieldset from '@/components/base/BaseFieldset.vue'
-import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
-// Logger
+// Components
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseRadio from '@/components/base/BaseRadio.vue'
+import BaseFieldset from '@/components/base/BaseFieldset.vue'
+import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
-
 const settingsStore = useSettingsStore()
+const { t } = useUnifiedI18n()
+const { createSetting } = useTabSettings(settingsStore, logger)
 
-const { t } = useI18n()
+// --- Settings Definitions ---
 
-// Extension enabled state
-const extensionEnabled = computed({
-  get: () => settingsStore.settings?.EXTENSION_ENABLED ?? true,
+// General
+const extensionEnabled = createSetting('EXTENSION_ENABLED', true)
+
+// FAB
+const showDesktopFab = createSetting('SHOW_DESKTOP_FAB', false)
+const mobileUiMode = createSetting('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AUTO)
+
+const mobileModeOptions = computed(() => [
+  { value: MOBILE_CONSTANTS.UI_MODE.AUTO, label: t('mobile_ui_mode_auto') },
+  { value: MOBILE_CONSTANTS.UI_MODE.MOBILE, label: t('mobile_ui_mode_mobile'), desc: t('mobile_ui_mode_mobile_desc') },
+  { value: MOBILE_CONSTANTS.UI_MODE.DESKTOP, label: t('mobile_ui_mode_desktop'), desc: t('mobile_ui_mode_desktop_desc') }
+])
+
+// Text Fields
+const translateOnTextFields = createSetting('TRANSLATE_ON_TEXT_FIELDS', false)
+const enableShortcutForTextFields = createSetting('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', false)
+const textFieldShortcut = createSetting('TEXT_FIELD_SHORTCUT', 'Ctrl+/')
+const textFieldMode = createSetting('COPY_REPLACE', 'copy', {
+  transformGet: (v) => v === 'replace' ? 'replace' : 'copy'
+})
+const replaceOnSpecialSites = createSetting('REPLACE_SPECIAL_SITES', false)
+
+// Selection
+const translateWithSelectElement = createSetting('TRANSLATE_WITH_SELECT_ELEMENT', false)
+const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', false)
+const selectionTranslationMode = createSetting('selectionTranslationMode', SelectionTranslationMode.IMMEDIATE)
+const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', false)
+const activeSelectionIconOnTextfields = createSetting('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', true)
+const enhancedTripleClickDrag = createSetting('ENHANCED_TRIPLE_CLICK_DRAG', false)
+
+// Dictionary
+const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
+
+// Whole Page
+const wholePageEnabled = createSetting('WHOLE_PAGE_TRANSLATION_ENABLED', true)
+const wholePageLazyLoading = createSetting('WHOLE_PAGE_LAZY_LOADING', true)
+const wholePageAutoTranslate = createSetting('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES', true)
+const wholePageShowOriginal = createSetting('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', false)
+const wholePageTranslateAfterScrollStop = createSetting('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', false)
+const wholePageScrollStopDelay = createSetting('WHOLE_PAGE_SCROLL_STOP_DELAY', 500)
+
+// --- Mode Specific Providers (Managed locally for complex structure) ---
+
+const createProviderSetting = (mode) => computed({
+  get: () => settingsStore.settings?.MODE_PROVIDERS?.[mode] || 'default',
   set: (value) => {
-    logger.debug('📝 Extension enabled changed:', value)
-    settingsStore.updateSettingLocally('EXTENSION_ENABLED', value)
-  }
-})
-
-// Desktop FAB settings
-const showDesktopFab = computed({
-  get: () => settingsStore.settings?.SHOW_DESKTOP_FAB || false,
-  set: (value) => {
-    logger.debug('📝 Show Desktop FAB changed:', value)
-    settingsStore.updateSettingLocally('SHOW_DESKTOP_FAB', value)
-  }
-})
-
-// Mobile UI Mode settings
-const mobileUiMode = computed({
-  get: () => settingsStore.settings?.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
-  set: (value) => {
-    logger.debug('📝 Mobile UI Mode changed:', value)
-    settingsStore.updateSettingLocally('MOBILE_UI_MODE', value)
-  }
-})
-
-// Text field settings
-const translateOnTextFields = computed({
-  get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_FIELDS || false,
-  set: (value) => {
-    logger.debug('📝 Translate on text fields changed:', value)
-    settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_FIELDS', value)
-  }
-})
-
-const enableShortcutForTextFields = computed({
-  get: () => settingsStore.settings?.ENABLE_SHORTCUT_FOR_TEXT_FIELDS || false,
-  set: (value) => settingsStore.updateSettingLocally('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', value)
-})
-
-const textFieldShortcut = computed({
-  get: () => settingsStore.settings?.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
-  set: (value) => settingsStore.updateSettingLocally('TEXT_FIELD_SHORTCUT', value)
-})
-
-const textFieldMode = computed({
-  get: () => settingsStore.settings?.COPY_REPLACE === 'replace' ? 'replace' : 'copy',
-  set: (value) => settingsStore.updateSettingLocally('COPY_REPLACE', value)
-})
-
-const replaceOnSpecialSites = computed({
-  get: () => settingsStore.settings?.REPLACE_SPECIAL_SITES || false,
-  set: (value) => settingsStore.updateSettingLocally('REPLACE_SPECIAL_SITES', value)
-})
-
-// Selection settings
-const translateWithSelectElement = computed({
-  get: () => settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT || false,
-  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_WITH_SELECT_ELEMENT', value)
-})
-
-const translateOnTextSelection = computed({
-  get: () => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION || false,
-  set: (value) => settingsStore.updateSettingLocally('TRANSLATE_ON_TEXT_SELECTION', value)
-})
-
-const selectionTranslationMode = computed({
-  get: () => settingsStore.settings?.selectionTranslationMode || SelectionTranslationMode.IMMEDIATE,
-  set: (value) => settingsStore.updateSettingLocally('selectionTranslationMode', value)
-})
-
-const requireCtrlForTextSelection = computed({
-  get: () => settingsStore.settings?.REQUIRE_CTRL_FOR_TEXT_SELECTION || false,
-  set: (value) => settingsStore.updateSettingLocally('REQUIRE_CTRL_FOR_TEXT_SELECTION', value)
-})
-
-const activeSelectionIconOnTextfields = computed({
-  get: () => settingsStore.settings?.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
-  set: (value) => settingsStore.updateSettingLocally('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', value)
-})
-
-const enhancedTripleClickDrag = computed({
-  get: () => settingsStore.settings?.ENHANCED_TRIPLE_CLICK_DRAG || false,
-  set: (value) => settingsStore.updateSettingLocally('ENHANCED_TRIPLE_CLICK_DRAG', value)
-})
-
-// Dictionary settings
-const enableDictionary = computed({
-  get: () => settingsStore.settings?.ENABLE_DICTIONARY || false,
-  set: (value) => settingsStore.updateSettingLocally('ENABLE_DICTIONARY', value)
-})
-
-// Whole Page settings
-const wholePageEnabled = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true,
-  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_TRANSLATION_ENABLED', value)
-})
-
-const wholePageLazyLoading = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_LAZY_LOADING ?? true,
-  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_LAZY_LOADING', value)
-})
-
-const wholePageAutoTranslate = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES ?? true,
-  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES', value)
-})
-
-const wholePageShowOriginal = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
-  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', value)
-})
-
-const wholePageTranslateAfterScrollStop = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP ?? false,
-  set: (value) => settingsStore.updateSettingLocally('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', value)
-})
-
-const wholePageScrollStopDelay = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_SCROLL_STOP_DELAY ?? 500,
-  set: (value) => {
-    logger.debug('📝 Whole Page Scroll Stop Delay changed:', value)
-    settingsStore.updateSettingLocally('WHOLE_PAGE_SCROLL_STOP_DELAY', value)
-  }
-})
-
-// --- Mode Specific Providers ---
-
-const fieldProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Field] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Field]: value === 'default' ? null : value }
+    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [mode]: value === 'default' ? null : value }
+    logger.debug(`📝 Provider for ${mode} changed:`, value)
     settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
   }
 })
 
-const selectElementProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Select_Element] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Select_Element]: value === 'default' ? null : value }
-    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
-  }
-})
+const fieldProvider = createProviderSetting(TranslationMode.Field)
+const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)
+const selectionProvider = createProviderSetting(TranslationMode.Selection)
+const pageProvider = createProviderSetting(TranslationMode.Page)
+const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
 
-const selectionProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Selection] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Selection]: value === 'default' ? null : value }
-    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
-  }
-})
-
-const pageProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Page] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Page]: value === 'default' ? null : value }
-    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
-  }
-})
-
-const dictionaryProvider = computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[TranslationMode.Dictionary_Translation] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [TranslationMode.Dictionary_Translation]: value === 'default' ? null : value }
-    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
-  }
-})
 </script>

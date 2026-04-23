@@ -89,16 +89,13 @@
 import './ImportExportTab.scss'
 import { ref } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 
-import { useI18n } from 'vue-i18n'
-
-
-const { t } = useI18n()
-
+const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 
 // State
@@ -138,21 +135,16 @@ const exportSettings = async () => {
       }
     }
     
-    // Use secureStorage for proper export handling
     const exportData = await secureStorage.prepareForExport(
       settings,
       exportPassword.value.trim() || null
     )
     
-    // Create filename with security indicator
     const timestamp = new Date().toISOString().slice(0, 10)
     const securitySuffix = exportPassword.value.trim() ? '_Encrypted' : ''
     const filename = `Translate-It_Settings${securitySuffix}_${timestamp}.json`
     
-    // Download file
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: 'application/json'
-    })
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -160,29 +152,16 @@ const exportSettings = async () => {
     a.click()
     URL.revokeObjectURL(url)
     
-    // Clear password and show success
     exportPassword.value = ''
     statusType.value = 'success'
-    statusMessage.value = exportPassword.value ? 
-      (t('export_success_encrypted') || 'Settings exported successfully with encrypted API keys!') :
-      (t('export_success_plaintext') || 'Settings exported successfully (API keys in plain text)')
+    statusMessage.value = t('export_success') || 'Settings exported successfully!'
     
-    setTimeout(() => {
-      statusMessage.value = ''
-    }, 3000)
+    setTimeout(() => { statusMessage.value = '' }, 3000)
     
   } catch (error) {
     statusType.value = 'error'
-    let errorMessage = t('export_error_generic') || 'Failed to export settings'
-    
-    if (error.message.includes('Password')) {
-      errorMessage = `${t('export_error_password') || 'Export failed'}: ${error.message}`
-    }
-    
-    statusMessage.value = errorMessage
-    setTimeout(() => {
-      statusMessage.value = ''
-    }, 3000)
+    statusMessage.value = t('export_error_generic') || 'Failed to export settings'
+    setTimeout(() => { statusMessage.value = '' }, 3000)
   } finally {
     isExporting.value = false
   }
@@ -193,16 +172,8 @@ const checkFileEncryption = async (file) => {
   try {
     const content = await file.text()
     const data = JSON.parse(content)
-    
-    if (data._hasEncryptedKeys && data._secureKeys) {
-      // File has encrypted keys - show password field
-      return true
-    } else {
-      // No encryption - hide password field
-      return false
-    }
+    return !!(data._hasEncryptedKeys && data._secureKeys)
   } catch {
-    // Invalid JSON or other error
     return false
   }
 }
@@ -215,19 +186,10 @@ const handleFileSelect = async (event) => {
     selectedFile.value = null
     return
   }
-  
   selectedFile.value = file
-  
-  // Check if file needs password
   const hasEncryption = await checkFileEncryption(file)
   showPasswordField.value = hasEncryption
-  
-  // Auto-import if no encryption detected
-  if (!hasEncryption) {
-    setTimeout(() => {
-      importSettings()
-    }, 500)
-  }
+  if (!hasEncryption) setTimeout(() => importSettings(), 500)
 }
 
 // Import settings
@@ -244,59 +206,21 @@ const importSettings = async () => {
   try {
     const fileContent = await selectedFile.value.text()
     const importedSettings = JSON.parse(fileContent)
-    const importPasswordValue = importPassword.value.trim() || null
-
-    // Pass raw imported settings to settings store (it will handle processing and migration)
-    await settingsStore.importSettings(importedSettings, importPasswordValue)
+    await settingsStore.importSettings(importedSettings, importPassword.value.trim() || null)
     
-    // Clear form only on successful import
     if (importFileInput.value) importFileInput.value.value = ''
     importPassword.value = ''
     showPasswordField.value = false
     selectedFile.value = null
     
     statusType.value = 'success'
-    statusMessage.value = t('import_success') || 'Settings imported successfully! Reloading...'
-    
-    // Reload page after 1.5 seconds
-    // setTimeout(() => {
-    //   window.location.reload()
-    // }, 1500)
+    statusMessage.value = t('import_success') || 'Settings imported successfully!'
     
   } catch (error) {
     statusType.value = 'error'
-    let errorMessage = t('import_error_generic') || 'Failed to import settings'
-    
-    // Handle specific error types
-    if (error.message.includes('Password') || error.message.includes('password')) {
-      errorMessage = `${t('import_error_password') || 'Import failed'}: ${error.message}`
-      
-      // Only clear password input on password errors, keep file selected
-      importPassword.value = ''
-      
-      // Focus password input for immediate retry
-      setTimeout(() => {
-        const passwordInput = document.querySelector('.import-password-input input')
-        if (passwordInput) passwordInput.focus()
-      }, 100)
-    } else if (error.message.includes('JSON')) {
-      errorMessage = t('import_error_invalid_format') || 'Import failed: Invalid file format'
-      
-      // Clear file input for non-password errors
-      if (importFileInput.value) importFileInput.value.value = ''
-      selectedFile.value = null
-      showPasswordField.value = false
-    } else {
-      // Clear file input for other errors
-      if (importFileInput.value) importFileInput.value.value = ''
-      selectedFile.value = null
-      showPasswordField.value = false
-    }
-    
-    statusMessage.value = errorMessage
-    setTimeout(() => {
-      statusMessage.value = ''
-    }, 4000)
+    statusMessage.value = error.message.includes('password') ? t('import_error_password') : (t('import_error_generic') || 'Import failed')
+    importPassword.value = ''
+    setTimeout(() => { statusMessage.value = '' }, 4000)
   } finally {
     isImporting.value = false
   }

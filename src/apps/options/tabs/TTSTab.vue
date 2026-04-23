@@ -1,5 +1,5 @@
 <template>
-  <div class="tab-content tts-tab">
+  <section class="options-tab-content tts-tab">
     <div class="settings-container">
       <div class="tab-header">
         <h2>{{ t('tts_tab_title') || 'Text-to-Speech' }}</h2>
@@ -8,114 +8,86 @@
 
       <!-- Engine Selection -->
       <div class="setting-group">
-        <div class="setting-item">
-          <label for="tts-engine-select">{{ t('tts_engine_label') || 'TTS Engine' }}</label>
-          <div class="setting-control select-wrapper">
-            <select
-              id="tts-engine-select"
-              v-model="ttsEngine"
-              class="theme-select"
-            >
-              <option :value="TTS_ENGINES.GOOGLE">
-                {{ t('tts_engine_google') || 'Google TTS (Standard)' }}
-              </option>
-              <option :value="TTS_ENGINES.EDGE">
-                {{ t('tts_engine_edge') || 'Microsoft Edge TTS (Neural)' }}
-              </option>
-            </select>
+        <div class="setting-row">
+          <div class="setting-info">
+            <label class="setting-label">{{ t('tts_engine_label') || 'TTS Engine' }}</label>
+            <p class="setting-description">
+              {{ t('tts_engine_desc') || 'Choose the default engine for text pronunciation. Edge TTS provides higher quality neural voices.' }}
+            </p>
           </div>
-        </div>
-        <div class="setting-description">
-          {{ t('tts_engine_desc') || 'Choose the default engine for text pronunciation. Edge TTS provides higher quality neural voices.' }}
+          <div class="setting-control">
+            <BaseSelect
+              v-model="ttsEngine"
+              :options="engineOptions"
+              class="tts-engine-select"
+            />
+          </div>
         </div>
       </div>
 
-      <hr class="section-divider">
+      <div class="section-separator" />
 
       <!-- Fallback Toggle -->
       <div class="setting-group">
-        <div class="setting-item">
-          <label for="tts-fallback-toggle">
-            {{ t('tts_fallback_label') || 'Enable Language Fallback' }}
-          </label>
-          <div class="setting-control toggle-wrapper">
-            <input
-              id="tts-fallback-toggle"
+        <div class="setting-row">
+          <div class="setting-info">
+            <BaseCheckbox
               v-model="ttsFallbackEnabled"
-              type="checkbox"
-              class="toggle-input"
-            >
-            <label
-              for="tts-fallback-toggle"
-              class="toggle-label"
+              :label="t('tts_fallback_label') || 'Enable Language Fallback'"
             />
+            <p class="setting-description">
+              {{ t('tts_fallback_desc') || 'Automatically switch to a similar language (e.g., Arabic for Persian) if the selected TTS engine does not support the original language natively.' }}
+            </p>
           </div>
-        </div>
-        <div class="setting-description">
-          {{ t('tts_fallback_desc') || 'Automatically switch to a similar language (e.g., Arabic for Persian) if the selected TTS engine does not support the original language natively.' }}
         </div>
       </div>
 
-      <hr class="section-divider">
+      <div class="section-separator" />
 
       <!-- Auto Detect Toggle -->
       <div class="setting-group">
-        <div class="setting-item">
-          <label for="tts-autodetect-toggle">
-            {{ t('tts_autodetect_label') || 'Smart Language Detection' }}
-          </label>
-          <div class="setting-control toggle-wrapper">
-            <input
-              id="tts-autodetect-toggle"
+        <div class="setting-row">
+          <div class="setting-info">
+            <BaseCheckbox
               v-model="ttsAutoDetectEnabled"
-              type="checkbox"
-              class="toggle-input"
-            >
-            <label
-              for="tts-autodetect-toggle"
-              class="toggle-label"
+              :label="t('tts_autodetect_label') || 'Smart Language Detection'"
             />
+            <p class="setting-description">
+              {{ t('tts_autodetect_desc') || 'Automatically detect the actual language of the text. If the selected engine fails to pronounce the text, it will attempt to identify the correct language and try again.' }}
+            </p>
           </div>
-        </div>
-        <div class="setting-description">
-          {{ t('tts_autodetect_desc') || 'Automatically detect the actual language of the text. If the selected engine fails to pronounce the text, it will attempt to identify the correct language and try again.' }}
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import './TTSTab.scss'
+import { computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TTS_ENGINES } from '@/shared/config/constants.js'
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TTSTab')
-
 const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
+const { createSetting } = useTabSettings(settingsStore, logger)
 
-const ttsEngine = computed({
-  get: () => settingsStore.settings.TTS_ENGINE || TTS_ENGINES.GOOGLE,
-  set: (value) => updateSettingLocally('TTS_ENGINE', value)
-})
+// TTS Engine Options
+const engineOptions = computed(() => [
+  { value: TTS_ENGINES.GOOGLE, label: t('tts_engine_google') || 'Google TTS (Standard)' },
+  { value: TTS_ENGINES.EDGE, label: t('tts_engine_edge') || 'Microsoft Edge TTS (Neural)' }
+])
 
-const ttsFallbackEnabled = computed({
-  get: () => settingsStore.settings.TTS_FALLBACK_ENABLED ?? true,
-  set: (value) => updateSettingLocally('TTS_FALLBACK_ENABLED', value)
-})
+// Settings using the new unified composable
+const ttsEngine = createSetting('TTS_ENGINE', TTS_ENGINES.GOOGLE)
+const ttsFallbackEnabled = createSetting('TTS_FALLBACK_ENABLED', true)
+const ttsAutoDetectEnabled = createSetting('TTS_AUTO_DETECT_ENABLED', true)
 
-const ttsAutoDetectEnabled = computed({
-  get: () => settingsStore.settings.TTS_AUTO_DETECT_ENABLED ?? true,
-  set: (value) => updateSettingLocally('TTS_AUTO_DETECT_ENABLED', value)
-})
-
-const updateSettingLocally = (key, value) => {
-  logger.debug(`Updating ${key} locally to:`, value)
-  settingsStore.updateSettingLocally(key, value)
-}
 </script>
