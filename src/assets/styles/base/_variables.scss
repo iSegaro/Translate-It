@@ -136,7 +136,9 @@
   --color-background-secondary: var(--bg-result-color, #f8f9fa);
   --color-background-soft: var(--sidebar-bg-color, #fffbe6);
   --color-surface: #f5f5f5;
+  --color-surface-alpha: rgba(245, 245, 245, 0.7);
   --color-border: var(--border-color, #e0e0e0);
+  --color-border-alpha: rgba(224, 220, 220, 0.4);
   --color-border-light: rgba(0, 0, 0, 0.05);
   --color-primary: var(--link-color, #1a73e8);
   --color-error: #ef5350;
@@ -202,6 +204,8 @@
   --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
   
   --color-surface: #242d44; /* Ensure dark theme background is blue */
+  --color-surface-alpha: rgba(30, 31, 34, 0.85); /* More neutral dark grey with higher opacity */
+  --color-border-alpha: rgba(255, 255, 255, 0.1);
   --color-primary-alpha: rgba(26, 115, 232, 0.3);
   --color-surface-shadow: rgba(255, 255, 255, 0.1);
   --color-background-hover: rgba(255, 255, 255, 0.1);
