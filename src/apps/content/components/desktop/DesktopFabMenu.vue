@@ -813,6 +813,24 @@ const stopDrag = (e) => {
 };
 
 onMounted(async () => {
+  // Inject FAB-specific styles lazily into shadow root
+  try {
+    const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+    if (fabUiStyles) {
+      const fabCss = Object.values(fabUiStyles).join('\n');
+      const hostId = window === window.top ? 'translate-it-ui-main' : 'translate-it-ui-iframe';
+      const host = document.getElementById(hostId);
+      if (host?.shadowRoot && !host.shadowRoot.getElementById('vue-fab-specific-styles')) {
+        const style = document.createElement('style');
+        style.id = 'vue-fab-specific-styles';
+        style.textContent = fabCss;
+        host.shadowRoot.appendChild(style);
+      }
+    }
+  } catch (error) {
+    console.warn('[DesktopFabMenu] Failed to inject lazy styles:', error);
+  }
+
   try {
     const position = await getDesktopFabPositionAsync();
     if (position) {

@@ -35,7 +35,8 @@ const sharedStyles = import.meta.glob([
 ], { query: '?inline', import: 'default', eager: true });
 
 // 2. FAB UI styles (Desktop FAB feature - available on all platforms)
-const fabUiStyles = import.meta.glob([
+// We export this so DesktopFabMenu can load it only when needed
+export const fabUiStyles = import.meta.glob([
   '@/apps/content/components/desktop/**/*.scss', 
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
@@ -46,10 +47,10 @@ const sheetUiStyles = import.meta.glob([
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// Combine all styles to ensure any UI mode works on any platform
+// Combine only core and sheet styles initially. 
+// FAB styles will be injected by the FAB component itself.
 const allComponentStyles = [
   ...Object.values(sharedStyles),
-  ...Object.values(fabUiStyles),
   ...Object.values(sheetUiStyles)
 ].join('\n');
 
