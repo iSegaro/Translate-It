@@ -441,8 +441,8 @@ const mobileUiMode = createSetting('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AU
 
 const mobileModeOptions = computed(() => [
   { value: MOBILE_CONSTANTS.UI_MODE.AUTO, label: t('mobile_ui_mode_auto') },
-  { value: MOBILE_CONSTANTS.UI_MODE.MOBILE, label: t('mobile_ui_mode_mobile'), desc: t('mobile_ui_mode_mobile_desc') },
-  { value: MOBILE_CONSTANTS.UI_MODE.DESKTOP, label: t('mobile_ui_mode_desktop'), desc: t('mobile_ui_mode_desktop_desc') }
+  { value: MOBILE_CONSTANTS.UI_MODE.MOBILE, label: t('mobile_ui_mode_mobile') },
+  { value: MOBILE_CONSTANTS.UI_MODE.DESKTOP, label: t('mobile_ui_mode_desktop') }
 ])
 
 // Text Fields
