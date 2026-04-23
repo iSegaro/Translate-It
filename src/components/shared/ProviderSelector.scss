@@ -227,6 +227,12 @@ img.ti-dropdown-arrow,
   transition: transform 0.2s ease !important;
   object-fit: contain !important;
   &.rotated { transform: rotate(180deg) !important; }
+
+  /* Whiten for Dark Mode */
+  :root.theme-dark &, :root.is-dark &, .theme-dark &, .is-dark & {
+    filter: brightness(0) invert(1) !important;
+    opacity: 0.9 !important;
+  }
 }
 
 /* 5. Dropdown Menu Base Styles */
