@@ -75,21 +75,22 @@
   outline: none !important;
   box-shadow: none !important;
   
-  /* Disable ALL hover effects */
+  /* Disable ALL hover effects to feel unified with main button */
   &, &:hover, &:active, &:focus {
     background: transparent !important;
     background-color: transparent !important;
     box-shadow: none !important;
-    filter: none !important;
     outline: none !important;
   }
 
-  * {
+  /* Make icon inert so it doesn't trigger its own hover states */
+  .ti-dropdown-arrow, .dropdown-arrow, * {
+    pointer-events: none !important;
     &, &:hover, &:active, &:focus {
       background: transparent !important;
       background-color: transparent !important;
       box-shadow: none !important;
-      filter: none !important;
+      /* Do not override filter/opacity here to allow dark mode rules to work */
     }
   }
 
@@ -128,11 +129,12 @@
     
     /* Disable hover effects for the arrow icon button inside */
     .dropdown-arrow, .ti-dropdown-arrow {
-      &, &:hover, &:active, &:focus, * {
+      pointer-events: none !important;
+      &, &:hover, &:active, &:focus {
         background: transparent !important;
         background-color: transparent !important;
-        filter: none !important;
         box-shadow: none !important;
+        /* Do not override filter/opacity here to allow dark mode rules to work */
       }
     }
 
