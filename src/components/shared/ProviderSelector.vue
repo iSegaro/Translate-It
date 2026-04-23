@@ -590,9 +590,23 @@ const handleKeydown = (event) => {
 const scrollToFocused = () => {
   nextTick(() => {
     if (dropdownMenuRef.value) {
-      const focusedEl = dropdownMenuRef.value.children[focusedIndex.value]
+      const container = dropdownMenuRef.value
+      const items = container.children
+      const focusedEl = items[focusedIndex.value]
+      
       if (focusedEl) {
-        focusedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        const containerTop = container.scrollTop
+        const containerBottom = containerTop + container.clientHeight
+        const elementTop = focusedEl.offsetTop
+        const elementBottom = elementTop + focusedEl.offsetHeight
+
+        if (elementTop < containerTop) {
+          // Scroll up to show element at top
+          container.scrollTo({ top: elementTop, behavior: 'smooth' })
+        } else if (elementBottom > containerBottom) {
+          // Scroll down to show element at bottom
+          container.scrollTo({ top: elementBottom - container.clientHeight, behavior: 'smooth' })
+        }
       }
     }
   })
