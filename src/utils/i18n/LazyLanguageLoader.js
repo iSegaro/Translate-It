@@ -16,14 +16,9 @@ import {
   clearTtsLanguageCache
 } from './TtsLanguageLoader.js';
 
-import {
-  detectBrowserLanguage,
-  detectLanguageFromText,
-  clearDetectionCache
-} from './LanguageDetector.js';
-
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LazyLanguageLoader');
 
@@ -42,6 +37,22 @@ const LAZY_LOAD_CONFIG = {
   // Debounce time for language detection (ms)
   DETECTION_DEBOUNCE: 300
 };
+
+/**
+ * Detect browser language preference for lazy preloading.
+ * Returns the primary language code and falls back to English on failure.
+ *
+ * @returns {string} Detected browser language code
+ */
+function getBrowserLanguageForPreload() {
+  try {
+    const browserLang = navigator.language || navigator.userLanguage || 'en';
+    return browserLang.split('-')[0].toLowerCase();
+  } catch (error) {
+    logger.warn('Failed to detect browser language for preload:', error);
+    return 'en';
+  }
+}
 
 /**
  * Lazy load translation language data
@@ -262,7 +273,7 @@ export async function preloadUserLanguages() {
 
   // Preload browser language if enabled
   if (LAZY_LOAD_CONFIG.PRELOAD_BROWSER_LANG) {
-    const browserLang = detectBrowserLanguage();
+    const browserLang = getBrowserLanguageForPreload();
     if (browserLang && !LAZY_LOAD_CONFIG.PERSISTENT_LANGUAGES.includes(browserLang)) {
       promises.push(lazyLoadTranslationLanguage(browserLang));
     }
@@ -298,7 +309,10 @@ export async function getLanguageDataLazy(langCode, type = 'translation', force 
  * @returns {Promise<{lang: string, confidence: number}>} Detection result
  */
 export async function detectLanguageLazy(text) {
-  const detection = await detectLanguageFromText(text);
+  const detectedLanguage = await LanguageDetectionService.detect(text);
+  const detection = detectedLanguage
+    ? { lang: detectedLanguage, confidence: 0.8 }
+    : { lang: null, confidence: 0.0 };
   const detectedLang = detection?.lang || null;
 
   // Lazy load the detected language
@@ -318,7 +332,6 @@ export function clearLazyLoadCache() {
   clearTranslationLanguageCache();
   clearInterfaceLanguageCache();
   clearTtsLanguageCache();
-  clearDetectionCache();
 }
 
 /**
