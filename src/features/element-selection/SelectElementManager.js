@@ -626,7 +626,27 @@ class SelectElementManager extends ResourceTracker {
 
     const contentCore = window.translateItContentCore;
     if (contentCore && typeof contentCore.injectMainDOMStyles === 'function') {
-      await contentCore.injectMainDOMStyles();
+      const selectionStyles = `
+        html[data-translate-it-select-mode="true"], 
+        html[data-translate-it-select-mode="true"] * {
+          cursor: crosshair !important;
+        }
+        :root {
+          --translate-highlight-color: #ff8800;
+          --translate-highlight-width: 3px;
+          --translate-highlight-offset: 2px;
+          --translate-highlight-z-index: 1040;
+        }
+        html body [data-translate-highlighted="true"],
+        html body .translate-it-element-highlighted {
+          outline: var(--translate-highlight-width) solid var(--translate-highlight-color) !important;
+          outline-offset: var(--translate-highlight-offset) !important;
+          z-index: var(--translate-highlight-z-index) !important;
+          position: relative !important;
+          box-shadow: 0 0 10px rgba(255, 136, 0, 0.5) !important;
+        }
+      `;
+      await contentCore.injectMainDOMStyles(selectionStyles, 'translate-it-select-mode-styles');
     }
   }
 

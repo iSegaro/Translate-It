@@ -95,14 +95,8 @@ export function ContentScriptCore() {
     return await loadFeatureOnDemand(featureName);
   };
 
-  core.injectMainDOMStyles = function() {
-    const mainDomCss = `
-      html[data-translate-it-select-mode="true"], 
-      html[data-translate-it-select-mode="true"] * { cursor: crosshair !important; }
-      :root { --translate-highlight-color: #ff8800; }
-      .translate-it-element-highlighted { outline: 3px solid var(--translate-highlight-color) !important; }
-    `;
-    this.injectStyles(mainDomCss, 'translate-it-main-dom-styles');
+  core.injectMainDOMStyles = function(css, id = 'translate-it-main-dom-styles') {
+    this.injectStyles(css, id);
   };
 
   // Compatibility
