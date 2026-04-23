@@ -364,15 +364,12 @@
   .language-pref-setting {
     margin-top: $spacing-md;
     
-    .accordion-inner {
-      padding-inline-start: 32px !important; // Match bilingual indentation
-    }
-    
     .language-pref-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: $spacing-sm;
+      padding-inline-start: 32px; // Match visual hierarchy for controls only
 
       .pref-label {
         font-size: $font-size-sm;
@@ -389,8 +386,8 @@
   .ai-optimization-setting {
     margin-top: $spacing-md;
 
-    .accordion-inner {
-      padding-inline-start: 32px !important; // Match other accordions indentation
+    .setting-group {
+      padding-inline-start: 32px; // Match visual hierarchy for controls only
     }
   }
 
@@ -551,6 +548,7 @@
       align-items: flex-start !important;
       gap: $spacing-xs !important;
       margin-inline-start: 0 !important;
+      padding-inline-start: 0 !important; // Remove indentation on mobile
       width: 100% !important;
 
       .pref-label {
@@ -561,6 +559,12 @@
       .pref-select {
         width: 100% !important;
         flex: none !important;
+      }
+    }
+
+    .ai-optimization-setting {
+      .setting-group {
+        padding-inline-start: 0 !important; // Remove indentation on mobile
       }
     }
   }
