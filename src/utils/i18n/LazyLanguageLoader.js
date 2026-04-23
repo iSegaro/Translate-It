@@ -40,7 +40,8 @@ const LAZY_LOAD_CONFIG = {
 
 /**
  * Detect browser language preference for lazy preloading.
- * Returns the primary language code and falls back to English on failure.
+ * This is intentionally local to the lazy loader because it is not part of the
+ * extension's text language-detection policy.
  *
  * @returns {string} Detected browser language code
  */
@@ -304,9 +305,12 @@ export async function getLanguageDataLazy(langCode, type = 'translation', force 
 }
 
 /**
- * Detect language from text with lazy loading
+ * Detect language from text for lazy loading.
+ * Delegates detection policy to the centralized LanguageDetectionService and
+ * only handles follow-up lazy preloading for the resolved language pack.
+ *
  * @param {string} text - Text to analyze
- * @returns {Promise<{lang: string, confidence: number}>} Detection result
+ * @returns {Promise<{lang: string|null, confidence: number}>} Detection result
  */
 export async function detectLanguageLazy(text) {
   const detectedLanguage = await LanguageDetectionService.detect(text);

@@ -6,6 +6,8 @@ The **Language Detection System** is a centralized, high-precision architecture 
 
 **Single Source of Truth**: `LanguageDetectionService.js`
 
+The i18n lazy-loading layer is only a consumer of detection results. It does not maintain a separate detection policy or a second heuristic engine.
+
 ---
 
 ## 🏗 Architecture & Flow
@@ -64,8 +66,12 @@ The central orchestrator for all detection requests. It manages:
 - **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when the user changes the Translation Provider or Latin Priority settings.
 - **Dynamic Routing**: Adjusts layer priority based on text length and script family.
 
+This is the only production entry point that should define detection policy. Other modules may preload languages or consume detection results, but they should delegate here rather than reimplement heuristics.
+
 ### 2. `textAnalysis.js` (The Engine)
 Contains low-level Unicode range analysis and script-specific detection functions. It differentiates between "Definitive Markers" (using `useDefaults: false`) and "Heuristic Guessing" (using `useDefaults: true`).
+
+This module is intentionally limited to low-level analysis helpers. It should not become a second orchestration layer.
 
 ### 3. `languageConstants.js` (The Validator)
 Provides the project's official language list (`LANGUAGE_CODE_TO_NAME_MAP`). It acts as the "Source of Truth" (SSOT) for the **Trust Filter**, ensuring we don't adopt obscure browser detections unless they are recognized by the extension.
@@ -155,6 +161,7 @@ If you want to add support for a language previously unknown to the extension:
 
 -   **`src/shared/services/LanguageDetectionService.js`**: The central orchestrator (Brain).
 -   **`src/shared/utils/text/textAnalysis.js`**: Unicode analysis (Engine).
+-   **`src/utils/i18n/LazyLanguageLoader.js`**: i18n consumer that reuses centralized detection results for lazy preloading.
 -   **`src/shared/config/languageConstants.js`**: Source of Truth for all language codes.
 -   **`src/features/tts/services/TTSDispatcher.js`**: Consumer for audio synthesis.
 -   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
