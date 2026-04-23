@@ -1,12 +1,12 @@
 @use "@/assets/styles/base/variables" as *;
 
 .activation-tab {
-  max-width: 650px !important;
+  max-width: 100% !important;
   width: 100% !important;
   display: block !important;
 
   :deep(.base-fieldset) {
-    max-width: 650px !important;
+    max-width: 100% !important;
     width: 100% !important;
     box-sizing: border-box !important;
     margin-right: 0 !important;
