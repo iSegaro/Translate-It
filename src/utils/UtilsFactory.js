@@ -112,15 +112,13 @@ class UtilsFactory {
         languagesUtils,
         pluginModule,
         languagePackLoader,
-        lazyLoader,
-        languageDetector
+        lazyLoader
       ] = await Promise.all([
         import('./i18n/i18n.js'),
         import('./i18n/languages.js'),
         import('./i18n/plugin.js'),
         import('./i18n/LanguagePackLoader.js'),
-        import('./i18n/LazyLanguageLoader.js'),
-        import('./i18n/LanguageDetector.js')
+        import('./i18n/LazyLanguageLoader.js')
       ]);
 
       // Preload core languages in background
@@ -155,14 +153,6 @@ class UtilsFactory {
           detectLanguageLazy: lazyLoader.detectLanguageLazy,
           clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
           getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
-        },
-        languageDetector: {
-          detectBrowserLanguage: languageDetector.detectBrowserLanguage,
-          detectLanguageFromText: languageDetector.detectLanguageFromText,
-          clearDetectionCache: languageDetector.clearDetectionCache,
-          getDetectionCacheInfo: languageDetector.getDetectionCacheInfo,
-          configureDetection: languageDetector.configureDetection,
-          getSupportedDetectionLanguages: languageDetector.getSupportedDetectionLanguages
         }
       };
     } catch (error) {

@@ -54,16 +54,6 @@ export {
   getLazyLoadCacheInfo
 } from './LazyLanguageLoader.js';
 
-// Language detection
-export {
-  detectBrowserLanguage,
-  detectLanguageFromText,
-  clearDetectionCache,
-  getDetectionCacheInfo,
-  configureDetection,
-  getSupportedDetectionLanguages
-} from './LanguageDetector.js';
-
 // Main language utilities (with backward compatibility)
 export {
   getLanguageData,
