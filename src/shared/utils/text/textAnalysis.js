@@ -43,6 +43,12 @@ export const CHINESE_SCRIPT_LANGUAGES = ['zh-cn', 'zh-tw', 'lzh', 'yue'];
 export const DEVANAGARI_SCRIPT_LANGUAGES = ['hi', 'mr', 'ne'];
 
 /**
+ * Latin script priority language codes for centralized management
+ * Used for validating user-selected priority in ambiguous short Latin strings.
+ */
+export const LATIN_SCRIPT_PRIORITY_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'tr', 'nl'];
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -313,7 +319,9 @@ export const detectLatinScriptLanguage = (text, preferences = {}, options = { us
   // If user explicitly chose 'none', return null to let the translation provider decide (auto)
   if (userPreference === 'none') return null;
   
-  if (userPreference) return userPreference;
+  if (userPreference && LATIN_SCRIPT_PRIORITY_LANGUAGES.includes(userPreference)) {
+    return userPreference;
+  }
 
   // 3. Final Default fallback (null means let the provider decide via 'auto')
   return null;

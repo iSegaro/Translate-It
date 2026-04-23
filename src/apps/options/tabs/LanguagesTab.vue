@@ -377,7 +377,7 @@ const createScriptSetting = (script, def) => computed({
 const arabicScriptPreference = createScriptSetting('arabic-script', 'fa')
 const chineseScriptPreference = createScriptSetting('chinese-script', 'zh-cn')
 const devanagariScriptPreference = createScriptSetting('devanagari-script', 'hi')
-const latinScriptPreference = createScriptSetting('latin-script', 'en')
+const latinScriptPreference = createScriptSetting('latin-script', 'none')
 
 const arabicScriptOptions = computed(() => [
   { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },

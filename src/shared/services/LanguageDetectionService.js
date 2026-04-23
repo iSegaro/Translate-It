@@ -9,7 +9,8 @@ import {
   isDevanagariScriptText,
   isLatinScriptText,
   isChineseScriptText,
-  ARABIC_SCRIPT_LANGUAGES
+  ARABIC_SCRIPT_LANGUAGES,
+  LATIN_SCRIPT_PRIORITY_LANGUAGES
 } from "@/shared/utils/text/textAnalysis.js";
 import { getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
 import { 
@@ -285,7 +286,7 @@ export class LanguageDetectionService {
         // This solves the issue where Polish or Catalan is detected for short English strings.
         if (isLatinScriptText(sample)) {
           const userLatinPriority = preferences['latin-script'];
-          if (userLatinPriority && userLatinPriority !== 'none') {
+          if (userLatinPriority && LATIN_SCRIPT_PRIORITY_LANGUAGES.includes(userLatinPriority)) {
             logger.debug(`[LanguageDetectionService] Applying User Latin Priority: ${userLatinPriority}`);
             return userLatinPriority;
           }
