@@ -6,6 +6,29 @@
     width: 100%;
   }
 
+  // Robust wrapping for ALL checkboxes and radios in this tab
+  :deep(.ti-checkbox), :deep(.base-radio), :deep(.base-checkbox) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    min-width: 0 !important;
+    gap: $spacing-sm !important;
+    
+    .ti-checkbox__label, .radio-label, .radio-label-content, .base-checkbox__label {
+      flex: 1 !important;
+      min-width: 0 !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+      line-height: 1.4 !important;
+    }
+
+    input {
+      margin-top: 2px !important;
+      flex-shrink: 0 !important;
+    }
+  }
+
   // API Settings Section
   .api-settings-section {
     margin-top: 0;
@@ -196,21 +219,6 @@
     }
 
     .setting-group {
-      // Allow all types of labels to wrap and show full text
-      > label,
-      .ti-checkbox__label,
-      .ti-radio__label {
-        width: 100% !important;
-        flex: none !important;
-        margin-bottom: 2px !important;
-        white-space: normal !important;
-        text-overflow: clip !important;
-        overflow: visible !important;
-        display: block !important;
-        line-height: 1.4 !important;
-        max-width: none !important; // Remove any max-width constraints
-      }
-
       // Label with toggle (like API Key) should ALWAYS be a flex row
       .label-with-toggle {
         display: flex !important;
@@ -229,32 +237,10 @@
         }
       }
 
-      // Checkbox specific alignment - reset inherited label styles
-      .ti-checkbox,
-      .base-checkbox {
-        width: 100% !important;
-        max-width: var(--input-max-width, 620px) !important;
-        margin-bottom: $spacing-xs;
-        display: flex !important;
-        flex-direction: row !important; // Checkbox itself should stay horizontal (box + text)
-        align-items: center !important;
-        gap: $spacing-sm;
-        white-space: normal !important;
-
-        .ti-checkbox__label {
-          margin-bottom: 0 !important;
-          flex: 1 !important;
-          white-space: normal !important;
-          width: auto !important;
-          display: inline-block !important;
-        }
-      }
-
       // Dropdowns and inputs inside providers should be consistent
       .tier-select,
       .formality-select,
       .model-select,
-      .deepl-checkbox,
       .api-url-input,
       .api-key-input-wrapper,
       :deep(.ti-input-wrapper),
@@ -268,33 +254,16 @@
         margin-bottom: $spacing-xs;
       }
 
-      // Special styling for checkboxes that need to match dropdown width visually
+      // Special styling for deepl-checkbox container to match dropdown width visually
       .deepl-checkbox {
-        display: flex !important;
-        align-items: center !important;
         padding: $spacing-sm !important;
         background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02)) !important;
         border: 1px solid var(--color-border-light, var(--color-border)) !important;
         border-radius: $border-radius-base !important;
         box-sizing: border-box !important;
         min-height: 38px !important;
-        white-space: normal !important;
         width: 100% !important;
         max-width: var(--input-max-width, 620px) !important;
-
-        &.ti-checkbox {
-          flex-direction: row !important;
-        }
-
-        :deep(.ti-checkbox__label),
-        .ti-checkbox__label {
-          white-space: normal !important;
-          word-break: break-word !important;
-          overflow: visible !important;
-          text-overflow: clip !important;
-          flex: 1 !important;
-          display: inline-block !important;
-        }
       }
 
       // Improve description styling for better hierarchy

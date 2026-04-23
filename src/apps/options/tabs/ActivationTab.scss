@@ -1,17 +1,75 @@
 @use "@/assets/styles/base/variables" as *;
 
+/* 
+  Activation Tab - Main Container
+*/
 .activation-tab {
   max-width: 100% !important;
   width: 100% !important;
   display: block !important;
 
-  :deep(.base-fieldset) {
+  .base-fieldset {
     max-width: 100% !important;
     width: 100% !important;
-    min-width: 0 !important; // Critical for zoom responsiveness
+    min-width: 0 !important;
     box-sizing: border-box !important;
     margin-right: 0 !important;
     margin-left: 0 !important;
+  }
+
+  /* 
+    FORCE Row Layout for ALL Checkboxes and Radios.
+    This is the core fix to prevent the label from jumping below the input.
+  */
+  .ti-checkbox, 
+  .base-radio, 
+  .base-checkbox {
+    display: flex !important;
+    flex-direction: row !important; /* Always stay in a row */
+    flex-wrap: nowrap !important;   /* Never wrap the input vs label */
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: $spacing-md !important;
+    margin-bottom: $spacing-xs !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    
+    // The text container (can be a span or a div from slot)
+    .ti-checkbox__label, 
+    .radio-label, 
+    .radio-label-content, 
+    .base-checkbox__label {
+      flex: 1 !important;
+      min-width: 0 !important;
+      white-space: normal !important; /* Allow internal text wrapping */
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      line-height: 1.5 !important;
+      display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      text-align: inherit !important;
+    }
+
+    // Fixed size and alignment for the actual input dot/box
+    input {
+      margin: 4px 0 0 0 !important;
+      flex: 0 0 16px !important; /* Don't grow or shrink the input */
+      width: 16px !important;
+      height: 16px !important;
+    }
+  }
+}
+
+/* 
+  RTL Adjustments 
+*/
+.rtl .activation-tab {
+  .ti-checkbox, .base-radio, .base-checkbox {
+    flex-direction: row !important; /* Keep as row, direction:rtl handles the order */
   }
 }
 
@@ -24,15 +82,8 @@
   flex-wrap: wrap !important;
   box-sizing: border-box !important;
 
-  // Add robust wrapping for labels inside rows
-  :deep(.ti-checkbox), :deep(.base-radio) {
+  .ti-checkbox, .base-radio {
     flex: 1 1 200px !important;
-    min-width: 0 !important;
-    
-    .ti-checkbox__label, .radio-label {
-      white-space: normal !important;
-      word-break: break-word !important;
-    }
   }
 
   .setting-label {
@@ -61,11 +112,7 @@
       pointer-events: auto !important;
       margin-inline-start: $spacing-sm !important;
       overflow: visible !important;
-      flex-shrink: 1 !important; // Allow shrinking on very narrow screens
-    }
-
-    .inline-picker {
-      width: auto !important;
+      flex-shrink: 1 !important;
     }
   }
 }
@@ -75,27 +122,22 @@
   width: 100% !important;
   box-sizing: border-box !important;
 
-    .trigger-modes-container, .delay-setting-container {
+  .trigger-modes-container, .delay-setting-container {
     display: flex !important;
     flex-wrap: wrap !important;
     align-items: flex-start !important;
     gap: $spacing-sm $spacing-md !important;
     margin-bottom: $spacing-sm !important;
     width: 100% !important;
-    box-sizing: border-box !important;
     
     .trigger-label, .delay-label {
       font-size: $font-size-sm !important;
       font-weight: 500 !important;
       color: var(--color-text) !important;
-      flex: 1 0 160px !important; // اجازه رشد برچسب
+      flex: 1 0 160px !important;
       max-width: 100% !important;
-      transition: opacity 0.2s ease !important;
       margin-top: 4px !important;
-
-      &.is-disabled {
-        opacity: 0.6 !important;
-      }
+      &.is-disabled { opacity: 0.6 !important; }
     }
     
     .radio-group-horizontal {
@@ -103,36 +145,14 @@
       flex-wrap: wrap !important;
       align-items: flex-start !important;
       gap: $spacing-md $spacing-xl !important;
-      flex: 10 1 380px !important; // اولویت بالای شکستن خط (380px) برای جلوگیری از تداخل در زوم
+      flex: 10 1 380px !important;
       min-width: 0 !important;
 
       .base-radio {
-        white-space: normal !important;
-        word-break: break-word !important;
-        align-items: flex-start !important;
-        line-height: 1.4 !important;
         max-width: 100% !important;
-        
-        :deep(.radio-label) {
-          white-space: normal !important;
-          word-break: break-word !important;
-          text-overflow: clip !important;
-          overflow: visible !important;
-          flex: 1 1 auto !important;
-          min-width: 0 !important;
-          padding-inline-end: 15px !important; // فضای امن بسیار زیاد برای موارد خاص در زوم
-        }
-
-        :deep(input[type="radio"]) {
-          margin-top: 2px !important;
-          flex-shrink: 0 !important; // جلوگیری از مچاله شدن دایره رادیو
-        }
+        width: auto !important;
       }
     }
-  }
-
-  .delay-setting-container {
-    margin-top: $spacing-xs !important;
   }
 }
 
@@ -148,19 +168,7 @@
     border: 1px solid var(--color-border) !important;
     background-color: var(--color-surface) !important;
     color: var(--color-text) !important;
-    font-family: inherit !important;
-    font-size: 0.95em !important;
     outline: none !important;
-    transition: border-color 0.2s !important;
-
-    &:focus {
-      border-color: var(--color-primary) !important;
-    }
-
-    &:disabled {
-      opacity: 0.6 !important;
-      cursor: not-allowed !important;
-    }
 
     &.compact-input {
       width: 65px !important;
@@ -173,24 +181,7 @@
   .unit-label {
     font-size: 0.9em !important;
     color: var(--color-text-secondary) !important;
-    transition: opacity 0.2s ease !important;
-
-    &.is-disabled {
-      opacity: 0.6 !important;
-    }
   }
-
-  &.inline-delay-input {
-    margin-inline-start: $spacing-xs !important;
-  }
-}
-
-.inline-setting-content {
-  display: flex !important;
-  align-items: center !important;
-  flex-wrap: wrap !important;
-  gap: $spacing-xs !important;
-  color: var(--color-text) !important;
 }
 
 .setting-row-with-provider {
@@ -202,40 +193,23 @@
   flex-wrap: wrap !important;
   box-sizing: border-box !important;
 
-  // Add robust wrapping for labels inside rows
-  :deep(.ti-checkbox) {
-    flex: 1 1 200px !important;
-    min-width: 0 !important;
-    
-    .ti-checkbox__label {
-      white-space: normal !important;
-      word-break: break-word !important;
-    }
-  }
-
   .mode-provider-container {
     display: flex !important;
     align-items: center !important;
     gap: $spacing-sm !important;
     width: 100% !important;
     max-width: 220px !important;
-    flex-shrink: 1 !important; // Allow shrinking on very narrow screens
+    flex-shrink: 1 !important;
 
     .mode-provider-label {
       font-size: $font-size-xs !important;
       color: var(--color-text-secondary) !important;
       white-space: nowrap !important;
-      transition: opacity 0.2s !important;
-
-      &.is-disabled {
-        opacity: 0.6 !important;
-      }
     }
 
-    :deep(.ti-provider-button-container) {
+    .ti-provider-button-container {
       flex: 1 !important;
       min-width: 0 !important;
-
       .ti-provider-button {
         width: 100% !important;
         padding: 6px 10px !important;
@@ -244,56 +218,27 @@
   }
 }
 
-.shortcut-setting {
-  width: 100% !important;
-  margin-top: $spacing-md !important;
-  padding: $spacing-md !important;
-  background-color: var(--color-surface) !important;
-  border-radius: $border-radius-sm !important;
-  border: 1px solid var(--color-border) !important;
-
-  .shortcut-label {
-    display: block !important;
-    font-size: $font-size-sm !important;
-    font-weight: $font-weight-medium !important;
-    color: var(--color-text) !important;
-    margin-bottom: $spacing-sm !important;
-  }
-}
-
-.shortcut-setting-compact {
-  width: 100% !important;
-  margin-top: $spacing-sm !important;
-  margin-inline-start: $spacing-lg !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
 .setting-description {
-  padding-inline-start: $spacing-xl !important;
+  padding-inline-start: 32px !important;
   margin-top: $spacing-xs !important;
-  
-  // Ensure description wraps and doesn't push width
   max-width: 100% !important;
   display: block !important;
   white-space: normal !important;
   word-break: break-word !important;
   box-sizing: border-box !important;
+  color: var(--color-text-secondary) !important;
+  font-size: $font-size-sm !important;
 }
 
 .sub-options-group {
   display: grid !important;
   grid-template-rows: 0fr !important;
-  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-              opacity 0.25s ease, 
-              margin 0.3s ease !important;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.3s ease !important;
   opacity: 0 !important;
   overflow: hidden !important;
   margin-inline-start: $spacing-md !important;
   border-inline-start: 2px solid transparent !important;
   width: auto !important;
-  max-width: calc(100% - #{$spacing-md}) !important;
-  box-sizing: border-box !important;
 
   &.open {
     grid-template-rows: 1fr !important;
@@ -314,78 +259,39 @@
   
   .radio-group {
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     gap: $spacing-xl !important;
     margin-bottom: $spacing-base !important;
     flex-wrap: wrap !important;
-
-    // Robust radio wrapping for sub-options
-    :deep(.base-radio) {
-      flex: 0 1 auto !important;
-      min-width: 0 !important;
-      
-      .radio-label {
-        white-space: normal !important;
-        word-break: break-word !important;
-      }
-    }
+    width: 100% !important;
 
     &.ui-mode-radio-group {
-      display: flex !important;
       justify-content: flex-start !important;
-      flex-wrap: wrap !important;
-      align-items: flex-start !important;
-      gap: $spacing-xl !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-
+      
       .base-radio {
         flex: 0 1 auto !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        justify-content: flex-start !important;
-
+        
         .radio-label-content {
           display: flex !important;
           flex-direction: column !important;
-          line-height: 1.2 !important;
-
+          
           .label-title {
             font-weight: 500 !important;
             color: var(--color-text) !important;
-            display: block !important;
           }
 
           .label-description {
             font-size: 0.85em !important;
             color: var(--color-text-secondary) !important;
-            display: block !important;
             margin-top: 2px !important;
           }
         }
       }
     }
   }
-  
-  .sub-setting-group {
-    margin-inline-start: $spacing-lg !important;
-    padding-inline-start: $spacing-md !important;
-    border-inline-start: 2px solid var(--color-border) !important;
-    width: auto !important;
-    max-width: calc(100% - #{$spacing-lg}) !important;
-    box-sizing: border-box !important;
-    
-    // Ensure nested checkboxes wrap
-    :deep(.ti-checkbox) {
-      .ti-checkbox__label {
-        white-space: normal !important;
-        word-break: break-word !important;
-      }
-    }
-  }
 }
 
-// Mobile responsive
+// Mobile responsive overrides
 @media (max-width: #{$breakpoint-md}) {
   .setting-row, .setting-row-with-provider {
     flex-direction: column !important;
@@ -404,16 +310,7 @@
     .radio-group {
       flex-direction: column !important;
       align-items: stretch !important;
-      gap: $spacing-base !important;
-
-      &.ui-mode-radio-group {
-        // Remove grid properties from flex container
-      }
-    }
-    
-    .sub-setting-group {
-      margin-inline-start: $spacing-base !important;
-      padding-inline-start: $spacing-sm !important;
+      gap: $spacing-lg !important;
     }
   }
 }
