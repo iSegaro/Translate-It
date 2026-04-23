@@ -119,7 +119,7 @@
 <script setup>
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from '@/composables/shared/useI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
@@ -137,7 +137,7 @@ import restoreIcon from '@/icons/ui/restore.png';
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
-const { t } = useI18n()
+const { t } = useUnifiedI18n()
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
 
 const computedProgress = computed(() => {

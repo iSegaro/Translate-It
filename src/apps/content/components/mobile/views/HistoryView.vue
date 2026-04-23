@@ -155,7 +155,7 @@
 
 <script setup>
 import { onMounted, computed } from 'vue'
-import { useI18n } from '@/composables/shared/useI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useHistory } from '@/features/history/composables/useHistory.js'
@@ -167,7 +167,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
-const { t } = useI18n()
+const { t } = useUnifiedI18n()
 const languages = useLanguages()
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'HistoryView')
 const { 

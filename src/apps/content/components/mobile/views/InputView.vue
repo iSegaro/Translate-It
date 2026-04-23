@@ -138,7 +138,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useI18n } from '@/composables/shared/useI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
@@ -158,7 +158,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
-const { t } = useI18n()
+const { t } = useUnifiedI18n()
 const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
 const { getErrorForDisplay } = useErrorHandler()
 const tts = useTTSSmart()

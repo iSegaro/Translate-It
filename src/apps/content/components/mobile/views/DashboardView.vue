@@ -127,7 +127,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from '@/composables/shared/useI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
@@ -152,7 +152,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'DashboardView');
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
-const { t } = useI18n()
+const { t } = useUnifiedI18n()
 const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
 const exclusionChecker = ExclusionChecker.getInstance();

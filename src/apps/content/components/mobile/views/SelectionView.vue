@@ -114,7 +114,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from '@/composables/shared/useI18n.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
@@ -128,7 +128,7 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
-const { t } = useI18n()
+const { t } = useUnifiedI18n()
 const tts = useTTSSmart()
 
 watch(() => selectionData.value.translation, (newTranslation) => {
