@@ -2,7 +2,7 @@
   <div
     ref="selectorRef"
     class="interface-locale-selector"
-    :class="[mode, { 'is-rtl': isRtl }]"
+    :class="[mode]"
   >
     <!-- Dropdown Mode -->
     <template v-if="mode === 'dropdown'">
@@ -104,10 +104,6 @@ const selectorRef = ref(null)
 
 const interfaceLanguages = computed(() => getInterfaceLanguages())
 const selectedLocale = computed(() => settingsStore.settings?.APPLICATION_LOCALIZE || 'en')
-const isRtl = computed(() => {
-  const locale = getLocaleInfo(selectedLocale.value);
-  return locale?.dir === 'rtl';
-})
 
 const currentLocaleName = computed(() => {
   const lang = interfaceLanguages.value.find(l => l.code === selectedLocale.value)

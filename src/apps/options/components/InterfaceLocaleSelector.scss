@@ -153,26 +153,6 @@
   }
 }
 
-/* RTL Support */
-.is-rtl {
-  &.list {
-    .locale-list-item {
-      flex-direction: row-reverse;
-      text-align: right;
-    }
-  }
-
-  &.dropdown {
-    .dropdown-item {
-      flex-direction: row-reverse;
-      text-align: right;
-    }
-    .current-locale-content {
-      flex-direction: row-reverse;
-    }
-  }
-}
-
 /* Tablet responsive: make it fit in the header when in dropdown mode */
 @media (max-width: #{$breakpoint-lg}) {
   .interface-locale-selector {
