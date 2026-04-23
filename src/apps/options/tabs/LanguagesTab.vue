@@ -435,7 +435,12 @@ watch(selectedProvider, () => {
 // --- Validation ---
 
 const validationErrorKey = ref('')
-const validationError = computed(() => validationErrorKey.value ? (getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t)) : '')
+const validationError = computed(() => {
+  const err = validationErrorKey.value ? (getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t)) : ''
+  // Sync with global store state
+  settingsStore.isSettingsValid = !err
+  return err
+})
 const validateLanguages = async () => {
   clearErrors()
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)

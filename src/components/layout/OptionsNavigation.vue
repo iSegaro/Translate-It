@@ -17,7 +17,7 @@
       </div>
       <button 
         id="saveSettings" 
-        :disabled="isSaving"
+        :disabled="isSaving || !settingsStore.isSettingsValid"
         class="save-button"
         @click="saveAllSettings"
       >

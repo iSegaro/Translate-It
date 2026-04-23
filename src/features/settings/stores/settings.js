@@ -146,6 +146,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const isLoading = ref(false)
   const isInitialized = ref(false)
   const isSaving = ref(false)
+  const isSettingsValid = ref(true) // Global validation state for options UI
   
   // Getters
   const isDarkTheme = computed(() => {
@@ -610,6 +611,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading,
     isInitialized,
     isSaving,
+    isSettingsValid,
     
     // Getters
     isDarkTheme,
