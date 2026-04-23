@@ -605,14 +605,8 @@
   "mobile_ui_mode_mobile": {
     "message": "常にモバイル"
   },
-  "mobile_ui_mode_mobile_desc": {
-    "message": "タッチ操作に最適化"
-  },
   "mobile_ui_mode_desktop": {
     "message": "常にデスクトップ"
-  },
-  "mobile_ui_mode_desktop_desc": {
-    "message": "デスクトップ用"
   },
   "mobile_input_header_title": {
     "message": "手動入力"

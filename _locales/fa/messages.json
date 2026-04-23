@@ -605,14 +605,8 @@
   "mobile_ui_mode_mobile": {
     "message": "همیشه موبایل"
   },
-  "mobile_ui_mode_mobile_desc": {
-    "message": "بهینه شده برای لمسی"
-  },
   "mobile_ui_mode_desktop": {
     "message": "همیشه دسکتاپ"
-  },
-  "mobile_ui_mode_desktop_desc": {
-    "message": "پنجره شناور"
   },
   "mobile_input_header_title": {
     "message": "ورودی دستی"

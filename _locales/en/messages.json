@@ -605,14 +605,8 @@
   "mobile_ui_mode_mobile": {
     "message": "Always Mobile"
   },
-  "mobile_ui_mode_mobile_desc": {
-    "message": "Optimized for touch"
-  },
   "mobile_ui_mode_desktop": {
     "message": "Always Desktop"
-  },
-  "mobile_ui_mode_desktop_desc": {
-    "message": "Floating Window"
   },
   "mobile_input_header_title": {
     "message": "Manual Input"
