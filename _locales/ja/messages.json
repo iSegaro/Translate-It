@@ -1938,7 +1938,7 @@
     "message": "スクロール停止時"
   },
   "whole_page_trigger_fluid": {
-    "message": "流動的（スクロール中）"
+    "message": "スクロール中"
   },
   "whole_page_delay_label": {
     "message": "翻訳遅延時間"

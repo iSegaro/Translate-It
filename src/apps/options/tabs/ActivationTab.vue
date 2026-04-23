@@ -315,45 +315,8 @@
         :class="{ open: wholePageEnabled }"
       >
         <div class="sub-options-inner">
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageLazyLoading"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
-            </span>
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageAutoTranslate"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
-            </span>
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageShowOriginal"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
-            </span>
-          </div>
-
           <div class="setting-group sub-setting-group whole-page-trigger-group">
             <div class="trigger-modes-container">
-              <span 
-                class="trigger-label"
-                :class="{ 'is-disabled': !extensionEnabled }"
-              >{{ t('whole_page_trigger_mode_label') || 'Translation Trigger Mode' }}:</span>
               <div class="radio-group-horizontal">
                 <BaseRadio
                   v-model="wholePageTranslateAfterScrollStop"
@@ -367,7 +330,7 @@
                   :value="false"
                   name="wholePageTrigger"
                   :disabled="!extensionEnabled"
-                  :label="t('whole_page_trigger_fluid') || 'Fluid (During Scroll)'"
+                  :label="t('whole_page_trigger_fluid') || 'During Scroll'"
                 />
               </div>
             </div>
@@ -398,6 +361,39 @@
                 ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
                 : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
               }}
+            </span>
+          </div>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageShowOriginal"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
+            </span>
+          </div>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageLazyLoading"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
+            </span>
+          </div>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              v-model="wholePageAutoTranslate"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
             </span>
           </div>
         </div>

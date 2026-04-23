@@ -42,7 +42,7 @@
     display: flex !important;
     flex-direction: row !important; /* Always stay in a row */
     flex-wrap: nowrap !important;   /* Never wrap the input vs label */
-    align-items: flex-start !important;
+    align-items: center !important; /* Changed from flex-start to center */
     justify-content: flex-start !important;
     min-width: 0 !important;
     width: 100% !important;
@@ -62,16 +62,18 @@
       white-space: normal !important; /* Allow internal text wrapping */
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
-      line-height: 1.5 !important;
-      display: block !important;
+      line-height: 1.2 !important; /* Adjusted line height for better centering */
+      display: inline-flex !important;
+      align-items: center !important;
       padding: 0 !important;
       margin: 0 !important;
       text-align: inherit !important;
+      transform: translateY(1px) !important; /* Manual nudge for perfect alignment */
     }
 
     // Fixed size and alignment for the actual input dot/box
     input {
-      margin: 4px 0 0 0 !important;
+      margin: 0 !important; /* Removed top margin */
       flex: 0 0 16px !important; /* Don't grow or shrink the input */
       width: 16px !important;
       height: 16px !important;
@@ -175,41 +177,85 @@
 }
 
 .whole-page-trigger-group {
-  margin-top: $spacing-md !important;
+  margin-top: 0 !important;
+  margin-bottom: $spacing-xl !important;
   width: 100% !important;
   box-sizing: border-box !important;
 
   .trigger-modes-container, .delay-setting-container {
     display: flex !important;
     flex-wrap: wrap !important;
-    align-items: flex-start !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: $spacing-sm $spacing-md !important;
     margin-bottom: $spacing-sm !important;
     width: 100% !important;
+
+    &.trigger-modes-container {
+      margin-bottom: $spacing-xl !important; /* Extra space below radio buttons */
+    }
     
-    .trigger-label, .delay-label {
+    .delay-label {
       font-size: $font-size-sm !important;
       font-weight: 500 !important;
       color: var(--color-text) !important;
-      flex: 1 0 160px !important;
       max-width: 100% !important;
-      margin-top: 4px !important;
+      margin-top: 0 !important;
       &.is-disabled { opacity: 0.6 !important; }
+    }
+
+    .delay-label {
+      flex: none !important;
+      min-width: 0 !important;
+      align-self: center !important;
     }
     
     .radio-group-horizontal {
       display: flex !important;
       flex-wrap: wrap !important;
-      align-items: flex-start !important;
-      gap: $spacing-md $spacing-xl !important;
-      flex: 10 1 380px !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: $spacing-md 48px !important; /* Increased horizontal gap significantly */
+      flex: none !important;
       min-width: 0 !important;
 
       .base-radio {
         max-width: 100% !important;
         width: auto !important;
+        min-width: max-content !important; /* Force container to fit text width */
+        align-items: center !important; /* Center icon and text vertically */
+        white-space: nowrap !important;
+        overflow: visible !important;
+        gap: 4px !important; /* Further reduced gap for maximum compactness */
+
+        input {
+          margin: 0 !important; /* Remove top margin to ensure perfect centering */
+        }
+
+        .radio-label, .radio-label-content {
+          white-space: nowrap !important;
+          flex: none !important;
+          padding-inline: 12px !important; /* Padding on both sides for safety */
+          overflow: visible !important;
+          line-height: 1 !important; /* Reset line height for precise centering */
+          display: inline-flex !important;
+          align-items: center !important;
+          transform: translateY(1px) !important; /* Manual nudge for perfect alignment */
+        }
       }
     }
+
+    &.delay-setting-container {
+      align-items: center !important;
+      justify-content: flex-start !important; /* Move to the start of the line */
+      gap: $spacing-sm !important;
+    }
+  }
+
+  .setting-description {
+    text-align: start !important; /* Align description to the start */
+    padding-inline-start: 0 !important;
+    width: 100% !important;
   }
 }
 
@@ -337,6 +383,18 @@
     .base-radio {
       width: auto !important;
       max-width: none !important;
+      align-items: center !important;
+
+      input {
+        margin: 0 !important;
+      }
+
+      .radio-label, .radio-label-content {
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        transform: translateY(1px) !important;
+      }
     }
   }
 }
