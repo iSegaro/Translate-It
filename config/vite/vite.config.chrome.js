@@ -220,6 +220,7 @@ export default defineConfig({
     ...(baseConfig.plugins || []),
     fixExtensionPaths(),
     webExtension({
+      additionalInputs: ['src/core/content-scripts/index-iframe.js'],
       manifest: async () => {
           const manifest = generateValidatedManifest('chrome');
           manifest.background = {

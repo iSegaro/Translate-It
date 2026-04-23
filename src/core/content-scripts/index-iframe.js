@@ -32,14 +32,14 @@ if (!window.translateItContentScriptCore) {
   if (isExtensionFrame || window.translateItContentScriptLoaded) return;
 
   try {
-    const { ContentScriptCore } = await import('./ContentScriptCore.js');
+    const { IFrameContentScriptCore } = await import('./IFrameContentScriptCore.js');
     const { checkUrlExclusionAsync } = await import('@/features/exclusion/utils/exclusion-utils.js');
 
     // 4. FAST FAIL
     if (await checkUrlExclusionAsync()) return;
 
-    // 5. Initialize Core
-    const contentScriptCore = new ContentScriptCore();
+    // 5. Initialize Core (Lite version)
+    const contentScriptCore = new IFrameContentScriptCore();
     window.translateItContentCore = contentScriptCore;
     window.translateItContentScriptCore = contentScriptCore;
     

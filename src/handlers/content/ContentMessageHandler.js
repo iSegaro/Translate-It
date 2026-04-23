@@ -606,7 +606,12 @@ export class ContentMessageHandler extends ResourceTracker {
       if (window.translateItContentCore && !window.translateItContentCore.vueLoaded) {
         try {
           this.logger.debug('Loading Vue app for page translation state tracking...');
+          // Only load Vue app if the method exists (Main frame only)
+        if (typeof window.translateItContentCore?.loadVueApp === 'function') {
           await window.translateItContentCore.loadVueApp();
+        } else if (process.env.NODE_ENV === 'development') {
+          logger.debug('Skipping loadVueApp in this context (likely iframe)');
+        }
           this.logger.info('Vue app loaded for page translation state tracking');
         } catch (vueError) {
           this.logger.warn('Failed to load Vue app, translation will continue without UI state sync:', vueError);

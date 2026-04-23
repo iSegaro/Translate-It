@@ -32,6 +32,8 @@ export function generateManifest(browser = 'chrome') {
     host_permissions: ['<all_urls>', 'file://*/*'],
     
     // Content scripts
+    // Note: The iframe-only entry is built as an additional input and injected
+    // programmatically for subframes so it does not also hit the top frame.
     content_scripts: [
       {
         js: ['src/core/content-scripts/index-main.js'],
@@ -39,13 +41,6 @@ export function generateManifest(browser = 'chrome') {
         matches: [ '<all_urls>', 'file:///*', '*://*/*' ],
         run_at: 'document_idle',
         all_frames: false
-      },
-      {
-        js: ['src/core/content-scripts/index-iframe.js'],
-        // Lite content script for all frames (iframes)
-        matches: [ '<all_urls>', 'file:///*', '*://*/*' ],
-        run_at: 'document_idle',
-        all_frames: true
       }
     ],
     

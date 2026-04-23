@@ -40,9 +40,9 @@ src/features/iframe-support/
 ## Usage
 
 ### 1. Automatic Initialization
-The system is automatically handled by the manifest and the two entry points:
-- `content-main.js` (Top frame only)
-- `content-iframe.js` (All frames)
+The system is automatically handled by the manifest/background flow and the two entry points:
+- `content-main.js` (Top frame only, declarative content script)
+- `content-iframe.js` (Subframes only, injected programmatically after subframe DOM is ready)
 
 ### 2. Vue Composable Usage (Standardized)
 

@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
+import { injectContentScriptsForTab } from '@/core/background/handlers/common/contentScriptInjector.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'command-handler');
 
 
@@ -98,17 +99,7 @@ async function handleSelectElementCommand(tab) {
       try {
         logger.debug(`[CommandHandler] Attempting to inject content script for select element mode`);
 
-        if (browser.scripting) {
-          await browser.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['src/core/content-scripts/index-main.js']
-          });
-        } else {
-          await browser.tabs.executeScript(tab.id, {
-            file: 'src/core/content-scripts/index-main.js',
-            allFrames: false
-          });
-        }
+        await injectContentScriptsForTab(tab.id);
 
         // Wait for initialization and retry
         await new Promise(resolve => setTimeout(resolve, 200));

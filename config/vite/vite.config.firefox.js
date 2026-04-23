@@ -66,6 +66,7 @@ export default defineConfig({
     copyFirefoxAssets(),
     
     webExtension({
+      additionalInputs: ['src/core/content-scripts/index-iframe.js'],
       // Generate dynamic manifest for Firefox
       manifest: () => {
         const manifest = generateValidatedManifest('firefox');

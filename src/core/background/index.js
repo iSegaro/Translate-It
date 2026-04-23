@@ -16,6 +16,9 @@ import "./listeners/onContextMenuClicked.js";
 // Import notification click listener
 import "./listeners/onNotificationClicked.js";
 
+// Inject iframe-only content scripts after subframe DOM becomes available
+import "./listeners/onSubframeDOMContentLoaded.js";
+
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
 import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';

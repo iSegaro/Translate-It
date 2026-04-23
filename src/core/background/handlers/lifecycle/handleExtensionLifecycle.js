@@ -1,5 +1,6 @@
 // src/background/handlers/lifecycle/handleExtensionLifecycle.js
 import browser from 'webextension-polyfill';
+import { injectContentScriptsForTab } from '@/core/background/handlers/common/contentScriptInjector.js';
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js"; // Changed from services
 
@@ -26,11 +27,7 @@ export async function handleExtensionLifecycle(
     logger.error('Reload failed, attempting content script injection:', error
     );
     if (sender.tab?.id) {
-      browser.scripting
-        .executeScript({
-          target: { tabId: sender.tab.id },
-          files: ["src/core/content-scripts/index-main.js"],
-        })
+      injectContentScriptsForTab(sender.tab.id)
         .catch((injectionError) => {
           logger.error('Content script injection fallback failed:', injectionError
           );
