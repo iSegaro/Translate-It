@@ -79,6 +79,9 @@ export function ContentScriptCore() {
     try {
       const { loadCoreFeatures } = await import('./chunks/lazy-features.js');
       await loadCoreFeatures();
+      
+      // We don't mark as fully loaded here to allow other features 
+      // to continue loading on-demand via InteractionCoordinator
       this.featuresLoaded = true;
       this.dispatchEvent(new CustomEvent('features-loaded'));
     } catch (error) {

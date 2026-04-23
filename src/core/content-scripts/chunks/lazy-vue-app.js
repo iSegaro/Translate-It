@@ -170,13 +170,6 @@ export async function loadVueApp(contentCore) {
       contentCore.dispatchEvent(new CustomEvent('vue-loaded'));
     }
 
-    // Preload features in background
-    setTimeout(() => {
-      if (contentCore) {
-        contentCore.loadFeatures();
-      }
-    }, 1000);
-
   } catch (error) {
     logger.error('Failed to load Vue app:', error);
     throw error;

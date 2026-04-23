@@ -19,11 +19,9 @@ let featuresInitialized = false;
 // Ensure global featureManager is available
 window.featureManager = window.featureManager || null;
 
-// Core features
+// Core features that must be available immediately
 const CORE_FEATURES = new Set([
-  'contentMessageHandler',
-  'textSelection',
-  'vue'
+  'contentMessageHandler'
 ]);
 
 /**
