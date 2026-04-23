@@ -65,7 +65,7 @@ export const CONFIG = {
   COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",
-  SOURCE_LANGUAGE: "en",
+  SOURCE_LANGUAGE: "auto",
   TARGET_LANGUAGE: "fa",
   LANGUAGE_DETECTION_PREFERENCES: {
     "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد

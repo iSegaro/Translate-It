@@ -30,7 +30,7 @@ function getDefaultSettings() {
       [TranslationMode.Sidepanel_Translate]: null,
       [TranslationMode.ScreenCapture]: null
     },
-    SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'en',
+    SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'fa',
     LANGUAGE_DETECTION_PREFERENCES: CONFIG.LANGUAGE_DETECTION_PREFERENCES || {
       "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
