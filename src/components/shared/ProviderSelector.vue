@@ -911,6 +911,14 @@ const selectProvider = async (provider) => {
     emit('update:modelValue', provider.id)
     emit('provider-change', provider.id)
     closeDropdown()
+
+    // Auto-trigger translation in split mode after selecting a provider
+    if (props.mode === 'split' && !props.disabled) {
+      // Use nextTick to ensure the store updates have propagated
+      nextTick(() => {
+        emit('translate', { provider: provider.id })
+      })
+    }
   } catch (error) {
     logger.error('Failed to update provider:', error)
     await handleError(error, 'provider-selector-change')
