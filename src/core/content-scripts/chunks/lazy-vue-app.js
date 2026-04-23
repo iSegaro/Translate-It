@@ -22,26 +22,36 @@ import contentAppStyles from '@/assets/styles/content-app-global.scss?inline';
 
 /**
  * AUTOMATED CSS GLOB IMPORT SYSTEM
- * Eagerly imports standalone SCSS files for components rendered in the Shadow DOM.
- * We use a strict whitelist to prevent bloating the host page with unnecessary styles.
+ * Optimized for Hybrid Support: Includes all UI styles to allow cross-platform 
+ * switching between Desktop FAB and Mobile Sheet on any device.
  */
-const standaloneStyles = import.meta.glob([
-  // 1. Core UI components injected into the content script (FAB, Tooltip, etc.)
-  '@/apps/content/components/**/*.scss',
-  
-  // 2. Shared UI components (Status indicators, etc.) used in both Shadow DOM and Extension pages
+
+// 1. Core shared and base styles
+const sharedStyles = import.meta.glob([
   '@/components/shared/**/*.scss',
   '@/components/base/**/*.scss',
-  
-  // 3. Feature-specific UI components (Translation results, Result windows, etc.)
   '@/features/**/components/**/*.scss',
-  
-  // EXCLUSION: Skip Sass partials (files starting with _) as they are only for @use
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// Combine all standalone styles into a single string
-const allComponentStyles = Object.values(standaloneStyles).join('\n');
+// 2. FAB UI styles (Desktop FAB feature - available on all platforms)
+const fabUiStyles = import.meta.glob([
+  '@/apps/content/components/desktop/**/*.scss', 
+  '!**/_*.scss'
+], { query: '?inline', import: 'default', eager: true });
+
+// 3. Sheet UI styles (Mobile Sheet feature - available on all platforms)
+const sheetUiStyles = import.meta.glob([
+  '@/apps/content/components/mobile/**/*.scss', 
+  '!**/_*.scss'
+], { query: '?inline', import: 'default', eager: true });
+
+// Combine all styles to ensure any UI mode works on any platform
+const allComponentStyles = [
+  ...Object.values(sharedStyles),
+  ...Object.values(fabUiStyles),
+  ...Object.values(sheetUiStyles)
+].join('\n');
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyVueApp');
 
