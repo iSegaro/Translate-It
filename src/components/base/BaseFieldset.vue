@@ -6,6 +6,7 @@
     <legend 
       v-if="legend || $slots.header" 
       class="base-fieldset__legend"
+      :class="{ 'has-header': $slots.header }"
     >
       <div class="legend-container">
         <span 

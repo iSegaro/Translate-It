@@ -20,15 +20,20 @@
   appearance: none;
   
   &__legend {
-    padding: 0;
+    padding: 0 0.5rem;
     margin-inline: 0.75rem;
     font-weight: $font-weight-semibold;
     color: var(--color-text-secondary);
     font-size: $font-size-sm;
-    width: calc(100% - 1.5rem);
+    width: auto;
     max-width: none;
     white-space: normal;
     box-sizing: border-box;
+
+    &.has-header {
+      width: calc(100% - 1.5rem);
+      padding: 0;
+    }
 
     .legend-container {
       display: flex;
@@ -37,7 +42,11 @@
       gap: $spacing-md;
       width: 100%;
       min-width: 0;
-      padding: 0 0.5rem;
+      padding: 0;
+
+      .has-header & {
+        padding: 0 0.5rem;
+      }
     }
 
     .legend-text {
