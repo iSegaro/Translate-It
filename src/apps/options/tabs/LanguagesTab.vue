@@ -30,8 +30,6 @@
           />
         </div>
 
-        <div class="section-separator" />
-
         <!-- API Settings Accordion -->
         <BaseAccordion
           :is-open="activeAccordion === 'api'"
