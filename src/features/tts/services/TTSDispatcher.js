@@ -114,16 +114,18 @@ export class TTSDispatcher {
         return { success: false, ...errorInfo };
       }
 
-      logger.info(`[TTSDispatcher] Final dispatch: engine=${resolution.engine}, lang=${resolution.language}`);
-
       // Notify UI immediately about the detected language for tooltip updates
-      ttsStateManager.lastTTSLanguage = resolution.language;
-      ttsStateManager.broadcastStatus('playing', { 
-        action: 'TTS_LANG_DETECTED', // Overriding default action for this specific broadcast
-        detectedSourceLanguage: resolution.language 
-      });
+      // Only broadcast if we actually performed a detection (was auto)
+      if (isExplicitAuto && targetLanguage !== 'auto') {
+        ttsStateManager.lastTTSLanguage = targetLanguage;
+        ttsStateManager.broadcastStatus('playing', { 
+          action: 'TTS_LANG_DETECTED', 
+          detectedSourceLanguage: targetLanguage 
+        });
+      }
 
-      // 4. Execution Attempt
+      // 3. Resolve BEST ENGINE with Circuit Breaker awareness
+      resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled);
       let response;
       if (resolution.engine === TTS_ENGINES.EDGE) {
         response = await handleEdgeTTSSpeak(message, sender, resolution.language);

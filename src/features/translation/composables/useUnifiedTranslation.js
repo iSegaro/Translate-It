@@ -344,19 +344,16 @@ export function useUnifiedTranslation(context = 'popup') {
 
     messageListener = (message) => {
       // 1. Handle TTS status updates to capture detected language from background
-      if (message.action === MessageActions.GOOGLE_TTS_ENDED || message.action === MessageActions.TTS_LANG_DETECTED) {
+      // Only update the local UI state for display, do NOT pollute lastTranslation
+      if (message.action === MessageActions.TTS_LANG_DETECTED) {
         if (message.detectedSourceLanguage) {
-          logger.debug(`[${context}] Captured language from TTS (${message.action}): ${message.detectedSourceLanguage}`);
+          logger.debug(`[${context}] Captured language from TTS: ${message.detectedSourceLanguage}`);
           
-          // Update lastTranslation to propagate language to UI (tooltip)
-          lastTranslation.value = {
-            source: sourceText.value,
-            ...lastTranslation.value,
-            sourceLanguage: message.detectedSourceLanguage
-          };
+          // Only update actualSourceLanguage for immediate UI feedback (labels)
+          // We don't touch lastTranslation here to avoid polluting translation metadata
+          actualSourceLanguage.value = message.detectedSourceLanguage;
         }
-        // If it's just a language update, we can return early. 
-        if (message.action === MessageActions.TTS_LANG_DETECTED) return;
+        return;
       }
 
       // 2. Handle Translation Results (Popup context)
