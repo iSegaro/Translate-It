@@ -106,7 +106,7 @@ export class TranslationSegmentMapper {
     }
 
     // 2. Remove any corrupted bracket patterns [[...]] which are the main source of artifacts
-    const bracketPattern = /\[\[[\s\.\-\—\–\…ـ]+\]\]/g;
+    const bracketPattern = /\[\[[\s.\-—–…ـ]+\]\]/g;
     cleaned = cleaned.replace(bracketPattern, ' ');
 
     // 3. Normalize whitespace (reduces multiple spaces/newlines to single space)

@@ -158,7 +158,7 @@ const exportSettings = async () => {
     
     setTimeout(() => { statusMessage.value = '' }, 3000)
     
-  } catch (error) {
+  } catch {
     statusType.value = 'error'
     statusMessage.value = t('export_error_generic') || 'Failed to export settings'
     setTimeout(() => { statusMessage.value = '' }, 3000)

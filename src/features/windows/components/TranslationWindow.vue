@@ -244,11 +244,6 @@ watch(() => props.targetLanguage, (newLang) => {
 });
 
 const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
-const hasTTSContent = computed(() => {
-  const hasOriginal = showOriginal.value && originalText.value && originalText.value.trim().length > 0;
-  const hasTranslated = !showOriginal.value && translatedText.value && translatedText.value.trim().length > 0;
-  return hasOriginal || hasTranslated;
-});
 
 const currentTTSText = computed(() => ttsMode.value === 'original' ? originalText.value || '' : translatedText.value || '');
 const currentTTSLang = computed(() => ttsMode.value === 'original' ? props.sourceLanguage : props.targetLanguage);

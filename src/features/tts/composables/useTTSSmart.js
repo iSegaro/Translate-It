@@ -9,8 +9,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 
@@ -180,7 +178,7 @@ export function useTTSSmart() {
       
       await sendMessage(message);
       return true;
-    } catch (error) {
+    } catch {
       logger.debug("[useTTSSmart] Global stop failed (expected if none playing)");
       return true;
     }

@@ -208,7 +208,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           if (chunkTexts.length > 1) {
             // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
             // Including optional surrounding whitespace to prevent double newlines and ensure clean replacement
-            const corruptedDelimiterRegex = /\s*\[\[[\s\.\-\—\–\…ـ]+\]\]\s*/g;
+            const corruptedDelimiterRegex = /\s*\[\[[\s.\-—–…ـ]+\]\]\s*/g;
             const sanitizedText = targetText.replace(corruptedDelimiterRegex, TRANSLATION_CONSTANTS.TEXT_DELIMITER);
             return sanitizedText;
           }
@@ -247,7 +247,6 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       // Handle HTML response, JSON parsing errors, and Status 400 with retry
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
         const maxRetries = providerConfig?.batching?.maxRetries || 3;
-        const minChunkSize = providerConfig?.batching?.minChunkSize || 100;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
 
         logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);

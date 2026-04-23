@@ -1,4 +1,3 @@
-import browser from 'webextension-polyfill';
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';

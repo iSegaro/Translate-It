@@ -131,7 +131,7 @@ export class TTSLanguageService {
     try {
       const dynamicVoice = await ttsVoiceService.getBestVoice(lowerLang);
       if (dynamicVoice) return dynamicVoice;
-    } catch (err) {
+    } catch {
       logger.debug('[TTSLanguageService] Dynamic voice resolution failed, using static fallback');
     }
 

@@ -9,9 +9,7 @@ import {
   isDevanagariScriptText,
   isLatinScriptText,
   isChineseScriptText,
-  ARABIC_SCRIPT_LANGUAGES,
-  CHINESE_SCRIPT_LANGUAGES,
-  DEVANAGARI_SCRIPT_LANGUAGES
+  ARABIC_SCRIPT_LANGUAGES
 } from "@/shared/utils/text/textAnalysis.js";
 import { getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
 import { 

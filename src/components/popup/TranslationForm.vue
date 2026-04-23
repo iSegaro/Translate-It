@@ -48,10 +48,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { usePopupResize } from '@/composables/ui/usePopupResize.js'
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -111,7 +110,6 @@ const {
   translationError,
   errorType,
   canTranslate,
-  detectedSourceLanguage,
   actualSourceLanguage,
   actualTargetLanguage,
   lastTranslation,

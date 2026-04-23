@@ -165,7 +165,6 @@ const {
   translationError,
   errorType,
   canTranslate,
-  detectedSourceLanguage,
   actualSourceLanguage,
   actualTargetLanguage,
   lastTranslation,

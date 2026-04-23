@@ -253,11 +253,6 @@ const formatKey = (key) => {
   return keyMap[key] || key
 }
 
-const formatShortcut = (shortcutString) => {
-  if (!shortcutString) return ''
-  return shortcutString.split('+').map(key => formatKey(key)).join(' + ')
-}
-
 onUnmounted(() => {
   removeKeyListeners()
 })
