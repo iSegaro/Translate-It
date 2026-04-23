@@ -112,12 +112,11 @@ const updateViewport = () => {
 onMounted(async () => {
   // Inject Sheet-specific styles lazily into shadow root
   try {
-    const { sheetUiStyles } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+    const { sheetUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
     const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
     
     if (sheetUiStyles && injectStylesToShadowRoot) {
-      const sheetCss = Object.values(sheetUiStyles).join('\n');
-      injectStylesToShadowRoot(sheetCss, 'vue-sheet-specific-styles');
+      injectStylesToShadowRoot(sheetUiStyles, 'vue-sheet-specific-styles');
     }
   } catch (error) {
     console.warn('[MobileFab] Failed to load lazy styles:', error);

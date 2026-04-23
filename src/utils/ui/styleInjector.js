@@ -9,12 +9,25 @@
  * @param {string} css - The CSS content to inject.
  * @param {string} styleId - Unique ID for the style tag to prevent duplicates.
  */
-export function injectStylesToShadowRoot(css, styleId) {
-  if (!css) return;
+export function injectStylesToShadowRoot(stylesData, styleId) {
+  if (!stylesData) return;
 
   try {
+    let css = '';
+    
+    // Support both single strings and Vite glob objects
+    if (typeof stylesData === 'string') {
+      css = stylesData;
+    } else {
+      // Support glob imports (either object of modules or array of strings/modules)
+      const values = Array.isArray(stylesData) ? stylesData : Object.values(stylesData);
+      css = values.map(val => (typeof val === 'string' ? val : val.default || '')).join('\n');
+    }
+
+    if (!css.trim()) return;
+
     const isTopFrame = window === window.top;
-    const hostId = isTopFrame ? 'translate-it-ui-main' : 'translate-it-ui-iframe';
+    const hostId = isTopFrame ? 'translate-it-host-main' : 'translate-it-host-iframe';
     const host = document.getElementById(hostId);
     
     if (host?.shadowRoot && !host.shadowRoot.getElementById(styleId)) {

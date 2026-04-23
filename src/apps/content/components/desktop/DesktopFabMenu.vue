@@ -815,12 +815,11 @@ const stopDrag = (e) => {
 onMounted(async () => {
   // Inject FAB-specific styles lazily into shadow root
   try {
-    const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+    const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
     const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
     
     if (fabUiStyles && injectStylesToShadowRoot) {
-      const fabCss = Object.values(fabUiStyles).join('\n');
-      injectStylesToShadowRoot(fabCss, 'vue-fab-specific-styles');
+      injectStylesToShadowRoot(fabUiStyles, 'vue-fab-specific-styles');
     }
   } catch (error) {
     console.warn('[DesktopFabMenu] Failed to load lazy styles:', error);
