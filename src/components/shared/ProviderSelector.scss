@@ -9,10 +9,10 @@
   align-items: center !important;
   &.ti-dropdown-open { z-index: 1000 !important; }
 
-  /* Split mode (Popup/Sidepanel) always opens to the right */
+  /* Split mode (Popup/Sidepanel) - Logic: Open from start edge */
   .ti-provider-dropdown-menu {
-    left: 0 !important;
-    right: auto !important;
+    inset-inline-start: 0 !important;
+    inset-inline-end: auto !important;
   }
 }
 
@@ -64,7 +64,7 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-left: 1px solid var(--color-border) !important;
+  border-inline-start: 1px solid var(--color-border) !important;
   width: 24px !important;
   height: 100% !important;
   cursor: pointer !important;
@@ -75,7 +75,7 @@
   outline: none !important;
   box-shadow: none !important;
   
-  /* Disable ALL hover effects for the area and everything inside it */
+  /* Disable ALL hover effects */
   &, &:hover, &:active, &:focus {
     background: transparent !important;
     background-color: transparent !important;
@@ -84,7 +84,6 @@
     outline: none !important;
   }
 
-  /* Target any child icons or buttons that might have their own hover */
   * {
     &, &:hover, &:active, &:focus {
       background: transparent !important;
@@ -104,10 +103,10 @@
   max-width: 250px !important;
   flex-shrink: 1 !important;
 
-  /* Button mode (Options Tabs) always opens to the left to avoid overflow */
+  /* Align menu to the end edge (right in LTR, left in RTL) to stay within tab content */
   .ti-provider-dropdown-menu {
-    right: 0 !important;
-    left: auto !important;
+    inset-inline-end: 0 !important;
+    inset-inline-start: auto !important;
   }
 
   .ti-provider-button {
@@ -125,7 +124,14 @@
     cursor: pointer !important;
     &:hover { border-color: var(--color-primary) !important; }
     .ti-api-provider-icon { width: 18px !important; height: 18px !important; }
-    span { flex: 1 !important; text-align: left !important; font-size: 14px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    span { 
+      flex: 1 !important; 
+      text-align: start !important; 
+      font-size: 14px !important; 
+      white-space: nowrap !important; 
+      overflow: hidden !important; 
+      text-overflow: ellipsis !important; 
+    }
   }
 }
 
@@ -137,19 +143,18 @@
   &.ti-dropdown-open { z-index: 1000 !important; }
 
   .ti-provider-dropdown-menu {
-    left: 100% !important; /* Open to the side by default for Sidepanel */
-    right: auto !important;
+    inset-inline-start: 100% !important;
+    inset-inline-end: auto !important;
     top: 0 !important;
-    margin-left: 10px !important;
+    margin-inline-start: 10px !important;
     margin-top: 0 !important;
   }
 
-  /* Specific override for floating WindowsManager header */
   &.ti-window-provider-selector {
     .ti-provider-dropdown-menu {
-      left: 0 !important;   /* Align with icon in windows */
-      top: 100% !important; /* Open downward by default */
-      margin-left: 0 !important;
+      inset-inline-start: 0 !important;
+      top: 100% !important;
+      margin-inline-start: 0 !important;
       margin-top: 4px !important;
 
       &.ti-open-upward {
@@ -226,6 +231,8 @@ img.ti-dropdown-arrow,
   flex-direction: column !important;
   overflow: hidden !important;
   margin-top: 4px !important;
+  /* Prevent interaction with parent container scrolling during open */
+  pointer-events: auto !important;
 
   &.ti-open-upward { top: auto !important; bottom: 100% !important; margin-top: 0 !important; margin-bottom: 4px !important; }
 }
@@ -250,62 +257,18 @@ img.ti-dropdown-arrow,
   span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
-.ti-provider-dropdown-footer {
-  background-color: var(--color-background) !important;
-  border-top: 1px solid var(--color-border) !important;
-  padding: 8px !important;
-  display: flex !important; flex-direction: row !important; gap: 6px !important;
-}
-
-.ti-sync-row {
-  display: flex !important; align-items: center !important; justify-content: center !important;
-  gap: 6px !important; padding: 6px !important; border-radius: $border-radius-sm !important;
-  border: 1px solid transparent !important; background: var(--color-surface) !important;
-  cursor: pointer !important; flex: 1 !important; color: var(--color-text-secondary) !important;
-  &:hover { background-color: var(--color-primary-alpha) !important; }
-  &.is-active { background-color: var(--color-primary-alpha) !important; border-color: var(--color-primary-light) !important; color: var(--color-primary) !important; }
-}
-
-.ti-sync-info {
-  display: flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  font-size: 10px !important;
-  span { white-space: nowrap !important; }
-}
-
-.ti-sync-icon {
-  font-size: 12px !important;
-  color: inherit !important;
-}
-
-.ti-sync-provider-icon {
-  width: 12px !important;
-  height: 12px !important;
-  opacity: 0.7 !important;
-  object-fit: contain !important;
-}
-
-/* 6. RTL Support */
+/* 6. RTL Support - Simplified using Logical Properties above */
 :global(.rtl) {
-  .ti-provider-dropdown-area { border-left: none !important; border-right: 1px solid var(--color-border) !important; }
-  .ti-provider-button span { text-align: right !important; }
   .ti-sync-row { flex-direction: row-reverse !important; }
 
-  /* In RTL Options Page, Button mode should still align so it doesn't exit frame */
-  .ti-provider-button-container .ti-provider-dropdown-menu {
-    left: 0 !important;
-    right: auto !important;
-  }
-
-  /* RTL Sidebar/Icon only opens to LEFT */
   .ti-provider-icon-only-container .ti-provider-dropdown-menu {
-    left: auto !important;
-    right: 100% !important;
-    margin-right: 10px !important;
-    margin-left: 0 !important;
+    inset-inline-start: auto !important;
+    inset-inline-end: 100% !important;
+    margin-inline-end: 10px !important;
+    margin-inline-start: 0 !important;
   }
 }
+
 
 /* 7. Mobile Mode (Bottom Sheets) */
 .ti-provider-mobile-container {
