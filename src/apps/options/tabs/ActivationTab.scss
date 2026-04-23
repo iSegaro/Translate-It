@@ -88,8 +88,8 @@
   }
 
   .fab-mode-select-wrapper .compact-select {
-    background-position: left 8px center !important;
-    padding-inline-start: 24px !important;
+    background-position: left 6px center !important;
+    padding-inline-start: 28px !important;
     padding-inline-end: $spacing-sm !important;
   }
 }
@@ -165,9 +165,10 @@
       padding-top: 0 !important;
       padding-bottom: 0 !important;
       padding-inline-start: $spacing-sm !important;
-      padding-inline-end: 24px !important;
+      padding-inline-end: 28px !important;
       font-size: $font-size-sm !important;
-      background-position: right 8px center !important;
+      background-position: right 6px center !important;
+      background-size: 1.2em 1.2em !important;
       width: auto !important;
       min-width: 120px !important;
     }
