@@ -326,11 +326,18 @@
   
   .radio-group {
     display: flex !important;
-    align-items: flex-start !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: $spacing-xl !important;
-    margin-bottom: $spacing-base !important;
+    margin-bottom: $spacing-xl !important; /* Increased margin for better separation */
     flex-wrap: wrap !important;
     width: 100% !important;
+
+    .base-radio {
+      width: auto !important;
+      max-width: none !important;
+    }
   }
 }
 

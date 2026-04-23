@@ -648,13 +648,13 @@
     "message": "Selection Translate Mode"
   },
   "options_selection_mode_immediate": {
-    "message": "Translate Immediately"
+    "message": "Immediately"
   },
   "options_selection_mode_onclick": {
-    "message": "Show icon to translate on click"
+    "message": "Show Icon"
   },
   "options_selection_mode_onfabclick": {
-    "message": "Use Desktop FAB to translate"
+    "message": "FAB"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "Require Ctrl key for text selection translation"

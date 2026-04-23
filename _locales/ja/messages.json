@@ -648,13 +648,13 @@
     "message": "選択翻訳モード"
   },
   "options_selection_mode_immediate": {
-    "message": "すぐに翻訳"
+    "message": "即座に"
   },
   "options_selection_mode_onclick": {
-    "message": "アイコンをクリックして翻訳"
+    "message": "アイコンを表示"
   },
   "options_selection_mode_onfabclick": {
-    "message": "デスクトップFABを使用して翻訳"
+    "message": "FAB"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "テキスト選択翻訳にCtrlキーを必要とする"

@@ -200,21 +200,21 @@
               :value="SelectionTranslationMode.IMMEDIATE"
               name="selectionTranslationMode"
               :disabled="!extensionEnabled"
-              :label="t('options_selection_mode_immediate') || 'Immediate'"
+              :label="t('options_selection_mode_immediate') || 'Immediately'"
             />
             <BaseRadio
               v-model="selectionTranslationMode"
               :value="SelectionTranslationMode.ON_CLICK"
               name="selectionTranslationMode"
               :disabled="!extensionEnabled"
-              :label="t('options_selection_mode_onclick') || 'On Click'"
+              :label="t('options_selection_mode_onclick') || 'Show Icon'"
             />
             <BaseRadio
               v-model="selectionTranslationMode"
               :value="SelectionTranslationMode.ON_FAB_CLICK"
               name="selectionTranslationMode"
               :disabled="!extensionEnabled || !showDesktopFab"
-              :label="t('options_selection_mode_onfabclick') || 'Use Desktop FAB'"
+              :label="t('options_selection_mode_onfabclick') || 'FAB'"
             />
           </div>
 

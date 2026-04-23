@@ -648,13 +648,13 @@
     "message": "حالت ترجمه متن انتخابی"
   },
   "options_selection_mode_immediate": {
-    "message": "ترجمه فوری"
+    "message": "بلافاصله"
   },
   "options_selection_mode_onclick": {
-    "message": "نمایش آیکون بجای ترجمه فوری"
+    "message": "نمایش آیکون"
   },
   "options_selection_mode_onfabclick": {
-    "message": "استفاده از دکمه شناور دسکتاپ برای ترجمه"
+    "message": "FAB"
   },
   "require_ctrl_for_text_selection_label": {
     "message": "الزام استفاده از کلید Ctrl برای ترجمه متن"
