@@ -277,10 +277,8 @@ img.ti-dropdown-arrow,
   span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
-/* 6. RTL Support - Simplified using Logical Properties above */
+/* 6. RTL Support - Simplified using Logical Properties */
 :global(.rtl) {
-  .ti-sync-row { flex-direction: row-reverse !important; }
-
   .ti-provider-icon-only-container .ti-provider-dropdown-menu {
     inset-inline-start: auto !important;
     inset-inline-end: 100% !important;
@@ -289,8 +287,113 @@ img.ti-dropdown-arrow,
   }
 }
 
+/* 7. Dropdown Footer (Sync Rows) */
+.ti-provider-dropdown-footer {
+  padding: 4px !important;
+  background-color: var(--color-surface-variant, var(--color-border-light, #f1f5f9)) !important;
+  border-top: 1px solid var(--color-border) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 4px !important;
 
-/* 7. Mobile Mode (Bottom Sheets) */
+  /* Dark theme override for footer background */
+  :root.is-dark &, .is-dark &, :root.theme-dark &, .theme-dark & {
+    background-color: var(--color-surface-dark, #1e293b) !important;
+  }
+}
+
+.ti-sync-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 5px 6px !important;
+  border: 1px solid transparent !important;
+  border-radius: $border-radius-sm !important;
+  background-color: var(--color-background, white) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+
+  &:hover {
+    border-color: var(--color-primary-light) !important;
+    background-color: var(--color-primary-alpha) !important;
+  }
+
+  &.is-active {
+    border-color: var(--color-primary) !important;
+    background-color: var(--color-primary-alpha) !important;
+    
+    .ti-sync-icon { color: var(--color-primary) !important; }
+    span { color: var(--color-primary) !important; font-weight: 600 !important; }
+  }
+
+  /* Dark theme override for buttons inside footer */
+  :root.is-dark &, .is-dark &, :root.theme-dark &, .theme-dark & {
+    background-color: var(--color-surface, #0f172a) !important;
+    border-color: var(--color-border) !important;
+    
+    &:hover {
+      background-color: var(--color-primary-alpha) !important;
+    }
+
+    /* Make inactive sync icon brighter in dark mode */
+    .ti-sync-icon {
+      color: rgba(255, 255, 255, 0.5) !important;
+      filter: brightness(1.2) !important;
+    }
+
+    /* Ensure active state still uses primary color */
+    &.is-active .ti-sync-icon {
+      color: var(--color-primary) !important;
+      filter: none !important;
+    }
+  }
+}
+
+.ti-sync-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  justify-content: flex-start !important;
+
+  .ti-sync-icon {
+    font-size: 10px !important;
+    width: 10px !important;
+    height: 10px !important;
+    color: var(--color-text-muted) !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    line-height: 1 !important;
+  }
+
+  span {
+    font-size: 10px !important;
+    color: var(--color-text) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    line-height: 10px !important; /* Match font-size exactly */
+    margin-top: 1px !important; /* Visual optical correction for small fonts */
+  }
+}
+
+.ti-sync-provider-icon {
+  width: 12px !important;
+  height: 12px !important;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
+  margin-inline-start: 4px !important;
+  opacity: 0.8 !important;
+}
+
+/* 8. Mobile Mode (Bottom Sheets) */
 .ti-provider-mobile-container {
   position: relative !important;
   width: 100% !important;
