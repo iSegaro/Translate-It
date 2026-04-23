@@ -32,7 +32,10 @@
 
         <!-- Validation errors -->
         <Transition name="fade-slide">
-          <div v-if="validationError" class="validation-error">
+          <div
+            v-if="validationError"
+            class="validation-error"
+          >
             <span class="error-icon">⚠️</span>
             <span class="error-message">{{ validationError }}</span>
           </div>
@@ -92,9 +95,15 @@
                             >
                             <div class="slider-labels">
                               <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                              <span class="slider-tick" @click="currentOptimizationLevel = 2">|</span>
+                              <span
+                                class="slider-tick"
+                                @click="currentOptimizationLevel = 2"
+                              >|</span>
                               <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                              <span class="slider-tick" @click="currentOptimizationLevel = 4">|</span>
+                              <span
+                                class="slider-tick"
+                                @click="currentOptimizationLevel = 4"
+                              >|</span>
                               <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
                             </div>
                           </div>
@@ -110,9 +119,14 @@
 
                       <div class="section-separator mini" />
 
-                      <div v-if="selectedProviderInfo && !providerSettingsComponent" class="api-info">
+                      <div
+                        v-if="selectedProviderInfo && !providerSettingsComponent"
+                        class="api-info"
+                      >
                         <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-                        <p class="setting-description">{{ t(selectedProviderInfo.descriptionKey) }}</p>
+                        <p class="setting-description">
+                          {{ t(selectedProviderInfo.descriptionKey) }}
+                        </p>
                       </div>
 
                       <component :is="providerSettingsComponent" />
@@ -238,7 +252,9 @@
                   v-model="aiContextEnabled"
                   :label="t('ai_context_translation_label')"
                 />
-                <p class="setting-description mb-md">{{ t('ai_context_translation_description') }}</p>
+                <p class="setting-description mb-md">
+                  {{ t('ai_context_translation_description') }}
+                </p>
               </div>
 
               <div class="setting-group vertical">
@@ -246,7 +262,9 @@
                   v-model="aiHistoryEnabled"
                   :label="t('ai_conversation_history_label')"
                 />
-                <p class="setting-description mb-md">{{ t('ai_conversation_history_description') }}</p>
+                <p class="setting-description mb-md">
+                  {{ t('ai_conversation_history_description') }}
+                </p>
               </div>
             </div>
           </template>
