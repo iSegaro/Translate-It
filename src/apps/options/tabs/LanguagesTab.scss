@@ -395,13 +395,46 @@
   }
 
   .validation-error {
-    margin-top: $spacing-lg;
+    margin: $spacing-xs 0 $spacing-lg 0 !important;
     padding: $spacing-sm $spacing-md;
     background-color: var(--color-error-alpha);
     color: var(--color-error);
     border-radius: $border-radius-base;
     font-size: $font-size-sm;
     border-inline-start: 4px solid var(--color-error);
+    max-width: 420px;
+    display: flex !important;
+    align-items: center !important;
+    gap: $spacing-sm !important;
+    box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.1);
+
+    .error-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .error-message {
+      font-weight: $font-weight-medium;
+      line-height: 1.4;
+    }
+  }
+
+  /* 
+    Fade-Slide Transition for errors and other elements
+  */
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .fade-slide-enter-from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 
   // API Info inside provider settings
@@ -418,6 +451,7 @@
   // --- Common alignment for all top-level setting groups ---
   .settings-container > .setting-group,
   .settings-container > .section-separator,
+  .settings-container > .validation-error,
   .api-settings-accordion :deep(.ti-accordion-header),
   .bilingual-setting :deep(.ti-accordion-header),
   .language-pref-setting :deep(.ti-accordion-header),

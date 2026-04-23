@@ -30,6 +30,14 @@
           />
         </div>
 
+        <!-- Validation errors -->
+        <Transition name="fade-slide">
+          <div v-if="validationError" class="validation-error">
+            <span class="error-icon">⚠️</span>
+            <span class="error-message">{{ validationError }}</span>
+          </div>
+        </Transition>
+
         <!-- API Settings Accordion -->
         <BaseAccordion
           :is-open="activeAccordion === 'api'"
@@ -244,11 +252,6 @@
           </template>
         </BaseAccordion>
       </template>
-
-      <!-- Validation errors -->
-      <div v-if="validationError" class="validation-error">
-        {{ validationError }}
-      </div>
     </div>
   </section>
 </template>
