@@ -280,15 +280,17 @@
 
     &.ui-mode-radio-group {
       display: flex !important;
-      justify-content: center !important;
+      justify-content: flex-start !important;
       flex-wrap: wrap !important;
       align-items: flex-start !important;
       gap: $spacing-xl !important;
       width: 100% !important;
+      box-sizing: border-box !important;
 
       .base-radio {
         flex: 0 1 auto !important;
-        min-width: 140px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
         justify-content: flex-start !important;
 
         .radio-label-content {
@@ -342,7 +344,7 @@
       gap: $spacing-base !important;
 
       &.ui-mode-radio-group {
-        grid-template-columns: 1fr !important;
+        // Remove grid properties from flex container
       }
     }
     

@@ -21,10 +21,7 @@
           :disabled="!extensionEnabled"
           :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
         />
-        <span
-          class="setting-description"
-          style="margin-inline-start: 32px; display: block; margin-top: 4px; color: var(--text-color-secondary, #666); font-size: 0.9em;"
-        >
+        <span class="setting-description">
           {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
         </span>
 
