@@ -16,41 +16,27 @@
     <!-- Desktop FAB Menu -->
     <BaseFieldset :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'">
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="showDesktopFab"
-          :disabled="!extensionEnabled"
-          :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
-        />
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="showDesktopFab"
+            :disabled="!extensionEnabled"
+            :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
+          />
+          <div 
+            class="fab-mode-select-wrapper"
+            :class="{ open: showDesktopFab }"
+          >
+            <BaseSelect
+              v-model="mobileUiMode"
+              :options="mobileModeOptions"
+              :disabled="!extensionEnabled || !showDesktopFab"
+              class="compact-select"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
         </span>
-
-        <!-- Mobile UI Mode Settings nested under FAB -->
-        <div 
-          class="sub-options-group fab-sub-options"
-          :class="{ open: showDesktopFab }"
-        >
-          <div class="sub-options-inner">
-            <div class="radio-group ui-mode-radio-group">
-              <BaseRadio
-                v-for="mode in mobileModeOptions"
-                :key="mode.value"
-                v-model="mobileUiMode"
-                :value="mode.value"
-                name="mobileUiMode"
-                :disabled="!extensionEnabled"
-              >
-                <div class="radio-label-content">
-                  <span class="label-title">{{ mode.label }}</span>
-                  <span 
-                    v-if="mode.desc" 
-                    class="label-description"
-                  >{{ mode.desc }}</span>
-                </div>
-              </BaseRadio>
-            </div>
-          </div>
-        </div>
       </div>
     </BaseFieldset>
 
@@ -434,6 +420,7 @@ import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'

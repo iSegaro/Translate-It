@@ -86,6 +86,12 @@
   .ti-checkbox, .base-radio, .base-checkbox {
     flex-direction: row !important; /* Keep as row, direction:rtl handles the order */
   }
+
+  .fab-mode-select-wrapper .compact-select {
+    background-position: left 8px center !important;
+    padding-inline-start: 24px !important;
+    padding-inline-end: $spacing-sm !important;
+  }
 }
 
 .setting-row {
@@ -128,6 +134,42 @@
       margin-inline-start: $spacing-sm !important;
       overflow: visible !important;
       flex-shrink: 1 !important;
+    }
+  }
+
+  .fab-mode-select-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    overflow: hidden !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    transform: translateX(-10px) scale(0.95) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    pointer-events: none !important;
+    flex-shrink: 0 !important;
+
+    &.open {
+      max-width: 160px !important;
+      width: 100% !important;
+      opacity: 1 !important;
+      transform: translateX(0) scale(1) !important;
+      pointer-events: auto !important;
+      margin-inline-start: $spacing-sm !important;
+      overflow: visible !important;
+      flex-shrink: 1 !important;
+    }
+
+    .compact-select {
+      height: 32px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      padding-inline-start: $spacing-sm !important;
+      padding-inline-end: 24px !important;
+      font-size: $font-size-sm !important;
+      background-position: right 8px center !important;
+      width: auto !important;
+      min-width: 120px !important;
     }
   }
 }
@@ -289,30 +331,6 @@
     margin-bottom: $spacing-base !important;
     flex-wrap: wrap !important;
     width: 100% !important;
-
-    &.ui-mode-radio-group {
-      justify-content: flex-start !important;
-      
-      .base-radio {
-        flex: 0 1 auto !important;
-        
-        .radio-label-content {
-          display: flex !important;
-          flex-direction: column !important;
-          
-          .label-title {
-            font-weight: 500 !important;
-            color: var(--color-text) !important;
-          }
-
-          .label-description {
-            font-size: 0.85em !important;
-            color: var(--color-text-secondary) !important;
-            margin-top: 2px !important;
-          }
-        }
-      }
-    }
   }
 }
 
