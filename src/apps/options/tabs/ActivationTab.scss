@@ -89,8 +89,7 @@
 
   .fab-mode-select-wrapper .compact-select {
     background-position: left 6px center !important;
-    padding-inline-start: 28px !important;
-    padding-inline-end: $spacing-sm !important;
+    /* Removed padding overrides because padding-inline-* already handles RTL correctly */
   }
 }
 
