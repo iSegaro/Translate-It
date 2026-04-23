@@ -295,7 +295,19 @@ const handleContextMenu = (event) => {
 }
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+  // Inject Screen Capture specific styles lazily
+  try {
+    const { screenCaptureUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
+    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
+    
+    if (screenCaptureUiStyles && injectStylesToShadowRoot) {
+      injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
+    }
+  } catch (error) {
+    console.warn('[ScreenSelector] Failed to load lazy styles:', error);
+  }
+
   tracker.addEventListener(document, 'mousemove', handleMouseMove)
   tracker.addEventListener(document, 'mouseleave', handleMouseLeave)
   tracker.addEventListener(document, 'keydown', handleKeyDown)

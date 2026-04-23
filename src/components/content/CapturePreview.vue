@@ -343,6 +343,18 @@ const translateText = ref('Translate')
 
 // Initialize localized messages
 onMounted(async () => {
+  // Inject Screen Capture specific styles lazily
+  try {
+    const { screenCaptureUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
+    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
+    
+    if (screenCaptureUiStyles && injectStylesToShadowRoot) {
+      injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
+    }
+  } catch (error) {
+    console.warn('[CapturePreview] Failed to load lazy styles:', error);
+  }
+
   const { getTranslationString } = await utilsFactory.getI18nUtils()
   translatingText.value = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...'
   translateText.value = await getTranslationString('TRANSLATE') || 'Translate'

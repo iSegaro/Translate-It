@@ -9,8 +9,9 @@ export const windowsUiStyles = import.meta.glob([
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// 2. Screen Capture UI styles
+// 2. Screen Capture UI styles (Includes the specific components in src/components/content)
 export const screenCaptureUiStyles = import.meta.glob([
+  '@/components/content/**/*.scss',
   '@/features/screen-capture/components/**/*.scss', 
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
@@ -31,8 +32,13 @@ export const sheetUiStyles = import.meta.glob([
 export const sharedStyles = import.meta.glob([
   '@/components/shared/**/*.scss',
   '@/components/base/**/*.scss',
+  '@/apps/content/components/**/*.scss',
   '@/features/**/components/**/*.scss',
+  // Exclude features that handle their own style injection
   '!**/features/windows/**',
   '!**/features/screen-capture/**',
+  '!**/components/content/**',
+  '!**/apps/content/components/desktop/**',
+  '!**/apps/content/components/mobile/**',
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
