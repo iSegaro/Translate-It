@@ -273,8 +273,15 @@ const currentTargetLanguage = computed(() => {
 })
 
 // Methods
-const handleTranslate = async () => {
-  logger.debug("Translation button clicked", { provider: currentProviderLocal.value });
+/**
+ * Handle translation requests
+ * @param {Object} data - Optional data from ProviderSelector (contains provider ID)
+ */
+const handleTranslate = async (data) => {
+  // Use the provider from event data if available, otherwise use local state
+  const providerId = data?.provider || currentProviderLocal.value;
+  
+  logger.debug("Translation button clicked", { provider: providerId });
   
   if (!canTranslate.value) {
     logger.debug("Translation skipped - input is empty or invalid");
@@ -285,13 +292,8 @@ const handleTranslate = async () => {
     logger.debug("Starting translation process...");
     
     let success = false;
-    // Use ref to trigger translation if available, otherwise fallback to composable
-    if (sourceInputRef.value && typeof sourceInputRef.value.triggerTranslation === 'function') {
-      success = await sourceInputRef.value.triggerTranslation();
-    } else {
-      // Fallback to direct composable call (already handles languages)
-      success = await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value, currentProviderLocal.value);
-    }
+    // Fallback to direct composable call (already handles languages)
+    success = await triggerTranslation(currentSourceLanguage.value, currentTargetLanguage.value, providerId);
     
     if (success) {
       logger.info("Translation completed successfully");

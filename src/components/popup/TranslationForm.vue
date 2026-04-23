@@ -141,9 +141,12 @@ const handleSourceInput = (_event) => {
 const handleKeydown = (_event) => {
   // Handled by TranslationInputField component
 }
-
-const handleTranslate = async () => {
-  logger.debug("Translation button clicked");
+/**
+ * Main translation handler
+ * @param {string} [manualProvider] - Optional provider ID to override props.provider
+ */
+const handleTranslate = async (manualProvider) => {
+  logger.debug("Translation button clicked", { manualProvider });
   
   if (!canTranslate.value) {
     logger.debug("Translation skipped - input is empty or invalid");
@@ -152,7 +155,9 @@ const handleTranslate = async () => {
   
   try {
     logger.debug("Starting translation process...");
-    logger.debug("Source text:", sourceText.value?.substring(0, 100) + "...");
+    
+    // Use manualProvider if provided, otherwise fallback to props.provider
+    const effectiveProvider = (typeof manualProvider === 'string' && manualProvider) ? manualProvider : props.provider;
     
     // Get current language values from props
     const sourceLanguage = props.sourceLanguage;
@@ -168,9 +173,9 @@ const handleTranslate = async () => {
       targetLanguage
     }
     
-    // Use composable translation function with current language values
-    logger.debug("Triggering translation...", { provider: props.provider });
-    const success = await triggerTranslation(sourceLanguage, targetLanguage, props.provider)    
+    // Use composable translation function with determined provider
+    logger.debug("Triggering translation...", { provider: effectiveProvider });
+    const success = await triggerTranslation(sourceLanguage, targetLanguage, effectiveProvider)    
     
     if (success) {
       logger.info("Translation completed successfully");

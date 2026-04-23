@@ -163,11 +163,14 @@ const translationFormRef = ref(null)
 
 /**
  * Handle translation requests emitted from ProviderSelector
+ * @param {Object} data - Contains the provider ID to use
  */
-const handleTranslate = () => {
+const handleTranslate = (data) => {
   const activeForm = translationFormRef.value;
   if (activeForm && typeof activeForm.triggerTranslation === 'function') {
-    activeForm.triggerTranslation();
+    // Pass the specific provider if available in the event data
+    const providerId = data?.provider || currentProvider.value;
+    activeForm.triggerTranslation(providerId);
   }
 }
 
