@@ -8,6 +8,7 @@
   :deep(.base-fieldset) {
     max-width: 100% !important;
     width: 100% !important;
+    min-width: 0 !important; // Critical for zoom responsiveness
     box-sizing: border-box !important;
     margin-right: 0 !important;
     margin-left: 0 !important;
@@ -22,6 +23,17 @@
   width: 100% !important;
   flex-wrap: wrap !important;
   box-sizing: border-box !important;
+
+  // Add robust wrapping for labels inside rows
+  :deep(.ti-checkbox), :deep(.base-radio) {
+    flex: 1 1 200px !important;
+    min-width: 0 !important;
+    
+    .ti-checkbox__label, .radio-label {
+      white-space: normal !important;
+      word-break: break-word !important;
+    }
+  }
 
   .setting-label {
     font-weight: 600 !important;
@@ -49,6 +61,7 @@
       pointer-events: auto !important;
       margin-inline-start: $spacing-sm !important;
       overflow: visible !important;
+      flex-shrink: 1 !important; // Allow shrinking on very narrow screens
     }
 
     .inline-picker {
@@ -189,12 +202,24 @@
   flex-wrap: wrap !important;
   box-sizing: border-box !important;
 
+  // Add robust wrapping for labels inside rows
+  :deep(.ti-checkbox) {
+    flex: 1 1 200px !important;
+    min-width: 0 !important;
+    
+    .ti-checkbox__label {
+      white-space: normal !important;
+      word-break: break-word !important;
+    }
+  }
+
   .mode-provider-container {
     display: flex !important;
     align-items: center !important;
     gap: $spacing-sm !important;
     width: 100% !important;
     max-width: 220px !important;
+    flex-shrink: 1 !important; // Allow shrinking on very narrow screens
 
     .mode-provider-label {
       font-size: $font-size-xs !important;
@@ -247,6 +272,13 @@
 .setting-description {
   padding-inline-start: $spacing-xl !important;
   margin-top: $spacing-xs !important;
+  
+  // Ensure description wraps and doesn't push width
+  max-width: 100% !important;
+  display: block !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  box-sizing: border-box !important;
 }
 
 .sub-options-group {
@@ -259,6 +291,9 @@
   overflow: hidden !important;
   margin-inline-start: $spacing-md !important;
   border-inline-start: 2px solid transparent !important;
+  width: auto !important;
+  max-width: calc(100% - #{$spacing-md}) !important;
+  box-sizing: border-box !important;
 
   &.open {
     grid-template-rows: 1fr !important;
@@ -273,6 +308,8 @@
     padding-inline-start: $spacing-lg !important;
     padding-top: $spacing-base !important;
     padding-bottom: $spacing-xs !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   
   .radio-group {
@@ -281,6 +318,17 @@
     gap: $spacing-xl !important;
     margin-bottom: $spacing-base !important;
     flex-wrap: wrap !important;
+
+    // Robust radio wrapping for sub-options
+    :deep(.base-radio) {
+      flex: 0 1 auto !important;
+      min-width: 0 !important;
+      
+      .radio-label {
+        white-space: normal !important;
+        word-break: break-word !important;
+      }
+    }
 
     &.ui-mode-radio-group {
       display: flex !important;
@@ -323,6 +371,17 @@
     margin-inline-start: $spacing-lg !important;
     padding-inline-start: $spacing-md !important;
     border-inline-start: 2px solid var(--color-border) !important;
+    width: auto !important;
+    max-width: calc(100% - #{$spacing-lg}) !important;
+    box-sizing: border-box !important;
+    
+    // Ensure nested checkboxes wrap
+    :deep(.ti-checkbox) {
+      .ti-checkbox__label {
+        white-space: normal !important;
+        word-break: break-word !important;
+      }
+    }
   }
 }
 
