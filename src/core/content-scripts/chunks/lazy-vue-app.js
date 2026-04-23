@@ -26,23 +26,35 @@ import contentAppStyles from '@/assets/styles/content-app-global.scss?inline';
  * switching between Desktop FAB and Mobile Sheet on any device.
  */
 
-// 1. Core shared and base styles
+// 1. Core shared and base styles (Excluding heavy features for lazy injection)
 const sharedStyles = import.meta.glob([
   '@/components/shared/**/*.scss',
   '@/components/base/**/*.scss',
   '@/features/**/components/**/*.scss',
+  '!**/features/windows/**',
+  '!**/features/screen-capture/**',
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// 2. FAB UI styles (Desktop FAB feature - available on all platforms)
-// We export this so DesktopFabMenu can load it only when needed
+// 2. Windows UI styles (Translation Window & Icon)
+export const windowsUiStyles = import.meta.glob([
+  '@/features/windows/components/**/*.scss', 
+  '!**/_*.scss'
+], { query: '?inline', import: 'default', eager: true });
+
+// 3. Screen Capture UI styles
+export const screenCaptureUiStyles = import.meta.glob([
+  '@/features/screen-capture/components/**/*.scss', 
+  '!**/_*.scss'
+], { query: '?inline', import: 'default', eager: true });
+
+// 4. FAB UI styles (Desktop FAB feature)
 export const fabUiStyles = import.meta.glob([
   '@/apps/content/components/desktop/**/*.scss', 
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
 
-// 3. Sheet UI styles (Mobile Sheet feature - available on all platforms)
-// We export this so Mobile Components can load it only when needed
+// 5. Sheet UI styles (Mobile Sheet feature)
 export const sheetUiStyles = import.meta.glob([
   '@/apps/content/components/mobile/**/*.scss', 
   '!**/_*.scss'

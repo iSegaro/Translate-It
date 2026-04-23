@@ -302,7 +302,20 @@ watch(() => props.initialSize, (newSize) => {
 
 const windowStyle = computed(() => ({ ...positionStyle.value }));
 
-onMounted(() => {
+onMounted(async () => {
+  // Inject Windows-specific styles lazily
+  try {
+    const { windowsUiStyles } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
+    
+    if (windowsUiStyles && injectStylesToShadowRoot) {
+      const windowCss = Object.values(windowsUiStyles).join('\n');
+      injectStylesToShadowRoot(windowCss, 'vue-windows-specific-styles');
+    }
+  } catch (error) {
+    console.warn('[TranslationWindow] Failed to load lazy styles:', error);
+  }
+
   requestAnimationFrame(() => {
     isVisible.value = true;
   });
