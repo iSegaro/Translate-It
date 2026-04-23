@@ -298,17 +298,15 @@ export async function getLanguageDataLazy(langCode, type = 'translation', force 
  * @returns {Promise<{lang: string, confidence: number}>} Detection result
  */
 export async function detectLanguageLazy(text) {
-  const detectedLang = await detectLanguageFromText(text);
+  const detection = await detectLanguageFromText(text);
+  const detectedLang = detection?.lang || null;
 
   // Lazy load the detected language
   if (detectedLang) {
     await lazyLoadTranslationLanguage(detectedLang);
   }
 
-  return {
-    lang: detectedLang,
-    confidence: detectedLang ? 0.8 : 0.0
-  };
+  return detection || { lang: null, confidence: 0.0 };
 }
 
 /**

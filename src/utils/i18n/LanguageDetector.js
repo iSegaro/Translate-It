@@ -1,8 +1,9 @@
 // src/utils/i18n/LanguageDetector.js
-// Language detection utilities for code splitting
+// Compatibility wrapper for language detection utilities used by i18n lazy loading
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'LanguageDetector');
 
@@ -63,6 +64,9 @@ export function detectBrowserLanguage() {
 
 /**
  * Detect language from text content
+ * Delegates to the centralized LanguageDetectionService to keep a single
+ * source of truth for detection policy across the extension.
+ *
  * @param {string} text - Text to analyze
  * @returns {Promise<{lang: string, confidence: number}>} Detection result with confidence
  */
@@ -87,8 +91,10 @@ export async function detectLanguageFromText(text) {
   }
 
   try {
-    // Enhanced heuristics for language detection
-    const detection = await detectLanguageHeuristics(sampleText);
+    const detectedLang = await LanguageDetectionService.detect(sampleText);
+    const detection = detectedLang
+      ? { lang: detectedLang, confidence: 0.8 }
+      : { lang: 'en', confidence: 0.0 };
 
     // Update cache
     updateCache(cacheKey, detection);
@@ -98,122 +104,6 @@ export async function detectLanguageFromText(text) {
     logger.warn('Failed to detect language from text:', error);
     return { lang: 'en', confidence: 0.0 };
   }
-}
-
-/**
- * Enhanced language detection heuristics with confidence scoring
- * @param {string} text - Text to analyze
- * @returns {Promise<{lang: string, confidence: number}>} Detection result
- */
-async function detectLanguageHeuristics(text) {
-  const sample = text.toLowerCase();
-  let detectedLang = 'en';
-  let confidence = 0.0;
-  let scores = {};
-
-  // Score each language based on character patterns
-  const languagePatterns = [
-    // Chinese
-    { lang: 'zh', pattern: /[\u4e00-\u9fff]/g, weight: 0.9 },
-    // Japanese
-    { lang: 'ja', pattern: /[\u3040-\u309f\u30a0-\u30ff]/g, weight: 0.9 },
-    // Korean
-    { lang: 'ko', pattern: /[\uac00-\ud7af]/g, weight: 0.9 },
-    // Arabic
-    { lang: 'ar', pattern: /[ا-ي]/g, weight: 0.9 },
-    // Hebrew
-    { lang: 'he', pattern: /[א-ת]/g, weight: 0.9 },
-    // Thai
-    { lang: 'th', pattern: /[\u0e00-\u0e7f]/g, weight: 0.9 },
-    // Devanagari (Hindi)
-    { lang: 'hi', pattern: /[\u0900-\u097f]/g, weight: 0.9 },
-    // Bengali
-    { lang: 'bn', pattern: /[\u0980-\u09ff]/g, weight: 0.9 },
-    // Greek
-    { lang: 'el', pattern: /[α-ωάέήίόύώ]/g, weight: 0.8 },
-    // Cyrillic
-    { lang: 'ru', pattern: /[а-яё]/g, weight: 0.7 },
-    // Ukrainian (specific characters)
-    { lang: 'uk', pattern: /[іїєґ]/g, weight: 0.8 },
-    // Persian
-    { lang: 'fa', pattern: /[پچژگ]/g, weight: 0.8 },
-    // Common Latin-based languages with word patterns
-    { lang: 'de', pattern: /\b(der|die|das|und|ist|nicht|für|mit|von|zu)\b/g, weight: 0.6 },
-    { lang: 'fr', pattern: /\b(le|la|les|et|est|pas|pour|dans|avec|que)\b/g, weight: 0.6 },
-    { lang: 'es', pattern: /\b(el|la|los|las|y|es|no|para|con|que|de)\b/g, weight: 0.6 },
-    { lang: 'it', pattern: /\b(il|la|lo|le|e|non|per|con|che|di)\b/g, weight: 0.6 },
-    { lang: 'pt', pattern: /\b(o|a|os|as|e|é|não|para|com|que|de)\b/g, weight: 0.6 },
-    { lang: 'ru', pattern: /\b(и|в|не|на|я|быть|то|он|с|что)\b/g, weight: 0.5 },
-    { lang: 'ja', pattern: /\b(の|に|は|を|と|が|で|も|から|まで)\b/g, weight: 0.5 }
-  ];
-
-  // Calculate scores for each language
-  languagePatterns.forEach(({ lang, pattern, weight }) => {
-    const matches = sample.match(pattern);
-    if (matches) {
-      scores[lang] = (scores[lang] || 0) + (matches.length * weight);
-    }
-  });
-
-  // Add character frequency analysis for Latin-based languages
-  if (Object.keys(scores).length === 0 || scores['en'] > 0) {
-    const latinScores = analyzeLatinScript(sample);
-    scores = { ...scores, ...latinScores };
-  }
-
-  // Find language with highest score
-  let maxScore = 0;
-  for (const [lang, score] of Object.entries(scores)) {
-    if (score > maxScore) {
-      maxScore = score;
-      detectedLang = lang;
-    }
-  }
-
-  // Calculate confidence based on max score and text length
-  confidence = Math.min(maxScore / (sample.length / 100), 1.0);
-
-  // If confidence is too low, default to English
-  if (confidence < DETECTION_CONFIG.CONFIDENCE_THRESHOLD) {
-    detectedLang = 'en';
-    confidence = 0.5;
-  }
-
-  return { lang: detectedLang, confidence };
-}
-
-/**
- * Analyze Latin script text for language patterns
- * @param {string} text - Text to analyze
- * @returns {Object} Language scores
- */
-function analyzeLatinScript(text) {
-  const scores = {};
-  const commonWords = {
-    en: ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'it'],
-    de: ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich'],
-    fr: ['de', 'le', 'et', 'à', 'un', 'il', 'être', 'et', 'en', 'avoir'],
-    es: ['de', 'la', 'que', 'el', 'en', 'y', 'a', 'ser', 'se', 'no'],
-    it: ['di', 'il', 'che', 'e', 'la', 'in', 'a', 'per', 'un', 'è'],
-    pt: ['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para']
-  };
-
-  // Count occurrences of common words
-  for (const [lang, words] of Object.entries(commonWords)) {
-    let count = 0;
-    words.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      const matches = text.match(regex);
-      if (matches) {
-        count += matches.length;
-      }
-    });
-    if (count > 0) {
-      scores[lang] = count * 0.3; // Lower weight for Latin scripts
-    }
-  }
-
-  return scores;
 }
 
 /**
