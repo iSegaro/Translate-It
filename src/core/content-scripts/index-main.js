@@ -1,12 +1,6 @@
 // Main Content script entry point - Top Frame only
 // Manages the complete Vue application, features, and UI.
 
-// Early Trusted Types setup - must run BEFORE any Vue code
-import browser from 'webextension-polyfill';
-window.browser = browser;
-import { setupTrustedTypesCompatibility } from '@/shared/vue/vue-utils.js';
-setupTrustedTypesCompatibility();
-
 // --- CRITICAL PRE-INITIALIZATION ---
 // Create placeholder objects for core infrastructure to prevent messaging errors
 // during the asynchronous boot process.
@@ -17,22 +11,17 @@ if (!window.translateItContentScriptCore) {
   window.translateItContentScriptCore = window.translateItContentCore;
 }
 
-import { ContentScriptCore } from './ContentScriptCore.js';
-import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
-
-// Import our modular components
-import { MainFrameAggregator } from './main/MainFrameAggregator.js';
-import { MainFrameCoordinator } from './main/MainFrameCoordinator.js';
-import { MainFeatureLoader } from './main/MainFeatureLoader.js';
-
+// Global reference for the core instance
 let contentScriptCore = null;
 
-// Import logging utilities
+// Logging state
 let logger = null;
 let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 
-// Lazy load logging dependencies
+/**
+ * Lazy load logging dependencies to reduce initial bundle size.
+ */
 async function initializeLogger() {
   if (logger) return logger;
   try {
@@ -45,6 +34,7 @@ async function initializeLogger() {
     logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
     return logger;
   } catch {
+    // Fallback logger if loading fails
     return {
       debug: () => {},
       info: (...args) => console.log('[ContentScriptIndex]', ...args),
@@ -61,28 +51,59 @@ async function initializeLogger() {
     return;
   }
 
-  // 2. FAST FAIL: Check exclusion before ANYTHING else (zero side effects)
-  if (await checkUrlExclusionAsync()) {
-    return;
-  }
-
-  // 3. SELF-DETECTION: Never run content script inside our own UI frames
-  const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
-                           window.location.href.startsWith(browser.runtime.getURL('')) ||
-                           document.documentElement.classList.contains('translate-it-ui-frame');
-  
-  if (isExtensionFrame) {
-    return;
-  }
-
   try {
+    // 2. LAZY LOAD CORE UTILS & POLYFILL
+    // We load these first to perform essential checks
+    const [
+      { default: browser },
+      { setupTrustedTypesCompatibility },
+      { checkUrlExclusionAsync }
+    ] = await Promise.all([
+      import('webextension-polyfill'),
+      import('@/shared/vue/vue-utils.js'),
+      import('@/features/exclusion/utils/exclusion-utils.js')
+    ]);
+
+    window.browser = browser;
+    setupTrustedTypesCompatibility();
+
+    // 3. FAST FAIL: Check exclusion before heavy architecture loading
+    if (await checkUrlExclusionAsync()) {
+      return;
+    }
+
+    // 4. SELF-DETECTION: Never run content script inside our own UI frames
+    const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
+                             window.location.href.startsWith(browser.runtime.getURL('')) ||
+                             document.documentElement.classList.contains('translate-it-ui-frame');
+    
+    if (isExtensionFrame) {
+      return;
+    }
+
+    // 5. LOAD MODULAR ARCHITECTURE COMPONENTS
+    // These are only loaded if the script is cleared for execution
+    const [
+      { ContentScriptCore },
+      { MainFrameAggregator },
+      { MainFrameCoordinator },
+      { MainFeatureLoader },
+      { MessageActions }
+    ] = await Promise.all([
+      import('./ContentScriptCore.js'),
+      import('./main/MainFrameAggregator.js'),
+      import('./main/MainFrameCoordinator.js'),
+      import('./main/MainFeatureLoader.js'),
+      import('@/shared/messaging/core/MessageActions.js')
+    ]);
+
     const scriptLogger = await initializeLogger();
 
     if (process.env.NODE_ENV === 'development') {
       scriptLogger.debug('Initializing main frame content script (Modular mode)');
     }
 
-    // Create and initialize ContentScriptCore instance
+    // 6. INITIALIZE CORE
     try {
       contentScriptCore = new ContentScriptCore();
       
@@ -93,8 +114,7 @@ async function initializeLogger() {
       const initialized = await contentScriptCore.initializeCritical();
       
       if (initialized) {
-        // --- MODULAR ARCHITECTURE INITIALIZATION ---
-        const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+        // --- MODULAR ARCHITECTURE SETUP ---
 
         // 1. Aggregator: Handles stats and unified progress
         const aggregator = new MainFrameAggregator(MessageActions);
@@ -118,7 +138,7 @@ async function initializeLogger() {
           scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
         }
 
-        // Start the multi-stage loading sequence
+        // Start the multi-stage loading sequence (Interaction-driven lazy loading)
         featureLoader.startIntelligentLoading();
 
         if (process.env.NODE_ENV === 'development') {
@@ -134,5 +154,5 @@ async function initializeLogger() {
   }
 })();
 
-// Export for debugging
+// Export for debugging purposes
 window.translateItContentScriptCore = contentScriptCore;
