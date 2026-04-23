@@ -63,6 +63,7 @@
       <div
         ref="dropdownMenuRef"
         class="ti-provider-dropdown-list"
+        @mouseleave="focusedIndex = -1"
       >
         <div
           v-for="(provider, index) in availableProviders"
@@ -176,6 +177,7 @@
       <div
         ref="dropdownMenuRef"
         class="ti-provider-dropdown-list"
+        @mouseleave="focusedIndex = -1"
       >
         <div
           v-for="(provider, index) in availableProviders"
@@ -281,6 +283,7 @@
       <div
         ref="dropdownMenuRef"
         class="ti-provider-dropdown-list"
+        @mouseleave="focusedIndex = -1"
       >
         <div
           v-for="(provider, index) in availableProviders"
@@ -394,6 +397,7 @@
       <div
         ref="dropdownMenuRef"
         class="ti-provider-dropdown-list"
+        @mouseleave="focusedIndex = -1"
       >
         <div
           v-for="(provider, index) in availableProviders"
