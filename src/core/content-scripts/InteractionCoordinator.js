@@ -156,6 +156,11 @@ class InteractionCoordinator {
     const selectedText = selection?.toString().trim();
     
     if (selectedText) {
+      // Ensure UI is ready immediately on selection
+      if (this.isTopFrame && window.translateItContentCore?.loadFeatureFromMain) {
+        window.translateItContentCore.loadFeatureFromMain('vue', 'INTERACTIVE');
+      }
+
       const { activateFeature } = await import('./chunks/lazy-features.js');
       await activateFeature('textSelection');
 
@@ -187,6 +192,11 @@ class InteractionCoordinator {
     // Check if we should handle this event
     const shouldHandle = isMainShortcut || (isEscape && (this.revertMightBeNeeded || window.isTranslationInProgress));
     if (!shouldHandle) return;
+
+    // Ensure UI is ready immediately on shortcut
+    if (this.isTopFrame && window.translateItContentCore?.loadFeatureFromMain) {
+      window.translateItContentCore.loadFeatureFromMain('vue', 'INTERACTIVE');
+    }
 
     const { loadFeature } = await import('./chunks/lazy-features.js');
     if (isMainShortcut) {
@@ -222,6 +232,11 @@ class InteractionCoordinator {
   async _handleContextMenu() {
     // Double-check if allowed before loading
     if (this.exclusionChecker.isFeatureEnabled('selectElement')) {
+      // Ensure UI is ready immediately
+      if (this.isTopFrame && window.translateItContentCore?.loadFeatureFromMain) {
+        window.translateItContentCore.loadFeatureFromMain('vue', 'INTERACTIVE');
+      }
+
       const { loadFeature } = await import('./chunks/lazy-features.js');
       await loadFeature('selectElement');
     }

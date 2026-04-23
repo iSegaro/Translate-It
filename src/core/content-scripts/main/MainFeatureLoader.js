@@ -11,18 +11,30 @@ export class MainFeatureLoader {
     // Smart loading configuration
     this.LOAD_STRATEGIES = {
       CRITICAL: { delay: 0, priority: 'high' },
-      ESSENTIAL: { delay: 500, priority: 'medium' },
-      ON_DEMAND: { delay: 2000, priority: 'low' },
-      INTERACTIVE: { delay: 0, priority: 'medium' }
+      ESSENTIAL: { delay: 400, priority: 'medium' },
+      LAZY_UI: { delay: 2500, priority: 'low' },
+      ON_DEMAND: { delay: 4000, priority: 'low' },
+      INTERACTIVE: { delay: 0, priority: 'high' }
     };
 
     // Feature categorization
     this.FEATURE_CATEGORIES = {
       CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
-      ESSENTIAL: ['textSelection', 'contentMessageHandler', 'vue'], // Immediate UI (FAB) & Detection
+      ESSENTIAL: ['contentMessageHandler'], // Essential communication
+      LAZY_UI: ['vue', 'textSelection'], // UI & Selection (can be promoted)
       INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation'], // On-demand heavy UI
       ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
     };
+  }
+
+  /**
+   * Promotes a feature to load immediately.
+   */
+  async promoteFeature(featureName) {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[MainFeatureLoader] Promoting feature: ${featureName}`);
+    }
+    return this.loadFeature(featureName, 'INTERACTIVE');
   }
 
   /**
@@ -45,10 +57,14 @@ export class MainFeatureLoader {
       );
     }, this.LOAD_STRATEGIES.ESSENTIAL.delay);
 
-    // Stage 3: On-demand preloading (longer delay)
+    // Stage 3: Lazy UI features (longer delay, unless promoted)
     setTimeout(() => {
-      // Logic for preloading optional features could go here
-    }, this.LOAD_STRATEGIES.ON_DEMAND.delay);
+      Promise.all(
+        this.FEATURE_CATEGORIES.LAZY_UI.map(feature =>
+          this.loadFeature(feature, 'LAZY_UI')
+        )
+      );
+    }, this.LOAD_STRATEGIES.LAZY_UI.delay);
   }
 
   /**
