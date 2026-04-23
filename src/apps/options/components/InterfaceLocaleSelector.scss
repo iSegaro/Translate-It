@@ -15,9 +15,14 @@
   flex-shrink: 0;
 }
 
-.locale-name {
+.locale-name, 
+.selected-locale-name {
   font-size: var(--font-size-sm);
   white-space: nowrap;
+  line-height: 1 !important; /* Reset line height for precise centering */
+  display: inline-flex !important;
+  align-items: center !important;
+  transform: translateY(1px) !important; /* Manual nudge for perfect alignment with flags */
 }
 
 /* Dropdown Mode Styles */
