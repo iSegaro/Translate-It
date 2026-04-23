@@ -72,7 +72,11 @@ export function isBrowserInternalPage(url) {
 export function isLocalFile(url) {
   if (!url || typeof url !== 'string') return false;
 
-  return url.toLowerCase().startsWith('file://');
+  try {
+    return new URL(url).protocol === 'file:';
+  } catch {
+    return false;
+  }
 }
 
 /**
