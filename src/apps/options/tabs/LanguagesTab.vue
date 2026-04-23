@@ -443,11 +443,28 @@ const getFilteredLanguages = (type) => {
 const filteredSourceLanguages = computed(() => getFilteredLanguages('source'))
 const filteredTargetLanguages = computed(() => getFilteredLanguages('target'))
 
-watch(selectedProvider, () => {
-  if (!filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) sourceLanguage.value = 'auto'
-  if (!filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)) {
-    targetLanguage.value = filteredTargetLanguages.value.find(l => l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || filteredTargetLanguages.value[0]?.code || 'en'
+const syncLanguagesWithProviderSupport = ({ clearInvalidTarget = false } = {}) => {
+  if (!filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) {
+    sourceLanguage.value = 'auto'
   }
+
+  if (!filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)) {
+    targetLanguage.value = clearInvalidTarget
+      ? ''
+      : (filteredTargetLanguages.value.find(l => l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || filteredTargetLanguages.value[0]?.code || 'en')
+  }
+}
+
+watch(selectedProvider, () => {
+  syncLanguagesWithProviderSupport()
+})
+
+watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (isEnabled, previousValue) => {
+  if (selectedProvider.value !== ProviderRegistryIds.DEEPL || previousValue === undefined || isEnabled === previousValue) {
+    return
+  }
+
+  syncLanguagesWithProviderSupport({ clearInvalidTarget: true })
 })
 
 // --- Validation ---
