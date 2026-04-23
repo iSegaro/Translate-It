@@ -8,6 +8,21 @@
   width: 100% !important;
   display: block !important;
 
+  .setting-group {
+    margin-bottom: 0 !important; /* Fieldset handles the bottom space */
+    gap: 0 !important; /* Use margins on items for more control */
+
+    // Only add margin if there's a previous setting-group
+    & + .setting-group {
+      margin-top: $spacing-lg !important;
+    }
+
+    // Special spacing for the main toggle at the top
+    &.extension-enabled-group {
+      margin-bottom: $spacing-xl !important;
+    }
+  }
+
   .base-fieldset {
     max-width: 100% !important;
     width: 100% !important;
@@ -33,7 +48,7 @@
     width: 100% !important;
     max-width: 100% !important;
     gap: $spacing-md !important;
-    margin-bottom: $spacing-xs !important;
+    margin-bottom: 0 !important; /* Removed fixed margin-bottom to let parent gap handle spacing */
     cursor: pointer !important;
     box-sizing: border-box !important;
     
@@ -238,28 +253,33 @@
 .sub-options-group {
   display: grid !important;
   grid-template-rows: 0fr !important;
-  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.3s ease !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   opacity: 0 !important;
   overflow: hidden !important;
   margin-inline-start: $spacing-md !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
   border-inline-start: 2px solid transparent !important;
   width: auto !important;
 
   &.open {
     grid-template-rows: 1fr !important;
     opacity: 1 !important;
-    margin-top: $spacing-base !important;
-    margin-bottom: $spacing-md !important;
+    margin-top: $spacing-md !important; /* Space from the checkbox/label above */
+    margin-bottom: 0 !important;
     border-inline-start-color: var(--color-border) !important;
   }
 
   .sub-options-inner {
     min-height: 0 !important;
     padding-inline-start: $spacing-lg !important;
-    padding-top: $spacing-base !important;
-    padding-bottom: $spacing-xs !important;
+    padding-top: $spacing-xs !important; /* Small top padding for internal items */
+    padding-bottom: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: $spacing-sm !important; /* Space between internal items */
   }
   
   .radio-group {

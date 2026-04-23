@@ -1,20 +1,31 @@
 @use "@/assets/styles/base/variables" as *;
 
+/**
+ * BaseFieldset - Standardized fieldset styling.
+ * Uses flexbox for the legend to allow for a header slot.
+ * Ensures consistent and symmetrical internal spacing.
+ */
 .base-fieldset {
   border: $border-width $border-style var(--color-border);
   border-radius: $border-radius-md;
-  padding: 1.5em 1.25em 1em 1.25em;
-  margin-bottom: $spacing-xl;
+  padding: 1rem !important; /* Standard 16px padding */
+  margin: 0 0 $spacing-xl 0;
   position: relative;
-  min-width: 0; // Fixes fieldset expansion on long content
+  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+
+  // Ensure no browser default padding/margin
+  -webkit-appearance: none;
+  appearance: none;
   
   &__legend {
     padding: 0;
-    margin-inline: 0.75em;
+    margin-inline: 0.75rem;
     font-weight: $font-weight-semibold;
     color: var(--color-text-secondary);
     font-size: $font-size-sm;
-    width: calc(100% - 1.5em); /* Take full width minus margins */
+    width: calc(100% - 1.5rem);
     max-width: none;
     white-space: normal;
     box-sizing: border-box;
@@ -26,7 +37,7 @@
       gap: $spacing-md;
       width: 100%;
       min-width: 0;
-      padding: 0 0.5em; /* Add internal padding for the text and actions */
+      padding: 0 0.5rem;
     }
 
     .legend-text {
@@ -48,11 +59,14 @@
     opacity: 0.6;
     pointer-events: none;
   }
-}
 
-// Remove border from last setting group in fieldset
-.base-fieldset :deep(.setting-group:last-of-type) {
-  border-bottom: none;
-  padding-bottom: 0;
-  margin-bottom: 0;
+  // --- RECURSIVE LAST-CHILD SPACING FIX ---
+  // Target any element that is the last child (even nested ones) 
+  // and force its bottom margin/padding to zero.
+  // This ensures the fieldset's bottom padding is the ONLY space at the bottom.
+  :deep(*:last-child) {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+  }
 }
