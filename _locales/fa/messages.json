@@ -270,7 +270,10 @@
     "message": "کلید اصلی"
   },
   "activation_group_fab_title": {
-    "message": "دکمه عملیات سریع (FAB)"
+    "message": "دکمه دسترسی سریع (FAB)"
+  },
+  "activation_group_select_element_title": {
+    "message": "انتخاب المان"
   },
   "activation_group_text_fields_title": {
     "message": "ترجمه فیلدهای متنی"

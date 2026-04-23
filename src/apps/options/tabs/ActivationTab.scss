@@ -184,40 +184,6 @@
   }
 }
 
-.setting-row-with-provider {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: $spacing-md !important;
-  width: 100% !important;
-  flex-wrap: wrap !important;
-  box-sizing: border-box !important;
-
-  .mode-provider-container {
-    display: flex !important;
-    align-items: center !important;
-    gap: $spacing-sm !important;
-    width: 100% !important;
-    max-width: 220px !important;
-    flex-shrink: 1 !important;
-
-    .mode-provider-label {
-      font-size: $font-size-xs !important;
-      color: var(--color-text-secondary) !important;
-      white-space: nowrap !important;
-    }
-
-    .ti-provider-button-container {
-      flex: 1 !important;
-      min-width: 0 !important;
-      .ti-provider-button {
-        width: 100% !important;
-        padding: 6px 10px !important;
-      }
-    }
-  }
-}
-
 .setting-description {
   padding-inline-start: 32px !important;
   margin-top: $spacing-xs !important;
@@ -228,6 +194,45 @@
   box-sizing: border-box !important;
   color: var(--color-text-secondary) !important;
   font-size: $font-size-sm !important;
+}
+
+// Ensure ProviderSelector in legend looks good
+.base-fieldset__legend {
+  .legend-actions-wrapper {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+
+    .legend-action-label {
+      font-size: $font-size-xs !important;
+      color: var(--color-text-secondary) !important;
+      white-space: nowrap !important;
+      font-weight: normal !important;
+
+      &.is-disabled {
+        opacity: 0.5 !important;
+      }
+    }
+  }
+
+  .ti-provider-button-container {
+    .ti-provider-button {
+      padding: 4px 8px !important;
+      height: 28px !important;
+      font-size: $font-size-xs !important;
+      background: var(--color-surface) !important;
+      
+      .ti-api-provider-icon {
+        width: 14px !important;
+        height: 14px !important;
+      }
+      
+      .dropdown-arrow {
+        width: 12px !important;
+        height: 12px !important;
+      }
+    }
+  }
 }
 
 .sub-options-group {
@@ -293,7 +298,7 @@
 
 // Mobile responsive overrides
 @media (max-width: #{$breakpoint-md}) {
-  .setting-row, .setting-row-with-provider {
+  .setting-row {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: $spacing-sm !important;

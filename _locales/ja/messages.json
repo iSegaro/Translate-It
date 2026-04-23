@@ -272,6 +272,9 @@
   "activation_group_fab_title": {
     "message": "クイックアクションボタン (FAB)"
   },
+  "activation_group_select_element_title": {
+    "message": "要素の選択"
+  },
   "activation_group_text_fields_title": {
     "message": "テキストフィールド翻訳"
   },

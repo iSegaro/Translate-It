@@ -56,27 +56,28 @@
 
     <!-- Text Field Translation -->
     <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
-      <div class="setting-group">
-        <div class="setting-row-with-provider">
-          <BaseCheckbox
-            v-model="translateOnTextFields"
-            :disabled="!extensionEnabled"
-            :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="fieldProvider"
+            allow-default
+            mode="button"
+            :is-global="false"
+            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
           />
-          <div class="mode-provider-container">
-            <span 
-              class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
-            >{{ t('provider_label') }}:</span>
-            <ProviderSelector
-              v-model="fieldProvider"
-              allow-default
-              mode="button"
-              :is-global="false"
-              :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
-            />
-          </div>
         </div>
+      </template>
+
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="translateOnTextFields"
+          :disabled="!extensionEnabled"
+          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
+        />
         <span class="setting-description">
           {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
         </span>
@@ -118,17 +119,17 @@
           <div class="radio-group">
             <BaseRadio
               v-model="textFieldMode"
-              value="copy"
-              name="textFieldMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
-            />
-            <BaseRadio
-              v-model="textFieldMode"
               value="replace"
               name="textFieldMode"
               :disabled="!extensionEnabled"
               :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
+            />
+            <BaseRadio
+              v-model="textFieldMode"
+              value="copy"
+              name="textFieldMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
             />
           </div>
 
@@ -143,55 +144,59 @@
       </div>
     </BaseFieldset>
 
-    <!-- On-Page Selection -->
-    <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
-      <div class="setting-group">
-        <div class="setting-row-with-provider">
-          <BaseCheckbox
-            v-model="translateWithSelectElement"
-            :disabled="!extensionEnabled"
-            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+    <!-- Select Element -->
+    <BaseFieldset :legend="t('activation_group_select_element_title') || 'Select Element'">
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="selectElementProvider"
+            allow-default
+            mode="button"
+            :is-global="false"
+            :disabled="!extensionEnabled || !translateWithSelectElement"
           />
-          <div class="mode-provider-container">
-            <span 
-              class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
-            >{{ t('provider_label') }}:</span>
-            <ProviderSelector
-              v-model="selectElementProvider"
-              allow-default
-              mode="button"
-              :is-global="false"
-              :disabled="!extensionEnabled || !translateWithSelectElement"
-            />
-          </div>
         </div>
+      </template>
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="translateWithSelectElement"
+          :disabled="!extensionEnabled"
+          :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+        />
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
         </span>
       </div>
+    </BaseFieldset>
+
+    <!-- On-Page Selection -->
+    <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !translateOnTextSelection }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="selectionProvider"
+            allow-default
+            mode="button"
+            :is-global="false"
+            :disabled="!extensionEnabled || !translateOnTextSelection"
+          />
+        </div>
+      </template>
 
       <div class="setting-group">
-        <div class="setting-row-with-provider">
-          <BaseCheckbox
-            v-model="translateOnTextSelection"
-            :disabled="!extensionEnabled"
-            :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
-          />
-          <div class="mode-provider-container">
-            <span 
-              class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || !translateOnTextSelection }"
-            >{{ t('provider_label') }}:</span>
-            <ProviderSelector
-              v-model="selectionProvider"
-              allow-default
-              mode="button"
-              :is-global="false"
-              :disabled="!extensionEnabled || !translateOnTextSelection"
-            />
-          </div>
-        </div>
+        <BaseCheckbox
+          v-model="translateOnTextSelection"
+          :disabled="!extensionEnabled"
+          :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
+        />
         <span class="setting-description">
           {{ t('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
         </span>
@@ -262,27 +267,28 @@
 
     <!-- Dictionary Mode -->
     <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
-      <div class="setting-group">
-        <div class="setting-row-with-provider">
-          <BaseCheckbox
-            v-model="enableDictionary"
-            :disabled="!extensionEnabled"
-            :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !enableDictionary }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="dictionaryProvider"
+            allow-default
+            mode="button"
+            :is-global="false"
+            :disabled="!extensionEnabled || !enableDictionary"
           />
-          <div class="mode-provider-container">
-            <span 
-              class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || !enableDictionary }"
-            >{{ t('provider_label') }}:</span>
-            <ProviderSelector
-              v-model="dictionaryProvider"
-              allow-default
-              mode="button"
-              :is-global="false"
-              :disabled="!extensionEnabled || !enableDictionary"
-            />
-          </div>
         </div>
+      </template>
+
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="enableDictionary"
+          :disabled="!extensionEnabled"
+          :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
+        />
         <span class="setting-description">
           {{ t('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
         </span>
@@ -291,27 +297,28 @@
 
     <!-- Whole Page Translation -->
     <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
-      <div class="setting-group">
-        <div class="setting-row-with-provider">
-          <BaseCheckbox
-            v-model="wholePageEnabled"
-            :disabled="!extensionEnabled"
-            :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !wholePageEnabled }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="pageProvider"
+            allow-default
+            mode="button"
+            :is-global="false"
+            :disabled="!extensionEnabled || !wholePageEnabled"
           />
-          <div class="mode-provider-container">
-            <span 
-              class="mode-provider-label"
-              :class="{ 'is-disabled': !extensionEnabled || !wholePageEnabled }"
-            >{{ t('provider_label') }}:</span>
-            <ProviderSelector
-              v-model="pageProvider"
-              allow-default
-              mode="button"
-              :is-global="false"
-              :disabled="!extensionEnabled || !wholePageEnabled"
-            />
-          </div>
         </div>
+      </template>
+
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="wholePageEnabled"
+          :disabled="!extensionEnabled"
+          :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
+        />
         <span class="setting-description">
           {{ t('whole_page_translation_enabled_description') || 'Allow translating the entire web page content while maintaining the layout.' }}
         </span>

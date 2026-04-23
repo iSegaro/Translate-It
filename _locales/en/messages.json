@@ -272,6 +272,9 @@
   "activation_group_fab_title": {
     "message": "Quick Action Button (FAB)"
   },
+  "activation_group_select_element_title": {
+    "message": "Select Element"
+  },
   "activation_group_text_fields_title": {
     "message": "Text Field Translation"
   },
