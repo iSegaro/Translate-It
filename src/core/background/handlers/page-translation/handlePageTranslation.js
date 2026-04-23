@@ -5,6 +5,7 @@ import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'handlePageTranslation');
 
@@ -137,6 +138,18 @@ export async function handlePageTranslation(message, sender) {
     }
 
     const tab = tabs[0];
+
+    const access = await tabPermissionChecker.checkTabAccess(tab.id);
+    if (!access.isAccessible) {
+      logger.debug(`Page translation blocked on restricted tab ${tab.id}: ${access.errorMessage}`);
+      return {
+        success: false,
+        message: access.errorMessage,
+        isRestrictedPage: true,
+        tabId: tab.id,
+        tabUrl: access.fullUrl,
+      };
+    }
 
     try {
       // Get all frames in the tab to ensure we reach every part of the page (especially iframes)

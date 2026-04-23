@@ -36,6 +36,19 @@ export function usePageTranslation() {
   let cancelledListener = null;
   let resetErrorListener = null;
 
+  function applyRestrictedPageState(response) {
+    const restrictedMessage = response?.message || 'Feature not available on this page';
+
+    isTranslating.value = false;
+    isTranslated.value = false;
+    isAutoTranslating.value = false;
+    progress.value = 0;
+    translatedCount.value = 0;
+    totalNodes.value = 0;
+    error.value = null;
+    message.value = restrictedMessage;
+  }
+
   /**
    * Fetch current translation status from the active tab
    */
@@ -55,6 +68,8 @@ export function usePageTranslation() {
         if (result.translatedCount !== undefined) {
           translatedCount.value = result.translatedCount;
         }
+      } else if (result?.isRestrictedPage) {
+        applyRestrictedPageState(result);
       } else {
         // Reset state if we can't get status (e.g. restricted page)
         isTranslated.value = false;
@@ -100,6 +115,11 @@ export function usePageTranslation() {
         context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
+      if (result?.isRestrictedPage) {
+        applyRestrictedPageState(result);
+        return;
+      }
+
       if (result.success) {
         isTranslated.value = true;
         translatedCount.value = result.translatedCount || 0;
@@ -143,6 +163,11 @@ export function usePageTranslation() {
         context: MessageContexts.PAGE_TRANSLATION_UI,
       });
 
+      if (result?.isRestrictedPage) {
+        applyRestrictedPageState(result);
+        return;
+      }
+
       if (result.success) {
         isTranslated.value = false;
         isAutoTranslating.value = false;
@@ -168,6 +193,11 @@ export function usePageTranslation() {
         action: MessageActions.PAGE_TRANSLATE_STOP_AUTO,
         context: MessageContexts.PAGE_TRANSLATION_UI,
       });
+
+      if (result?.isRestrictedPage) {
+        applyRestrictedPageState(result);
+        return;
+      }
 
       if (result.success) {
         isAutoTranslating.value = false;
@@ -486,5 +516,4 @@ export function usePageTranslation() {
     }),
   };
 }
-
 
