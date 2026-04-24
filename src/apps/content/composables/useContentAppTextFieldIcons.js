@@ -1,6 +1,7 @@
 import { ref, onMounted } from 'vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppTextFieldIcons');
 
@@ -44,7 +45,6 @@ export function useContentAppTextFieldIcons(tracker) {
    */
   const onIconClick = (id) => {
     logger.info(`TextFieldIcon clicked: ${id}`);
-    const pageEventBus = window.pageEventBus;
     if (pageEventBus) {
       pageEventBus.emit('text-field-icon-clicked', { id });
     }

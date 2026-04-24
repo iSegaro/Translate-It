@@ -9,9 +9,10 @@ import { LOG_COMPONENTS } from '../shared/logging/logConstants.js';
 
 class EventBus {
   constructor() {
-    // Only create the bus element if we are in a document context (e.g., content script)
-    this.bus = (typeof document !== 'undefined')
-      ? document.createElement('div')
+    // Use window as the global event bus. This is often more reliable than document
+    // for cross-bundle communication in extension content scripts.
+    this.bus = (typeof window !== 'undefined')
+      ? window
       : null;
     
     // Store wrapped callbacks for proper removal
