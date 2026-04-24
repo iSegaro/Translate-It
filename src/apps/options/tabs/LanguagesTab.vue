@@ -197,6 +197,15 @@
               </p>
 
               <div class="language-pref-row">
+                <label class="pref-label">{{ t('latin_script_priority_label') }}:</label>
+                <BaseSelect
+                  v-model="latinScriptPreference"
+                  :options="latinScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
                 <label class="pref-label">{{ t('arabic_script_priority_label') }}:</label>
                 <BaseSelect
                   v-model="arabicScriptPreference"
@@ -219,15 +228,6 @@
                 <BaseSelect
                   v-model="devanagariScriptPreference"
                   :options="devanagariScriptOptions"
-                  class="pref-select"
-                />
-              </div>
-
-              <div class="language-pref-row">
-                <label class="pref-label">{{ t('latin_script_priority_label') }}:</label>
-                <BaseSelect
-                  v-model="latinScriptPreference"
-                  :options="latinScriptOptions"
                   class="pref-select"
                 />
               </div>
