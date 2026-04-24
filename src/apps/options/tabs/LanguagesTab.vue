@@ -317,7 +317,11 @@ const bilingualTranslation = createSetting('BILINGUAL_TRANSLATION', false, {
     if (val) {
       const currentModes = { ...(settingsStore.settings?.BILINGUAL_TRANSLATION_MODES || {}) }
       if (!visibleBilingualModes.some(m => currentModes[m])) {
-        visibleBilingualModes.forEach(m => { currentModes[m] = true })
+        visibleBilingualModes.forEach(m => { 
+          if (m !== TranslationMode.Page) {
+            currentModes[m] = true 
+          }
+        })
         currentModes[TranslationMode.Sidepanel_Translate] = true
         settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', currentModes)
       }
