@@ -387,11 +387,16 @@ export class PageTranslationScheduler extends ResourceTracker {
       const translatedTexts = JSON.parse(result.translatedText);
       batch.forEach((item, index) => {
         const translatedItem = translatedTexts[index];
-        const translatedText = (typeof translatedItem === 'object' && translatedItem !== null) 
+        let translatedText = (typeof translatedItem === 'object' && translatedItem !== null) 
           ? (translatedItem.text || translatedItem.t || JSON.stringify(translatedItem))
           : translatedItem;
+        
+        // Final safety check to ensure we never pass an object to domtranslator
+        if (typeof translatedText === 'object' && translatedText !== null) {
+          translatedText = translatedText.text || translatedText.t || JSON.stringify(translatedText);
+        }
           
-        item.resolve(translatedText || item.text);
+        item.resolve(String(translatedText || item.text));
         this.translatedCount++;
       });
 

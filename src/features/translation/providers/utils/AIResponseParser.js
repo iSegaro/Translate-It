@@ -132,7 +132,20 @@ export const AIResponseParser = {
     let processedResult = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
 
     if (expectedFormat === ResponseFormat.STRING) {
-      return this._stripMarkdown(processedResult);
+      const stripped = this._stripMarkdown(processedResult);
+      // Fallback: If AI returned JSON even though we asked for STRING
+      if (stripped.startsWith('{') || stripped.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(stripped);
+          const items = this._normalizeToItems(parsed);
+          if (items && items.length > 0) {
+            const firstItem = items[0];
+            const { text } = this._extractItemData(firstItem);
+            if (text) return text;
+          }
+        } catch { /* ignore and return stripped */ }
+      }
+      return stripped;
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
@@ -241,13 +254,18 @@ export const AIResponseParser = {
     if (typeof text === 'string' && (text.startsWith('{') || text.startsWith('['))) {
       try {
         const inner = JSON.parse(text);
-        if (typeof inner === 'object') {
+        if (typeof inner === 'object' && inner !== null) {
           text = inner.t || inner.text || inner.translation || Object.values(inner)[0] || text;
         }
       } catch { /* ignore */ }
     }
 
-    return { text, id };
+    // FINAL SAFETY: Ensure text is always a string to prevent [object Object] leaks in the UI
+    if (text !== null && typeof text === 'object') {
+      text = text.t || text.text || text.translation || Object.values(text)[0] || JSON.stringify(text);
+    }
+
+    return { text: String(text || ''), id };
   },
 
   /**

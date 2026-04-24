@@ -324,13 +324,23 @@ export class ProviderCoordinator {
   _cleanResult(result, expectedFormat) {
     if (!result) return "";
 
-    // If result is already an array, clean each element
+    // If result is already an array, clean each element and ENSURE they are strings
     if (Array.isArray(result)) {
-      return result.map(item => AIResponseParser.cleanAIResponse(item, ResponseFormat.STRING));
+      return result.map(item => {
+        const cleaned = AIResponseParser.cleanAIResponse(item, ResponseFormat.STRING);
+        return this._ensureString(cleaned);
+      });
     }
 
     // Use the contract-aware cleaner
-    return AIResponseParser.cleanAIResponse(result, expectedFormat);
+    const cleaned = AIResponseParser.cleanAIResponse(result, expectedFormat);
+    
+    // If cleaning produced an array (e.g. from JSON_ARRAY), ensure its elements are strings
+    if (Array.isArray(cleaned)) {
+      return cleaned.map(item => this._ensureString(item));
+    }
+
+    return this._ensureString(cleaned);
   }
 
   /**
