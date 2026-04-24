@@ -9,7 +9,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
