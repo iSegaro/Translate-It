@@ -1,7 +1,7 @@
 <template>
   <div>
     <h3>{{ t('lingva_api_settings_title') || 'Lingva API Settings' }}</h3>
-    <div class="setting-group api-key-info">
+    <div class="setting-group vertical api-key-info">
       <span class="setting-description">
         {{ t('lingva_api_url_info') || 'You can use public Lingva instances or host your own.' }}
       </span>
@@ -14,11 +14,12 @@
         {{ t('lingva_instances_link') || 'Find public Lingva instances.' }}
       </a>
     </div>
-    <div class="setting-group">
+    <div class="setting-group vertical">
       <label>{{ t('lingva_api_url_label') || 'Lingva API URL' }}</label>
       <BaseInput
         v-model="lingvaApiUrl"
         :placeholder="t('lingva_api_url_placeholder') || 'Enter Lingva API URL (e.g., https://lingva.ml)'"
+        class="api-url-input"
         dir="ltr"
       />
     </div>
