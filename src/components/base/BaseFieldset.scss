@@ -26,42 +26,35 @@
     color: var(--color-text-secondary);
     font-size: $font-size-sm;
     width: auto;
-    max-width: none;
-    white-space: normal;
+    max-width: 60%; // Prevent legend from overlapping header actions
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     box-sizing: border-box;
 
-    &.has-header {
-      width: calc(100% - 1.5rem);
-      padding: 0;
-    }
-
-    .legend-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: $spacing-md;
-      width: 100%;
-      min-width: 0;
-      padding: 0;
-
-      .has-header & {
-        padding: 0 0.5rem;
-      }
-    }
-
     .legend-text {
-      flex-shrink: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      display: block;
     }
+  }
 
-    .legend-actions {
-      display: flex;
-      align-items: center;
-      gap: $spacing-sm;
-      flex-shrink: 0;
-    }
+  &__header-actions {
+    position: absolute;
+    top: -1px; /* Align precisely with the border line */
+    right: 1.25rem;
+    transform: translateY(-50%);
+    background: var(--color-background);
+    padding: 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    z-index: 1;
+    pointer-events: auto;
+    line-height: 1; /* Reset line-height to prevent vertical shifts */
+  }
+
+  &__content {
+    width: 100%;
+    min-width: 0;
   }
   
   &.disabled {

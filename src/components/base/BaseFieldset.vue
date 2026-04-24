@@ -1,27 +1,25 @@
 <template>
   <fieldset
     class="base-fieldset"
-    :class="{ disabled }"
+    :class="{ disabled, 'has-header': $slots.header }"
   >
     <legend 
-      v-if="legend || $slots.header" 
+      v-if="legend" 
       class="base-fieldset__legend"
-      :class="{ 'has-header': $slots.header }"
     >
-      <div class="legend-container">
-        <span 
-          v-if="legend" 
-          class="legend-text"
-        >{{ legend }}</span>
-        <div 
-          v-if="$slots.header" 
-          class="legend-actions"
-        >
-          <slot name="header" />
-        </div>
-      </div>
+      <span class="legend-text">{{ legend }}</span>
     </legend>
-    <slot />
+
+    <div 
+      v-if="$slots.header" 
+      class="base-fieldset__header-actions"
+    >
+      <slot name="header" />
+    </div>
+
+    <div class="base-fieldset__content">
+      <slot />
+    </div>
   </fieldset>
 </template>
 
