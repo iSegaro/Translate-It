@@ -1959,7 +1959,7 @@
     "message": "会話メモリ"
   },
   "ai_conversation_history_description": {
-    "message": "同じセッション内の以前の翻訳の短いメモリを維持します。要素選択モードでの一貫したスタイルに不可欠です。"
+    "message": "Select Elementモードで直近の翻訳内容を短期間保持し、一貫性と文脈理解を向上させます。翻訳品質の向上が期待できますが、トークン使用量がわずかに増加する可能性があります。"
   },
   "bilingual_translation_label": {
     "message": "双方向翻訳 (言語の自動入れ替え)"
@@ -1968,10 +1968,10 @@
     "message": "検出された言語が翻訳先言語と一致する場合、自動的に翻訳元言語（翻訳元が自動の場合は英語）へ翻訳します。"
   },
   "bilingual_mode_selection_label": {
-    "message": "テキスト選択 (WindowsManager)"
+    "message": "テキスト選択"
   },
   "bilingual_mode_select_element_label": {
-    "message": "要素選択 (Select Element)"
+    "message": "要素選択"
   },
   "bilingual_mode_field_label": {
     "message": "テキストフィールド"

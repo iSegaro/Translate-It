@@ -1959,7 +1959,7 @@
     "message": "Conversation Memory"
   },
   "ai_conversation_history_description": {
-    "message": "Maintains a short memory of previous translations in the same session. Essential for consistent style in Select Element mode."
+    "message": "Keeps a short memory of recent translations in Select Element mode to improve consistency and context awareness. This can enhance translation quality, but may slightly increase token usage."
   },
   "bilingual_translation_label": {
     "message": "Bilingual Translation (Swap Language)"
@@ -1968,7 +1968,7 @@
     "message": "If the detected input language matches your target language, it will automatically translate back to your source language (or English if source is Auto)."
   },
   "bilingual_mode_selection_label": {
-    "message": "Text Selection (WindowsManager)"
+    "message": "Text Selection"
   },
   "bilingual_mode_select_element_label": {
     "message": "Select Element"

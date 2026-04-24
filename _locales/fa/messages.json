@@ -1959,7 +1959,7 @@
     "message": "حافظه گفتگو"
   },
   "ai_conversation_history_description": {
-    "message": "نگهداری حافظه کوتاه از ترجمه‌های قبلی در همان سشن. برای حفظ یکدستی استایل در مود انتخاب المان ضروری است."
+    "message": "در حالت Select Element بخشی از ترجمه‌های قبلی را به‌صورت موقت نگه می‌دارد تا یکپارچگی و درک متن بهتر شود. این کار می‌تواند کیفیت ترجمه را افزایش دهد، اما ممکن است مصرف توکن را کمی بیشتر کند."
   },
   "bilingual_translation_label": {
     "message": "ترجمه دوطرفه (جابجایی زبان)"
@@ -1968,10 +1968,10 @@
     "message": "اگر زبان متن شناسایی شده با زبان مقصد یکی باشد، به طور خودکار به زبان مبدا (یا انگلیسی در صورت خودکار بودن مبدا) ترجمه می‌شود."
   },
   "bilingual_mode_selection_label": {
-    "message": "انتخاب متن (WindowsManager)"
+    "message": "انتخاب متن"
   },
   "bilingual_mode_select_element_label": {
-    "message": "انتخاب المان (Select Element)"
+    "message": "انتخاب المان"
   },
   "bilingual_mode_field_label": {
     "message": "فیلدهای متنی"
