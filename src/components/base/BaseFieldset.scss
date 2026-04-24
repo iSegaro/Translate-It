@@ -50,6 +50,13 @@
     z-index: 1;
     pointer-events: auto;
     line-height: 1; /* Reset line-height to prevent vertical shifts */
+
+    // Lift the stacking context when dropdown is open or element is focused
+    // to ensure it appears on top of subsequent fieldsets.
+    &:focus-within,
+    &:has(.ti-dropdown-open) {
+      z-index: 100;
+    }
   }
 
   &__content {

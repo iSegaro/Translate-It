@@ -103,6 +103,7 @@
   width: 100% !important;
   max-width: 250px !important;
   flex-shrink: 1 !important;
+  &.ti-dropdown-open { z-index: 1000 !important; }
 
   /* Align menu to the end edge (right in LTR, left in RTL) to stay within tab content */
   .ti-provider-dropdown-menu {
@@ -397,6 +398,7 @@ img.ti-dropdown-arrow,
 .ti-provider-mobile-container {
   position: relative !important;
   width: 100% !important;
+  &.ti-dropdown-open { z-index: 1000 !important; }
 
   .ti-provider-mobile-button {
     display: flex !important;
