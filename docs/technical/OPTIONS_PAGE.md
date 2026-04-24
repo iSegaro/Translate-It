@@ -77,6 +77,50 @@ Add the appropriate input or toggle in the relevant tab component (under `src/co
 
 ---
 
+## Highlighting & Spotlight System
+
+The Options page features a robust **Spotlight System** designed to direct user attention to specific settings or sections via deep-linking. This is particularly useful for linking from the `Changelog` or `Help` pages directly to a relevant configuration.
+
+### How it Works
+The system is managed centrally and follows a 5-step sequence:
+1.  **Detection**: The `OptionsLayout.vue` watches for a `highlight` query parameter in the URL (e.g., `#/languages?highlight=BILINGUAL_SECTION`).
+2.  **Reveal**: If the target element is hidden inside an accordion or a collapsed section, the `useHighlightManager` triggers a "reveal" action to make it visible.
+3.  **Scroll**: The page performs a smooth scroll to position the target element at the center of the viewport.
+4.  **Pulse Animation**: A non-intrusive CSS animation (`ti-highlight-pulse`) is applied to the element, creating a spotlight effect with professional spacing around the content.
+5.  **Cleanup**: The `highlight` parameter is automatically removed from the URL after the animation starts to keep the browser history clean.
+
+### Developer Guide: Highlighting an Element
+
+To make an element or a section "highlightable," follow these steps:
+
+#### 1. Assign a Unique ID
+Add a unique `id` attribute to the target Vue component or HTML element. 
+**Convention**: For individual settings, use the setting key name (e.g., `id="SHOW_DESKTOP_FAB"`). For sections, use a descriptive suffix (e.g., `id="PROXY_SECTION"`).
+
+```html
+<BaseCheckbox
+  id="MY_SETTING_KEY"
+  v-model="mySetting"
+  label="Custom Setting"
+/>
+```
+
+#### 2. Configure Reveal Logic (For Accordions)
+If the element is inside a `BaseAccordion`, ensure the following:
+-   **Global Rules**: Add a rule to the `globalReveal` function in `src/apps/options/composables/useHighlightManager.js` so the system knows which accordion to open based on the ID prefix.
+-   **Tab Listener**: Ensure the Tab component has a listener for the `options-reveal-accordion` event in its `onMounted` hook to update its internal `activeAccordion` state.
+
+```javascript
+// Example reveal rule in useHighlightManager.js
+if (id.startsWith('MY_PREFIX_')) return 'my-accordion-name';
+```
+
+#### 3. Create the Link
+Use the following URL structure to trigger the highlight:
+`options.html#/{tab_name}?highlight={element_id}`
+
+---
+
 ## Import/Export Mechanism
 
 The extension provides a robust way to backup and restore settings via the **Import/Export** tab. This process is not a simple JSON dump; it involves security and integrity checks:
@@ -113,4 +157,4 @@ Located in `src/shared/config/settingsMigrations.js`, this system ensures that u
 
 ---
 
-**Last Updated**: March 2026
+**Last Updated**: April 2026
