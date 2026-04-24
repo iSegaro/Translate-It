@@ -40,6 +40,7 @@ import { computed } from 'vue'
 import "./WebAIApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import { REPO_URLS } from '@/shared/config/constants.js'
 
@@ -48,12 +49,12 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 
 const webAIApiUrl = computed({
-  get: () => settingsStore.settings?.WEBAI_API_URL || '',
+  get: () => settingsStore.settings?.WEBAI_API_URL || CONFIG.WEBAI_API_URL,
   set: (value) => settingsStore.updateSettingLocally('WEBAI_API_URL', value)
 })
 
 const webAIApiModel = computed({
-  get: () => settingsStore.settings?.WEBAI_API_MODEL || '',
+  get: () => settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL,
   set: (value) => settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
 })
 </script>
