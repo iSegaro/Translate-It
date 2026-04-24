@@ -249,7 +249,7 @@ export const CONFIG = {
   PROVIDER_OPTIMIZATION_LEVELS: {}, // Per-provider level overrides { Gemini: 5, OpenAI: 2 }
   AI_CONTEXT_TRANSLATION_ENABLED: true, // ارسال کانتکست (عنوان صفحه، تیتر بخش) به پرووایدرهای هوشمند
   AI_CONVERSATION_HISTORY_ENABLED: false, // ارسال تاریخچه ترجمه‌های قبلی برای حفظ استایل (مخصوص Select Element)
-  BILINGUAL_TRANSLATION: false, // ترجمه دوطرفه: اگر متن ورودی به زبان مقصد بود، آن را به زبان مبدا ترجمه کن
+  BILINGUAL_TRANSLATION: true, // ترجمه دوطرفه: اگر متن ورودی به زبان مقصد بود، آن را به زبان مبدا ترجمه کن
   BILINGUAL_TRANSLATION_MODES: {
     [TranslationMode.Popup_Translate]: true,
     [TranslationMode.Sidepanel_Translate]: true,
