@@ -13,6 +13,10 @@
     padding: $spacing-lg;
     margin-top: $spacing-md;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    
+    // Standard way to force LTR layout for technical/English content
+    direction: ltr;
+    text-align: left;
   }
 
   .loading-changelog, .error-changelog {
@@ -30,8 +34,10 @@
     font-size: $font-size-sm;
     line-height: 1.6;
     color: var(--color-text);
+    // Ensure the container itself doesn't inherit alignment from parent
+    text-align: left;
 
-    :deep(h1), :deep(h2), :deep(h3) {
+    h1, h2, h3 {
       margin-top: $spacing-lg;
       margin-bottom: $spacing-sm;
       color: var(--color-text);
@@ -40,20 +46,29 @@
       &:first-child { margin-top: 0; }
     }
 
-    :deep(h1) { font-size: $font-size-xl; border-bottom: 2px solid var(--color-border-light); padding-bottom: 8px; }
-    :deep(h2) { font-size: $font-size-lg; border-bottom: 1px solid var(--color-border-light); padding-bottom: 4px; }
-    :deep(h3) { font-size: $font-size-base; }
+    h1 { font-size: $font-size-xl; border-bottom: 2px solid var(--color-border-light); padding-bottom: 8px; }
+    h2 { font-size: $font-size-lg; border-bottom: 1px solid var(--color-border-light); padding-bottom: 4px; }
+    h3 { font-size: $font-size-base; }
 
-    :deep(p) { margin-bottom: $spacing-md; }
+    p { margin-bottom: $spacing-md; }
 
-    :deep(ul), :deep(ol) {
+    ul, ol {
       margin-bottom: $spacing-md;
+      // Using physical padding-left to ensure consistent indent regardless of global RTL
+      padding-left: $spacing-xl;
+      padding-right: 0;
+      // Reset logical properties that might be set globally
       padding-inline-start: $spacing-xl;
+      padding-inline-end: 0;
       
-      li { margin-bottom: $spacing-xs; }
+      li { 
+        margin-bottom: $spacing-xs;
+        // Ensures markers (bullets) are placed correctly in LTR context
+        display: list-item;
+      }
     }
 
-    :deep(code) {
+    code {
       background-color: var(--color-background-alt);
       padding: 2px 6px;
       border-radius: 4px;
@@ -62,17 +77,19 @@
       color: var(--color-primary);
     }
 
-    :deep(a) {
+    a {
       color: var(--color-primary);
       text-decoration: none;
       
       &:hover { text-decoration: underline; }
     }
 
-    :deep(blockquote) {
+    blockquote {
       margin: $spacing-md 0;
       padding: $spacing-sm $spacing-lg;
-      border-inline-start: 4px solid var(--color-border);
+      // Force left border for the quote indicator
+      border-left: 4px solid var(--color-border);
+      border-right: none;
       background-color: var(--color-background-alt);
       color: var(--color-text-secondary);
     }

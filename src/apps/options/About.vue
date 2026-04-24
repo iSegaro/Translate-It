@@ -6,7 +6,7 @@
         {{ t('about_section_title') || "What's New" }}
       </h2>
       
-      <div class="changelog-container">
+      <div class="changelog-container" dir="ltr">
         <div
           v-if="isLoadingChangelog"
           class="loading-changelog"
