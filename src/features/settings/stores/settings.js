@@ -9,6 +9,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
+import { TTS_ENGINES } from '@/shared/config/constants.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
@@ -73,7 +74,7 @@ function getDefaultSettings() {
     // browser Translation API Settings
     BROWSER_TRANSLATE_ENABLED: CONFIG.BROWSER_TRANSLATE_ENABLED ?? true,
     BROWSER_TRANSLATE_AUTO_DOWNLOAD: CONFIG.BROWSER_TRANSLATE_AUTO_DOWNLOAD ?? true,
-    TTS_ENGINE: CONFIG.TTS_ENGINE || 'google',
+    TTS_ENGINE: CONFIG.TTS_ENGINE || TTS_ENGINES.EDGE,
     TTS_FALLBACK_ENABLED: CONFIG.TTS_FALLBACK_ENABLED ?? true,
     TTS_AUTO_DETECT_ENABLED: CONFIG.TTS_AUTO_DETECT_ENABLED ?? true,
     SHOW_DESKTOP_FAB: CONFIG.SHOW_DESKTOP_FAB ?? false,
