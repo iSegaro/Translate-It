@@ -94,9 +94,6 @@ const fetchChangelog = async () => {
 
     let html = marked(markdown, markedOptions)
 
-    // Post-process to add spacing between sections
-    html = html.replace(/(<h[1-6][^>]*>.*?<\/h[1-6]>)\s*(?=<h[1-6]|$)/g, '$1<br>')
-
     // Update raw changelog
     rawChangelog.value = html
   } catch (error) {

@@ -109,14 +109,14 @@
   --input-focus-shadow-color: rgba(25, 103, 210, 0.2);
   --button-bg-color: #1a73e8;
   --button-text-color: #fff;
-  --button-hover-bg-color: #185abc;
+  --button-hover-bg-color: #1557b0;
   --link-color: #1a73e8;
-  --link-hover-color: #0c5dc0;
+  --link-hover-color: #174ea6;
   --section-title-border: #dadce0;
   
     // Component specific colors
-  --accent-color: #8ab4f8;
-  --accent-color-alpha: rgba(138, 180, 248, 0.1);
+  --accent-color: #1a73e8;
+  --accent-color-alpha: rgba(26, 115, 232, 0.1);
   --placeholder-color: #9aa0a6;
   
   // Icon filters
@@ -144,7 +144,7 @@
   --color-error: #ef5350;
   --color-success: #4caf50;
   --color-success-alpha: rgba(76, 175, 80, 0.1);
-  --color-info: #2196f3;
+  --color-info: #1a73e8;
 }
 
 :root.theme-dark, .theme-dark {
@@ -184,13 +184,13 @@
   --button-bg-color: #1a73e8;
   --button-text-color: #fff;
   --button-hover-bg-color: #185abc;
-  --link-color: #1a73e8;
-  --link-hover-color: #185abc;
+  --link-color: #8ab4f8;
+  --link-hover-color: #d2e3fc;
   --section-title-border: #5f6368;
   
   // Component specific colors
-  --accent-color: #1a73e8;
-  --accent-color-alpha: rgba(26, 115, 232, 0.2);
+  --accent-color: #8ab4f8;
+  --accent-color-alpha: rgba(138, 180, 248, 0.2);
   --placeholder-color: #888;
   
   // Icon filters
@@ -206,7 +206,7 @@
   --color-surface: #242d44; /* Ensure dark theme background is blue */
   --color-surface-alpha: rgba(30, 31, 34, 0.85); /* More neutral dark grey with higher opacity */
   --color-border-alpha: rgba(255, 255, 255, 0.1);
-  --color-primary-alpha: rgba(26, 115, 232, 0.3);
+  --color-primary-alpha: rgba(138, 180, 248, 0.3);
   --color-surface-shadow: rgba(255, 255, 255, 0.1);
   --color-background-hover: rgba(255, 255, 255, 0.1);
   --color-button-surface: rgba(32, 33, 36, 0.95);
@@ -220,11 +220,11 @@
   --color-background-soft: var(--sidebar-bg-color, #303741);
   --color-border: var(--border-color, #3c4043);
   --color-border-light: rgba(255, 255, 255, 0.1);
-  --color-primary: #1a73e8;
+  --color-primary: var(--link-color, #8ab4f8);
   --color-error: #ef5350;
   --color-success: #66bb6a;
   --color-success-alpha: rgba(102, 187, 106, 0.1);
-  --color-info: #42a5f5;
+  --color-info: #8ab4f8;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
 }
