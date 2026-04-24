@@ -103,7 +103,7 @@ class MessageHandler {
     } else {
       // Event-like or streaming messages that might not have a handler in all contexts
       // Don't log for these to reduce verbosity in the console
-      const broadcastActions = [
+      const silentBroadcastActions = [
         MessageActions.TRANSLATION_STREAM_UPDATE, 
         MessageActions.TRANSLATION_STREAM_END, 
         MessageActions.TRANSLATION_RESULT_UPDATE,
@@ -112,7 +112,7 @@ class MessageHandler {
         MessageActions.PAGE_RESTORE_COMPLETE,
       ];
       
-      if (!broadcastActions.includes(action)) {
+      if (!silentBroadcastActions.includes(action)) {
         logger.debug(`No handler for: ${action}`);
       }
       // No handler, so we don't need to keep the message channel open
