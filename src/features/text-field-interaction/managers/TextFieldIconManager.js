@@ -349,8 +349,18 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Check if WindowsManager currently has an active icon
     if (this._windowsManagerIconActive) {
-      this.logger.debug('Skipping icon creation: WindowsManager icon is currently active');
-      return false;
+      // Fail-safe: Check if an actual WindowsManager icon exists in the DOM
+      // This prevents the flag from getting stuck if a dismiss event was missed
+      // We specifically look for IDs starting with 'translation-icon-' or the fixed 'translate-it-icon' ID
+      const hasWindowsManagerIcon = !!document.querySelector('[id^="translation-icon-"], #translate-it-icon');
+      
+      if (!hasWindowsManagerIcon) {
+        this.logger.debug('WindowsManager icon flag was stuck, resetting it');
+        this._windowsManagerIconActive = false;
+      } else {
+        this.logger.debug('Skipping icon creation: WindowsManager icon is currently active');
+        return false;
+      }
     }
 
     // Check if another icon is already active
@@ -520,8 +530,18 @@ export class TextFieldIconManager extends ResourceTracker {
 
     // Check if WindowsManager currently has an active icon
     if (this._windowsManagerIconActive) {
-      this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation on focus');
-      return null;
+      // Fail-safe: Check if an actual WindowsManager icon exists in the DOM
+      // This prevents the flag from getting stuck if a dismiss event was missed
+      // We specifically look for IDs starting with 'translation-icon-' or the fixed 'translate-it-icon' ID
+      const hasWindowsManagerIcon = !!document.querySelector('[id^="translation-icon-"], #translate-it-icon');
+      
+      if (!hasWindowsManagerIcon) {
+        this.logger.debug('WindowsManager icon flag was stuck, resetting it');
+        this._windowsManagerIconActive = false;
+      } else {
+        this.logger.debug('WindowsManager icon is active, skipping TextFieldIcon creation on focus');
+        return null;
+      }
     }
 
     if (state?.activeTranslateIcon) {

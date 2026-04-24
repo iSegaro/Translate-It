@@ -1642,6 +1642,10 @@ export class WindowsManager extends ResourceTracker {
       };
       
       WindowsManagerEvents.dismissIcon(iconId);
+    } else {
+      // Broadcast a general dismiss event to ensure flags are reset in other managers
+      // This is a fail-safe for cases where the iconId might have been lost
+      pageEventBus.emit('windows-manager-dismiss-icon', { id: 'all' });
     }
     
     if (windowId) {
