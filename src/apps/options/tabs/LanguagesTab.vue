@@ -342,7 +342,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
-import { isProviderConfigured, getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
+import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components

@@ -141,7 +141,7 @@ function isLayoutBarrier(el) {
 /**
  * Determines if text alignment should be preserved based on explicit styles.
  */
-function getPreservedAlignment(element, targetLanguage) {
+function getPreservedAlignment(element) {
   // Check for explicit inline style alignment
   const explicitAlign = element.style.textAlign;
   if (explicitAlign === 'left' || explicitAlign === 'right' || explicitAlign === 'center') {
