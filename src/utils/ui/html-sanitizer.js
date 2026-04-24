@@ -15,7 +15,7 @@ const getLogger = () => {
 
 /**
  * XSS configuration that matches the project's security requirements
- * Based on Agent.md documentation
+ * Based on AGENT.md documentation
  */
 const XSS_CONFIG = {
   whiteList: { br: [] }, // Only <br> tags allowed

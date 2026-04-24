@@ -193,7 +193,7 @@ async function setupProject() {
     console.log('      - Chrome: chrome://extensions/ (Enable Developer Mode)');
     console.log('      - Firefox: about:debugging (This Firefox → Load Temporary Add-on)');
     console.log('   3. Start development with: pnpm run watch:chrome or pnpm run watch:firefox');
-    console.log('   4. Read Agent.md for detailed development guidelines');
+    console.log('   4. Read AGENT.md for detailed development guidelines');
     
     if (chromeValidator !== 'y' && chromeValidator !== 'yes') {
       console.log('\n⚡ Optional:');
