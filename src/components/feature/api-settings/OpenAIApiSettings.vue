@@ -16,6 +16,7 @@
     </div>
 
     <ApiKeyInput
+      id="OPENAI_API_KEY"
       v-model="openaiApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('openai_api_key_placeholder') || 'Enter your API keys (one per line)'"

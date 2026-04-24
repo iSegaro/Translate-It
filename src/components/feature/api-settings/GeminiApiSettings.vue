@@ -15,6 +15,7 @@
       </a>
     </div>
     <ApiKeyInput
+      id="GEMINI_API_KEY"
       v-model="geminiApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('gemini_api_key_placeholder') || 'Enter your API keys (one per line)'"
@@ -38,6 +39,7 @@
     >
       <label>{{ t('gemini_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
+        id="GEMINI_API_URL"
         v-model="geminiApiUrl"
         :placeholder="t('gemini_api_url_placeholder') || 'Enter custom API URL'"
         class="api-url-input"

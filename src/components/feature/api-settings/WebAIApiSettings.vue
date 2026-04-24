@@ -17,6 +17,7 @@
     <div class="setting-group vertical">
       <label>{{ t('webai_api_url_label') || 'WebAI API URL' }}</label>
       <BaseInput
+        id="WEBAI_API_URL"
         v-model="webAIApiUrl"
         :placeholder="t('webai_api_url_placeholder') || 'Enter WebAI API URL'"
         class="api-url-input"

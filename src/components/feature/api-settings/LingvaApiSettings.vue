@@ -17,6 +17,7 @@
     <div class="setting-group vertical">
       <label>{{ t('lingva_api_url_label') || 'Lingva API URL' }}</label>
       <BaseInput
+        id="LINGVA_API_URL"
         v-model="lingvaApiUrl"
         :placeholder="t('lingva_api_url_placeholder') || 'Enter Lingva API URL (e.g., https://lingva.ml)'"
         class="api-url-input"

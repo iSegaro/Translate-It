@@ -15,27 +15,36 @@ import { findProviderById } from '../providers/ProviderManifest.js';
  * @returns {boolean} - True if all required settings are present and not empty.
  */
 export const isProviderConfigured = (providerId, settings) => {
-  if (!providerId || !settings) return true;
+  return !getFirstMissingSetting(providerId, settings);
+};
+
+/**
+ * Identifies the first missing required setting for a provider.
+ * Useful for highlighting the exact field that needs attention.
+ * 
+ * @param {string} providerId - The ID of the provider to check.
+ * @param {Object} settings - The current settings object.
+ * @returns {string|null} - The key of the first missing setting, or null if all are present.
+ */
+export const getFirstMissingSetting = (providerId, settings) => {
+  if (!providerId || !settings) return null;
 
   const provider = findProviderById(providerId);
   
-  // If provider not found or has no required settings, consider it "configured" (or at least not needing action)
   if (!provider || !provider.requiredSettings || !Array.isArray(provider.requiredSettings)) {
-    return true;
+    return null;
   }
 
-  // Check if every required setting key has a non-empty value
-  return provider.requiredSettings.every(key => {
+  // Find the first required setting key that is missing or empty
+  return provider.requiredSettings.find(key => {
     const value = settings[key];
     
-    // Check for null, undefined, or empty string (after trimming)
-    if (value === null || value === undefined) return false;
+    if (value === null || value === undefined) return true;
     
     if (typeof value === 'string') {
-      return value.trim() !== '';
+      return value.trim() === '';
     }
     
-    // For non-string types, existence is enough
-    return true;
-  });
+    return false;
+  }) || null;
 };

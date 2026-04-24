@@ -15,6 +15,7 @@
       </a>
     </div>
     <ApiKeyInput
+      id="OPENROUTER_API_KEY"
       v-model="openrouterApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('openrouter_api_key_placeholder') || 'Enter your API keys (one per line)'"

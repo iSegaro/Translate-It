@@ -342,7 +342,8 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
-import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js'
+import { isProviderConfigured, getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
@@ -354,6 +355,7 @@ import BaseAccordion from '@/components/base/BaseAccordion.vue'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
+const { highlightElement } = useHighlightManager()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
 const { validateLanguages: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
@@ -397,11 +399,16 @@ const bilingualTranslation = createSetting('BILINGUAL_TRANSLATION', false, {
 const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2, {
   onChanged: (newProvider) => {
     // Check if the selected provider needs configuration
-    const isConfigured = isProviderConfigured(newProvider, settingsStore.settings);
+    const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
     
-    if (!isConfigured) {
-      logger.debug(`[LanguagesTab] Provider ${newProvider} is not configured. Opening API accordion.`);
+    if (missingKey) {
+      logger.debug(`[LanguagesTab] Provider ${newProvider} is missing setting: ${missingKey}. Opening API accordion.`);
       activeAccordion.value = 'api';
+      
+      // Delay to allow accordion animation to start/finish before highlighting
+      setTimeout(() => {
+        highlightElement(missingKey);
+      }, 400);
     }
   }
 })

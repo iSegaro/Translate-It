@@ -20,6 +20,7 @@
     </div>
 
     <ApiKeyInput
+      id="DEEPL_API_KEY"
       v-model="deeplApiKey"
       :label="t('deepl_api_key_label') || 'API Keys'"
       :placeholder="t('deepl_api_key_placeholder') || 'Enter your API keys (one per line)'"

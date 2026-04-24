@@ -14,6 +14,49 @@ export function useHighlightManager() {
   const router = useRouter();
 
   /**
+   * Internal helper to perform the scroll and animation
+   */
+  const applyHighlight = (elementId) => {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      logger.warn(`Element with ID "${elementId}" not found for highlighting.`);
+      return;
+    }
+
+    // 1. Scroll into view
+    logger.debug(`Scrolling to element: ${elementId}`);
+    element.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+
+    // 2. Apply highlight class
+    // Wait for scroll to finish approximately
+    setTimeout(() => {
+      logger.debug(`Applying highlight animation to: ${elementId}`);
+      element.classList.add('is-highlighting');
+
+      // 3. Remove highlight class after animation finishes (matches CSS duration)
+      setTimeout(() => {
+        element.classList.remove('is-highlighting');
+        logger.debug(`Highlight class removed from: ${elementId}`);
+      }, 3600);
+    }, 500);
+  };
+
+  /**
+   * Manually trigger a highlight on a specific element ID.
+   * Useful for programmatic highlighting (e.g., when a setting is missing).
+   * 
+   * @param {string} elementId - The ID of the element to highlight
+   */
+  const highlightElement = (elementId) => {
+    if (!elementId) return;
+    logger.debug(`Manual highlight requested for: ${elementId}`);
+    applyHighlight(elementId);
+  };
+
+  /**
    * Checks the current route for a highlight parameter and performs the reveal/scroll/highlight sequence.
    * @param {Object} options Configuration options
    * @param {Function} options.revealAction Optional callback to open accordions or parents before highlighting
@@ -22,15 +65,14 @@ export function useHighlightManager() {
     const targetId = route.query.highlight;
     if (!targetId) return;
 
-    logger.debug(`Target highlight detected: ${targetId}`);
+    logger.debug(`Target highlight detected from URL: ${targetId}`);
 
     // Wait for the next tick to ensure components are mounted
     await nextTick();
 
     // Small delay to allow for lazy-loaded tabs to stabilize
     setTimeout(async () => {
-      // 1. Unified Reveal Logic
-      // This helps open accordions automatically based on ID patterns
+      // Unified Reveal Logic
       const globalReveal = (id) => {
         if (id.startsWith('PROXY_')) return 'proxy';
         if (id === 'DEBUG_MODE' || id.startsWith('LOG_LEVEL_')) return 'debug';
@@ -46,12 +88,9 @@ export function useHighlightManager() {
       if (accordionToOpen || typeof options.revealAction === 'function') {
         logger.debug(`Attempting to reveal: ${targetId}`);
         
-        // If the tab has a custom reveal action, use it
         if (typeof options.revealAction === 'function') {
           options.revealAction(targetId);
         } else if (accordionToOpen) {
-          // If no custom action, try to find and trigger the tab's internal accordion state
-          // This assumes the tab exposes its activeAccordion or uses a shared pattern
           window.dispatchEvent(new CustomEvent('options-reveal-accordion', { detail: accordionToOpen }));
         }
 
@@ -59,40 +98,18 @@ export function useHighlightManager() {
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
-      const element = document.getElementById(targetId);
-      if (!element) {
-        logger.warn(`Element with ID "${targetId}" not found for highlighting.`);
-        return;
-      }
+      // Apply the actual highlight logic
+      applyHighlight(targetId);
 
-      // 2. Scroll into view
-      logger.debug(`Scrolling to element: ${targetId}`);
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-
-      // 3. Apply highlight class
-      // Wait for scroll to finish approximately
-      setTimeout(() => {
-        logger.debug(`Applying highlight animation to: ${targetId}`);
-        element.classList.add('is-highlighting');
-
-        // 4. Remove highlight class after animation finishes (matches CSS duration)
-        setTimeout(() => {
-          element.classList.remove('is-highlighting');
-          logger.debug(`Highlight class removed from: ${targetId}`);
-        }, 3600);
-
-        // 5. Clean up URL (optional but recommended for professional UX)
-        const newQuery = { ...route.query };
-        delete newQuery.highlight;
-        router.replace({ query: newQuery });
-      }, 500);
+      // Clean up URL
+      const newQuery = { ...route.query };
+      delete newQuery.highlight;
+      router.replace({ query: newQuery });
     }, 100);
   };
 
   return {
-    checkAndHighlight
+    checkAndHighlight,
+    highlightElement
   };
 }

@@ -9,6 +9,7 @@
     <div class="setting-group vertical">
       <label>{{ t('custom_api_settings_api_url_label') || 'API URL' }}</label>
       <BaseInput
+        id="CUSTOM_API_URL"
         v-model="customApiUrl"
         :placeholder="t('custom_api_url_placeholder') || '(e.g., v1/chat/completions)'"
         class="api-url-input"
@@ -19,6 +20,7 @@
       </p>
     </div>
     <ApiKeyInput
+      id="CUSTOM_API_KEY"
       v-model="customApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('custom_api_key_placeholder') || 'Enter your API keys (one per line)'"
