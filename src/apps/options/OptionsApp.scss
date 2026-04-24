@@ -1,12 +1,15 @@
 .extension-options {
   width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100svh;
   display: flex;
-  justify-content: center;
-  align-items: flex-start !important; /* This was the key fix */
+  justify-content: stretch;
+  align-items: stretch !important;
   background-color: var(--color-background) !important;
   box-sizing: border-box;
-  padding: 10px; /* Restored small padding for better aesthetics */
+  padding: 0; /* Full width edge-to-edge */
+  margin: 0;
+  overflow: hidden;
 }
 
 .extension-options.rtl {

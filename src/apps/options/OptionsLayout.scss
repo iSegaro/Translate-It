@@ -3,19 +3,19 @@
 
 .options-layout {
   display: flex;
-  width: min(1200px, calc(100vw - 40px));
-  max-width: 1200px;
+  width: 100%;
+  max-width: none;
   min-width: 320px;
   background-color: var(--color-background);
-  border-radius: $border-radius-lg;
-  box-shadow: $shadow-lg;
-  border: $border-width $border-style var(--color-border);
-  margin: 0 auto;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  margin: 0;
   box-sizing: border-box;
   
-  /* Robust height for both desktop and mobile/emulators */
-  height: calc(100vh - 20px);
-  height: calc(100svh - 20px); 
+  /* Full height edge-to-edge */
+  height: 100vh;
+  height: 100svh; 
   
   overflow: hidden;
 }
@@ -29,7 +29,7 @@
   flex: 1;
   display: flex;
   background-color: var(--color-background);
-  border-radius: 0 $border-radius-lg $border-radius-lg 0;
+  border-radius: 0;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;

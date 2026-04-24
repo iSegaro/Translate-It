@@ -64,8 +64,8 @@ body.options-context {
   min-height: 100svh !important;
   overflow: hidden !important;
   display: flex !important;
-  justify-content: center !important;
-  align-items: center !important; /* Restore centering at body level */
+  justify-content: stretch !important;
+  align-items: stretch !important;
   padding: 0 !important;
   margin: 0; 
 }
