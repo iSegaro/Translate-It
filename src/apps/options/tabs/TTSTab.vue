@@ -7,7 +7,10 @@
       </div>
 
       <!-- Engine Selection -->
-      <div class="setting-group">
+      <div 
+        id="TTS_ENGINE_SECTION"
+        class="setting-group"
+      >
         <div class="setting-row">
           <div class="setting-info">
             <label class="setting-label">{{ t('tts_engine_label') || 'TTS Engine' }}</label>
@@ -17,6 +20,7 @@
           </div>
           <div class="setting-control">
             <BaseSelect
+              id="TTS_ENGINE"
               v-model="ttsEngine"
               :options="engineOptions"
               class="tts-engine-select"
@@ -28,7 +32,10 @@
       <div class="section-separator" />
 
       <!-- Fallback Toggle -->
-      <div class="setting-group">
+      <div 
+        id="TTS_SETTINGS_SECTION"
+        class="setting-group"
+      >
         <div class="setting-row">
           <div class="setting-info">
             <BaseCheckbox

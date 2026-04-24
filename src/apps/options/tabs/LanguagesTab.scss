@@ -33,7 +33,7 @@
       box-sizing: border-box;
       width: 100%;
       max-width: var(--input-max-width, 620px);
-      overflow: hidden;
+      overflow: visible;
       display: block;
 
       .opt-control-group {
@@ -295,7 +295,7 @@
     max-width: 100%;
     box-sizing: border-box;
     display: block;
-    overflow: hidden;
+    overflow: visible;
 
     h3 {
       font-size: $font-size-base;

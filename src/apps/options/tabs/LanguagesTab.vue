@@ -73,7 +73,10 @@
                       class="provider-settings"
                     >
                       <!-- Optimization Level Section -->
-                      <div class="optimization-control-area">
+                      <div 
+                        id="OPTIMIZATION_LEVELS_SECTION"
+                        class="optimization-control-area"
+                      >
                         <div class="opt-control-group">
                           <div class="label-with-value">
                             <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
@@ -186,6 +189,7 @@
 
         <!-- Bilingual Translation Setting -->
         <BaseAccordion
+          id="BILINGUAL_SECTION"
           :is-open="activeAccordion === 'bilingual'"
           item-class="bilingual-setting"
           @toggle="toggleAccordion('bilingual')"
@@ -228,6 +232,7 @@
 
         <!-- Language Detection Preferences -->
         <BaseAccordion
+          id="DETECTION_SECTION"
           :is-open="activeAccordion === 'detection'"
           item-class="language-pref-setting"
           @toggle="toggleAccordion('detection')"
@@ -283,6 +288,7 @@
 
         <!-- AI Optimization -->
         <BaseAccordion
+          id="AI_OPT_SECTION"
           :is-open="activeAccordion === 'ai'"
           item-class="ai-optimization-setting"
           @toggle="toggleAccordion('ai')"
@@ -352,6 +358,13 @@ const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 // State
 const activeAccordion = ref(null)
 const toggleAccordion = (name) => { activeAccordion.value = activeAccordion.value === name ? null : name }
+
+// Global reveal listener for highlighting
+onMounted(() => {
+  window.addEventListener('options-reveal-accordion', (e) => {
+    activeAccordion.value = e.detail;
+  });
+})
 
 // --- Standard Settings ---
 

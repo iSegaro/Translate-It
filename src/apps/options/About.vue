@@ -24,6 +24,7 @@
           v-else
           ref="changelogContentRef"
           class="changelog-content"
+          @click="handleLinkClick"
           v-html="sanitizedChangelog"
         />
       </div>
@@ -34,10 +35,12 @@
 <script setup>
 import './About.scss'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import browser from 'webextension-polyfill'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useHighlightManager } from './composables/useHighlightManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -46,6 +49,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'About')
 
 // Composables
 const { t } = useUnifiedI18n()
+const router = useRouter()
+const { checkAndHighlight } = useHighlightManager()
 
 // State
 const isLoadingChangelog = ref(true)
@@ -116,6 +121,22 @@ const addTargetBlankToLinks = () => {
   })
 }
 
+/**
+ * Handle clicks on internal links to use Vue Router instead of full page reloads
+ */
+const handleLinkClick = (event) => {
+  const link = event.target.closest('a')
+  if (!link) return
+
+  const href = link.getAttribute('href')
+  if (href && href.startsWith('#/')) {
+    event.preventDefault()
+    const path = href.substring(1) // Remove the #
+    logger.debug(`🚀 Intercepted internal link click: ${path}`)
+    router.push(path)
+  }
+}
+
 // Watch for content changes and process links after DOM update
 watch(sanitizedChangelog, () => {
   nextTick(() => {
@@ -127,5 +148,6 @@ watch(sanitizedChangelog, () => {
 
 onMounted(() => {
   fetchChangelog()
+  checkAndHighlight()
 })
 </script>

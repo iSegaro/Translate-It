@@ -74,3 +74,57 @@ body.sidepanel-context #app {
   width: 100% !important;
   height: 100% !important;
 }
+
+// --- Highlight System ---
+// Used by useHighlightManager to spotlight specific settings
+@keyframes ti-highlight-pulse {
+  0% { 
+    outline: 2px solid transparent; 
+    box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 64, 128, 255), 0);
+    background-color: transparent;
+  }
+  15% { 
+    outline: 2px solid var(--primary-color, #4080ff);
+    box-shadow: 0 0 0 8px rgba(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    background-color: rgba(var(--primary-color-rgb, 64, 128, 255), 0.05);
+  }
+  85% { 
+    outline: 2px solid var(--primary-color, #4080ff);
+    box-shadow: 0 0 0 8px rgba(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    background-color: rgba(var(--primary-color-rgb, 64, 128, 255), 0.05);
+  }
+  100% { 
+    outline: 2px solid transparent; 
+    box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 64, 128, 255), 0);
+    background-color: transparent;
+  }
+}
+
+.is-highlighting {
+  position: relative;
+  scroll-margin-top: 100px; // Ensure space from top when scrolling
+  z-index: 10;
+
+  &::after {
+    content: '';
+    position: absolute;
+    // Standard padding for most elements
+    inset: -10px; 
+    border-radius: 12px;
+    pointer-events: none;
+    animation: ti-highlight-pulse 3.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+    z-index: -1;
+  }
+
+  // Specific adjustment for Fieldsets to avoid legend (caption) overlap
+  &.base-fieldset::after {
+    inset: -22px -12px -12px -12px; // Extra space at the top for the legend
+    border-radius: 14px;
+  }
+
+  // Specific adjustment for Accordions to have a tighter top border
+  &.base-accordion::after {
+    inset: -2px -10px -10px -10px;
+    border-radius: 10px;
+  }
+}

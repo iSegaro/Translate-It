@@ -12,9 +12,12 @@
 
 <script setup>
 import './OptionsLayout.scss'
+import { useRoute } from 'vue-router'
+import { watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { createLanguageTransition, createThemeTransition } from '@/composables/ui/useUITransition.js'
+import { useHighlightManager } from './composables/useHighlightManager.js'
 import OptionsSidebar from './OptionsSidebar.vue'
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -26,6 +29,18 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsLayout')
 // Stores & Composables
 const { locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
+const route = useRoute()
+const { checkAndHighlight } = useHighlightManager()
+
+// --- Highlighting Logic ---
+// Automatically check for highlight parameters on mount and route changes
+onMounted(() => {
+  checkAndHighlight()
+})
+
+watch(() => route.fullPath, () => {
+  checkAndHighlight()
+}, { deep: true })
 
 // --- UI Transitions ---
 

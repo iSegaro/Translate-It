@@ -3,8 +3,12 @@
     <div class="settings-container">
       <h2>{{ t('advance_section_title') || 'Advanced Settings' }}</h2>
       
-      <div class="setting-group vertical">
+      <div 
+        id="TRANSLATION_HISTORY_SECTION"
+        class="setting-group vertical"
+      >
         <BaseCheckbox
+          id="ENABLE_TRANSLATION_HISTORY"
           v-model="enableTranslationHistory"
           :label="t('enable_translation_history_label') || 'Enable Translation History'"
         />
@@ -26,6 +30,7 @@
 
       <!-- Proxy Settings Section -->
       <BaseAccordion
+        id="PROXY_SECTION"
         :is-open="activeAccordion === 'proxy'"
         item-class="proxy-setting"
         @toggle="toggleAccordion('proxy')"
@@ -67,6 +72,7 @@
               <label class="setting-label">{{ t('proxy_host_label') || 'Host' }}</label>
               <div class="input-container">
                 <BaseInput
+                  id="PROXY_HOST"
                   v-model="proxyHost"
                   placeholder="proxy.example.com"
                   dir="ltr"
@@ -79,6 +85,7 @@
               <label class="setting-label">{{ t('proxy_port_label') || 'Port' }}</label>
               <div class="input-container">
                 <BaseInput
+                  id="PROXY_PORT"
                   v-model="proxyPort"
                   type="number"
                   placeholder="8080"
@@ -158,6 +165,7 @@
 
       <!-- Debug Mode Section -->
       <BaseAccordion
+        id="DEBUG_MODE_SECTION"
         :is-open="activeAccordion === 'debug'"
         item-class="debug-setting"
         @toggle="toggleAccordion('debug')"
@@ -213,10 +221,11 @@
 
 <script setup>
 import './AdvanceTab.scss'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
@@ -241,6 +250,13 @@ const activeAccordion = ref(null)
 const toggleAccordion = (name) => {
   activeAccordion.value = activeAccordion.value === name ? null : name
 }
+
+// Global reveal listener for highlighting
+onMounted(() => {
+  window.addEventListener('options-reveal-accordion', (e) => {
+    activeAccordion.value = e.detail;
+  });
+})
 
 // --- Settings ---
 

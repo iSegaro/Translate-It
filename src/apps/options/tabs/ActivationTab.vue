@@ -14,10 +14,14 @@
     </div>
 
     <!-- Desktop FAB Menu -->
-    <BaseFieldset :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'">
+    <BaseFieldset 
+      id="FIELDSET_FAB"
+      :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'"
+    >
       <div class="setting-group">
         <div class="setting-row">
           <BaseCheckbox
+            id="SHOW_DESKTOP_FAB"
             v-model="showDesktopFab"
             :disabled="!extensionEnabled"
             :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
@@ -252,7 +256,10 @@
     </BaseFieldset>
 
     <!-- Whole Page Translation -->
-    <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
+    <BaseFieldset 
+      id="FIELDSET_WHOLE_PAGE"
+      :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -271,6 +278,7 @@
 
       <div class="setting-group">
         <BaseCheckbox
+          id="WHOLE_PAGE_TRANSLATION_ENABLED"
           v-model="wholePageEnabled"
           :disabled="!extensionEnabled"
           :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
@@ -285,7 +293,10 @@
         :class="{ open: wholePageEnabled }"
       >
         <div class="sub-options-inner">
-          <div class="setting-group sub-setting-group whole-page-trigger-group">
+          <div 
+            id="WHOLE_PAGE_TRIGGER_MODE"
+            class="setting-group sub-setting-group whole-page-trigger-group"
+          >
             <div class="trigger-modes-container">
               <div class="radio-group-horizontal">
                 <BaseRadio
@@ -374,10 +385,11 @@
 
 <script setup>
 import './ActivationTab.scss'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
