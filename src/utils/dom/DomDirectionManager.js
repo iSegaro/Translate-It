@@ -11,7 +11,6 @@ import {
   RTL_LANGUAGES, 
   BLOCK_TAGS, 
   LAYOUT_TAGS, 
-  FORMATTING_TAGS, 
   LAYOUT_DISPLAY_MODES, 
   INTERACTIVE_TAGS,
   isRTLStrongCharacter,
@@ -73,12 +72,11 @@ export function detectDirectionFromContent(text = '', targetLanguage = null) {
     return isRTL(targetLanguage) ? 'rtl' : null;
   }
   
-  const isTargetRTL = isRTL(targetLanguage);
   const total = rtlStrongCount + ltrStrongCount;
   const ltrRatio = ltrStrongCount / total;
   
   // RTL BIAS: For translated content, prefer RTL unless text is overwhelmingly LTR (>95%)
-  if (isTargetRTL) {
+  if (isRTL(targetLanguage)) {
     return (rtlStrongCount > 0 || ltrRatio < 0.95) ? 'rtl' : 'ltr';
   }
 
@@ -144,8 +142,6 @@ function isLayoutBarrier(el) {
  * Determines if text alignment should be preserved based on explicit styles.
  */
 function getPreservedAlignment(element, targetLanguage) {
-  const isTargetRTL = isRTL(targetLanguage);
-  
   // Check for explicit inline style alignment
   const explicitAlign = element.style.textAlign;
   if (explicitAlign === 'left' || explicitAlign === 'right' || explicitAlign === 'center') {

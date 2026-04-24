@@ -385,11 +385,10 @@
 
 <script setup>
 import './ActivationTab.scss'
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
-import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
