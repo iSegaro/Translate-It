@@ -164,12 +164,16 @@
             <div class="accordion-inner">
               <div class="dictionary-content-wrapper">
                 <div class="setting-group dictionary-provider-group mb-md">
-                  <label class="setting-label">{{ t('translation_api_label') || 'Service' }}:</label>
+                  <label 
+                    class="setting-label"
+                    :class="{ 'is-disabled': !enableDictionary }"
+                  >{{ t('translation_api_label') || 'Service' }}:</label>
                   <ProviderSelector 
                     v-model="dictionaryProvider" 
                     mode="button"
                     :is-global="false"
                     allow-default
+                    :disabled="!enableDictionary"
                   />
                 </div>
                 <p class="setting-description">
