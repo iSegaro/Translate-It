@@ -63,6 +63,9 @@
   justify-content: center;
   align-items: center;
   gap: $spacing-sm;
+  background-color: var(--color-background);
+  position: relative;
+  z-index: 1005; /* Higher than history-list */
 }
 
 .export-btn {

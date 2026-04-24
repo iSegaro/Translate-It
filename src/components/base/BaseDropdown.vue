@@ -146,14 +146,14 @@ const getFocusableElements = () => {
 const focusFirst = () => {
   const elements = getFocusableElements()
   if (elements.length > 0) {
-    elements[0].focus()
+    elements[0].focus({ preventScroll: true })
   }
 }
 
 const focusLast = () => {
   const elements = getFocusableElements()
   if (elements.length > 0) {
-    elements[elements.length - 1].focus()
+    elements[elements.length - 1].focus({ preventScroll: true })
   }
 }
 
