@@ -2,19 +2,19 @@
 
 ##### Added
 
-- Added a persistent, vertically draggable **[Desktop FAB (Floating Action Button)](#/activation?highlight=FIELDSET_FAB)** for quick access to `Select Element` and `Page Translation` with smart-fading and real-time status tracking
-- Added comprehensive **Mobile & Touchscreen Support** featuring a native-like **In-Page Bottom Sheet** architecture with smooth gesture controls (swipe-to-expand/dismiss) for mobile browsers (Firefox Android, Kiwi, Lemur)
-- Added **[Optimization Levels](#/languages?highlight=OPTIMIZATION_LEVELS_SECTION)** to fine-tune translation strategies between speed and cost (Economy, Balanced, Turbo/Fast) for both AI and traditional providers
-- Added **[Microsoft Edge TTS (Neural)](#/tts?highlight=TTS_ENGINE_SECTION)** engine support for high-quality, natural-sounding speech synthesis
-- Added advanced **[Text-to-Speech Settings](#/tts?highlight=TTS_SETTINGS_SECTION)**, including Smart Language Detection and automatic fallback to similar languages (e.g., Arabic for Persian)
-- Added **[Bilingual Translation](#/languages?highlight=BILINGUAL_SECTION)** (Swap Language) support across all translation modes (Selection, Field, Select Element, Page) with independent toggles
-- Added **[Language Detection Preferences](#/languages?highlight=DETECTION_SECTION)** to prioritize specific languages within script families (e.g., Persian vs. Arabic, Simplified vs. Traditional Chinese, Hindi vs. Marathi)
-- Added **[AI Optimization](#/languages?highlight=AI_OPT_SECTION)** features for AI providers, including `Smart Context` for better accuracy and `Conversation History` for consistent terminology
-- Added new **[Whole Page Translation](#/activation?highlight=FIELDSET_WHOLE_PAGE)** triggers: "On Scroll Stop" (with customizable delay) and "Fluid Translation" during scroll
-- Added support for **Iframe** content translation across all translation modules
-- Added comprehensive support for **Local Files** (`file:///` URLs) in all translation modes
-- Added a toggle to enable or disable **[Translation History](#/advance?highlight=TRANSLATION_HISTORY_SECTION)** in the Advanced settings
-- Added a granular **[Debug Mode](#/advance?highlight=DEBUG_MODE_SECTION)** with component-level logging controls for advanced troubleshooting and performance monitoring
+- Added a persistent, vertically draggable [Desktop FAB (Floating Action Button)](#/activation?highlight=FIELDSET_FAB) for quick access to `Select Element` and `Page Translation` with smart-fading and real-time status tracking
+- Added comprehensive `Mobile & Touchscreen Support` featuring a native-like `In-Page Bottom Sheet` architecture with smooth gesture controls (swipe-to-expand/dismiss) for mobile browsers (Firefox Android, Kiwi, Lemur)
+- Added [Optimization Levels](#/languages?highlight=OPTIMIZATION_LEVELS_SECTION) to fine-tune translation strategies between speed and cost (Economy, Balanced, Turbo/Fast) for both AI and traditional providers
+- Added [Microsoft Edge TTS (Neural)](#/tts?highlight=TTS_ENGINE_SECTION) engine support for high-quality, natural-sounding speech synthesis
+- Added advanced [Text-to-Speech Settings](#/tts?highlight=TTS_SETTINGS_SECTION), including Smart Language Detection and automatic fallback to similar languages (e.g., Arabic for Persian)
+- Added [Bilingual Translation](#/languages?highlight=BILINGUAL_SECTION) (Swap Language) support across all translation modes (Selection, Field, Select Element, Page) with independent toggles
+- Added [Language Detection Preferences](#/languages?highlight=DETECTION_SECTION) to prioritize specific languages within script families (e.g., Persian vs. Arabic, Simplified vs. Traditional Chinese, Hindi vs. Marathi)
+- Added [AI Optimization](#/languages?highlight=AI_OPT_SECTION) features for AI providers, including `Smart Context` for better accuracy and `Conversation History` for consistent terminology
+- Added new [Whole Page Translation](#/activation?highlight=FIELDSET_WHOLE_PAGE) triggers: "On Scroll Stop" (with customizable delay) and "Fluid Translation" during scroll
+- Added support for `Iframe` content translation across all translation modules
+- Added comprehensive support for Local Files (`file:///` URLs) in all translation modes
+- Added a toggle to enable or disable [Translation History](#/advance?highlight=TRANSLATION_HISTORY_SECTION) in the Advanced settings
+- Added a granular [Debug Mode](#/advance?highlight=DEBUG_MODE_SECTION) with component-level logging controls for advanced troubleshooting and performance monitoring
 
 ##### 
 
