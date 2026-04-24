@@ -413,7 +413,13 @@ const { createSetting, createProviderSetting } = useTabSettings(settingsStore, l
 const extensionEnabled = createSetting('EXTENSION_ENABLED', true)
 
 // FAB
-const showDesktopFab = createSetting('SHOW_DESKTOP_FAB', false)
+const showDesktopFab = createSetting('SHOW_DESKTOP_FAB', false, {
+  onChanged: (val) => {
+    if (!val && selectionTranslationMode.value === SelectionTranslationMode.ON_FAB_CLICK) {
+      selectionTranslationMode.value = SelectionTranslationMode.ON_CLICK
+    }
+  }
+})
 const mobileUiMode = createSetting('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AUTO)
 
 const mobileModeOptions = computed(() => [
