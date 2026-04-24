@@ -268,9 +268,12 @@ export function usePageTranslation() {
    */
   function handleComplete(data) {
     isTranslating.value = false;
+    const isMainFrame = typeof window !== 'undefined' && window.self === window.top;
 
-    // Skip empty/invalid messages
-    if (!data || (data.translatedCount === 0 && !data.isTranslated)) {
+    // Skip empty/invalid messages - they might come from iframes or initialization
+    // BUT: process if it is aggregated as it represents the whole page state
+    // OR: if we are in the main frame/popup context
+    if (!data.isAggregated && !isMainFrame && (!data || (data.translatedCount === 0 && !data.isTranslated))) {
       // Refresh status to get accurate state from content script
       refreshStatus().catch(() => {});
       return;
@@ -325,10 +328,12 @@ export function usePageTranslation() {
   function handleAutoRestoreComplete(data) {
     isAutoTranslating.value = false;
     isTranslating.value = false;
+    const isMainFrame = typeof window !== 'undefined' && window.self === window.top;
 
     // Skip empty/invalid messages - they might come from empty frames
     // Only process messages with meaningful translation data
-    if (!data || (data.translatedCount === 0 && !data.isTranslated)) {
+    // BUT: Allow if it's aggregated or from the main frame
+    if (!data.isAggregated && !isMainFrame && (!data || (data.translatedCount === 0 && !data.isTranslated))) {
       // If this is an invalid message, refresh status from content script to get accurate state
       refreshStatus().catch(() => {});
       return;

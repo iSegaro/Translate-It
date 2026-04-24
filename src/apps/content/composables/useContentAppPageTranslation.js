@@ -166,12 +166,14 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_AUTO_RESTORE_COMPLETE, (detail) => {
       const hasTranslations = detail.translatedCount > 0;
       const currentState = mobileStore.pageTranslationData;
+      const isMainFrame = window.self === window.top;
 
       // Skip empty messages if we already have active/valid translation state
       // This prevents individual iframe messages from overwriting main frame translation data
       // BUT: Allow aggregated messages to pass through as they represent the whole page state
-      if (!detail.isAggregated && !hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
-        logger.debug('Skipping empty auto-restore message, keeping current state:', currentState);
+      // AND: Allow messages from the main frame as it is the authoritative source
+      if (!detail.isAggregated && !isMainFrame && !hasTranslations && (currentState.isTranslated || currentState.isTranslating || currentState.isAutoTranslating)) {
+        logger.debug('Skipping empty auto-restore message from iframe, keeping current state:', currentState);
         return;
       }
 

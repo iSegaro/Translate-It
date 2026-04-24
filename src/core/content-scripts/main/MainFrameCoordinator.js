@@ -286,7 +286,8 @@ export class MainFrameCoordinator {
           isTranslating: false,
           status: 'idle'
         });
-        // Don't emit - PageTranslationManager already handled broadcasting
+        // Emit aggregated event so everyone knows the main state has been reset/stopped
+        this.aggregator.emitAggregateProgress(this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE, data);
       }
     });
 
