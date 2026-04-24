@@ -66,7 +66,7 @@ export const CONFIG = {
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",
   SOURCE_LANGUAGE: "auto",
-  TARGET_LANGUAGE: "fa",
+  TARGET_LANGUAGE: "en",
   LANGUAGE_DETECTION_PREFERENCES: {
     "arabic-script": "fa", // پیش‌فرض: وقتی اسکریپت عربی تشخیص داده شد، اولویت با فارسی باشد
     "chinese-script": "zh-cn", // پیش‌فرض: چینی ساده‌شده
