@@ -54,7 +54,7 @@ export function ContentScriptCore() {
 
       this.initialized = true;
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   };
@@ -67,7 +67,7 @@ export function ContentScriptCore() {
       await loadVueApp(this);
       this.vueLoaded = true;
       this.dispatchEvent(new CustomEvent('vue-loaded'));
-    } catch (error) {
+    } catch {
       // Fallback
       const { initializeLegacyHandlers } = await import('./legacy-handlers.js');
       await initializeLegacyHandlers(this);
@@ -84,7 +84,7 @@ export function ContentScriptCore() {
       // to continue loading on-demand via InteractionCoordinator
       this.featuresLoaded = true;
       this.dispatchEvent(new CustomEvent('features-loaded'));
-    } catch (error) {
+    } catch {
       const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
       await FeatureManager.getInstance().initialize();
     }

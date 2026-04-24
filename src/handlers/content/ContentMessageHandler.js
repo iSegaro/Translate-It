@@ -610,7 +610,7 @@ export class ContentMessageHandler extends ResourceTracker {
         if (typeof window.translateItContentCore?.loadVueApp === 'function') {
           await window.translateItContentCore.loadVueApp();
         } else if (process.env.NODE_ENV === 'development') {
-          logger.debug('Skipping loadVueApp in this context (likely iframe)');
+          this.logger.debug('Skipping loadVueApp in this context (likely iframe)');
         }
           this.logger.info('Vue app loaded for page translation state tracking');
         } catch (vueError) {

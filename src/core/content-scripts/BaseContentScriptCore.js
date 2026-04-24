@@ -8,7 +8,6 @@ let LOG_COMPONENTS = null;
 let checkContentScriptAccess = null;
 let ExtensionContextManager = null;
 let createMessageHandler = null;
-let ErrorHandler = null;
 
 async function loadBaseDependencies() {
   if (logger) return;
@@ -19,7 +18,6 @@ async function loadBaseDependencies() {
     tabPermissionsModule,
     extensionContextModule,
     messageHandlerModule,
-    errorHandlerModule,
     windowErrorHandlersModule
   ] = await Promise.all([
     import("@/shared/logging/logger.js"),
@@ -27,7 +25,6 @@ async function loadBaseDependencies() {
     import("@/core/tabPermissions.js"),
     import('@/core/extensionContext.js'),
     import('@/shared/messaging/core/MessageHandler.js'),
-    import('@/shared/error-management/ErrorHandler.js'),
     import('@/shared/error-management/windowErrorHandlers.js')
   ]);
 
@@ -36,7 +33,6 @@ async function loadBaseDependencies() {
   checkContentScriptAccess = tabPermissionsModule.checkContentScriptAccess;
   ExtensionContextManager = extensionContextModule.default;
   createMessageHandler = messageHandlerModule.createMessageHandler;
-  ErrorHandler = errorHandlerModule.ErrorHandler;
   
   window._translateItWindowErrorHandlersModule = windowErrorHandlersModule;
   logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'BaseContentScriptCore');

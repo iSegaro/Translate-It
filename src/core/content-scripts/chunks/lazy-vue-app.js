@@ -47,7 +47,7 @@ function isSuitableEnvironmentForVue() {
     const testElement = document.createElement('div');
     testElement.style.setProperty('display', 'block');
     if (testElement.style.getPropertyValue('display') !== 'block') return false;
-  } catch (error) { return false; }
+  } catch { return false; }
 
   return true;
 }
