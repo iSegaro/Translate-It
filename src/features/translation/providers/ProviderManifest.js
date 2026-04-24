@@ -56,6 +56,7 @@ const getRawManifest = () => [
     importFunction: () => import("./DeepLTranslate.js").then(m => ({ default: m.DeepLTranslateProvider })),
     features: ["text", "autoDetect", "formality"],
     needsApiKey: true,
+    requiredSettings: ['DEEPL_API_KEY'],
     supported: true,
   },
   {
@@ -92,6 +93,7 @@ const getRawManifest = () => [
     importFunction: () => import("./LingvaProvider.js").then(m => ({ default: m.LingvaProvider })),
     features: ["text", "autoDetect"],
     needsApiKey: false,
+    requiredSettings: ['LINGVA_API_URL'],
     supported: true,
   },
   {
@@ -118,6 +120,7 @@ const getRawManifest = () => [
     importFunction: () => import("./GoogleGemini.js").then(m => ({ default: m.GeminiProvider })),
     features: ["text", "context", "smart", "bulk", "image"],
     needsApiKey: true,
+    requiredSettings: ['GEMINI_API_KEY'],
     supported: true,
   },
   {
@@ -130,6 +133,7 @@ const getRawManifest = () => [
     importFunction: () => import("./OpenAI.js").then(m => ({ default: m.OpenAIProvider })),
     features: ["text", "context", "smart", "image"],
     needsApiKey: true,
+    requiredSettings: ['OPENAI_API_KEY'],
     supported: true,
   },
   {
@@ -142,6 +146,7 @@ const getRawManifest = () => [
     importFunction: () => import("./OpenRouter.js").then(m => ({ default: m.OpenRouterProvider })),
     features: ["text", "context", "smart"],
     needsApiKey: true,
+    requiredSettings: ['OPENROUTER_API_KEY'],
     supported: true,
   },
   {
@@ -154,6 +159,7 @@ const getRawManifest = () => [
     importFunction: () => import("./DeepSeek.js").then(m => ({ default: m.DeepSeekProvider })),
     features: ["text", "context", "smart", "thinking"],
     needsApiKey: true,
+    requiredSettings: ['DEEPSEEK_API_KEY'],
     supported: true,
   },
   {
@@ -166,6 +172,7 @@ const getRawManifest = () => [
     importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
     features: ["text", "context", "configurable"],
     needsApiKey: true,
+    requiredSettings: ['CUSTOM_API_KEY', 'CUSTOM_API_URL'],
     supported: true,
   },
 
@@ -180,6 +187,7 @@ const getRawManifest = () => [
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     features: ["text", "context", "offline"],
     needsApiKey: false,
+    requiredSettings: ['WEBAI_API_URL'],
     supported: true,
   },
   {

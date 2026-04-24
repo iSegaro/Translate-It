@@ -342,6 +342,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js'
 
 // Components
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
@@ -393,7 +394,17 @@ const bilingualTranslation = createSetting('BILINGUAL_TRANSLATION', false, {
   }
 })
 
-const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2)
+const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2, {
+  onChanged: (newProvider) => {
+    // Check if the selected provider needs configuration
+    const isConfigured = isProviderConfigured(newProvider, settingsStore.settings);
+    
+    if (!isConfigured) {
+      logger.debug(`[LanguagesTab] Provider ${newProvider} is not configured. Opening API accordion.`);
+      activeAccordion.value = 'api';
+    }
+  }
+})
 const aiContextEnabled = createSetting('SMART_CONTEXT_TRANSLATION_ENABLED', true)
 const aiHistoryEnabled = createSetting('AI_CONVERSATION_HISTORY_ENABLED', true)
 
