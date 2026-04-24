@@ -131,10 +131,13 @@
       padding-inline-start: $spacing-sm !important;
       padding-inline-end: 28px !important;
       font-size: $font-size-sm !important;
+      background-color: var(--color-background-alt, var(--color-surface)) !important;
       background-position: right 6px center !important;
       background-size: 1.2em 1.2em !important;
       width: auto !important;
       min-width: 120px !important;
+      border: 1px solid var(--color-border) !important;
+      border-radius: $border-radius-base !important;
     }
   }
 }
