@@ -10,24 +10,26 @@
         Loading languages...
       </div>
       <template v-else>
-        <div class="setting-group">
-          <label>{{ t('source_language_label') || 'Source Language' }}</label>
-          <LanguageDropdown
-            v-model="sourceLanguage"
-            :languages="filteredSourceLanguages"
-            type="source"
-            class="language-dropdown"
-          />
-        </div>
+        <div class="languages-selectors-container">
+          <div class="setting-group">
+            <label>{{ t('source_language_label') || 'Source Language' }}</label>
+            <LanguageDropdown
+              v-model="sourceLanguage"
+              :languages="filteredSourceLanguages"
+              type="source"
+              class="language-dropdown"
+            />
+          </div>
 
-        <div class="setting-group">
-          <label>{{ t('target_language_label') || 'Target Language' }}</label>
-          <LanguageDropdown
-            v-model="targetLanguage"
-            :languages="filteredTargetLanguages"
-            type="target"
-            class="language-dropdown"
-          />
+          <div class="setting-group">
+            <label>{{ t('target_language_label') || 'Target Language' }}</label>
+            <LanguageDropdown
+              v-model="targetLanguage"
+              :languages="filteredTargetLanguages"
+              type="target"
+              class="language-dropdown"
+            />
+          </div>
         </div>
 
         <!-- Validation errors -->
