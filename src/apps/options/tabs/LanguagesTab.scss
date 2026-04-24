@@ -1,9 +1,15 @@
 @use "@/assets/styles/base/variables" as *;
 
 .languages-tab {
+  // CRITICAL FIX: Allow dropdowns to overflow the tab container
+  :global(.tab-content-container) {
+    overflow: visible !important;
+  }
+
   .settings-container {
     max-width: 100%;
     width: 100%;
+    overflow: visible !important;
   }
 
   // Base components (BaseCheckbox, BaseRadio) handle their own internal alignment
@@ -299,6 +305,31 @@
     }
   }
 
+  // --- Dropdown Clipping Fixes ---
+  // Allow the tab container to show overflowing content (e.g., ProviderSelector menus)
+  :global(.tab-content-container) {
+    overflow: visible !important;
+  }
+
+  // Ensure accordions allow content to overflow when open while maintaining animations
+  .api-settings-accordion, .bilingual-setting, .dictionary-mode-setting, .language-pref-setting, .ai-optimization-setting {
+    position: relative;
+    
+    &.is-open {
+      z-index: 100; // Stay above subsequent accordions when open
+      overflow: visible;
+
+      .accordion-body {
+        // Keep display: grid (from base) for smooth height transition, but allow overflow
+        overflow: visible !important;
+      }
+
+      .body-inner {
+        overflow: visible !important;
+      }
+    }
+  }
+
   // --- Specific style for Bilingual & Dictionary Setting ---
   .bilingual-setting, .dictionary-mode-setting {
     margin-top: $spacing-md;
@@ -310,9 +341,6 @@
       width: 100%;
       // Standard indentation to match visual hierarchy
       padding-inline-start: 32px; 
-      // Adjusted right padding to maintain alignment with the header selector
-      // 56px original - 32px new left padding = 24px (or keep 56px if it's relative to container)
-      // Actually, since it's a block, we need to keep 56px for absolute alignment with header
       padding-inline-end: 56px; 
       box-sizing: border-box;
 
@@ -334,6 +362,13 @@
           flex: 0 0 200px !important;
           width: 200px !important;
           margin: 0 !important;
+          // Only the container of the absolute dropdown needs to allow overflow
+          overflow: visible !important; 
+
+          .ti-provider-button {
+            height: 32px !important;
+            padding: 0 10px !important;
+          }
         }
       }
 
@@ -350,7 +385,7 @@
 
     .checkbox-area {
       display: flex;
-      align-items: center; /* Use accordion header alignment */
+      align-items: center; 
       gap: 12px;
       flex: 1;
       
@@ -368,8 +403,8 @@
         user-select: none;
         padding: 4px 0;
         transition: color $transition-base;
-        line-height: 1; /* Reset for better alignment */
-        transform: translateY(1px); /* Match checkbox label nudge */
+        line-height: 1; 
+        transform: translateY(1px); 
 
         &.active {
           color: var(--color-primary);
@@ -381,7 +416,7 @@
       display: flex;
       flex-direction: column;
       gap: $spacing-xs;
-      padding-inline-start: 32px; // Indent to show visual hierarchy
+      padding-inline-start: 32px; 
       margin-top: $spacing-sm;
     }
   }
@@ -395,7 +430,7 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: $spacing-sm;
-      padding-inline-start: 32px; // Match visual hierarchy for controls only
+      padding-inline-start: 32px; 
 
       .pref-label {
         font-size: $font-size-sm;
@@ -413,7 +448,7 @@
     margin-top: $spacing-md;
 
     .setting-group {
-      padding-inline-start: 32px; // Match visual hierarchy for controls only
+      padding-inline-start: 32px; 
     }
   }
 
@@ -549,7 +584,7 @@
   .accordion-inner {
     padding: $spacing-sm 0 $spacing-md 0 !important;
     display: block !important;
-    overflow: hidden !important;
+    overflow: visible !important; 
 
     .setting-group,
     .setting-group,
@@ -574,6 +609,7 @@
     .settings-container > .section-separator,
     .api-settings-accordion :deep(.ti-accordion-header),
     .bilingual-setting :deep(.ti-accordion-header),
+    .dictionary-mode-setting :deep(.ti-accordion-header),
     .language-pref-setting :deep(.ti-accordion-header),
     .ai-optimization-setting :deep(.ti-accordion-header),
     .accordion-inner {
@@ -609,7 +645,7 @@
       align-items: flex-start !important;
       gap: $spacing-xs !important;
       margin-inline-start: 0 !important;
-      padding-inline-start: 0 !important; // Remove indentation on mobile
+      padding-inline-start: 0 !important; 
       width: 100% !important;
 
       .pref-label {
@@ -625,16 +661,16 @@
 
     .ai-optimization-setting {
       .setting-group {
-        padding-inline-start: 0 !important; // Remove indentation on mobile
+        padding-inline-start: 0 !important; 
       }
     }
 
     .dictionary-mode-setting {
       .dictionary-content-wrapper {
-        padding-inline-end: $spacing-md !important; // Reduce padding on mobile
+        padding-inline-end: $spacing-md !important; 
         
         .dictionary-provider-group {
-          flex-direction: row !important; // Keep it horizontal like the header
+          flex-direction: row !important; 
           justify-content: space-between !important;
           align-items: center !important;
 
@@ -644,7 +680,7 @@
           }
 
           :deep(.ti-provider-button-container) {
-            width: 200px !important; // Match header selector width exactly
+            width: 200px !important; 
             flex: 0 0 200px !important;
           }
         }
