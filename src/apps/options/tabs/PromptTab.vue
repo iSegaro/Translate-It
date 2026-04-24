@@ -35,15 +35,30 @@
           <p>{{ t('prompt_template_help') || 'You can use the following keywords in your prompt template:' }}</p>
           <ul>
             <li>
-              <code dir="ltr">${_SOURCE}</code>: {{ t('prompt_source_help') || 'Source language.' }}
-              <span class="lang-name">({{ sourceLanguageName }})</span>
+              <div class="keyword-box">
+                <code dir="ltr">${_SOURCE}</code>
+                <span class="lang-name">{{ sourceLanguageName }}</span>
+              </div>
+              <div class="keyword-desc">
+                {{ t('prompt_source_help') || 'Source language.' }}
+              </div>
             </li>
             <li>
-              <code dir="ltr">${_TARGET}</code>: {{ t('prompt_target_help') || 'Target language.' }}
-              <span class="lang-name">({{ targetLanguageName }})</span>
+              <div class="keyword-box">
+                <code dir="ltr">${_TARGET}</code>
+                <span class="lang-name">{{ targetLanguageName }}</span>
+              </div>
+              <div class="keyword-desc">
+                {{ t('prompt_target_help') || 'Target language.' }}
+              </div>
             </li>
             <li>
-              <code dir="ltr">${_TEXT}</code>: {{ t('prompt_text_help') || 'Text to be translated.' }}
+              <div class="keyword-box">
+                <code dir="ltr">${_TEXT}</code>
+              </div>
+              <div class="keyword-desc">
+                {{ t('prompt_text_help') || 'Text to be translated.' }}
+              </div>
             </li>
           </ul>
         </div>

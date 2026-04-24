@@ -49,54 +49,89 @@
 
     .prompt-template-input {
       width: 100%;
+      position: relative;
       
       :deep(textarea) {
-        font-family: monospace;
-        font-size: $font-size-sm;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Ubuntu Mono', 'Consolas', monospace;
+        font-size: 14px;
+        font-weight: 450;
         line-height: 1.6;
-        padding: $spacing-md;
-        background-color: var(--color-surface);
+        padding: $spacing-lg;
+        background-color: var(--color-background-secondary);
+        color: var(--color-text);
         border: 1px solid var(--color-border);
         border-radius: $border-radius-base;
         resize: vertical;
-        transition: border-color $transition-base, box-shadow $transition-base;
+        transition: all $transition-base;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        min-height: 250px;
+        letter-spacing: 0.2px;
 
         &:focus {
           border-color: var(--color-primary);
-          box-shadow: 0 0 0 2px var(--color-primary-alpha);
+          box-shadow: 0 0 0 3px var(--color-primary-alpha), inset 0 2px 4px rgba(0, 0, 0, 0.05);
           outline: none;
         }
 
         &.highlight-on-reset {
           animation: highlight-pulse 0.8s ease-out;
         }
+        
+        &::placeholder {
+          color: var(--color-text-secondary);
+          opacity: 0.5;
+        }
       }
     }
   }
 
   .validation-error {
+    margin-top: $spacing-sm;
     padding: $spacing-sm $spacing-md;
     background-color: var(--color-error-alpha);
     color: var(--color-error);
     border-radius: $border-radius-sm;
     font-size: $font-size-sm;
     border-inline-start: 4px solid var(--color-error);
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    
+    &::before {
+      content: "⚠️";
+      font-size: 14px;
+    }
   }
 
   .prompt-template-help {
-    margin-top: $spacing-xl;
+    margin: $spacing-xl auto 0;
     padding: $spacing-md;
-    background-color: var(--color-background-alt);
-    border-radius: $border-radius-base;
+    background-color: var(--color-surface);
+    border-radius: $border-radius-lg;
     border: 1px solid var(--color-border-light);
-    align-self: center; // Centers the box itself
+    box-shadow: $shadow-sm;
+    max-width: 650px; // Compact width
+    width: 100%;
     box-sizing: border-box;
 
     p {
-      font-size: $font-size-sm;
-      font-weight: $font-weight-medium;
+      font-size: 13px;
+      font-weight: $font-weight-semibold;
       color: var(--color-text);
-      margin-bottom: $spacing-sm;
+      margin-bottom: $spacing-md;
+      display: flex;
+      align-items: center;
+      justify-content: center; // Center the title
+      gap: $spacing-sm;
+      
+      &::before {
+        content: "";
+        display: inline-block;
+        width: 4px;
+        height: 14px;
+        background: var(--color-primary);
+        border-radius: 2px;
+      }
     }
 
     ul {
@@ -104,29 +139,59 @@
       padding: 0;
       margin: 0;
       display: flex;
-      flex-direction: column;
-      gap: $spacing-xs;
+      flex-wrap: wrap;
+      justify-content: center; // Center cards
+      gap: $spacing-sm;
 
       li {
-        font-size: $font-size-xs;
-        color: var(--color-text-secondary);
+        background: var(--color-background);
+        padding: $spacing-sm $spacing-md;
+        border-radius: $border-radius-md;
+        border: 1px solid var(--color-border-light);
         display: flex;
-        align-items: center;
-        gap: $spacing-xs;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 4px;
+        transition: transform $transition-fast, box-shadow $transition-fast;
+        flex: 1 1 180px; // Compact card size
+        max-width: 200px;
 
-        code {
-          background-color: var(--color-surface);
-          padding: 2px 6px;
-          border-radius: 4px;
-          border: 1px solid var(--color-border);
-          color: var(--color-primary);
-          font-weight: $font-weight-bold;
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: $shadow-sm;
+          border-color: var(--color-primary-alpha);
         }
 
-        .lang-name {
-          opacity: 0.7;
-          font-style: italic;
+        .keyword-box {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 2px;
+          
+          code {
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            color: var(--color-primary);
+            font-weight: $font-weight-bold;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+          }
+          
+          .lang-name {
+            font-size: 10px;
+            background: var(--color-primary-alpha);
+            padding: 1px 6px;
+            border-radius: 8px;
+            color: var(--color-primary);
+            font-weight: $font-weight-medium;
+          }
+        }
+        
+        .keyword-desc {
+          font-size: 11px;
+          color: var(--color-text-secondary);
+          line-height: 1.4;
+          text-align: center;
         }
       }
     }
