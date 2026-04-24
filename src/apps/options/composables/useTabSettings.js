@@ -68,8 +68,28 @@ export function useTabSettings(settingsStore, logger) {
     return result
   }
 
+  /**
+   * Creates a computed property for a mode-specific provider setting.
+   * Handles the 'default' value mapping to null in the store.
+   * 
+   * @param {string} mode - The translation mode (from TranslationMode enum)
+   * @returns {import('vue').ComputedRef} A Vue computed property
+   */
+  const createProviderSetting = (mode) => computed({
+    get: () => settingsStore.settings?.MODE_PROVIDERS?.[mode] || 'default',
+    set: (value) => {
+      const modeProviders = { 
+        ...(settingsStore.settings?.MODE_PROVIDERS || {}), 
+        [mode]: value === 'default' ? null : value 
+      }
+      logger.debug(`📝 Provider for mode [${mode}] changed:`, value)
+      settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
+    }
+  })
+
   return {
     createSetting,
-    createSettings
+    createSettings,
+    createProviderSetting
   }
 }

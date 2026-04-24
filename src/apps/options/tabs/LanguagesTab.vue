@@ -138,6 +138,48 @@
           </template>
         </BaseAccordion>
 
+        <!-- Dictionary Mode -->
+        <BaseAccordion
+          :is-open="activeAccordion === 'dictionary'"
+          item-class="dictionary-mode-setting"
+          @toggle="toggleAccordion('dictionary')"
+        >
+          <template #header>
+            <div class="checkbox-area">
+              <BaseCheckbox
+                v-model="enableDictionary"
+                class="dictionary-main-checkbox"
+                @click.stop
+              />
+              <span 
+                class="accordion-title-text"
+                :class="{ active: activeAccordion === 'dictionary' }"
+              >
+                {{ t('activation_group_dictionary_title') || 'Dictionary Mode' }}
+              </span>
+            </div>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
+              <div class="dictionary-content-wrapper">
+                <div class="setting-group dictionary-provider-group mb-md">
+                  <label class="setting-label">{{ t('translation_api_label') || 'Service' }}:</label>
+                  <ProviderSelector 
+                    v-model="dictionaryProvider" 
+                    mode="button"
+                    :is-global="false"
+                    allow-default
+                  />
+                </div>
+                <p class="setting-description">
+                  {{ t('enable_dictionary_translation_description') }}
+                </p>
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+
         <!-- Bilingual Translation Setting -->
         <BaseAccordion
           :is-open="activeAccordion === 'bilingual'"
@@ -299,7 +341,7 @@ import BaseAccordion from '@/components/base/BaseAccordion.vue'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
-const { createSetting } = useTabSettings(settingsStore, logger)
+const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
 const { validateLanguages: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 
@@ -382,6 +424,10 @@ const arabicScriptPreference = createScriptSetting('arabic-script', 'fa')
 const chineseScriptPreference = createScriptSetting('chinese-script', 'zh-cn')
 const devanagariScriptPreference = createScriptSetting('devanagari-script', 'hi')
 const latinScriptPreference = createScriptSetting('latin-script', 'none')
+
+// --- Dictionary Logic ---
+const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
+const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
 
 const arabicScriptOptions = computed(() => [
   { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },

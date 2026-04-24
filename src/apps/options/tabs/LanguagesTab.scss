@@ -299,9 +299,54 @@
     }
   }
 
-  // --- Specific style for Bilingual Setting ---
-  .bilingual-setting {
+  // --- Specific style for Bilingual & Dictionary Setting ---
+  .bilingual-setting, .dictionary-mode-setting {
     margin-top: $spacing-md;
+
+    .dictionary-content-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-sm;
+      width: 100%;
+      // Standard indentation to match visual hierarchy
+      padding-inline-start: 32px; 
+      // Adjusted right padding to maintain alignment with the header selector
+      // 56px original - 32px new left padding = 24px (or keep 56px if it's relative to container)
+      // Actually, since it's a block, we need to keep 56px for absolute alignment with header
+      padding-inline-end: 56px; 
+      box-sizing: border-box;
+
+      .dictionary-provider-group {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+
+        label {
+          flex: 1 !important;
+          width: auto !important;
+          margin: 0 !important;
+          white-space: nowrap;
+        }
+
+        :deep(.ti-provider-button-container) {
+          flex: 0 0 200px !important;
+          width: 200px !important;
+          margin: 0 !important;
+        }
+      }
+
+      .setting-description {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-inline-start: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+    }
 
     .checkbox-area {
       display: flex;
@@ -309,7 +354,7 @@
       gap: 12px;
       flex: 1;
       
-      :deep(.bilingual-main-checkbox) {
+      :deep(.bilingual-main-checkbox), :deep(.dictionary-main-checkbox) {
         width: auto !important;
         margin: 0 !important;
         
@@ -454,6 +499,7 @@
   .settings-container > .validation-error,
   .api-settings-accordion :deep(.ti-accordion-header),
   .bilingual-setting :deep(.ti-accordion-header),
+  .dictionary-mode-setting :deep(.ti-accordion-header),
   .language-pref-setting :deep(.ti-accordion-header),
   .ai-optimization-setting :deep(.ti-accordion-header),
   .accordion-inner {
@@ -580,6 +626,28 @@
     .ai-optimization-setting {
       .setting-group {
         padding-inline-start: 0 !important; // Remove indentation on mobile
+      }
+    }
+
+    .dictionary-mode-setting {
+      .dictionary-content-wrapper {
+        padding-inline-end: $spacing-md !important; // Reduce padding on mobile
+        
+        .dictionary-provider-group {
+          flex-direction: row !important; // Keep it horizontal like the header
+          justify-content: space-between !important;
+          align-items: center !important;
+
+          label {
+            width: auto !important;
+            flex: 1 !important;
+          }
+
+          :deep(.ti-provider-button-container) {
+            width: 200px !important; // Match header selector width exactly
+            flex: 0 0 200px !important;
+          }
+        }
       }
     }
   }

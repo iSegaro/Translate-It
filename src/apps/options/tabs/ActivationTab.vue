@@ -251,36 +251,6 @@
       </div>
     </BaseFieldset>
 
-    <!-- Dictionary Mode -->
-    <BaseFieldset :legend="t('activation_group_dictionary_title') || 'Dictionary Mode'">
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !enableDictionary }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="dictionaryProvider"
-            allow-default
-            mode="button"
-            :is-global="false"
-            :disabled="!extensionEnabled || !enableDictionary"
-          />
-        </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="enableDictionary"
-          :disabled="!extensionEnabled"
-          :label="t('enable_dictionary_translation_label') || 'Enable Dictionary Translation'"
-        />
-        <span class="setting-description">
-          {{ t('enable_dictionary_translation_description') || 'When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations.' }}
-        </span>
-      </div>
-    </BaseFieldset>
-
     <!-- Whole Page Translation -->
     <BaseFieldset :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'">
       <template #header>
@@ -420,12 +390,12 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
-const { createSetting } = useTabSettings(settingsStore, logger)
+const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
 
+// --- State ---
 // --- Settings Definitions ---
 
 // General
@@ -458,9 +428,6 @@ const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTI
 const activeSelectionIconOnTextfields = createSetting('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', true)
 const enhancedTripleClickDrag = createSetting('ENHANCED_TRIPLE_CLICK_DRAG', false)
 
-// Dictionary
-const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
-
 // Whole Page
 const wholePageEnabled = createSetting('WHOLE_PAGE_TRANSLATION_ENABLED', true)
 const wholePageLazyLoading = createSetting('WHOLE_PAGE_LAZY_LOADING', true)
@@ -469,21 +436,9 @@ const wholePageShowOriginal = createSetting('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER',
 const wholePageTranslateAfterScrollStop = createSetting('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', false)
 const wholePageScrollStopDelay = createSetting('WHOLE_PAGE_SCROLL_STOP_DELAY', 500)
 
-// --- Mode Specific Providers (Managed locally for complex structure) ---
-
-const createProviderSetting = (mode) => computed({
-  get: () => settingsStore.settings?.MODE_PROVIDERS?.[mode] || 'default',
-  set: (value) => {
-    const modeProviders = { ...settingsStore.settings.MODE_PROVIDERS, [mode]: value === 'default' ? null : value }
-    logger.debug(`📝 Provider for ${mode} changed:`, value)
-    settingsStore.updateSettingLocally('MODE_PROVIDERS', modeProviders)
-  }
-})
-
 const fieldProvider = createProviderSetting(TranslationMode.Field)
 const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)
 const selectionProvider = createProviderSetting(TranslationMode.Selection)
 const pageProvider = createProviderSetting(TranslationMode.Page)
-const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
 
 </script>
