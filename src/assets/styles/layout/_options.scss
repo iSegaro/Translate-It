@@ -51,7 +51,7 @@ textarea {
   &:focus {
     outline: none;
     border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
+    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgb(25 103 210 / 20%));
   }
 
   &::placeholder {
@@ -179,10 +179,10 @@ input[type="radio"] {
 
 .ti-input-error {
   border-color: var(--color-error) !important;
-  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2) !important;
+  box-shadow: 0 0 0 2px rgb(244 67 54 / 20%) !important;
 
   &:focus {
     border-color: var(--color-error) !important;
-    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3) !important;
+    box-shadow: 0 0 0 2px rgb(244 67 54 / 30%) !important;
   }
 }

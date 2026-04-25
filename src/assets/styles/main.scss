@@ -36,7 +36,7 @@ body.sidepanel-context {
   color: var(--color-text);
   background-color: var(--color-background);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-text-rendering: optimizeLegibility;
+  -moz-osx-text-rendering: optimizelegibility;
   margin: 0;
   padding: 0;
   
@@ -49,6 +49,7 @@ body.sidepanel-context {
 /* Popup context - Fully fluid but with base size for Desktop Extension */
 body.popup-context {
   width: 100% !important;
+
   /* Set a base width/height so the browser knows the minimum size to open the popup */
   min-width: 450px !important; 
   min-height: 400px !important;
@@ -60,7 +61,6 @@ body.popup-context {
 
 /* Options context - only applied in options.js */
 body.options-context {
-  min-height: 100vh !important;
   min-height: 100svh !important;
   overflow: hidden !important;
   display: flex !important;
@@ -80,22 +80,25 @@ body.sidepanel-context #app {
 @keyframes ti-highlight-pulse {
   0% { 
     outline: 2px solid transparent; 
-    box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 64, 128, 255), 0);
+    box-shadow: 0 0 0 0 rgb(var(--primary-color-rgb, 64, 128, 255), 0);
     background-color: transparent;
   }
+
   15% { 
     outline: 2px solid var(--primary-color, #4080ff);
-    box-shadow: 0 0 0 8px rgba(var(--primary-color-rgb, 64, 128, 255), 0.15);
-    background-color: rgba(var(--primary-color-rgb, 64, 128, 255), 0.05);
+    box-shadow: 0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    background-color: rgb(var(--primary-color-rgb, 64, 128, 255), 0.05);
   }
+
   85% { 
     outline: 2px solid var(--primary-color, #4080ff);
-    box-shadow: 0 0 0 8px rgba(var(--primary-color-rgb, 64, 128, 255), 0.15);
-    background-color: rgba(var(--primary-color-rgb, 64, 128, 255), 0.05);
+    box-shadow: 0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    background-color: rgb(var(--primary-color-rgb, 64, 128, 255), 0.05);
   }
+
   100% { 
     outline: 2px solid transparent; 
-    box-shadow: 0 0 0 0 rgba(var(--primary-color-rgb, 64, 128, 255), 0);
+    box-shadow: 0 0 0 0 rgb(var(--primary-color-rgb, 64, 128, 255), 0);
     background-color: transparent;
   }
 }
@@ -108,6 +111,7 @@ body.sidepanel-context #app {
   &::after {
     content: '';
     position: absolute;
+
     // Standard padding for most elements
     inset: -10px; 
     border-radius: 12px;
@@ -118,13 +122,13 @@ body.sidepanel-context #app {
 
   // Specific adjustment for Fieldsets to avoid legend (caption) overlap
   &.base-fieldset::after {
-    inset: -22px -12px -12px -12px; // Extra space at the top for the legend
+    inset: -22px -12px -12px; // Extra space at the top for the legend
     border-radius: 14px;
   }
 
   // Specific adjustment for Accordions to have a tighter top border
   &.base-accordion::after {
-    inset: -2px -10px -10px -10px;
+    inset: -2px -10px -10px;
     border-radius: 10px;
   }
 }

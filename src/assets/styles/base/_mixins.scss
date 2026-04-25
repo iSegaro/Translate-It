@@ -63,9 +63,11 @@
     transition: all $transition-fast;
   } @else {
     $transitions: ();
+
     @each $property in $properties {
       $transitions: list.append($transitions, #{$property} $transition-fast, comma);
     }
+
     transition: $transitions;
   }
 }
@@ -75,9 +77,11 @@
     transition: all $transition-slow;
   } @else {
     $transitions: ();
+
     @each $property in $properties {
       $transitions: list.append($transitions, #{$property} $transition-slow, comma);
     }
+
     transition: $transitions;
   }
 }
@@ -111,7 +115,8 @@
   font-weight: $font-weight-medium;
   text-decoration: none;
   cursor: pointer;
-  @include transition-fast();
+
+  @include transition-fast;
   
   &:disabled {
     opacity: 0.6;
@@ -121,6 +126,7 @@
 
 @mixin button-primary {
   @include button-base;
+
   background-color: var(--color-primary);
   color: white;
   
@@ -131,6 +137,7 @@
 
 @mixin button-secondary {
   @include button-base;
+
   background-color: transparent;
   color: var(--color-primary);
   border-color: var(--color-primary);
@@ -164,17 +171,18 @@
   transform: none;
 
   &:hover:not(:disabled) {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+    background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%));
     opacity: 1;
   }
 
   &.ti-active,
   &.active {
-    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
+    background-color: var(--color-primary-alpha, rgb(25 103 210 / 12%)) !important;
     color: var(--color-primary) !important;
     
     img, .toolbar-icon, .ti-toolbar-icon, .ti-provider-icon-only {
       opacity: 1;
+
       /* Filter to make dark icons primary blue (#1976d2) */
       filter: brightness(0) saturate(100%) invert(39%) sepia(85%) saturate(1518%) hue-rotate(193deg) brightness(97%) contrast(92%);
     }
@@ -195,12 +203,13 @@
   background-color: var(--input-bg-color, var(--color-background));
   color: var(--input-text-color, var(--color-text));
   font-size: $font-size-base;
+
   @include transition-fast(border-color);
   
   &:focus {
     outline: none;
     border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
+    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgb(25 103 210 / 20%));
   }
   
   &::placeholder {
@@ -238,6 +247,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -248,6 +258,7 @@
     transform: translateY(10px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;

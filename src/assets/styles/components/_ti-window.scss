@@ -23,10 +23,10 @@
   // Loading window properties
   --ti-loading-width: 60px;
   --ti-loading-height: 40px;
-  --ti-loading-bg-light: #ffffff;
-  --ti-loading-bg-dark: #333333;
-  --ti-loading-border-light: rgba(0, 0, 0, 0.1);
-  --ti-loading-border-dark: rgba(255, 255, 255, 0.2);
+  --ti-loading-bg-light: #fff;
+  --ti-loading-bg-dark: #333;
+  --ti-loading-border-light: rgb(0 0 0 / 10%);
+  --ti-loading-border-dark: rgb(255 255 255 / 20%);
 
   // Window dimensions using proper SCSS->CSS conversion
   @include window-dimensions;
@@ -40,7 +40,9 @@
 // Base window styles with CSS Grid layout and Modern Containment
 .ti-window {
   border-radius: var(--ti-window-border-radius);
+
   @include shadow-lg;
+
   display: grid;
   grid-template-rows: auto 1fr; // header auto, body flexible
   font-family: $font-family-base;
@@ -84,7 +86,7 @@
     justify-content: center;
     background: var(--ti-loading-bg-light);
     border: $border-width $border-style var(--ti-loading-border-light);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 15%);
     position: fixed !important;
 
     // Loading window visibility override
@@ -137,7 +139,7 @@
 
   // Light theme with increased specificity
   &.light {
-    background-color: var(--bg-color, #ffffff);
+    background-color: var(--bg-color, #fff);
     border: $border-width $border-style var(--border-color, #e8e8e8);
     color: var(--text-color, #2c3e50);
 
@@ -167,7 +169,7 @@
 
     // Dark theme header with maximum specificity
     .ti-window-header {
-      background-color: var(--header-bg-color, #333333);
+      background-color: var(--header-bg-color, #333);
       border-bottom: $border-width $border-style var(--header-border-color, #424242);
     }
 
@@ -178,7 +180,7 @@
       color: var(--text-color, #e0e0e0);
 
       &:hover {
-        background-color: var(--border-color, #555555);
+        background-color: var(--border-color, #555);
       }
     }
   }
@@ -253,7 +255,7 @@
 }
 
 .ti-window.dark .ti-window-provider-selector .ti-provider-icon-button:hover {
-  background-color: var(--border-color, #555555) !important;
+  background-color: var(--border-color, #555) !important;
 }
 
 .ti-window-provider-selector .ti-provider-icon-only {
@@ -278,23 +280,25 @@
   min-width: 190px !important;
   max-height: 400px !important;
   overflow-y: auto !important;
-  background-color: var(--header-bg-color, #ffffff) !important;
+  background-color: var(--header-bg-color, #fff) !important;
   border: 1px solid var(--header-border-color, #e8e8e8) !important;
   border-radius: 8px !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 10px 25px rgb(0 0 0 / 20%) !important;
   z-index: 10002 !important;
   padding: 6px 0 !important;
   display: block;
 
   &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 10px; }
+
+  &::-webkit-scrollbar-thumb { background: rgb(0 0 0 / 10%); border-radius: 10px; }
 }
 
 .ti-window.dark .ti-window-provider-selector .ti-provider-dropdown-menu {
   background-color: #2c2c2c !important;
   border-color: #444 !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
-  &::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
+  box-shadow: 0 10px 25px rgb(0 0 0 / 40%) !important;
+
+  &::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 10%); }
 }
 
 .ti-window-provider-selector .ti-dropdown-item {
@@ -310,9 +314,12 @@
   font-size: 13px !important;
   text-align: left !important;
 
-  &:hover { background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important; }
-  &.ti-active { background-color: var(--language-controls-bg-color, rgba(59, 130, 246, 0.1)) !important; font-weight: 600 !important; }
+  &:hover { background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%)) !important; }
+
+  &.ti-active { background-color: var(--language-controls-bg-color, rgb(59 130 246 / 10%)) !important; font-weight: 600 !important; }
+
   img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
+
   span { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex: 1 !important; }
 }
 
@@ -338,12 +345,14 @@
   border-radius: var(--ti-action-btn-border-radius, 6px) !important;
   cursor: pointer !important;
   background-color: transparent;
+
   @include transition-fast(background-color);
+
   padding: 0 !important;
   margin: 0 !important;
 
   &:hover {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.1));
+    background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 10%));
   }
 }
 
@@ -357,8 +366,7 @@
   margin-left: 0; // Removed excessive margins
   margin-right: 0; // Removed excessive margins
   flex: 1; // Take remaining space in flex container
-  overflow-y: auto; // Enable vertical scrolling when content exceeds height
-  overflow-x: clip; // Modern way to clip overflow
+  overflow: clip auto; // Enable vertical scrolling when content exceeds height // Modern way to clip overflow
 
   // Improved content constraint with proper box-sizing
   width: 100%; // Take full width of parent
@@ -425,7 +433,7 @@
 
   // Firefox scrollbar
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  scrollbar-color: rgb(0 0 0 / 20%) transparent;
 
   // Markdown content styling
   .simple-markdown {
@@ -446,7 +454,7 @@
 
     // Code blocks
     pre {
-      background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+      background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%));
       padding: 8px;
       border-radius: 4px;
       overflow-x: auto;
@@ -454,7 +462,7 @@
     }
 
     code {
-      background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+      background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%));
       padding: 2px 4px;
       border-radius: 3px;
       font-family: monospace;
@@ -472,24 +480,24 @@
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgb(0 0 0 / 20%);
     border-radius: 3px;
     transition: background-color 0.2s ease;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.3);
+      background-color: rgb(0 0 0 / 30%);
     }
   }
 
   // Dark theme scrollbar
   .ti-window.dark & {
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-color: rgb(255 255 255 / 20%) transparent;
 
     &::-webkit-scrollbar-thumb {
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: rgb(255 255 255 / 20%);
 
       &:hover {
-        background-color: rgba(255, 255, 255, 0.3);
+        background-color: rgb(255 255 255 / 30%);
       }
     }
   }
@@ -502,7 +510,7 @@
 }
 
 .ti-window.dark .ti-action-btn:hover {
-  background-color: var(--toolbar-link-hover-bg-color, rgba(255, 255, 255, 0.1));
+  background-color: var(--toolbar-link-hover-bg-color, rgb(255 255 255 / 10%));
 }
 
 // Dark theme dictionary label fixes
@@ -517,12 +525,12 @@
 }
 
 .ti-window.light .ti-action-btn:hover {
-  background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+  background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%));
 }
 
 // Enhanced Original Text Section Styles for Shadow DOM
 .ti-window .ti-original-text-section {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   padding: 12px 0;
   position: relative;
 
@@ -537,14 +545,14 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(59, 130, 246, 0.4) 15%,
-      rgba(59, 130, 246, 0.7) 50%,
-      rgba(59, 130, 246, 0.4) 85%,
+      rgb(59 130 246 / 40%) 15%,
+      rgb(59 130 246 / 70%) 50%,
+      rgb(59 130 246 / 40%) 85%,
       transparent 100%
     ) !important;
     border-radius: 1px !important;
     opacity: 1 !important;
-    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2) !important;
+    box-shadow: 0 1px 4px rgb(59 130 246 / 20%) !important;
     z-index: 1;
   }
 }
@@ -579,7 +587,7 @@
   line-height: 1.5;
   color: #4b5563;
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: break-word;
   padding: 0; /* Removed padding */
   background: transparent; /* Removed background */
   border: none; /* Removed border */
@@ -593,17 +601,18 @@
 
 // Enhanced dark theme adjustments for original text section
 .ti-window.dark .ti-original-text-section {
+
   /* Enhanced separator for dark theme with blue accent */
   &::after {
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(96, 165, 250, 0.5) 15%,
-      rgba(96, 165, 250, 0.8) 50%,
-      rgba(96, 165, 250, 0.5) 85%,
+      rgb(96 165 250 / 50%) 15%,
+      rgb(96 165 250 / 80%) 50%,
+      rgb(96 165 250 / 50%) 85%,
       transparent 100%
     ) !important;
-    box-shadow: 0 1px 6px rgba(96, 165, 250, 0.3) !important;
+    box-shadow: 0 1px 6px rgb(96 165 250 / 30%) !important;
   }
 }
 

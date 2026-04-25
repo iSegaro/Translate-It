@@ -25,7 +25,9 @@ body.popup-context {
   min-height: 350px;
   height: auto;
   background: var(--bg-color);
+
   @include shadow-md;
+
   border-radius: $border-radius-md;
   overflow: hidden;
   display: flex;
@@ -60,7 +62,9 @@ body.popup-context .ti-toolbar-icon {
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity);
+
   @include transition-fast(opacity, filter, background-color);
+
   filter: var(--icon-filter);
 
   &:hover {
@@ -81,7 +85,7 @@ body.popup-context .ti-toolbar-icon {
 .ti-result {
   background-color: var(--bg-result-color);
   white-space: normal !important;
-  word-wrap: break-word;
+  overflow-wrap: break-word;
   overflow-y: auto;
 }
 

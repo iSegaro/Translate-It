@@ -111,9 +111,10 @@ html[data-translate-it-select-mode="true"] {
     // Text content (title/description) container
     > div {
       flex: 1;
+
       /* text-align and direction removed to allow inline styles to work */
       white-space: pre-wrap;
-      word-wrap: break-word;
+      overflow-wrap: break-word;
       overflow-wrap: break-word;
       line-height: 1.4;
       align-self: flex-start;
@@ -125,7 +126,7 @@ html[data-translate-it-select-mode="true"] {
     // Title specific styling
     [data-title] {
       white-space: pre-wrap;
-      word-wrap: break-word;
+      overflow-wrap: break-word;
       overflow-wrap: break-word;
       line-height: 1.4;
       display: block;
@@ -137,7 +138,7 @@ html[data-translate-it-select-mode="true"] {
     // Description specific styling
     [data-description] {
       white-space: pre-wrap;
-      word-wrap: break-word;
+      overflow-wrap: break-word;
       overflow-wrap: break-word;
       line-height: 1.4;
       display: block;
@@ -151,6 +152,7 @@ html[data-translate-it-select-mode="true"] {
   [data-button],
   > button {
     flex-shrink: 0;
+
     // Use logical property for RTL/LTR support - pushes button to the "end" in both directions
     margin-inline-start: auto;
     white-space: nowrap;

@@ -9,7 +9,6 @@
   padding: 0 !important;
   margin: 0 !important;
   background: none !important;
-  border: none !important;
   outline: none !important;
   font: inherit !important;
 
@@ -21,12 +20,12 @@
   height: 28px !important;
 
   // Appearance
-  background-color: #ffffff !important;
+  background-color: #fff !important;
   border: 1px solid #dadce0 !important;
   border-radius: 50% !important;
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    0 2px 8px rgb(0 0 0 / 10%),
+    0 1px 3px rgb(0 0 0 / 8%) !important;
 
   // Layout
   display: flex !important;
@@ -62,8 +61,8 @@
     background-color: #f8f9fa !important;
     border-color: #dadce0 !important;
     box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.15),
-      0 2px 6px rgba(0, 0, 0, 0.1) !important;
+      0 4px 12px rgb(0 0 0 / 15%),
+      0 2px 6px rgb(0 0 0 / 10%) !important;
     transform: scale(1.1) translateY(-1px) !important;
   }
 
@@ -76,8 +75,8 @@
   &:focus-visible {
     border-color: #4285f4 !important;
     box-shadow:
-      0 0 0 2px rgba(66, 133, 244, 0.2),
-      0 2px 8px rgba(0, 0, 0, 0.1) !important;
+      0 0 0 2px rgb(66 133 244 / 20%),
+      0 2px 8px rgb(0 0 0 / 10%) !important;
   }
 }
 
@@ -140,14 +139,14 @@
   &.placement-inside-top-right,
   &.placement-inside-top-left {
     // Inside placements have slightly different styling
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: rgb(255 255 255 / 95%);
     backdrop-filter: blur(2px);
-    border-color: rgba(224, 224, 224, 0.8);
+    border-color: rgb(224 224 224 / 80%);
     
     // Subtle shadow to distinguish from content
     box-shadow: 
-      0 1px 4px rgba(0, 0, 0, 0.12),
-      0 0 0 1px rgba(255, 255, 255, 0.8);
+      0 1px 4px rgb(0 0 0 / 12%),
+      0 0 0 1px rgb(255 255 255 / 80%);
   }
 
   // Multiline-specific inside placements
@@ -159,8 +158,8 @@
     margin-bottom: 2px;
     
     // More subtle appearance in multiline contexts
-    background-color: rgba(255, 255, 255, 0.9);
-    border-color: rgba(200, 200, 200, 0.8);
+    background-color: rgb(255 255 255 / 90%);
+    border-color: rgb(200 200 200 / 80%);
   }
 
   &.placement-inside-top-right,
@@ -185,21 +184,21 @@
   // Smart attachment indicator
   &.smart-attached {
     // Visual indicator for smart positioning
-    border-color: rgba(66, 133, 244, 0.3);
+    border-color: rgb(66 133 244 / 30%);
     
     // Different styling for inside vs outside placements
     &:not([class*="inside"]) {
       box-shadow: 
-        0 2px 8px rgba(66, 133, 244, 0.1),
-        0 1px 3px rgba(66, 133, 244, 0.08),
-        inset 0 0 0 1px rgba(66, 133, 244, 0.1);
+        0 2px 8px rgb(66 133 244 / 10%),
+        0 1px 3px rgb(66 133 244 / 8%),
+        inset 0 0 0 1px rgb(66 133 244 / 10%);
     }
     
     &[class*="inside"] {
       box-shadow: 
-        0 1px 4px rgba(66, 133, 244, 0.15),
-        0 0 0 1px rgba(66, 133, 244, 0.2),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+        0 1px 4px rgb(66 133 244 / 15%),
+        0 0 0 1px rgb(66 133 244 / 20%),
+        inset 0 0 0 1px rgb(255 255 255 / 90%);
     }
   }
 }
@@ -221,7 +220,7 @@
 }
 
 // Responsive design
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .ti-field-icon {
     // Slightly larger on mobile for easier touch interaction
     &.size-small {

@@ -16,7 +16,7 @@
   h3 {
     font-size: $font-size-lg;
     font-weight: $font-weight-medium;
-    margin: 0 0 $spacing-sm 0;
+    margin: 0 0 $spacing-sm;
     color: var(--color-text);
   }
 
@@ -72,6 +72,7 @@
   text-decoration: none;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
+
   @include transition-fast(color);
 
   &:hover {

@@ -60,11 +60,12 @@
 
 @keyframes tab-fade-in {
   from { opacity: 0; transform: translateY(5px); }
+
   to { opacity: 1; transform: translateY(0); }
 }
 
 // Global mobile overrides for all tabs
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .options-tab-content {
     padding-top: $spacing-sm !important; /* Bring content closer to top */
     padding-bottom: 140px !important; // Match the overlap fix
