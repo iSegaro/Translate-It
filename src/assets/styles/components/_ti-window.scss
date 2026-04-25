@@ -1,140 +1,38 @@
 @use '../base/variables' as *;
 @use '../base/mixins' as *;
 
-// TranslationWindow component styles - for Shadow DOM injection
-// CRITICAL: Complete isolation from host page styles
+// Window component styles for Translate-It UI
+// Using modern CSS properties for performance and isolation
 
-// CSS Custom Properties for component-specific overrides - scoped to :host
-:host {
-  // Window-specific animation properties
-  --ti-window-border-radius: #{$border-radius-lg};
-  --ti-window-opacity-hidden: 0;
-  --ti-window-opacity-visible: 0.9;
-  --ti-window-transform-hidden: scale(0.95);
-  --ti-window-transform-visible: scale(1);
-  --ti-window-visibility-hidden: hidden;
-  --ti-window-visibility-visible: visible;
-  --ti-window-transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
-                            transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
-                            visibility 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
-                            width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
-                            height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-
-  // Loading window properties
-  --ti-loading-width: 60px;
-  --ti-loading-height: 40px;
-  --ti-loading-bg-light: #fff;
-  --ti-loading-bg-dark: #333;
-  --ti-loading-border-light: rgb(0 0 0 / 10%);
-  --ti-loading-border-dark: rgb(255 255 255 / 20%);
-
-  // Window dimensions using proper SCSS->CSS conversion
-  @include window-dimensions;
-
-  // CRITICAL: Ensure proper positioning and z-index
-  position: fixed !important;
-  z-index: 2147483647 !important;
-  pointer-events: none !important;
-}
-
-// Base window styles with CSS Grid layout and Modern Containment
 .ti-window {
-  border-radius: var(--ti-window-border-radius);
+  --ti-window-border-radius: 12px;
+  --ti-action-btn-size: 28px;
+  --ti-action-btn-border-radius: 8px;
 
-  @include shadow-lg;
-
-  display: grid;
-  grid-template-rows: auto 1fr; // header auto, body flexible
-  font-family: $font-family-base;
-  opacity: var(--ti-window-opacity-hidden);
-  transform: var(--ti-window-transform-hidden);
-  transition: var(--ti-window-transition);
-  visibility: var(--ti-window-visibility-hidden);
-  direction: ltr !important;
-  text-align: left !important;
-  unicode-bidi: plaintext !important;
-  max-width: 95vw; // Prevent overflow on small screens
+  position: absolute;
+  min-width: 280px;
+  max-width: 450px;
+  min-height: 80px;
+  max-height: 85vh;
+  z-index: var(--ti-z-modal, 10001);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 20%), 0 0 0 1px rgb(0 0 0 / 5%);
+  border-radius: var(--ti-z-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   box-sizing: border-box;
+  animation: ti-fade-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+  text-align: left;
+  line-height: 1.5;
+  font-family: $font-family-base;
 
-  // CRITICAL: Ensure proper positioning and z-index override external styles
-  position: fixed !important;
-  z-index: 2147483646 !important;
-  pointer-events: all !important;
+  // CSS containment for maximum performance
+  contain: layout style paint;
+  isolation: isolate;
 
-  // Modern CSS containment for performance
-  container-type: inline-size; // Enable container queries
-  contain: layout style; // Establish layout and style containment
-  isolation: isolate; // Create new stacking context
-
-  // Disable transitions when dragging
-  &.is-dragging {
-    transition: none;
-  }
-
-  // Loading window specific styles
-  &.ti-loading-window {
-    width: var(--ti-loading-width);
-    height: var(--ti-loading-height);
-    min-width: var(--ti-loading-width);
-    min-height: var(--ti-loading-height);
-    max-width: var(--ti-loading-width);
-    max-height: var(--ti-loading-height);
-    border-radius: 20px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--ti-loading-bg-light);
-    border: $border-width $border-style var(--ti-loading-border-light);
-    box-shadow: 0 4px 20px rgb(0 0 0 / 15%);
-    position: fixed !important;
-
-    // Loading window visibility override
-    &.visible {
-      opacity: var(--ti-window-opacity-visible);
-      transform: var(--ti-window-transform-visible);
-      visibility: var(--ti-window-visibility-visible);
-    }
-
-    // Dark theme for loading window
-    &.dark {
-      background: var(--ti-loading-bg-dark);
-      border-color: var(--ti-loading-border-dark);
-
-      &.visible {
-        opacity: var(--ti-window-opacity-visible);
-        transform: var(--ti-window-transform-visible);
-        visibility: var(--ti-window-visibility-visible);
-      }
-    }
-  }
-
-  // Normal window - restored to original behavior
-  &.normal-window {
-    width: #{css-var('normal-window-width', $selection-window-max-width)};
-    height: max-content; // Height based on content
-    min-height: #{css-var('normal-window-min-height', 120px)};
-    max-height: #{css-var('normal-window-max-height', 400px)}; // Add max height for scrolling
-    overflow: visible; // Allow dropdowns to go outside the window
-    display: flex;
-    flex-direction: column; // Ensure proper layout for scrollable content
-  }
-
-  // Relative position for provider selector to follow flex flow in header actions
-  .ti-window-provider-selector {
-    position: relative !important;
-    z-index: 10001 !important;
-    width: 28px !important;
-    height: 28px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  &.visible {
-    opacity: var(--ti-window-opacity-visible);
-    transform: var(--ti-window-transform-visible);
-    visibility: var(--ti-window-visibility-visible);
+  &.ti-active {
+    box-shadow: 0 15px 50px rgb(0 0 0 / 25%), 0 0 0 1px rgb(0 0 0 / 5%);
   }
 
   // Light theme with increased specificity
@@ -143,20 +41,29 @@
     border: $border-width $border-style var(--border-color, #e8e8e8);
     color: var(--text-color, #2c3e50);
 
-    // Light theme header with maximum specificity
+    // Light theme header
     .ti-window-header {
-      background-color: var(--header-bg-color, #f7f7f7);
+      background-color: var(--header-bg-color, #f8f9fa);
       border-bottom: $border-width $border-style var(--header-border-color, #e8e8e8);
     }
 
-    // Light theme action buttons with maximum specificity
+    // Light theme action buttons
     .ti-action-btn,
     .ti-smart-tts-btn {
       background-color: var(--toolbar-link-hover-bg-color, #f0f0f0);
       color: var(--text-color, #555);
 
       &:hover {
-        background-color: var(--bg-color, #e5e5e5);
+        background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%));
+      }
+    }
+
+    // Light theme specific overrides for nested components
+    .ti-window-provider-selector .ti-provider-icon-button {
+      background-color: var(--toolbar-link-hover-bg-color, #f0f0f0) !important;
+
+      &:hover {
+        background-color: var(--bg-color, #e5e5e5) !important;
       }
     }
   }
@@ -167,27 +74,39 @@
     border: $border-width $border-style var(--border-color, #424242);
     color: var(--text-color, #e0e0e0);
 
-    // Dark theme header with maximum specificity
+    // Dark theme header
     .ti-window-header {
-      background-color: var(--header-bg-color, #333);
-      border-bottom: $border-width $border-style var(--header-border-color, #424242);
+      background-color: var(--header-bg-color, #373737);
+      border-bottom: $border-width $border-style var(--header-border-color, #4a4a4a);
     }
 
-    // Dark theme action buttons with maximum specificity
+    // Dark theme action buttons
     .ti-action-btn,
     .ti-smart-tts-btn {
       background-color: var(--toolbar-link-hover-bg-color, #424242);
       color: var(--text-color, #e0e0e0);
 
       &:hover {
-        background-color: var(--border-color, #555);
+        background-color: var(--toolbar-link-hover-bg-color, rgb(255 255 255 / 10%));
       }
+    }
+
+    // Dark theme specific overrides for nested components
+    .ti-window-provider-selector .ti-provider-icon-button {
+      background-color: var(--toolbar-link-hover-bg-color, #424242) !important;
+
+      &:hover {
+        background-color: var(--border-color, #555) !important;
+      }
+    }
+
+    .ti-window-body .simple-markdown strong {
+      color: var(--text-color, #e8eaed) !important;
     }
   }
 }
 
 // Component-specific styles with maximum specificity
-// Window header with increased specificity
 .ti-window .ti-window-header,
 .ti-window-header {
   display: flex;
@@ -201,7 +120,7 @@
   border-radius: var(--ti-window-border-radius) var(--ti-window-border-radius) 0 0;
 }
 
-// Header actions with increased specificity
+// Header actions
 .ti-window .ti-header-actions,
 .ti-header-actions {
   display: flex;
@@ -210,7 +129,7 @@
   flex: 1;
 }
 
-// Provider Selector Integration (Shadow DOM Compatible)
+// Provider Selector Integration
 .ti-window .ti-window-provider-selector .ti-provider-selector-btn,
 .ti-window-provider-selector .ti-provider-selector-btn {
   display: inline-flex !important;
@@ -240,22 +159,6 @@
   line-height: 0 !important;
   box-sizing: border-box !important;
   cursor: pointer !important;
-}
-
-.ti-window.light .ti-window-provider-selector .ti-provider-icon-button {
-  background-color: var(--toolbar-link-hover-bg-color, #f0f0f0) !important;
-}
-
-.ti-window.light .ti-window-provider-selector .ti-provider-icon-button:hover {
-  background-color: var(--bg-color, #e5e5e5) !important;
-}
-
-.ti-window.dark .ti-window-provider-selector .ti-provider-icon-button {
-  background-color: var(--toolbar-link-hover-bg-color, #424242) !important;
-}
-
-.ti-window.dark .ti-window-provider-selector .ti-provider-icon-button:hover {
-  background-color: var(--border-color, #555) !important;
 }
 
 .ti-window-provider-selector .ti-provider-icon-only {
@@ -288,9 +191,14 @@
   padding: 6px 0 !important;
   display: block;
 
-  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
 
-  &::-webkit-scrollbar-thumb { background: rgb(0 0 0 / 10%); border-radius: 10px; }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(0 0 0 / 10%);
+    border-radius: 10px;
+  }
 }
 
 .ti-window.dark .ti-window-provider-selector .ti-provider-dropdown-menu {
@@ -298,7 +206,9 @@
   border-color: #444 !important;
   box-shadow: 0 10px 25px rgb(0 0 0 / 40%) !important;
 
-  &::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 10%); }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 10%);
+  }
 }
 
 .ti-window-provider-selector .ti-dropdown-item {
@@ -314,16 +224,30 @@
   font-size: 13px !important;
   text-align: left !important;
 
-  &:hover { background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%)) !important; }
+  &:hover {
+    background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%)) !important;
+  }
 
-  &.ti-active { background-color: var(--language-controls-bg-color, rgb(59 130 246 / 10%)) !important; font-weight: 600 !important; }
+  &.ti-active {
+    background-color: var(--language-controls-bg-color, rgb(59 130 246 / 10%)) !important;
+    font-weight: 600 !important;
+  }
 
-  img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
+  img {
+    width: 16px !important;
+    height: 16px !important;
+    object-fit: contain !important;
+  }
 
-  span { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; flex: 1 !important; }
+  span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    flex: 1 !important;
+  }
 }
 
-// Header close section with increased specificity
+// Header close section
 .ti-window .ti-header-close,
 .ti-header-close {
   display: flex;
@@ -331,7 +255,7 @@
   margin-left: auto;
 }
 
-// Action button with increased specificity
+// Action button
 .ti-window .ti-action-btn,
 .ti-window .ti-smart-tts-btn,
 .ti-action-btn,
@@ -363,55 +287,50 @@
   min-height: #{css-var('normal-window-min-height', 120px)};
   display: flex;
   flex-direction: column;
-  margin-left: 0; // Removed excessive margins
-  margin-right: 0; // Removed excessive margins
-  flex: 1; // Take remaining space in flex container
-  overflow: clip auto; // Enable vertical scrolling when content exceeds height // Modern way to clip overflow
+  margin-left: 0;
+  margin-right: 0;
+  flex: 1;
+  overflow: clip auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
-  // Improved content constraint with proper box-sizing
-  width: 100%; // Take full width of parent
-  max-width: 100%; // Prevent overflow
-  box-sizing: border-box; // Include padding and borders in width
+  // Modern CSS containment
+  contain: layout style paint;
+  isolation: isolate;
 
-  // Modern CSS containment for better isolation and performance
-  contain: layout style paint; // Full containment for maximum isolation
-  isolation: isolate; // Create stacking context
-
-  // Optimized list styles for dictionary/definition content
-  .ti-window-body ul,
-  .ti-window-body ol {
-    // Reset default padding and use more efficient spacing
+  // Optimized list styles for dictionary content
+  ul,
+  ol {
     padding: 0;
-    margin: 6px 0; // Reduced margin for better spacing
+    margin: 6px 0;
   }
 
-  // LTR content with reduced padding
-  .ti-window-body[dir="ltr"] ul,
-  .ti-window-body[dir="ltr"] ol,
-  .ti-window-body .simple-markdown[dir="ltr"] ul,
-  .ti-window-body .simple-markdown[dir="ltr"] ol {
-    padding-left: 16px; // Reduced from 20px for less excessive padding
+  // LTR content
+  &[dir="ltr"] ul,
+  &[dir="ltr"] ol,
+  .simple-markdown[dir="ltr"] ul,
+  .simple-markdown[dir="ltr"] ol {
+    padding-left: 16px;
     padding-right: 0;
   }
 
-  // RTL content with reduced padding
-  [dir="rtl"] .ti-window-body ul,
-  [dir="rtl"] .ti-window-body ol,
-  .ti-window-body[dir="rtl"] ul,
-  .ti-window-body[dir="rtl"] ol,
+  // RTL content
+  [dir="rtl"] &,
+  &[dir="rtl"] ul,
+  &[dir="rtl"] ol,
   [dir="rtl"] .simple-markdown ul,
   [dir="rtl"] .simple-markdown ol,
   .simple-markdown[dir="rtl"] ul,
   .simple-markdown[dir="rtl"] ol {
     padding-left: 0;
-    padding-right: 16px; // Reduced from 20px for less excessive padding
+    padding-right: 16px;
   }
 
-  // Optimized list items with better spacing and proper LTR positioning
+  // Optimized list items
   li {
-    // Ensure proper spacing between list items with reduced gaps
-    margin-bottom: 3px; // Reduced from 4px for tighter spacing
-    margin-left: 1.5em; // Add proper left margin for LTR bullet spacing
+    margin-bottom: 3px;
+    margin-left: 1.5em;
 
     &:last-child {
       margin-bottom: 0;
@@ -421,14 +340,17 @@
     [dir="rtl"] &,
     &.rtl-content {
       margin-left: 0;
-      margin-right: 1.5em; // Add right margin for RTL
+      margin-right: 1.5em;
     }
   }
 
-  // Nested lists with improved spacing
-  ul ul, ol ol, ul ol, ol ul {
-    margin-top: 3px; // Reduced from 4px
-    margin-bottom: 3px; // Reduced from 4px
+  // Nested lists
+  ul ul,
+  ol ol,
+  ul ol,
+  ol ul {
+    margin-top: 3px;
+    margin-bottom: 3px;
   }
 
   // Firefox scrollbar
@@ -437,7 +359,6 @@
 
   // Markdown content styling
   .simple-markdown {
-    // Ensure paragraphs have proper spacing
     p {
       margin-bottom: 8px;
 
@@ -446,13 +367,11 @@
       }
     }
 
-    // Style for labeled definitions (e.g., "نوع: اسم")
     strong {
       font-weight: 600;
       color: var(--color-text, inherit);
     }
 
-    // Code blocks
     pre {
       background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%));
       padding: 8px;
@@ -501,168 +420,4 @@
       }
     }
   }
-}
-
-// Dark theme specific overrides
-.ti-window.dark .ti-window-header {
-  background-color: var(--header-bg-color, #373737);
-  border-bottom-color: var(--header-border-color, #4a4a4a);
-}
-
-.ti-window.dark .ti-action-btn:hover {
-  background-color: var(--toolbar-link-hover-bg-color, rgb(255 255 255 / 10%));
-}
-
-// Dark theme dictionary label fixes
-.ti-window.dark .ti-window-body .simple-markdown strong {
-  color: var(--text-color, #e8eaed) !important;
-}
-
-// Light theme specific overrides
-.ti-window.light .ti-window-header {
-  background-color: var(--header-bg-color, #f8f9fa);
-  border-bottom-color: var(--header-border-color, #e8e8e8);
-}
-
-.ti-window.light .ti-action-btn:hover {
-  background-color: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%));
-}
-
-// Enhanced Original Text Section Styles for Shadow DOM
-.ti-window .ti-original-text-section {
-  margin: 0 0 16px;
-  padding: 12px 0;
-  position: relative;
-
-  /* Premium visual separator with enhanced visibility */
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px !important;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgb(59 130 246 / 40%) 15%,
-      rgb(59 130 246 / 70%) 50%,
-      rgb(59 130 246 / 40%) 85%,
-      transparent 100%
-    ) !important;
-    border-radius: 1px !important;
-    opacity: 1 !important;
-    box-shadow: 0 1px 4px rgb(59 130 246 / 20%) !important;
-    z-index: 1;
-  }
-}
-
-.ti-window .ti-original-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #3b82f6;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding-left: 2px;
-  position: relative;
-
-  /* Add decorative element */
-  &::before {
-    content: '';
-    position: absolute;
-    left: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 4px;
-    background: linear-gradient(135deg, #3b82f6, #60a5fa);
-    border-radius: 50%;
-    opacity: 0.8;
-  }
-}
-
-.ti-window .ti-original-text {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #4b5563;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  padding: 0; /* Removed padding */
-  background: transparent; /* Removed background */
-  border: none; /* Removed border */
-  border-radius: 0; /* Removed border-radius */
-  position: relative;
-
-  /* Improved text rendering */
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-feature-settings: 'kern' 1, 'liga' 1;
-}
-
-// Enhanced dark theme adjustments for original text section
-.ti-window.dark .ti-original-text-section {
-
-  /* Enhanced separator for dark theme with blue accent */
-  &::after {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgb(96 165 250 / 50%) 15%,
-      rgb(96 165 250 / 80%) 50%,
-      rgb(96 165 250 / 50%) 85%,
-      transparent 100%
-    ) !important;
-    box-shadow: 0 1px 6px rgb(96 165 250 / 30%) !important;
-  }
-}
-
-.ti-window.dark .ti-original-label {
-  color: #60a5fa;
-
-  /* Dark theme decorative element */
-  &::before {
-    background: linear-gradient(135deg, #60a5fa, #93c5fd);
-  }
-}
-
-.ti-window.dark .ti-original-text {
-  color: #d1d5db;
-  background: transparent; /* Removed background */
-  border: none; /* Removed border */
-  box-shadow: none; /* Removed box-shadow */
-}
-
-// Ultra-fast transitions with scale-based height for instant response
-.ti-original-text-enter-active {
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out, margin-bottom 0.3s ease-out !important;
-  overflow: hidden !important;
-}
-
-.ti-original-text-leave-active {
-  transition: transform 0.2s ease-in, opacity 0.2s ease-in, margin-bottom 0.2s ease-in !important;
-  overflow: hidden !important;
-}
-
-.ti-original-text-enter-from {
-  opacity: 0 !important;
-  transform: scaleY(0) !important;
-  margin-bottom: 0 !important;
-}
-
-.ti-original-text-leave-to {
-  opacity: 0 !important;
-  transform: scaleY(0) !important;
-  margin-bottom: 0 !important;
-}
-
-.ti-original-text-enter-to {
-  opacity: 1 !important;
-  transform: scaleY(1) !important;
-  margin-bottom: 16px !important;
-}
-
-.ti-original-text-leave-from {
-  opacity: 1 !important;
-  transform: scaleY(1) !important;
-  margin-bottom: 16px !important;
 }

@@ -74,9 +74,9 @@
 // Global mobile overrides for all tabs
 @media (width <= 768px) {
   .options-tab-content {
-
-    /* Bring content closer to top */
+    /* stylelint-disable-next-line declaration-no-important */
     padding-top: $spacing-sm !important;
+    /* stylelint-disable-next-line declaration-no-important */
     padding-bottom: 140px !important; // Match the overlap fix
 
     h2 {
