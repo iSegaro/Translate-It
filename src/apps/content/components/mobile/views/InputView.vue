@@ -46,7 +46,6 @@
             <img
               src="@/icons/ui/paste.png"
               class="ti-m-icon-img-small"
-              :style="mobileIconStyle"
             >
             {{ t('action_paste_from_clipboard') || 'Paste' }}
           </button>
@@ -137,6 +136,7 @@
 </template>
 
 <script setup>
+import './InputView.scss'
 import { ref, computed, watch } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
@@ -163,11 +163,6 @@ const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANS
 const { getErrorForDisplay } = useErrorHandler()
 const tts = useTTSSmart()
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'InputView')
-
-const mobileIconStyle = computed(() => {
-  const filter = settingsStore.isDarkTheme ? 'invert(1) brightness(2)' : 'none';
-  return `width: 14px !important; height: 14px !important; object-fit: contain !important; filter: ${filter} !important;`;
-});
 
 const inputText = ref(mobileStore.selectionData.text || '')
 const sourceLang = ref(mobileStore.selectionData.sourceLang || settingsStore.settings.SOURCE_LANGUAGE || 'auto')

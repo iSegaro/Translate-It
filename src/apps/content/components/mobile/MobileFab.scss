@@ -53,6 +53,10 @@
   -webkit-tap-highlight-color: transparent !important;
 
   /* State Overrides */
+  &.is-hidden {
+    display: none !important;
+  }
+
   &.is-idle:not(.is-dragging):not(:hover) {
     --fab-opacity: 0.2 !important;
   }

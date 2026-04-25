@@ -8,7 +8,8 @@
       'is-positioning': isPositioning,
       'is-unstable': isViewportUnstable && !isFabDragging,
       'is-left': side === 'left',
-      'is-right': side === 'right'
+      'is-right': side === 'right',
+      'is-hidden': !side || fabPosition.y === null
     }"
     translate="no"
     :style="dynamicVars"
@@ -29,6 +30,7 @@
 </template>
 
 <script setup>
+import './MobileFab.scss';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -176,7 +178,7 @@ onMounted(async () => {
  */
 const dynamicVars = computed(() => {
   if (!isReady.value || side.value === null || fabPosition.value.y === null) {
-    return { display: 'none !important' };
+    return {};
   }
   
   let currentOpacity = '1';

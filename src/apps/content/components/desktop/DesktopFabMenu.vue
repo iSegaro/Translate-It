@@ -63,14 +63,7 @@
             @mouseenter="hoveredItemIndex = index"
             @mouseleave="hoveredItemIndex = -1"
           >
-            <div 
-              class="menu-icon-wrapper"
-              :style="{ 
-                marginRight: side === 'right' ? '10px !important' : '0 !important', 
-                marginLeft: side === 'left' ? '10px !important' : '0 !important', 
-                order: side === 'left' ? 2 : 0
-              }" 
-            >
+            <div class="menu-icon-wrapper">
               <!-- Circle Progress for Page Translation -->
               <svg
                 v-if="item.showProgress"
@@ -105,10 +98,7 @@
                 :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
               >
             </div>
-            <span 
-              class="fab-menu-item-text"
-              :style="{ 'text-align': side === 'right' ? 'left' : 'right' }"
-            >
+            <span class="fab-menu-item-text">
               {{ item.label }}
             </span>
           </div>
@@ -157,7 +147,7 @@
           @click.stop="triggerTranslation"
         >
           <div class="fab-badge-pulse-glow" />
-          <div style="width: 4px !important; height: 4px !important; background-color: white !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(255, 255, 255, 0.8) !important; z-index: 1;" />
+          <div class="white-dot" />
         </div>
       </Transition>
     </div>
@@ -172,7 +162,7 @@
         class="fab-settings-badge"
         :title="t('desktop_fab_settings_tooltip')"
         :style="{ 
-          'bottom': (isTTSActive && (isHovered || isMenuOpen) ? 'calc(-2 * var(--badge-offset))' : 'calc(-1 * var(--badge-offset))') + ' !important',
+          '--badge-bottom-offset': (isTTSActive && (isHovered || isMenuOpen) ? 'calc(-2 * var(--badge-offset))' : 'calc(-1 * var(--badge-offset))'),
           'transform': getBadgeTransform(isHovered || isMenuOpen, isSettingsHovered)
         }"
         @click.stop="handleOpenSettings"
@@ -197,9 +187,8 @@
         :class="{ 'is-playing': ttsState === 'playing', 'is-loading': ttsState === 'loading' }"
         :title="ttsTooltip"
         :style="{ 
-          'bottom': 'calc(-1 * var(--badge-offset)) !important', 
-          'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered),
-          'background-color': ttsState === 'playing' ? '#fa5252 !important' : ''
+          '--badge-bottom-offset': 'calc(-1 * var(--badge-offset))', 
+          'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
         }"
         @click.stop="handleTTS"
         @mouseenter="isTTSHovered = true"
@@ -273,6 +262,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
@@ -575,48 +565,25 @@ const containerStyle = computed(() => {
   const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
   const easing = ANIMATION_CONFIG.SOFT_EASING;
 
-  // Disable transitions immediately when unstable to prevent jump visualization
-  if (isViewportUnstable.value && !isDragging.value) {
-    return {
-      'transition': 'none !important',
-      'opacity': '0 !important',
-      'pointer-events': 'none !important',
-      'top': `${verticalPos.value}px !important`
-    };
+  // Build transition string dynamically
+  let transitionStr = 'none';
+  if (!isPositioning.value && !isViewportUnstable.value) {
+    const opacityDuration = isMenuOpen.value ? ANIMATION_CONFIG.QUICK_FADE : (opacityValue === ANIMATION_CONFIG.OPACITY_FULL ? ANIMATION_CONFIG.FADE_IN : ANIMATION_CONFIG.FADE_OUT);
+    transitionStr = `transform ${moveDuration} ${easing}, left ${moveDuration} ${easing}, right ${moveDuration} ${easing}, opacity ${opacityDuration} ${easing}`;
   }
-
-  // Disable transitions during initial positioning
-  if (isPositioning.value) {
-    return {
-      'transition': 'none !important',
-      'opacity': '0 !important',
-      'top': verticalPos.value === -1 ? '50% !important' : `${verticalPos.value}px !important`,
-      'transform': verticalPos.value === -1 ? 'translateY(-50%) !important' : 'none !important'
-    };
-  }
-
-  const transitions = [
-    `transform ${moveDuration} ${easing}`,
-    `left ${moveDuration} ${easing}`,
-    `right ${moveDuration} ${easing}`
-  ];
-
-  const opacityDuration = isMenuOpen.value ? ANIMATION_CONFIG.QUICK_FADE : (opacityValue === ANIMATION_CONFIG.OPACITY_FULL ? ANIMATION_CONFIG.FADE_IN : ANIMATION_CONFIG.FADE_OUT);
-  transitions.push(`opacity ${opacityDuration} ${easing}`);
 
   const style = {
-    'transition': `${transitions.join(', ')} !important`,
-    'opacity': `${opacityValue} !important`,
-    'pointer-events': `${pointerEvents} !important`
+    '--fab-opacity': opacityValue,
+    '--fab-pointer-events': pointerEvents,
+    '--fab-transition': transitionStr
   };
 
   if (verticalPos.value === -1) {
-    style.top = '50% !important';
-    style.bottom = 'auto !important';
-    style.transform = 'translateY(-50%) !important';
+    style['--fab-top'] = '50%';
+    style['--fab-transform'] = 'translateY(-50%)';
   } else {
-    style.top = `${verticalPos.value}px !important`;
-    style.bottom = 'auto !important';
+    style['--fab-top'] = `${verticalPos.value}px`;
+    style['--fab-transform'] = 'none';
   }
 
   return style;
@@ -627,14 +594,13 @@ const mainButtonStyle = computed(() => {
   const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
   const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
   
-  // Use CSS variables for responsive translate amount
   const translateValue = isActive 
     ? (isRight ? 'calc(-1 * var(--fab-active-translate))' : 'var(--fab-active-translate)') 
     : '0px';
 
   return {
     'transform': `translateX(${translateValue})`,
-    'transition': `transform ${moveDuration} ${ANIMATION_CONFIG.SOFT_EASING}, background-color 0.2s ease, box-shadow 0.3s ease !important`
+    'transition': `transform ${moveDuration} ${ANIMATION_CONFIG.SOFT_EASING}, background-color 0.2s ease, box-shadow 0.3s ease`
   };
 });
 
