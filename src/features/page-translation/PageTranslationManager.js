@@ -104,6 +104,9 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: ActionReasons.BUSY_OR_DONE };
     if (!PageTranslationHelper.isSuitableForTranslation(this.logger)) return { success: false, reason: ActionReasons.NOT_SUITABLE };
 
+    // Inject layout fixes to the host page
+    this._injectLayoutFix();
+
     // Emit event to stop conflicting features (e.g., Select Element Mode)
     pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'page-translation' });
 
@@ -215,6 +218,7 @@ export class PageTranslationManager extends ResourceTracker {
 
   async restorePage() {
     this._cleanupSession();
+    this._removeLayoutFix();
     try {
       // 0. Stop scroll tracker
       this.scrollTracker.stop();
@@ -255,6 +259,7 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   resetLocalState() {
+    this._removeLayoutFix();
     this.isTranslated = false;
     this.isTranslating = false;
     this.isAutoTranslating = false;
@@ -374,6 +379,42 @@ export class PageTranslationManager extends ResourceTracker {
         data: { sessionId: this.translationMessageId }
       }).catch(() => {});
       this.translationMessageId = null;
+    }
+  }
+
+  _injectLayoutFix() {
+    try {
+      document.documentElement.classList.add('ti-translation-active');
+      if (!document.getElementById('ti-translation-layout-fix')) {
+        const style = document.createElement('style');
+        style.id = 'ti-translation-layout-fix';
+        style.textContent = `
+          html.ti-translation-active, 
+          html.ti-translation-active body { 
+            overflow-x: hidden !important;
+            width: 100% !important;
+            position: relative !important;
+            /* Prevent body-level transforms from breaking position: fixed for the UI Host */
+            transform: none !important;
+            filter: none !important;
+            perspective: none !important;
+            contain: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    } catch (e) {
+      this.logger.debug('Failed to inject layout fix:', e);
+    }
+  }
+
+  _removeLayoutFix() {
+    try {
+      document.documentElement.classList.remove('ti-translation-active');
+      const style = document.getElementById('ti-translation-layout-fix');
+      if (style) style.remove();
+    } catch (e) {
+      this.logger.debug('Failed to remove layout fix:', e);
     }
   }
 
