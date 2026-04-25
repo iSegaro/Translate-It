@@ -42,6 +42,7 @@
 </template>
 
 <script setup>
+import './MobileSheet.scss'
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
@@ -167,9 +168,9 @@ const sheetStyle = computed(() => {
   }
 
   return {
-    transform: transformValue,
-    transition: isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
-    height: heightValue
+    '--sheet-transform': transformValue,
+    '--sheet-transition': isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
+    '--sheet-height': heightValue
   }
 })
 

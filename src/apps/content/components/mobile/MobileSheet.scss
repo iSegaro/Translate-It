@@ -76,6 +76,11 @@
   overscroll-behavior: none !important;
   background-color: var(--ti-mobile-bg) !important;
   color: var(--ti-mobile-text) !important;
+
+  /* Dynamic CSS Variable Bridges */
+  transform: var(--sheet-transform, translateY(0)) !important;
+  transition: var(--sheet-transition, transform 0.3s ease-out, height 0.3s ease-out) !important;
+  height: var(--sheet-height, 35vh) !important;
 }
 
 .ti-m-sheet-header {

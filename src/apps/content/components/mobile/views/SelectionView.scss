@@ -1,207 +1,181 @@
-/* src/apps/content/components/mobile/views/SelectionView.scss */
+/* Selection View - Structural Styles */
 
 .ti-m-selection-view {
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
-  font-family: sans-serif !important;
-  gap: 15px !important;
   background-color: inherit !important;
-  padding: 0 15px !important; /* پدینگ سراسری مشابه بقیه صفحات */
-}
+  font-family: sans-serif !important;
 
-.ti-m-selection-header {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  padding: 10px 0 !important;
-  border-bottom: 1px solid var(--ti-mobile-header-border) !important;
-  margin: 0 -15px 15px !important;
-  padding-left: 10px !important;
-  padding-right: 15px !important;
-}
-
-.ti-m-header-left {
-  display: flex !important;
-  align-items: center !important;
-  gap: 5px !important;
-  flex: 1 !important;
-}
-
-.ti-m-header-right {
-  display: flex !important;
-  align-items: center !important;
-}
-
-.ti-m-back-btn {
-  background: none !important;
-  border: none !important;
-  width: 40px !important;
-  height: 40px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  border-radius: 50% !important;
-  color: var(--ti-mobile-text) !important;
-  -webkit-tap-highlight-color: transparent !important;
-  transition: background-color 0.2s ease !important;
-
-  &:active {
-    background-color: var(--ti-mobile-header-border) !important;
+  /* هدر اختصاصی Selection */
+  .ti-m-selection-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 0 !important;
+    border-bottom: 1px solid var(--ti-mobile-header-border) !important;
+    margin: 0 -15px 15px !important;
+    padding-left: 10px !important;
+    padding-right: 15px !important;
+    background-color: var(--ti-mobile-bg) !important;
   }
 
-  svg {
-    display: block !important;
-    width: 20px !important;
-    height: 20px !important;
-    flex-shrink: 0 !important;
-    transform: rotate(90deg) !important;
-    stroke: currentColor !important;
-    stroke-width: 1.2px !important;
+  .ti-m-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex: 1 !important;
   }
-}
 
-.ti-m-lang-pair {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 6px 12px !important;
-  border-radius: 20px !important;
-  background-color: var(--ti-mobile-card-bg) !important;
-  cursor: pointer !important;
-}
+  .ti-m-back-btn {
+    background: none !important;
+    border: none !important;
+    width: 36px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    border-radius: 50% !important;
+    color: var(--ti-mobile-text) !important;
 
-.ti-m-lang-target {
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  color: var(--ti-mobile-accent) !important;
-}
-
-.ti-m-lang-source {
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  text-transform: uppercase !important;
-  color: var(--ti-mobile-text-secondary) !important;
-}
-
-.ti-m-close-btn {
-  background: none !important;
-  border: none !important;
-  width: 40px !important;
-  height: 40px !important;
-  padding: 0 !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 50% !important;
-  -webkit-tap-highlight-color: transparent !important;
-
-  &:active {
-    background-color: var(--ti-mobile-header-border) !important;
+    svg {
+      width: 18px !important;
+      height: 18px !important;
+      transform: rotate(90deg) !important;
+      stroke: currentColor !important;
+      stroke-width: 1.2px !important;
+    }
   }
-}
 
-.ti-m-content-area {
-  flex: 1 !important;
-  overflow-y: auto !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 15px !important;
-  padding-bottom: 20px !important;
-}
-
-.ti-m-loading-container {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 40px 0 !important;
-  color: var(--ti-mobile-text-muted) !important;
-  gap: 10px !important;
-}
-
-.ti-m-spinner {
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 50% !important;
-  border: 3px solid var(--ti-mobile-border) !important;
-  border-top-color: var(--ti-mobile-accent) !important;
-  animation: spin-mobile 1s linear infinite !important;
-}
-
-.ti-m-results-stack {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-}
-
-.ti-m-original-card {
-  border: 1px solid var(--ti-mobile-border) !important;
-  border-radius: 12px !important;
-  padding: 12px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 6px !important;
-  cursor: pointer !important;
-  background: var(--ti-mobile-card-bg) !important;
-  transition: transform 0.1s ease !important;
-
-  &:active {
-    transform: scale(0.98) !important;
+  .ti-m-lang-pair {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    
+    &:active {
+      background-color: var(--ti-mobile-header-border) !important;
+    }
   }
-}
 
-.ti-m-original-title {
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  color: var(--ti-mobile-text-muted) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-}
+  .ti-m-lang-target {
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    color: var(--ti-mobile-text) !important;
+    text-transform: uppercase !important;
+  }
 
-.ti-m-original-text {
-  font-size: 14px !important;
-  line-height: 1.5 !important;
-  text-align: start !important;
-  word-wrap: break-word !important;
-  color: var(--ti-mobile-text-secondary) !important;
-}
-
-.ti-m-icon-img {
-  object-fit: contain !important;
-}
-
-.ti-m-swap-icon {
-  width: 12px !important;
-  height: 12px !important;
-  opacity: 0.6 !important;
-}
-
-.ti-m-close-icon {
-  width: 22px !important;
-  height: 22px !important;
-  opacity: 0.5 !important;
-  filter: var(--ti-mobile-icon-filter) !important;
-  transition: opacity 0.2s ease !important;
-}
-
-/* Dark Mode Overrides */
-.ti-m-selection-view.is-dark {
-  .ti-m-close-icon {
-    filter: invert(1) !important; /* روشن کردن ضربدر بدون سفید کردن پس‌زمینه */
-    opacity: 0.8 !important;      /* کمی روشن‌تر برای خوانایی بهتر */
+  .ti-m-lang-source {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: var(--ti-mobile-text-muted) !important;
+    text-transform: uppercase !important;
   }
 
   .ti-m-swap-icon {
-    filter: invert(1) !important;
+    width: 14px !important;
+    height: 14px !important;
     opacity: 0.6 !important;
+  }
+
+  .ti-m-close-btn {
+    background: none !important;
+    border: none !important;
+    padding: 8px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .ti-m-close-icon {
+    width: 14px !important;
+    height: 14px !important;
+    object-fit: contain !important;
+  }
+
+  /* محتوا */
+  .ti-m-content-area {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 0 !important;
+  }
+
+  .ti-m-results-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    width: 100% !important;
+  }
+
+  /* کارت متن اصلی */
+  .ti-m-original-card {
+    background: var(--ti-mobile-card-bg) !important;
+    border: 1px solid var(--ti-mobile-border) !important;
+    border-radius: 14px !important;
+    padding: 12px 15px !important;
+    margin-top: 5px !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+
+    &:active {
+      background-color: var(--ti-mobile-header-border) !important;
+    }
+  }
+
+  .ti-m-original-title {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    color: var(--ti-mobile-text-muted) !important;
+    margin-bottom: 6px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .ti-m-original-text {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    color: var(--ti-mobile-text) !important;
+    opacity: 0.8 !important;
+    text-align: start !important;
+  }
+
+  /* حالت لودینگ */
+  .ti-m-loading-container {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 40px 0 !important;
+    gap: 12px !important;
+    color: var(--ti-mobile-text-muted) !important;
+    font-size: 14px !important;
+  }
+
+  .ti-m-spinner {
+    width: 28px !important;
+    height: 28px !important;
+    border: 3px solid var(--ti-mobile-header-border) !important;
+    border-top-color: var(--ti-mobile-accent) !important;
+    border-radius: 50% !important;
+    animation: ti-m-spin 0.8s linear infinite !important;
+  }
+
+  /* آیکون‌ها */
+  .ti-m-icon-img {
+    filter: var(--ti-mobile-icon-filter) !important;
+  }
+
+  &.is-dark {
+    .ti-m-icon-img {
+      filter: brightness(0) invert(1) !important;
+    }
   }
 }
 
-@keyframes spin-mobile { 
-  0% { transform: rotate(0deg); } 
-  100% { transform: rotate(360deg); } 
+@keyframes ti-m-spin {
+  to { transform: rotate(360deg); }
 }
