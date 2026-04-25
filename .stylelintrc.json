@@ -106,6 +106,19 @@
       "rules": {
         "declaration-no-important": null
       }
+    },
+    {
+      "files": [
+        "src/assets/styles/content-app-global.scss",
+        "src/assets/styles/content-main-dom.scss",
+        "src/assets/styles/content-main-dom.css"
+      ],
+      "rules": {
+        "declaration-no-important": null,
+        "selector-max-specificity": null,
+        "selector-max-attribute": null,
+        "selector-class-pattern": null
+      }
     }
   ],
   "ignoreFiles": [
