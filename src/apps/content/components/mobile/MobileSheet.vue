@@ -152,8 +152,14 @@ const sheetStyle = computed(() => {
   
   // Dynamic height for peek mode based on view
   let targetHeight = isPeek ? '35vh' : '75vh'
-  if (isPeek && activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
-    targetHeight = '145px'
+  
+  if (isPeek) {
+    if (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
+      targetHeight = '145px'
+    } else if (activeView.value === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION) {
+      // Stabilize height for page translation to prevent jumping and content overflow
+      targetHeight = '220px'
+    }
   }
   
   let transformValue = 'translateY(0)'

@@ -8,6 +8,9 @@
   gap: 15px !important;
   background-color: inherit !important;
   padding: 0 15px !important; /* پدینگ سراسری */
+  box-sizing: border-box !important;
+  width: 100% !important;
+  overflow-x: hidden !important;
 }
 
 .ti-m-view-header {
@@ -20,6 +23,7 @@
   padding-left: 10px !important;
   padding-right: 15px !important;
   position: relative !important;
+  box-sizing: border-box !important;
 }
 
 .ti-m-header-left-section {
@@ -104,11 +108,14 @@
   max-width: 150px !important; 
   flex-shrink: 0 !important;
   z-index: 2 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 
   img {
     width: 10px !important;
     height: 10px !important;
     object-fit: contain !important;
+    flex-shrink: 0 !important;
   }
 
   /* Status-based Styling */
@@ -255,6 +262,11 @@
   position: relative !important;
   background: var(--ti-mobile-header-border) !important;
   margin-bottom: 5px !important;
+  
+  /* CRITICAL: Force hardware-accelerated clipping to prevent unclipped 
+     transformed children from expanding parent width on mobile browsers */
+  transform: translateZ(0) !important;
+  mask-image: radial-gradient(white, black) !important;
 
   .has-error & {
     background: var(--ti-mobile-error-bg) !important;

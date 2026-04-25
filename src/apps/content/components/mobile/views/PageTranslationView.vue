@@ -40,7 +40,8 @@
       
       <!-- Primary Action Pill (Centered) -->
       <button 
-        class="ti-m-header-primary-btn"
+        class="ti-m-header-primary-btn notranslate"
+        translate="no"
         :data-status="pageTranslationData.status === 'error' ? 'error' : (pageTranslationData.isTranslating || pageTranslationData.isAutoTranslating ? 'translating' : (pageTranslationData.isTranslated ? 'translated' : 'ready'))"
         @click.stop="primaryAction.handler"
       >
@@ -66,7 +67,8 @@
 
     <!-- Progress Card -->
     <div 
-      class="ti-m-progress-card" 
+      class="ti-m-progress-card notranslate"
+      translate="no"
       :class="{ 'has-error': pageTranslationData.status === 'error' }"
     >
       <div class="ti-m-progress-label-row">
