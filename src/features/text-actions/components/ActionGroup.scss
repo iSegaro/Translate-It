@@ -1,0 +1,52 @@
+.ti-action-group {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Layout variants */
+.ti-layout-horizontal {
+  flex-direction: row !important;
+}
+
+.ti-layout-vertical {
+  flex-direction: column !important;
+}
+
+/* Spacing variants */
+.ti-spacing-tight {
+  gap: 2px !important;
+}
+
+.ti-spacing-normal {
+  gap: 4px !important;
+}
+
+.ti-spacing-loose {
+  gap: 8px !important;
+}
+
+/* Style variants */
+.ti-bordered {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 4px !important;
+  padding: 2px !important;
+}
+
+.ti-elevated {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 4px !important;
+  padding: 2px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .ti-bordered {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .ti-elevated {
+    background: rgba(0, 0, 0, 0.9) !important;
+    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.1) !important;
+  }
+}

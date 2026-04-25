@@ -1,0 +1,63 @@
+.ti-translation-icon {
+  animation: ti-slide-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+.ti-translation-icon:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.ti-translation-icon__svg {
+  display: block !important;
+  pointer-events: none !important;
+  transition: transform 0.2s ease !important;
+}
+
+.ti-translation-icon.is-hovering .ti-translation-icon__svg {
+  transform: scale(1.05) !important;
+}
+
+.ti-translation-icon.is-active .ti-translation-icon__svg {
+  transform: scale(0.95) !important;
+}
+
+@keyframes ti-slide-in-up {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-contrast: high) {
+  .ti-translation-icon {
+    border-width: 2px !important;
+    border-color: #000000 !important;
+  }
+
+  .ti-translation-icon.is-hovering {
+    background-color: #000000 !important;
+  }
+
+  .ti-translation-icon__svg {
+    filter: invert(1) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-translation-icon {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  .ti-translation-icon {
+    display: none !important;
+  }
+}

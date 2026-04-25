@@ -1,0 +1,144 @@
+.ti-action-toolbar {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  /* transition: opacity 0.2s ease, visibility 0.2s ease !important; */
+  width: 100% !important;
+}
+
+/* Toolbar groups */
+.ti-toolbar-left,
+.ti-toolbar-right {
+  display: flex !important;
+  gap: 2px !important;
+  align-items: center !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.ti-toolbar-left {
+  flex: 0 1 auto !important;
+}
+
+.ti-toolbar-right {
+  flex: 0 1 auto !important;
+}
+
+.ti-language-label {
+  font-size: 10px !important;
+  color: var(--ti-color-text-secondary, #5f6368) !important;
+  background: var(--ti-color-surface-variant, #f1f3f4) !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  margin-right: 4px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  opacity: 0.8 !important;
+  border: 1px solid var(--ti-color-border, rgba(0, 0, 0, 0.05)) !important;
+}
+
+/* Layout variants */
+.ti-layout-horizontal {
+  flex-direction: row !important;
+}
+
+.ti-layout-horizontal .ti-toolbar-left,
+.ti-layout-horizontal .ti-toolbar-right {
+  flex-direction: row !important;
+}
+
+.ti-layout-vertical {
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+}
+
+.ti-layout-vertical .ti-toolbar-left,
+.ti-layout-vertical .ti-toolbar-right {
+  flex-direction: column !important;
+  width: 100% !important;
+}
+
+.ti-layout-vertical .ti-toolbar-right {
+  margin-top: 4px !important;
+}
+
+/* Position variants */
+.ti-position-top-right {
+  position: absolute !important;
+  top: 8px !important;
+  right: 0 !important;
+  max-width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+}
+
+.ti-position-top-left {
+  position: absolute !important;
+  top: 8px !important;
+  left: 0 !important;
+  max-width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+}
+
+.ti-position-bottom-right {
+  position: absolute !important;
+  bottom: 8px !important;
+  right: 0 !important;
+  max-width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+  right: 8px !important;
+}
+
+.ti-position-bottom-left {
+  position: absolute !important;
+  bottom: 8px !important;
+  left: 0 !important;
+  max-width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+}
+
+.ti-position-inline {
+  position: relative !important;
+  display: inline-flex !important;
+}
+
+/* Mode-specific styles - simplified */
+.ti-mode-input,
+.ti-mode-output,
+.ti-mode-floating {
+  background: var(--color-background, rgba(255, 255, 255, 0.95)) !important;
+  border-radius: 4px !important;
+  padding: 0 2px !important; /* Reduced vertical padding from 2px to 0px */
+  border: 1px solid var(--color-border, transparent) !important;
+  min-height: unset !important; /* Ensure no minimum height is enforced */
+  line-height: 1 !important;
+}
+
+.ti-mode-inline,
+.ti-mode-sidepanel {
+  background: transparent !important;
+  padding: 0 2px !important; /* Reduced vertical padding */
+}
+
+/* Content-based visibility - Removed to always show toolbar with full opacity
+   Individual buttons now handle disabled state instead of toolbar transparency */
+
+/* Dark mode support - using theme classes for consistency */
+:root.theme-dark .ti-mode-input,
+:root.theme-dark .ti-mode-output,
+:root.theme-dark .ti-mode-floating,
+.theme-dark .ti-mode-input,
+.theme-dark .ti-mode-output,
+.theme-dark .ti-mode-floating {
+  background: var(--color-surface, rgba(32, 33, 36, 0.9)) !important;
+  border-color: var(--color-border, rgba(255, 255, 255, 0.15)) !important;
+}
+
+/* Ensure proper spacing for icon-only buttons */
+:root.theme-dark .ti-action-toolbar,
+.theme-dark .ti-action-toolbar {
+  /* Add slight padding to ensure icons have proper spacing */
+  gap: 2px !important;
+}
