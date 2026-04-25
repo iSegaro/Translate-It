@@ -36,7 +36,7 @@
 }
 
 // UI Components
-@mixin ti-toolbar-button-minimal {
+@mixin ti-toolbar-button-minimal($icon-size: 20px) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -65,8 +65,8 @@
   }
 
   svg, img {
-    width: 18px;
-    height: 18px;
+    width: $icon-size;
+    height: $icon-size;
   }
 }
 
