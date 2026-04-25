@@ -107,30 +107,29 @@ async function createMountPoint() {
         position: fixed !important; 
         top: 0 !important; 
         left: 0 !important; 
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100vw !important; 
-        height: 100vh !important; 
+        width: 100vw !important;
+        height: 100vh !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
         pointer-events: none !important; 
         z-index: 2147483647 !important; 
-        overflow: visible !important; 
+        overflow: hidden !important; 
         visibility: visible !important;
-        /* CRITICAL: Isolate this layer completely from the host page's layout engine */
+        direction: ltr !important;
         contain: strict !important;
         isolation: isolate !important;
-        will-change: transform !important;
+        transform: none !important;
       }
       #${UI_HOST_IDS.APP_CONTAINER} { 
-        position: absolute !important; 
+        position: relative !important; 
         top: 0 !important;
         left: 0 !important;
         width: 100% !important; 
         height: 100% !important; 
         pointer-events: none !important; 
         overflow: visible !important; 
+        direction: ltr !important;
       }
       #${UI_HOST_IDS.APP_CONTAINER} > * { 
         pointer-events: auto !important; 
@@ -150,8 +149,8 @@ async function createMountPoint() {
     }
 
     shadowRoot.appendChild(appContainer);
-    // CRITICAL: Append to documentElement (html) instead of body
-    // This isolates the UI host from body-level transforms and style shifts
+    // CRITICAL: Append to documentElement (html) to escape any transforms or filters applied to body
+    // This ensures position: fixed children anchor to the viewport correctly
     document.documentElement.appendChild(hostElement);
   }
 

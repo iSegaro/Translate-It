@@ -19,29 +19,31 @@
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
   z-index: 2147483647 !important;
   pointer-events: none !important;
   direction: ltr !important;
   text-align: left !important;
-  overflow: visible !important;
+  overflow: hidden !important;
+  visibility: visible !important;
+  /* CRITICAL: contain: strict forces the host to stay fixed to viewport and ignore document width shifts */
   contain: strict !important;
   isolation: isolate !important;
-  will-change: transform !important;
+  transform: none !important;
 }
 
 .content-app-container {
   display: block !important;
-  position: absolute !important;
+  position: relative !important;
   top: 0 !important;
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
   pointer-events: none !important;
   overflow: visible !important;
+  direction: ltr !important;
+  text-align: left !important;
 }
 
 /* Enable pointer events only for actual interactive UI elements */
