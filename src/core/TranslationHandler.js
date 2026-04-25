@@ -10,11 +10,13 @@ import DefaultStrategy from "@/features/text-field-interaction/strategies/Defaul
 import DiscordStrategy from "@/features/text-field-interaction/strategies/DiscordStrategy.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 
-
 import { debounce } from "../core/debounce.js";
 import { state, TranslationMode } from "@/shared/config/config.js";
 import { logMethod } from "../core/helpers.js";
-import { detectOS as detectPlatform, OS_PLATFORMS as Platform } from "../utils/browser/compatibility.js";
+import {
+  detectOS as detectPlatform,
+  OS_PLATFORMS as Platform,
+} from "../utils/browser/compatibility.js";
 import EventCoordinator from "./EventCoordinator.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
@@ -22,8 +24,8 @@ import FeatureManager from "@/core/managers/content/FeatureManager.js";
 import { translateFieldViaSmartHandler } from "../handlers/smartTranslationIntegration.js";
 import ExtensionContextManager from "../core/extensionContext.js";
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
 // Singleton instance
 let translationHandlerInstance = null;
@@ -32,12 +34,20 @@ export default class TranslationHandler {
   constructor(featureManager = null) {
     // Enforce singleton pattern
     if (translationHandlerInstance) {
-      const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
-      logger.debug('TranslationHandler singleton already exists, returning existing instance');
+      const logger = getScopedLogger(
+        LOG_COMPONENTS.BACKGROUND,
+        "TranslationHandler",
+      );
+      logger.debug(
+        "TranslationHandler singleton already exists, returning existing instance",
+      );
       return translationHandlerInstance;
     }
     // Initialize logger
-    this.logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TranslationHandler');
+    this.logger = getScopedLogger(
+      LOG_COMPONENTS.BACKGROUND,
+      "TranslationHandler",
+    );
 
     this.notifier = new NotificationManager();
     this.errorHandler = new ErrorHandler(this.notifier);
@@ -65,18 +75,18 @@ export default class TranslationHandler {
     // Use provided FeatureManager or get singleton instance (for backward compatibility)
     this.featureManager = featureManager || FeatureManager.getInstance();
 
-    this.logger.debug('Creating EventCoordinator...');
+    this.logger.debug("Creating EventCoordinator...");
     this.eventCoordinator = new EventCoordinator(this, this.featureManager);
-    this.logger.debug('EventCoordinator created successfully');
+    this.logger.debug("EventCoordinator created successfully");
 
     // Store singleton instance
     translationHandlerInstance = this;
-    this.logger.debug('TranslationHandler singleton created');
+    this.logger.debug("TranslationHandler singleton created");
   }
 
   @logMethod
   reinitialize() {
-  this.logger.debug('Reinitializing state after update...');
+    this.logger.debug("Reinitializing state after update...");
     this.isProcessing = false;
     this.select_Element_ModeActive = false;
   }
@@ -115,7 +125,7 @@ export default class TranslationHandler {
         origin: "TranslationHandler",
       });
     } catch (error) {
-  this.logger.error('Error handling failed:', error);
+      this.logger.error("Error handling failed:", error);
       throw this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "TranslationHandler-handleError",
@@ -137,7 +147,7 @@ export default class TranslationHandler {
 
   async handleCtrlSlash() {
     // Note: handleCtrlSlash is now handled by ShortcutManager in content-scripts
-  this.logger.debug('Ctrl+/ handling delegated to ShortcutManager');
+    this.logger.debug("Ctrl+/ handling delegated to ShortcutManager");
   }
 
   async handleEditableElement(event) {
@@ -158,7 +168,6 @@ export default class TranslationHandler {
           return;
         }
       }
-
 
       state.translateMode = TranslationMode.Field;
 
@@ -245,7 +254,7 @@ export default class TranslationHandler {
 
   getSelectElementContext() {
     // Only available in window context (content scripts/web pages)
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
       return {
         select_element: window.getSelection(),
         activeElement: document.activeElement,

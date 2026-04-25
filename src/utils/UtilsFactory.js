@@ -1,20 +1,22 @@
 // src/utils/UtilsFactory.js
 // Factory for loading utils modules with optimized splitting
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
 // Static imports for core utilities (lightweight and frequently used)
-import * as eventsUtils from './browser/events.js';
-import * as compatibilityUtils from './browser/compatibility.js';
-import getActionbarIconManager, { ActionbarIconManager } from './browser/ActionbarIconManager.js';
-import * as themeUtils from './ui/theme.js';
-import * as exclusionUtils from './ui/exclusion.js';
-import * as htmlSanitizerUtils from './ui/html-sanitizer.js';
-import * as secureStorageModule from './secureStorage.js';
-import * as messageIdModule from './messaging/messageId.js';
+import * as eventsUtils from "./browser/events.js";
+import * as compatibilityUtils from "./browser/compatibility.js";
+import getActionbarIconManager, {
+  ActionbarIconManager,
+} from "./browser/ActionbarIconManager.js";
+import * as themeUtils from "./ui/theme.js";
+import * as exclusionUtils from "./ui/exclusion.js";
+import * as htmlSanitizerUtils from "./ui/html-sanitizer.js";
+import * as secureStorageModule from "./secureStorage.js";
+import * as messageIdModule from "./messaging/messageId.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.UTILS, 'UtilsFactory');
+const logger = getScopedLogger(LOG_COMPONENTS.UTILS, "UtilsFactory");
 
 /**
  * Factory class for utils modules
@@ -26,7 +28,7 @@ class UtilsFactory {
     this.loadedModules = new Map();
     // Loading promises to prevent duplicate loads
     this.loadingPromises = new Map();
-    
+
     // Initialize static modules in cache
     this._initializeStaticModules();
   }
@@ -36,31 +38,31 @@ class UtilsFactory {
     const legacyCompatibility = {
       ...compatibilityUtils,
       detectPlatform: compatibilityUtils.detectOS,
-      Platform: compatibilityUtils.OS_PLATFORMS
+      Platform: compatibilityUtils.OS_PLATFORMS,
     };
-    
-    this.loadedModules.set('browser', {
+
+    this.loadedModules.set("browser", {
       ...eventsUtils,
       ...legacyCompatibility,
       ActionbarIconManager,
-      getActionbarIconManager
+      getActionbarIconManager,
     });
 
     // UI Utils
-    this.loadedModules.set('ui', {
+    this.loadedModules.set("ui", {
       ...themeUtils,
       ...exclusionUtils,
-      ...htmlSanitizerUtils
+      ...htmlSanitizerUtils,
     });
 
     // Security Utils
-    this.loadedModules.set('security', {
-      ...secureStorageModule
+    this.loadedModules.set("security", {
+      ...secureStorageModule,
     });
 
     // Core Utils
-    this.loadedModules.set('core', {
-      ...messageIdModule
+    this.loadedModules.set("core", {
+      ...messageIdModule,
     });
   }
 
@@ -75,7 +77,7 @@ class UtilsFactory {
    * Async module loader for compatibility
    */
   async getModuleSafe(moduleName) {
-    if (moduleName === 'i18n' || moduleName === 'languages') {
+    if (moduleName === "i18n" || moduleName === "languages") {
       return await this.getI18nUtils();
     }
     return this.loadedModules.get(moduleName);
@@ -85,26 +87,26 @@ class UtilsFactory {
    * Load i18n utilities lazily (remain dynamic due to size)
    */
   async getI18nUtils() {
-    if (this.loadedModules.has('i18n')) {
-      return this.loadedModules.get('i18n');
+    if (this.loadedModules.has("i18n")) {
+      return this.loadedModules.get("i18n");
     }
 
-    if (this.loadingPromises.has('i18n')) {
-      return await this.loadingPromises.get('i18n');
+    if (this.loadingPromises.has("i18n")) {
+      return await this.loadingPromises.get("i18n");
     }
 
     const loadingPromise = this._loadI18nUtils();
-    this.loadingPromises.set('i18n', loadingPromise);
+    this.loadingPromises.set("i18n", loadingPromise);
 
     const utils = await loadingPromise;
-    this.loadedModules.set('i18n', utils);
-    this.loadingPromises.delete('i18n');
+    this.loadedModules.set("i18n", utils);
+    this.loadingPromises.delete("i18n");
 
     return utils;
   }
 
   async _loadI18nUtils() {
-    logger.debug('Loading i18n utils lazily');
+    logger.debug("Loading i18n utils lazily");
 
     try {
       const [
@@ -112,23 +114,23 @@ class UtilsFactory {
         languagesUtils,
         pluginModule,
         languagePackLoader,
-        lazyLoader
+        lazyLoader,
       ] = await Promise.all([
-        import('./i18n/i18n.js'),
-        import('./i18n/languages.js'),
-        import('./i18n/plugin.js'),
-        import('./i18n/LanguagePackLoader.js'),
-        import('./i18n/LazyLanguageLoader.js')
+        import("./i18n/i18n.js"),
+        import("./i18n/languages.js"),
+        import("./i18n/plugin.js"),
+        import("./i18n/LanguagePackLoader.js"),
+        import("./i18n/LazyLanguageLoader.js"),
       ]);
 
       // Preload core languages in background
-      languagePackLoader.preloadCoreLanguagePacks().catch(err => {
-        logger.debug('Failed to preload core languages:', err);
+      languagePackLoader.preloadCoreLanguagePacks().catch((err) => {
+        logger.debug("Failed to preload core languages:", err);
       });
 
       // Preload user languages based on preferences
-      lazyLoader.preloadUserLanguages().catch(err => {
-        logger.debug('Failed to preload user languages:', err);
+      lazyLoader.preloadUserLanguages().catch((err) => {
+        logger.debug("Failed to preload user languages:", err);
       });
 
       return {
@@ -141,8 +143,9 @@ class UtilsFactory {
           loadLanguagePack: languagePackLoader.loadLanguagePack,
           loadLanguagePackByType: languagePackLoader.loadLanguagePackByType,
           isLanguagePackAvailable: languagePackLoader.isLanguagePackAvailable,
-          isLanguagePackAvailableByType: languagePackLoader.isLanguagePackAvailableByType,
-          getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo
+          isLanguagePackAvailableByType:
+            languagePackLoader.isLanguagePackAvailableByType,
+          getLanguagePackCacheInfo: languagePackLoader.getLanguagePackCacheInfo,
         },
         lazyLanguageLoader: {
           lazyLoadTranslationLanguage: lazyLoader.lazyLoadTranslationLanguage,
@@ -152,11 +155,11 @@ class UtilsFactory {
           getLanguageDataLazy: lazyLoader.getLanguageDataLazy,
           detectLanguageLazy: lazyLoader.detectLanguageLazy,
           clearLazyLoadCache: lazyLoader.clearLazyLoadCache,
-          getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo
-        }
+          getLazyLoadCacheInfo: lazyLoader.getLazyLoadCacheInfo,
+        },
       };
     } catch (error) {
-      logger.error('Failed to load i18n utils:', error);
+      logger.error("Failed to load i18n utils:", error);
       throw error;
     }
   }
@@ -165,20 +168,21 @@ class UtilsFactory {
    * Load browser utilities (now returns sync but kept async for API compatibility)
    */
   async getBrowserUtils() {
-    return this.loadedModules.get('browser');
+    return this.loadedModules.get("browser");
   }
 
   /**
    * Load text processing utilities lazily
    */
   async getTextUtils() {
-    if (this.loadedModules.has('text')) {
-      return this.loadedModules.get('text');
+    if (this.loadedModules.has("text")) {
+      return this.loadedModules.get("text");
     }
 
-    const { TranslationRenderer } = await import('./rendering/TranslationRenderer.js');
+    const { TranslationRenderer } =
+      await import("./rendering/TranslationRenderer.js");
     const utils = { TranslationRenderer };
-    this.loadedModules.set('text', utils);
+    this.loadedModules.set("text", utils);
     return utils;
   }
 
@@ -186,41 +190,41 @@ class UtilsFactory {
    * Load UI utilities
    */
   async getUIUtils() {
-    return this.loadedModules.get('ui');
+    return this.loadedModules.get("ui");
   }
 
   /**
    * Load security utilities
    */
   async getSecurityUtils() {
-    return this.loadedModules.get('security');
+    return this.loadedModules.get("security");
   }
 
   /**
    * Load core utilities
    */
   async getCoreUtils() {
-    return this.loadedModules.get('core');
+    return this.loadedModules.get("core");
   }
 
   /**
    * Clear all cached modules (only clears dynamic ones)
    */
   clearCache() {
-    logger.debug('Clearing utils factory dynamic cache');
-    const browser = this.loadedModules.get('browser');
-    const ui = this.loadedModules.get('ui');
-    const security = this.loadedModules.get('security');
-    const core = this.loadedModules.get('core');
-    
+    logger.debug("Clearing utils factory dynamic cache");
+    const browser = this.loadedModules.get("browser");
+    const ui = this.loadedModules.get("ui");
+    const security = this.loadedModules.get("security");
+    const core = this.loadedModules.get("core");
+
     this.loadedModules.clear();
     this.loadingPromises.clear();
-    
+
     // Restore static ones
-    this.loadedModules.set('browser', browser);
-    this.loadedModules.set('ui', ui);
-    this.loadedModules.set('security', security);
-    this.loadedModules.set('core', core);
+    this.loadedModules.set("browser", browser);
+    this.loadedModules.set("ui", ui);
+    this.loadedModules.set("security", security);
+    this.loadedModules.set("core", core);
   }
 
   /**
@@ -229,7 +233,7 @@ class UtilsFactory {
   getStatus() {
     return {
       loadedModules: Array.from(this.loadedModules.keys()),
-      loadingPromises: Array.from(this.loadingPromises.keys())
+      loadingPromises: Array.from(this.loadingPromises.keys()),
     };
   }
 }

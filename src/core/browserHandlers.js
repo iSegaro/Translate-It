@@ -1,11 +1,11 @@
 // src/core/browserHandlers.js
 // Provides functions to add handlers based on browser capabilities
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BrowserHandlers');
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, "BrowserHandlers");
 
 /**
  * Detect if current browser supports Chromium features (Chrome, Edge, Opera, etc.)
@@ -13,12 +13,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'BrowserHandlers');
  */
 export const isChromium = () => {
   const info = getBrowserInfoSync();
-  return info.isChrome || info.isEdge || /chromium|opera|opr/i.test(navigator.userAgent || '');
+  return (
+    info.isChrome ||
+    info.isEdge ||
+    /chromium|opera|opr/i.test(navigator.userAgent || "")
+  );
 };
 
 /**
  * Detect if current browser is Chrome specifically
- * @returns {boolean} True if Chrome, false otherwise  
+ * @returns {boolean} True if Chrome, false otherwise
  */
 export const isChrome = () => {
   return getBrowserInfoSync().isChrome;
@@ -41,9 +45,13 @@ export const addChromiumSpecificHandlers = () => {
   if (isChromium()) {
     // OFFSCREEN_READY is needed in all Chromium-based browsers (Chrome, Edge, Opera, etc.)
     // Note: Already mapped in LifecycleManager, no need to add again
-    logger.debug('[Chromium] OFFSCREEN_READY handler already configured for Chromium offscreen documents');
+    logger.debug(
+      "[Chromium] OFFSCREEN_READY handler already configured for Chromium offscreen documents",
+    );
   } else {
-    logger.debug('[Firefox/Other] Skipped OFFSCREEN_READY handler (not needed for direct audio)');
+    logger.debug(
+      "[Firefox/Other] Skipped OFFSCREEN_READY handler (not needed for direct audio)",
+    );
   }
 };
 
@@ -55,7 +63,7 @@ export const addChromiumSpecificHandlers = () => {
 export const addFirefoxSpecificHandlers = () => {
   if (isFirefox()) {
     // Currently no Firefox-specific handlers
-    logger.debug('[Firefox] No Firefox-specific handlers to add');
+    logger.debug("[Firefox] No Firefox-specific handlers to add");
   }
 };
 
@@ -65,10 +73,10 @@ export const addFirefoxSpecificHandlers = () => {
  * @param {Object} Handlers - Available handlers object
  */
 export const addBrowserSpecificHandlers = () => {
-  logger.debug('Adding browser-specific handlers...');
+  logger.debug("Adding browser-specific handlers...");
 
   addChromiumSpecificHandlers();
   addFirefoxSpecificHandlers();
 
-  logger.debug('Browser-specific handlers added');
+  logger.debug("Browser-specific handlers added");
 };

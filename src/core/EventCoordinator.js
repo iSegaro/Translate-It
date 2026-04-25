@@ -1,15 +1,15 @@
 /**
  * EventCoordinator - Smart event routing system integrated with FeatureManager
- * 
+ *
  * Modernized to work with Smart Handler Registration system.
  * Now acts as a lightweight coordinator that delegates to FeatureManager
  * for handler management and feature activation.
- * 
+ *
  * Architecture:
  * - FeatureManager → Handles all feature lifecycle
  * - EventCoordinator → Routes events to active handlers only
  * - Backward Compatibility → Maintains existing API surface
- * 
+ *
  * Key Changes:
  * - No more manual exclusion checks
  * - No more manager creation
@@ -17,17 +17,15 @@
  * - Simplified event routing
  */
 
-import {
-  state,
-} from "@/shared/config/config.js";
+import { state } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { logMethod } from "../core/helpers.js";
 import { clearAllCaches } from "@/shared/utils/text/extraction.js";
 import { getTranslationString } from "../utils/i18n/i18n.js";
-import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from "@/shared/config/constants.js";
 
 export default class EventCoordinator {
   /** @param {object} translationHandler
@@ -38,7 +36,7 @@ export default class EventCoordinator {
     this.notifier = translationHandler.notifier;
     this.strategies = translationHandler.strategies;
     this.isProcessing = translationHandler.isProcessing;
-    this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'EventCoordinator');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CORE, "EventCoordinator");
 
     // Bind coordinator methods
     this.handleEvent = this.handleEvent.bind(this);
@@ -52,7 +50,9 @@ export default class EventCoordinator {
     // All managers are now handled by FeatureManager
     // EventCoordinator just routes events to active handlers
 
-    this.logger.info('EventCoordinator initialized (Smart Handler Registration mode)');
+    this.logger.info(
+      "EventCoordinator initialized (Smart Handler Registration mode)",
+    );
   }
 
   /**
@@ -77,9 +77,12 @@ export default class EventCoordinator {
 
     try {
       // Get active feature handlers from FeatureManager
-      const selectElementManager = this.featureManager.getFeatureHandler('selectElement');
-      const textSelectionHandler = this.featureManager.getFeatureHandler('textSelection');
-      const textFieldIconHandler = this.featureManager.getFeatureHandler('textFieldIcon');
+      const selectElementManager =
+        this.featureManager.getFeatureHandler("selectElement");
+      const textSelectionHandler =
+        this.featureManager.getFeatureHandler("textSelection");
+      const textFieldIconHandler =
+        this.featureManager.getFeatureHandler("textFieldIcon");
 
       // Check if select element is active (priority handling)
       if (selectElementManager?.isSelectElementActive?.()) {
@@ -89,7 +92,10 @@ export default class EventCoordinator {
       }
 
       // === TEXT FIELD COORDINATION ===
-      if (textFieldIconHandler?.isActive && this.isEditableElement(event.target)) {
+      if (
+        textFieldIconHandler?.isActive &&
+        this.isEditableElement(event.target)
+      ) {
         await this.coordinateTextFieldHandling(event, textFieldIconHandler);
         return;
       }
@@ -99,7 +105,6 @@ export default class EventCoordinator {
         await this.coordinateTextSelection(event, textSelectionHandler);
         return;
       }
-
     } catch (rawError) {
       await this.handleCoordinationError(rawError, event);
     }
@@ -115,7 +120,7 @@ export default class EventCoordinator {
 
       const target = event.target;
       const textFieldManager = textFieldIconHandler.getTextFieldIconManager();
-      
+
       if (!textFieldManager) {
         // No TextFieldIconManager available - logged at TRACE level for detailed debugging
         // this.logger.trace('No TextFieldIconManager available in handler');
@@ -123,18 +128,21 @@ export default class EventCoordinator {
       }
 
       // Delegate based on event type
-      if (event.type === 'focus') {
+      if (event.type === "focus") {
         return await textFieldManager.handleEditableFocus?.(target);
-      } else if (event.type === 'blur') {
+      } else if (event.type === "blur") {
         return textFieldManager.handleEditableBlur?.(target);
       } else {
         event.stopPropagation();
         return await textFieldManager.processEditableElement?.(target);
       }
-      
     } catch (error) {
-      this.logger.error('Error in text field coordination:', error);
-      await this.handleCoordinationError(error, event, 'text-field-coordination');
+      this.logger.error("Error in text field coordination:", error);
+      await this.handleCoordinationError(
+        error,
+        event,
+        "text-field-coordination",
+      );
     }
   }
 
@@ -145,7 +153,7 @@ export default class EventCoordinator {
   async coordinateTextSelection(event, textSelectionHandler) {
     try {
       const textSelectionManager = textSelectionHandler.getSelectionManager();
-      
+
       if (!textSelectionManager) {
         // No TextSelectionManager available - logged at TRACE level for detailed debugging
         // this.logger.trace('No TextSelectionManager available in handler');
@@ -153,26 +161,36 @@ export default class EventCoordinator {
       }
 
       // Check if Ctrl requirement is satisfied
-      if (typeof textSelectionManager.shouldProcessTextSelection === 'function') {
-        const shouldProcess = await textSelectionManager.shouldProcessTextSelection(event);
+      if (
+        typeof textSelectionManager.shouldProcessTextSelection === "function"
+      ) {
+        const shouldProcess =
+          await textSelectionManager.shouldProcessTextSelection(event);
         if (!shouldProcess) return;
       }
 
       // Delegate to TextSelectionManager
-      if (typeof textSelectionManager.handleTextSelection === 'function') {
+      if (typeof textSelectionManager.handleTextSelection === "function") {
         await textSelectionManager.handleTextSelection(event);
       }
-      
     } catch (error) {
-      this.logger.error('Error in text selection coordination:', error);
-      await this.handleCoordinationError(error, event, 'text-selection-coordination');
+      this.logger.error("Error in text selection coordination:", error);
+      await this.handleCoordinationError(
+        error,
+        event,
+        "text-selection-coordination",
+      );
     }
   }
 
   /**
    * Centralized error handling for coordination
    */
-  async handleCoordinationError(rawError, event, context = 'event-coordination') {
+  async handleCoordinationError(
+    rawError,
+    event,
+    context = "event-coordination",
+  ) {
     const error = await ErrorHandler.processError(rawError);
     await this.translationHandler.errorHandler.handle(error, {
       type: ErrorTypes.UI,
@@ -189,21 +207,21 @@ export default class EventCoordinator {
 
   isEditableElement(element) {
     if (!element) return false;
-    
+
     const tagName = element.tagName?.toLowerCase();
     const type = element.type?.toLowerCase();
-    
+
     // Check for input elements - include all text field types or empty type (defaults to text)
-    if (tagName === 'input') {
+    if (tagName === "input") {
       return !type || INPUT_TYPES.ALL_TEXT_FIELDS.includes(type);
     }
-    
+
     // Check for textarea
-    if (tagName === 'textarea') return true;
-    
+    if (tagName === "textarea") return true;
+
     // Check for contenteditable elements
-    if (element.contentEditable === 'true') return true;
-    
+    if (element.contentEditable === "true") return true;
+
     return false;
   }
 
@@ -216,12 +234,16 @@ export default class EventCoordinator {
       event.metaKey
     ) {
       this.ctrlKeyPressed = true;
-      
+
       // Update active TextSelectionManager key state if available
-      const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
+      const textSelectionHandler =
+        this.featureManager?.getFeatureHandler("textSelection");
       if (textSelectionHandler?.isActive) {
         const textSelectionManager = textSelectionHandler.getSelectionManager();
-        if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
+        if (
+          textSelectionManager &&
+          typeof textSelectionManager.updateCtrlKeyState === "function"
+        ) {
           textSelectionManager.updateCtrlKeyState(true);
         }
       }
@@ -233,12 +255,17 @@ export default class EventCoordinator {
       // تأخیر کوتاه برای اطمینان از اینکه mouseup event پردازش شده
       setTimeout(() => {
         this.ctrlKeyPressed = false;
-        
+
         // Update active TextSelectionManager key state if available
-        const textSelectionHandler = this.featureManager?.getFeatureHandler('textSelection');
+        const textSelectionHandler =
+          this.featureManager?.getFeatureHandler("textSelection");
         if (textSelectionHandler?.isActive) {
-          const textSelectionManager = textSelectionHandler.getSelectionManager();
-          if (textSelectionManager && typeof textSelectionManager.updateCtrlKeyState === 'function') {
+          const textSelectionManager =
+            textSelectionHandler.getSelectionManager();
+          if (
+            textSelectionManager &&
+            typeof textSelectionManager.updateCtrlKeyState === "function"
+          ) {
             textSelectionManager.updateCtrlKeyState(false);
           }
         }
@@ -247,13 +274,14 @@ export default class EventCoordinator {
   }
 
   // === BACKWARD COMPATIBILITY METHODS ===
-  
+
   /**
    * @deprecated - Now delegated to FeatureManager handlers
    * Kept for backward compatibility
    */
   handleEditableFocus(element) {
-    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    const textFieldHandler =
+      this.featureManager?.getFeatureHandler("textFieldIcon");
     if (textFieldHandler?.isActive) {
       const manager = textFieldHandler.getTextFieldIconManager();
       return manager?.handleEditableFocus?.(element) || null;
@@ -266,7 +294,8 @@ export default class EventCoordinator {
    * Kept for backward compatibility
    */
   async handleEditableElement(event) {
-    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    const textFieldHandler =
+      this.featureManager?.getFeatureHandler("textFieldIcon");
     if (textFieldHandler?.isActive) {
       return await this.coordinateTextFieldHandling(event, textFieldHandler);
     }
@@ -277,7 +306,8 @@ export default class EventCoordinator {
    * Kept for backward compatibility
    */
   handleEditableBlur(element) {
-    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    const textFieldHandler =
+      this.featureManager?.getFeatureHandler("textFieldIcon");
     if (textFieldHandler?.isActive) {
       const manager = textFieldHandler.getTextFieldIconManager();
       if (manager?.handleEditableBlur) {
@@ -291,7 +321,8 @@ export default class EventCoordinator {
    * Kept for backward compatibility
    */
   _processEditableElement(element) {
-    const textFieldHandler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    const textFieldHandler =
+      this.featureManager?.getFeatureHandler("textFieldIcon");
     if (textFieldHandler?.isActive) {
       const manager = textFieldHandler.getTextFieldIconManager();
       return manager?.processEditableElement?.(element) || null;
@@ -301,17 +332,17 @@ export default class EventCoordinator {
 
   // === COMPATIBILITY GETTERS ===
   get textSelectionManager() {
-    const handler = this.featureManager?.getFeatureHandler('textSelection');
+    const handler = this.featureManager?.getFeatureHandler("textSelection");
     return handler?.isActive ? handler.getSelectionManager() : null;
   }
 
   get textFieldManager() {
-    const handler = this.featureManager?.getFeatureHandler('textFieldIcon');
+    const handler = this.featureManager?.getFeatureHandler("textFieldIcon");
     return handler?.isActive ? handler.getTextFieldIconManager() : null;
   }
 
   get selectElementManager() {
-    const handler = this.featureManager?.getFeatureHandler('selectElement');
+    const handler = this.featureManager?.getFeatureHandler("selectElement");
     return handler?.isActive ? handler.getSelectElementManager() : null;
   }
 
@@ -328,7 +359,6 @@ export default class EventCoordinator {
 
   // Note: Select element handling completely removed
   // SelectElementManager handles all select element clicks directly via its own event listeners
-
 
   // Note: ESC key handling completely removed from EventCoordinator
   // All ESC functionality is handled by specialized managers:

@@ -14,7 +14,6 @@ export function getTranslationHandlerInstance() {
   return _handler;
 }
 
-
 /**
  * برای استفاده در تست یا ریست کامل
  */
