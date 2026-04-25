@@ -143,7 +143,7 @@
 
 /* Compact Icon Style (Unification) */
 .is-compact-icon {
-  @include toolbar-button-minimal;
+  @include ti-toolbar-button-minimal;
 
   /* Force internal BaseButton content to center */
   .ti-btn__text {

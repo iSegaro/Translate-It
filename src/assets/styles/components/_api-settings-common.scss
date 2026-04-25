@@ -89,7 +89,7 @@
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
 
-  @include transition-fast(color);
+  @include ti-transition-fast(color);
 
   &:hover {
     color: var(--color-primary-dark);

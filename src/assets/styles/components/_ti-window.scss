@@ -19,17 +19,12 @@
   border-radius: var(--ti-z-modal);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   box-sizing: border-box;
   animation: ti-fade-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
   text-align: left;
   line-height: 1.5;
   font-family: $font-family-base;
-
-  // CSS containment for maximum performance
-  contain: layout style paint;
-  isolation: isolate;
 
   &.ti-active {
     box-shadow: 0 15px 50px rgb(0 0 0 / 25%), 0 0 0 1px rgb(0 0 0 / 5%);
@@ -270,7 +265,7 @@
   cursor: pointer !important;
   background-color: transparent;
 
-  @include transition-fast(background-color);
+  @include ti-transition-fast(background-color);
 
   padding: 0 !important;
   margin: 0 !important;
@@ -294,10 +289,6 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-
-  // Modern CSS containment
-  contain: layout style paint;
-  isolation: isolate;
 
   // Optimized list styles for dictionary content
   ul,

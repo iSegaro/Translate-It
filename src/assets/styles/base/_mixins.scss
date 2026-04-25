@@ -5,6 +5,71 @@
 @use "sass:math";
 @use "./variables" as *;
 
+// Transitions
+@mixin ti-transition-fast($properties...) {
+  transition: $properties $transition-fast;
+}
+
+@mixin ti-transition-base($properties...) {
+  transition: $properties $transition-base;
+}
+
+@mixin ti-transition-slow($properties...) {
+  transition: $properties $transition-slow;
+}
+
+// Shadows
+@mixin ti-shadow-sm {
+  box-shadow: $shadow-sm;
+}
+
+@mixin ti-shadow-base {
+  box-shadow: $shadow-base;
+}
+
+@mixin ti-shadow-md {
+  box-shadow: $shadow-md;
+}
+
+@mixin ti-shadow-lg {
+  box-shadow: $shadow-lg;
+}
+
+// UI Components
+@mixin ti-toolbar-button-minimal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all $transition-fast;
+
+  &:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-text);
+  }
+
+  &:active {
+    background-color: var(--color-background-active);
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: transparent;
+  }
+
+  svg, img {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 // Standard flexbox layout helper
 @mixin flex-center {
   display: flex;

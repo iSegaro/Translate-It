@@ -159,7 +159,7 @@
    ------------------------
 */
 .ti-icon-button {
-  @include toolbar-button-minimal;
+  @include ti-toolbar-button-minimal;
 
   &:hover:not(:disabled) {
     background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;

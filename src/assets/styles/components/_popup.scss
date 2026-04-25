@@ -27,7 +27,7 @@ body.popup-context {
   height: auto;
   background: var(--bg-color);
 
-  @include shadow-md;
+  @include ti-shadow-md;
 
   border-radius: $border-radius-md;
   overflow: hidden;
@@ -64,7 +64,7 @@ body.popup-context .ti-toolbar-icon {
   cursor: pointer;
   opacity: var(--icon-opacity);
 
-  @include transition-fast(opacity, filter, background-color);
+  @include ti-transition-fast(opacity, filter, background-color);
 
   filter: var(--icon-filter);
 
@@ -75,7 +75,7 @@ body.popup-context .ti-toolbar-icon {
 
 // Revert icon animation
 .ti-revert-icon {
-  @include transition-slow(transform, opacity, filter);
+  @include ti-transition-slow(transform, opacity, filter);
 
   &:hover {
     transform: rotate(360deg);
