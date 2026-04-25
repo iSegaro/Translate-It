@@ -14,8 +14,8 @@
   align-items: center !important;
   justify-content: center !important;
   width: 100% !important;
-  padding: 12px 10px !important;
-  gap: 4px !important;
+  padding: 16px 12px !important;
+  gap: 8px !important;
   box-sizing: border-box !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
@@ -46,13 +46,13 @@
 }
 
 .ti-m-icon-container {
-  width: 40px !important;
-  height: 40px !important;
+  width: 44px !important;
+  height: 44px !important;
   border-radius: 12px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  margin-bottom: 2px !important;
+  margin-bottom: 4px !important;
   flex-shrink: 0 !important;
   transition: transform 0.1s ease, background-color 0.2s ease !important;
 
@@ -65,12 +65,17 @@
 }
 
 .ti-m-action-label {
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
+  line-height: 1.2 !important;
   text-align: center !important;
-  white-space: nowrap !important;
+  white-space: normal !important;
   width: 100% !important;
   color: var(--ti-mobile-text) !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
 }
 
 /* Specific Icon Colors */

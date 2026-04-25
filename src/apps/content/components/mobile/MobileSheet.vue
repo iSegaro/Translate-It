@@ -161,7 +161,7 @@ const sheetStyle = computed(() => {
   
   if (isPeek) {
     if (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
-      targetHeightPx = 145
+      targetHeightPx = 180
     } else if (activeView.value === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION) {
       // Stabilize height for page translation to prevent jumping and content overflow
       targetHeightPx = 220
