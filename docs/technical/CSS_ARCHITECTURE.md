@@ -227,7 +227,7 @@ The extension uses specific entry points to manage the boundary between the exte
 
 ### Documentation Files
 
-#### `/src/assets/styles/README-CSS-VARIABLES.md`
+#### `./CSS_VARIABLES_GUIDE.md`
 - Best practices guide
 - Common pitfalls and solutions
 - Future usage patterns
