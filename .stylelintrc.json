@@ -4,6 +4,8 @@
     "stylelint-config-recommended-vue"
   ],
   "rules": {
+    "at-rule-no-unknown": null,
+    "scss/at-rule-no-unknown": true,
     "selector-class-pattern": [
       "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
       {
@@ -51,12 +53,6 @@
       "always",
       {
         "ignore": ["stylelint-commands"]
-      }
-    ],
-    "at-rule-no-unknown": [
-      true,
-      {
-        "ignoreAtRules": ["use", "forward"]
       }
     ],
     "scss/dollar-variable-pattern": [
@@ -109,6 +105,7 @@
     },
     {
       "files": [
+        "src/assets/styles/main.scss",
         "src/assets/styles/content-app-global.scss",
         "src/assets/styles/content-main-dom.scss",
         "src/assets/styles/content-main-dom.css"
@@ -117,7 +114,8 @@
         "declaration-no-important": null,
         "selector-max-specificity": null,
         "selector-max-attribute": null,
-        "selector-class-pattern": null
+        "selector-class-pattern": null,
+        "selector-max-id": null
       }
     }
   ],
