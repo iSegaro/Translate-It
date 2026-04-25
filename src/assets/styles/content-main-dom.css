@@ -23,8 +23,9 @@ html[data-translate-it-select-mode="true"] body * {
   cursor: crosshair;
 }
 
-/* Disable interactions on clickable elements during select mode
-Scoped to select-element mode only with high specificity */
+/* Disable interactions on clickable elements during select mode */
+
+/* Scoped to select-element mode only with high specificity */
 html[data-translate-it-select-mode="true"] a:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
 html[data-translate-it-select-mode="true"] button:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
 html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
@@ -39,6 +40,7 @@ html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast], [data
 }
 
 /* Disable default hover effects during select mode */
+
 /* Common content elements that might have hover effects */
 html[data-translate-it-select-mode="true"] *:hover,
 html[data-translate-it-select-mode="true"] body:hover,
@@ -67,6 +69,7 @@ html[data-translate-it-select-mode="true"] textarea:hover {
 }
 
 /* JS-controlled highlighting for selected elements */
+
 /* Using CSS custom properties for consistency */
 :root {
   --translate-highlight-color: #f80;

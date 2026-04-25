@@ -78,26 +78,8 @@
       0 0 0 2px rgb(66 133 244 / 20%),
       0 2px 8px rgb(0 0 0 / 10%) !important;
   }
-}
 
-.ti-field-icon__svg {
-  width: 16px !important;
-  height: 16px !important;
-  display: block !important;
-  pointer-events: none;
-  transition: transform 0.2s ease !important;
-
-  .ti-field-icon.is-hovering & {
-    transform: scale(1.05) !important;
-  }
-
-  .ti-field-icon.is-active & {
-    transform: scale(0.95) !important;
-  }
-}
-
-// Size variants
-.ti-field-icon {
+  // Size variants
   &.size-small {
     width: 24px !important;
     height: 24px !important;
@@ -127,10 +109,8 @@
       height: 18px !important;
     }
   }
-}
 
-// Placement-specific styles
-.ti-field-icon {
+  // Placement-specific styles
   // Inside placements - general styling
   &.placement-inside-right,
   &.placement-inside-left,
@@ -142,9 +122,9 @@
     background-color: rgb(255 255 255 / 95%);
     backdrop-filter: blur(2px);
     border-color: rgb(224 224 224 / 80%);
-    
+
     // Subtle shadow to distinguish from content
-    box-shadow: 
+    box-shadow:
       0 1px 4px rgb(0 0 0 / 12%),
       0 0 0 1px rgb(255 255 255 / 80%);
   }
@@ -156,7 +136,7 @@
     // Additional styling to avoid scrollbar conflicts
     margin-right: 2px;
     margin-bottom: 2px;
-    
+
     // More subtle appearance in multiline contexts
     background-color: rgb(255 255 255 / 90%);
     border-color: rgb(200 200 200 / 80%);
@@ -185,21 +165,37 @@
   &.smart-attached {
     // Visual indicator for smart positioning
     border-color: rgb(66 133 244 / 30%);
-    
+
     // Different styling for inside vs outside placements
     &:not([class*="inside"]) {
-      box-shadow: 
+      box-shadow:
         0 2px 8px rgb(66 133 244 / 10%),
         0 1px 3px rgb(66 133 244 / 8%),
         inset 0 0 0 1px rgb(66 133 244 / 10%);
     }
-    
+
     &[class*="inside"] {
-      box-shadow: 
+      box-shadow:
         0 1px 4px rgb(66 133 244 / 15%),
         0 0 0 1px rgb(66 133 244 / 20%),
         inset 0 0 0 1px rgb(255 255 255 / 90%);
     }
+  }
+}
+
+.ti-field-icon__svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  pointer-events: none;
+  transition: transform 0.2s ease !important;
+
+  .ti-field-icon.is-hovering & {
+    transform: scale(1.05) !important;
+  }
+
+  .ti-field-icon.is-active & {
+    transform: scale(0.95) !important;
   }
 }
 
@@ -260,12 +256,12 @@
   .ti-field-icon {
     border-width: 2px;
     border-color: #000;
-    
+
     &.is-hovering {
       background-color: #000;
       color: #fff;
     }
-    
+
     .ti-field-icon__svg {
       filter: contrast(2);
     }
@@ -278,7 +274,7 @@
     animation: none;
     transition: none;
   }
-  
+
   .icon-enter-active,
   .icon-leave-active {
     transition: none;

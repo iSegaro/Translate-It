@@ -105,17 +105,24 @@
     },
     {
       "files": [
+        "src/assets/styles/layout/_options.scss",
+        "src/assets/styles/layout/_sidepanel.scss",
         "src/assets/styles/main.scss",
         "src/assets/styles/content-app-global.scss",
         "src/assets/styles/content-main-dom.scss",
-        "src/assets/styles/content-main-dom.css"
+        "src/assets/styles/content-main-dom.css",
+        "src/assets/styles/components/_ti-field-icon.scss",
+        "src/assets/styles/components/_ti-window.scss",
+        "src/assets/styles/components/_toast-integration.scss"
       ],
       "rules": {
         "declaration-no-important": null,
         "selector-max-specificity": null,
         "selector-max-attribute": null,
         "selector-class-pattern": null,
-        "selector-max-id": null
+        "selector-max-id": null,
+        "selector-max-class": null,
+        "declaration-block-no-duplicate-properties": null
       }
     }
   ],
