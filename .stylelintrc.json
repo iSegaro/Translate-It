@@ -3,7 +3,6 @@
     "stylelint-config-standard-scss",
     "stylelint-config-recommended-vue"
   ],
-  "customSyntax": "postcss-html",
   "rules": {
     "selector-class-pattern": [
       "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
@@ -14,9 +13,6 @@
     "selector-id-pattern": null,
     "no-duplicate-selectors": true,
     "no-empty-source": null,
-    "string-quotes": "single",
-    "indentation": 2,
-    "max-empty-lines": 2,
     "rule-empty-line-before": [
       "always",
       {
@@ -50,9 +46,6 @@
     "declaration-block-no-redundant-longhand-properties": true,
     "property-no-vendor-prefix": true,
     "value-no-vendor-prefix": true,
-    "media-feature-range-operator-space-before": "never",
-    "media-feature-range-operator-space-after": "always",
-    "media-feature-parentheses-space-inside": "never",
     "media-feature-name-no-vendor-prefix": true,
     "comment-empty-line-before": [
       "always",
@@ -83,18 +76,12 @@
       {
         "message": "Placeholders should use kebab-case"
       }
-    ],
-    "order/properties-alphabetical-order": true,
-    "plugin/selector-bem-pattern": {
-      "preset": "bem",
-      "implicitComponents": true,
-      "componentNamePattern": "ti-[a-z]+",
-      "utilitySelectors": "ti-u-([a-z]-?)+"
-    }
+    ]
   },
   "overrides": [
     {
       "files": ["**/*.vue"],
+      "customSyntax": "postcss-html",
       "rules": {
         "selector-class-pattern": [
           "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
