@@ -109,7 +109,7 @@
         <div 
           class="ti-m-progress-bar-fill" 
           :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
-          :style="{ width: pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
+          :style="{ '--progress-width': pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
         />
       </div>
     </div>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup>
+import './PageTranslationView.scss'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'

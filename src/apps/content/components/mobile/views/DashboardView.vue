@@ -125,6 +125,7 @@
 </template>
 
 <script setup>
+import './DashboardView.scss'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'

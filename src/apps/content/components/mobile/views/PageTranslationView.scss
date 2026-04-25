@@ -292,10 +292,11 @@
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
   box-shadow: 0 0 10px rgba(51, 154, 240, 0.3) !important;
   background: linear-gradient(90deg, var(--ti-mobile-accent), var(--ti-mobile-accent-hover)) !important;
+  width: var(--progress-width, 0%) !important;
 
   .has-error & {
     background: var(--ti-mobile-error) !important;
-    width: 100% !important;
+    --progress-width: 100% !important;
   }
 
   &.indeterminate { 
