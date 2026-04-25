@@ -16,7 +16,7 @@
   max-height: 85vh;
   z-index: var(--ti-z-modal, 10001);
   box-shadow: 0 10px 40px rgb(0 0 0 / 20%), 0 0 0 1px rgb(0 0 0 / 5%);
-  border-radius: var(--ti-z-modal);
+  border-radius: var(--ti-window-border-radius);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -289,6 +289,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  border-radius: 0 0 var(--ti-window-border-radius) var(--ti-window-border-radius);
 
   // Optimized list styles for dictionary content
   ul,
