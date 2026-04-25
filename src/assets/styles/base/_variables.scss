@@ -10,11 +10,7 @@
   --ti-z-selection: 1050;
   --ti-z-field-icon: 1060;
   --ti-z-max: 2147483647;
-}
 
-// Map theme variables to component variables with fallbacks
-// These definitions should be first so theme-specific blocks can override them if needed
-:root {
   // Primary colors (mapped from theme)
   --color-primary: var(--tab-button-active-color, #1976d2);
   --color-primary-light: #42a5f5;
