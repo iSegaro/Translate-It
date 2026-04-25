@@ -27,7 +27,7 @@
           </svg>
         </button>
         
-        <!-- Status Info (Now on the Left) -->
+        <!-- Status Info (Icon Only) -->
         <div
           class="ti-m-header-status-row"
           @click="goToDashboard"
@@ -35,7 +35,6 @@
           <PageTranslationStatus 
             mode="mobile-header"
           />
-          <span class="ti-m-header-title">{{ statusMessage }}</span>
         </div>
       </div>
       
@@ -52,16 +51,6 @@
       </button>
 
       <div class="ti-m-header-actions">
-        <!-- Auto Close Toggle Button -->
-        <button 
-          class="ti-m-auto-close-btn"
-          :class="{ 'is-active': settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE }"
-          :title="t('mobile_page_auto_close_tooltip') || 'Close automatically after starting'"
-          @click="toggleAutoClose"
-        >
-          {{ t('mobile_page_auto_close_label') || 'Auto Close' }}
-        </button>
-
         <button
           class="ti-m-close-btn"
           @click="closeView"
@@ -111,6 +100,21 @@
           :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
           :style="{ '--progress-width': pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
         />
+      </div>
+
+      <!-- Settings Row (Auto Close) -->
+      <div class="ti-m-progress-settings-row">
+        <div class="ti-m-setting-info">
+          <span class="ti-m-setting-label">{{ t('mobile_page_auto_close_label') || 'Auto Close' }}</span>
+          <span class="ti-m-setting-desc">{{ t('mobile_page_auto_close_tooltip') || 'Close after starting' }}</span>
+        </div>
+        <button 
+          class="ti-m-setting-toggle-btn"
+          :class="{ 'is-active': settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE }"
+          @click="toggleAutoClose"
+        >
+          <div class="ti-m-toggle-thumb" />
+        </button>
       </div>
     </div>
   </div>
