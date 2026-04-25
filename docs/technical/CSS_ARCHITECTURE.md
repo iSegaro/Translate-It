@@ -59,6 +59,9 @@ The extension operates in two distinct environments. Your choice of styling meth
 ### CSS Isolation Strategy
 The Translate-It extension renders all UI components in a Shadow DOM. We use a **Robust Automated SCSS Injection Pipeline** to manage styles.
 
+For a detailed technical guide on how this was implemented and how to maintain it, see: 
+ **[Architecture Standard: Component-Adjacent SCSS](./COMPONENT_ADJACENT_SCSS.md)**
+
 #### 1. Component-Adjacent SCSS (The Standard Pattern)
 For every Vue component (e.g., `MyComponent.vue`), a matching SCSS file (e.g., `MyComponent.scss`) must be created in the same directory.
 
