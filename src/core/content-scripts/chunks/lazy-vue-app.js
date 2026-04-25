@@ -101,9 +101,40 @@ async function createMountPoint() {
 
     const resetStyles = document.createElement('style');
     resetStyles.textContent = `
-      :host { all: initial; display: block; position: fixed !important; top: 0 !important; left: 0 !important; width: 0 !important; height: 0 !important; pointer-events: none; z-index: 2147483647; overflow: visible !important; }
-      #${UI_HOST_IDS.APP_CONTAINER} { width: 100%; height: 100%; pointer-events: none; }
-      #${UI_HOST_IDS.APP_CONTAINER} > * { pointer-events: auto; }
+      :host { 
+        all: initial; 
+        display: block !important; 
+        position: fixed !important; 
+        top: 0 !important; 
+        left: 0 !important; 
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important; 
+        height: 100vh !important; 
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        pointer-events: none !important; 
+        z-index: 2147483647 !important; 
+        overflow: visible !important; 
+        visibility: visible !important;
+        /* CRITICAL: Isolate this layer completely from the host page's layout engine */
+        contain: strict !important;
+        isolation: isolate !important;
+        will-change: transform !important;
+      }
+      #${UI_HOST_IDS.APP_CONTAINER} { 
+        position: absolute !important; 
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important; 
+        height: 100% !important; 
+        pointer-events: none !important; 
+        overflow: visible !important; 
+      }
+      #${UI_HOST_IDS.APP_CONTAINER} > * { 
+        pointer-events: auto !important; 
+      }
     `;
     shadowRoot.appendChild(resetStyles);
 
@@ -119,7 +150,9 @@ async function createMountPoint() {
     }
 
     shadowRoot.appendChild(appContainer);
-    document.body.appendChild(hostElement);
+    // CRITICAL: Append to documentElement (html) instead of body
+    // This isolates the UI host from body-level transforms and style shifts
+    document.documentElement.appendChild(hostElement);
   }
 
   return hostElement.shadowRoot.getElementById(UI_HOST_IDS.APP_CONTAINER);
