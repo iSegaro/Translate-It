@@ -15,7 +15,6 @@
         :src="iconSrc" 
         :alt="iconAlt"
         class="ti-button-icon"
-        style="width: 16px !important; height: 16px !important; object-fit: contain;"
       >
     </template>
     

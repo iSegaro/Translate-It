@@ -8,6 +8,8 @@
   flex-shrink: 0 !important;
   object-fit: contain !important;
   filter: var(--icon-filter) !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 
 /* Feedback animation - Fixed positioning for Teleport */
