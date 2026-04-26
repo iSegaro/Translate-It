@@ -167,10 +167,12 @@
         class="sub-options-group"
         :class="{ open: translateWithSelectElement }"
       >
-        <div class="sub-options-inner">
+        <div
+          id="PAGE_CONTEXT_SELECT_ELEMENT"
+          class="sub-options-inner"
+        >
           <div class="setting-group sub-setting-group">
             <BaseCheckbox
-              id="PAGE_CONTEXT_SELECT_ELEMENT"
               v-model="showSelectElementInContextMenu"
               :disabled="!extensionEnabled"
               :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
