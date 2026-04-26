@@ -357,12 +357,17 @@ export class ContextMenuManager extends ResourceTracker {
       const commands = await browser.commands.getAll();
 
       // Get settings for feature enablement
-      const settings = await storageManager.get(['TRANSLATE_WITH_SELECT_ELEMENT', 'EXTENSION_ENABLED']);
+      const settings = await storageManager.get([
+        'TRANSLATE_WITH_SELECT_ELEMENT', 
+        'EXTENSION_ENABLED',
+        'CONTEXT_MENU_VISIBILITY'
+      ]);
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
-      const isSelectElementEnabled = isExtensionEnabled && (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false); // Default to true
+      const isSelectElementEnabled = isExtensionEnabled && (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false);
+      const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // --- 1. Create Page Context Menu ---
-      if (isSelectElementEnabled) {
+      if (isSelectElementEnabled && visibility.PAGE_CONTEXT_SELECT_ELEMENT) {
         try {
           let pageMenuTitle =
             (await getTranslationString("context_menu_translate_with_selection", locale)) ||
@@ -387,7 +392,7 @@ export class ContextMenuManager extends ResourceTracker {
         logger.debug("[ContextMenuManager] Creating Action (Browser Action) menus...");
 
         // --- Translate Element Menu (First option) ---
-        if (isSelectElementEnabled) {
+        if (isSelectElementEnabled && visibility.ACTION_CONTEXT_SELECT_ELEMENT) {
           let actionPageMenuTitle =
             (await getTranslationString("context_menu_translate_with_selection", locale)) ||
             "Translate Element";
@@ -402,6 +407,9 @@ export class ContextMenuManager extends ResourceTracker {
           });
           logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
         }
+        
+        // Always show API Provider unless we decide to make it toggleable too
+        // For now, keeping it consistent with the plan (only toggle requested items)
 
         // --- API Provider Parent Menu ---
         await this.createMenu({
@@ -448,34 +456,42 @@ export class ContextMenuManager extends ResourceTracker {
         );
 
         // --- Options Menu ---
-        await this.createMenu({
-          id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-          title: (await getTranslationString("context_menu_options", locale)) || "Options",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_OPTIONS) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_OPTIONS_ID,
+            title: (await getTranslationString("context_menu_options", locale)) || "Options",
+            contexts: ["action"],
+          });
+        }
 
         // --- Separator ---
-        await this.createMenu({
-          id: "action-separator-1",
-          type: "separator",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_SHORTCUTS || visibility.ACTION_CONTEXT_HELP) {
+          await this.createMenu({
+            id: "action-separator-1",
+            type: "separator",
+            contexts: ["action"],
+          });
+        }
 
         // --- Other Action Menus ---
-        await this.createMenu({
-          id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
-          title:
-            (await getTranslationString("context_menu_shortcuts", locale)) ||
-            "Manage Shortcuts",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_SHORTCUTS) {
+          await this.createMenu({
+            id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+            title:
+              (await getTranslationString("context_menu_shortcuts", locale)) ||
+              "Manage Shortcuts",
+            contexts: ["action"],
+          });
+        }
 
-        await this.createMenu({
-          id: HELP_MENU_ID,
-          title:
-            (await getTranslationString("context_menu_help", locale)) || "Help & Support",
-          contexts: ["action"],
-        });
+        if (visibility.ACTION_CONTEXT_HELP) {
+          await this.createMenu({
+            id: HELP_MENU_ID,
+            title:
+              (await getTranslationString("context_menu_help", locale)) || "Help & Support",
+            contexts: ["action"],
+          });
+        }
         logger.debug("Action context menus created successfully.");
       } catch (e) {
         logger.error("Error creating action context menus:", e);
@@ -817,7 +833,8 @@ export class ContextMenuManager extends ResourceTracker {
             changes.TRANSLATION_API || 
             changes.TRANSLATE_WITH_SELECT_ELEMENT || 
             changes.EXTENSION_ENABLED ||
-            changes.DEBUG_MODE
+            changes.DEBUG_MODE ||
+            changes.CONTEXT_MENU_VISIBILITY
           ) {
             logger.info(
               "Settings changed in storage. Rebuilding context menus for synchronization."

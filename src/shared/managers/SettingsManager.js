@@ -79,7 +79,14 @@ class SettingsManager {
       WHOLE_PAGE_ROOT_MARGIN: '10px',
       WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1,
       WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100,
-      WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false
+      WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false,
+      CONTEXT_MENU_VISIBILITY: {
+        PAGE_CONTEXT_SELECT_ELEMENT: true,
+        ACTION_CONTEXT_SELECT_ELEMENT: true,
+        ACTION_CONTEXT_OPTIONS: true,
+        ACTION_CONTEXT_SHORTCUTS: true,
+        ACTION_CONTEXT_HELP: true
+      }
     }
 
     logger.debug('SettingsManager singleton created')

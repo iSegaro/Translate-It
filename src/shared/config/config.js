@@ -297,6 +297,13 @@ export const CONFIG = {
   PROXY_PASSWORD: "", // رمز عبور proxy (اختیاری)
 
   // --- UI & Styling ---
+  CONTEXT_MENU_VISIBILITY: {
+    PAGE_CONTEXT_SELECT_ELEMENT: true,    // نمایش در کلیک‌راست صفحات
+    ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
+    ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
+    ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون
+    ACTION_CONTEXT_HELP: true             // نمایش راهنما در منوی آیکون
+  },
 
   // --- Font Settings ---
   TRANSLATION_FONT_FAMILY: "auto", // Auto-detect based on target language or custom font
@@ -965,6 +972,13 @@ export const getTranslateOnTextSelectionAsync = async () => {
   return getSettingValueAsync(
     "TRANSLATE_ON_TEXT_SELECTION",
     CONFIG.TRANSLATE_ON_TEXT_SELECTION
+  );
+};
+
+export const getContextMenuVisibilityAsync = async () => {
+  return getSettingValueAsync(
+    "CONTEXT_MENU_VISIBILITY",
+    CONFIG.CONTEXT_MENU_VISIBILITY
   );
 };
 
