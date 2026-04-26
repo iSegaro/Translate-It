@@ -189,7 +189,9 @@ export class PageTranslationManager extends ResourceTracker {
         this.sessionContext
       );
       
-      this.bridge.translate(document.documentElement);
+      // CRITICAL: Translate only document.body to prevent scroll jumps and HEAD-tag interference.
+      // Translating documentElement causes jumps to top on sites with complex scrollers (like Twitter).
+      this.bridge.translate(document.body);
       
       this.isTranslated = false;
       this.isTranslating = true;
@@ -382,23 +384,56 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Injects minimal CSS fixes to ensure layout stability during translation.
+   * 
+   * Strategy: "Non-Intrusive Protection"
+   * 1. Uses 'overflow-x: clip' to prevent horizontal scrollbars without triggering scroll resets.
+   * 2. Uses 'max-width: 100%' to keep the body within viewport bounds (fixes Wikipedia FAB drift).
+   * 3. Neutralizes 'transform/filter' on body to protect 'position: fixed' elements (Toasts, FAB).
+   * 4. Strictly avoids touching the <html> tag to prevent the browser from jumping to the top.
+   * 
+   * @private
+   */
   _injectLayoutFix() {
     try {
-      document.documentElement.classList.add('ti-translation-active');
+      // Only mark the body. Modifying <html> is the primary cause of scroll resets in Chromium.
+      document.body.classList.add('ti-translation-active');
+      
       if (!document.getElementById('ti-translation-layout-fix')) {
         const style = document.createElement('style');
         style.id = 'ti-translation-layout-fix';
         style.textContent = `
-          html.ti-translation-active, 
-          html.ti-translation-active body { 
-            overflow-x: hidden !important;
-            width: 100% !important;
-            position: relative !important;
-            /* Prevent body-level transforms from breaking position: fixed for the UI Host */
+          /**
+           * UNIVERSAL LAYOUT STABILITY FIX
+           * Applied during page translation to prevent UI breakage.
+           */
+          body.ti-translation-active { 
+            /* 
+               We use 'clip' instead of 'hidden' because it prevents horizontal overflow
+               without creating a new BFC (Block Formatting Context) for scrolling, 
+               which is essential to avoid scroll-to-top jumps on virtualized lists (Twitter/X).
+            */
+            overflow-x: clip !important;
+            
+            /* Prevents body expansion beyond viewport when translated text is longer than original */
+            max-width: 100% !important;
+
+            /* 
+               Protects 'position: fixed' elements. By neutralizing transforms/filters on body,
+               we ensure that the UI Host (FAB, Toasts) stays attached to the viewport 
+               rather than moving with the body content.
+            */
             transform: none !important;
             filter: none !important;
             perspective: none !important;
             contain: none !important;
+
+            /* 
+               CRITICAL WARNING: 
+               Do NOT apply 'position', 'width', 'height', or 'display' to body/html here.
+               These properties trigger heavy layout recalculations and scroll resets.
+            */
           }
         `;
         document.head.appendChild(style);
@@ -408,9 +443,13 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Removes layout fixes and cleans up the DOM after translation is restored or stopped.
+   * @private
+   */
   _removeLayoutFix() {
     try {
-      document.documentElement.classList.remove('ti-translation-active');
+      document.body.classList.remove('ti-translation-active');
       const style = document.getElementById('ti-translation-layout-fix');
       if (style) style.remove();
     } catch (e) {
