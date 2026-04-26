@@ -5,6 +5,7 @@
 
 import { ref } from 'vue';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
+import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -18,6 +19,37 @@ export function useWindowsManager() {
   
   // Logger
   const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'useWindowsManager');
+
+  /**
+   * Handle global selection change (Coordinator Pattern)
+   */
+  const handleGlobalSelectionChange = async (detail) => {
+    // If there is no WindowsManager instance (the heavy class), 
+    // the composable can handle basic mobile UI orchestration
+    let windowsManager = window.windowsManagerInstance;
+
+    // If not globally available, try to get it via Singleton if it exists
+    if (!windowsManager) {
+      try {
+        const { WindowsManager } = await import('@/features/windows/managers/WindowsManager.js');
+        windowsManager = WindowsManager.getInstance();
+      } catch {
+        // Class not available yet
+      }
+    }
+
+    const hasManager = !!windowsManager;
+
+    logger.info('Global selection change received in useWindowsManager', { 
+      text: detail.text?.substring(0, 20),
+      hasManager 
+    });
+
+    // If we have the manager, let it handle the heavy lifting (logic, settings, positioning)
+    if (hasManager && typeof windowsManager.show === 'function') {
+      windowsManager.show(detail.text, detail.position, detail.options);
+    }
+  };
 
   /**
    * Event handlers
@@ -194,6 +226,7 @@ export function useWindowsManager() {
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);
+    pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleGlobalSelectionChange);
 
     logger.debug('WindowsManager event listeners setup complete');
   };
@@ -207,6 +240,7 @@ export function useWindowsManager() {
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);
+    pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleGlobalSelectionChange);
 
     logger.debug('WindowsManager event listeners cleaned up');
   };

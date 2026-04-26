@@ -435,8 +435,12 @@ const { createSetting, createProviderSetting } = useTabSettings(settingsStore, l
 const extensionEnabled = createSetting('EXTENSION_ENABLED', true)
 
 // FAB
+const showMobileFab = createSetting('SHOW_MOBILE_FAB', true)
 const showDesktopFab = createSetting('SHOW_DESKTOP_FAB', false, {
   onChanged: (val) => {
+    // Sync mobile FAB with desktop FAB toggle
+    showMobileFab.value = val
+    
     if (!val && selectionTranslationMode.value === SelectionTranslationMode.ON_FAB_CLICK) {
       selectionTranslationMode.value = SelectionTranslationMode.ON_CLICK
     }
