@@ -99,9 +99,11 @@
 
   .ti-m-icon-select-element,
   .ti-m-icon-history,
-  .ti-m-icon-settings {
+  .ti-m-icon-settings,
+  .ti-m-icon-revert,
+  .ti-m-icon-tts {
     .ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
+      filter: invert(1) !important;
     }
   }
 }

@@ -27,6 +27,7 @@
   text-align: left !important;
   overflow: hidden !important;
   visibility: visible !important;
+
   /* CRITICAL: contain: strict forces the host to stay fixed to viewport and ignore document width shifts */
   contain: strict !important;
   isolation: isolate !important;
