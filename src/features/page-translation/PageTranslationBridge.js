@@ -47,13 +47,22 @@ export class PageTranslationBridge extends ResourceTracker {
     /**
      * Standard translator callback for domtranslator.
      * Note: In domtranslator 1.x, the constructor callback ONLY receives (text, score).
-     * We use a monkey-patch on nodesTranslator to capture the current node.
+     * We synchronously capture the current node before any async work to prevent de-sync.
      */
     const translateWithContext = async (text, score) => {
+      // CRITICAL: Capture the node IMMEDIATELY as the first line.
+      // Since domtranslator's walk is synchronous, this is the only safe way 
+      // to link the text to the node before the event loop yields.
+      const node = nodesTranslator.currentNode;
+
       if (!text || !text.trim()) return text;
 
-      // Capture the node that was set during the monkey-patched translate/update call
-      const node = nodesTranslator.currentNode;
+      // Diagnostic Log: See what's being discovered
+      this.logger.debugLazy(() => [`Discovered node: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, {
+        score,
+        tagName: node?.parentElement?.tagName || node?.ownerElement?.tagName || 'UNKNOWN',
+        nodePresent: !!node
+      }]);
 
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
@@ -82,6 +91,7 @@ export class PageTranslationBridge extends ResourceTracker {
     /**
      * MONKEY-PATCH: Capture the node being processed by NodesTranslator.
      * This allows us to pass the node to the scheduler for visibility checks.
+     * We set it directly on the instance as the walk is synchronous.
      */
     const originalTranslate = nodesTranslator.translate;
     nodesTranslator.translate = function(node, callback) {

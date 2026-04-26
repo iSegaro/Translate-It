@@ -220,6 +220,7 @@ export const CONFIG = {
   TTS_FALLBACK_ENABLED: true, // استفاده از صدای جایگزین (مثل عربی برای فارسی) در صورت عدم پشتیبانی موتور
   TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
+  SHOW_MOBILE_FAB: true, // نمایش دکمه دسترسی سریع در موبایل
   DESKTOP_FAB_POSITION: { 
     side: 'right', 
     y: -1 
@@ -930,6 +931,13 @@ export const getShowDesktopFabAsync = async () => {
   return getSettingValueAsync(
     "SHOW_DESKTOP_FAB",
     CONFIG.SHOW_DESKTOP_FAB
+  );
+};
+
+export const getShowMobileFabAsync = async () => {
+  return getSettingValueAsync(
+    "SHOW_MOBILE_FAB",
+    CONFIG.SHOW_MOBILE_FAB
   );
 };
 

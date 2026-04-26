@@ -307,6 +307,11 @@
     border-inline-start-color: var(--color-border) !important;
   }
 
+  // Allow highlight spotlight to overflow the container without being clipped
+  &:has(.is-highlighting) {
+    overflow: visible !important;
+  }
+
   .sub-options-inner {
     min-height: 0 !important;
     padding-inline-start: $spacing-lg !important;

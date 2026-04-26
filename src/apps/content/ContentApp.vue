@@ -92,7 +92,7 @@
 
       <!-- Mobile Floating Action Button (FAB) -->
       <MobileFab
-        v-if="isMobileUI && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen && isTopFrame"
+        v-if="isMobileUI && showMobileFab && !mobileStore.isOpen && !isSelectModeActive && !isFullscreen && isTopFrame"
       />
 
       <!-- Page Translation Original Text Tooltip -->
@@ -162,6 +162,7 @@ const {
   isFullscreen,
   isExtensionEnabled,
   showDesktopFab,
+  showMobileFab,
   isMobileUI
 } = useContentAppUIState(settingsStore, mobileStore, tracker);
 

@@ -215,7 +215,7 @@ export class WindowsManager extends ResourceTracker {
       this._selectionChangeHandler = (detail) => {
         // Only react to selection change if we are not already processing or showing
         // And ensure it's from the same frame (PageEventBus is local, so this is natural)
-        this.logger.debug('Global selection change received in WindowsManager');
+        this.logger.info('Global selection change received in WindowsManager', { text: detail.text?.substring(0, 20) });
         this.show(detail.text, detail.position, detail.options);
       };
       pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, this._selectionChangeHandler);
@@ -319,7 +319,7 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    // Mobile specific: Determine behavior based on translation mode
+    // Mobile specific: Determine behavior based on device detection
     if (this.shouldUseMobileUI()) {
       if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
         this.logger.info('Mobile + Immediate mode: showing mobile sheet immediately');
@@ -327,16 +327,17 @@ export class WindowsManager extends ResourceTracker {
         return;
       } 
       
+      // In Mobile, if we are in onFabClick mode, we store the text for the FAB.
+      // We no longer return here, allowing the icon to be shown if the user has 
+      // enabled the translation-on-selection feature.
       if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
-        this.logger.info('Mobile + onFabClick mode: preserving for FAB trigger');
+        this.logger.info('Mobile + onFabClick mode: preparing data for FAB');
         this.state.setOriginalText(selectedText);
-        // Add a one-time outside click listener to clear the stored text if user clicks elsewhere
         this.clickManager.addOutsideClickListener();
-        return;
+        
+        // We continue execution to check if we should also show the icon
+        this.logger.debug('Mobile: Continuing to check if icon should be shown alongside FAB');
       }
-      
-      // If mode is ON_CLICK, we fall through to show the desktop-style icon even on mobile
-      this.logger.info('Mobile + onClick mode: showing translation icon as requested');
     }
 
     const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
