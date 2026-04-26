@@ -1,5 +1,4 @@
 /* src/apps/content/components/desktop/DesktopFabMenu.scss */
-@use "@/assets/styles/base/variables" as *;
 
 .desktop-fab-container {
   /* Responsive Sizing Variables */
@@ -44,11 +43,17 @@
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-end !important;
-  pointer-events: none !important;
   width: fit-content !important;
   height: fit-content !important;
   position: fixed !important;
   z-index: 2147483647 !important;
+
+  /* Dynamic Variables controlled by JS */
+  top: var(--fab-top, 50%) !important;
+  opacity: var(--fab-opacity, 1) !important;
+  pointer-events: var(--fab-pointer-events, none) !important;
+  transition: var(--fab-transition, none) !important;
+  transform: var(--fab-transform, translateY(-50%)) !important;
 
   // Revert Badge
   .fab-revert-badge {
@@ -85,6 +90,7 @@
     touch-action: none !important;
     position: relative !important;
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2) !important;
+    background-color: transparent !important; 
     transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.3s ease !important;
 
     &:hover {
@@ -93,6 +99,7 @@
 
     &.is-open {
       background-color: #357abd !important;
+      border-radius: 50% !important; /* Ensure it stays circular when background appears */
     }
 
     &.has-status {
@@ -140,6 +147,15 @@
       z-index: 0 !important;
       pointer-events: none !important;
     }
+
+    .white-dot {
+      width: 4px !important;
+      height: 4px !important;
+      background-color: white !important;
+      border-radius: 50% !important;
+      box-shadow: 0 0 2px rgba(255, 255, 255, 0.8) !important;
+      z-index: 1 !important;
+    }
   }
 
   // Settings & TTS Badges
@@ -157,6 +173,7 @@
     pointer-events: auto !important;
     transition: all 0.2s ease !important;
     backdrop-filter: blur(12px) !important;
+    bottom: var(--badge-bottom-offset, -38px) !important;
 
     img {
       width: var(--badge-icon-size) !important;
@@ -167,13 +184,8 @@
     }
   }
 
-  .fab-tts-loader {
-    width: calc(var(--badge-icon-size) * 0.9) !important;
-    height: calc(var(--badge-icon-size) * 0.9) !important;
-    border: 2px solid rgba(74, 144, 226, 0.3) !important;
-    border-top-color: #4a90e2 !important;
-    border-radius: 50% !important;
-    animation: fab-spin 0.8s linear infinite !important;
+  .fab-tts-badge.is-playing {
+    background-color: #fa5252 !important;
   }
 
   // Menu
@@ -241,7 +253,7 @@
 
           .progress-fill {
             transition: stroke-dashoffset 0.4s ease !important;
-            stroke: #4a90e2 !important; // Default blue
+            stroke: #4a90e2 !important; 
           }
         }
       }
@@ -261,7 +273,7 @@
         font-size: var(--menu-font-size) !important;
         font-weight: 600 !important;
         white-space: nowrap !important;
-        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-family: sans-serif !important;
         line-height: 1.2 !important;
         flex: 1 !important;
         letter-spacing: -0.01em !important;
@@ -325,7 +337,6 @@
       border-radius: 50% 0 0 50% !important;
       img { margin-right: calc(var(--fab-edge-offset) - 10px) !important; transform: scaleX(1); }
     }
-    .fab-translate-badge { left: calc(var(--translate-badge-size) * -0.3) !important; }
   }
 
   &.is-left {
@@ -336,22 +347,20 @@
       border-radius: 0 50% 50% 0 !important;
       img { margin-left: calc(var(--fab-edge-offset) - 10px) !important; transform: scaleX(-1); }
     }
-    .fab-translate-badge { right: calc(var(--translate-badge-size) * -0.3) !important; }
   }
 }
 
 // Transitions
 .fade-scale-enter-active { transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important; }
 .fade-scale-leave-active { transition: none !important; }
-.fade-scale-enter-from, .fade-scale-leave-to { opacity: 0 !important; transform: scale(0.6) translateY(15px) !important; }
+.fade-scale-enter-from, .fade-scale-leave-to { opacity: 0 !important; transform: scale(0.6) !important; }
 
-.fab-menu-enter-active { transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important; }
-.fab-menu-leave-active { transition: none !important; }
-.fab-menu-enter-from, .fab-menu-leave-to { opacity: 0 !important; transform: scale(0.9) translateY(10px) !important; }
-
-@keyframes fab-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes pulse-glow {
-  0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); transform: scale(1); }
-  50% { box-shadow: 0 0 0 8px rgba(244, 67, 54, 0); transform: scale(1.1); }
-  100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); transform: scale(1); }
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes fab-spin {
+  to { transform: rotate(360deg); }
 }

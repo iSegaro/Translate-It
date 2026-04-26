@@ -16,12 +16,14 @@ body.sidepanel-context .toolbar-icon {
 
 /* Active state for toolbar buttons in sidepanel */
 body.sidepanel-context .toolbar-button.ti-active .toolbar-icon {
+
   /* Use same filter as popup - no additional brightness adjustments */
   filter: var(--icon-filter);
 }
 
 /* Active state for SidepanelToolbar buttons */
 body.sidepanel-context .ti-active .toolbar-icon {
+
   /* Use same filter as popup - no additional brightness adjustments */
   filter: var(--icon-filter);
 }
@@ -63,7 +65,7 @@ textarea:focus {
   font-size: 16px;
   color: var(--color-text);
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .ti-inline-toolbar {
@@ -153,7 +155,7 @@ textarea:focus {
 
 .clear-all-btn {
   background-color: var(--color-error);
-  color: white;
+  color: #fff;
   border: none;
   border-radius: 4px;
   padding: 5px 15px;

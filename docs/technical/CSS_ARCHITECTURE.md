@@ -13,7 +13,7 @@ This document describes the modern, principled CSS architecture implemented in t
 
 ### 2. **Modern Layout Methods**
 - CSS Grid for complex layouts (TranslationWindow)
-- CSS Containment for performance optimization
+- CSS Containment for performance optimization (with caveats for dropdowns)
 - Logical properties for internationalization
 
 ### 3. **Strategic !important Usage**
@@ -21,6 +21,11 @@ This document describes the modern, principled CSS architecture implemented in t
 - !important used only when necessary for Shadow DOM isolation
 - Prevents external page style interference
 - Maintains predictable styling in web page context
+
+### 4. **Strict Stylelint Enforcement**
+- **Class Naming**: All class names must use the `ti-` prefix (e.g., `.ti-window`).
+- **Color Formats**: Use Hex codes (e.g., `#ffffff`) or CSS variables. Named colors (e.g., `white`) are prohibited.
+- **Formatting**: Multi-line declaration blocks are required. Single-line blocks are prohibited for better readability.
 
 ## When to use `<style scoped>` vs. Adjacent SCSS
 
@@ -54,6 +59,9 @@ The extension operates in two distinct environments. Your choice of styling meth
 ### CSS Isolation Strategy
 The Translate-It extension renders all UI components in a Shadow DOM. We use a **Robust Automated SCSS Injection Pipeline** to manage styles.
 
+For a detailed technical guide on how this was implemented and how to maintain it, see: 
+ **[Architecture Standard: Component-Adjacent SCSS](./COMPONENT_ADJACENT_SCSS.md)**
+
 #### 1. Component-Adjacent SCSS (The Standard Pattern)
 For every Vue component (e.g., `MyComponent.vue`), a matching SCSS file (e.g., `MyComponent.scss`) must be created in the same directory.
 
@@ -76,11 +84,13 @@ Inside the Shadow DOM, `!important` is **mandatory** for all visual properties. 
 - **Use !important**: Apply it to all visual properties in the SCSS file.
 - **Use Design Tokens**: Utilize CSS variables from `_variables.scss` for theming.
 - **Use Namespace Classes**: Wrap your SCSS in a component-specific class (e.g., `.ti-my-component { ... }`).
+- **Use Standardized Mixins**: Use `ti-transition-fast`, `ti-shadow-md`, etc., for consistency.
 
 #### DON'T ❌
 - **Avoid <style scoped>**: Do not write styles inside `.vue` files for content components; they will not be injected into the Shadow DOM.
 - **Avoid Inline Styles**: Minimize the use of `:style` for static visual properties.
 - **Manual Registration**: You no longer need to `@use` every component's SCSS in a global file; the system finds them automatically.
+- **Avoid `contain: paint` for Overflows**: Do not use `contain: paint` or `overflow: hidden` on containers that host dropdowns or menus that need to overflow the component boundaries.
 
 ---
 
@@ -92,6 +102,7 @@ If you create `NewFeature.vue`, also create `NewFeature.scss` in the same folder
 ### Step 2: Write your styles
 In `NewFeature.scss`, write your styles. 
 - **CRITICAL:** Use `!important` for all visual properties if the component will be used in **Shadow DOM**.
+- **Linting:** Ensure all classes start with `ti-` and colors use Hex codes.
 
 ### Step 3: Registration (The "Where does it show up?" Rule)
 - **If used ONLY in Shadow DOM**:
@@ -139,7 +150,7 @@ In `NewFeature.scss`, write your styles.
 
 **Usage:**
 ```scss
-.component {
+.ti-component {
   width: #{css-var('window-width', 300px)};
   padding: #{css-var('window-padding', 16px)};
 }
@@ -161,12 +172,13 @@ In `NewFeature.scss`, write your styles.
 .ti-window-body {
   contain: layout style; // Establish containment
   overflow-x: clip; // Modern way to clip overflow
+  // NOTE: Avoid 'paint' containment if this component contains dropdowns
 }
 ```
 
 #### 3. Logical Properties
 ```scss
-.component {
+.ti-component {
   inline-size: 300px;           // Instead of width
   margin-inline: 5px;           // Instead of margin-left/right
   padding-block-start: 8px;     // Instead of padding-top
@@ -197,10 +209,11 @@ The extension uses specific entry points to manage the boundary between the exte
 ### Core SCSS Files
 
 #### `/src/assets/styles/base/_mixins.scss`
+- Standardized transition mixins (`ti-transition-fast`, `ti-transition-slow`)
+- Standardized shadow mixins (`ti-shadow-md`, `ti-shadow-lg`)
+- UI component mixins (`ti-toolbar-button-minimal`)
 - CSS Properties Generator mixin
 - Safe CSS Variable function
-- Component-specific mixins (window-dimensions)
-- Common utility mixins
 
 #### `/src/assets/styles/base/_variables.scss`
 - SCSS variables for compilation
@@ -214,7 +227,7 @@ The extension uses specific entry points to manage the boundary between the exte
 
 ### Documentation Files
 
-#### `/src/assets/styles/README-CSS-VARIABLES.md`
+#### `./CSS_VARIABLES_GUIDE.md`
 - Best practices guide
 - Common pitfalls and solutions
 - Future usage patterns
@@ -266,7 +279,10 @@ $font-size-base: 14px;
 ```scss
 // 1. CSS Custom Properties Definition
 :root {
-  @include window-dimensions; // Uses mixin for safe interpolation
+  @include css-properties('ti', (
+    'normal-window-width': 300px,
+    'normal-window-min-height': 120px
+  ));
 }
 
 // 2. Component Base Styles
@@ -274,9 +290,10 @@ $font-size-base: 14px;
   display: grid;
   grid-template-rows: auto 1fr;
   container-type: inline-size;
+  @include ti-shadow-md; // Using standardized mixin
 
   // 3. Variant Styles
-  &.normal-window {
+  &.ti-normal-window {
     width: #{css-var('normal-window-width', 300px)};
     min-height: #{css-var('normal-window-min-height', 120px)};
   }
@@ -285,15 +302,15 @@ $font-size-base: 14px;
 // 4. Child Component Styles
 .ti-window-body {
   padding: #{css-var('window-padding', 16px)};
-  contain: layout style;
-  overflow-x: clip;
+  contain: layout style; // Safe: no paint containment to allow dropdowns
+  overflow-y: auto;
 }
 ```
 
 #### Vue Component Integration
 ```vue
 <template>
-  <div class="ti-window normal-window" :class="[theme, { visible: isVisible }]">
+  <div class="ti-window ti-normal-window" :class="[theme, { visible: isVisible }]">
     <div class="ti-window-header">
       <!-- Header content -->
     </div>
@@ -304,8 +321,8 @@ $font-size-base: 14px;
 </template>
 
 <style scoped>
-/* Component-specific styles only */
-/* Base styles handled by global CSS */
+/* Component-specific styles only if standard UI page */
+/* Use Adjacent SCSS if used in Shadow DOM */
 </style>
 ```
 
@@ -313,15 +330,17 @@ $font-size-base: 14px;
 
 ### 1. CSS Containment
 ```scss
-.component {
+.ti-component {
   contain: layout style; // Isolate layout calculations
+  // WARNING: Adding 'paint' will clip absolute-positioned children like dropdowns
 }
 ```
 
 ### 2. Modern Overflow Handling
 ```scss
-.content {
-  overflow-x: clip; // Better than hidden
+.ti-content {
+  overflow-y: auto;
+  overflow-x: clip; // Safer than 'hidden' for performance
 }
 ```
 
@@ -332,7 +351,7 @@ $font-size-base: 14px;
 }
 
 @container (min-width: 300px) {
-  .content {
+  .ti-content {
     // Responsive styles
   }
 }
@@ -351,7 +370,7 @@ $font-size-base: 14px;
 <!-- No style block here -->
 
 <!-- ✅ After (MyComponent.scss in same folder) -->
-.ti-item { color: red !important; }
+.ti-item { color: #ff0000 !important; } // Use Hex code and ti- prefix
 ```
 
 ### From Legacy Inline JS
@@ -375,9 +394,8 @@ $font-size-base: 14px;
 ## Testing and Validation
 
 ### CSS Validation
-- ESLint SCSS rules
-- Stylelint configuration
-- Build-time variable checking
+- **Stylelint**: Enforces `ti-` prefix, Hex colors, and multi-line formatting.
+- **Build Checks**: Sass compiler validates mixin existence and variable usage.
 
 ### Browser Testing
 - Chrome DevTools CSS debugging
@@ -393,18 +411,18 @@ $font-size-base: 14px;
 
 ### DO ✅
 - Use CSS Grid for complex layouts
-- Implement CSS containment for performance
+- Implement CSS containment strategically (avoid `paint` on overflow-prone elements)
 - Use safe variable functions with fallbacks
 - Follow logical properties for i18n
 - Establish design token system
+- Use the `ti-` prefix for all class names
 
 ### DON'T ❌
 - Use !important declarations unnecessarily (only for Shadow DOM isolation)
-- Hardcode values in CSS
-- Mix SCSS variables directly in CSS properties
-- Rely on complex CSS specificity
-- Ignore browser compatibility
+- Hardcode values in CSS; use variables or tokens
+- Use named colors; always use Hex codes or variables
 - Apply aggressive CSS resets that break component functionality
+- Use single-line declaration blocks
 
 ## Future Roadmap
 
@@ -436,7 +454,7 @@ width: var(--ti-variable);
 
 #### 2. SCSS Variable Interpolation
 **Problem:** `--var: #{$undefined}` causes compile error
-**Solution:** Use css-properties mixin
+**Solution:** Use `css-properties` mixin
 ```scss
 // Use this
 @include css-properties('ti', (
@@ -447,10 +465,14 @@ width: var(--ti-variable);
 --ti-var: #{$scss-variable};
 ```
 
+#### 3. Clipped Dropdowns
+**Problem:** Dropdown menus are cut off inside a window.
+**Solution:** Ensure parent containers do not have `contain: paint` or `overflow: hidden`. Use `overflow: clip auto` if necessary.
+
 ## Conclusion
 
 The modern CSS architecture provides a solid foundation for maintainable, performant, and future-proof styling. By following these patterns and using the provided tools, developers can avoid common CSS pitfalls and build robust UI components.
 
 ---
 
-*Last Update: March 2026*
+*Last Update: April 2026*

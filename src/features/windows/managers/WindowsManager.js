@@ -176,6 +176,12 @@ export class WindowsManager extends ResourceTracker {
 
       // Listen for dismissal events from the UI to sync state
       this._dismissRequestHandler = (payload) => {
+        // CRITICAL: Ignore dismiss requests from UI during icon->window transition
+        // to prevent the new window from being closed by the icon's removal event
+        if (this._isIconToWindowTransition) {
+          this.logger.debug('Ignoring dismiss request from UI during active transition');
+          return;
+        }
         this.logger.debug('Dismiss request received from UI', payload);
         this.dismiss(false); // UI already handled animation/removal
       };
@@ -513,20 +519,23 @@ export class WindowsManager extends ResourceTracker {
     // Outside click handling is now managed by ClickManager
 
     // Add outside click listener with delay for iframe support
-    setTimeout(() => {
-      if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
-        this.clickManager.addOutsideClickListener();
+    // ONLY if not in transition
+    if (!this._isIconToWindowTransition) {
+      setTimeout(() => {
+        if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
+          this.clickManager.addOutsideClickListener();
 
-        // Notify iframes to activate their click listeners
-        if (this.crossFrameManager && this.isTopFrame) {
-          this.crossFrameManager.messageRouter._broadcastToAllIframes({
-            type: 'translateit-activate-click-listeners',
-            frameId: this.crossFrameManager.frameId,
-            timestamp: Date.now()
-          });
+          // Notify iframes to activate their click listeners
+          if (this.crossFrameManager && this.isTopFrame) {
+            this.crossFrameManager.messageRouter._broadcastToAllIframes({
+              type: 'translateit-activate-click-listeners',
+              frameId: this.crossFrameManager.frameId,
+              timestamp: Date.now()
+            });
+          }
         }
-      }
-    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+      }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+    }
 
     this.logger.info('Translation icon created successfully', { iconId });
   }
@@ -862,7 +871,7 @@ export class WindowsManager extends ResourceTracker {
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const theme = this.themeManager.currentTheme || 'light';
     
-    // Emit event to create small loading window
+    // Emit event to create small loading window (spinner)
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText,
@@ -878,24 +887,31 @@ export class WindowsManager extends ResourceTracker {
     this.state.setActiveWindowId(windowId);
     this.state.setOriginalText(selectedText);
     this.state.setTranslationCancelled(false);
-    this.state.setIconMode(false);
     this.state.setVisible(true);
 
-    // Add outside click listener with delay for iframe support
-    setTimeout(() => {
-      if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
-        this.clickManager.addOutsideClickListener();
+    // ONLY clear icon mode if we are NOT in transition
+    if (!this._isIconToWindowTransition) {
+      this.state.setIconMode(false);
+    }
 
-        // Notify iframes to activate their click listeners
-        if (this.crossFrameManager && this.isTopFrame) {
-          this.crossFrameManager.messageRouter._broadcastToAllIframes({
-            type: 'translateit-activate-click-listeners',
-            frameId: this.crossFrameManager.frameId,
-            timestamp: Date.now()
-          });
+    // Add outside click listener with delay for iframe support
+    // ONLY if not in transition to avoid immediate dismissal race conditions
+    if (!this._isIconToWindowTransition) {
+      setTimeout(() => {
+        if (this.state.hasActiveElements && !this.state.pendingTranslationWindow) {
+          this.clickManager.addOutsideClickListener();
+
+          // Notify iframes to activate their click listeners
+          if (this.crossFrameManager && this.isTopFrame) {
+            this.crossFrameManager.messageRouter._broadcastToAllIframes({
+              type: 'translateit-activate-click-listeners',
+              frameId: this.crossFrameManager.frameId,
+              timestamp: Date.now()
+            });
+          }
         }
-      }
-    }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+      }, WindowsConfig.TIMEOUTS.OUTSIDE_CLICK_DELAY);
+    }
 
     this.logger.info('Translation window created successfully', { windowId });
 
@@ -905,27 +921,17 @@ export class WindowsManager extends ResourceTracker {
 
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
-        this.logger.info('Translation cancelled by user, updating window with cancellation message');
-        
-        // Get localized message for cancellation
-        const errorInfo = await this.errorHandler.getErrorForUI(new Error(ErrorTypes.USER_CANCELLED), 'windows-translation');
-        
-        WindowsManagerEvents.updateWindow(windowId, {
-          initialSize: 'normal',
-          isLoading: false,
-          isError: true,
-          initialTranslatedText: errorInfo.message
-        });
+        this.logger.info('Translation cancelled by user');
         return;
       }
 
-      // Update window with translation result and resize to normal
+      // Update window with translation result and expand to normal size
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
-        detectedSourceLanguage: translationResult.sourceLanguage, // Pass the actual detected language
+        detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
         provider: translationResult.provider
       });
@@ -1394,90 +1400,62 @@ export class WindowsManager extends ResourceTracker {
    * @param {object} detail - Event detail containing { id, text, position }
    */
   async _handleIconClickFromVue(detail) {
-    this.logger.info('Icon click event received from UI Host', {
+    this.logger.info('Icon click received', {
       id: detail?.id,
-      processing: this.state.isProcessing,
-      mode: this.state.isIconMode ? 'icon' : 'window'
+      state: { isProcessing: this.state.isProcessing, isIconMode: this.state.isIconMode }
     });
 
-    if (!detail || !detail.id) {
-      this.logger.error('Icon click event: detail is missing or id is undefined', detail);
-      return;
-    }
+    if (!detail || !detail.id) return;
 
-    // Prevent duplicate processing of the same icon click
     if (this.state.isProcessing) {
+      this.logger.debug('Skipping: already processing');
       return;
     }
 
-    // Track recently processed clicks to prevent duplicates
     const now = Date.now();
-    if (this._lastProcessedClick &&
-        this._lastProcessedClick.id === detail.id &&
-        (now - this._lastProcessedClick.timestamp) < 500) { // 500ms debounce
-      this.logger.debug('Ignoring duplicate click within debounce window');
+    if (this._lastProcessedClick && this._lastProcessedClick.id === detail.id && (now - this._lastProcessedClick.timestamp) < 500) {
       return;
-    }
-
-    // Check if this is a recent click from a just-dismissed icon
-    // Allow clicks within a short window after dismiss to handle timing issues
-    const recentDismissWindow = 1000; // 1 second grace period
-
-    if (!this.state.isIconMode) {
-      // Check if we recently dismissed this specific icon
-      if (this._lastDismissedIcon &&
-          this._lastDismissedIcon.id === detail.id &&
-          (now - this._lastDismissedIcon.timestamp) < recentDismissWindow) {
-        // Temporarily restore icon mode for processing
-        this.state.setIconMode(true);
-      } else {
-        return;
-      }
     }
 
     const { id, text, position } = detail;
-    this.logger.debug('Processing icon click', { id, textLength: text?.length });
-
-    // Track this click to prevent duplicates
-    this._lastProcessedClick = {
-      id: id,
-      timestamp: now
-    };
-
-    // Set processing state to prevent duplicates
+    this._lastProcessedClick = { id, timestamp: now };
     this.state.setProcessing(true);
 
-    // Prevent other icons from being created while we process this click
     if (state && typeof state === 'object') {
       state.preventTextFieldIconCreation = true;
     }
 
-    // Set flag to preserve selection during icon->window transition BEFORE calling _showWindow
+    // CRITICAL: Set transition flag BEFORE any UI changes
     this._isIconToWindowTransition = true;
-    this.logger.info('Set transition flag - preserving selection during icon->window transition');
+    this.logger.debug('Starting transition: Icon -> Window');
 
-    // Dismiss the icon that was clicked
-    this.logger.info('Dismissing icon', { id });
+    // PHASE 1: Create window first. 
+    // We don't call dismiss() yet so the icon stays visible while the window is being prepared.
+    this.logger.debug('Step 1: Requesting window display');
+    const showPromise = this._showWindow(text, position);
 
-    // Track dismissed icon for timing tolerance
-    this._lastDismissedIcon = {
-      id: id,
-      timestamp: Date.now()
-    };
+    // PHASE 2: Wait a tiny bit for Vue to at least start the window rendering, 
+    // then dismiss only the icon without resetting global state.
+    // We add a small delay (100-150ms) to ensure the window is visible before icon disappears
+    this.logger.debug('Step 2: Scheduling icon dismissal (atomic handover)');
+    
+    setTimeout(() => {
+      this.logger.debug('Step 2b: Executing icon dismissal');
+      this.state.setIconMode(false);
+      WindowsManagerEvents.dismissIcon(id);
+      this._removeDismissListener();
+    }, 120); // 120ms is a safe buffer for Vue rendering and browser painting
 
-    WindowsManagerEvents.dismissIcon(id);
+    await showPromise;
+    this.logger.debug('Transition complete');
 
-    // Show the translation window
-    this.logger.info('Calling _showWindow', { textLength: text?.length });
-    await this._showWindow(text, position);
-
-    // Reset flags after processing - don't reset immediately, let setTimeout handle it
     setTimeout(() => {
       if (state && typeof state === 'object') {
         state.preventTextFieldIconCreation = false;
       }
       this.state.setProcessing(false);
-      // Clear the processed click tracking after processing completes
+      this._isIconToWindowTransition = false;
+      // Clear the processed click tracking
       this._lastProcessedClick = null;
     }, WindowsConfig.TIMEOUTS.PENDING_WINDOW_RESET);
   }
@@ -1627,8 +1605,8 @@ export class WindowsManager extends ResourceTracker {
     // Clean up icon
     this._cleanupIcon(true);
 
-    // Clean up window - now handled by Vue UI Host
-    if (this.state.isVisible) {
+    // Clean up window - ONLY if we are not in handover/preserve mode
+    if (this.state.isVisible && !preserveSelection) {
       // Just reset state, Vue components handle their own cleanup
       this.state.setVisible(false);
     }
@@ -1648,7 +1626,8 @@ export class WindowsManager extends ResourceTracker {
       pageEventBus.emit('windows-manager-dismiss-icon', { id: 'all' });
     }
     
-    if (windowId) {
+    // Only dismiss the window if we are NOT preserving for a handover
+    if (windowId && !preserveSelection) {
       WindowsManagerEvents.dismissWindow(windowId, withFadeOut);
     }
 
@@ -1658,7 +1637,8 @@ export class WindowsManager extends ResourceTracker {
     }
 
     // Cancel any ongoing translation when dismissing
-    if (this.translationHandler) {
+    // ONLY if we are not preserving for a handover
+    if (this.translationHandler && !preserveSelection) {
       this.state.setTranslationCancelled(true);
 
       // Check if cancelAllTranslations method exists (compatibility between core and windows TranslationHandler)
@@ -1672,9 +1652,18 @@ export class WindowsManager extends ResourceTracker {
     this._lastDismissedText = this.state.originalText;
     this._lastDismissTime = Date.now();
 
-    // Reset flags
-    this._resetState();
-    this.state.setProcessing(false); // Ensure processing is reset on dismiss
+    // Reset flags - ONLY if we are not preserving for a handover
+    if (!preserveSelection) {
+      this._resetState();
+    } else {
+      // In handover mode, we only clear specific transient flags
+      this._removeDismissListener();
+      this._isDismissingDueToTyping = false;
+      this._isInShiftClickOperation = false;
+      if (state && typeof state === 'object') {
+        state.preventTextFieldIconCreation = false;
+      }
+    }
 
     // Reset dismissing flag and cleanup tracking
     this._isDismissing = false;

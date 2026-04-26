@@ -1,255 +1,281 @@
-@forward './variables';
-@use './variables' as *;
-@use 'sass:list';
+// Mixins for the Translate-It project
+// Using modern SCSS features
 
-// Common mixins for the extension
+@use "sass:color";
+@use "sass:math";
+@use "./variables" as *;
 
-// CSS Custom Properties Generator - اصولی ترین راه برای interpolation
-@mixin css-properties($prefix: 'ti', $properties: ()) {
-  @each $name, $value in $properties {
-    --#{$prefix}-#{$name}: #{$value};
-  }
+// Transitions
+@mixin ti-transition-fast($properties...) {
+  transition: $properties $transition-fast;
 }
 
-// Safe CSS variable function with fallback
-@function css-var($name, $fallback: null) {
-  @if $fallback {
-    @return var(--ti-#{$name}, #{$fallback});
-  } @else {
-    @return var(--ti-#{$name});
-  }
+@mixin ti-transition-base($properties...) {
+  transition: $properties $transition-base;
 }
 
-// Window dimensions mixin with proper SCSS->CSS conversion
-@mixin window-dimensions {
-  @include css-properties('ti', (
-    'normal-window-width': $selection-window-max-width,
-    'normal-window-min-height': 120px,
-    'normal-window-max-height': 400px,
-    'window-padding': $spacing-md,
-    'window-body-margin': 5px,
-    'action-btn-size': 28px,
-    'action-btn-border-radius': $border-radius-md
-  ));
+@mixin ti-transition-slow($properties...) {
+  transition: $properties $transition-slow;
 }
 
-// Loading state mixin
-@mixin loading-state {
-  position: relative;
-  pointer-events: none;
-  
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    height: 16px;
-    margin: -8px 0 0 -8px;
-    border: 2px solid var(--color-border);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-}
-
-// Transition mixins
-@mixin transition($property: all, $duration: $transition-base, $timing: ease) {
-  transition: $property $duration $timing;
-}
-
-@mixin transition-fast($properties...) {
-  @if list.length($properties) == 0 {
-    transition: all $transition-fast;
-  } @else {
-    $transitions: ();
-    @each $property in $properties {
-      $transitions: list.append($transitions, #{$property} $transition-fast, comma);
-    }
-    transition: $transitions;
-  }
-}
-
-@mixin transition-slow($properties...) {
-  @if list.length($properties) == 0 {
-    transition: all $transition-slow;
-  } @else {
-    $transitions: ();
-    @each $property in $properties {
-      $transitions: list.append($transitions, #{$property} $transition-slow, comma);
-    }
-    transition: $transitions;
-  }
-}
-
-// Shadow mixins
-@mixin shadow-sm {
+// Shadows
+@mixin ti-shadow-sm {
   box-shadow: $shadow-sm;
 }
 
-@mixin shadow-base {
+@mixin ti-shadow-base {
   box-shadow: $shadow-base;
 }
 
-@mixin shadow-md {
+@mixin ti-shadow-md {
   box-shadow: $shadow-md;
 }
 
-@mixin shadow-lg {
+@mixin ti-shadow-lg {
   box-shadow: $shadow-lg;
 }
 
-// Button mixins
-@mixin button-base {
+// UI Components
+@mixin ti-toolbar-button-minimal($icon-size: 20px) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: $spacing-sm $spacing-md;
-  border: $border-width $border-style transparent;
-  border-radius: $border-radius-md;
-  font-size: $font-size-base;
-  font-weight: $font-weight-medium;
-  text-decoration: none;
-  cursor: pointer;
-  @include transition-fast();
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
-@mixin button-primary {
-  @include button-base;
-  background-color: var(--color-primary);
-  color: white;
-  
-  &:hover:not(:disabled) {
-    background-color: var(--color-primary-dark);
-  }
-}
-
-@mixin button-secondary {
-  @include button-base;
-  background-color: transparent;
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-  
-  &:hover:not(:disabled) {
-    background-color: var(--color-primary);
-    color: white;
-  }
-}
-
-// Minimal Toolbar Button Mixin (Unified Style)
-@mixin toolbar-button-minimal {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  max-width: 28px;
-  min-height: 28px;
-  max-height: 28px;
+  padding: 4px;
   border-radius: 4px;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  line-height: 1;
-  margin: 0;
-  transform: none;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all $transition-fast;
 
-  &:hover:not(:disabled) {
-    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
-    opacity: 1;
+  &:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-text);
   }
 
-  &.ti-active,
-  &.active {
-    background-color: var(--color-primary-alpha, rgba(25, 103, 210, 0.12)) !important;
-    color: var(--color-primary) !important;
-    
-    img, .toolbar-icon, .ti-toolbar-icon, .ti-provider-icon-only {
-      opacity: 1;
-      /* Filter to make dark icons primary blue (#1976d2) */
-      filter: brightness(0) saturate(100%) invert(39%) sepia(85%) saturate(1518%) hue-rotate(193deg) brightness(97%) contrast(92%);
-    }
+  &:active {
+    background-color: var(--color-background-active);
+    transform: translateY(1px);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    background-color: transparent;
+  }
+
+  svg, img {
+    width: $icon-size;
+    height: $icon-size;
   }
 }
 
-// Input mixins
-@mixin input-base {
-  width: 100%;
-  padding: $spacing-sm $spacing-base;
-  border: $border-width $border-style var(--input-border-color, var(--color-border));
-  border-radius: $border-radius-md;
-  background-color: var(--input-bg-color, var(--color-background));
-  color: var(--input-text-color, var(--color-text));
+// Standard flexbox layout helper
+@mixin flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+// Media query helpers for responsiveness
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == "sm" {
+    @media (max-width: $breakpoint-sm) { @content; }
+  } @else if $breakpoint == "md" {
+    @media (max-width: $breakpoint-md) { @content; }
+  } @else if $breakpoint == "lg" {
+    @media (max-width: $breakpoint-lg) { @content; }
+  }
+}
+
+// Text truncation with ellipsis
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Scrollbar styling for modern browsers
+@mixin custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+  }
+}
+
+// Card style base
+@mixin base-card {
+  background-color: var(--color-background);
+  border: $border-width $border-style var(--color-border);
+  border-radius: $border-radius-base;
+  box-shadow: $shadow-sm;
+}
+
+// Interactive button base
+@mixin interactive-element {
+  cursor: pointer;
+  transition: all $transition-base;
+  user-select: none;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+  }
+}
+
+// Layout helper for options sections
+@mixin section-base {
+  margin-bottom: $spacing-xl;
+  padding-bottom: $spacing-lg;
+  border-bottom: $border-width $border-style var(--section-title-border);
+
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+}
+
+// Typography - Heading 1
+@mixin h1 {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: var(--color-text);
+  margin-bottom: $spacing-base;
+}
+
+// Typography - Heading 2
+@mixin h2 {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: var(--color-text);
+  margin-bottom: $spacing-sm;
+}
+
+// Typography - Body text
+@mixin body-text {
   font-size: $font-size-base;
-  @include transition-fast(border-color);
-  
-  &:focus {
-    outline: none;
-    border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
-  }
-  
-  &::placeholder {
-    color: var(--color-text-secondary);
-  }
+  font-weight: $font-weight-normal;
+  color: var(--color-text);
+  line-height: 1.6;
 }
 
-// Responsive breakpoints
-@mixin mobile {
-  @media (max-width: #{$breakpoint-md - 1px}) {
+// RTL Support helper
+@mixin rtl {
+  [dir="rtl"] & {
     @content;
   }
 }
 
-@mixin tablet {
-  @media (min-width: #{$breakpoint-md}) and (max-width: #{$breakpoint-lg - 1px}) {
-    @content;
+// Ghost button style
+@mixin ghost-button {
+  background-color: transparent;
+  border: $border-width $border-style var(--color-border);
+  color: var(--color-text-secondary);
+
+  &:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-text);
+    border-color: var(--color-primary);
   }
 }
 
-@mixin desktop {
-  @media (min-width: #{$breakpoint-lg}) {
-    @content;
+// Primary button style
+@mixin primary-button {
+  background-color: var(--color-primary);
+  border: none;
+  color: #fff;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    background-color: var(--color-primary-dark);
   }
 }
 
-// Animation keyframes
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+// Outline button style
+@mixin outline-button {
+  background-color: transparent;
+  border: $border-width $border-style var(--color-primary);
+  color: var(--color-primary);
+
+  &:hover {
+    background-color: var(--color-primary-alpha);
   }
 }
 
-@keyframes fadeIn {
+// Focus ring style for accessibility
+@mixin focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--input-focus-shadow-color);
+  border-color: var(--input-focus-border-color);
+}
+
+// Glassmorphism effect base
+@mixin glass-effect {
+  background: var(--color-surface-alpha);
+  backdrop-filter: blur(8px);
+  border: $border-width $border-style var(--color-border-alpha);
+}
+
+// Skeleton loading animation
+@mixin skeleton-loading {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-background-hover) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: ti-skeleton-shimmer 1.5s infinite linear;
+}
+
+@keyframes ti-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+
+  100% { background-position: -200% 0; }
+}
+
+// Fade in animation
+@keyframes ti-fade-in {
+  from { opacity: 0; }
+
+  to { opacity: 1; }
+}
+
+@mixin ti-fade-in-anim($duration: 0.3s) {
+  animation: ti-fade-in $duration ease-in-out forwards;
+}
+
+// Slide up animation
+@keyframes ti-slide-up {
   from {
     opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
     transform: translateY(10px);
-    opacity: 0;
   }
+
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: translateY(0);
   }
+}
+
+@mixin ti-slide-up-anim($duration: 0.3s) {
+  animation: ti-slide-up $duration ease-out forwards;
 }

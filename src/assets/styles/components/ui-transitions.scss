@@ -1,11 +1,11 @@
-/**
- * UI Transitions - Modular Animation System
- * Used for smooth transitions during UI state changes like language/theme switching
- */
+/* stylelint-disable selector-class-pattern */
+/* stylelint-disable selector-pseudo-class-no-unknown */
+/* stylelint-disable selector-max-specificity */
 
-@use "../base/variables" as *;
+// UI Transitions System for Translate-It
+// Optimized for performance and modern browser rendering
 
-// CSS Custom Properties for easy customization
+// Core variables for the transition system
 :root {
   --ui-transition-duration: 600ms;
   --ui-transition-scale-duration: 200ms;
@@ -18,56 +18,65 @@
   --ui-transition-translate-distance: 30px;
 }
 
-// Base transition container
+// Container that coordinates children transitions
 .ui-transition-container {
   position: relative;
-  transform-origin: center center;
+  will-change: transform, opacity;
+  transition: transform var(--ui-transition-scale-duration) var(--ui-transition-timing);
 
-  &.transitioning {
-    overflow: hidden;
-    
-    // Scale animation with custom duration
+  &.active {
     transform: scale(var(--ui-transition-scale-mid));
     transition: transform var(--ui-transition-scale-duration) var(--ui-transition-timing),
                 box-shadow var(--ui-transition-scale-duration) var(--ui-transition-timing);
-    
-    box-shadow: 
-      0 2px 4px rgba(0, 0, 0, 0.1),
-      0 0 30px rgba(var(--ui-transition-shimmer-color), 0.1);
+    box-shadow: 0 10px 40px rgb(var(--ui-transition-shimmer-color), 0.15),
+                0 0 30px rgb(var(--ui-transition-shimmer-color), 0.1);
   }
 }
 
-// Shimmer overlay effect
+// Subtle shimmer effect during transitions
 .ui-transition-container.transitioning::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: -10px;
   background: linear-gradient(
-    45deg,
-    transparent 30%,
-    rgba(var(--ui-transition-shimmer-color), 0.08) 50%,
-    transparent 70%
+    90deg,
+    transparent 0%,
+    rgb(var(--ui-transition-shimmer-color), 0.08) 50%,
+    transparent 100%
   );
-  transform: translateX(-100%);
-  animation: ui-shimmer var(--ui-transition-shimmer-duration) ease-out;
-  pointer-events: none;
   z-index: 10;
-  border-radius: inherit;
+  pointer-events: none;
+  animation: ui-shimmer var(--ui-transition-shimmer-duration) ease-out;
 }
 
 @keyframes ui-shimmer {
   0% {
     transform: translateX(-100%);
+    opacity: 0;
   }
+
+  50% {
+    opacity: 1;
+  }
+
   100% {
     transform: translateX(100%);
+    opacity: 0;
   }
 }
 
-// Content transition animations
+@keyframes ui-simple-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+// --- Vue Transition Classes ---
+
 .ui-transition-enter-active,
 .ui-transition-leave-active {
   transition: all var(--ui-transition-duration) var(--ui-transition-timing);
@@ -75,14 +84,14 @@
 
 .ui-transition-enter-from {
   opacity: 0;
-  transform: translateY(var(--ui-transition-translate-distance)) 
+  transform: translateY(var(--ui-transition-translate-distance))
              scale(var(--ui-transition-scale-start));
   filter: blur(var(--ui-transition-blur-amount));
 }
 
 .ui-transition-leave-to {
   opacity: 0;
-  transform: translateY(calc(-1 * var(--ui-transition-translate-distance))) 
+  transform: translateY(calc(-1 * var(--ui-transition-translate-distance)))
              scale(var(--ui-transition-scale-start));
   filter: blur(var(--ui-transition-blur-amount));
 }
@@ -94,46 +103,43 @@
   filter: blur(0);
 }
 
-// Language-specific animations
+// Contextual Variations
 .ui-transition-container.language-transition {
   --ui-transition-shimmer-color: var(--color-primary-rgb, 59, 130, 246);
-  
+
   .ui-transition-enter-from {
-    transform: translateY(var(--ui-transition-translate-distance)) 
+    transform: translateY(var(--ui-transition-translate-distance))
                scale(var(--ui-transition-scale-start));
   }
-  
+
   .ui-transition-leave-to {
-    transform: translateY(calc(-1 * var(--ui-transition-translate-distance))) 
+    transform: translateY(calc(-1 * var(--ui-transition-translate-distance)))
                scale(var(--ui-transition-scale-start));
   }
 }
 
-// Theme-specific animations  
 .ui-transition-container.theme-transition {
   --ui-transition-shimmer-color: var(--color-accent-rgb, 99, 102, 241);
-  
-  &.transitioning {
-    // Override scale for theme - no scaling animation
-    transform: scale(1) !important;
+
+  .ui-transition-enter-active,
+  .ui-transition-leave-active {
     transition: box-shadow var(--ui-transition-scale-duration) var(--ui-transition-timing);
   }
-  
+
   .ui-transition-enter-from {
     transform: translateX(var(--ui-transition-translate-distance));
     filter: blur(var(--ui-transition-blur-amount)) hue-rotate(15deg);
   }
-  
+
   .ui-transition-leave-to {
     transform: translateX(calc(-1 * var(--ui-transition-translate-distance)));
     filter: blur(var(--ui-transition-blur-amount)) hue-rotate(-15deg);
   }
 }
 
-// Settings-specific animations
 .ui-transition-container.settings-transition {
   --ui-transition-shimmer-color: var(--color-success-rgb, 34, 197, 94);
-  
+
   .ui-transition-enter-from,
   .ui-transition-leave-to {
     transform: scale(var(--ui-transition-scale-start));
@@ -141,52 +147,45 @@
   }
 }
 
-// RTL Support
+// RTL Support adjustments
 :global(.options-layout.rtl) {
   .ui-transition-enter-from {
-    transform: translateY(20px) scale(0.95) rotateY(5deg);
+    transform: translateX(calc(-1 * var(--ui-transition-translate-distance)));
   }
-  
+
   .ui-transition-leave-to {
-    transform: translateY(-20px) scale(0.95) rotateY(-5deg);
+    transform: translateX(var(--ui-transition-translate-distance));
   }
-  
+
   .ui-transition-container.theme-transition {
     .ui-transition-enter-from {
-      transform: translateX(calc(-1 * var(--ui-transition-translate-distance))) 
+      transform: translateX(calc(-1 * var(--ui-transition-translate-distance)))
                  scale(var(--ui-transition-scale-start));
     }
-    
+
     .ui-transition-leave-to {
-      transform: translateX(var(--ui-transition-translate-distance)) 
+      transform: translateX(var(--ui-transition-translate-distance))
                  scale(var(--ui-transition-scale-start));
     }
   }
 }
 
-// Reduced motion support
+// Low Motion Support
 @media (prefers-reduced-motion: reduce) {
   .ui-transition-container {
     --ui-transition-duration: 200ms;
     --ui-transition-blur-amount: 0px;
     --ui-transition-translate-distance: 10px;
     --ui-transition-scale-start: 0.98;
-    
+
     &.transitioning::before {
-      animation: none;
-      opacity: 0.3;
-      background: rgba(var(--ui-transition-shimmer-color), 0.05);
+      background: rgb(var(--ui-transition-shimmer-color), 0.05);
       animation: ui-simple-fade var(--ui-transition-duration) ease-out;
     }
   }
 }
 
-@keyframes ui-simple-fade {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.3; }
-}
-
-// Animation variants for different durations
+// Helper utility classes
 .ui-transition-fast {
   --ui-transition-duration: 300ms;
 }
@@ -195,7 +194,6 @@
   --ui-transition-duration: 1000ms;
 }
 
-// Animation variants for different intensities
 .ui-transition-subtle {
   --ui-transition-scale-start: 0.98;
   --ui-transition-blur-amount: 1px;

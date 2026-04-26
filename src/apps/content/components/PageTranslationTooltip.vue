@@ -4,7 +4,7 @@
     ref="tooltipRef"
     class="ti-page-translation-tooltip"
     :dir="direction"
-    :style="tooltipDynamicStyle"
+    :style="{ '--tooltip-transform': `translate3d(${position.x}px, ${position.y}px, 0)` }"
   >
     {{ text }}
   </div>
@@ -12,7 +12,7 @@
 
 <script setup>
 import './PageTranslationTooltip.scss'
-import { ref, nextTick, computed } from 'vue';
+import { ref, nextTick } from 'vue';
 import { pageEventBus, PAGE_TRANSLATION_EVENTS } from '@/core/PageEventBus.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
@@ -25,19 +25,6 @@ const tooltipRef = ref(null);
 
 // Use the central resource tracker for safe memory management
 const tracker = useResourceTracker('page-translation-tooltip');
-
-/**
- * Optimized Dynamic Styling:
- * Only handling transformation for performance.
- * Visual properties like direction are now handled via CSS attribute selectors.
- */
-const tooltipDynamicStyle = computed(() => {
-  if (!isVisible.value) return 'display: none !important;';
-
-  return {
-    transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0) !important`
-  };
-});
 
 const showTooltip = async (detail) => {
   if (!detail.text) return;

@@ -51,7 +51,7 @@ textarea {
   &:focus {
     outline: none;
     border-color: var(--input-focus-border-color, var(--color-primary));
-    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgba(25, 103, 210, 0.2));
+    box-shadow: 0 0 0 2px var(--input-focus-shadow-color, rgb(25 103 210 / 20%));
   }
 
   &::placeholder {
@@ -67,7 +67,7 @@ button {
   border: none;
   border-radius: $border-radius-base;
   background-color: var(--button-bg-color, var(--color-primary));
-  color: var(--button-text-color, white);
+  color: var(--button-text-color, #fff);
   transition: background-color $transition-base;
 
   &:hover {
@@ -93,7 +93,7 @@ button {
 
   &:hover {
     background-color: var(--color-primary);
-    color: white;
+    color: #fff;
   }
 }
 
@@ -147,24 +147,24 @@ input[type="radio"] {
 
   &.status-success {
     background-color: var(--color-success);
-    color: white;
+    color: #fff;
   }
 
   &.status-error {
     background-color: var(--color-error);
-    color: white;
+    color: #fff;
   }
 
   &.status-warning {
     background-color: var(--color-warning);
-    color: white;
+    color: #fff;
   }
 }
 
 .validation-error {
   padding: $spacing-sm $spacing-base;
   background-color: var(--color-error);
-  color: white;
+  color: #fff;
   border-radius: $border-radius-base;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
@@ -179,10 +179,10 @@ input[type="radio"] {
 
 .ti-input-error {
   border-color: var(--color-error) !important;
-  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2) !important;
+  box-shadow: 0 0 0 2px rgb(244 67 54 / 20%) !important;
 
   &:focus {
     border-color: var(--color-error) !important;
-    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3) !important;
+    box-shadow: 0 0 0 2px rgb(244 67 54 / 30%) !important;
   }
 }

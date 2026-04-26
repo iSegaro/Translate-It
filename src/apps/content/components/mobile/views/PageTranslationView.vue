@@ -27,7 +27,7 @@
           </svg>
         </button>
         
-        <!-- Status Info (Now on the Left) -->
+        <!-- Status Info (Icon Only) -->
         <div
           class="ti-m-header-status-row"
           @click="goToDashboard"
@@ -35,13 +35,13 @@
           <PageTranslationStatus 
             mode="mobile-header"
           />
-          <span class="ti-m-header-title">{{ statusMessage }}</span>
         </div>
       </div>
       
       <!-- Primary Action Pill (Centered) -->
       <button 
-        class="ti-m-header-primary-btn"
+        class="ti-m-header-primary-btn notranslate"
+        translate="no"
         :data-status="pageTranslationData.status === 'error' ? 'error' : (pageTranslationData.isTranslating || pageTranslationData.isAutoTranslating ? 'translating' : (pageTranslationData.isTranslated ? 'translated' : 'ready'))"
         @click.stop="primaryAction.handler"
       >
@@ -52,16 +52,6 @@
       </button>
 
       <div class="ti-m-header-actions">
-        <!-- Auto Close Toggle Button -->
-        <button 
-          class="ti-m-auto-close-btn"
-          :class="{ 'is-active': settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE }"
-          :title="t('mobile_page_auto_close_tooltip') || 'Close automatically after starting'"
-          @click="toggleAutoClose"
-        >
-          {{ t('mobile_page_auto_close_label') || 'Auto Close' }}
-        </button>
-
         <button
           class="ti-m-close-btn"
           @click="closeView"
@@ -77,7 +67,8 @@
 
     <!-- Progress Card -->
     <div 
-      class="ti-m-progress-card" 
+      class="ti-m-progress-card notranslate"
+      translate="no"
       :class="{ 'has-error': pageTranslationData.status === 'error' }"
     >
       <div class="ti-m-progress-label-row">
@@ -109,14 +100,30 @@
         <div 
           class="ti-m-progress-bar-fill" 
           :class="{ 'indeterminate': pageTranslationData.totalCount === 0 && pageTranslationData.isTranslating }"
-          :style="{ width: pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
+          :style="{ '--progress-width': pageTranslationData.status === 'error' ? '100%' : `${computedProgress}%` }"
         />
+      </div>
+
+      <!-- Settings Row (Auto Close) -->
+      <div class="ti-m-progress-settings-row">
+        <div class="ti-m-setting-info">
+          <span class="ti-m-setting-label">{{ t('mobile_page_auto_close_label') || 'Auto Close' }}</span>
+          <span class="ti-m-setting-desc">{{ t('mobile_page_auto_close_tooltip') || 'Close after starting' }}</span>
+        </div>
+        <button 
+          class="ti-m-setting-toggle-btn"
+          :class="{ 'is-active': settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE }"
+          @click="toggleAutoClose"
+        >
+          <div class="ti-m-toggle-thumb" />
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import './PageTranslationView.scss'
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -144,15 +151,6 @@ const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'completed') return 100;
   if (!pageTranslationData.value.totalCount || pageTranslationData.value.totalCount === 0) return 0;
   return Math.round((pageTranslationData.value.translatedCount / pageTranslationData.value.totalCount) * 100);
-})
-
-const statusMessage = computed(() => {
-  if (pageTranslationData.value.isTranslating) return t('mobile_page_translating_status') || 'Translating Page...';
-  if (pageTranslationData.value.isTranslated) {
-    return pageTranslationData.value.isAutoTranslating ? (t('mobile_page_auto_translating_status') || 'Auto-Translating') : (t('mobile_page_translated_status') || 'Page Translated');
-  }
-  if (pageTranslationData.value.status === 'error') return t('mobile_page_translation_failed') || 'Translation Failed';
-  return t('mobile_page_ready_status') || 'Ready to Translate';
 })
 
 const primaryAction = computed(() => {

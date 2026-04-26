@@ -1,3 +1,4 @@
+/* stylelint-disable selector-class-pattern */
 // Centralized markdown styles for the extension
 // This file contains all common markdown styling to avoid duplication
 
@@ -23,10 +24,15 @@
   }
 
   h1 { font-size: 1.5em; }
+
   h2 { font-size: 1.375em; }
+
   h3 { font-size: 1.25em; }
+
   h4 { font-size: 1.125em; }
+
   h5 { font-size: 1em; }
+
   h6 { font-size: 0.875em; }
 
   // Paragraphs with proper spacing
@@ -72,8 +78,8 @@
 
   // Code formatting
   code {
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-    background-color: var(--color-code-inline-bg, rgba(0, 0, 0, 0.1));
+    font-family: Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace;
+    background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%));
     padding: 0.2em 0.4em;
     border-radius: 3px;
     font-size: 0.9em;
@@ -81,7 +87,7 @@
   }
 
   pre {
-    background-color: var(--color-code-block-bg, rgba(0, 0, 0, 0.05));
+    background-color: var(--color-code-block-bg, rgb(0 0 0 / 5%));
     border: 1px solid var(--color-border);
     border-radius: 4px;
     padding: 1em;
@@ -180,9 +186,11 @@
   }
 
   // Responsive adjustments
-  @media (max-width: 768px) {
+  @media (width <= 768px) {
     h1 { font-size: 1.375em; }
+
     h2 { font-size: 1.25em; }
+
     h3 { font-size: 1.125em; }
 
     pre {
@@ -231,7 +239,7 @@
 
   // Label formatting (e.g., "نوع: اسم")
   strong {
-    &:after {
+    &::after {
       content: ":";
       margin-right: 0.25em;
     }
@@ -247,7 +255,7 @@
 // Fallback styles
 .markdown-fallback {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 // Utility classes

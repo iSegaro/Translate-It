@@ -1,7 +1,7 @@
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'provider-handler');
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, "provider-handler");
 /**
  * Provider Handler - Handle provider-related requests
  * Based on OLD implementation pattern for reliability
@@ -12,7 +12,8 @@ export async function getAvailableProviders() {
 
   try {
     // Import provider registry from central index
-    const { ProviderRegistry } = await import("@/features/translation/providers/index.js");
+    const { ProviderRegistry } =
+      await import("@/features/translation/providers/index.js");
     const providers = [];
     for (const [id, ProviderClass] of ProviderRegistry.providers) {
       providers.push({

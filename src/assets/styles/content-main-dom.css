@@ -1,84 +1,78 @@
 /* Main DOM CSS - Critical styles only for Main DOM injection */
+
 /* Modern CSS Architecture (2025) - Zero !important Policy */
 
 /* ==========================================================================
    Select Element Mode Styles - Main DOM Injection (Critical Only)
    ========================================================================== */
 
-/* Scoped cursor change when in select element mode using high specificity */
+/* Scoped styles when in select element mode using high specificity */
 html[data-translate-it-select-mode="true"] {
   cursor: crosshair;
-
-  /* Apply to all elements when in select mode */
-  & * {
-    cursor: crosshair;
-  }
-
-  /* More specific for body elements */
-  body {
-    cursor: crosshair;
-
-    & * {
-      cursor: crosshair;
-    }
-  }
 }
 
-/* Disable interactions on clickable elements during select mode
-Scoped to select-element mode only with high specificity */
-html[data-translate-it-select-mode="true"] {
-  /* Interactive elements that should be disabled */
-  a:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  button:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  [onclick]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  [role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  div[role="link"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  input[type="submit"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  input[type="button"]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]),
-  [href]:not([data-sonner-toast]):not([data-sonner-toaster]):not([data-translate-ui]) {
-    pointer-events: none;
-    color: inherit;
-    text-decoration: none;
-  }
+html[data-translate-it-select-mode="true"] * {
+  cursor: crosshair;
+}
+
+html[data-translate-it-select-mode="true"] body {
+  cursor: crosshair;
+}
+
+html[data-translate-it-select-mode="true"] body * {
+  cursor: crosshair;
+}
+
+/* Disable interactions on clickable elements during select mode */
+
+/* Scoped to select-element mode only with high specificity */
+html[data-translate-it-select-mode="true"] a:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] button:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] [onclick]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] [role="link"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] div[role="link"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] input[type="submit"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] input[type="button"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
+html[data-translate-it-select-mode="true"] [href]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]) {
+  pointer-events: none;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Disable default hover effects during select mode */
-/* Let JavaScript handle highlighting instead */
-html[data-translate-it-select-mode="true"] {
-  /* Common content elements that might have hover effects */
-  *:hover,
-  body:hover,
-  p:hover,
-  div:hover,
-  span:hover,
-  h1:hover,
-  h2:hover,
-  h3:hover,
-  h4:hover,
-  h5:hover,
-  h6:hover,
-  li:hover,
-  td:hover,
-  th:hover,
-  article:hover,
-  section:hover {
-    outline: none;
-  }
+
+/* Common content elements that might have hover effects */
+html[data-translate-it-select-mode="true"] *:hover,
+html[data-translate-it-select-mode="true"] body:hover,
+html[data-translate-it-select-mode="true"] p:hover,
+html[data-translate-it-select-mode="true"] div:hover,
+html[data-translate-it-select-mode="true"] span:hover,
+html[data-translate-it-select-mode="true"] h1:hover,
+html[data-translate-it-select-mode="true"] h2:hover,
+html[data-translate-it-select-mode="true"] h3:hover,
+html[data-translate-it-select-mode="true"] h4:hover,
+html[data-translate-it-select-mode="true"] h5:hover,
+html[data-translate-it-select-mode="true"] h6:hover,
+html[data-translate-it-select-mode="true"] li:hover,
+html[data-translate-it-select-mode="true"] td:hover,
+html[data-translate-it-select-mode="true"] th:hover,
+html[data-translate-it-select-mode="true"] article:hover,
+html[data-translate-it-select-mode="true"] section:hover {
+  outline: none;
 }
 
 /* Visual feedback for input elements during select mode */
-html[data-translate-it-select-mode="true"] {
-  input:hover,
-  textarea:hover {
-    outline: 2px solid #4a90e2;
-    outline-offset: 1px;
-  }
+html[data-translate-it-select-mode="true"] input:hover,
+html[data-translate-it-select-mode="true"] textarea:hover {
+  outline: 2px solid #4a90e2;
+  outline-offset: 1px;
 }
 
 /* JS-controlled highlighting for selected elements */
+
 /* Using CSS custom properties for consistency */
 :root {
-  --translate-highlight-color: #ff8800;
+  --translate-highlight-color: #f80;
   --translate-highlight-width: 3px;
   --translate-highlight-offset: 2px;
   --translate-highlight-z-index: 1040;
@@ -92,11 +86,12 @@ html body .translate-it-element-highlighted.translate-it-element-highlighted {
   z-index: var(--translate-highlight-z-index);
   position: relative;
   box-shadow: 0 0 0 var(--translate-highlight-width) var(--translate-highlight-color);
+}
 
-  /* Prevent child elements from showing their own outlines */
-  * {
-    outline: none;
-  }
+/* Prevent child elements from showing their own outlines */
+html body [data-translate-highlighted="true"][data-translate-highlighted="true"] *,
+html body .translate-it-element-highlighted.translate-it-element-highlighted * {
+  outline: none;
 }
 
 /* ==========================================================================
@@ -160,7 +155,7 @@ font.immersive-translate-target-inner,
   text-align: inherit !important;
 }
 
-/* Ensure proper bidirectional text handling */
+/* Ensure proper text direction handling */
 .immersive-translate-target-wrapper[dir="rtl"],
 .immersive-translate-segment-wrapper[dir="rtl"] {
   text-align: right;

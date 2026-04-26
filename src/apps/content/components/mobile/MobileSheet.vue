@@ -42,6 +42,7 @@
 </template>
 
 <script setup>
+import './MobileSheet.scss'
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
@@ -139,9 +140,12 @@ watch(isOpen, (newValue) => {
   if (newValue && !hasMouse) {
     document.body.style.overflow = 'hidden'
     document.body.style.touchAction = 'none'
+    // CRITICAL: Also lock documentElement to prevent horizontal scroll issues on mobile
+    document.documentElement.style.overflow = 'hidden'
   } else {
     document.body.style.overflow = ''
     document.body.style.touchAction = ''
+    document.documentElement.style.overflow = ''
   }
 }, { immediate: true })
 
@@ -149,12 +153,22 @@ const sheetStyle = computed(() => {
   const y = isDragging.value ? currentY.value : 0
   const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK
   
-  // Dynamic height for peek mode based on view
-  let targetHeight = isPeek ? '35vh' : '75vh'
-  if (isPeek && activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
-    targetHeight = '145px'
+  // Use VisualViewport height for more stable calculations on mobile
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  
+  // Dynamic height for peek mode based on view using px for stability
+  let targetHeightPx = isPeek ? (viewportHeight * 0.35) : (viewportHeight * 0.75);
+  
+  if (isPeek) {
+    if (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
+      targetHeightPx = 180
+    } else if (activeView.value === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION) {
+      // Stabilize height for page translation to prevent jumping and content overflow
+      targetHeightPx = 220
+    }
   }
   
+  const targetHeight = `${targetHeightPx}px`
   let transformValue = 'translateY(0)'
   let heightValue = targetHeight
 
@@ -167,21 +181,23 @@ const sheetStyle = computed(() => {
   }
 
   return {
-    transform: transformValue,
-    transition: isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
-    height: heightValue
+    '--sheet-transform': transformValue,
+    '--sheet-transition': isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
+    '--sheet-height': heightValue
   }
 })
 
 const closeSheet = () => {
-  // Ensure body is unlocked before closing
+  // Ensure body/html are unlocked before closing
   document.body.style.overflow = ''
   document.body.style.touchAction = ''
+  document.documentElement.style.overflow = ''
   mobileStore.closeSheet()
 }
 
 onUnmounted(() => {
   document.body.style.overflow = ''
   document.body.style.touchAction = ''
+  document.documentElement.style.overflow = ''
 })
 </script>

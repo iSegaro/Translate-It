@@ -2,7 +2,7 @@
   <button
     v-if="isVisible && !isFullscreen"
     ref="iconElement"
-    class="translation-icon"
+    class="ti-translation-icon"
     :class="{ 'is-hovering': isHovering, 'is-active': isActive }"
     :style="dynamicStyle"
     data-translate-ui="true"
@@ -20,7 +20,7 @@
     @keydown="onKeydown"
   >
     <svg
-      class="translation-icon__svg"
+      class="ti-translation-icon__svg"
       viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -68,6 +68,7 @@
 </template>
 
 <script setup>
+import './TranslationIcon.scss';
 import { ref, computed, onMounted } from 'vue';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
@@ -243,52 +244,8 @@ onMounted(async () => {
 
 // Public methods
 defineExpose({
-  updatePosition: () => {},
-  animateOut
+  animateIn,
+  animateOut,
+  handleDismiss
 });
 </script>
-
-<style scoped>
-.translation-icon {
-  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.translation-icon:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.translation-icon__svg {
-  display: block;
-  pointer-events: none;
-  transition: transform 0.2s ease;
-}
-
-.translation-icon.is-hovering .translation-icon__svg {
-  transform: scale(1.05);
-}
-
-.translation-icon.is-active .translation-icon__svg {
-  transform: scale(0.95);
-}
-
-@keyframes slideInUp {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@media (prefers-contrast: high) {
-  .translation-icon { border-width: 2px !important; border-color: #000 !important; }
-  .translation-icon.is-hovering { background-color: #000 !important; }
-  .translation-icon__svg { filter: invert(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .translation-icon { animation: none; transition: none !important; }
-}
-
-@media print {
-  .translation-icon { display: none; }
-}
-</style>

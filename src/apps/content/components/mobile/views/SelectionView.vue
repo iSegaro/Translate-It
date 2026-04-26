@@ -72,7 +72,7 @@
         class="ti-m-results-stack"
       >
         <!-- Result Card -->
-        <div style="width: 100% !important;">
+        <div class="ti-m-result-wrapper">
           <TranslationDisplay
             mode="mobile"
             :content="selectionData.translation"
@@ -112,6 +112,7 @@
 </template>
 
 <script setup>
+import './SelectionView.scss'
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'

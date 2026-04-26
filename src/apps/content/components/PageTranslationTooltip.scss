@@ -18,6 +18,7 @@
   display: block !important;
   will-change: transform !important;
   transition: opacity 0.2s ease !important;
+  transform: var(--tooltip-transform, none) !important;
 
   /* Text direction & alignment */
   direction: ltr !important;

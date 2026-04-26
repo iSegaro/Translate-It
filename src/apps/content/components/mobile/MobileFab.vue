@@ -8,7 +8,8 @@
       'is-positioning': isPositioning,
       'is-unstable': isViewportUnstable && !isFabDragging,
       'is-left': side === 'left',
-      'is-right': side === 'right'
+      'is-right': side === 'right',
+      'is-hidden': !side || fabPosition.y === null
     }"
     translate="no"
     :style="dynamicVars"
@@ -29,6 +30,7 @@
 </template>
 
 <script setup>
+import './MobileFab.scss';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
@@ -65,6 +67,7 @@ const isSelectionDirty = ref(false);
 const pendingText = ref('');
 
 // Internal variables
+let dragStartX = 0;
 let dragStartY = 0;
 let initialFabY = 0;
 let animationFrameId = null;
@@ -84,7 +87,11 @@ const handleSelectionChange = () => {
 
 const checkBounds = () => {
   if (typeof window === 'undefined' || !userPreferredY.value) return;
-  const maxY = window.innerHeight - 60;
+  
+  // Use VisualViewport for more accurate visible area height on mobile
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const maxY = viewportHeight - 60;
+  
   fabPosition.value.y = Math.max(50, Math.min(userPreferredY.value, maxY));
 };
 
@@ -92,7 +99,8 @@ const updateViewport = () => {
   if (typeof window === 'undefined') return;
   
   // Only hide FAB on scroll for actual mobile devices (where toolbars hide/show)
-  if (deviceDetector.isMobile()) {
+  // This prevents flickering during translation layout shifts on desktop emulators
+  if (deviceDetector.isMobile() && !window.matchMedia('(pointer: fine)').matches) {
     isViewportUnstable.value = true;
   }
   
@@ -106,6 +114,8 @@ const updateViewport = () => {
   instabilityTimer = tracker.trackTimeout(() => {
     isViewportUnstable.value = false;
     instabilityTimer = null;
+    // CRITICAL: Re-check bounds after stabilization to catch finalized innerHeight/viewport changes
+    checkBounds();
   }, 250);
 };
 
@@ -124,8 +134,16 @@ onMounted(async () => {
 
   if (typeof window !== 'undefined') {
     tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
-    tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
+    
+    // Only update on resize/orientation changes.
+    // position: fixed handles scrolling automatically.
     tracker.addEventListener(window, 'resize', updateViewport);
+    
+    // NEW: Use VisualViewport API for better mobile support if available
+    if (window.visualViewport) {
+      tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
+      tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
+    }
   }
 
   tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
@@ -176,7 +194,7 @@ onMounted(async () => {
  */
 const dynamicVars = computed(() => {
   if (!isReady.value || side.value === null || fabPosition.value.y === null) {
-    return { display: 'none !important' };
+    return {};
   }
   
   let currentOpacity = '1';
@@ -196,7 +214,15 @@ const dynamicVars = computed(() => {
   };
 
   if (isFabDragging.value && fabPosition.value.x !== null) {
+    // When dragging, use explicit left coordinate
     vars['--fab-left'] = `${fabPosition.value.x}px`;
+  } else {
+    // When snapped, use side-based left/margin values
+    if (side.value === MOBILE_CONSTANTS.FAB.SIDE.LEFT) {
+      vars['--fab-left'] = '0';
+    } else {
+      vars['--fab-left'] = '100%';
+    }
   }
 
   return vars;
@@ -214,12 +240,12 @@ const onFabDragStart = (e) => {
   
   const point = isMouseEvent ? e : e.touches[0];
   
-  isFabDragging.value = true;
+  dragStartX = point.clientX;
   dragStartY = point.clientY;
   initialFabY = fabPosition.value.y;
   
-  // Initialize X position immediately to prevent jumping during click/start
-  fabPosition.value.x = point.clientX;
+  // Don't set isFabDragging = true yet, wait for move threshold in Move handler
+  isFabDragging.value = false;
 
   if (isMouseEvent) {
     tracker.addEventListener(window, 'mousemove', onFabDragMove);
@@ -230,10 +256,20 @@ const onFabDragStart = (e) => {
 };
 
 const onFabDragMove = (e) => {
-  if (!isFabDragging.value) return;
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
+  const currentX = point.clientX;
   const currentY = point.clientY;
+
+  // Drag Threshold: Only start dragging if moved more than 5px from start
+  if (!isFabDragging.value) {
+    const moveDist = Math.sqrt(Math.pow(currentX - dragStartX, 2) + Math.pow(currentY - dragStartY, 2));
+    if (moveDist > 5) {
+      isFabDragging.value = true;
+    } else {
+      return;
+    }
+  }
   
   if (e.cancelable) e.preventDefault();
   
@@ -243,10 +279,10 @@ const onFabDragMove = (e) => {
       fabPosition.value.y = Math.max(50, Math.min(window.innerHeight - 50, initialFabY + deltaY));
       
       const snapThreshold = window.innerWidth / 2;
-      side.value = point.clientX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
+      side.value = currentX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
       
       // Track X position during drag for smooth visualization
-      fabPosition.value.x = point.clientX;
+      fabPosition.value.x = currentX;
       
       animationFrameId = null;
     });

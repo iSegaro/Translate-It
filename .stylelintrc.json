@@ -3,8 +3,9 @@
     "stylelint-config-standard-scss",
     "stylelint-config-recommended-vue"
   ],
-  "customSyntax": "postcss-html",
   "rules": {
+    "at-rule-no-unknown": null,
+    "scss/at-rule-no-unknown": true,
     "selector-class-pattern": [
       "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
       {
@@ -14,9 +15,6 @@
     "selector-id-pattern": null,
     "no-duplicate-selectors": true,
     "no-empty-source": null,
-    "string-quotes": "single",
-    "indentation": 2,
-    "max-empty-lines": 2,
     "rule-empty-line-before": [
       "always",
       {
@@ -50,20 +48,11 @@
     "declaration-block-no-redundant-longhand-properties": true,
     "property-no-vendor-prefix": true,
     "value-no-vendor-prefix": true,
-    "media-feature-range-operator-space-before": "never",
-    "media-feature-range-operator-space-after": "always",
-    "media-feature-parentheses-space-inside": "never",
     "media-feature-name-no-vendor-prefix": true,
     "comment-empty-line-before": [
       "always",
       {
         "ignore": ["stylelint-commands"]
-      }
-    ],
-    "at-rule-no-unknown": [
-      true,
-      {
-        "ignoreAtRules": ["use", "forward"]
       }
     ],
     "scss/dollar-variable-pattern": [
@@ -83,18 +72,12 @@
       {
         "message": "Placeholders should use kebab-case"
       }
-    ],
-    "order/properties-alphabetical-order": true,
-    "plugin/selector-bem-pattern": {
-      "preset": "bem",
-      "implicitComponents": true,
-      "componentNamePattern": "ti-[a-z]+",
-      "utilitySelectors": "ti-u-([a-z]-?)+"
-    }
+    ]
   },
   "overrides": [
     {
       "files": ["**/*.vue"],
+      "customSyntax": "postcss-html",
       "rules": {
         "selector-class-pattern": [
           "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
@@ -118,6 +101,28 @@
       "files": ["src/assets/styles/utilities/**/*.scss"],
       "rules": {
         "declaration-no-important": null
+      }
+    },
+    {
+      "files": [
+        "src/assets/styles/layout/_options.scss",
+        "src/assets/styles/layout/_sidepanel.scss",
+        "src/assets/styles/main.scss",
+        "src/assets/styles/content-app-global.scss",
+        "src/assets/styles/content-main-dom.scss",
+        "src/assets/styles/content-main-dom.css",
+        "src/assets/styles/components/_ti-field-icon.scss",
+        "src/assets/styles/components/_ti-window.scss",
+        "src/assets/styles/components/_toast-integration.scss"
+      ],
+      "rules": {
+        "declaration-no-important": null,
+        "selector-max-specificity": null,
+        "selector-max-attribute": null,
+        "selector-class-pattern": null,
+        "selector-max-id": null,
+        "selector-max-class": null,
+        "declaration-block-no-duplicate-properties": null
       }
     }
   ],

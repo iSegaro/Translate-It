@@ -6,14 +6,13 @@
 
 // src/handlers/getSelectedTextHandler.js
 import browser from "webextension-polyfill";
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'getSelectedText');
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, "getSelectedText");
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 // removed legacy createLogger import
-
 
 export async function handleGetSelectedText(
   message,
@@ -21,7 +20,7 @@ export async function handleGetSelectedText(
   sendResponse,
   safeSendMessage,
 ) {
-  logger.debug('Handling request.');
+  logger.debug("Handling request.");
   try {
     const tabs = await browser.tabs.query({
       active: true,
@@ -34,13 +33,13 @@ export async function handleGetSelectedText(
       const response = await safeSendMessage(tab.id, {
         action: "getSelectedText",
       });
-  logger.debug('Got:', response);
+      logger.debug("Got:", response);
       sendResponse(response || { selectedText: "" });
     } else {
       sendResponse({ selectedText: "" });
     }
   } catch (err) {
-  logger.error('Error:', err);
+    logger.error("Error:", err);
     sendResponse({ selectedText: "", error: String(err) });
   }
   return true;

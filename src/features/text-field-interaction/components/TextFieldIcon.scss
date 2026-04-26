@@ -1,0 +1,10 @@
+/* Component-specific styles for TextFieldIcon */
+.ti-text-field-icon-wrapper {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}

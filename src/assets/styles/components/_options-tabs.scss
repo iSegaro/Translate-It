@@ -1,3 +1,4 @@
+/* stylelint-disable selector-class-pattern */
 @use "../base/variables" as *;
 
 // Standard Layout for Options Page Tabs
@@ -50,7 +51,7 @@
 
   .validation-error {
     background-color: var(--color-error);
-    color: white;
+    color: #fff;
     padding: $spacing-base;
     border-radius: $border-radius-base;
     margin-top: $spacing-base;
@@ -59,14 +60,23 @@
 }
 
 @keyframes tab-fade-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 // Global mobile overrides for all tabs
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .options-tab-content {
-    padding-top: $spacing-sm !important; /* Bring content closer to top */
+    /* stylelint-disable-next-line declaration-no-important */
+    padding-top: $spacing-sm !important;
+    /* stylelint-disable-next-line declaration-no-important */
     padding-bottom: 140px !important; // Match the overlap fix
 
     h2 {

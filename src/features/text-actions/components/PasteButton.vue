@@ -15,7 +15,6 @@
         :src="iconSrc" 
         :alt="iconAlt"
         class="ti-button-icon"
-        style="width: 16px !important; height: 16px !important; object-fit: contain;"
       >
     </template>
     
@@ -37,7 +36,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import './PasteButton.scss';
+import { ref, computed } from 'vue';
 import browser from 'webextension-polyfill'
 import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
@@ -166,51 +166,3 @@ const handlePaste = async (event) => {
   }
 }
 </script>
-
-<style scoped>
-/* Paste button specific styles */
-.ti-paste-button.ti-pasting {
-  opacity: 0.7;
-}
-
-/* Button elements */
-.ti-button-icon {
-  flex-shrink: 0;
-  object-fit: contain;
-  filter: var(--icon-filter);
-}
-
-/* Feedback animation - Fixed positioning for Teleport */
-.ti-paste-feedback-global {
-  position: fixed; /* نمایش به صورت فیکس در کل صفحه */
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.9);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  z-index: 2147483647; /* حداکثر مقدار ممکن */
-  pointer-events: none;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-}
-
-.ti-feedback-enter-active,
-.ti-feedback-leave-active {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.ti-feedback-enter-from,
-.ti-feedback-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(8px);
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .ti-variant-standalone {
-    border-color: rgba(255, 255, 255, 0.2);
-    background-color: rgba(0, 0, 0, 0.9);
-  }
-}
-</style>

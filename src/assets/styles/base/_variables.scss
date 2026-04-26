@@ -1,3 +1,4 @@
+/* stylelint-disable selector-class-pattern */
 // Z-index CSS Custom Properties
 :root {
   // Z-index layers
@@ -10,11 +11,7 @@
   --ti-z-selection: 1050;
   --ti-z-field-icon: 1060;
   --ti-z-max: 2147483647;
-}
 
-// Map theme variables to component variables with fallbacks
-// These definitions should be first so theme-specific blocks can override them if needed
-:root {
   // Primary colors (mapped from theme)
   --color-primary: var(--tab-button-active-color, #1976d2);
   --color-primary-light: #42a5f5;
@@ -26,7 +23,7 @@
   --color-secondary-dark: #9a0036;
   
   // Neutral colors (mapped from theme)
-  --color-background: var(--bg-color, #ffffff);
+  --color-background: var(--bg-color, #fff);
   --color-surface: #f5f5f5;
   --color-surface-alt: var(--main-bg-color, #fafafa);
   --color-textarea-background: var(--textarea-bg-color, #f1f3f4);
@@ -41,18 +38,18 @@
     
   // Default fallback values for provider icon filtering (light theme bias)
   --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
-  --provider-icon-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --provider-icon-active-shadow: 0 1px 3px rgb(0 0 0 / 20%);
   
   /* Spacing */
   --spacing-md: 16px;
   --spacing-sm: 8px;
 
   /* Theme-aware Color Variables */
-  --color-background-hover: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05));
+  --color-background-hover: var(--toolbar-link-hover-bg-color, rgb(0 0 0 / 5%));
   --color-active-background: var(--tab-button-active-bg, #e8f0fe);
   --color-active-text: var(--tab-button-active-color, #1967d2);
-  --color-primary-alpha: var(--accent-color-alpha, rgba(25, 103, 210, 0.2));
-  --color-surface-shadow: var(--provider-icon-active-shadow, rgba(0, 0, 0, 0.1));
+  --color-primary-alpha: var(--accent-color-alpha, rgb(25 103 210 / 20%));
+  --color-surface-shadow: var(--provider-icon-active-shadow, rgb(0 0 0 / 10%));
 
   /* Typography */
   --font-size-xxl: 24px;
@@ -75,11 +72,11 @@
 // Modern SCSS using @forward for shared variables
 :root.theme-light, .theme-light {
   // Base colors
-  --bg-color: #ffffff;
+  --bg-color: #fff;
   --text-color: #202124;
   --sidebar-bg-color: #fffbe6;
-  --main-bg-color: #ffffff;
-  --textarea-bg-color: #ffffff;
+  --main-bg-color: #fff;
+  --textarea-bg-color: #fff;
   --border-color: #e0e0e0;
   
   // Popup specific colors
@@ -106,7 +103,7 @@
   --input-text-color: #202124;
   --input-border-color: #dadce0;
   --input-focus-border-color: #1967d2;
-  --input-focus-shadow-color: rgba(25, 103, 210, 0.2);
+  --input-focus-shadow-color: rgb(25 103 210 / 20%);
   --button-bg-color: #1a73e8;
   --button-text-color: #fff;
   --button-hover-bg-color: #1557b0;
@@ -116,7 +113,7 @@
   
     // Component specific colors
   --accent-color: #1a73e8;
-  --accent-color-alpha: rgba(26, 115, 232, 0.1);
+  --accent-color-alpha: rgb(26 115 232 / 10%);
   --placeholder-color: #9aa0a6;
   
   // Icon filters
@@ -127,23 +124,23 @@
   
   // Provider icon filtering
   --provider-icon-active-filter: brightness(1.6) contrast(2.0) saturate(1.0);
-  --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
+  --provider-icon-active-shadow: 0 1px 3px rgb(255 255 255 / 10%);
   
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);
   --color-text-secondary: var(--placeholder-color, #9aa0a6);
-  --color-background: var(--bg-color, #ffffff);
+  --color-background: var(--bg-color, #fff);
   --color-background-secondary: var(--bg-result-color, #f8f9fa);
   --color-background-soft: var(--sidebar-bg-color, #fffbe6);
   --color-surface: #f5f5f5;
-  --color-surface-alpha: rgba(245, 245, 245, 0.7);
+  --color-surface-alpha: rgb(245 245 245 / 70%);
   --color-border: var(--border-color, #e0e0e0);
-  --color-border-alpha: rgba(224, 220, 220, 0.4);
-  --color-border-light: rgba(0, 0, 0, 0.05);
+  --color-border-alpha: rgb(224 220 220 / 40%);
+  --color-border-light: rgb(0 0 0 / 5%);
   --color-primary: var(--link-color, #1a73e8);
   --color-error: #ef5350;
   --color-success: #4caf50;
-  --color-success-alpha: rgba(76, 175, 80, 0.1);
+  --color-success-alpha: rgb(76 175 80 / 10%);
   --color-info: #1a73e8;
 }
 
@@ -180,7 +177,7 @@
   --input-text-color: #e8eaed;
   --input-border-color: #5f6368;
   --input-focus-border-color: #8ab4f8;
-  --input-focus-shadow-color: rgba(138, 180, 248, 0.3);
+  --input-focus-shadow-color: rgb(138 180 248 / 30%);
   --button-bg-color: #1a73e8;
   --button-text-color: #fff;
   --button-hover-bg-color: #185abc;
@@ -190,7 +187,7 @@
   
   // Component specific colors
   --accent-color: #8ab4f8;
-  --accent-color-alpha: rgba(138, 180, 248, 0.2);
+  --accent-color-alpha: rgb(138 180 248 / 20%);
   --placeholder-color: #888;
   
   // Icon filters
@@ -201,16 +198,15 @@
   
   // Provider icon filtering
   --provider-icon-active-filter: brightness(0.1) invert(1) brightness(1.2) contrast(1.5);
-  --provider-icon-active-shadow: 0 1px 3px rgba(255, 255, 255, 0.1);
-  
+  --provider-icon-active-shadow: 0 1px 3px rgb(255 255 255 / 10%);
   --color-surface: #242d44; /* Ensure dark theme background is blue */
-  --color-surface-alpha: rgba(30, 31, 34, 0.85); /* More neutral dark grey with higher opacity */
-  --color-border-alpha: rgba(255, 255, 255, 0.1);
-  --color-primary-alpha: rgba(138, 180, 248, 0.3);
-  --color-surface-shadow: rgba(255, 255, 255, 0.1);
-  --color-background-hover: rgba(255, 255, 255, 0.1);
-  --color-button-surface: rgba(32, 33, 36, 0.95);
-  --color-button-hover: rgba(255, 255, 255, 0.15);
+  --color-surface-alpha: rgb(30 31 34 / 85%); /* More neutral dark grey with higher opacity */
+  --color-border-alpha: rgb(255 255 255 / 10%);
+  --color-primary-alpha: rgb(138 180 248 / 30%);
+  --color-surface-shadow: rgb(255 255 255 / 10%);
+  --color-background-hover: rgb(255 255 255 / 10%);
+  --color-button-surface: rgb(32 33 36 / 95%);
+  --color-button-hover: rgb(255 255 255 / 15%);
   
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);
@@ -219,11 +215,11 @@
   --color-background-secondary: var(--bg-result-color, #0e0e0e);
   --color-background-soft: var(--sidebar-bg-color, #303741);
   --color-border: var(--border-color, #3c4043);
-  --color-border-light: rgba(255, 255, 255, 0.1);
+  --color-border-light: rgb(255 255 255 / 10%);
   --color-primary: var(--link-color, #8ab4f8);
   --color-error: #ef5350;
   --color-success: #66bb6a;
-  --color-success-alpha: rgba(102, 187, 106, 0.1);
+  --color-success-alpha: rgb(102 187 106 / 10%);
   --color-info: #8ab4f8;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
@@ -245,7 +241,6 @@ $font-size-md: 15px;
 $font-size-lg: 16px;
 $font-size-xl: 18px;
 $font-size-xxl: 20px;
-
 $font-weight-normal: 400;
 $font-weight-medium: 500;
 $font-weight-semibold: 600;
@@ -266,16 +261,15 @@ $border-radius-sm: 4px;
 $border-radius-base: 6px;
 $border-radius-md: 8px;
 $border-radius-lg: 12px;
-
 $border-width: 1px;
 $border-style: solid;
 $border-color: var(--color-border);
 
 // Shadows
-$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-$shadow-base: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-$shadow-md: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
-$shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.10);
+$shadow-sm: 0 1px 2px rgb(0 0 0 / 5%);
+$shadow-base: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 24%);
+$shadow-md: 0 3px 6px rgb(0 0 0 / 15%), 0 2px 4px rgb(0 0 0 / 12%);
+$shadow-lg: 0 10px 20px rgb(0 0 0 / 15%), 0 3px 6px rgb(0 0 0 / 10%);
 
 // Transitions
 $transition-fast: 0.15s ease;

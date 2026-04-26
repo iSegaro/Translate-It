@@ -34,7 +34,7 @@
     <template v-else>
       <!-- Enhanced Actions Toolbar (Desktop/Standard) -->
       <ActionToolbar
-        v-show="showToolbar && hasContent && mode !== 'mobile'"
+        v-if="showToolbar && hasContent && mode !== 'mobile'"
         :text="content"
         :language="lastTranslation?.targetLanguage || targetLanguage"
         :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"

@@ -2,19 +2,22 @@
  * Notification Handler - Unified handler for notifications.onClicked events
  * Handles browser notification clicks and actions
  */
-import browser from 'webextension-polyfill';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'notification-handler');
+import browser from "webextension-polyfill";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+const logger = getScopedLogger(
+  LOG_COMPONENTS.BACKGROUND,
+  "notification-handler",
+);
 
 /**
  * Handle update notification click
  */
 async function handleUpdateNotification() {
   try {
-    logger.debug('Update notification clicked');
+    logger.debug("Update notification clicked");
     // Open options page to show changelog/about
-    const optionsUrl = browser.runtime.getURL('options.html#about');
+    const optionsUrl = browser.runtime.getURL("options.html#about");
 
     // Check if options page is already open
     const tabs = await browser.tabs.query({ url: optionsUrl });
@@ -29,11 +32,11 @@ async function handleUpdateNotification() {
     }
 
     // Clear the notification
-    await browser.notifications.clear('update-notification');
+    await browser.notifications.clear("update-notification");
 
-    logger.debug('Update notification handled - opened options page');
+    logger.debug("Update notification handled - opened options page");
   } catch (error) {
-    logger.error('Error handling update notification:', error);
+    logger.error("Error handling update notification:", error);
   }
 }
 
@@ -42,17 +45,17 @@ async function handleUpdateNotification() {
  */
 async function handleMigrationNotification() {
   try {
-    logger.debug('Migration notification clicked');
+    logger.debug("Migration notification clicked");
     // Open options page to show settings
-    const optionsUrl = browser.runtime.getURL('options.html');
+    const optionsUrl = browser.runtime.getURL("options.html");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
-    await browser.notifications.clear('migration-success');
+    await browser.notifications.clear("migration-success");
 
-    logger.debug('Migration notification handled - opened options page');
+    logger.debug("Migration notification handled - opened options page");
   } catch (error) {
-    logger.error('Error handling migration notification:', error);
+    logger.error("Error handling migration notification:", error);
   }
 }
 
@@ -61,17 +64,17 @@ async function handleMigrationNotification() {
  */
 async function handleProviderChangeNotification() {
   try {
-    logger.debug('Provider change notification clicked');
+    logger.debug("Provider change notification clicked");
     // Open options page to API settings
-    const optionsUrl = browser.runtime.getURL('options.html#api');
+    const optionsUrl = browser.runtime.getURL("options.html#api");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
-    await browser.notifications.clear('provider-changed');
+    await browser.notifications.clear("provider-changed");
 
-    logger.debug('Provider change notification handled - opened API settings');
+    logger.debug("Provider change notification handled - opened API settings");
   } catch (error) {
-    logger.error('Error handling provider change notification:', error);
+    logger.error("Error handling provider change notification:", error);
   }
 }
 
@@ -80,17 +83,19 @@ async function handleProviderChangeNotification() {
  */
 async function handleSiteExclusionNotification() {
   try {
-    logger.debug('Site exclusion notification clicked');
+    logger.debug("Site exclusion notification clicked");
     // Open options page to advanced settings
-    const optionsUrl = browser.runtime.getURL('options.html#advance');
+    const optionsUrl = browser.runtime.getURL("options.html#advance");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
-    await browser.notifications.clear('site-excluded');
+    await browser.notifications.clear("site-excluded");
 
-    logger.debug('Site exclusion notification handled - opened advanced settings');
+    logger.debug(
+      "Site exclusion notification handled - opened advanced settings",
+    );
   } catch (error) {
-    logger.error('Error handling site exclusion notification:', error);
+    logger.error("Error handling site exclusion notification:", error);
   }
 }
 
@@ -99,17 +104,19 @@ async function handleSiteExclusionNotification() {
  */
 async function handleSiteInclusionNotification() {
   try {
-    logger.debug('Site inclusion notification clicked');
+    logger.debug("Site inclusion notification clicked");
     // Open options page to advanced settings
-    const optionsUrl = browser.runtime.getURL('options.html#advance');
+    const optionsUrl = browser.runtime.getURL("options.html#advance");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
-    await browser.notifications.clear('site-included');
+    await browser.notifications.clear("site-included");
 
-    logger.debug('Site inclusion notification handled - opened advanced settings');
+    logger.debug(
+      "Site inclusion notification handled - opened advanced settings",
+    );
   } catch (error) {
-    logger.error('Error handling site inclusion notification:', error);
+    logger.error("Error handling site inclusion notification:", error);
   }
 }
 
@@ -118,17 +125,19 @@ async function handleSiteInclusionNotification() {
  */
 async function handleTranslationErrorNotification() {
   try {
-    logger.error('Translation error notification clicked');
+    logger.error("Translation error notification clicked");
     // Open options page to API settings for troubleshooting
-    const optionsUrl = browser.runtime.getURL('options.html#api');
+    const optionsUrl = browser.runtime.getURL("options.html#api");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
-    await browser.notifications.clear('translation-error');
+    await browser.notifications.clear("translation-error");
 
-    logger.error('Translation error notification handled - opened API settings');
+    logger.error(
+      "Translation error notification handled - opened API settings",
+    );
   } catch (error) {
-    logger.error('Error handling translation error notification:', error);
+    logger.error("Error handling translation error notification:", error);
   }
 }
 
@@ -143,7 +152,7 @@ async function handleSuccessNotification(notificationId) {
 
     logger.init(`Success notification ${notificationId} cleared`);
   } catch (error) {
-    logger.error('Error handling success notification:', error);
+    logger.error("Error handling success notification:", error);
   }
 }
 
@@ -154,15 +163,17 @@ async function handleErrorNotification(notificationId) {
   try {
     logger.error(`Error notification clicked: ${notificationId}`);
     // Open options page for help/troubleshooting
-    const optionsUrl = browser.runtime.getURL('options.html#help');
+    const optionsUrl = browser.runtime.getURL("options.html#help");
     await browser.tabs.create({ url: optionsUrl });
 
     // Clear the notification
     await browser.notifications.clear(notificationId);
 
-    logger.error(`Error notification ${notificationId} handled - opened help page`);
+    logger.error(
+      `Error notification ${notificationId} handled - opened help page`,
+    );
   } catch (error) {
-    logger.error('Error handling error notification:', error);
+    logger.error("Error handling error notification:", error);
   }
 }
 
@@ -171,33 +182,33 @@ async function handleErrorNotification(notificationId) {
  */
 async function handleTTSNotification() {
   try {
-    logger.debug('TTS notification clicked');
+    logger.debug("TTS notification clicked");
     // Open sidepanel if available
     try {
       const windows = await browser.windows.getAll({ focused: true });
       if (windows.length > 0 && browser.sidePanel && browser.sidePanel.open) {
         await browser.sidePanel.open({ windowId: windows[0].id });
-        logger.debug('Opened sidepanel for TTS');
+        logger.debug("Opened sidepanel for TTS");
       } else {
         // Fallback to popup
         await browser.action.openPopup();
-        logger.debug('Opened popup for TTS');
+        logger.debug("Opened popup for TTS");
       }
     } catch {
       // If sidepanel/popup fails, open options page
-      const optionsUrl = browser.runtime.getURL('options.html');
+      const optionsUrl = browser.runtime.getURL("options.html");
       await browser.tabs.create({ url: optionsUrl });
-      logger.debug('Opened options page as TTS fallback');
+      logger.debug("Opened options page as TTS fallback");
     }
 
     // Clear TTS-related notifications
-    await browser.notifications.clear('tts-started');
-    await browser.notifications.clear('tts-completed');
-    await browser.notifications.clear('tts-error');
+    await browser.notifications.clear("tts-started");
+    await browser.notifications.clear("tts-completed");
+    await browser.notifications.clear("tts-error");
 
-    logger.debug('TTS notification handled');
+    logger.debug("TTS notification handled");
   } catch (error) {
-    logger.error('Error handling TTS notification:', error);
+    logger.error("Error handling TTS notification:", error);
   }
 }
 
@@ -209,41 +220,44 @@ export async function handleNotificationEvent(notificationId) {
   try {
     // Handle specific notification types
     switch (notificationId) {
-      case 'update-notification':
+      case "update-notification":
         await handleUpdateNotification();
         break;
 
-      case 'migration-success':
+      case "migration-success":
         await handleMigrationNotification();
         break;
 
-      case 'provider-changed':
+      case "provider-changed":
         await handleProviderChangeNotification();
         break;
 
-      case 'site-excluded':
+      case "site-excluded":
         await handleSiteExclusionNotification();
         break;
 
-      case 'site-included':
+      case "site-included":
         await handleSiteInclusionNotification();
         break;
 
-      case 'translation-error':
+      case "translation-error":
         await handleTranslationErrorNotification();
         break;
 
-      case 'tts-started':
-      case 'tts-completed':
-      case 'tts-error':
+      case "tts-started":
+      case "tts-completed":
+      case "tts-error":
         await handleTTSNotification();
         break;
 
       default:
         // Handle generic notifications based on naming patterns
-        if (notificationId.includes('success')) {
+        if (notificationId.includes("success")) {
           await handleSuccessNotification(notificationId);
-        } else if (notificationId.includes('error') || notificationId.includes('failed')) {
+        } else if (
+          notificationId.includes("error") ||
+          notificationId.includes("failed")
+        ) {
           await handleErrorNotification(notificationId);
         } else {
           // Unknown notification - just clear it

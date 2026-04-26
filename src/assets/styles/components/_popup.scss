@@ -1,3 +1,4 @@
+/* stylelint-disable selector-class-pattern */
 @use '../base/variables' as *;
 @use '../base/mixins' as *;
 
@@ -7,7 +8,7 @@
 body.popup-context {
   margin: 0;
   padding: 0;
-  width: $popup-width !important;
+  width: $popup-width;
   min-height: 350px;
   max-height: $popup-max-height;
   height: auto;
@@ -16,7 +17,7 @@ body.popup-context {
   color: var(--text-color);
   font-size: $font-size-md;
   overflow: hidden;
-  transition: height 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 // Popup container
@@ -25,7 +26,9 @@ body.popup-context {
   min-height: 350px;
   height: auto;
   background: var(--bg-color);
-  @include shadow-md;
+
+  @include ti-shadow-md;
+
   border-radius: $border-radius-md;
   overflow: hidden;
   display: flex;
@@ -60,7 +63,9 @@ body.popup-context .ti-toolbar-icon {
   height: 20px;
   cursor: pointer;
   opacity: var(--icon-opacity);
-  @include transition-fast(opacity, filter, background-color);
+
+  @include ti-transition-fast(opacity, filter, background-color);
+
   filter: var(--icon-filter);
 
   &:hover {
@@ -70,7 +75,7 @@ body.popup-context .ti-toolbar-icon {
 
 // Revert icon animation
 .ti-revert-icon {
-  @include transition-slow(transform, opacity, filter);
+  @include ti-transition-slow(transform, opacity, filter);
 
   &:hover {
     transform: rotate(360deg);
@@ -80,8 +85,8 @@ body.popup-context .ti-toolbar-icon {
 // Textarea and result styles
 .ti-result {
   background-color: var(--bg-result-color);
-  white-space: normal !important;
-  word-wrap: break-word;
+  white-space: normal;
+  overflow-wrap: break-word;
   overflow-y: auto;
 }
 
@@ -111,7 +116,7 @@ body.popup-context .ti-toolbar-icon {
 
 // Fade in animation
 .ti-result.ti-fade-in {
-  animation: fadeIn 0.4s ease-in-out;
+  animation: ti-fade-in 0.4s ease-in-out;
 }
 
 

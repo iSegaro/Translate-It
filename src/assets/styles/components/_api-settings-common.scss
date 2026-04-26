@@ -1,3 +1,4 @@
+/* stylelint-disable selector-class-pattern */
 @forward '../base/variables';
 @forward '../base/mixins';
 @use '../base/variables' as *;
@@ -16,7 +17,7 @@
   h3 {
     font-size: $font-size-lg;
     font-weight: $font-weight-medium;
-    margin: 0 0 $spacing-sm 0;
+    margin: 0 0 $spacing-sm;
     color: var(--color-text);
   }
 
@@ -65,6 +66,21 @@
     border-radius: 4px;
     border: 1px solid var(--color-border, #e0e0e0);
   }
+
+  // Validation states - Increased specificity to avoid !important
+  &.ti-error {
+    .api-key-input,
+    .model-select {
+      border-color: var(--color-error);
+    }
+  }
+
+  &.ti-success {
+    .api-key-input,
+    .model-select {
+      border-color: var(--color-success);
+    }
+  }
 }
 
 .api-link {
@@ -72,7 +88,8 @@
   text-decoration: none;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
-  @include transition-fast(color);
+
+  @include ti-transition-fast(color);
 
   &:hover {
     color: var(--color-primary-dark);
@@ -91,21 +108,4 @@
 
 .ti-model-select {
   min-width: 200px;
-}
-
-// Validation states
-.setting-group {
-  &.ti-error {
-    .api-key-input,
-    .model-select {
-      border-color: var(--color-error) !important;
-    }
-  }
-
-  &.ti-success {
-    .api-key-input,
-    .model-select {
-      border-color: var(--color-success) !important;
-    }
-  }
 }

@@ -72,6 +72,7 @@
 </template>
 
 <script setup>
+import './TextFieldIcon.scss';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
@@ -251,7 +252,3 @@ onMounted(() => {
   internalVisible.value = props.visible;
 });
 </script>
-
-<style scoped>
-/* Component-specific styles */
-</style>

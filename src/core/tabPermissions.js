@@ -1,9 +1,9 @@
 // src/core/tabPermissions.js
 // Tab permissions and accessibility utilities
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissions');
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+const logger = getScopedLogger(LOG_COMPONENTS.CORE, "TabPermissions");
 
 /**
  * Check if a URL is restricted for content script injection
@@ -11,21 +11,23 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissions');
  * @returns {boolean} True if URL is restricted
  */
 export function isRestrictedUrl(url) {
-  if (!url || typeof url !== 'string') return true;
+  if (!url || typeof url !== "string") return true;
 
   const restrictedPrefixes = [
-    'chrome://',
-    'chrome-extension://',
-    'moz-extension://',
-    'about:',
-    'edge://',
-    'opera://',
-    'vivaldi://',
-    'brave://',
+    "chrome://",
+    "chrome-extension://",
+    "moz-extension://",
+    "about:",
+    "edge://",
+    "opera://",
+    "vivaldi://",
+    "brave://",
     // Note: file:// is removed from restricted prefixes to allow local file access
   ];
 
-  return restrictedPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
+  return restrictedPrefixes.some((prefix) =>
+    url.toLowerCase().startsWith(prefix),
+  );
 }
 
 /**
@@ -34,14 +36,13 @@ export function isRestrictedUrl(url) {
  * @returns {boolean} True if it's an extension page
  */
 export function isExtensionPage(url) {
-  if (!url || typeof url !== 'string') return false;
-  
-  const extensionPrefixes = [
-    'chrome-extension://',
-    'moz-extension://',
-  ];
-  
-  return extensionPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
+  if (!url || typeof url !== "string") return false;
+
+  const extensionPrefixes = ["chrome-extension://", "moz-extension://"];
+
+  return extensionPrefixes.some((prefix) =>
+    url.toLowerCase().startsWith(prefix),
+  );
 }
 
 /**
@@ -50,18 +51,20 @@ export function isExtensionPage(url) {
  * @returns {boolean} True if it's a browser internal page
  */
 export function isBrowserInternalPage(url) {
-  if (!url || typeof url !== 'string') return false;
+  if (!url || typeof url !== "string") return false;
 
   const internalPrefixes = [
-    'chrome://',
-    'about:',
-    'edge://',
-    'opera://',
-    'vivaldi://',
-    'brave://',
+    "chrome://",
+    "about:",
+    "edge://",
+    "opera://",
+    "vivaldi://",
+    "brave://",
   ];
 
-  return internalPrefixes.some(prefix => url.toLowerCase().startsWith(prefix));
+  return internalPrefixes.some((prefix) =>
+    url.toLowerCase().startsWith(prefix),
+  );
 }
 
 /**
@@ -70,10 +73,10 @@ export function isBrowserInternalPage(url) {
  * @returns {boolean} True if it's a local file
  */
 export function isLocalFile(url) {
-  if (!url || typeof url !== 'string') return false;
+  if (!url || typeof url !== "string") return false;
 
   try {
-    return new URL(url).protocol === 'file:';
+    return new URL(url).protocol === "file:";
   } catch {
     return false;
   }
@@ -91,9 +94,8 @@ export function isSafeLocalFile(url) {
     // Simple check - if user opens the file, let's trust them
     logger.debug(`[TabPermissions] Local file allowed: ${url}`);
     return true;
-
   } catch (error) {
-    logger.error('[TabPermissions] Error checking local file safety:', error);
+    logger.error("[TabPermissions] Error checking local file safety:", error);
     return false;
   }
 }
@@ -104,24 +106,24 @@ export function isSafeLocalFile(url) {
  * @returns {string} User-friendly error message
  */
 export function getRestrictedUrlMessage(url) {
-  if (!url) return 'Page information unavailable';
+  if (!url) return "Page information unavailable";
 
   if (isBrowserInternalPage(url)) {
-    return 'Feature not available on browser internal pages';
+    return "Feature not available on browser internal pages";
   }
 
   if (isExtensionPage(url)) {
-    return 'Feature not available on extension pages';
+    return "Feature not available on extension pages";
   }
 
   if (isLocalFile(url)) {
     if (!isSafeLocalFile(url)) {
-      return 'File type blocked for security reasons';
+      return "File type blocked for security reasons";
     }
-    return 'Local file access is enabled';
+    return "Local file access is enabled";
   }
 
-  return 'Feature not available on this type of page';
+  return "Feature not available on this type of page";
 }
 
 /**
@@ -141,7 +143,7 @@ export function checkContentScriptAccess() {
       const isSafe = isSafeLocalFile(url);
       isRestricted = !isSafe;
       if (!isSafe) {
-        errorMessage = 'File type blocked for security reasons';
+        errorMessage = "File type blocked for security reasons";
         logger.warn(`[TabPermissions] Unsafe local file blocked: ${url}`);
       } else {
         logger.info(`[TabPermissions] Safe local file allowed: ${url}`);
@@ -156,23 +158,28 @@ export function checkContentScriptAccess() {
       isSafeLocalFile: isLocalFile(url) ? isSafeLocalFile(url) : null,
       isExtensionPage: isExtensionPage(url),
       isBrowserInternalPage: isBrowserInternalPage(url),
-      errorMessage: isRestricted ? (errorMessage || getRestrictedUrlMessage(url)) : null,
-      timestamp: Date.now()
+      errorMessage: isRestricted
+        ? errorMessage || getRestrictedUrlMessage(url)
+        : null,
+      timestamp: Date.now(),
     };
 
     if (isRestricted) {
-      logger.info('[TabPermissions] Content script access restricted:', result);
+      logger.info("[TabPermissions] Content script access restricted:", result);
     }
 
     return result;
   } catch (error) {
-    logger.error('[TabPermissions] Error checking content script access:', error);
+    logger.error(
+      "[TabPermissions] Error checking content script access:",
+      error,
+    );
     return {
       isAccessible: false,
       isRestricted: true,
-      errorMessage: 'Unable to determine page accessibility',
+      errorMessage: "Unable to determine page accessibility",
       error: error.message,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 }
@@ -182,9 +189,9 @@ export function checkContentScriptAccess() {
  */
 export class TabPermissionChecker {
   constructor() {
-  this.logger = getScopedLogger(LOG_COMPONENTS.CORE, 'TabPermissionChecker');
+    this.logger = getScopedLogger(LOG_COMPONENTS.CORE, "TabPermissionChecker");
   }
-  
+
   /**
    * Check if a tab is accessible for content script communication
    * @param {number} tabId - Tab ID to check
@@ -192,13 +199,13 @@ export class TabPermissionChecker {
    */
   async checkTabAccess(tabId) {
     try {
-      if (!tabId || typeof tabId !== 'number') {
+      if (!tabId || typeof tabId !== "number") {
         return {
           tabId,
           isAccessible: false,
           isRestricted: true,
-          errorMessage: 'Invalid tab ID',
-          timestamp: Date.now()
+          errorMessage: "Invalid tab ID",
+          timestamp: Date.now(),
         };
       }
 
@@ -208,18 +215,21 @@ export class TabPermissionChecker {
         const browser = globalThis.browser || globalThis.chrome;
         tabInfo = await browser.tabs.get(tabId);
       } catch (error) {
-        this.logger.warn(`[TabPermissionChecker] Could not get tab info for ${tabId}:`, error);
+        this.logger.warn(
+          `[TabPermissionChecker] Could not get tab info for ${tabId}:`,
+          error,
+        );
         return {
           tabId,
           isAccessible: false,
           isRestricted: true,
-          errorMessage: 'Tab not found or not accessible',
+          errorMessage: "Tab not found or not accessible",
           error: error.message,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
       }
 
-      const url = tabInfo.url || '';
+      const url = tabInfo.url || "";
       let isRestricted = isRestrictedUrl(url);
       let errorMessage = null;
 
@@ -229,16 +239,20 @@ export class TabPermissionChecker {
         const isSafe = isSafeLocalFile(url);
         isRestricted = !isSafe;
         if (!isSafe) {
-          errorMessage = 'File type blocked for security reasons';
-          this.logger.warn(`[TabPermissionChecker] Unsafe local file blocked: ${url}`);
+          errorMessage = "File type blocked for security reasons";
+          this.logger.warn(
+            `[TabPermissionChecker] Unsafe local file blocked: ${url}`,
+          );
         } else {
-          this.logger.info(`[TabPermissionChecker] Safe local file allowed: ${url}`);
+          this.logger.info(
+            `[TabPermissionChecker] Safe local file allowed: ${url}`,
+          );
         }
       }
 
       const result = {
         tabId,
-        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''), // Truncate for logging
+        url: url.substring(0, 100) + (url.length > 100 ? "..." : ""), // Truncate for logging
         fullUrl: url,
         isAccessible: !isRestricted,
         isRestricted,
@@ -246,13 +260,15 @@ export class TabPermissionChecker {
         isSafeLocalFile: isLocalFile(url) ? isSafeLocalFile(url) : null,
         isExtensionPage: isExtensionPage(url),
         isBrowserInternalPage: isBrowserInternalPage(url),
-        errorMessage: isRestricted ? (errorMessage || getRestrictedUrlMessage(url)) : null,
+        errorMessage: isRestricted
+          ? errorMessage || getRestrictedUrlMessage(url)
+          : null,
         tabInfo: {
           title: tabInfo.title,
           status: tabInfo.status,
-          active: tabInfo.active
+          active: tabInfo.active,
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // if (isRestricted) {
@@ -263,18 +279,21 @@ export class TabPermissionChecker {
 
       return result;
     } catch (error) {
-      this.logger.error(`[TabPermissionChecker] Error checking tab ${tabId} access:`, error);
+      this.logger.error(
+        `[TabPermissionChecker] Error checking tab ${tabId} access:`,
+        error,
+      );
       return {
         tabId,
         isAccessible: false,
         isRestricted: true,
-        errorMessage: 'Unable to check tab accessibility',
+        errorMessage: "Unable to check tab accessibility",
         error: error.message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
     }
   }
-  
+
   /**
    * Test if content script can be injected into a tab
    * @param {number} tabId - Tab ID to test
@@ -284,7 +303,7 @@ export class TabPermissionChecker {
     const accessInfo = await this.checkTabAccess(tabId);
     return accessInfo.isAccessible;
   }
-  
+
   /**
    * Get a list of accessible tabs
    * @param {Object} queryInfo - Tab query criteria (same as browser.tabs.query)
@@ -294,22 +313,27 @@ export class TabPermissionChecker {
     try {
       const browser = globalThis.browser || globalThis.chrome;
       const tabs = await browser.tabs.query(queryInfo);
-      
+
       const accessibleTabs = [];
       for (const tab of tabs) {
         const accessInfo = await this.checkTabAccess(tab.id);
         if (accessInfo.isAccessible) {
           accessibleTabs.push({
             ...tab,
-            accessInfo
+            accessInfo,
           });
         }
       }
-      
-      this.logger.debug(`[TabPermissionChecker] Found ${accessibleTabs.length}/${tabs.length} accessible tabs`);
+
+      this.logger.debug(
+        `[TabPermissionChecker] Found ${accessibleTabs.length}/${tabs.length} accessible tabs`,
+      );
       return accessibleTabs;
     } catch (error) {
-      this.logger.error('[TabPermissionChecker] Error getting accessible tabs:', error);
+      this.logger.error(
+        "[TabPermissionChecker] Error getting accessible tabs:",
+        error,
+      );
       return [];
     }
   }

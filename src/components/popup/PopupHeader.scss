@@ -12,8 +12,8 @@
   border-bottom: 1px solid var(--header-border-color, #dee2e6) !important;
   width: 100% !important;
   box-sizing: border-box !important;
-  min-height: 50px !important;
-  gap: 12px !important;
+  min-height: 52px !important;
+  gap: 8px !important;
   
   // Force LTR and Row direction
   direction: ltr !important;
@@ -31,12 +31,12 @@
 
   /* Toolbar Buttons Base Style */
   .ti-toolbar-button {
-    width: 28px !important;
-    height: 28px !important;
+    width: 36px !important;
+    height: 36px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border-radius: 4px !important;
+    border-radius: 6px !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     flex-shrink: 0 !important;
     background-color: transparent !important;
@@ -46,14 +46,18 @@
     margin: 0 !important;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.06) !important;
-      transform: scale(1.15) !important;
+      background-color: rgba(0, 0, 0, 0.08) !important;
+      transform: translateY(-1px) !important;
+    }
+
+    &:active {
+      transform: translateY(0) scale(0.95) !important;
     }
 
     /* Target the icon inside and KILL any background/hover on it */
     img, .ti-toolbar-icon, .ti-icon-button {
-      width: 18px !important;
-      height: 18px !important;
+      width: 22px !important;
+      height: 22px !important;
       background: transparent !important;
       background-color: transparent !important;
       border: none !important;

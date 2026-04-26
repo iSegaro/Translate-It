@@ -226,17 +226,21 @@
 
   // Loading State
   &.ti-loading-window {
-    width: 60px !important;
-    height: 40px !important;
-    border-radius: 20px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     background: #fff !important;
-    border: 1px solid rgba(0, 0, 0, 0.1) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
     cursor: move !important;
     touch-action: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 
     &.dark {
       background: #333 !important;
@@ -245,10 +249,13 @@
 
     // Spinner positioning
     .ti-loading-spinner-wrapper {
-      position: absolute !important;
-      top: 50% !important;
-      left: 50% !important;
-      transform: translate(-50%, -50%) !important;
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      transform: none !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
   }
 }

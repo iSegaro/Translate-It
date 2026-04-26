@@ -1,148 +1,60 @@
-// Toast Integration Styles - Vue Sonner Integration
-// Modern CSS Architecture (2025) - Zero !important Policy
-// Centralized styles for toast integration with Select Element mode
-
 @use '../base/variables' as *;
+@use '../base/mixins' as *;
 
-/* ==========================================================================
-   Toast Integration - Vue Sonner Compatibility (Shadow DOM)
-   ========================================================================== */
+// ============================================================================
+// Sonner Toast Integration - Scoped to Translate-It UI
+// ============================================================================
 
-// CSS custom properties for toast styling consistency
-:root {
-  --toast-cursor: auto;
-  --toast-z-index: #{$z-overlay};
+// Base styles for the toast container injected into pages
+// Scoped to avoid affecting other extensions or page elements
+[data-sonner-toaster][data-sonner-toaster] {
+  // Respect user theme for toast notifications
+  --normal-bg: var(--color-background);
+  --normal-border: var(--color-border);
+  --normal-text: var(--color-text);
+  --success-bg: var(--color-success-alpha);
+  --success-border: var(--color-success);
+  --success-text: var(--color-success);
+  --error-bg: var(--color-error-alpha);
+  --error-border: var(--color-error);
+  --error-text: var(--color-error);
+  
+  // Custom font from extension variables
+  --font-sans: #{$font-family-base};
+  --font-mono: monospace;
 }
 
-// Vue Sonner toast element cursor and interaction overrides
-// High specificity without !important
-[data-sonner-toaster][data-sonner-toaster],
-[data-sonner-toast][data-sonner-toast],
-.sonner-toaster.sonner-toaster,
-.sonner-toast.sonner-toast,
-[data-testid="toaster"][data-testid="toaster"],
-li[data-sonner-toast][data-sonner-toast],
-div[data-sonner-toast][data-sonner-toast] {
-  cursor: var(--toast-cursor);
-  pointer-events: auto;
-  contain: layout style;
-  max-width: 356px;
-  min-width: 280px;
-
-  // Apply to all child elements
-  * {
-    cursor: var(--toast-cursor);
-    pointer-events: auto;
-  }
-}
-
-// Content app container cursor protection (Shadow DOM)
-.ti-content-app-container {
-  cursor: var(--toast-cursor);
-  contain: layout style;
-
-  * {
-    cursor: var(--toast-cursor);
-  }
-}
-
-/* ==========================================================================
-   Main DOM Toast Integration (Critical for select-element mode)
-   ========================================================================== */
-
-// Toast elements exception during Select Element mode
-// Ensure toasts remain interactive when crosshair cursor is active
-html[data-translate-it-select-mode="true"] {
-  [data-sonner-toaster][data-sonner-toaster],
-  [data-sonner-toast][data-sonner-toast],
-  .sonner-toaster.sonner-toaster,
-  .sonner-toast.sonner-toast,
-  .content-app-container.content-app-container {
-    cursor: var(--toast-cursor);
-    pointer-events: auto;
-    position: relative;
-    z-index: var(--toast-z-index);
-    contain: layout style;
-
-    // Ensure all child elements are interactive
-    * {
-      cursor: var(--toast-cursor);
-      pointer-events: auto;
-    }
-  }
-}
-
-/* ==========================================================================
-   Toast Content Layout - Select Element Notifications
-   ========================================================================== */
-
-// Vue Sonner toast layout improvements for action buttons
+// Scoped toast styles for better layout control
 [data-sonner-toast] {
-  // Ensure proper height and prevent overflow issues
-  min-height: auto;
-  height: auto;
-  max-height: none;
-  max-width: 320px;
-  min-width: 280px;
-  overflow: hidden;
+  // Use extension typography
+  font-family: var(--font-sans);
+  font-size: $font-size-base;
+  
+  // Custom shadow and rounded corners
+  box-shadow: $shadow-md;
+  border-radius: $border-radius-base;
+  border-width: $border-width;
+  border-style: $border-style;
+  
+  // Responsive padding
+  padding: $spacing-sm $spacing-base;
 
-  // CRITICAL: Make the toast itself a flex container for proper RTL/LTR icon spacing
-  // This ensures the icon (div[data-icon]) and content (div[data-content])
-  // are properly spaced with gap in both LTR and RTL
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: flex-start !important;
-  gap: 12px !important;
-
-  // CRITICAL: Icon alignment fix for RTL - ensure icon is properly aligned with text
-  > [data-icon] {
-    flex-shrink: 0;
-    align-self: flex-start;
-  }
-
-  // Direct child content container
-  > div[data-content] {
+  // Content alignment and layout
+  [data-content] {
     display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    width: 100%;
-    overflow: hidden;
-
-    // Text content (title/description) container
-    > div {
-      flex: 1;
-      /* text-align and direction removed to allow inline styles to work */
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      line-height: 1.4;
-      align-self: flex-start;
-      overflow: hidden;
-      word-break: break-word;
-      hyphens: auto;
-    }
-
-    // Title specific styling
-    [data-title] {
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      line-height: 1.4;
-      display: block;
-      overflow: hidden;
-      word-break: break-word;
-      hyphens: auto;
-    }
-
-    // Description specific styling
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    
+    // Message text layout
+    [data-title],
     [data-description] {
       white-space: pre-wrap;
-      word-wrap: break-word;
       overflow-wrap: break-word;
       line-height: 1.4;
       display: block;
       overflow: hidden;
-      word-break: break-word;
       hyphens: auto;
     }
   }
@@ -151,7 +63,8 @@ html[data-translate-it-select-mode="true"] {
   [data-button],
   > button {
     flex-shrink: 0;
-    // Use logical property for RTL/LTR support - pushes button to the "end" in both directions
+
+    // Use logical property for RTL/LTR support
     margin-inline-start: auto;
     white-space: nowrap;
     align-self: flex-start;
@@ -162,6 +75,5 @@ html[data-translate-it-select-mode="true"] {
    RTL/LTR Toast Direction Support
    ========================================================================== */
 
-// Direction is now applied via inline styles (style option in toastOptions)
-// Direction is set based on extension locale (IsRTL from getTranslationString, cached on first use)
-// No className-based rules needed
+// Direction is now applied via inline styles in ToastIntegrationService.js
+// based on the extension's locale.

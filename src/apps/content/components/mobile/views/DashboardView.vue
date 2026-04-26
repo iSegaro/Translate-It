@@ -125,12 +125,14 @@
 </template>
 
 <script setup>
+import './DashboardView.scss'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
@@ -214,11 +216,11 @@ const translatePage = (event) => {
   }
 }
 
-const activateSelectElement = () => {
+const activateSelectElement = async () => {
   try {
     logger.info('Select Element mode requested from Mobile Dashboard');
     mobileStore.closeSheet();
-    pageEventBus.emit(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE);
+    await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
       ExtensionContextManager.handleContextError(err, 'mobile-dashboard:select-element');
