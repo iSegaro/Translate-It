@@ -76,10 +76,40 @@
           class="ti-m-icon-container ti-m-icon-tts"
           :class="{ 'is-playing': tts.isPlaying.value }"
         >
-          <div
+          <!-- Loading State (Spinning Speaker) -->
+          <svg
             v-if="tts.isLoading.value"
-            class="ti-m-tts-loader"
-          />
+            class="ti-toolbar-icon ti-m-tts-loader"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
+            />
+            <path
+              fill="currentColor"
+              opacity="0.5"
+              d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
+            />
+          </svg>
+
+          <!-- Playing State (Stop Icon) -->
+          <svg
+            v-else-if="tts.isPlaying.value"
+            class="ti-toolbar-icon ti-m-tts-stop"
+            viewBox="0 0 24 24"
+          >
+            <rect
+              x="6"
+              y="6"
+              width="12"
+              height="12"
+              rx="1.5"
+              fill="currentColor"
+            />
+          </svg>
+
+          <!-- Idle State (Standard Icon) -->
           <img
             v-else
             :src="ttsIcon"
