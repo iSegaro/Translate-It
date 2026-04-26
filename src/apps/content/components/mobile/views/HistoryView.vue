@@ -153,7 +153,7 @@
 
 <script setup>
 import './HistoryView.scss'
-import { onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'

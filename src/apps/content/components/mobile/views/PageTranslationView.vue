@@ -153,15 +153,6 @@ const computedProgress = computed(() => {
   return Math.round((pageTranslationData.value.translatedCount / pageTranslationData.value.totalCount) * 100);
 })
 
-const statusMessage = computed(() => {
-  if (pageTranslationData.value.isTranslating) return t('mobile_page_translating_status') || 'Translating Page...';
-  if (pageTranslationData.value.isTranslated) {
-    return pageTranslationData.value.isAutoTranslating ? (t('mobile_page_auto_translating_status') || 'Auto-Translating') : (t('mobile_page_translated_status') || 'Page Translated');
-  }
-  if (pageTranslationData.value.status === 'error') return t('mobile_page_translation_failed') || 'Translation Failed';
-  return t('mobile_page_ready_status') || 'Ready to Translate';
-})
-
 const primaryAction = computed(() => {
   const isError = pageTranslationData.value.status === 'error';
 
