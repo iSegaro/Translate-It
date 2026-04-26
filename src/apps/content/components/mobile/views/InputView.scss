@@ -6,6 +6,8 @@
   height: 100% !important;
   background-color: inherit !important;
   font-family: sans-serif !important;
+  padding: 0 15px !important; // اضافه کردن پدینگ جانبی برای کل صفحه
+  box-sizing: border-box !important;
 
   /* هدر استاندارد */
   .ti-m-view-header {
@@ -13,9 +15,9 @@
     align-items: center !important;
     padding: 10px 0 !important;
     border-bottom: 1px solid var(--ti-mobile-header-border) !important;
-    margin: 0 -15px 15px !important;
+    margin: 0 -15px 15px !important; // منفی برای کشیده شدن خط زیرین به لبه‌ها
     padding-left: 10px !important;
-    padding-right: 15px !important;
+    padding-right: 15px !important; // اطمینان از فاصله سمت راست در هدر
     background-color: var(--ti-mobile-bg) !important;
   }
 
@@ -44,7 +46,8 @@
     font-weight: 700 !important;
     font-size: 14px !important;
     color: var(--ti-mobile-text) !important;
-    margin-left: 5px !important;
+    margin-left: 12px !important; // افزایش فاصله از دکمه بازگشت
+    flex: 1 !important; // اشغال فضای باقی‌مانده برای هل دادن موارد احتمالی در آینده
   }
 
   /* کارت ورودی متن */
@@ -180,7 +183,7 @@
   /* Dark Theme Overrides */
   &.is-dark {
     .ti-m-icon-img-small {
-      filter: brightness(0) invert(1) !important;
+      filter: invert(1) !important;
     }
   }
 }

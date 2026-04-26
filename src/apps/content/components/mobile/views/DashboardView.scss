@@ -85,7 +85,16 @@
 .ti-m-icon-history { background: #fff9db !important; }
 .ti-m-icon-settings { background: #fff4e6 !important; }
 .ti-m-icon-revert { background: #fff5f5 !important; }
-.ti-m-icon-tts { background: #e7f5ff !important; }
+.ti-m-icon-tts {
+  background: #e7f5ff !important;
+  color: #228be6 !important;
+
+  svg {
+    width: 24px !important;
+    height: 24px !important;
+    display: block !important;
+  }
+}
 
 /* Dark Mode Overrides */
 .ti-m-dashboard-view.is-dark {
@@ -95,13 +104,23 @@
   .ti-m-icon-history { background: rgba(250, 176, 5, 0.15) !important; }
   .ti-m-icon-settings { background: rgba(253, 126, 20, 0.15) !important; }
   .ti-m-icon-revert { background: rgba(250, 82, 82, 0.15) !important; }
-  .ti-m-icon-tts { background: rgba(51, 154, 240, 0.15) !important; }
+  .ti-m-icon-tts {
+    background: rgba(51, 154, 240, 0.15) !important;
+    color: #4dabf7 !important;
+  }
 
   .ti-m-icon-select-element,
   .ti-m-icon-history,
-  .ti-m-icon-settings {
+  .ti-m-icon-settings,
+  .ti-m-icon-revert,
+  .ti-m-icon-tts {
     .ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
+      filter: invert(1) !important;
+    }
+
+    /* Don't invert SVGs that already have correct theme-aware coloring */
+    svg.ti-toolbar-icon {
+      filter: none !important;
     }
   }
 }
@@ -112,4 +131,8 @@
 
 .ti-m-tts-loader {
   animation: ti-m-spin 0.8s linear infinite !important;
+}
+
+.ti-m-tts-stop {
+  /* Stop icon styling */
 }

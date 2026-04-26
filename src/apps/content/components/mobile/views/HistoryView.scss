@@ -184,7 +184,7 @@
   /* Dark Theme */
   &.is-dark {
     .ti-m-icon-img-trash, .ti-m-export-icon-img {
-      filter: brightness(0) invert(1) !important;
+      filter: invert(1) !important;
     }
   }
 }

@@ -338,10 +338,48 @@
 
 // Mobile responsive overrides
 @media (max-width: #{$breakpoint-md}) {
+  .activation-tab {
+    .base-fieldset {
+      padding: $spacing-sm !important;
+    }
+  }
+
   .setting-row {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: $spacing-sm !important;
+
+    .ti-checkbox, .base-radio {
+      flex: 0 0 auto !important;
+    }
+
+    &.fab-setting-row {
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: $spacing-sm !important;
+
+      .ti-checkbox {
+        flex: 1 !important;
+        min-width: 0 !important;
+      }
+
+      .fab-mode-select-wrapper {
+        margin-inline-start: 0 !important;
+        flex-shrink: 0 !important;
+
+        &.open {
+          max-width: 140px !important;
+        }
+
+        .compact-select {
+          min-width: 100px !important;
+          height: 30px !important;
+          font-size: $font-size-xs !important;
+        }
+      }
+    }
   }
 
   .setting-description {
@@ -353,9 +391,11 @@
     margin-inline-start: $spacing-sm !important;
     
     .radio-group {
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: $spacing-lg !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: $spacing-sm $spacing-xl !important;
     }
   }
 }

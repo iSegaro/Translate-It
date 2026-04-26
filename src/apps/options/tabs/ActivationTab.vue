@@ -19,7 +19,7 @@
       :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'"
     >
       <div class="setting-group">
-        <div class="setting-row">
+        <div class="setting-row fab-setting-row">
           <BaseCheckbox
             id="SHOW_DESKTOP_FAB"
             v-model="showDesktopFab"
@@ -160,6 +160,26 @@
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
         </span>
+      </div>
+
+      <!-- Select Element Sub-Options -->
+      <div 
+        class="sub-options-group"
+        :class="{ open: translateWithSelectElement }"
+      >
+        <div class="sub-options-inner">
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              id="PAGE_CONTEXT_SELECT_ELEMENT"
+              v-model="showSelectElementInContextMenu"
+              :disabled="!extensionEnabled"
+              :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
+            />
+            <span class="setting-description">
+              {{ t('show_select_element_in_context_menu_description') || 'Display the \'Select Element\' option in the browser\'s right-click context menu.' }}
+            </span>
+          </div>
+        </div>
       </div>
     </BaseFieldset>
 
@@ -391,7 +411,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
+import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 
 // Components
@@ -439,6 +459,18 @@ const replaceOnSpecialSites = createSetting('REPLACE_SPECIAL_SITES', false)
 
 // Selection
 const translateWithSelectElement = createSetting('TRANSLATE_WITH_SELECT_ELEMENT', false)
+const contextMenuVisibility = createSetting('CONTEXT_MENU_VISIBILITY', CONFIG.CONTEXT_MENU_VISIBILITY)
+
+const showSelectElementInContextMenu = computed({
+  get: () => contextMenuVisibility.value?.PAGE_CONTEXT_SELECT_ELEMENT ?? true,
+  set: (val) => {
+    contextMenuVisibility.value = {
+      ...contextMenuVisibility.value,
+      PAGE_CONTEXT_SELECT_ELEMENT: val
+    }
+  }
+})
+
 const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', false)
 const selectionTranslationMode = createSetting('selectionTranslationMode', SelectionTranslationMode.IMMEDIATE)
 const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', false)

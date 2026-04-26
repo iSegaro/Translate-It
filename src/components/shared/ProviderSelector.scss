@@ -233,7 +233,7 @@ img.ti-dropdown-arrow,
 
   /* Whiten for Dark Mode */
   :root.theme-dark &, :root.is-dark &, .theme-dark &, .is-dark & {
-    filter: brightness(0) invert(1) !important;
+    filter: invert(1) !important;
     opacity: 0.9 !important;
   }
 }

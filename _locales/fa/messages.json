@@ -449,6 +449,12 @@
   "translate_with_select_element_description": {
     "message": "اجازه می‌دهد تا ترجمه با استفاده از یک روش انتخاب خاص (مانند انتخاب کل یک پاراگراف) فعال شود."
   },
+  "show_select_element_in_context_menu_label": {
+    "message": "نمایش در منوی کلیک‌راست"
+  },
+  "show_select_element_in_context_menu_description": {
+    "message": "گزینه «انتخاب المان» را در منوی کلیک‌راست مرورگر نمایش می‌دهد."
+  },
   "translate_on_text_selection_label": {
     "message": "فعال‌سازی ترجمه روی انتخاب متن"
   },
