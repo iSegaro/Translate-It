@@ -83,7 +83,8 @@ function getDefaultSettings() {
     TTS_ENGINE: CONFIG.TTS_ENGINE || TTS_ENGINES.EDGE,
     TTS_FALLBACK_ENABLED: CONFIG.TTS_FALLBACK_ENABLED ?? true,
     TTS_AUTO_DETECT_ENABLED: CONFIG.TTS_AUTO_DETECT_ENABLED ?? true,
-    SHOW_DESKTOP_FAB: CONFIG.SHOW_DESKTOP_FAB ?? false,
+    SHOW_DESKTOP_FAB: CONFIG.SHOW_DESKTOP_FAB ?? true,
+    SHOW_MOBILE_FAB: CONFIG.SHOW_MOBILE_FAB ?? true,
     TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
     ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
     TEXT_FIELD_SHORTCUT: CONFIG.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
@@ -252,10 +253,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const sanitizeSettings = () => {
     const s = settings.value;
     
-    // 1. FAB Consistency: If FAB is disabled, we can't use it for translation trigger.
+    // 1. FAB Consistency: If BOTH FABs are disabled, we can't use it for translation trigger.
     // Fallback to ON_CLICK (Show icon) to ensure user has a way to translate.
-    if (s.SHOW_DESKTOP_FAB === false && s.selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
-      logger.info('Sanitizing settings: FAB disabled, falling back selectionTranslationMode to ON_CLICK');
+    if (s.SHOW_DESKTOP_FAB === false && s.SHOW_MOBILE_FAB === false && s.selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
+      logger.info('Sanitizing settings: Both FABs disabled, falling back selectionTranslationMode to ON_CLICK');
       s.selectionTranslationMode = SelectionTranslationMode.ON_CLICK;
     }
     

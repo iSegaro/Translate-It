@@ -26,23 +26,34 @@ export class PageTranslationQueueFilter {
     for (const item of queue) {
       const targetNode = item.node || item.textNode || item;
 
-      if (PageTranslationHelper.isInViewportWithMargin(targetNode, 0)) {
+      // Pass logger for diagnostics
+      if (PageTranslationHelper.isInViewportWithMargin(targetNode, 0, logger)) {
         viewportItems.push(item);
-      } else if (PageTranslationHelper.isInViewportWithMargin(targetNode, viewportBuffer)) {
+      } else if (PageTranslationHelper.isInViewportWithMargin(targetNode, viewportBuffer, logger)) {
         bufferItems.push(item);
       } else {
         otherItems.push(item);
       }
     }
 
-    // RULE: If no items in viewport, we don't start a batch just for buffer/off-screen
-    // EXCEPTION: If lazy loading is disabled, we continue even if nothing is in viewport.
+    // 1b. Sorting: Prioritize by Context and Target-Script Match
+    // This ensures that an API batch is "Pure" and won't be poisoned by target-language content.
+    const contextSorter = (a, b) => 
+      (a.contextId - b.contextId) || 
+      (Number(a.matchesTargetScript) - Number(b.matchesTargetScript)) || 
+      (b.score - a.score);
+
+    viewportItems.sort(contextSorter);
+    bufferItems.sort(contextSorter);
+    otherItems.sort(contextSorter);
+
+    // RULE: If no items in viewport OR buffer, we don't start a batch in lazy mode.
     const isLazy = config.lazyLoading !== false;
-    if (viewportItems.length === 0 && isLazy) {
+    if (viewportItems.length === 0 && bufferItems.length === 0 && isLazy) {
       // SMART PURGE: Only purge in lazy mode to avoid memory leaks during long scrolls
       if (queue.length > 1000) {
         const MAX_DISTANCE_PX = 3000;
-        const purgeResult = this._purgeDistantItems(otherItems, MAX_DISTANCE_PX);
+        const purgeResult = this._purgeDistantItems(otherItems, MAX_DISTANCE_PX, logger);
         
         if (purgeResult.purgedCount > 0) {
           logger.debug(`Purged ${purgeResult.purgedCount} items that were too far (> ${MAX_DISTANCE_PX}px)`);
@@ -54,11 +65,16 @@ export class PageTranslationQueueFilter {
 
     const batchItems = [];
     let currentChars = 0;
+    let batchMatchesTarget = null;
 
     // 1. Selection Phase A: Viewport Items (Up to chunkSize/maxChars)
     for (const item of viewportItems) {
       if (batchItems.length >= chunkSize) break;
       if (maxChars && currentChars + item.text.length > maxChars && batchItems.length > 0) break;
+      
+      // SCRIPT PURITY: Don't mix "target-script matches" with "other scripts"
+      if (batchItems.length > 0 && item.matchesTargetScript !== batchMatchesTarget) break;
+      if (batchItems.length === 0) batchMatchesTarget = item.matchesTargetScript;
 
       batchItems.push(item);
       currentChars += item.text.length;
@@ -125,7 +141,7 @@ export class PageTranslationQueueFilter {
    * Internal helper to filter out items that are physically far from the viewport.
    * Marks them as "ejected" so the scheduler can handle them specially.
    */
-  static _purgeDistantItems(items, maxDistance) {
+  static _purgeDistantItems(items, maxDistance, logger = null) {
     const remaining = [];
     let purgedCount = 0;
 
@@ -133,7 +149,7 @@ export class PageTranslationQueueFilter {
       const targetNode = item.node || item.textNode || item;
       
       // If we can't determine distance or it's within range, keep it
-      if (!targetNode || PageTranslationHelper.isInViewportWithMargin(targetNode, maxDistance)) {
+      if (!targetNode || PageTranslationHelper.isInViewportWithMargin(targetNode, maxDistance, logger)) {
         remaining.push(item);
       } else {
         // MARK FOR RETRY: Instead of final resolution, mark it as ejected.

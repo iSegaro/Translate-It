@@ -27,36 +27,49 @@ export class PageTranslationFluidFilter {
     for (const item of queue) {
       const targetNode = item.node || item.textNode || item;
       
-      if (PageTranslationHelper.isInViewportWithMargin(targetNode, 0)) {
+      // Pass logger to identify why items are skipped
+      if (PageTranslationHelper.isInViewportWithMargin(targetNode, 0, logger)) {
         viewportItems.push(item);
-      } else if (PageTranslationHelper.isInViewportWithMargin(targetNode, viewportBuffer)) {
+      } else if (PageTranslationHelper.isInViewportWithMargin(targetNode, viewportBuffer, logger)) {
         bufferItems.push(item);
       } else {
         otherItems.push(item);
       }
     }
 
-    // RULE: If no items in viewport, we don't start a batch just for buffer/off-screen
-    // EXCEPTION: If lazy loading is disabled, we continue even if nothing is in viewport.
+    // RULE: If no items in viewport OR buffer, we don't start a batch in lazy mode.
+    // This prevents unnecessary API calls for far-away content.
     const isLazy = config.lazyLoading !== false;
-    if (viewportItems.length === 0 && isLazy) {
+    if (viewportItems.length === 0 && bufferItems.length === 0 && isLazy) {
       return { batchItems: [], remainingItems: queue };
     }
 
-    // 2. Sorting: Within categories, prioritize by score (DESC)
-    viewportItems.sort((a, b) => b.score - a.score);
-    bufferItems.sort((a, b) => b.score - a.score);
+    // 2. Sorting: Prioritize by Context, then Target-Script Match, then Score
+    // This quarantines texts that match target script to prevent poisoning other items.
+    const contextSorter = (a, b) => 
+      (a.contextId - b.contextId) || 
+      (Number(a.matchesTargetScript) - Number(b.matchesTargetScript)) || 
+      (b.score - a.score);
+    
+    viewportItems.sort(contextSorter);
+    bufferItems.sort(contextSorter);
     if (!isLazy) {
-      otherItems.sort((a, b) => b.score - a.score);
+      otherItems.sort(contextSorter);
     }
 
     const batchItems = [];
     let currentChars = 0;
+    let batchMatchesTarget = null;
 
     // 3. Selection Phase A: Viewport Items (Up to chunkSize/maxChars)
     for (const item of viewportItems) {
       if (batchItems.length >= chunkSize) break;
       if (currentChars + item.text.length > maxChars && batchItems.length > 0) break;
+      
+      // SCRIPT PURITY: Don't mix "target-script matches" with "other scripts"
+      if (batchItems.length > 0 && item.matchesTargetScript !== batchMatchesTarget) break;
+      
+      if (batchItems.length === 0) batchMatchesTarget = item.matchesTargetScript;
 
       batchItems.push(item);
       currentChars += item.text.length;

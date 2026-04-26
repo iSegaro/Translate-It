@@ -18,11 +18,22 @@ export class PageTranslationHelper {
   static shouldTranslate(text) {
     if (!text) return false;
     const trimmed = text.trim();
-    if (/^\d+$/.test(trimmed)) return false;
-    if (/^(\d+:)+\d+$/.test(trimmed)) return false;
-    if (trimmed.length < 2 && !/[\u0600-\u06FF]/.test(trimmed)) return false;
-    if (/^\d+(\.\d+)?[kKM]$/.test(trimmed)) return false;
-    return true;
+    
+    // Skip empty or purely whitespace strings
+    if (!trimmed) return false;
+
+    // Filter rules
+    const isNumeric = /^\d+$/.test(trimmed);
+    const isTime = /^(\d+:)+\d+$/.test(trimmed);
+    
+    // ALLOW 2+ character words for English (e.g., "In", "On", "Go")
+    // For Farsi/Arabic, we already have special handling.
+    const isTooShort = trimmed.length < 2 && !/[\u0600-\u06FF]/.test(trimmed);
+    const isMetric = /^\d+(\.\d+)?[kKM]$/.test(trimmed);
+
+    const shouldSkip = isNumeric || isTime || isTooShort || isMetric;
+
+    return !shouldSkip;
   }
 
   /**
@@ -54,30 +65,92 @@ export class PageTranslationHelper {
     });
   }
 
-  static isInViewportWithMargin(node, margin) {
+  /**
+   * Finds the nearest semantic container for a node to group related texts.
+   * This helps in "Logical Context Batching" to prevent language detection traps.
+   * 
+   * @param {Node} node - The DOM node
+   * @returns {HTMLElement|null} The nearest semantic container element
+   */
+  static getNearestSemanticContainer(node) {
+    if (!node) return null;
+    
+    let element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
+                 (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
+    
+    if (!element) return null;
+
+    // Define semantic tags that represent a logical context
+    const semanticTags = new Set([
+      'ARTICLE', 'ASIDE', 'NAV', 'SECTION', 'HEADER', 'FOOTER', 
+      'MAIN', 'FORM', 'BLOCKQUOTE', 'UL', 'OL'
+    ]);
+
+    let current = element;
+    let depth = 0;
+    const MAX_DEPTH = 10; // Performance safety limit
+
+    while (current && depth < MAX_DEPTH) {
+      if (semanticTags.has(current.tagName)) {
+        return current;
+      }
+      
+      // Special case for Twitter/React: check for roles
+      const role = current.getAttribute('role');
+      if (role === 'article' || role === 'navigation' || role === 'main') {
+        return current;
+      }
+
+      current = current.parentElement;
+      depth++;
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if a node is within the viewport plus a given margin.
+   * This is used for prioritization and lazy loading.
+   * 
+   * NOTE: Removed offsetParent check to support fixed/sticky elements.
+   * Relying on getBoundingClientRect which returns 0x0 for display:none.
+   * 
+   * @param {Node} node - The DOM node to check (Text, Attribute or Element)
+   * @param {number} margin - Extra safety margin in pixels
+   * @param {Object} logger - Optional logger for debugging
+   * @returns {boolean}
+   */
+  static isInViewportWithMargin(node, margin, logger = null) {
     if (!node) return false;
     try {
       const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
                      (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
 
       if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-      if (element.offsetParent === null && element.tagName !== 'BODY' && !(element instanceof SVGElement)) {
-        return false;
-      }
+      
+      // Basic connectivity check to ensure the element is still in the DOM
+      if (!element.isConnected) return false;
 
       const rect = element.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return false;
+      
+      // If the element has no dimensions, it's effectively invisible
+      if (rect.width === 0 || rect.height === 0) {
+        return false;
+      }
 
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
 
-      return (
+      const inViewport = (
         rect.bottom >= -margin &&
         rect.top <= viewportHeight + margin &&
         rect.right >= -margin &&
         rect.left <= viewportWidth + margin
       );
-    } catch {
+      
+      return inViewport;
+    } catch (e) {
+      if (logger) logger.debug('Error in isInViewportWithMargin', e);
       return false;
     }
   }

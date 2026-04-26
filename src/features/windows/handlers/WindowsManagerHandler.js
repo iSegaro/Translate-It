@@ -37,9 +37,18 @@ export class WindowsManagerHandler extends ResourceTracker {
     }
 
     try {
-      // Check if we're in an iframe - WindowsManager should only be created in main frame
-      if (window !== window.top) {
-        logger.debug('In iframe context - creating ClickManager for cross-frame communication');
+      // Check if we should show global UI in this frame
+      const isTopFrame = window === window.top;
+      const canAccessTop = (() => {
+        try { return !!(window.top && window.top.location && window.top.location.href); } 
+        catch { return false; }
+      })();
+      
+      const shouldShowGlobalUI = isTopFrame || !canAccessTop;
+
+      // If this frame is NOT responsible for global UI, it only needs a ClickManager
+      if (!shouldShowGlobalUI) {
+        logger.debug('In child iframe context - creating ClickManager only');
 
         // In iframe, we only need ClickManager for outside click detection
         this.state = new WindowsState();

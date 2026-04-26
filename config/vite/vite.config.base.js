@@ -71,8 +71,6 @@ export const createBaseConfig = (browser, options = {}) => {
       emptyOutDir: true,
       // Force clean rebuild in watch mode
       watch: isWatchMode ? {
-        include: ['src/**/*', 'html/**/*', 'public/**/*'],
-        exclude: ['node_modules/**', 'dist/**'],
         clearScreen: false
       } : undefined,
       rollupOptions: {
@@ -198,13 +196,6 @@ export const createBaseConfig = (browser, options = {}) => {
       }
     },
 
-    watch: {
-      include: ['src/**/*', 'html/**/*', 'public/**/*'],
-      exclude: ['node_modules/**', 'dist/**'],
-      usePolling: false,
-      interval: 100
-    },
-    
     optimizeDeps: {
       include: [
         'vue',

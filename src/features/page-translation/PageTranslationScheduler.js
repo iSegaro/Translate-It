@@ -8,7 +8,9 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { isRTL } from '@/utils/dom/DomDirectionManager.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
+import { shouldApplyRtl } from '@/shared/utils/text/textAnalysis.js';
 import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
@@ -38,6 +40,10 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.highPriorityCount = 0;
     this.isWaitingForVisibility = false; // flag to track idle state
     
+    // Memory-safe map for logical context grouping
+    this.contextMap = new WeakMap();
+    this._nextContextId = 1;
+
     this.settings = { 
       ...DEFAULT_PAGE_TRANSLATION_SETTINGS,
       poolDelay: 150, // Time to wait for collecting more items (AnyLang style)
@@ -55,6 +61,8 @@ export class PageTranslationScheduler extends ResourceTracker {
         this.logger.debug('Cleaning up queue via ResourceTracker', this.queue.length);
         this.queue = [];
       }
+      this.contextMap = new WeakMap(); // Reset context map
+      this._nextContextId = 1;
     });
   }
 
@@ -82,6 +90,8 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.sessionContext = null;
     this._lastReportTime = 0;
     this._reportPending = false;
+    this.contextMap = new WeakMap();
+    this._nextContextId = 1;
   }
 
   stop() {
@@ -91,6 +101,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._reportPending = false;
     this.isScrolling = false;
     this.isWaitingForVisibility = false;
+    this.contextMap = new WeakMap();
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
@@ -133,18 +144,47 @@ export class PageTranslationScheduler extends ResourceTracker {
     // 1. Session & State Validation
     if (context && context !== this.sessionContext) return text;
     if (!this.isTranslated || this.fatalErrorOccurred || !text || !text.trim()) return text;
-    if (!PageTranslationHelper.shouldTranslate(text)) return text;
+    
+    // Pass this.logger for diagnostic visibility
+    if (!PageTranslationHelper.shouldTranslate(text)) {
+      // Diagnostic for skipped items
+      this.logger.debugLazy(() => [`Item rejected by shouldTranslate: "${text.substring(0, 20)}..."`]);
+      return text;
+    }
 
     this.totalTasks++;
     this._reportProgress();
 
     const isHighPriority = score >= this.settings.priorityThreshold;
 
+    // 2. Discover Logical Context and Script Type for smart grouping
+    const container = PageTranslationHelper.getNearestSemanticContainer(node);
+    let contextId = 0; 
+    
+    if (container) {
+      if (!this.contextMap.has(container)) {
+        this.contextMap.set(container, this._nextContextId++);
+      }
+      contextId = this.contextMap.get(container);
+    }
+
+    // Identify script group to prevent mixing target-language script and other scripts in a single batch.
+    // This is the "Ultimate Solution" to prevent language detection traps for ALL languages.
+    const isTargetRtl = isRTL(this.settings.targetLanguage);
+    const textIsRtl = shouldApplyRtl(text);
+    
+    // Flag if this text's script matches the target language's script
+    // (e.g., if target is Farsi, flag all RTL texts; if target is English, flag all Latin texts)
+    const matchesTargetScript = (isTargetRtl === textIsRtl);
+
     return new Promise((resolve, reject) => {
       this.queue.push({ 
         text: text.trim(), 
         score: score || 0, 
         isHighPriority,
+        contextId,
+        isRtlText: textIsRtl,
+        matchesTargetScript, // Added: for ultimate script-pure batching
         resolve, 
         reject, 
         context,
@@ -357,16 +397,19 @@ export class PageTranslationScheduler extends ResourceTracker {
     try {
       if (!this.isTranslated) throw new Error('Session stopped');
 
+      this.logger.debug(`Sending batch: ${batch.length} items`);
       const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
 
       // Validation after async call
       if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
+        this.logger.debug('Batch discarded: session changed or stopped');
         batch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
         return;
       }
 
       // Detect failure or Soft-Failure with error details
       if (!result?.success || result?.hasError) {
+        this.logger.warn('Batch failed:', result?.error || 'Unknown error');
         const rawErrorMessage = result?.error || '';
         const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
           ? new Error(rawErrorMessage || 'Extension context invalidated')
@@ -377,34 +420,37 @@ export class PageTranslationScheduler extends ResourceTracker {
         if (result?.isFatal) batchError.isFatal = true;
 
         await this._handleBatchError(batchError, batch);
-        
-        // If it was a Soft-Failure (success: true but with error), we still want to resolve with original text
-        // Note: _handleBatchError already does this, but we return here to skip normal processing
         return;
       }
 
       // Resolve successfully translated items
       const translatedTexts = JSON.parse(result.translatedText);
+      this.logger.debug(`Batch received: ${translatedTexts.length} items`);
+
+      if (translatedTexts.length !== batch.length) {
+        this.logger.error('Batch size mismatch!', { sent: batch.length, received: translatedTexts.length });
+      }
+
       batch.forEach((item, index) => {
         const translatedItem = translatedTexts[index];
         let translatedText = (typeof translatedItem === 'object' && translatedItem !== null) 
           ? (translatedItem.text || translatedItem.t || JSON.stringify(translatedItem))
           : translatedItem;
-        
+
         // Final safety check to ensure we never pass an object to domtranslator
         if (typeof translatedText === 'object' && translatedText !== null) {
-          translatedText = translatedText.text || translatedText.t || JSON.stringify(translatedText);
+          translatedText = translatedItem.text || translatedItem.t || JSON.stringify(translatedItem);
         }
-          
+
         item.resolve(String(translatedText || item.text));
         this.translatedCount++;
       });
 
       this._reportProgress();
     } catch (error) {
+      this.logger.error('Batch execution error:', error);
       await this._handleBatchError(error, batch);
-    }
-  }
+    }  }
 
   async _getBatchConfig() {
     // Priority: this.settings (from Manager) -> defaults

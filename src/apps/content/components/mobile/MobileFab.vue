@@ -74,17 +74,6 @@ let animationFrameId = null;
 let instabilityTimer = null;
 let fabIdleTimerId = null;
 
-const handleSelectionChange = () => {
-  if (typeof window === 'undefined') return;
-  const selection = window.getSelection();
-  const selectedText = selection ? selection.toString().trim() : '';
-  
-  if (selectedText) {
-    isSelectionDirty.value = true;
-    startFabIdleTimer();
-  }
-};
-
 const checkBounds = () => {
   if (typeof window === 'undefined' || !userPreferredY.value) return;
   
@@ -133,8 +122,6 @@ onMounted(async () => {
   }
 
   if (typeof window !== 'undefined') {
-    tracker.addEventListener(document, 'selectionchange', handleSelectionChange);
-    
     // Only update on resize/orientation changes.
     // position: fixed handles scrolling automatically.
     tracker.addEventListener(window, 'resize', updateViewport);

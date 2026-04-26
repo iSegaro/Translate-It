@@ -618,7 +618,7 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Check if the selection originated from inside our own UI elements
    */
   isSelectionInsideUI(selection) {
-    // 1. Check if the last mouse up was inside our UI (highly reliable)
+    // 1. Check if the last mouse up was inside our UI (highly reliable for mouse selections)
     if (this.isClickInsideTranslationWindow()) {
       return true;
     }
@@ -626,18 +626,50 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     if (!selection || !selection.anchorNode) return false;
 
     try {
+      /**
+       * Helper to check if a node is inside our UI
+       */
+      const isOurNode = (node) => {
+        if (!node) return false;
+        
+        // Get the element container
+        const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+        if (!element) return false;
+
+        // Check standard element matching (isUIElement checks ancestors too)
+        if (this.elementDetection.isUIElement(element)) {
+          return true;
+        }
+        
+        // Check Shadow DOM boundaries
+        const root = node.getRootNode();
+        if (root instanceof ShadowRoot) {
+          // Specifically verify if this shadow root host belongs to our extension
+          // This prevents ignoring selections in OTHER extensions' shadow DOMs
+          if (this.elementDetection.isHostElement(root.host)) {
+            return true;
+          }
+        }
+        
+        return false;
+      };
+
       // 2. Check anchorNode (where selection started)
-      const anchorElement = selection.anchorNode.nodeType === Node.TEXT_NODE ? 
-                           selection.anchorNode.parentElement : selection.anchorNode;
-      
-      if (this.elementDetection.isUIElement(anchorElement)) {
+      if (isOurNode(selection.anchorNode)) {
         return true;
       }
 
-      // 3. Check if nodes are in a Shadow Root (most reliable indicator for UI components)
-      const root = selection.anchorNode.getRootNode();
-      if (root instanceof ShadowRoot) {
+      // 3. Check focusNode (where selection ended)
+      if (isOurNode(selection.focusNode)) {
         return true;
+      }
+
+      // 4. Check common ancestor if range exists
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (isOurNode(range.commonAncestorContainer)) {
+          return true;
+        }
       }
 
     } catch (error) {

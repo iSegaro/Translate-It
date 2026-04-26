@@ -37,7 +37,8 @@ export function useContentAppUIState(settingsStore, mobileStore, tracker) {
   const isSelectModeActive = ref(false);
   const isFullscreen = computed(() => mobileStore.isFullscreen); 
   const isExtensionEnabled = computed(() => settingsStore.settings?.EXTENSION_ENABLED !== false);
-  const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB || false);
+  const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB !== false);
+  const showMobileFab = computed(() => settingsStore.settings?.SHOW_MOBILE_FAB !== false);
 
   // Determine if we should use Mobile UI based on device and user preference
   const isMobileUI = computed(() => {
@@ -93,6 +94,7 @@ export function useContentAppUIState(settingsStore, mobileStore, tracker) {
     isFullscreen,
     isExtensionEnabled,
     showDesktopFab,
+    showMobileFab,
     isMobileUI,
     updateFullscreenState
   };
