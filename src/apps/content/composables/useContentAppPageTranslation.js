@@ -37,8 +37,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         mobileStore.updateSelectionData({
           text: detail.text,
           translation: detail.translation || '',
-          sourceLang: detail.sourceLang || 'auto',
-          targetLang: detail.targetLang || 'en',
+          sourceLang: detail.sourceLang || detail.sourceLanguage || 'auto',
+          targetLang: detail.targetLang || detail.targetLanguage || 'en',
           isLoading: detail.isLoading || false,
           isError: detail.isError || false,
           error: detail.error || null

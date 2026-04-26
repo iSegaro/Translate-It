@@ -30,15 +30,13 @@
           class="ti-m-lang-pair"
           @click="goBack"
         >
-          <span class="ti-m-lang-target">{{ selectionData.targetLang }}</span>
+          <span class="ti-m-lang-source">{{ sourceName }}</span>
           <img
             src="@/icons/ui/swap.png"
             class="ti-m-swap-icon ti-m-icon-img"
             :alt="t('mobile_swap_languages_alt') || 'to'"
           >
-          <span class="ti-m-lang-source">
-            {{ selectionData.sourceLang && selectionData.sourceLang !== 'auto' ? selectionData.sourceLang : (t('mobile_selection_auto_label') || 'Auto') }}
-          </span>
+          <span class="ti-m-lang-target">{{ targetName }}</span>
         </div>
       </div>
       
@@ -124,6 +122,7 @@ import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 
 const mobileStore = useMobileStore()
@@ -131,6 +130,20 @@ const settingsStore = useSettingsStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
 const tts = useTTSSmart()
+
+const sourceName = computed(() => {
+  const code = selectionData.value.sourceLang;
+  if (!code || code === 'auto') return t('mobile_selection_auto_label') || 'Auto';
+  const name = getLanguageNameFromCode(code);
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : code;
+});
+
+const targetName = computed(() => {
+  const code = selectionData.value.targetLang;
+  if (!code) return '';
+  const name = getLanguageNameFromCode(code);
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : code;
+});
 
 watch(() => selectionData.value.translation, (newTranslation) => {
   if (newTranslation && newTranslation.length > 200 && sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK) {
