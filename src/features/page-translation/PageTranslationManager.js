@@ -397,9 +397,9 @@ export class PageTranslationManager extends ResourceTracker {
    */
   _injectLayoutFix() {
     try {
-      // Only mark the body. Modifying <html> is the primary cause of scroll resets in Chromium.
-      document.body.classList.add('ti-translation-active');
-      
+      // Mark both html and body for maximum specificity without triggering scroll jumps
+      document.documentElement.classList.add('ti-translation-active');
+
       if (!document.getElementById('ti-translation-layout-fix')) {
         const style = document.createElement('style');
         style.id = 'ti-translation-layout-fix';
@@ -408,30 +408,26 @@ export class PageTranslationManager extends ResourceTracker {
            * UNIVERSAL LAYOUT STABILITY FIX
            * Applied during page translation to prevent UI breakage.
            */
-          body.ti-translation-active { 
-            /* 
-               We use 'clip' instead of 'hidden' because it prevents horizontal overflow
-               without creating a new BFC (Block Formatting Context) for scrolling, 
-               which is essential to avoid scroll-to-top jumps on virtualized lists (Twitter/X).
-            */
+          html.ti-translation-active {
+            /* Force html to contain overflow without scroll reset */
             overflow-x: clip !important;
-            
-            /* Prevents body expansion beyond viewport when translated text is longer than original */
+            max-width: 100vw !important;
+          }
+
+          html.ti-translation-active body {
+            /* Use 'clip' instead of 'hidden' to prevent scroll-to-top jumps */
+            overflow-x: clip !important;
             max-width: 100% !important;
 
-            /* 
-               Protects 'position: fixed' elements. By neutralizing transforms/filters on body,
-               we ensure that the UI Host (FAB, Toasts) stays attached to the viewport 
-               rather than moving with the body content.
-            */
+            /* Protects 'position: fixed' elements (FAB, Toasts) */
             transform: none !important;
             filter: none !important;
             perspective: none !important;
             contain: none !important;
 
-            /* 
-               CRITICAL WARNING: 
-               Do NOT apply 'position', 'width', 'height', or 'display' to body/html here.
+            /*
+               CRITICAL WARNING:
+               Do NOT apply 'position', 'height', or 'display' to body here.
                These properties trigger heavy layout recalculations and scroll resets.
             */
           }
@@ -449,7 +445,7 @@ export class PageTranslationManager extends ResourceTracker {
    */
   _removeLayoutFix() {
     try {
-      document.body.classList.remove('ti-translation-active');
+      document.documentElement.classList.remove('ti-translation-active');
       const style = document.getElementById('ti-translation-layout-fix');
       if (style) style.remove();
     } catch (e) {
