@@ -142,15 +142,29 @@ function isLayoutBarrier(el) {
  * Determines if text alignment should be preserved based on explicit styles.
  */
 function getPreservedAlignment(element) {
-  // Check for explicit inline style alignment
-  const explicitAlign = element.style.textAlign;
-  if (explicitAlign === 'left' || explicitAlign === 'right' || explicitAlign === 'center') {
-    return explicitAlign;
+  // Use computed style to detect alignment from CSS classes (especially for center/justify)
+  const style = window.getComputedStyle(element);
+  const computedAlign = style.textAlign;
+
+  // 1. Always preserve 'center' and 'justify' - they are intentional design choices
+  // regardless of whether they come from inline styles or CSS classes.
+  if (computedAlign === 'center' || computedAlign === 'justify') {
+    return computedAlign;
   }
 
-  // Check for legacy align attribute
+  // 2. Check for explicit inline style alignment for left/right.
+  // We only preserve 'left' or 'right' if they are set as inline styles.
+  // This is because we want to allow the system to change direction-based
+  // alignment (like default left) to right for RTL, but respect
+  // explicit overrides.
+  const inlineAlign = element.style.textAlign;
+  if (inlineAlign === 'left' || inlineAlign === 'right') {
+    return inlineAlign;
+  }
+
+  // 3. Check for legacy align attribute
   const alignAttr = element.getAttribute('align');
-  if (alignAttr === 'center') return 'center';
+  if (alignAttr === 'center' || alignAttr === 'justify') return alignAttr;
 
   // For Block tags, if no explicit style exists, we let it follow direction.
   if (BLOCK_TAGS.has(element.tagName.toUpperCase())) {
