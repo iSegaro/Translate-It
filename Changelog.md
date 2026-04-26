@@ -1,3 +1,16 @@
+#### v1.11.0 – Released on April 26, 2026
+
+##### Added
+
+- Added an option to toggle `Select Element` in the context menu via [Activation](#/activation?highlight=PAGE_CONTEXT_SELECT_ELEMENT) settings.
+
+##### Fixed
+
+- Fixed various UI issues and improved visual consistency
+- Resolved issues in `Page Translation` where certain text segments were intermittently skipped or left untranslated
+
+---
+
 #### v1.10.0 – Released on April 25, 2026
 
 ##### Added
