@@ -14,25 +14,11 @@ async function getActiveSelectElementManager() {
   let featureManager = window.featureManager;
 
   if (!featureManager) {
-    // FeatureManager might not be initialized yet, this can happen during startup
-    logger.info('FeatureManager not available - attempting to initialize it');
-
-    try {
-      // Try to initialize FeatureManager dynamically
-      const { loadCoreFeatures } = await import('@/core/content-scripts/chunks/lazy-features.js');
-      await loadCoreFeatures();
-
-      featureManager = window.featureManager;
-      if (featureManager) {
-        logger.info('FeatureManager initialized successfully');
-      } else {
-        logger.info('Failed to initialize FeatureManager after attempt');
-        return null;
-      }
-    } catch (error) {
-      logger.error('Error initializing FeatureManager:', error);
-      return null;
-    }
+    // DO NOT attempt to initialize FeatureManager here.
+    // This function is called during Keyboard interaction sync, and triggering
+    // a full feature load here causes race conditions and partial state initialization
+    // that locks the UI (SelectElementManager side effects).
+    return null;
   }
 
   return featureManager.getFeatureHandler('selectElement') || null;

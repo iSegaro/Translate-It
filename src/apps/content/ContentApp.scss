@@ -13,10 +13,9 @@
   overflow: visible !important;
 }
 
-/* Individual components inside will override this (e.g., toaster, toolbars) */
-.content-app-container > * {
-  pointer-events: all !important; /* Re-enable pointer events for children */
-}
+/* Individual components inside will override pointer events if needed (e.g., toaster, windows) */
+/* Do NOT use .content-app-container > * { pointer-events: all } as it breaks pass-through for overlays */
+
 
 /* CRITICAL: Toast text direction for RTL/LTR support */
 /* Direction is set based on extension locale (IsRTL from getTranslationString) via inline styles */

@@ -46,15 +46,20 @@
   text-align: left !important;
 }
 
+/* Ensure Sonner toaster container is transparent to clicks and selection */
+[data-sonner-toaster] {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
 /* Enable pointer events only for actual interactive UI elements */
 .ti-field-icon,
+.ti-translation-icon,
 .ti-window,
-.ti-m-sheet-overlay,
 .ti-m-sheet,
 .desktop-fab-container,
-.ti-page-translation-tooltip,
-.element-highlight-overlay,
-.sonner-toaster,
+.mobile-fab,
 .sonner-toast {
   pointer-events: auto !important;
+  user-select: auto !important;
 }

@@ -132,7 +132,7 @@ async function createMountPoint() {
         direction: ltr !important;
       }
       #${UI_HOST_IDS.APP_CONTAINER} > * { 
-        pointer-events: auto !important; 
+        pointer-events: none; 
       }
     `;
     shadowRoot.appendChild(resetStyles);
