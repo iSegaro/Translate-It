@@ -449,6 +449,12 @@
   "translate_with_select_element_description": {
     "message": "特定の選択方法（例：段落全体の選択）で翻訳を呼び出せます。"
   },
+  "show_select_element_in_context_menu_label": {
+    "message": "右クリックメニューに表示"
+  },
+  "show_select_element_in_context_menu_description": {
+    "message": "ブラウザの右クリックコンテキストメニューに「要素を選択」オプションを表示します。"
+  },
   "translate_on_text_selection_label": {
     "message": "テキスト選択時の翻訳を有効にする"
   },

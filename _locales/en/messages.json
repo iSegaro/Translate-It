@@ -449,6 +449,12 @@
   "translate_with_select_element_description": {
     "message": "Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph)."
   },
+  "show_select_element_in_context_menu_label": {
+    "message": "Show in context menu"
+  },
+  "show_select_element_in_context_menu_description": {
+    "message": "Display the 'Select Element' option in the browser's right-click context menu."
+  },
   "translate_on_text_selection_label": {
     "message": "Enable translation on text selection"
   },

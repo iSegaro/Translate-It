@@ -141,6 +141,13 @@ function getDefaultSettings() {
       [TranslationMode.Dictionary_Translation]: true,
       [TranslationMode.ScreenCapture]: true
     },
+    CONTEXT_MENU_VISIBILITY: CONFIG.CONTEXT_MENU_VISIBILITY || {
+      PAGE_CONTEXT_SELECT_ELEMENT: true,
+      ACTION_CONTEXT_SELECT_ELEMENT: true,
+      ACTION_CONTEXT_OPTIONS: true,
+      ACTION_CONTEXT_SHORTCUTS: true,
+      ACTION_CONTEXT_HELP: true
+    },
     translationHistory: []
   };
 }
