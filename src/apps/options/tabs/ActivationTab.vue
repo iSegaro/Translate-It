@@ -19,7 +19,7 @@
       :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'"
     >
       <div class="setting-group">
-        <div class="setting-row">
+        <div class="setting-row fab-setting-row">
           <BaseCheckbox
             id="SHOW_DESKTOP_FAB"
             v-model="showDesktopFab"
