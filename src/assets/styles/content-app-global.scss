@@ -14,24 +14,18 @@
 // Minimal Shadow DOM Reset - Only reset what's necessary
 // ============================================================================
 :host {
-  all: initial;
   display: block !important;
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 0 !important;
+  height: 0 !important;
   z-index: 2147483647 !important;
   pointer-events: none !important;
   direction: ltr !important;
   text-align: left !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   visibility: visible !important;
-
-  /* CRITICAL: contain: strict forces the host to stay fixed to viewport and ignore document width shifts */
-  contain: strict !important;
-  isolation: isolate !important;
-  transform: none !important;
 }
 
 .content-app-container {

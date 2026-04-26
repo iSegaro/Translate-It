@@ -101,25 +101,21 @@ async function createMountPoint() {
 
     const resetStyles = document.createElement('style');
     resetStyles.textContent = `
-      :host { 
-        all: initial; 
-        display: block !important; 
-        position: fixed !important; 
-        top: 0 !important; 
-        left: 0 !important; 
-        width: 100vw !important;
-        height: 100vh !important;
+      :host {
+        display: block !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
-        pointer-events: none !important; 
-        z-index: 2147483647 !important; 
-        overflow: hidden !important; 
+        pointer-events: none !important;
+        z-index: 2147483647 !important;
+        overflow: visible !important;
         visibility: visible !important;
         direction: ltr !important;
-        contain: strict !important;
-        isolation: isolate !important;
-        transform: none !important;
       }
       #${UI_HOST_IDS.APP_CONTAINER} { 
         position: relative !important; 
