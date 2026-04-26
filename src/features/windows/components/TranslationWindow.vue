@@ -13,7 +13,7 @@
     @click.stop
   >
     <LoadingSpinner
-      size="lg"
+      size="sm"
       class="ti-loading-spinner-wrapper"
     />
   </div>
@@ -263,8 +263,8 @@ const handleProviderChange = (newProvider) => {
 };
 
 const showOriginal = ref(false);
-const currentWidth = computed(() => currentSize.value === 'small' ? 60 : null);
-const currentHeight = computed(() => currentSize.value === 'small' ? 40 : null);
+const currentWidth = computed(() => currentSize.value === 'small' ? 28 : null);
+const currentHeight = computed(() => currentSize.value === 'small' ? 28 : null);
 
 const {
   currentPosition,
