@@ -60,6 +60,12 @@
       width: 16px;
       height: 16px;
       object-fit: contain;
+
+      /* Dark mode visibility */
+      :root.theme-dark &,
+      .theme-dark & {
+        filter: invert(1);
+      }
     }
   }
 }
