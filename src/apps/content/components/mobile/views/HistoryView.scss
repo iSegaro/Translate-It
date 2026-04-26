@@ -66,6 +66,7 @@
   /* دکمه Export و Select مخفی */
   .ti-m-export-container {
     position: relative !important;
+    z-index: 1 !important;
   }
 
   .ti-m-export-btn {
@@ -84,18 +85,28 @@
 
   .ti-m-native-select {
     position: absolute !important;
-    inset: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    /* عریض کردن المنت برای وادار کردن مرورگر به باز کردن منو به سمت چپ */
+    width: 200px !important;
+    max-width: 300% !important;
     opacity: 0 !important;
     cursor: pointer !important;
     color-scheme: light !important;
+    direction: rtl !important;
 
     option {
       background-color: #ffffff !important;
       color: #333333 !important;
+      direction: ltr !important;
     }
   }
 
   .ti-m-clear-all-btn {
+    position: relative !important;
+    z-index: 2 !important; /* لایه بالاتر برای جلوگیری از همپوشانی با سلکت عریض */
     background: none !important;
     border: none !important;
     font-size: 11px !important;
@@ -191,10 +202,12 @@
   &.is-dark {
     .ti-m-native-select {
       color-scheme: dark !important;
+      direction: rtl !important;
 
       option {
         background-color: var(--ti-mobile-bg) !important;
         color: var(--ti-mobile-text) !important;
+        direction: ltr !important;
       }
     }
 
@@ -202,4 +215,8 @@
       filter: invert(1) !important;
     }
   }
+}
+
+@keyframes ti-m-spin {
+  to { transform: rotate(360deg); }
 }
