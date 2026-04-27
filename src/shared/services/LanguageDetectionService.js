@@ -9,6 +9,7 @@ import {
   isDevanagariScriptText,
   isLatinScriptText,
   isChineseScriptText,
+  shouldApplyRtl,
   ARABIC_SCRIPT_LANGUAGES,
   LATIN_SCRIPT_PRIORITY_LANGUAGES
 } from "@/shared/utils/text/textAnalysis.js";
@@ -16,7 +17,9 @@ import { getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js"
 import { 
   getCanonicalCode, 
   LANGUAGE_CODE_TO_NAME_MAP,
-  GLOBAL_TRUSTED_LANGUAGES 
+  LANGUAGE_NAME_TO_CODE_MAP,
+  GLOBAL_TRUSTED_LANGUAGES,
+  RTL_LANGUAGES
 } from "@/shared/config/languageConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -49,6 +52,47 @@ if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChang
  * Provides a multi-layered, context-aware detection flow for the entire extension.
  */
 export class LanguageDetectionService {
+  /**
+   * Checks if a language code or name is considered RTL (Right-to-Left).
+   * 
+   * @param {string} langOrName - Language code or full name to check
+   * @returns {boolean} True if the language is RTL
+   */
+  static isRTL(langOrName) {
+    if (!langOrName || langOrName === 'auto') return false;
+    
+    const input = langOrName.toLowerCase().trim();
+    
+    // 1. Try to get code from name mapping (e.g., 'Persian' -> 'fa')
+    const codeFromName = LANGUAGE_NAME_TO_CODE_MAP[input];
+    const code = codeFromName || input;
+    
+    const lang = getCanonicalCode(code);
+    return RTL_LANGUAGES.has(lang);
+  }
+
+  /**
+   * Determines the text direction (rtl or ltr) based on language code and/or content.
+   * 
+   * @param {string} text - Text to analyze (for content-based fallback)
+   * @param {string} langCode - Explicit language code (primary source)
+   * @returns {string} 'rtl' or 'ltr'
+   */
+  static getDirection(text, langCode = null) {
+    // 1. Primary source: explicit language code
+    if (langCode && langCode !== 'auto') {
+      if (this.isRTL(langCode)) return 'rtl';
+    }
+
+    // 2. Secondary source: content analysis (for auto-detect or mixed content)
+    if (text) {
+      return shouldApplyRtl(text) ? 'rtl' : 'ltr';
+    }
+
+    // 3. Final default
+    return 'ltr';
+  }
+
   /**
    * Identifies the general script family of the text.
    * Used to partition the cache by script type within the same URL.

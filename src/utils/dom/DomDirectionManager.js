@@ -8,14 +8,12 @@
  */
 
 import { 
-  RTL_LANGUAGES, 
   BLOCK_TAGS, 
   LAYOUT_TAGS, 
   LAYOUT_DISPLAY_MODES, 
-  INTERACTIVE_TAGS,
-  isRTLStrongCharacter,
-  isLTRStrongCharacter
+  INTERACTIVE_TAGS
 } from './DomTranslatorConstants.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
 // --- 1. Core Utilities ---
 
@@ -23,9 +21,7 @@ import {
  * Checks if a language code is RTL
  */
 export function isRTL(langCode) {
-  if (!langCode) return false;
-  const base = langCode.toLowerCase().split('-')[0];
-  return RTL_LANGUAGES.has(base);
+  return LanguageDetectionService.isRTL(langCode);
 }
 
 /**
@@ -49,38 +45,7 @@ export function stripBiDiMarks(text) {
  * Biased towards target language for translated content.
  */
 export function detectDirectionFromContent(text = '', targetLanguage = null) {
-  if (!text || typeof text !== 'string') return null;
-
-  // FAST PATH: Explicit BiDi markers
-  if (text.includes('\u200F') || text.includes('&rlm;')) return 'rtl';
-  if (text.includes('\u200E') || text.includes('&lrm;')) return 'ltr';
-
-  const trimmedText = text.trim();
-  if (trimmedText.length === 0) return null;
-
-  let rtlStrongCount = 0;
-  let ltrStrongCount = 0;
-
-  for (let i = 0; i < trimmedText.length; i++) {
-    const code = trimmedText.codePointAt(i);
-    if (code > 0xFFFF) i++;
-    if (isRTLStrongCharacter(code)) rtlStrongCount++;
-    else if (isLTRStrongCharacter(code)) ltrStrongCount++;
-  }
-
-  if (rtlStrongCount === 0 && ltrStrongCount === 0) {
-    return isRTL(targetLanguage) ? 'rtl' : null;
-  }
-  
-  const total = rtlStrongCount + ltrStrongCount;
-  const ltrRatio = ltrStrongCount / total;
-  
-  // RTL BIAS: For translated content, prefer RTL unless text is overwhelmingly LTR (>95%)
-  if (isRTL(targetLanguage)) {
-    return (rtlStrongCount > 0 || ltrRatio < 0.95) ? 'rtl' : 'ltr';
-  }
-
-  return ltrRatio > 0.85 ? 'ltr' : 'rtl';
+  return LanguageDetectionService.getDirection(text, targetLanguage);
 }
 
 /**

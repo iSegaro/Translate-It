@@ -157,6 +157,7 @@ import './FontSelector.scss'
 import { CONFIG } from '@/shared/config/config.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { systemFontDetector } from '@/shared/fonts/SystemFontDetector.js'
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -380,15 +381,9 @@ const previewStyle = computed(() => ({
   fontFamily: getFontFamilyCSS(localFontFamily.value),
   fontSize: `${localFontSize.value}px`,
   lineHeight: '1.5',
-  direction: isRTL(props.targetLanguage) ? 'rtl' : 'ltr',
+  direction: LanguageDetectionService.isRTL(props.targetLanguage) ? 'rtl' : 'ltr',
   textAlign: 'center'
 }))
-
-// Helper function to detect RTL languages
-const isRTL = (language) => {
-  const rtlLanguages = ['farsi', 'persian', 'fa', 'arabic', 'ar', 'hebrew', 'he']
-  return rtlLanguages.includes(language?.toLowerCase())
-}
 
 // Watch for prop changes and update local values
 watch(() => props.fontFamily, (newVal) => {
