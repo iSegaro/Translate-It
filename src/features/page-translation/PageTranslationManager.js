@@ -403,30 +403,25 @@ export class PageTranslationManager extends ResourceTracker {
         style.textContent = `
           /**
            * UNIVERSAL LAYOUT STABILITY FIX
-           * Applied during page translation to prevent UI breakage.
            */
-          html.ti-translation-active {
-            /* Force html to contain overflow without scroll reset */
+          html.ti-translation-active body {
+            /* Basic protection for all devices */
             overflow-x: clip !important;
-            max-width: 100vw !important;
           }
 
-          html.ti-translation-active body {
-            /* Use 'clip' instead of 'hidden' to prevent scroll-to-top jumps */
-            overflow-x: clip !important;
-            max-width: 100% !important;
-
-            /* Protects 'position: fixed' elements (FAB, Toasts) */
-            transform: none !important;
-            filter: none !important;
-            perspective: none !important;
-            contain: none !important;
-
-            /*
-               CRITICAL WARNING:
-               Do NOT apply 'position', 'height', or 'display' to body here.
-               These properties trigger heavy layout recalculations and scroll resets.
-            */
+          /**
+           * MOBILE & TOUCH SPECIFIC FIX
+           * We use containment on mobile/tablet or touch devices to solve persistent 
+           * horizontal scrollbars (like on Wikipedia) without causing layout jumps 
+           * on desktop (like Twitter).
+           * Since UI Host is attached to <html>, containment on <body> won't break 
+           * the fixed position of the FAB/Sheet.
+           */
+          @media (max-width: 1024px), (pointer: coarse) {
+            html.ti-translation-active body {
+              contain: paint !important;
+              max-width: 100% !important;
+            }
           }
         `;
         document.head.appendChild(style);

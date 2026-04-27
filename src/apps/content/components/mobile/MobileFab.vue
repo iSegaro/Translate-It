@@ -203,13 +203,7 @@ const dynamicVars = computed(() => {
   if (isFabDragging.value && fabPosition.value.x !== null) {
     // When dragging, use explicit left coordinate
     vars['--fab-left'] = `${fabPosition.value.x}px`;
-  } else {
-    // When snapped, use side-based left/margin values
-    if (side.value === MOBILE_CONSTANTS.FAB.SIDE.LEFT) {
-      vars['--fab-left'] = '0';
-    } else {
-      vars['--fab-left'] = '100%';
-    }
+    vars['--fab-right'] = 'auto';
   }
 
   return vars;
