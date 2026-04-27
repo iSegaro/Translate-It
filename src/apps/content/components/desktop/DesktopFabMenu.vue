@@ -720,12 +720,17 @@ const onDrag = (e) => {
   const point = isMouseEvent ? e : e.touches[0];
 
   if (!isDragging.value) {
-    const dy = point.clientY - startY - verticalPos.value;
+    const dy = point.clientY - (startY + verticalPos.value);
     const dx = point.clientX - startX;
-    if (Math.abs(dy) > 5 || Math.abs(dx) > 10) {
+    
+    // Only start dragging if moved beyond threshold
+    if (Math.abs(dy) > 5 || Math.abs(dx) > 5) {
       isDragging.value = true;
       wasDragged.value = true;
       isFaded.value = false;
+      
+      // Re-sync startY to current point to ensure smooth transition from threshold
+      startY = point.clientY - verticalPos.value;
     }
   }
 
@@ -818,9 +823,22 @@ onMounted(async () => {
   // Settle position before showing to prevent jumps
   setTimeout(() => {
     isReady.value = true;
-    setTimeout(() => {
-      isPositioning.value = false;
-    }, 150);
+    
+    // Settling pixel position on first mount if not already set
+    // We do this in a double requestAnimationFrame or nextTick to ensure the DOM is ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (verticalPos.value === -1 && fabContainerRef.value) {
+          const rect = fabContainerRef.value.getBoundingClientRect();
+          verticalPos.value = rect.top;
+          userPreferredY.value = rect.top;
+        }
+        
+        setTimeout(() => {
+          isPositioning.value = false;
+        }, 150);
+      });
+    });
   }, 100);
 
   startFadeTimer(false);

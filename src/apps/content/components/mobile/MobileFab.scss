@@ -1,19 +1,20 @@
 /* src/apps/content/components/mobile/MobileFab.scss */
 
 .mobile-fab {
+
   /* Responsive Sizing Variables */
   --fab-size: 54px;
   --fab-icon-size: 28px;
   --fab-visible-width: 18px; /* How much of the FAB is visible at the screen edge */
   
   /* Media Queries for Responsive Scaling */
-  @media (min-width: 576px) { // Tablet
+  @media (width >= 576px) { // Tablet
     --fab-size: 64px;
     --fab-icon-size: 34px;
     --fab-visible-width: 22px;
   }
 
-  @media (min-width: 992px) { // Desktop / Large Screen
+  @media (width >= 992px) { // Desktop / Large Screen
     --fab-size: 72px;
     --fab-icon-size: 40px;
     --fab-visible-width: 26px;
@@ -30,24 +31,21 @@
 
   position: fixed !important;
   bottom: var(--fab-y) !important;
-  left: var(--fab-left) !important;
-  margin-left: var(--fab-margin-left) !important;
-  
+  left: var(--fab-left, auto) !important;
+  right: var(--fab-right, auto) !important;
+  margin-left: var(--fab-margin-left, 0) !important;
   width: var(--fab-size) !important;
   height: var(--fab-size) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: var(--fab-justify-content) !important;
-  
   z-index: 2147483647 !important;
   opacity: var(--fab-opacity) !important;
   pointer-events: var(--fab-pointer-events) !important;
-  
   background-color: transparent !important;
   box-shadow: none !important;
   border-radius: 50% !important;
   cursor: pointer !important;
-  
   transition: var(--fab-transition) !important;
   -webkit-tap-highlight-color: transparent !important;
 
@@ -56,13 +54,15 @@
     display: none !important;
   }
 
-  &.is-idle:not(.is-dragging):not(:hover) {
+  &.is-idle:not(.is-dragging, :hover) {
     --fab-opacity: 0.2 !important;
   }
 
   &.is-unstable {
     opacity: 0 !important;
+
     --fab-opacity: 0 !important;
+
     pointer-events: none !important;
   }
 
@@ -73,14 +73,18 @@
 
   &.is-dragging {
     --fab-justify-content: center !important;
+
     /* Centering with slight offset (40% of size) to keep it visible under finger */
     --fab-margin-left: calc(var(--fab-size) * -0.4) !important;
+
     transform: none !important;
   }
 
   &.is-left {
-    --fab-left: 0 !important;
-    --fab-margin-left: calc(var(--fab-visible-width) - var(--fab-size)) !important;
+    left: 0 !important;
+    right: auto !important;
+    --fab-margin-left: 0 !important;
+    transform: translateX(calc(-1 * (var(--fab-size) - var(--fab-visible-width)))) !important;
     --fab-justify-content: flex-end !important;
 
     img {
@@ -89,8 +93,11 @@
   }
 
   &.is-right {
-    --fab-left: 100% !important;
-    --fab-margin-left: calc(-1 * var(--fab-visible-width)) !important;
+    left: auto !important;
+    right: 0 !important;
+    --fab-margin-left: 0 !important;
+    margin-right: 0 !important;
+    transform: translateX(calc(var(--fab-size) - var(--fab-visible-width))) !important;
     --fab-justify-content: flex-start !important;
 
     img {

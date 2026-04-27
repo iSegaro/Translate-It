@@ -149,6 +149,7 @@ function saveOriginalStyles(element) {
   element.setAttribute('data-original-direction', element.style.direction || '');
   element.setAttribute('data-original-text-align', element.style.textAlign || '');
   element.setAttribute('data-original-unicode-bidi', element.style.unicodeBidi || '');
+  element.setAttribute('data-original-max-width', element.style.maxWidth || '');
   
   const originalDir = element.getAttribute('dir');
   if (originalDir !== null) element.setAttribute('data-original-dir', originalDir);
@@ -188,7 +189,12 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
         container.style.direction = targetDir;
         container.style.unicodeBidi = 'isolate';
         
-        // 2. Handle Text Alignment for Block elements
+        // 2. Surgical isolation: Prevent long translated strings from pushing parent width
+        if (isBlock) {
+          container.style.maxWidth = '100%';
+        }
+        
+        // 3. Handle Text Alignment for Block elements
         if (isTargetRTL && isBlock) {
           const preserved = getPreservedAlignment(container, targetLanguage);
           // Only force 'right' if no explicit alignment exists
@@ -225,6 +231,7 @@ export function applyElementDirection(element, targetLanguage) {
   
   element.style.direction = targetDir;
   element.style.unicodeBidi = 'isolate';
+  element.style.maxWidth = '100%';
   
   if (isTargetRTL && BLOCK_TAGS.has(element.tagName.toUpperCase())) {
     const preserved = getPreservedAlignment(element, targetLanguage);
@@ -249,6 +256,7 @@ export function restoreElementDirection(element) {
       const origDir = el.getAttribute('data-original-direction');
       const origAlign = el.getAttribute('data-original-text-align');
       const origBidi = el.getAttribute('data-original-unicode-bidi');
+      const origMaxW = el.getAttribute('data-original-max-width');
 
       if (origDir) el.style.direction = origDir;
       else el.style.removeProperty('direction');
@@ -258,6 +266,9 @@ export function restoreElementDirection(element) {
 
       if (origBidi) el.style.unicodeBidi = origBidi;
       else el.style.removeProperty('unicode-bidi');
+
+      if (origMaxW) el.style.maxWidth = origMaxW;
+      else el.style.removeProperty('max-width');
 
       if (el.hasAttribute('data-original-dir')) {
         el.setAttribute('dir', el.getAttribute('data-original-dir'));
