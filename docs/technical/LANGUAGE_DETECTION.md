@@ -1,8 +1,8 @@
-# Language Detection System
+# Language Detection & Direction System
 
 ## Overview
 
-The **Language Detection System** is a centralized, high-precision architecture designed to identify the language of any text across the extension. It follows a **"Detection Inheritance"** philosophy, where detection results from powerful translation providers (Google, DeepL, Edge, etc.) are captured and reused across the system to eliminate redundant processing and maximize accuracy.
+The **Language Detection System** is a centralized, high-precision architecture designed to identify both the **language** and **text direction (RTL/LTR)** of any text across the extension. It follows a **"Detection Inheritance"** philosophy, where detection results from powerful translation providers (Google, DeepL, Edge, etc.) are captured and reused across the system to eliminate redundant processing and maximize accuracy.
 
 **Single Source of Truth**: `LanguageDetectionService.js`
 
@@ -12,7 +12,16 @@ The i18n lazy-loading layer is only a consumer of detection results. It does not
 
 ## 🏗 Architecture & Flow
 
-The system follows a **Hierarchical Priority Flow**. Before invoking internal detection layers, it checks for inherited metadata.
+The system follows a **Hierarchical Priority Flow**. Before invoking internal detection layers, it checks for inherited metadata and handles text direction context.
+
+The system handles two primary responsibilities:
+1.  **Language Identification**: Multi-layered detection (Statistical, Deterministic, Heuristic).
+2.  **Direction Management**: Determining if text should be rendered as RTL or LTR based on language codes and/or Unicode content analysis.
+
+### Direction Detection Strategy
+1.  **Language Match**: If an explicit language code is available (e.g., `fa`, `ar`), it is checked against the master `RTL_LANGUAGES` list in `languageConstants.js`.
+2.  **Unicode Analysis**: If the language is `auto` or ambiguous, the system performs a character-by-character analysis using **Strong Directional Characters** (Unicode Bidirectional Algorithm principles).
+3.  **Majority Voting**: For mixed content, a majority-voting algorithm (with an RTL bias) determines the final direction.
 
 ### Dynamic Flow Diagram
 ```
@@ -21,7 +30,7 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
                  ▼
     ┌──────────────────────────┐
     │ Layer 0: Inherited?      │─── (Yes) ──▶ [ Use Inherited Lang ]
-    │ (AuthSource Metadata)    │
+    │ (AuthSource Metadata)    │              [ Resolve Direction  ]
     └────────────┬─────────────┘
                  │
                 (No)
@@ -46,12 +55,15 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
                     │ 3. Heuristic Layer       │
                     │    (User Prefs / Defaults)│
                     └──────────────────────────┘
+                                  │
+                                  ▼
+                   [ Final Result: Lang + Dir ]
 ```
 
 ### Priority Hierarchy
 1.  **Layer 0: Provider Feedback (Verified Results)**: If the text was previously translated, the provider's verified detection is cached in `SESSION_CACHE`. This cache is automatically invalidated when translation settings or providers change.
 2.  **Layer 1: Deterministic Layer**: Unicode range analysis for unique script markers (e.g., Persian `پ`).
-3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., detecting English "articles" as Catalan "ca"). Only whitelisted Latin priority codes are accepted.
+3.  **Layer 1.5: User Priority (Short Latin Strings)**: For Latin strings < 60 chars, the user's "Latin Script Priority" setting is checked *before* statistical detection to prevent common false positives (e.g., English "articles" as Catalan "ca"). Only whitelisted Latin priority codes are accepted.
 4.  **Layer 2: Statistical Layer**: Browser `i18n` API (prioritized for texts > 60 chars).
 5.  **Layer 3: Heuristic Layer**: Fallbacks based on script-specific defaults (e.g., Arabic defaults to `fa`).
 
@@ -60,28 +72,35 @@ The system follows a **Hierarchical Priority Flow**. Before invoking internal de
 ## Core Components
 
 ### 1. `LanguageDetectionService.js` (The Brain)
-The central orchestrator for all detection requests. It manages:
+The central orchestrator for all detection and direction requests. It manages:
+- **`detect(text, options)`**: Main entry point for identifying the language code.
+- **`isRTL(langCodeOrName)`**: Checks if a language code (or full name) is natively RTL using the master `RTL_LANGUAGES` set.
+- **`getDirection(text, langCode)`**: The unified method to determine `rtl` or `ltr`. It intelligently combines language hints and content analysis.
 - **Layer 0 Cache**: A dual-mode session cache storing exact text matches (`textHash`) and URL-based script inheritance (`URL + ScriptFamily`).
-- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections. It ensures `sourceLanguage` is resolved to a concrete code (e.g., `en`) even if the request was `auto`.
-- **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when the user changes the Translation Provider or Latin Priority settings.
-- **Dynamic Routing**: Adjusts layer priority based on text length and script family.
-
-This is the only production entry point that should define detection policy. Other modules may preload languages or consume detection results, but they should delegate here rather than reimplement heuristics.
+- **Provider Feedback Loop**: Implements `registerDetectionResult(text, lang, context)` to ingest verified detections.
+- **Cache Invalidation**: Listens to `browser.storage.onChanged` to clear detection history when settings change.
 
 ### 2. `textAnalysis.js` (The Engine)
-Contains low-level Unicode range analysis and script-specific detection functions. It differentiates between "Definitive Markers" (using `useDefaults: false`) and "Heuristic Guessing" (using `useDefaults: true`).
+Contains low-level Unicode range analysis and script-specific detection functions.
+- **`isRTLStrongCharacter(code)`**: Identifies inherently RTL characters (Arabic, Hebrew, Syriac, etc.).
+- **`shouldApplyRtl(text)`**: High-precision content analyzer for mixed-direction strings using majority-voting.
+- **Script Detection**: Differentiates between "Definitive Markers" and "Heuristic Guessing".
 
-This module is intentionally limited to low-level analysis helpers. It should not become a second orchestration layer.
+### 3. `languageConstants.js` (The Validator & SSOT)
+Acts as the "Source of Truth" for all language-related metadata.
+- **`RTL_LANGUAGES`**: Master list of RTL codes.
+- **`LANGUAGE_CODE_TO_NAME_MAP`**: Official language list.
+- **`GLOBAL_TRUSTED_LANGUAGES`**: Used by the Trust Filter.
 
-### 3. `languageConstants.js` (The Validator)
-Provides the project's official language list (`LANGUAGE_CODE_TO_NAME_MAP`). It acts as the "Source of Truth" (SSOT) for the **Trust Filter**, ensuring we don't adopt obscure browser detections unless they are recognized by the extension.
+### 4. `useTextDirection.js` (The UI Hook)
+A Vue composable providing reactive direction state for components (`direction`, `textAlign`, `textDirectionStyle`).
 
 ---
 
 ## 🔍 Detection Layers & Supported Markers
 
-### 1. Deterministic Layer (The "Smoking Gun")
-Uses specialized Regex to find characters unique to specific languages.
+### Deterministic Layer (The "Smoking Gun")
+Uses specialized Unicode markers to find characters unique to specific languages.
 
 | Script Family | Language Markers | Detected Code |
 | :--- | :--- | :--- |
@@ -100,17 +119,6 @@ Uses specialized Regex to find characters unique to specific languages.
 | **Cyrillic** | `а-яё` (Russian), `ґєії` (Ukrainian) | `ru`, `uk` |
 | **CJK Range** | Hiragana/Katakana (Japanese), Hangul (Korean) | `ja`, `ko` |
 
-*Note: Common markers like `é, è, à` are intentionally skipped in the French deterministic layer to allow the Statistical Layer to provide higher precision for ambiguous Latin strings (e.g., distinguishing French from Italian or Acehnese).*
-
-### 2. Statistical Layer (Browser API)
-Utilizes `browser.i18n.detectLanguage`. Results are validated against the internal Trust Filter.
-
-### 3. Heuristic Layer (Fallbacks)
-The safety net for ambiguous strings:
-- **User Preferences**: Consults `storage.local`.
-- **Latin Priority Validation**: Latin priority is limited to the curated UI whitelist (`en`, `fr`, `es`, `de`, `it`, `pt`, `tr`, `nl`). The special value `none` keeps provider-side auto detection enabled for ambiguous Latin strings.
-- **Script Defaults**: Arabic script defaults to `fa`, Devanagari defaults to `hi`, Chinese defaults to `zh-cn`.
-
 ---
 
 ## Technical Details
@@ -121,39 +129,51 @@ The safety net for ambiguous strings:
 
 ### 2. Trust Filter (Dynamic Context Validation)
 To prevent misidentification of short strings (e.g., "hello" as Serbian `sr`), the system implements a **Context-Aware Trust Filter**:
-
-- **Dynamic Trust Set**: A set of languages deemed "safe" to accept for short strings:
+- **Dynamic Trust Set**: 
     1. **User's Context**: UI Language + Active Target Language.
-    2. **Global Trusted Set**: Managed in `languageConstants.js` as `GLOBAL_TRUSTED_LANGUAGES`. Includes major world languages and explicitly supported minor languages.
-- **Confidence Bypass**: If a detection has a confidence score **> 80%**, it bypasses the Trust Set restriction, allowing for accurate detection of niche languages.
-- **Validation**: If a result fails both checks, it is rejected, and the system falls back to Heuristics.
+    2. **Global Trusted Set**: Managed in `languageConstants.js` as `GLOBAL_TRUSTED_LANGUAGES`.
+- **Confidence Bypass**: If a detection has a confidence score **> 80%**, it bypasses the Trust Set restriction.
 
 ### 3. Detection vs. Provider Support (Philosophy)
 The system separates **Detection** from **Execution**:
-- We aim to detect the *actual* language as accurately as possible (e.g., detecting `ace` for Acehnese).
-- If the chosen **Translation Provider** does not support that specific code, the `ProviderCoordinator` handles the fallback (usually by retrying with `auto` or using a phonetic mapping for TTS).
+- We aim to detect the *actual* language as accurately as possible.
+- Fallbacks are handled at the Provider or TTS level if a specific code is not supported.
 
 ---
 
 ## Development Guide
 
-### How to use in a new module
+### How to use Language Detection
 ```javascript
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 const detectedLang = await LanguageDetectionService.detect(someText);
 ```
 
+### How to use Direction Management
+```javascript
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
+
+// Check by code/name
+const isRtl = LanguageDetectionService.isRTL('fa'); 
+
+// Get smart direction
+const dir = LanguageDetectionService.getDirection(text, langCode); 
+```
+
+### How to use in Vue Components
+```javascript
+import { useTextDirection } from '@/composables/shared/useTextDirection.js';
+const { textDirectionStyle } = useTextDirection(text, langCode);
+```
+
 ### How to add a new Language Marker (Internal)
-1.  **Engine Update**: Update `src/shared/utils/text/textAnalysis.js` regex.
+1.  **Engine Update**: Update `src/shared/utils/text/textAnalysis.js` Unicode ranges/regex.
 2.  **Service Integration**: Update `getDeterministicResult` in `LanguageDetectionService.js`.
 
 ### How to add a new Language (Full Support)
-If you want to add support for a language previously unknown to the extension:
-
-1.  **SSOT Registration**: Add the language code and name to `LANGUAGE_NAME_TO_CODE_MAP` in `src/shared/config/languageConstants.js`. **(Critical: Without this, detection will be rejected by Validation 4).**
-2.  **Provider Mapping**: Add the code to the relevant provider lists in `PROVIDER_SUPPORTED_LANGUAGES` (e.g., `google`, `bing`, `yandex`).
+1.  **SSOT Registration**: Add to `LANGUAGE_NAME_TO_CODE_MAP` and `RTL_LANGUAGES` (if applicable) in `src/shared/config/languageConstants.js`.
+2.  **Provider Mapping**: Add the code to the relevant provider lists in `PROVIDER_SUPPORTED_LANGUAGES`.
 3.  **Trust Expansion**: Add the code to `GLOBAL_TRUSTED_LANGUAGES` in `src/shared/config/languageConstants.js`.
-4.  **TTS Mapping (Optional)**: If the language lacks a native voice but uses a similar script (e.g., Acehnese using Latin), add a mapping to `TTSLanguageService.js` (e.g., `ace -> en`).
 
 ---
 
@@ -161,11 +181,10 @@ If you want to add support for a language previously unknown to the extension:
 
 -   **`src/shared/services/LanguageDetectionService.js`**: The central orchestrator (Brain).
 -   **`src/shared/utils/text/textAnalysis.js`**: Unicode analysis (Engine).
--   **`src/utils/i18n/LazyLanguageLoader.js`**: i18n consumer that reuses centralized detection results for lazy preloading.
--   **`src/shared/config/languageConstants.js`**: Source of Truth for all language codes.
--   **`src/features/tts/services/TTSDispatcher.js`**: Consumer for audio synthesis.
+-   **`src/shared/config/languageConstants.js`**: Source of Truth for all language codes & RTL status.
+-   **`src/composables/shared/useTextDirection.js`**: Reactive UI direction interface.
 -   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
--   **`src/features/tts/services/TTSLanguageService.js`**: Phonetic mappings and fallback logic.
 
 ---
-**Last Updated**: April 21, 2026
+**Last Updated**: April 2۷, 2026
+
