@@ -17,7 +17,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
 // Hover manager for original text preview
-import { pageTranslationHoverManager } from '@/features/page-translation/PageTranslationHoverManager.js';
+import { hoverPreviewManager } from '@/features/shared/hover-preview/HoverPreviewManager.js';
 import { getSelectElementShowOriginalOnHoverAsync } from '@/shared/config/config.js';
 
 // Import CSS as inline string
@@ -110,7 +110,7 @@ class SelectElementManager extends ResourceTracker {
       // Initialize hover manager for original text preview if enabled
       getSelectElementShowOriginalOnHoverAsync().then(enabled => {
         if (enabled) {
-          pageTranslationHoverManager.initialize();
+          hoverPreviewManager.initialize();
           this.logger.debug('Hover manager initialized via SelectElementManager');
         }
       });
@@ -168,7 +168,7 @@ class SelectElementManager extends ResourceTracker {
 
       // Ensure hover manager is initialized if enabled
       getSelectElementShowOriginalOnHoverAsync().then(enabled => {
-        if (enabled) pageTranslationHoverManager.initialize();
+        if (enabled) hoverPreviewManager.initialize();
       });
 
       const servicesAvailable = await this._ensureServicesAvailable();

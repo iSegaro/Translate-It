@@ -27,7 +27,7 @@ import { collectTextNodes, generateElementId, extractContextMetadata } from './D
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Import hover manager dependencies
-import { pageTranslationLookup } from '@/features/page-translation/utils/PageTranslationLookup.js';
+import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 
 // Export state and revert logic for external use
@@ -293,7 +293,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
     
     // 1. Register original text before modification for Hover Tooltip
-    pageTranslationLookup.add(textNode, originalText);
+    hoverPreviewLookup.add(textNode, originalText);
 
     // 2. Mark the immediate parent element as having original text (Surgical marking)
     const parentElement = textNode.parentElement;
