@@ -127,14 +127,31 @@ Uses specialized Unicode markers to find characters unique to specific languages
 - Below **60 chars**, deterministic markers (Layer 1) are prioritized.
 - Above **60 chars**, the Browser API is prioritized.
 
-### 2. Trust Filter (Dynamic Context Validation)
+### 2. Arabic Script Detection (Adaptive Thresholds)
+The `isArabicScriptText()` function implements an adaptive threshold strategy to minimize false positives:
+
+- **Very Short Texts (< 20 chars)**: Uses `isPersianText()` with Persian exclusive characters (`پ چ ژ گ ک ی`)
+  - *Rationale*: For very short texts, percentage-based detection is unreliable
+  - *Example*: "سلام" → true (detected as Persian), "Hello [[---]]" → false (only markers)
+
+- **Medium Texts (20-49 chars)**: Uses **50% threshold** for Arabic script percentage
+  - *Rationale*: Stricter threshold for mixed English text with few Persian words
+  - *Example*: 40-char text with 15 Arabic chars → 37.5% → false (rejected)
+  - *Example*: 40-char text with 25 Arabic chars → 62.5% → true (accepted)
+
+- **Long Texts (>= 50 chars)**: Uses **40% threshold** for Arabic script percentage
+  - *Rationale*: Relaxed threshold for better detection of real Arabic/Persian content
+  - *Example*: 100-char text with 35 Arabic chars → 35% → false (rejected)
+  - *Example*: 100-char text with 45 Arabic chars → 45% → true (accepted)
+
+### 3. Trust Filter (Dynamic Context Validation)
 To prevent misidentification of short strings (e.g., "hello" as Serbian `sr`), the system implements a **Context-Aware Trust Filter**:
-- **Dynamic Trust Set**: 
+- **Dynamic Trust Set**:
     1. **User's Context**: UI Language + Active Target Language.
     2. **Global Trusted Set**: Managed in `languageConstants.js` as `GLOBAL_TRUSTED_LANGUAGES`.
 - **Confidence Bypass**: If a detection has a confidence score **> 80%**, it bypasses the Trust Set restriction.
 
-### 3. Detection vs. Provider Support (Philosophy)
+### 4. Detection vs. Provider Support (Philosophy)
 The system separates **Detection** from **Execution**:
 - We aim to detect the *actual* language as accurately as possible.
 - Fallbacks are handled at the Provider or TTS level if a specific code is not supported.
@@ -186,5 +203,5 @@ const { textDirectionStyle } = useTextDirection(text, langCode);
 -   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
 
 ---
-**Last Updated**: April 2۷, 2026
+**Last Updated**: April 27, 2026
 
