@@ -315,8 +315,9 @@
   .sub-options-inner {
     min-height: 0 !important;
     padding-inline-start: $spacing-lg !important;
+    padding-inline-end: $spacing-md !important;
     padding-top: $spacing-xs !important;
-    padding-bottom: 0 !important;
+    padding-bottom: $spacing-sm !important;
     width: 100% !important;
     box-sizing: border-box !important;
     display: flex !important;
