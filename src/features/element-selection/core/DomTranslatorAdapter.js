@@ -26,6 +26,10 @@ import { globalSelectElementState, revertSelectElementTranslation } from './DomT
 import { collectTextNodes, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
+// Import hover manager dependencies
+import { pageTranslationLookup } from '@/features/page-translation/utils/PageTranslationLookup.js';
+import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
+
 // Export state and revert logic for external use
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
@@ -288,6 +292,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
     const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
     
+    // 1. Register original text before modification for Hover Tooltip
+    pageTranslationLookup.add(textNode, originalText);
+
+    // 2. Mark the immediate parent element as having original text (Surgical marking)
+    const parentElement = textNode.parentElement;
+    if (parentElement && parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL) !== 'true') {
+      parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
+    }
+
     textNode.nodeValue = leadingWhitespace + bidiMark + finalTranslation + bidiMark + trailingWhitespace;
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
