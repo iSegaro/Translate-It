@@ -140,12 +140,9 @@ export class PageTranslationManager extends ResourceTracker {
         this.hoverManager.destroy();
       }
 
-      // Start scroll tracker if enabled
-      if (this.settings.translateAfterScrollStop) {
-        this.scrollTracker.start(this.settings.scrollStopDelay);
-      } else {
-        this.scrollTracker.stop();
-      }
+      // Start scroll tracker to ensure visibility-driven flushes for already-enqueued items.
+      // This is critical for catching nodes skipped during fast scrolling.
+      this.scrollTracker.start(this.settings.scrollStopDelay);
 
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === ProviderRegistryIds.LINGVA) {

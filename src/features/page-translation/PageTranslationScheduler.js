@@ -201,14 +201,12 @@ export class PageTranslationScheduler extends ResourceTracker {
 
   /**
    * External signal that scrolling has stopped.
-   * Only used when WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP is enabled.
+   * Ensures that any pending items in the queue are processed once motion stops.
    */
   signalScrollStop() {
     this.isScrolling = false;
-    if (this.settings.translateAfterScrollStop) {
-      this.logger.debug('Signal: Scroll Stop. Queue size:', this.queue.length);
-      this.flush();
-    }
+    this.logger.debug('Signal: Scroll Stop. Queue size:', this.queue.length);
+    this.flush();
   }
 
   /**
@@ -267,7 +265,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     
     // Adaptive delay: 
     // - Very first batch is slightly delayed to collect initial content.
-    // - High priority items (Viewport) trigger faster processing (50ms).
+    // - High priority items (Viewport) trigger faster processing.
     // - Low priority items:
     //    a) If translateAfterScrollStop is true: use poolDelay (internal batching)
     //    b) If translateAfterScrollStop is false (Fluid): use user-defined scrollStopDelay
@@ -278,7 +276,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     const delay = this.isFirstBatch 
       ? PAGE_TRANSLATION_TIMING.FIRST_BATCH_DELAY 
       : (isHighPriority 
-          ? (this.settings.translateAfterScrollStop ? Math.min(PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY, standardDelay) : standardDelay)
+          ? Math.min(PAGE_TRANSLATION_TIMING.HIGH_PRIORITY_DELAY, standardDelay)
           : standardDelay);
 
     if (this.batchTimer) {
