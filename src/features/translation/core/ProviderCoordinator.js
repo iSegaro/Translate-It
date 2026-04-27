@@ -60,13 +60,13 @@ export class ProviderCoordinator {
         const detectedLanguage = await LanguageDetectionService.detect(sampleText, { url: options.url });
         if (detectedLanguage) {
           logger.debug(`[Coordinator] Using detected source language: ${detectedLanguage} (instead of auto)`);
-          
-          // FIX: In Whole Page mode, if detected source is same as target, 
+
+          // FIX: In Whole Page mode OR Select Element mode, if detected source is same as target,
           // we force it back to 'auto' for traditional providers.
           // This allows Google/Bing to handle per-item detection within the batch,
           // preventing the skipping of English items in a "mostly Farsi" batch.
-          if (translateMode === TranslationMode.Page && detectedLanguage === processedTargetLang) {
-            logger.debug(`[Coordinator] Source matches target in Page mode (${detectedLanguage}). Forcing auto to prevent skipping.`);
+          if ((translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element) && detectedLanguage === processedTargetLang) {
+            logger.debug(`[Coordinator] Source matches target in ${translateMode} mode (${detectedLanguage}). Forcing auto to prevent skipping.`);
             processedSourceLang = AUTO_DETECT_VALUE;
           } else {
             processedSourceLang = detectedLanguage;

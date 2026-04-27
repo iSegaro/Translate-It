@@ -1,7 +1,7 @@
 import browser from 'webextension-polyfill';
-import { 
-  detectArabicScriptLanguage, 
-  detectChineseScriptLanguage, 
+import {
+  detectArabicScriptLanguage,
+  detectChineseScriptLanguage,
   detectDevanagariScriptLanguage,
   detectLatinScriptLanguage,
   isArabicScriptText,
@@ -14,8 +14,8 @@ import {
   LATIN_SCRIPT_PRIORITY_LANGUAGES
 } from "@/shared/utils/text/textAnalysis.js";
 import { getLanguageDetectionPreferencesAsync } from "@/shared/config/config.js";
-import { 
-  getCanonicalCode, 
+import {
+  getCanonicalCode,
   LANGUAGE_CODE_TO_NAME_MAP,
   LANGUAGE_NAME_TO_CODE_MAP,
   GLOBAL_TRUSTED_LANGUAGES,
@@ -26,7 +26,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageDetectionService');
 
-// Pre-create the trusted set for O(1) lookups
+// Pre-create trusted set for O(1) lookups
 const GLOBAL_TRUSTED_SET = new Set(GLOBAL_TRUSTED_LANGUAGES);
 
 /**
@@ -49,31 +49,31 @@ if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChang
 
 /**
  * Centralized Language Detection Service
- * Provides a multi-layered, context-aware detection flow for the entire extension.
+ * Provides a multi-layered, context-aware detection flow for entire extension.
  */
 export class LanguageDetectionService {
   /**
    * Checks if a language code or name is considered RTL (Right-to-Left).
-   * 
+   *
    * @param {string} langOrName - Language code or full name to check
-   * @returns {boolean} True if the language is RTL
+   * @returns {boolean} True if language is RTL
    */
   static isRTL(langOrName) {
     if (!langOrName || langOrName === 'auto') return false;
-    
+
     const input = langOrName.toLowerCase().trim();
-    
+
     // 1. Try to get code from name mapping (e.g., 'Persian' -> 'fa')
     const codeFromName = LANGUAGE_NAME_TO_CODE_MAP[input];
     const code = codeFromName || input;
-    
+
     const lang = getCanonicalCode(code);
     return RTL_LANGUAGES.has(lang);
   }
 
   /**
-   * Determines the text direction (rtl or ltr) based on language code and/or content.
-   * 
+   * Determines text direction (rtl or ltr) based on language code and/or content.
+   *
    * @param {string} text - Text to analyze (for content-based fallback)
    * @param {string} langCode - Explicit language code (primary source)
    * @returns {string} 'rtl' or 'ltr'
@@ -94,9 +94,9 @@ export class LanguageDetectionService {
   }
 
   /**
-   * Identifies the general script family of the text.
-   * Used to partition the cache by script type within the same URL.
-   * 
+   * Identifies general script family of text.
+   * Used to partition cache by script type within the same URL.
+   *
    * @param {string} text - Text to analyze
    * @returns {string} Script family code ('latin', 'arabic', 'cjk', 'devanagari', 'other')
    */
@@ -111,14 +111,14 @@ export class LanguageDetectionService {
 
   /**
    * Registers a verified detection result (Feedback Loop from Providers).
-   * 
+   *
    * @param {string} text - The original text
    * @param {string} langCode - The verified language code
    * @param {Object} context - Optional context (url, tabId)
    */
   static registerDetectionResult(text, langCode, context = {}) {
     if (!text || !langCode || langCode === 'auto') return;
-    
+
     const sample = text.trim();
     if (sample.length < 2) return;
 
@@ -143,7 +143,7 @@ export class LanguageDetectionService {
       const firstKey = SESSION_CACHE.keys().next().value;
       SESSION_CACHE.delete(firstKey);
     }
-    
+
     logger.debug(`[LanguageDetectionService] Registered feedback: "${sample.substring(0, 20)}..." -> ${lang}`);
   }
 
@@ -153,17 +153,17 @@ export class LanguageDetectionService {
    * 1. Layer 1: Deterministic Layer (Unique Markers)
    * 2. Layer 2: Statistical Layer (Browser API)
    * 3. Layer 3: Heuristic Layer (Script Defaults & Preferences)
-   * 
+   *
    * @param {string} text - Text to analyze
    * @param {Object} options - Detection options (url, tabId)
    * @returns {string|null} Detected language code
    */
   static async detect(text, options = {}) {
     if (!text || typeof text !== 'string' || !text.trim()) return null;
-    
+
     try {
       const sample = text.trim();
-      
+
       // --- LAYER 0: SESSION CACHE ---
       // Check for exact text match first
       const exactCached = SESSION_CACHE.get(`text:${sample}`);
@@ -184,7 +184,7 @@ export class LanguageDetectionService {
 
       const preferences = await getLanguageDetectionPreferencesAsync();
       const textLength = sample.length;
-      
+
       // Threshold for when statistical detection (Browser API) becomes highly reliable
       const STATISTICAL_RELIABILITY_THRESHOLD = 60;
       const isLongText = textLength > STATISTICAL_RELIABILITY_THRESHOLD;
@@ -194,11 +194,11 @@ export class LanguageDetectionService {
         // Arabic Script family
         const arabic = detectArabicScriptLanguage(sample, preferences, { useDefaults: false });
         if (arabic) return arabic;
-        
+
         // Chinese Script family
         const chinese = detectChineseScriptLanguage(sample, preferences, { useDefaults: false });
         if (chinese) return chinese;
-        
+
         // Devanagari Script family
         const devanagari = detectDevanagariScriptLanguage(sample, preferences, { useDefaults: false });
         if (devanagari) return devanagari;
@@ -208,8 +208,8 @@ export class LanguageDetectionService {
         if (latinVariant) return latinVariant;
 
         // Japanese/Korean specific ranges
-        if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
-        if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
+        if (/[぀-ゟ゠-ヿ]/.test(sample)) return 'ja';
+        if (/[가-힯]/.test(sample)) return 'ko';
 
         return null;
       };
@@ -223,31 +223,35 @@ export class LanguageDetectionService {
             // Only trust if reliable or very high percentage
             if (result.isReliable || top.percentage > 50) {
               const lang = getCanonicalCode(top.language);
-              
+
               // Validation 1: Script/Language consistency
               const isTextArabic = isArabicScriptText(sample);
               const isResultArabic = ARABIC_SCRIPT_LANGUAGES.includes(lang);
 
-              // Prevention of common false positives
-              if (lang === 'ko' && !/[\uAC00-\uD7AF]/.test(sample)) return null;
-              if (lang === 'ja' && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(sample)) return null;
+              // Prevention of common false positives: Validate script consistency
+              if (lang === 'ko' && !/[가-힯]/.test(sample)) return null;
+              if (lang === 'ja' && !/[぀-ゟ゠-ヿ一-鿿]/.test(sample)) return null;
               if (lang === 'zh' && !isChineseScriptText(sample)) return null;
-              if ((lang === 'fa' || lang === 'ar') && !isTextArabic) return null;
 
-              // Validation 2: Script Consistency Check
-              // If text is Arabic script but API detected a non-Arabic script language, it's a false positive.
+              // FA/AR validation: Only reject if detected as FA/AR but text has no Arabic script characters
+              if ((lang === 'fa' || lang === 'ar') && !isTextArabic) {
+                logger.debug(`[LanguageDetectionService] Rejected FA/AR: text is not Arabic script (lang=${lang})`);
+                return null;
+              }
+
+              // Script consistency check: If text has Arabic script but detected as non-Arabic language, reject
               if (isTextArabic && !isResultArabic) return null;
-              
+
               // Validation 3: Dynamic Trust Filter for Short Strings
               // For short strings, the browser API often makes mistakes or detects obscure languages (like 'ca' for 'articles').
               // We only trust these detections if they are 'reliable' AND in a trusted set, or if they are in the user's context.
               if (textLength < 25) {
                 const uiLang = browser.i18n.getUILanguage().split('-')[0].toLowerCase();
                 const targetLang = preferences.targetLanguage ? getCanonicalCode(preferences.targetLanguage) : null;
-                
+
                 const isInUserContext = uiLang === lang || targetLang === lang;
                 const isGloballyTrusted = GLOBAL_TRUSTED_SET.has(lang);
-                
+
                 // For short strings, we apply extreme skepticism to obscure languages.
                 // An obscure language (not in GLOBAL_TRUSTED_SET) MUST be in the User Context to be accepted.
                 // A globally trusted language (like English) is accepted if it's high confidence or reliable.
@@ -273,7 +277,8 @@ export class LanguageDetectionService {
                 logger.debug(`[LanguageDetectionService] Unrecognized language code '${lang}' rejected.`);
                 return null;
               }
-              
+
+              logger.debug(`[LanguageDetectionService] Statistical detection accepted: ${lang}`);
               return lang;
             }
           }
@@ -286,20 +291,33 @@ export class LanguageDetectionService {
       // --- LAYER 3: HEURISTIC (Fallbacks & Defaults) ---
       const getHeuristicResult = () => {
         const arabic = detectArabicScriptLanguage(sample, preferences, { useDefaults: true });
-        if (arabic) return arabic;
-        
+        if (arabic) {
+          logger.debug(`[LanguageDetectionService] Heuristic detected Arabic script: ${arabic}`);
+          return arabic;
+        }
+
         const chinese = detectChineseScriptLanguage(sample, preferences, { useDefaults: true });
-        if (chinese) return chinese;
+        if (chinese) {
+          logger.debug(`[LanguageDetectionService] Heuristic detected Chinese script: ${chinese}`);
+          return chinese;
+        }
 
         const devanagari = detectDevanagariScriptLanguage(sample, preferences, { useDefaults: true });
-        if (devanagari) return devanagari;
+        if (devanagari) {
+          logger.debug(`[LanguageDetectionService] Heuristic detected Devanagari script: ${devanagari}`);
+          return devanagari;
+        }
 
         // Latin Script family (e.g. "articles" follow user preference)
         if (isLatinScriptText(sample)) {
           const latin = detectLatinScriptLanguage(sample, preferences, { useDefaults: true });
-          if (latin) return latin;
+          if (latin) {
+            logger.debug(`[LanguageDetectionService] Heuristic detected Latin script: ${latin}`);
+            return latin;
+          }
         }
-        
+
+        logger.debug(`[LanguageDetectionService] Heuristic layer - no detection found`);
         return null;
       };
 
@@ -308,20 +326,17 @@ export class LanguageDetectionService {
         // Long text: Statistical -> Deterministic -> Heuristic
         const statistical = await getStatisticalResult();
         if (statistical) {
-          logger.debug(`[LanguageDetectionService] Long text detection - Statistical: ${statistical}`);
           return statistical;
         }
 
         const deterministic = getDeterministicResult();
         if (deterministic) {
-          logger.debug(`[LanguageDetectionService] Long text detection - Deterministic: ${deterministic}`);
           return deterministic;
         }
       } else {
         // Short text: Deterministic -> (User Priority for Latin) -> Statistical -> Heuristic
         const deterministic = getDeterministicResult();
         if (deterministic) {
-          logger.debug(`[LanguageDetectionService] Short text detection - Deterministic: ${deterministic}`);
           return deterministic;
         }
 
@@ -338,7 +353,6 @@ export class LanguageDetectionService {
 
         const statistical = await getStatisticalResult();
         if (statistical) {
-          logger.debug(`[LanguageDetectionService] Short text detection - Statistical: ${statistical}`);
           return statistical;
         }
       }
@@ -346,11 +360,9 @@ export class LanguageDetectionService {
       // Final fallback
       const heuristic = getHeuristicResult();
       if (heuristic) {
-        logger.debug(`[LanguageDetectionService] Final heuristic fallback: ${heuristic}`);
         return heuristic;
       }
 
-      logger.debug(`[LanguageDetectionService] Could not detect language reliably`);
       return null;
     } catch (error) {
       logger.error(`[LanguageDetectionService] Error in detection flow:`, error);
