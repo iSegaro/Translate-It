@@ -9,6 +9,8 @@ List of features, enhancements, and ideas planned for future development.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.
 
+- نمایش متن اصلی در موقع هاور با ترجمه Select Element
+
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
 - Integration Module: Gmail, Twitter, Goolge Docs
@@ -24,6 +26,8 @@ List of features, enhancements, and ideas planned for future development.
 - اضافه کردن ویژگی textbox در WindowsManager تا کاربر بتونه متن رو ادیت کنه و دوباره ترجمه کنه
 
 - مینیمال کردن کامپوننت انتخاب سرعت در صفحه تنظیمات پرووایدرها
+
+- اضافه کردن جستجوی گوگل - https://github.com/LuanRT/google-this
 
 - اضافه کردن FAV برای کلمات
 
