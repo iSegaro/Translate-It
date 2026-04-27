@@ -162,27 +162,30 @@
         </span>
       </div>
 
-      <div class="setting-group sub-setting-group">
-        <BaseCheckbox
-          v-model="selectElementShowOriginal"
-          :disabled="!extensionEnabled || !translateWithSelectElement"
-          :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
-        />
-        <span class="setting-description">
-          {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
-        </span>
-      </div>
-
       <!-- Select Element Sub-Options -->
       <div 
         class="sub-options-group"
         :class="{ open: translateWithSelectElement }"
       >
-        <div
-          id="PAGE_CONTEXT_SELECT_ELEMENT"
-          class="sub-options-inner"
-        >
-          <div class="setting-group sub-setting-group">
+        <div class="sub-options-inner">
+          <div
+            id="SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="selectElementShowOriginal"
+              :disabled="!extensionEnabled"
+              :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
+            />
+            <span class="setting-description">
+              {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
+            </span>
+          </div>
+
+          <div
+            id="PAGE_CONTEXT_SELECT_ELEMENT"
+            class="setting-group sub-setting-group"
+          >
             <BaseCheckbox
               v-model="showSelectElementInContextMenu"
               :disabled="!extensionEnabled"
