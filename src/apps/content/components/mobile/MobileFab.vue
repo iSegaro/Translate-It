@@ -73,12 +73,17 @@ let instabilityTimer = null;
 let fabIdleTimerId = null;
 
 const checkBounds = () => {
-  if (typeof window === 'undefined' || !userPreferredY.value) return;
+  if (typeof window === 'undefined' || userPreferredY.value === null) return;
   
   // Use VisualViewport for more accurate visible area height on mobile
   const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const maxY = viewportHeight - 80;
   
+  if (userPreferredY.value === -1) {
+    fabPosition.value.y = Math.round(viewportHeight / 2);
+    return;
+  }
+
+  const maxY = viewportHeight - 80;
   fabPosition.value.y = Math.max(20, Math.min(userPreferredY.value, maxY));
 };
 
@@ -163,7 +168,8 @@ onMounted(async () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           // If position not saved, settle it now based on current calculated default
-          if (fabPosition.value.y !== null) {
+          // ONLY if it was not already a default centered position (-1)
+          if (fabPosition.value.y !== null && userPreferredY.value !== -1) {
             userPreferredY.value = fabPosition.value.y;
           }
           
