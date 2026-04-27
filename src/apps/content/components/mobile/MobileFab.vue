@@ -17,8 +17,6 @@
     @click="onMobileFabClick"
     @mousedown="onFabDragStart"
     @touchstart="onFabDragStart"
-    @touchmove="onFabDragMove"
-    @touchend="onFabDragEnd"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
   >
@@ -79,9 +77,9 @@ const checkBounds = () => {
   
   // Use VisualViewport for more accurate visible area height on mobile
   const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const maxY = viewportHeight - 60;
+  const maxY = viewportHeight - 80;
   
-  fabPosition.value.y = Math.max(50, Math.min(userPreferredY.value, maxY));
+  fabPosition.value.y = Math.max(20, Math.min(userPreferredY.value, maxY));
 };
 
 const updateViewport = () => {
@@ -157,9 +155,23 @@ onMounted(async () => {
     }
 
     checkBounds();
+    
+    // Settle position before showing to prevent jumps
     tracker.trackTimeout(() => {
       isReady.value = true;
-      tracker.trackTimeout(() => { isPositioning.value = false; }, 500);
+      
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // If position not saved, settle it now based on current calculated default
+          if (fabPosition.value.y !== null) {
+            userPreferredY.value = fabPosition.value.y;
+          }
+          
+          tracker.trackTimeout(() => {
+            isPositioning.value = false;
+          }, 150);
+        });
+      });
     }, 150);
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
@@ -214,11 +226,6 @@ const onFabDragStart = (e) => {
   const isMouseEvent = e.type === 'mousedown';
   if (isMouseEvent && e.button !== 0) return;
   
-  // PREVENT SELECTION CLEAR: This ensures clicking the FAB doesn't kill the page selection
-  if (isMouseEvent) {
-    e.preventDefault();
-  }
-  
   const point = isMouseEvent ? e : e.touches[0];
   
   dragStartX = point.clientX;
@@ -231,6 +238,10 @@ const onFabDragStart = (e) => {
   if (isMouseEvent) {
     tracker.addEventListener(window, 'mousemove', onFabDragMove);
     tracker.addEventListener(window, 'mouseup', onFabDragEnd);
+  } else {
+    // For touch, we must use window listeners with passive: false to allow preventDefault
+    tracker.addEventListener(window, 'touchmove', onFabDragMove, { passive: false });
+    tracker.addEventListener(window, 'touchend', onFabDragEnd);
   }
   
   isFabIdle.value = false;
@@ -239,25 +250,38 @@ const onFabDragStart = (e) => {
 const onFabDragMove = (e) => {
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
+  
+  // CRITICAL: Prevent page scroll during FAB drag
+  if (!isMouseEvent && e.cancelable) {
+    e.preventDefault();
+  }
+
   const currentX = point.clientX;
   const currentY = point.clientY;
 
   // Drag Threshold: Only start dragging if moved more than 5px from start
   if (!isFabDragging.value) {
-    const moveDist = Math.sqrt(Math.pow(currentX - dragStartX, 2) + Math.pow(currentY - dragStartY, 2));
-    if (moveDist > 5) {
+    const dx = currentX - dragStartX;
+    const dy = currentY - dragStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
       isFabDragging.value = true;
+      
+      // Re-sync starting coordinates to current point to ensure smooth transition from threshold
+      dragStartX = currentX;
+      dragStartY = currentY;
+      initialFabY = fabPosition.value.y;
     } else {
       return;
     }
   }
   
-  if (e.cancelable) e.preventDefault();
-  
   if (!animationFrameId) {
     animationFrameId = requestAnimationFrame(() => {
+      // Inverted delta because we are controlling 'bottom' property
+      // Moving finger UP (smaller currentY) should INCREASE 'bottom'
       const deltaY = dragStartY - currentY;
-      fabPosition.value.y = Math.max(50, Math.min(window.innerHeight - 50, initialFabY + deltaY));
+      const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      fabPosition.value.y = Math.max(20, Math.min(viewportHeight - 80, initialFabY + deltaY));
       
       const snapThreshold = window.innerWidth / 2;
       side.value = currentX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
@@ -271,14 +295,18 @@ const onFabDragMove = (e) => {
 };
 
 const onFabDragEnd = async (e) => {
-  if (!isFabDragging.value) return;
-  isFabDragging.value = false;
+  const isMouseEvent = e && (e.type === 'mouseup' || e.type === 'mousemove');
   
-  const isMouseEvent = e && e.type === 'mouseup';
   if (isMouseEvent) {
     tracker.removeEventListener(window, 'mousemove', onFabDragMove);
     tracker.removeEventListener(window, 'mouseup', onFabDragEnd);
+  } else {
+    tracker.removeEventListener(window, 'touchmove', onFabDragMove);
+    tracker.removeEventListener(window, 'touchend', onFabDragEnd);
   }
+
+  if (!isFabDragging.value) return;
+  isFabDragging.value = false;
 
   try {
     userPreferredY.value = fabPosition.value.y;
