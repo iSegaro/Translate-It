@@ -3,11 +3,14 @@
 ##### Added
 
 - Added an option to toggle `Select Element` in the context menu via [Activation](#/activation?highlight=PAGE_CONTEXT_SELECT_ELEMENT) settings.
+- Added an [option](#/activation?highlight=SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER) to show the original text on hover via `Select Element`.
+
 
 ##### Fixed
 
 - Fixed various UI issues and improved visual consistency
 - Resolved issues in `Page Translation` where certain text segments were intermittently skipped or left untranslated
+- Fixed issues in language detection.
 
 ---
 
