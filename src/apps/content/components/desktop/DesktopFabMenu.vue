@@ -222,7 +222,7 @@
           height="16"
         >
           <path
-            fill="white"
+            fill="currentColor"
             d="M6 6h12v12H6z"
           />
         </svg>
