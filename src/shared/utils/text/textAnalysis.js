@@ -49,6 +49,37 @@ export const DEVANAGARI_SCRIPT_LANGUAGES = ['hi', 'mr', 'ne'];
 export const LATIN_SCRIPT_PRIORITY_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'tr', 'nl'];
 
 /**
+ * Internal helper to calculate script density percentage.
+ * 
+ * @param {string} text - Text to analyze
+ * @param {RegExp} regex - Global regex for the script range
+ * @returns {number} Percentage of characters matching the script (0-100)
+ * @private
+ */
+const getScriptDensity = (text, regex) => {
+  if (!text || typeof text !== 'string' || text.length === 0) return 0;
+  const matches = text.match(regex);
+  return matches ? (matches.length / text.length) * 100 : 0;
+};
+
+/**
+ * Internal helper to check if script density meets adaptive thresholds.
+ * High density (50%+) for short strings to avoid false positives in mixed text.
+ * Slightly lower density (40%+) for longer strings to account for punctuation/numbers.
+ * 
+ * @param {string} text - Text to analyze
+ * @param {RegExp} regex - Global regex for the script range
+ * @returns {boolean} True if density meets the threshold
+ * @private
+ */
+const meetsDensityThreshold = (text, regex) => {
+  const length = text.length;
+  if (length === 0) return false;
+  const density = getScriptDensity(text, regex);
+  return length < 50 ? density >= 50 : density >= 40;
+};
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -64,38 +95,28 @@ export const isPersianText = (text) => {
 
 /**
  * Check if text contains Arabic script (both Arabic and Persian)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Arabic script characters
  */
 export const isArabicScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
 
-  const textLength = text.length;
-
-  // For very short texts (< 20 chars), use Persian exclusive characters only
-  // This prevents false positives for mixed text with few Arabic/Persian words
-  if (textLength < 20) {
-    return isPersianText(text);
+  // 1. High-Confidence markers for very short strings
+  // If it has Persian unique markers, we trust it even at lower total density
+  if (text.length < 20 && isPersianText(text)) {
+    return true;
   }
 
-  // Arabic/Persian Unicode range (U+0600 to U+06FF)
-  const arabicScriptRegex = /[؀-ۿ]/g;
-  const matches = text.match(arabicScriptRegex);
-
-  if (!matches || matches.length === 0) return false;
-
-  // Calculate percentage of Arabic script characters
-  const arabicScriptCount = matches.length;
-  const arabicScriptPercentage = (arabicScriptCount / textLength) * 100;
-
-  // Adaptive threshold based on text length
-  // Medium texts (< 50 chars): stricter threshold (50%) to avoid false positives
-  // Long texts (>= 50 chars): relaxed threshold (40%) for better detection
-  if (textLength < 50) {
-    return arabicScriptPercentage >= 50;
-  } else {
-    return arabicScriptPercentage >= 40;
+  // 2. Strict density for common short words (e.g., "سلام" needs high density if short)
+  // Unicode range (U+0600 to U+06FF)
+  if (text.length < 20) {
+    return getScriptDensity(text, /[؀-ۿ]/g) >= 70;
   }
+
+  // 3. Adaptive threshold for medium/long strings
+  return meetsDensityThreshold(text, /[؀-ۿ]/g);
 };
 
 /**
@@ -109,9 +130,8 @@ export const isArabicScriptText = (text) => {
 export const detectArabicScriptLanguage = (text, preferences = {}, options = { useDefaults: true }) => {
   if (!text || typeof text !== 'string') return null;
 
-  // Check if it's Arabic script
-  const hasArabicScript = isArabicScriptText(text);
-  if (!hasArabicScript) {
+  // Check if it's Arabic script (using density-aware check)
+  if (!isArabicScriptText(text)) {
     return null;
   }
 
@@ -250,34 +270,40 @@ export const correctTextDirection = (element, text) => {
 
 /**
  * Check if text contains CJK characters (Chinese, Japanese, or Korean)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains CJK script characters
  */
 export const isCjkScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // Ranges: CJK Unified Ideographs, Hiragana, Katakana, Hangul Syllables
-  return /[一-鿿぀-ゟ゠-ヿ가-힯]/.test(text);
+  return meetsDensityThreshold(text, /[一-鿿぀-ゟ゠-ヿ가-힯]/g);
 };
 
 /**
  * Check if text contains Latin characters
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Latin characters
  */
 export const isLatinScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
-  return /[a-zA-Z]/.test(text);
+  return meetsDensityThreshold(text, /[a-zA-Z]/g);
 };
 
 /**
  * Check if text contains Chinese characters (CJK Unified Ideographs)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Chinese characters
  */
 export const isChineseScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // CJK Unified Ideographs range
-  return /[一-鿿]/.test(text);
+  return meetsDensityThreshold(text, /[一-鿿]/g);
 };
 
 /**
@@ -315,13 +341,15 @@ export const detectChineseScriptLanguage = (text, preferences = {}, options = { 
 };
 /**
  * Check if text contains Devanagari characters (Hindi, Marathi, Nepali)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Devanagari characters
  */
 export const isDevanagariScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // Devanagari Unicode range (U+0900 to U+097F)
-  return /[ऀ-ॿ]/.test(text);
+  return meetsDensityThreshold(text, /[ऀ-ॿ]/g);
 };
 
 /**
