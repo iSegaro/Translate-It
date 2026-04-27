@@ -1928,6 +1928,12 @@
   "whole_page_show_original_on_hover_description": {
     "message": "Show the original text in a tooltip when hovering over translated content."
   },
+  "select_element_show_original_on_hover_label": {
+    "message": "Show original on hover"
+  },
+  "select_element_show_original_on_hover_description": {
+    "message": "Show the original text in a tooltip when hovering over elements translated via Select Element."
+  },
   "whole_page_translate_after_scroll_stop_label": {
     "message": "Translate on scroll stop"
   },

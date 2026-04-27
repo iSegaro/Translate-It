@@ -29,7 +29,7 @@ PageTranslationManager (Orchestrator)
 │
 ├─→ PageTranslationScrollTracker (Motion Detection)
 │
-├─→ PageTranslationHoverManager (Interaction Manager)
+├─→ HoverPreviewManager (Shared Interaction Manager)
 │       └─→ PageEventBus → PageTranslationTooltip (Vue UI)
 │
 ├─→ PageTranslationHelper (Static Utilities)
@@ -66,8 +66,8 @@ Activity and motion detection utility. Detects scroll events and **dynamic DOM c
 ### 7. PageTranslationBridge
 The communication bridge between the extension and the `domtranslator` library. Intercepts nodes to provide visibility data.
 
-### 8. PageTranslationHoverManager
-Handles user interactions (Original Text Preview) via `PageEventBus`.
+### 8. HoverPreviewManager
+Handles user interactions (Original Text Preview) via `PageEventBus`. Shared with Select Element mode.
 
 ### 9. PageTranslationHelper & Constants
 Static utilities for DOM calculations and shared system values.

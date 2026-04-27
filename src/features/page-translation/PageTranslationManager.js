@@ -20,7 +20,7 @@ import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
 import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { PageTranslationBridge } from './PageTranslationBridge.js';
-import { PageTranslationHoverManager } from './PageTranslationHoverManager.js';
+import { hoverPreviewManager } from '@/features/shared/hover-preview/HoverPreviewManager.js';
 import { PageTranslationScrollTracker } from './utils/PageTranslationScrollTracker.js';
 import { PAGE_TRANSLATION_TIMING } from './PageTranslationConstants.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -50,7 +50,7 @@ export class PageTranslationManager extends ResourceTracker {
     
     this.scheduler = new PageTranslationScheduler();
     this.bridge = new PageTranslationBridge();
-    this.hoverManager = new PageTranslationHoverManager();
+    this.hoverManager = hoverPreviewManager;
     this.scrollTracker = new PageTranslationScrollTracker(
       () => {
         this.logger.debug('Scroll stop detected, signaling scheduler');

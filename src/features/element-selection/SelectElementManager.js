@@ -16,6 +16,10 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
+// Hover manager for original text preview
+import { hoverPreviewManager } from '@/features/shared/hover-preview/HoverPreviewManager.js';
+import { getSelectElementShowOriginalOnHoverAsync } from '@/shared/config/config.js';
+
 // Import CSS as inline string
 import selectionStyles from './SelectElement.scss?inline';
 
@@ -103,6 +107,14 @@ class SelectElementManager extends ResourceTracker {
       this.setupCancelListener();
       this.setupCrossFrameCommunication();
 
+      // Initialize hover manager for original text preview if enabled
+      getSelectElementShowOriginalOnHoverAsync().then(enabled => {
+        if (enabled) {
+          hoverPreviewManager.initialize();
+          this.logger.debug('Hover manager initialized via SelectElementManager');
+        }
+      });
+
       this.addEventListener(pageEventBus, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (data) => {
         this.activateSelectElementMode(data || {}).catch(() => {});
       });
@@ -153,6 +165,11 @@ class SelectElementManager extends ResourceTracker {
 
       if (this.elementSelector) this.elementSelector.clearHighlight();
       this.setupEventListeners();
+
+      // Ensure hover manager is initialized if enabled
+      getSelectElementShowOriginalOnHoverAsync().then(enabled => {
+        if (enabled) hoverPreviewManager.initialize();
+      });
 
       const servicesAvailable = await this._ensureServicesAvailable();
       if (!servicesAvailable) throw new Error('Services initialization failed');

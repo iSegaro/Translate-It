@@ -174,7 +174,7 @@
 import './TranslationDisplay.scss';
 import { ref, computed, watch, onMounted } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
-import { isRTLLanguage, detectTextDirectionFromContent } from "@/features/element-selection/utils/textDirection.js";
+import { useTextDirection } from "@/composables/shared/useTextDirection.js";
 import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -368,30 +368,24 @@ const currentUiLang = computed(() => {
   return String(lang).toLowerCase();
 });
 
-// Enhanced text direction computation with content-first detection
+// Setup centralized text direction using the composable
+const { direction: detectedDir, textAlign: detectedAlign } = useTextDirection(
+  computed(() => hasError.value ? "" : props.content),
+  computed(() => hasError.value ? currentUiLang.value : props.targetLanguage)
+);
+
+// Final text direction for display, with special handling for error states
 const textDirection = computed(() => {
-  // If we have an error, follow UI language direction strictly but center text
   if (hasError.value) {
-    const lang = currentUiLang.value;
-    const direction = isRTLLanguage(lang) ? 'rtl' : 'ltr';
     return {
-      dir: direction,
-      textAlign: 'center',
+      dir: detectedDir.value,
+      textAlign: 'center', // Center align errors for better UX
     };
   }
 
-  const textToCheck = props.content || "";
-  if (!textToCheck.trim()) {
-    const direction = isRTLLanguage(props.targetLanguage) ? 'rtl' : 'ltr';
-    return { dir: direction, textAlign: direction === 'rtl' ? 'right' : 'left' };
-  }
-
-  // Use advanced content-based detection
-  const direction = detectTextDirectionFromContent(textToCheck, props.targetLanguage);
-
   return {
-    dir: direction,
-    textAlign: direction === 'rtl' ? 'right' : 'left',
+    dir: detectedDir.value,
+    textAlign: detectedAlign.value,
   };
 });
 

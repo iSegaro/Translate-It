@@ -87,9 +87,9 @@ export class browserTranslateProvider extends BaseTranslateProvider {
       logger.error('browser.i18n.detectLanguage failed:', error);
     }
 
-    // Final fallback to regex detection
-    const fallbackResult = await LanguageSwappingService._applyRegexFallback(text, 'auto', 'fa', 'English', 'Farsi', 'BrowserAPI');
-    return fallbackResult[0] !== 'auto' ? fallbackResult[0] : "en";
+    // Final fallback: return English as default
+    // Note: LanguageSwappingService now handles all necessary language detection logic
+    return "en";
   }
 
   /**

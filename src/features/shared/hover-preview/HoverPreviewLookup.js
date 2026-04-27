@@ -1,8 +1,8 @@
 /**
- * PageTranslationLookup - Specialized memory-efficient lookup for original texts.
+ * HoverPreviewLookup - Specialized memory-efficient lookup for original texts.
  * Uses WeakMap to link DOM nodes to their original content without polluting the DOM.
  */
-export class PageTranslationLookup {
+export class HoverPreviewLookup {
   constructor() {
     // WeakMap ensures that when a Node is removed from DOM, its original text is garbage collected.
     this.lookup = new WeakMap();
@@ -36,4 +36,4 @@ export class PageTranslationLookup {
   }
 }
 
-export const pageTranslationLookup = new PageTranslationLookup();
+export const hoverPreviewLookup = new HoverPreviewLookup();

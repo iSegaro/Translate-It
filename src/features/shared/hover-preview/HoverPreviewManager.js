@@ -1,19 +1,20 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
-import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
+import { hoverPreviewLookup } from './HoverPreviewLookup.js';
+import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { PageTranslationEvents } from '@/core/PageEventBus.js';
 import { stripBiDiMarks } from '@/utils/dom/DomDirectionManager.js';
 
 /**
- * PageTranslationHoverManager - Lightweight tooltip to show original text on hover.
+ * HoverPreviewManager - Lightweight tooltip to show original text on hover.
  * Refactored to use Shadow DOM (Vue UI Host) via PageEventBus.
+ * Shared between Whole Page Translation and Select Element modes.
  */
-export class PageTranslationHoverManager extends ResourceTracker {
+export class HoverPreviewManager extends ResourceTracker {
   constructor() {
-    super('page-translation-hover-manager');
-    this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'HoverManager');
+    super('hover-preview-manager');
+    this.logger = getScopedLogger(LOG_COMPONENTS.UI, 'HoverPreviewManager');
     this.isActive = false;
     this.currentElement = null;
     
@@ -31,7 +32,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     this.addEventListener(document, 'mouseout', this.handleMouseOut, { capture: true });
     
     this.isActive = true;
-    this.logger.init('Hover manager initialized (Shadow DOM Mode)');
+    this.logger.init('Hover preview manager initialized (Shadow DOM Mode)');
   }
 
   destroy() {
@@ -45,7 +46,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     
     this.isActive = false;
     this.currentElement = null;
-    this.logger.debug('Hover manager destroyed');
+    this.logger.debug('Hover preview manager destroyed');
   }
 
   handleMouseOver(event) {
@@ -117,7 +118,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
 
     while ((node = walker.nextNode())) {
       if (node.nodeType === Node.TEXT_NODE) {
-        const original = pageTranslationLookup.get(node);
+        const original = hoverPreviewLookup.get(node);
         // Use original text if translated, otherwise use current text to keep continuity
         const content = original !== undefined ? original : node.textContent;
         if (content) {
@@ -152,7 +153,7 @@ export class PageTranslationHoverManager extends ResourceTracker {
     if (element.attributes) {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
-        const original = pageTranslationLookup.get(attr);
+        const original = hoverPreviewLookup.get(attr);
         
         // FIX: Only show original text for attributes if it was actually translated.
         // We strip BiDi marks (RLM/LRM) from the current value before comparison to detect if
@@ -167,4 +168,4 @@ export class PageTranslationHoverManager extends ResourceTracker {
   }
 }
 
-export const pageTranslationHoverManager = new PageTranslationHoverManager();
+export const hoverPreviewManager = new HoverPreviewManager();
