@@ -162,6 +162,17 @@
         </span>
       </div>
 
+      <div class="setting-group sub-setting-group">
+        <BaseCheckbox
+          v-model="selectElementShowOriginal"
+          :disabled="!extensionEnabled || !translateWithSelectElement"
+          :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
+        />
+        <span class="setting-description">
+          {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
+        </span>
+      </div>
+
       <!-- Select Element Sub-Options -->
       <div 
         class="sub-options-group"
@@ -465,6 +476,7 @@ const replaceOnSpecialSites = createSetting('REPLACE_SPECIAL_SITES', false)
 
 // Selection
 const translateWithSelectElement = createSetting('TRANSLATE_WITH_SELECT_ELEMENT', false)
+const selectElementShowOriginal = createSetting('SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER', false)
 const contextMenuVisibility = createSetting('CONTEXT_MENU_VISIBILITY', CONFIG.CONTEXT_MENU_VISIBILITY)
 
 const showSelectElementInContextMenu = computed({

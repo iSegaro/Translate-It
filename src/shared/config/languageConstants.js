@@ -115,6 +115,27 @@ export const GLOBAL_TRUSTED_LANGUAGES = [
   'ml', 'ta', 'te', 'kn', 'mr', 'ne', 'my', 'km', 'lo', 'am', 'hy', 'ka', 'ace', 'gd'
 ];
 
+/**
+ * Standard RTL (Right-to-Left) language codes.
+ * This is the Single Source of Truth for the entire extension.
+ */
+export const RTL_LANGUAGES = new Set([
+  'ar',   // Arabic
+  'fa',   // Persian (Farsi)
+  'he',   // Hebrew
+  'ur',   // Urdu
+  'ps',   // Pashto
+  'sd',   // Sindhi
+  'ckb',  // Central Kurdish (Sorani)
+  'ku',   // Kurdish (general, when using Arabic script)
+  'yi',   // Yiddish
+  'ug',   // Uyghur
+  'dv',   // Divehi
+  'syr',  // Syriac
+  'arc',  // Aramaic
+  'azb'   // South Azerbaijani
+]);
+
 // Provider-specific language code mappings
 export const PROVIDER_LANGUAGE_MAPPINGS = {
   // Google Translate Language Codes

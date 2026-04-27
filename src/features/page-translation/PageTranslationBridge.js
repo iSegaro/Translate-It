@@ -6,7 +6,7 @@ import {
 } from 'domtranslator';
 import { createNodesFilter } from 'domtranslator/utils/nodes';
 import { applyNodeDirection, isRTL, restoreElementDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
-import { pageTranslationLookup } from './utils/PageTranslationLookup.js';
+import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { 
   PAGE_TRANSLATION_ATTRIBUTES, 
   PAGE_TRANSLATION_SELECTORS
@@ -31,7 +31,7 @@ export class PageTranslationBridge extends ResourceTracker {
     const isTargetRTL = isRTL(settings.targetLanguage);
 
     // Reset lookup for a new session
-    pageTranslationLookup.clear();
+    hoverPreviewLookup.clear();
 
     const currentSession = {
       intersectionScheduler: null,
@@ -117,9 +117,9 @@ export class PageTranslationBridge extends ResourceTracker {
         // This is used for the "Show original on hover" feature.
         if (bridge.showOriginalOnHover && node) {
           if (node.nodeType === Node.TEXT_NODE) {
-            pageTranslationLookup.add(node, node.textContent);
+            hoverPreviewLookup.add(node, node.textContent);
           } else if (node.nodeType === Node.ATTRIBUTE_NODE) {
-            pageTranslationLookup.add(node, node.value);
+            hoverPreviewLookup.add(node, node.value);
           }
         }
 

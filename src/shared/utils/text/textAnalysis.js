@@ -49,6 +49,37 @@ export const DEVANAGARI_SCRIPT_LANGUAGES = ['hi', 'mr', 'ne'];
 export const LATIN_SCRIPT_PRIORITY_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'tr', 'nl'];
 
 /**
+ * Internal helper to calculate script density percentage.
+ * 
+ * @param {string} text - Text to analyze
+ * @param {RegExp} regex - Global regex for the script range
+ * @returns {number} Percentage of characters matching the script (0-100)
+ * @private
+ */
+const getScriptDensity = (text, regex) => {
+  if (!text || typeof text !== 'string' || text.length === 0) return 0;
+  const matches = text.match(regex);
+  return matches ? (matches.length / text.length) * 100 : 0;
+};
+
+/**
+ * Internal helper to check if script density meets adaptive thresholds.
+ * High density (50%+) for short strings to avoid false positives in mixed text.
+ * Slightly lower density (40%+) for longer strings to account for punctuation/numbers.
+ * 
+ * @param {string} text - Text to analyze
+ * @param {RegExp} regex - Global regex for the script range
+ * @returns {boolean} True if density meets the threshold
+ * @private
+ */
+const meetsDensityThreshold = (text, regex) => {
+  const length = text.length;
+  if (length === 0) return false;
+  const density = getScriptDensity(text, regex);
+  return length < 50 ? density >= 50 : density >= 40;
+};
+
+/**
  * Check if text contains Persian characters (distinguishes from Arabic)
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Persian characters
@@ -58,21 +89,34 @@ export const isPersianText = (text) => {
 
   // Persian-specific characters (not present in standard Arabic):
   // پ (U+067E), چ (U+0686), ژ (U+0698), گ (U+06AF), ک (U+06A9), ی (U+06CC)
-  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
+  const persianExclusiveChars = /[پچژگکی]/;
   return persianExclusiveChars.test(text);
 };
 
 /**
  * Check if text contains Arabic script (both Arabic and Persian)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Arabic script characters
  */
 export const isArabicScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
 
-  // Arabic/Persian Unicode range (U+0600 to U+06FF)
-  const arabicScriptRegex = /[\u0600-\u06FF]/;
-  return arabicScriptRegex.test(text);
+  // 1. High-Confidence markers for very short strings
+  // If it has Persian unique markers, we trust it even at lower total density
+  if (text.length < 20 && isPersianText(text)) {
+    return true;
+  }
+
+  // 2. Strict density for common short words (e.g., "سلام" needs high density if short)
+  // Unicode range (U+0600 to U+06FF)
+  if (text.length < 20) {
+    return getScriptDensity(text, /[؀-ۿ]/g) >= 70;
+  }
+
+  // 3. Adaptive threshold for medium/long strings
+  return meetsDensityThreshold(text, /[؀-ۿ]/g);
 };
 
 /**
@@ -86,29 +130,33 @@ export const isArabicScriptText = (text) => {
 export const detectArabicScriptLanguage = (text, preferences = {}, options = { useDefaults: true }) => {
   if (!text || typeof text !== 'string') return null;
 
-  // Check if it's Arabic script
-  if (!isArabicScriptText(text)) return null;
+  // Check if it's Arabic script (using density-aware check)
+  if (!isArabicScriptText(text)) {
+    return null;
+  }
 
   // 1. Language-specific unique characters
-  
+
   // Urdu-specific (U+0621, U+0624, U+0626, U+0679, U+0686, U+0688, U+0691, U+06AF, U+06BA, U+06BE, U+06C1, U+06D2)
-  const urduExclusiveChars = /[\u0679\u0688\u0691\u06BA\u06BE\u06C1\u06D2]/;
+  const urduExclusiveChars = /[ٹڈڑںھہے]/;
   if (urduExclusiveChars.test(text)) return 'ur';
 
   // Pashto-specific (U+0672, U+0675, U+0681, U+0685, U+0692, U+069A, U+06BC, U+06CD, U+06D0)
-  const pashtoExclusiveChars = /[\u0672\u0675\u0681\u0685\u0692\u069A\u06BC\u06CD\u06D0]/;
+  const pashtoExclusiveChars = /[ٲٵځڅڒښڼۍې]/;
   if (pashtoExclusiveChars.test(text)) return 'ps';
 
   // Persian-specific (پ، چ، ژ، گ، ک فارسی، ی فارسی)
-  const persianExclusiveChars = /[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/;
+  const persianExclusiveChars = /[پچژگکی]/;
   if (persianExclusiveChars.test(text)) return 'fa';
 
   // Arabic-specific (ة، ي عربی، ك عربی، ى)
-  const arabicExclusiveChars = /[\u0629\u064A\u0643\u0649]/;
+  const arabicExclusiveChars = /[ةيكى]/;
   if (arabicExclusiveChars.test(text)) return 'ar';
 
   // If no unique markers found and we don't want defaults, return null to allow other layers to decide
-  if (!options.useDefaults) return null;
+  if (!options.useDefaults) {
+    return null;
+  }
 
   // 2. Use user preference for ambiguous text (like "سلام")
   const userPreference = preferences['arabic-script'];
@@ -121,16 +169,79 @@ export const detectArabicScriptLanguage = (text, preferences = {}, options = { u
 };
 
 /**
- * Check if RTL (Right-to-Left) should be applied to text
+ * Checks if a character code belongs to an RTL strong directional category.
+ * Includes: Hebrew, Arabic, Syriac, Thaana, NKo, etc.
+ * @param {number} code - Unicode character code
+ * @returns {boolean}
+ */
+export function isRTLStrongCharacter(code) {
+  return (
+    (code >= 0x0590 && code <= 0x05FF) ||  // Hebrew
+    (code >= 0x0600 && code <= 0x06FF) ||  // Arabic
+    (code >= 0x0700 && code <= 0x074F) ||  // Syriac
+    (code >= 0x0750 && code <= 0x077F) ||  // Arabic Supplement
+    (code >= 0x0780 && code <= 0x07BF) ||  // Thaana
+    (code >= 0x07C0 && code <= 0x07FF) ||  // NKo
+    (code >= 0x08A0 && code <= 0x08FF) ||  // Arabic Extended
+    (code >= 0xFB1D && code <= 0xFB4F) ||  // Hebrew Presentation Forms
+    (code >= 0xFB50 && code <= 0xFDFF) ||  // Arabic Presentation Forms
+    (code >= 0xFE70 && code <= 0xFEFF) ||  // Arabic Presentation Forms-B
+    (code === 0x200F)                      // Right-to-Left Mark
+  );
+}
+
+/**
+ * Checks if a character code belongs to an LTR strong directional category.
+ * Includes: Latin, Greek, Cyrillic, etc.
+ * @param {number} code - Unicode character code
+ * @returns {boolean}
+ */
+export function isLTRStrongCharacter(code) {
+  return (
+    (code >= 0x0041 && code <= 0x005A) ||  // Basic Latin uppercase
+    (code >= 0x0061 && code <= 0x007A) ||  // Basic Latin lowercase
+    (code >= 0x00C0 && code <= 0x00D6) ||  // Latin-1 Supplement letters
+    (code >= 0x00D8 && code <= 0x00F6) ||  // Latin-1 Supplement letters
+    (code >= 0x00F8 && code <= 0x00FF) ||  // Latin-1 Supplement letters
+    (code >= 0x0100 && code <= 0x017F) ||  // Latin Extended-A
+    (code >= 0x0180 && code <= 0x024F) ||  // Latin Extended-B
+    (code >= 0x0250 && code <= 0x02AF) ||  // IPA Extensions
+    (code >= 0x0370 && code <= 0x03FF) ||  // Greek and Coptic
+    (code >= 0x0400 && code <= 0x04FF) ||  // Cyrillic
+    (code >= 0x0500 && code <= 0x052F) ||  // Cyrillic Supplement
+    (code >= 0x1E00 && code <= 0x1EFF) ||  // Latin Extended Additional
+    (code === 0x200E)                      // Left-to-Right Mark
+  );
+}
+
+/**
+ * Check if RTL (Right-to-Left) should be applied to text based on content.
+ * Uses a majority-voting algorithm with strong directional character detection.
  * @param {string} text - Text to check
  * @returns {boolean} True if RTL should be applied
  */
 export const shouldApplyRtl = (text) => {
   if (!text || typeof text !== 'string') return false;
+  const trimmedText = text.trim();
+  if (trimmedText.length === 0) return false;
 
-  // Check for RTL characters (Arabic, Hebrew, Persian)
-  const rtlRegex = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
-  return rtlRegex.test(text);
+  let rtlStrongCount = 0;
+  let ltrStrongCount = 0;
+
+  for (let i = 0; i < trimmedText.length; i++) {
+    const code = trimmedText.codePointAt(i);
+    if (code > 0xFFFF) i++; // Handle surrogate pairs
+
+    if (isRTLStrongCharacter(code)) rtlStrongCount++;
+    else if (isLTRStrongCharacter(code)) ltrStrongCount++;
+  }
+
+  // If no strong characters found, default to LTR
+  if (rtlStrongCount === 0 && ltrStrongCount === 0) return false;
+
+  // RTL Bias: If any significant RTL content exists, or more than 40% is RTL, consider it RTL
+  // This helps with mixed strings where the target context is usually RTL.
+  return (rtlStrongCount / (rtlStrongCount + ltrStrongCount)) > 0.4;
 };
 
 /**
@@ -159,34 +270,40 @@ export const correctTextDirection = (element, text) => {
 
 /**
  * Check if text contains CJK characters (Chinese, Japanese, or Korean)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains CJK script characters
  */
 export const isCjkScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // Ranges: CJK Unified Ideographs, Hiragana, Katakana, Hangul Syllables
-  return /[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/.test(text);
+  return meetsDensityThreshold(text, /[一-鿿぀-ゟ゠-ヿ가-힯]/g);
 };
 
 /**
  * Check if text contains Latin characters
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Latin characters
  */
 export const isLatinScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
-  return /[a-zA-Z]/.test(text);
+  return meetsDensityThreshold(text, /[a-zA-Z]/g);
 };
 
 /**
  * Check if text contains Chinese characters (CJK Unified Ideographs)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Chinese characters
  */
 export const isChineseScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // CJK Unified Ideographs range
-  return /[\u4E00-\u9FFF]/.test(text);
+  return meetsDensityThreshold(text, /[一-鿿]/g);
 };
 
 /**
@@ -203,11 +320,11 @@ export const detectChineseScriptLanguage = (text, preferences = {}, options = { 
   // 1. Heuristic: Unique Markers for Traditional vs Simplified
 
   // Traditional Chinese unique markers
-  const traditionalMarkers = /[\u5011\u570B\u5B78\u6703\u9019]/;
+  const traditionalMarkers = /[們國學會這]/;
   if (traditionalMarkers.test(text)) return 'zh-tw';
 
   // Simplified Chinese unique markers
-  const simplifiedMarkers = /[\u4EEC\u56FD\u5B66\u4F1A\u8FD9]/;
+  const simplifiedMarkers = /[们国学会这]/;
   if (simplifiedMarkers.test(text)) return 'zh-cn';
 
   // If no unique markers found and we don't want defaults, return null
@@ -224,13 +341,15 @@ export const detectChineseScriptLanguage = (text, preferences = {}, options = { 
 };
 /**
  * Check if text contains Devanagari characters (Hindi, Marathi, Nepali)
+ * Uses adaptive density thresholds to prevent false positives in mixed text.
+ * 
  * @param {string} text - Text to check
  * @returns {boolean} True if text contains Devanagari characters
  */
 export const isDevanagariScriptText = (text) => {
   if (!text || typeof text !== 'string') return false;
   // Devanagari Unicode range (U+0900 to U+097F)
-  return /[\u0900-\u097F]/.test(text);
+  return meetsDensityThreshold(text, /[ऀ-ॿ]/g);
 };
 
 /**
@@ -245,9 +364,9 @@ export const detectDevanagariScriptLanguage = (text, preferences = {}, options =
   if (!text || !isDevanagariScriptText(text)) return null;
 
   // 1. Language-specific unique markers
-  
+
   // Marathi unique characters: ळ (U+0933)
-  const marathiMarkers = /[\u0933]/;
+  const marathiMarkers = /[ळ]/;
   if (marathiMarkers.test(text)) return 'mr';
 
   // If no unique markers found and we don't want defaults, return null
@@ -266,7 +385,7 @@ export const detectDevanagariScriptLanguage = (text, preferences = {}, options =
 /**
  * Detect language for Latin script text using unique character markers (Diacritics)
  * or user preferences for ambiguous strings.
- * 
+ *
  * @param {string} text - Text to analyze
  * @param {Object} preferences - User language detection preferences
  * @param {Object} options - Detection options
@@ -280,10 +399,10 @@ export const detectLatinScriptLanguage = (text, preferences = {}, options = { us
   // 1. Deterministic Layer: Language-specific unique characters
   // German: ä, ö, ü, ß
   if (/[ßäöüÄÖÜ]/.test(sample)) return 'de';
-  
+
   // Spanish: ñ, inverted punctuation (¿, ¡)
   if (/[ñ¿¡]/.test(sample)) return 'es';
-  
+
   // Portuguese specific (tilde)
   if (/[ãõÃÕ]/.test(sample)) return 'pt';
 
@@ -297,12 +416,12 @@ export const detectLatinScriptLanguage = (text, preferences = {}, options = { us
     if (/[ığşİ]/.test(sample)) return 'tr';
     // Vietnamese overlap check
     if (/[đĐ₫]/.test(sample)) return 'vi';
-    return 'fr'; 
+    return 'fr';
   }
-  
+
   // Nordic languages
   if (/[åøæÅØÆ]/.test(sample)) return 'no';
-  
+
   // Cyrillic (Ukrainian/Russian)
   // Check Ukrainian specific markers first
   if (/[ґєії]/.test(sample)) return 'uk';
@@ -315,10 +434,10 @@ export const detectLatinScriptLanguage = (text, preferences = {}, options = { us
 
   // 2. Use user preference for ambiguous text (e.g., "articles")
   const userPreference = preferences['latin-script'];
-  
+
   // If user explicitly chose 'none', return null to let the translation provider decide (auto)
   if (userPreference === 'none') return null;
-  
+
   if (userPreference && LATIN_SCRIPT_PRIORITY_LANGUAGES.includes(userPreference)) {
     return userPreference;
   }

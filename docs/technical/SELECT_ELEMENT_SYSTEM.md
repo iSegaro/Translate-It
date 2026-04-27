@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content. It uses a token-optimized, context-aware batching strategy to ensure high-quality translations while minimizing costs.
+The Select Element system provides an intuitive way for users to translate content directly on a webpage. Users activate this mode, hover over any element to see a visual highlight, and click to translate its text content. After translation, it allows viewing the original text via a surgical hover tooltip (if enabled). It uses a token-optimized, context-aware batching strategy to ensure high-quality translations while minimizing costs.
 
 ## Architecture
 
@@ -17,6 +17,8 @@ User Click → SelectElementManager
      │   Translation Provider System (AI or Traditional)
      │       ↓ (Real-time Stream)
      │   DomTranslatorAdapter ←─ (UID Mapping & BIDI Injection)
+     │
+     └─→ HoverPreviewManager (Shared component for Original Text preview)
      └─→ SelectElementNotificationManager (toast UI & lifecycle control)
 ```
 
@@ -79,6 +81,14 @@ Manages RTL/LTR direction and text alignment.
 - **High-Accuracy Detection**: Uses strong-character analysis (not just language codes) to detect direction.
 - **Surgical Application**: `applyNodeDirection` finds the smallest safe container for a text node to apply direction without breaking parent layout.
 
+### 7. HoverPreviewManager.js (Shared Feature)
+A shared component located in `src/features/shared/hover-preview/` that handles showing the original text when hovering over translated elements.
+
+**Responsibilities:**
+- **Surgical Interaction**: Detects hover on elements marked with `data-has-original="true"`.
+- **Memory Efficient**: Uses a `WeakMap` based lookup (`HoverPreviewLookup`) to store original text nodes without preventing garbage collection.
+- **Shadow DOM UI**: Emits events to the `PageEventBus` to show/hide the tooltip in the Vue-based Shadow DOM host.
+
 ## Optimization Strategy: Smart Logical Block Batching
 
 To provide high-quality translation while remaining cost-effective, the system uses "Smart Logical Block Batching":
@@ -109,6 +119,7 @@ Select Element mode is **UI-Aware**. It follows the provider selected in the glo
 - **Hover Highlighting**: Blue outline on hoverable elements.
 - **Crosshair Cursor**: Indicates selection mode is active.
 - **Navigation Prevention**: Clicks on links/buttons don't navigate during mode.
+- **Original Text Preview**: When enabled, hovering over translated text shows a tooltip with the original content. This uses "surgical marking" to ensure you only see the original text for the specific element you are hovering over.
 
 ### Toast Notifications
 - **Activation Notice**: Shows when mode is activated.
@@ -203,9 +214,14 @@ src/features/element-selection/
 │   ├── elementHelpers.js                # Validation & DOM walking
 │   └── timeoutCalculator.js             # Dynamic provider timeouts
 │
-└── handlers/                            # Message & event handlers
+├── handlers/                            # Message & event handlers
     └── handleActivateSelectElementMode.js
+
+src/features/shared/hover-preview/       # SHARED FEATURE
+├── HoverPreviewManager.js               # Tooltip logic (shared with Whole Page)
+└── HoverPreviewLookup.js                # Memory-efficient original text storage
 ```
+
 
 ## Debugging
 

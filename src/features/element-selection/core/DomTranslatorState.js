@@ -6,6 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { restoreElementDirection } from '@/utils/dom/DomDirectionManager.js';
+import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 
 // Global translation state registry to ensure singleton behavior across chunks
 const getGlobalState = () => {
@@ -86,6 +87,11 @@ export async function revertSelectElementTranslation() {
 
       // 2. Restore direction and styles for the element, its descendants, and its ancestors.
       if (element) {
+        // Remove tracking attribute for hover tooltip from element and ALL descendants
+        const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
+        element.removeAttribute(attr);
+        element.querySelectorAll(`[${attr}]`).forEach(el => el.removeAttribute(attr));
+
         // This function now recursively cleans ancestors up to the body
         restoreElementDirection(element);
 

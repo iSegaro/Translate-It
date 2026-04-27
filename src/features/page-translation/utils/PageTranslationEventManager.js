@@ -63,13 +63,10 @@ export class PageTranslationEventManager {
       if (this.manager.settings) {
         this.manager.settings.translateAfterScrollStop = !!newValue;
         
-        // Update scroll tracker based on the new mode
+        // Update scroll tracker - it should now be active in BOTH modes
+        // to ensure visibility-driven flushes for already-enqueued items.
         if (this.manager.isTranslating || this.manager.isAutoTranslating) {
-          if (newValue) {
-            this.manager.scrollTracker.start(this.manager.settings.scrollStopDelay);
-          } else {
-            this.manager.scrollTracker.stop();
-          }
+          this.manager.scrollTracker.start(this.manager.settings.scrollStopDelay);
         }
       }
     });

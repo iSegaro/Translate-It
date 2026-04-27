@@ -22,7 +22,7 @@ export class LanguageSwappingService {
   }
 
   /**
-   * Get detected language for a text using the centralized service
+   * Get detected language for a text using centralized service
    */
   static async getDetectedLanguage(text) {
     return await LanguageDetectionService.detect(text);
@@ -53,6 +53,8 @@ export class LanguageSwappingService {
         // --- BILINGUAL & AUTO-SWAP LOGIC ---
         // BILINGUAL_TRANSLATION is the master switch.
         // Only swap when source is AUTO to respect user's explicit source choice.
+        // CRITICAL FIX: Only swap when detected language MATCHES target (meaning text is ALREADY in target language)
+        // This prevents incorrect swaps when translating mixed-language text
         const shouldSwap = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
 
         if (shouldSwap) {
@@ -66,62 +68,20 @@ export class LanguageSwappingService {
 
            logger.debug(`${providerName}: Bilingual swap applied for mode ${mode}. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
+        } else {
+          // CRITICAL FIX: No language swapping needed - return original languages WITHOUT calling fallback
+          // The fallback was causing incorrect swaps when detected != target
+          logger.debug(`${providerName}: No swap needed (detected: ${detectedLangCode} != target: ${targetLangCode})`);
+          return [sourceLang, targetLang];
         }
-
-        // No language swapping needed or allowed
-      } else if (useRegexFallback) {
-        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode);
+      } else {
+        return [sourceLang, targetLang];
       }
     } catch (error) {
-      logger.error(`${providerName}: Language detection failed:`, error);
-      if (useRegexFallback) {
-        return await this._applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode);
+        logger.error(`${providerName}: Language detection failed:`, error);
+
+        // CRITICAL FIX: On error, return original languages WITHOUT swapping
+        return [sourceLang, targetLang];
       }
-    }
-
-    // No language swapping applied
-    return [sourceLang, targetLang];
-  }
-
-  static async _applyRegexFallback(text, sourceLang, targetLang, originalSourceLang, originalTargetLang, providerName, mode) {
-    const targetNorm = this._normalizeLangValue(targetLang);
-    const sourceNorm = this._normalizeLangValue(sourceLang);
-    const targetLangCode = getCanonicalCode(targetNorm);
-
-    const bilingualEnabled = await getBilingualTranslationEnabledAsync();
-    const bilingualModes = await getBilingualTranslationModesAsync();
-    const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
-
-    // Detect language using the centralized multi-layered approach
-    const detectedLanguageRaw = await this.getDetectedLanguage(text);
-    const detectedLanguage = getCanonicalCode(detectedLanguageRaw);
-
-    // Only swap languages if:
-    // 1. Text script is recognized (detectedLanguage exists) AND
-    // 2. Bilingual is enabled AND
-    // 3. Mode flag is enabled AND
-    // 4. Detected language matches target language (meaning text is already in target language) AND
-    // 5. Source is AUTO (only apply swap when auto-detect is selected)
-    if (
-      detectedLanguage &&
-      bilingualEnabled &&
-      isModeEnabled &&
-      detectedLanguage === targetLangCode &&
-      sourceNorm === AUTO_DETECT_VALUE
-    ) {
-      let newTargetLang;
-
-      if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-        newTargetLang = originalSourceLang;
-      } else {
-        // Default to English when source is auto and target is Persian/Arabic
-        newTargetLang = "en";
-      }
-
-      logger.debug(`${providerName}: Regex fallback swap for mode ${mode}: ${targetLang} → ${newTargetLang} (detected: ${detectedLanguage})`);
-      return [targetNorm, newTargetLang];
-    }
-
-    return [sourceLang, targetLang];
   }
 }

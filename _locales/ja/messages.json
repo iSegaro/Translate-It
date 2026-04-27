@@ -1928,6 +1928,12 @@
   "whole_page_show_original_on_hover_description": {
     "message": "翻訳されたテキストにマウスカーソルを合わせると、ツールチップで原文を表示します。"
   },
+  "select_element_show_original_on_hover_label": {
+    "message": "ホバー時に原文を表示"
+  },
+  "select_element_show_original_on_hover_description": {
+    "message": "「要素選択」で翻訳された要素にマウスを重ねると、ツールチップで元のテキストを表示します。"
+  },
   "whole_page_translate_after_scroll_stop_label": {
     "message": "スクロール停止時に翻訳"
   },
