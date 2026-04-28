@@ -364,7 +364,10 @@ export class ProviderCoordinator {
     
     // If it's an object from a specialized orchestrator, try to find text
     if (typeof result === 'object') {
-      return result.t || result.text || result.translatedText || JSON.stringify(result);
+      const text = result.t || result.text || result.translatedText;
+      // CRITICAL: If no text property found, do NOT JSON.stringify it as it leads to artifacts in the UI.
+      // Returning empty string is safer than showing technical JSON data to the user.
+      return typeof text === 'string' ? text : "";
     }
     
     return String(result);

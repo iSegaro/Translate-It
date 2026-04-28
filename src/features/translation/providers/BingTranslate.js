@@ -198,7 +198,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           
           const targetText = data?.[0]?.translations?.[0]?.text;
           if (typeof targetText !== 'string') {
-            return chunkTexts.map(() => "");
+            // Fallback to original text strings if translation is missing
+            return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
           }
           
           // COMPREHENSIVE DELIMITER SANITIZATION
@@ -225,7 +226,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
       // If result is a string and we have multiple segments, let Coordinator split it.
       // If we are in a recursive call, we might need to wrap it in an array for the parent.
-      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(() => ""));
+      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t));
 
       // Add completion log for successful translation
       if (retryAttempt === 0 && finalResult.length > 0) {
@@ -290,7 +291,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         // return the original text for THIS chunk instead of throwing.
         // This prevents one bad chunk from breaking the entire page translation.
         logger.error(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
-        return chunkTexts;
+        return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
       }
 
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {

@@ -184,7 +184,11 @@ export class BaseTranslateProvider extends BaseProvider {
         // MISMATCH CASE: Provider did internal splitting or merged segments
         // Join everything and let the SegmentMapper redistribute it correctly
         const joinedResult = responseArray
-          .map(r => (typeof r === 'string' ? r : (r?.text || '')))
+          .map(r => {
+            if (typeof r === 'string') return r;
+            // Extract text from object but ensure it's not undefined
+            return (r?.t || r?.text || r?.translatedText || '');
+          })
           .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(

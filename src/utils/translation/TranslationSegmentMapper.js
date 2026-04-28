@@ -141,7 +141,10 @@ export class TranslationSegmentMapper {
    * @private
    */
   static splitByWordRatio(translatedText, originalSegments, providerName) {
-    const totalOriginalChars = originalSegments.reduce((sum, s) => sum + s.length, 0);
+    // Ensure we are working with text lengths even if segments are objects (Page Translation mode)
+    const getLength = (s) => (typeof s === 'object' ? (s.t || s.text || "") : String(s || "")).length;
+    const totalOriginalChars = originalSegments.reduce((sum, s) => sum + getLength(s), 0);
+    
     const words = translatedText.trim().split(/\s+/);
     
     if (words.length === 0) return originalSegments.map(() => "");
@@ -150,12 +153,14 @@ export class TranslationSegmentMapper {
     let currentWordIdx = 0;
 
     for (let i = 0; i < originalSegments.length; i++) {
-      if (originalSegments[i].trim() === "") {
-        result[i] = originalSegments[i];
+      const segText = typeof originalSegments[i] === 'object' ? (originalSegments[i].t || originalSegments[i].text || "") : String(originalSegments[i] || "");
+      
+      if (segText.trim() === "") {
+        result[i] = "";
         continue;
       }
 
-      const ratio = originalSegments[i].length / totalOriginalChars;
+      const ratio = getLength(originalSegments[i]) / totalOriginalChars;
       const targetWordCount = Math.max(1, Math.round(ratio * words.length));
       
       const segmentWords = words.slice(currentWordIdx, currentWordIdx + targetWordCount);
