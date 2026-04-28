@@ -55,6 +55,7 @@ Error during translation: Error: This request requires more credits, or fewer ma
 ### Other
 - [Lumetrium Prompt Catalog](https://lumetrium.com/definer/wiki/sources/ai/prompts/catalog): Catalog of specialized prompts for translation and dictionary services.
 - [Immersive Translate Prompts](https://github.com/immersive-translate/prompts/tree/main/plugins)
+- [Wiktionary](https://github.com/LearnRomanian/wiktionary-scraper)
 
 ---
 
