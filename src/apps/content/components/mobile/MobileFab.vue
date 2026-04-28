@@ -20,20 +20,22 @@
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
   >
-    <img 
-      src="@/icons/extension/extension_icon_64.svg" 
-      :alt="t('mobile_fab_alt') || 'Translate'" 
-    >
+    <div class="mobile-fab-inner">
+      <img 
+        src="@/icons/extension/extension_icon_64.svg" 
+        :alt="t('mobile_fab_alt') || 'Translate'" 
+      >
 
-    <!-- Page Translation Status Badge -->
-    <Transition
-      name="fade-scale"
-    >
-      <PageTranslationStatus 
-        v-if="pageTranslationStatus.isActive" 
-        mode="desktop-fab" 
-      />
-    </Transition>
+      <!-- Page Translation Status Badge -->
+      <Transition
+        name="fade-scale"
+      >
+        <PageTranslationStatus 
+          v-if="pageTranslationStatus.isActive" 
+          mode="desktop-fab" 
+        />
+      </Transition>
+    </div>
   </div>
 </template>
 
