@@ -13,6 +13,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
@@ -195,19 +196,23 @@ class SelectElementManager extends ResourceTracker {
 
         const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
         if (activeProvider === ProviderRegistryIds.BING) {
-          this.baseNotificationManager.show(
-            bingWarning || 'Bing may have issues. Try another provider.',
-            'warning',
-            NOTIFICATION_TIME.WARNING_PROVIDER,
-            { id: 'bing-warning' }
-          );
+          if (await shouldShowProviderWarning('Bing')) {
+            this.baseNotificationManager.show(
+              bingWarning || 'Bing may have issues. Try another provider.',
+              'warning',
+              NOTIFICATION_TIME.WARNING_PROVIDER,
+              { id: 'bing-warning' }
+            );
+          }
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
-          this.baseNotificationManager.show(
-            lingvaWarning || 'Lingva may have issues. Try another provider.',
-            'warning',
-            NOTIFICATION_TIME.WARNING_PROVIDER,
-            { id: 'lingva-warning' }
-          );
+          if (await shouldShowProviderWarning('Lingva')) {
+            this.baseNotificationManager.show(
+              lingvaWarning || 'Lingva may have issues. Try another provider.',
+              'warning',
+              NOTIFICATION_TIME.WARNING_PROVIDER,
+              { id: 'lingva-warning' }
+            );
+          }
         }
       }
 

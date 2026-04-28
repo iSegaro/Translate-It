@@ -12,6 +12,7 @@ import { NOTIFICATION_TIME } from '@/shared/config/constants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
@@ -146,19 +147,23 @@ export class PageTranslationManager extends ResourceTracker {
 
       // Show warning for Lingva provider in Whole Page Translation
       if (this.settings.translationApi === ProviderRegistryIds.LINGVA) {
-        const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
-        this.notificationManager.show(
-          warningMessage || 'Lingva may have issues with long texts during page translation.',
-          'warning',
-          NOTIFICATION_TIME.WARNING_PROVIDER
-        );
+        if (await shouldShowProviderWarning('Lingva')) {
+          const warningMessage = await getTranslationString('LINGVA_WPT_WARNING');
+          this.notificationManager.show(
+            warningMessage || 'Lingva may have issues with long texts during page translation.',
+            'warning',
+            NOTIFICATION_TIME.WARNING_PROVIDER
+          );
+        }
       } else if (this.settings.translationApi === ProviderRegistryIds.BING) {
-        const warningMessage = await getTranslationString('BING_WPT_WARNING');
-        this.notificationManager.show(
-          warningMessage || 'Bing may have issues with long texts during page translation.',
-          'warning',
-          NOTIFICATION_TIME.WARNING_PROVIDER
-        );
+        if (await shouldShowProviderWarning('Bing')) {
+          const warningMessage = await getTranslationString('BING_WPT_WARNING');
+          this.notificationManager.show(
+            warningMessage || 'Bing may have issues with long texts during page translation.',
+            'warning',
+            NOTIFICATION_TIME.WARNING_PROVIDER
+          );
+        }
       }
 
       this.scheduler.setTranslationState(true, this.translationMessageId, this.sessionContext);
