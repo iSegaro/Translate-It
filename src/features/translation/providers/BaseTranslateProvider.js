@@ -120,12 +120,20 @@ export class BaseTranslateProvider extends BaseProvider {
           { sessionId }
         );
 
+        // Scrub artifacts from streaming results
+        const scrubbedResponse = Array.isArray(chunkResponse) 
+          ? chunkResponse.map(r => {
+              const text = typeof r === 'string' ? r : (r?.t || r?.text || r?.translatedText || '');
+              return TraditionalTextProcessor.scrubBidiArtifacts(text);
+            })
+          : TraditionalTextProcessor.scrubBidiArtifacts(chunkResponse);
+
         const statsAfter = sessionId ? statsManager.getSessionSummary(sessionId) : null;
         const actualChunkChars = statsAfter ? (statsAfter.chars - charsBefore) : this._calculateTraditionalCharCount(chunk.texts);
         const originalChunkChars = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
-        allResults.push(...chunkResponse);
-        await TraditionalStreamManager.streamChunkResults(this.providerName, chunkResponse, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
+        allResults.push(...(Array.isArray(scrubbedResponse) ? scrubbedResponse : [scrubbedResponse]));
+        await TraditionalStreamManager.streamChunkResults(this.providerName, scrubbedResponse, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
       } catch (error) {
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
@@ -179,7 +187,10 @@ export class BaseTranslateProvider extends BaseProvider {
       
       if (responseArray.length === chunk.texts.length) {
         // IDEAL CASE: Provider returned exactly what we asked for
-        chunkResults = responseArray;
+        chunkResults = responseArray.map(r => {
+          const text = typeof r === 'string' ? r : (r?.t || r?.text || r?.translatedText || '');
+          return TraditionalTextProcessor.scrubBidiArtifacts(text);
+        });
       } else {
         // MISMATCH CASE: Provider did internal splitting or merged segments
         // Join everything and let the SegmentMapper redistribute it correctly
@@ -196,7 +207,7 @@ export class BaseTranslateProvider extends BaseProvider {
           chunk.texts,
           TRANSLATION_CONSTANTS.TEXT_DELIMITER,
           this.providerName
-        );
+        ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
       }
 
       allResults.push(...chunkResults);

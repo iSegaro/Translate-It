@@ -21,8 +21,10 @@ export class TranslationSegmentMapper {
    * Enhanced mapping: attempt to reconstruct original segments from translated text
    */
   static mapTranslationToOriginalSegments(translatedText, originalSegments, delimiter, providerName = 'Unknown') {
+    const scrub = (text) => this.removeAllDelimiters(text, delimiter);
+
     if (!translatedText || !Array.isArray(originalSegments)) {
-      return [translatedText];
+      return [typeof translatedText === 'string' ? scrub(translatedText) : translatedText];
     }
 
     // 0. Handle unified response object from ProviderCoordinator
@@ -31,34 +33,31 @@ export class TranslationSegmentMapper {
     }
 
     if (originalSegments.length <= 1) {
-      return Array.isArray(translatedText) ? translatedText : [translatedText];
+      const result = Array.isArray(translatedText) ? translatedText : [translatedText];
+      return result.map(s => typeof s === 'string' ? scrub(s) : s);
     }
 
     // 0.5. Normalize common delimiter mangling (e.g. "[[ --- ]]" or "[[ ... ]]")
-    // This is a CRITICAL fix for traditional providers that often add spaces or change dashes in the delimiter.
     if (typeof translatedText === 'string') {
-      // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
-      // Including optional surrounding whitespace to ensure clean replacement and prevent artifacts.
-      const bracketPattern = /\s*\[\[[\s.\-—–…ـ]+\]\]\s*/g;
+      // Aggressive Regex: Matches [[ with anything inside ]] and ALL surrounding hidden Unicode marks/spaces
+      const bracketPattern = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[^\]]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
       if (bracketPattern.test(translatedText)) {
-        // We replace with the current delimiter to ensure the primary split below works perfectly.
         translatedText = translatedText.replace(bracketPattern, delimiter);
       }
     }
 
-    // 0.6. Handle cases where translatedText is already an array (e.g. from a provider that returns arrays)
+    // 0.6. Handle cases where translatedText is already an array
     if (Array.isArray(translatedText)) {
       if (translatedText.length === originalSegments.length) {
-        return translatedText;
+        return translatedText.map(s => typeof s === 'string' ? scrub(s) : s);
       }
-      // If it is an array but wrong length, join it to try splitting by delimiters below
       translatedText = translatedText.join('\n');
     }
 
     // 1. Try standard splitting
     let segments = translatedText.split(delimiter);
     if (segments.length === originalSegments.length) {
-      return segments.map(s => s.trim());
+      return segments.map(s => scrub(s).trim());
     }
 
     // 2. Try alternative common delimiters
@@ -66,7 +65,7 @@ export class TranslationSegmentMapper {
       const testSegments = translatedText.split(altDelim);
       if (testSegments.length === originalSegments.length) {
         logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
-        return testSegments.map(s => s.trim());
+        return testSegments.map(s => scrub(s).trim());
       }
     }
 
@@ -102,10 +101,13 @@ export class TranslationSegmentMapper {
   static removeAllDelimiters(text, primaryDelimiter) {
     if (!text) return "";
 
-    let cleaned = text;
+    // 1. Aggressive Regex: Matches [[ with anything inside ]] and ALL surrounding hidden Unicode marks/spaces
+    // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
+    // This preserves user content like [[Reference]] while scrubbing [[ --- ]]
+    const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s\.\-\—\–\…\ـ\·\・]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+    let cleaned = text.replace(BIDI_ARTIFACT_REGEX, ' ');
 
-    // 1. Remove standard, primary, and common alternative delimiters
-    // Use a Set to ensure unique patterns and filter out empty/null values
+    // 2. Remove standard, primary, and common alternative delimiters
     const delimitersToRemove = new Set([
       primaryDelimiter,
       DEFAULT_TEXT_DELIMITER,
@@ -114,23 +116,21 @@ export class TranslationSegmentMapper {
 
     for (const delim of delimitersToRemove) {
       if (!delim || delim.trim() === '') continue;
-      // Escape for regex
       const escaped = delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       cleaned = cleaned.split(new RegExp(escaped, 'g')).join(' ');
     }
 
-    // 2. Remove any corrupted bracket patterns [[...]] which are the main source of artifacts
-    const bracketPattern = /\[\[[\s.\-—–…ـ]+\]\]/g;
-    cleaned = cleaned.replace(bracketPattern, ' ');
-
     // 3. Clean up isolated bracket remnants and delimiter fragments at word boundaries
-    // This handles cases where only parts of the delimiter were mangled or preserved.
-    cleaned = cleaned.replace(/\[\[[\s\-\.]+/, ' ');
-    cleaned = cleaned.replace(/[\s\-\.]+\]\]/, ' ');
-    cleaned = cleaned.replace(/\s[\]\-\.]+\s/g, ' ');
-    cleaned = cleaned.replace(/\s[\[\-\.]+\s/g, ' ');
+    // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
+    cleaned = cleaned.replace(/\[\[[\s\-\.\—\–\…\ـ\·\・]+/, ' ');
+    cleaned = cleaned.replace(/[\s\-\.\—\–\…\ـ\·\・]+\]\]/, ' ');
+    cleaned = cleaned.replace(/\s[\]\-\.\—\–\…\ـ\·\・]+\s/g, ' ');
+    cleaned = cleaned.replace(/\s[\[\-\.\—\–\…\ـ\·\・]+\s/g, ' ');
 
-    // 4. Normalize whitespace (reduces multiple spaces/newlines to single space)
+    // 4. Final safety scrub using the BIDI regex again (handles cases where delimiters merged)
+    cleaned = cleaned.replace(BIDI_ARTIFACT_REGEX, ' ');
+
+    // 5. Normalize whitespace
     return cleaned.replace(/\s+/g, ' ').trim();
   }
 

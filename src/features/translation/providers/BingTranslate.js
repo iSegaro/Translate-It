@@ -203,21 +203,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
           }
           
-          // COMPREHENSIVE DELIMITER SANITIZATION
-          // Bing often corrupts the delimiter [[---]] by changing dashes to ellipses, 
-          // long dashes, or adding spaces (e.g., [[...]], [[…-]], [[ — ]]).
-          // We normalize these back to the standard delimiter so the Coordinator can split correctly.
-          if (chunkTexts.length > 1) {
-            // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
-            // Including optional surrounding whitespace to prevent double newlines and ensure clean replacement
-            const corruptedDelimiterRegex = /\s*\[\[[\s.\-—–…ـ]+\]\]\s*/g;
-            const sanitizedText = targetText.replace(corruptedDelimiterRegex, TRANSLATION_CONSTANTS.TEXT_DELIMITER);
-            return sanitizedText;
-          }
-
-          // Return raw text string. Coordinator will handle robust splitting for multiple segments.
+          // Return raw text string. 
+          // Centralized TranslationSegmentMapper will handle robust splitting, 
+          // delimiter normalization, and BIDI-aware scrubbing for multiple segments.
           return targetText;
-        },
+          },
+
         context,
         abortController,
         charCount: TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),

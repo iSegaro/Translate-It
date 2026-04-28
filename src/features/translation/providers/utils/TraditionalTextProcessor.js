@@ -21,7 +21,31 @@ const getTextInfo = (item) => {
   return { text: str, length: str.length };
 };
 
+// Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
+// This preserves user content like [[Reference]] while scrubbing [[ --- ]]
+const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s\.\-\—\–\…\ـ\·\・]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+
 export const TraditionalTextProcessor = {
+  /**
+   * Universal scrubbing for technical artifacts (brackets, BIDI marks)
+   * This is a "Last Resort" safety layer to ensure no technical leak reaches the UI
+   */
+  scrubBidiArtifacts(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    // 1. Remove intact brackets with BIDI marks
+    // We replace with a space to prevent accidental word merging
+    let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, ' ');
+    
+    // 2. Remove isolated remnants (Safety layer for malformed delimiters)
+    // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
+    scrubbed = scrubbed.replace(/\[\[[\s\-\.\—\–\…\ـ\·\・]+/, ' ');
+    scrubbed = scrubbed.replace(/[\s\-\.\—\–\…\ـ\·\・]+\]\]/, ' ');
+    
+    // 3. Final normalization (compact multiple spaces and trim)
+    return scrubbed.replace(/\s+/g, ' ').trim();
+  },
+
   /**
    * Create chunks based on provider strategy
    */

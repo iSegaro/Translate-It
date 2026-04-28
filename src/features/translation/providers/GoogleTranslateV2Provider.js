@@ -205,8 +205,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
           inDelimiterZone = false;
           if (currentIdx < results.length) {
-            // Clean any delimiter remnants (like isolated brackets) that leaked into the text segment
-            const cleanTrans = trans.replace(/^[\]\-\s\n\r…·・]+/, '').replace(/[\[\-\s\n\r…·・]+$/, '');
+            // Clean any delimiter remnants using centralized BIDI scrubbing
+            const cleanTrans = TraditionalTextProcessor.scrubBidiArtifacts(trans);
             results[currentIdx] += cleanTrans;
           }
         }
@@ -271,4 +271,3 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     return markdownOutput.trim();
   }
 }
-
