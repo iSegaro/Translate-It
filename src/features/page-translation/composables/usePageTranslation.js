@@ -238,6 +238,13 @@ export function usePageTranslation() {
    * Update progress
    */
   function updateProgress(data) {
+    if (data.status === 'idle' || data.status === 'error') {
+      isTranslating.value = false;
+      isAutoTranslating.value = false;
+      progress.value = 0;
+      return;
+    }
+
     if (data.progress !== undefined) {
       progress.value = data.progress;
     }
