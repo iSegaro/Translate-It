@@ -24,6 +24,16 @@
       src="@/icons/extension/extension_icon_64.svg" 
       :alt="t('mobile_fab_alt') || 'Translate'" 
     >
+
+    <!-- Page Translation Status Badge -->
+    <Transition
+      name="fade-scale"
+    >
+      <PageTranslationStatus 
+        v-if="pageTranslationStatus.isActive" 
+        mode="desktop-fab" 
+      />
+    </Transition>
   </div>
 </template>
 
@@ -34,13 +44,15 @@ import { useMobileStore } from '@/store/modules/mobile.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -60,6 +72,26 @@ const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
 const isViewportUnstable = ref(false);
+
+// Page Translation Status (Mirroring Desktop FAB)
+const pageTranslationStatus = computed(() => {
+  const data = mobileStore.pageTranslationData;
+  const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
+  const isAuto = data.isAutoTranslating;
+  
+  const isCompleted = !isTranslating && !isAuto && (
+    data.isTranslated || 
+    data.status === TRANSLATION_STATUS.COMPLETED || 
+    (data.totalCount > 0 && data.translatedCount >= data.totalCount)
+  );
+  
+  const isError = data.status === TRANSLATION_STATUS.ERROR;
+  const isActive = isTranslating || isAuto || isCompleted || isError;
+  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
+  
+  return { isActive, isTranslating, isAuto, isCompleted, isError, percent };
+});
+
 const side = ref(null); 
 const isSelectionDirty = ref(false);
 const pendingText = ref('');
@@ -192,6 +224,13 @@ onMounted(async () => {
     side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     isReady.value = true;
   }
+
+  // Listen for error resets to ensure UI stays in sync
+  tracker.trackResource('error-reset-sync', pageEventBus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+    if (pageTranslationStatus.value.isError) {
+      logger.debug('Mobile FAB Error state reset via event');
+    }
+  }));
 });
 
 /**
