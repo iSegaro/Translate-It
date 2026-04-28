@@ -9,13 +9,9 @@ List of features, enhancements, and ideas planned for future development.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.
 
-- نمایش متن اصلی در موقع هاور با ترجمه Select Element
-
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
 - Integration Module: Gmail, Twitter, Goolge Docs
-
-- توی تنظیمات پیش‌فرض، باید ویژگی WindowsManager غیرفعال باشه تا اگه کاربر خواست خودش فعالش کنه. در حالت موبایل.
 
 - بهبود حالت نوشتن
 
