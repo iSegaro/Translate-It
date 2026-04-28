@@ -360,15 +360,16 @@ export class PageTranslationManager extends ResourceTracker {
         errorType: errorType || ErrorTypes.TRANSLATION_FAILED,
         isFatal: true
       });
-    } else {
-      // Broadcast local state update via PageEventBus
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
-        status: 'idle',
-        isTranslating: false,
-        percent: 0,
-        isInternal: true
-      });
     }
+
+    // ALWAYS broadcast local state update via PageEventBus to ensure UI (FAB, Sidepanel) 
+    // resets its state even on non-silent fatal errors.
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
+      status: 'idle',
+      isTranslating: false,
+      percent: 0,
+      isInternal: true
+    });
   }
 
   _cleanupSession() {
