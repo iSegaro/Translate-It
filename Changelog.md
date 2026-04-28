@@ -10,7 +10,12 @@
 
 - Fixed various UI issues and improved visual consistency
 - Resolved issues in `Page Translation` where certain text segments were intermittently skipped or left untranslated
-- Fixed issues in language detection.
+- Fixed issues in language detection
+- Fixed an issue where canceling translation in `Select Element` mode did not work properly
+
+##### Changed
+
+- Improved Bing provider performance
 
 ---
 
