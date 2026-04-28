@@ -197,7 +197,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
             safeResolve({ success: true, targetLanguage: effectiveTargetLanguage });
           },
           onError: (error) => {
-            if (isSettled || !this.currentMessageId || error.message === 'Handler cancelled') return;
+            if (isSettled || !this.currentMessageId) return;
+            
+            // Still resolve to allow cleanup, but pass the error
             safeResolve({ success: false, error });
           }
         });
@@ -208,7 +210,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       await contentScriptIntegration.initialize();
       
-      const response = await sendRegularMessage({
+      const response = await contentScriptIntegration.sendTranslationRequest({
         action: MessageActions.TRANSLATE,
         messageId, 
         data: {

@@ -75,14 +75,14 @@ export class BaseAIProvider extends BaseProvider {
    * Entry point for image translation with rate limiting
    */
   async translateImage(base64Image, sourceLang, targetLang, options = {}) {
-    const { priority, sessionId } = options;
+    const { priority, sessionId, abortController, messageId } = options;
     const context = `${this.providerName.toLowerCase()}-image-translation`;
 
     return await this._executeWithRateLimit(
       (opts) => this._translateImageInternal(base64Image, sourceLang, targetLang, { ...opts, ...options }),
       context,
       priority,
-      { sessionId }
+      { sessionId, abortController, messageId }
     );
   }
 
@@ -141,7 +141,7 @@ export class BaseAIProvider extends BaseProvider {
         }),
         context,
         priority,
-        { sessionId }
+        { sessionId, abortController, messageId }
       );
 
       // Stats recording is handled by ProviderRequestEngine. 
@@ -196,7 +196,7 @@ export class BaseAIProvider extends BaseProvider {
           }),
           chunkContext,
           priority,
-          { sessionId }
+          { sessionId, abortController, messageId }
         );
         
         results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));

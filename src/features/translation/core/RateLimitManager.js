@@ -291,6 +291,16 @@ export class RateLimitManager {
 
   async _executeRequest(state, request, providerName, options = {}) {
     const requestStartTime = Date.now();
+    
+    // Check if aborted before starting
+    if (request.options?.abortController?.signal?.aborted) {
+      const abortError = new Error('Request aborted before execution');
+      abortError.name = 'AbortError';
+      abortError.isCancelled = true;
+      request.reject(abortError);
+      return;
+    }
+
     try {
       const result = await request.task(options);
       const duration = Date.now() - requestStartTime;
@@ -418,6 +428,36 @@ export class RateLimitManager {
         state.queues[p] = [];
       });
       state.activeRequests = 0;
+    }
+  }
+
+  /**
+   * Clear pending requests for a specific messageId across all providers
+   * @param {string} messageId - Optional message ID to filter by
+   */
+  clearPendingRequests(messageId = null) {
+    logger.debug(`Clearing pending requests${messageId ? ` for messageId: ${messageId}` : ''}`);
+    
+    for (const [providerName, state] of this.providerStates.entries()) {
+      [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
+        const queue = state.queues[p];
+        const remaining = [];
+        
+        for (const request of queue) {
+          const reqMessageId = request.options?.messageId || request.options?.abortController?.messageId;
+          
+          if (!messageId || reqMessageId === messageId) {
+            const error = new Error(messageId ? 'Request cancelled' : 'All requests cleared');
+            error.name = 'AbortError';
+            error.isCancelled = true;
+            request.reject(error);
+          } else {
+            remaining.push(request);
+          }
+        }
+        
+        state.queues[p] = remaining;
+      });
     }
   }
 }

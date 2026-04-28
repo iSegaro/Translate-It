@@ -66,14 +66,14 @@ export async function handleCancelTranslation(request, sender) {
     try {
       const { rateLimitManager } = await import("../core/RateLimitManager.js");
       if (cancelAll) {
-        await rateLimitManager.clearPendingRequests();
-        logger.debug('[CancelTranslation] RateLimitManager cleared all pending requests');
+        logger.info('[CancelTranslation] Clearing all pending requests in RateLimitManager');
+        rateLimitManager.clearPendingRequests();
       } else if (messageId) {
-        await rateLimitManager.clearPendingRequests(messageId);
-        logger.debug('[CancelTranslation] RateLimitManager cleared pending requests', { messageId });
+        logger.info(`[CancelTranslation] Clearing pending requests for messageId: ${messageId}`);
+        rateLimitManager.clearPendingRequests(messageId);
       }
     } catch (error) {
-      logger.debug('[CancelTranslation] RateLimitManager cleanup failed (may not have clearPendingRequests method):', error);
+      logger.error('[CancelTranslation] RateLimitManager cleanup failed:', error);
     }
 
     // Always return success since the cancellation intent is acknowledged

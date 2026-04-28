@@ -117,7 +117,7 @@ export class BaseTranslateProvider extends BaseProvider {
           (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0) }),
           chunkContext,
           priority,
-          { sessionId }
+          { sessionId, abortController, messageId }
         );
 
         // Scrub artifacts from streaming results
@@ -175,7 +175,7 @@ export class BaseTranslateProvider extends BaseProvider {
         (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
         chunkContext,
         priority,
-        { sessionId }
+        { sessionId, abortController, messageId }
       );
 
       // Handle different response formats and CRITICAL: Split joined strings back into segments

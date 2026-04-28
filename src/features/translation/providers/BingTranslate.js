@@ -253,6 +253,14 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           try {
             const results = [];
             for (let i = 0; i < chunkTexts.length; i += newChunkSize) {
+              // Check for cancellation before processing each sub-chunk
+              if (abortController?.signal.aborted) {
+                const cancelError = new Error('Translation cancelled by user');
+                cancelError.name = 'AbortError';
+                cancelError.isCancelled = true;
+                throw cancelError;
+              }
+
               const subChunk = chunkTexts.slice(i, i + newChunkSize);
               const subResults = await this._translateChunk(
                 subChunk,

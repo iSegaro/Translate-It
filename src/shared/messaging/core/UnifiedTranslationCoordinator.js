@@ -12,6 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
+import { MessageActions } from './MessageActions.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -246,6 +247,16 @@ export class UnifiedTranslationCoordinator {
     if (translation.type === 'streaming') {
       streamingTimeoutManager.cancelStreaming(messageId, reason);
     }
+
+    // Notify background to stop translation immediately
+    // We don't await this as we want the content-side cancellation to be immediate
+    sendRegularMessage({
+      action: MessageActions.CANCEL_TRANSLATION,
+      data: { messageId, reason }
+    }).catch(err => {
+      // Log at debug level as this is often due to extension context invalidation during cancellation
+      logger.debug(`Cancellation message to background failed for ${messageId}:`, err.message);
+    });
 
     this.activeTranslations.delete(messageId);
     this.streamingOperations.delete(messageId);

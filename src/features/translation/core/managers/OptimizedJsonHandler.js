@@ -80,7 +80,18 @@ export class OptimizedJsonHandler {
             const delay = self._calculateDelay(batch, i, batches.length, providerConfig);
             const concurrencyAwareDelay = Math.min(delay, 100);
             if (concurrencyAwareDelay > 0) {
-              await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
+              await new Promise((resolve, reject) => {
+                const timer = setTimeout(resolve, concurrencyAwareDelay);
+                if (abortController?.signal) {
+                  abortController.signal.addEventListener('abort', () => {
+                    clearTimeout(timer);
+                    const abortError = new Error('Batch cancelled during stagger delay');
+                    abortError.name = 'AbortError';
+                    abortError.isCancelled = true;
+                    reject(abortError);
+                  }, { once: true });
+                }
+              });
             }
           }
 
@@ -137,6 +148,7 @@ export class OptimizedJsonHandler {
                                errorType === ErrorTypes.TRANSLATION_CANCELLED;
 
           if (isCancellation) {
+            logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
             return; // Exit silently on cancellation
           }
           
@@ -155,6 +167,12 @@ export class OptimizedJsonHandler {
       }
 
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Final check for cancellation before sending end-of-stream markers
+      if (abortController.signal.aborted || engine.isCancelled(messageId)) {
+        logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
+      }
 
       if (hasErrors) {
         await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage);
@@ -202,16 +220,13 @@ export class OptimizedJsonHandler {
     } 
     
     // Strategy 2: Traditional Providers (Edge, Google, etc.)
-    // We pass the ARRAY of texts directly. The ProviderCoordinator and the Provider's internal 
-    // _batchTranslate logic (powered by TraditionalTextProcessor) will handle the chunking 
-    // and joining much more robustly than doing it here manually.
     const response = await providerInstance.translate(
       textsToTranslate,
       source,
       target,
       { 
-        ...arguments[9], 
         mode, abortController, messageId, sessionId, 
+        contextMetadata, contextSummary, engine, sender,
         rawJsonPayload: true, 
         expectedFormat: ResponseFormat.STRING 
       }
