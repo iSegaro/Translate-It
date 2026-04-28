@@ -471,15 +471,18 @@ const menuItems = computed(() => {
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
-  if (status.isTranslating || status.isAuto) {
+  if (status.isAuto || status.isTranslating) {
     items.push({
-      id: 'page_translating',
-      label: status.isTranslating ? t('desktop_fab_translating_label') : t('desktop_fab_stop_auto_translating_label'),
+      id: 'page_translating_stop',
+      label: t('desktop_fab_stop_auto_translating_label'),
       icon: IconHourglass,
-      showProgress: true,
+      showProgress: status.isTranslating,
       percent: status.percent,
-      closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
+      closeMenu: true,
+      action: () => {
+        logger.info('Stopping page translation from FAB');
+        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
+      }
     });
   } else if (status.isCompleted) {
     items.push({
