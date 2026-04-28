@@ -492,7 +492,7 @@ const showSelectElementInContextMenu = computed({
   }
 })
 
-const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', false)
+const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', CONFIG.TRANSLATE_ON_TEXT_SELECTION)
 const selectionTranslationMode = createSetting('selectionTranslationMode', SelectionTranslationMode.IMMEDIATE)
 const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', false)
 const activeSelectionIconOnTextfields = createSetting('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', true)

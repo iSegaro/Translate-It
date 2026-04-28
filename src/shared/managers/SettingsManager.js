@@ -13,7 +13,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
-import { SelectionTranslationMode } from '@/shared/config/config.js'
+import { SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
@@ -46,7 +46,7 @@ class SettingsManager {
       APPLICATION_LOCALIZE: 'en',
       EXTENSION_ENABLED: true,
       TRANSLATE_ON_TEXT_FIELDS: false,
-      TRANSLATE_ON_TEXT_SELECTION: true,
+      TRANSLATE_ON_TEXT_SELECTION: !isMobile,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,

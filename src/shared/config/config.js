@@ -6,6 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS, TTS_ENGINES } from './constants.js';
+import { isMobile } from '@/shared/utils/device.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
 logger.info('Config module initialized');
@@ -56,6 +57,7 @@ export const TRANSLATION_ERRORS = {
 
 // Detect environment
 const isFirefox = typeof __BROWSER__ !== 'undefined' ? __BROWSER__ === 'firefox' : false;
+export { isMobile } from '@/shared/utils/device.js';
 
 // Shared configuration (initial defaults)
 export const CONFIG = {
@@ -232,7 +234,7 @@ export const CONFIG = {
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
-  TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
+  TRANSLATE_ON_TEXT_SELECTION: !isMobile, // فعال کردن ترجمه با انتخاب متن در صفحه (غیرفعال در موبایل)
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
