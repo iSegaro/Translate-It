@@ -10,6 +10,7 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 
@@ -122,7 +123,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       abortController,
       charCount: this._calculateTraditionalCharCount(chunkTexts),
       sessionId: options.sessionId,
-      originalCharCount: options.originalCharCount || originalCharCount
+      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
     });
 
     // Handle dictionary formatting for single segment

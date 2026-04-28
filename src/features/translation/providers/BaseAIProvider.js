@@ -153,7 +153,15 @@ export class BaseAIProvider extends BaseProvider {
           m.statsManager.recordError(this.providerName, sessionId);
         }).catch(() => { /* ignore */ });
       }
+      
       logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
+      
+      // CRITICAL FALLBACK: Return clean original text to prevent technical artifacts (JSON leaks)
+      // This ensures that even if AI fails, the UI gets clean text for mapping.
+      if (Array.isArray(texts)) {
+        return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
+      }
+      
       throw error;
     }
   }
@@ -174,23 +182,29 @@ export class BaseAIProvider extends BaseProvider {
       logger.debugLazy(() => [`[${this.providerName}] Traditional Prompt preparation complete`, { systemPrompt, userText }]);
       const chunkContext = `${context}-segment-${i + 1}/${texts.length}`;
 
-      const response = await this._executeWithRateLimit(
-        (opts) => this._callAI(systemPrompt, userText, {
-          ...opts,
-          abortController,
-          messageId,
-          sessionId,
-          mode: translateMode,
-          sourceLang,
-          targetLang,
-          expectedFormat: expectedFormat || ResponseFormat.STRING
-        }),
-        chunkContext,
-        priority,
-        { sessionId }
-      );
-      
-      results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
+      try {
+        const response = await this._executeWithRateLimit(
+          (opts) => this._callAI(systemPrompt, userText, {
+            ...opts,
+            abortController,
+            messageId,
+            sessionId,
+            mode: translateMode,
+            sourceLang,
+            targetLang,
+            expectedFormat: expectedFormat || ResponseFormat.STRING
+          }),
+          chunkContext,
+          priority,
+          { sessionId }
+        );
+        
+        results.push(AIResponseParser.cleanAIResponse(response, expectedFormat || ResponseFormat.STRING));
+      } catch (error) {
+        logger.error(`[${this.providerName}] Traditional segment translation failed:`, error.message);
+        // Return clean original text as fallback for this segment
+        results.push(typeof text === 'object' ? (text.t || text.text || "") : (text || ""));
+      }
     }
     return results.length === 1 && texts.length === 1 ? results[0] : results;
   }

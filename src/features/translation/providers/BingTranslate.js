@@ -9,6 +9,7 @@ import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorM
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 
@@ -219,9 +220,9 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
-        charCount: this._calculateTraditionalCharCount(chunkTexts),
+        charCount: TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0)
+        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
       });
 
       // If result is a string and we have multiple segments, let Coordinator split it.

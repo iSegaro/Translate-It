@@ -180,28 +180,25 @@ export class OptimizedJsonHandler {
     } 
     
     // Strategy 2: Traditional Providers (Edge, Google, etc.)
-    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-    const delimiter = TranslationSegmentMapper.STANDARD_DELIMITER;
-    const joinedText = textsToTranslate.join(delimiter);
-
+    // We pass the ARRAY of texts directly. The ProviderCoordinator and the Provider's internal 
+    // _batchTranslate logic (powered by TraditionalTextProcessor) will handle the chunking 
+    // and joining much more robustly than doing it here manually.
     const response = await providerInstance.translate(
-      joinedText,
+      textsToTranslate,
       source,
       target,
-      { ...arguments[9], mode, abortController, messageId, sessionId, rawJsonPayload: true, expectedFormat: ResponseFormat.STRING }
+      { 
+        ...arguments[9], 
+        mode, abortController, messageId, sessionId, 
+        rawJsonPayload: true, 
+        expectedFormat: ResponseFormat.STRING 
+      }
     );
 
     // Extract text from unified response
-    const translatedJoined = (response && typeof response === 'object' && response.translatedText !== undefined) 
+    return (response && typeof response === 'object' && response.translatedText !== undefined) 
       ? response.translatedText 
       : response;
-
-    return TranslationSegmentMapper.mapTranslationToOriginalSegments(
-      translatedJoined,
-      textsToTranslate,
-      delimiter,
-      providerInstance.providerName
-    );
   }
 
   _mapResults(originalBatch, translatedResults) {

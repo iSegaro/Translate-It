@@ -2,6 +2,7 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { 
@@ -186,7 +187,7 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         abortController,
         charCount: this._calculateTraditionalCharCount(chunkTexts),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || originalCharCount
+        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
       });
     };
 

@@ -513,7 +513,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
         logger.error('[DeepL] XML corruption detected, falling back to original text for this chunk');
-        return chunkTexts;
+        return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
@@ -527,9 +527,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         // Run both halves in parallel for better performance during fallback
         const [firstResult, secondResult] = await Promise.all([
           this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => firstHalf),
+            .catch(() => firstHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t)),
           this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => secondHalf)
+            .catch(() => secondHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t))
         ]);
 
         return [...firstResult, ...secondResult];
@@ -541,7 +541,8 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         const results = [];
         for (const text of chunkTexts) {
-          if (!text || text.trim().length === 0) {
+          const originalText = typeof text === 'object' ? (text.t || text.text || "") : (text || "");
+          if (!originalText || originalText.trim().length === 0) {
             results.push('');
             continue;
           }
@@ -551,7 +552,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             const res = await this._translateChunk([text], sourceLang, targetLang, translateMode, abortController, 5, 1, 0, 1, options);
             results.push(Array.isArray(res) ? res[0] : res);
           } catch {
-            results.push(text);
+            results.push(originalText);
           }
         }
 

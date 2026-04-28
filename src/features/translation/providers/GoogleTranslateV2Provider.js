@@ -2,6 +2,7 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
@@ -225,7 +226,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       abortController,
       sessionId: options.sessionId,
       charCount: this._calculateTraditionalCharCount(chunkTexts),
-      originalCharCount
+      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
     });
 
     // Handle dictionary formatting for single segment
