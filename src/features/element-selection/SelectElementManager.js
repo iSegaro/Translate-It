@@ -8,7 +8,7 @@ import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { matchErrorToType, isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
@@ -489,14 +489,14 @@ class SelectElementManager extends ResourceTracker {
         this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
       }
     } catch (error) {
-      this.logger.warn('Select Element translation failed:', error);
-      // CRITICAL: Log the actual error
-      
-      const errorType = matchErrorToType(error);
-      const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 
-                             errorType === ErrorTypes.TRANSLATION_CANCELLED ||
-                             error.message === 'Handler cancelled';
+      const isCancellation = isCancellationError(error);
 
+      if (isCancellation) {
+        this.logger.debug('Select Element translation cancelled:', error.message);
+      } else {
+        this.logger.warn('Select Element translation failed:', error);
+      }
+      
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'element-selection');
       }

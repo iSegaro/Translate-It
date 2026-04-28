@@ -15,6 +15,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from './MessageActions.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { createStreamingResponseHandler } from './StreamingResponseHandler.js';
+import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'ContentScriptIntegration');
 
@@ -101,7 +102,11 @@ export class ContentScriptIntegration {
     try {
       return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
     } catch (error) {
-      logger.error(`Translation request failed:`, error);
+      if (isCancellationError(error)) {
+        logger.debug(`Translation request cancelled:`, message.messageId);
+      } else {
+        logger.error(`Translation request failed:`, error);
+      }
       throw error;
     }
   }

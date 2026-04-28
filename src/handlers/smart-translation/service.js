@@ -3,6 +3,7 @@
  */
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
@@ -108,8 +109,13 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       }
     }
   } catch (err) {
-    logger.error('Text field translation request failed:', err);
-    await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
+    if (isCancellationError(err)) {
+      logger.debug('Text field translation request cancelled:', err.message);
+    } else {
+      logger.error('Text field translation request failed:', err);
+      await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
+    }
+    
     if (currentToastId) notificationManager.dismiss(currentToastId);
     clearPendingTranslationData(currentToastId);
     clearPendingNotificationData('error');

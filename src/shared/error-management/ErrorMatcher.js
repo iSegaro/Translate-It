@@ -125,6 +125,18 @@ export class ErrorMatcher {
   static isFatal(type) { return isFatalError(type); }
   static needsSettings(type) { return needsSettings(type); }
   static shouldSuppressConsole(type) { return shouldSuppressConsole(type); }
+  static isCancellation(error) { return isCancellationError(error); }
+}
+
+/**
+ * Determines if an error is a cancellation error
+ */
+export function isCancellationError(error) {
+  if (!error) return false;
+  if (error.isCancelled) return true;
+  
+  const type = typeof error === 'string' ? error : (error.type || matchErrorToType(error));
+  return type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 }
 
 /**
@@ -280,7 +292,14 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("translation failed") || msg.includes("translation_failed") || msg.includes("batch translation failed") || msg === "translation failed") return ErrorTypes.TRANSLATION_FAILED;
   if (msg.includes("translation error") || msg.includes("translation_error")) return ErrorTypes.TRANSLATION_ERROR;
 
-  if (msg.includes("cancelled by user") || msg.includes("translation cancelled") || msg.includes("user cancelled") || msg.includes("user_cancelled") || msg.includes("operation cancelled")) return ErrorTypes.USER_CANCELLED;
+  if (msg.includes("cancelled by user") || 
+      msg.includes("translation cancelled") || 
+      msg.includes("user cancelled") || 
+      msg.includes("user_cancelled") || 
+      msg.includes("operation cancelled") ||
+      msg === "cancelled" ||
+      msg === "handler cancelled" ||
+      msg === "request cancelled") return ErrorTypes.USER_CANCELLED;
 
   if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json")) return ErrorTypes.HTML_RESPONSE_ERROR;
   if (msg.includes("json parsing") || msg.includes("json parse") || msg.includes("unexpected end of json input")) return ErrorTypes.JSON_PARSING_ERROR;

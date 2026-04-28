@@ -57,8 +57,23 @@ export class OptimizedJsonHandler {
         }
       } else {
         // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
-        // Run batches in parallel, but RateLimitManager will ultimately throttle them
-        const batchPromises = batches.map((batch, i) => processBatch(batch, i));
+        // Let RateLimitManager handle the actual concurrency and delays.
+        
+        // OPTIMIZATION: If source is auto, wait for the first batch to detect the language.
+        // This prevents redundant detection calls for all subsequent batches.
+        if (detectedSourceLanguage === 'auto' && batches.length > 0) {
+          logger.debug(`[JsonHandler] Auto-detection mode: Executing first batch sequentially to resolve source language...`);
+          await processBatch(batches[0], 0);
+          
+          // If first batch failed fatally, don't continue
+          if (hasErrors && lastError && isFatalError(lastError)) {
+            return { success: false, streaming: true, error: lastError };
+          }
+        }
+
+        // Process remaining batches. They will be queued in RateLimitManager.
+        const startIndex = (detectedSourceLanguage !== 'auto' && batches.length > 1) ? 1 : 0;
+        const batchPromises = batches.slice(startIndex).map((batch, i) => processBatch(batch, i + startIndex));
         await Promise.all(batchPromises);
       }
 
@@ -75,28 +90,6 @@ export class OptimizedJsonHandler {
         try {
           checkCancellation();
 
-          // Intelligent delay for non-sequential execution
-          if (i > 0 && providerConfig.rateLimit.maxConcurrent > 1) {
-            const delay = self._calculateDelay(batch, i, batches.length, providerConfig);
-            const concurrencyAwareDelay = Math.min(delay, 100);
-            if (concurrencyAwareDelay > 0) {
-              await new Promise((resolve, reject) => {
-                const timer = setTimeout(resolve, concurrencyAwareDelay);
-                if (abortController?.signal) {
-                  abortController.signal.addEventListener('abort', () => {
-                    clearTimeout(timer);
-                    const abortError = new Error('Batch cancelled during stagger delay');
-                    abortError.name = 'AbortError';
-                    abortError.isCancelled = true;
-                    reject(abortError);
-                  }, { once: true });
-                }
-              });
-            }
-          }
-
-          checkCancellation();
-
           const statsBefore = statsManager.getSessionSummary(sessionId);
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
@@ -104,7 +97,7 @@ export class OptimizedJsonHandler {
           const translatedBatchResponse = await self._performBatchCall(
             providerInstance, 
             batch, 
-            sourceLanguage, 
+            detectedSourceLanguage, // Use potentially updated detectedSourceLanguage
             targetLanguage, 
             mode, 
             abortController, 
@@ -119,8 +112,8 @@ export class OptimizedJsonHandler {
           checkCancellation();
 
           // Capture detected language from the first successful batch if it's currently 'auto'
-          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.sourceLanguage) {
-            detectedSourceLanguage = translatedBatchResponse.sourceLanguage;
+          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.detectedLanguage) {
+            detectedSourceLanguage = translatedBatchResponse.detectedLanguage;
             logger.debug(`[JsonHandler] Captured detected source language: ${detectedSourceLanguage}`);
           }
 
@@ -296,14 +289,6 @@ export class OptimizedJsonHandler {
       }
       return translatedContent;
     });
-  }
-
-  _calculateDelay(batch, index, total, config) {
-    if (!config?.batching?.delayBetweenRequests) return 0;
-    const baseDelay = config.batching.delayBetweenRequests;
-    const batchComplexity = batch.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
-    if (batchComplexity > 1000) return baseDelay * 1.5;
-    return baseDelay;
   }
 
   async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage) {
