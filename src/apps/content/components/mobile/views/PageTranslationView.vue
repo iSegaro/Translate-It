@@ -148,6 +148,7 @@ const { t } = useUnifiedI18n()
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
 
 const computedProgress = computed(() => {
+  if (pageTranslationData.value.status === 'error') return 0;
   if (pageTranslationData.value.status === 'completed') return 100;
   if (!pageTranslationData.value.totalCount || pageTranslationData.value.totalCount === 0) return 0;
   return Math.round((pageTranslationData.value.translatedCount / pageTranslationData.value.totalCount) * 100);
@@ -205,6 +206,12 @@ const toggleAutoClose = async () => {
 
 const startTranslation = () => { 
   logger.info('Starting page translation from Mobile View');
+  
+  // Reset error state before retrying
+  if (pageTranslationData.value.status === 'error') {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+  }
+
   pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
   if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
     mobileStore.closeSheet() 
