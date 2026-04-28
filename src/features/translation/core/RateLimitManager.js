@@ -7,6 +7,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -174,14 +175,20 @@ export class RateLimitManager {
           const index = queue.indexOf(request);
           if (index !== -1) {
             queue.splice(index, 1);
-            reject(new Error('Request aborted while in queue'));
+            const abortError = new Error('Request aborted while in queue');
+            abortError.name = 'AbortError';
+            abortError.isCancelled = true;
+            reject(abortError);
           }
         };
         abortSignal.addEventListener('abort', onAbort, { once: true });
         
         // If already aborted
         if (abortSignal.aborted) {
-          reject(new Error('Request aborted before enqueuing'));
+          const abortError = new Error('Request aborted before enqueuing');
+          abortError.name = 'AbortError';
+          abortError.isCancelled = true;
+          reject(abortError);
           return;
         }
       }
@@ -198,10 +205,22 @@ export class RateLimitManager {
     const state = this.providerStates.get(providerName);
     if (!state || state.isProcessingQueue) return;
 
+    // Stop processing if circuit is open
+    if (this._isCircuitOpen(state)) {
+      this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
+      return;
+    }
+
     state.isProcessingQueue = true;
 
     try {
       while (this._hasPendingRequests(state)) {
+        // Re-check circuit breaker inside loop
+        if (this._isCircuitOpen(state)) {
+          this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
+          break;
+        }
+
         // Check concurrency
         if (state.activeRequests >= state.config.maxConcurrent) break;
 
@@ -250,6 +269,26 @@ export class RateLimitManager {
     return null;
   }
 
+  _rejectQueue(state, error) {
+    const isCircuitBreaker = error.message?.includes('Circuit breaker open');
+    
+    [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
+      while (state.queues[p].length > 0) {
+        const req = state.queues[p].shift();
+        
+        // If it's a circuit breaker reject, we want it to be fatal enough to stop but 
+        // also recognizable as a cancellation if the user/handler decides so.
+        // For now, let's keep the error as provided but add Abort properties if it's a clear stop.
+        if (isCircuitBreaker) {
+          error.name = 'AbortError';
+          error.isCancelled = true;
+        }
+        
+        req.reject(error);
+      }
+    });
+  }
+
   async _executeRequest(state, request, providerName, options = {}) {
     const requestStartTime = Date.now();
     try {
@@ -263,7 +302,16 @@ export class RateLimitManager {
       
       request.resolve(result);
     } catch (error) {
-      this._recordFailure(state, error, providerName);
+      // Don't count cancellations as failures
+      const isCancellation = error.name === 'AbortError' || 
+                           error.isCancelled || 
+                           error.message?.includes('cancelled') ||
+                           error.message?.includes('aborted');
+      
+      if (!isCancellation) {
+        this._recordFailure(state, error, providerName);
+      }
+      
       request.reject(error);
     } finally {
       state.activeRequests--;
@@ -324,10 +372,15 @@ export class RateLimitManager {
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 
-    if (state.consecutiveFailures >= state.circuitBreakThreshold) {
-      state.isCircuitOpen = true;
-      state.circuitOpenTime = Date.now();
-      logger.error(`Circuit breaker OPENED for ${providerName} after ${state.consecutiveFailures} failures`);
+    // CRITICAL: Open circuit breaker immediately on fatal errors
+    const isFatal = isFatalError(error);
+
+    if (isFatal || state.consecutiveFailures >= state.circuitBreakThreshold) {
+      if (!state.isCircuitOpen) {
+        state.isCircuitOpen = true;
+        state.circuitOpenTime = Date.now();
+        logger.error(`Circuit breaker OPENED for ${providerName} ${isFatal ? '(FATAL ERROR) ' : ''}after ${state.consecutiveFailures} failures. Error: ${error.message || error}`);
+      }
     }
   }
 

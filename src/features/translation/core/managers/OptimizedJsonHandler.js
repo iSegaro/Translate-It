@@ -10,6 +10,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -51,6 +53,7 @@ export class OptimizedJsonHandler {
         // Execute one by one to minimize memory footprint and prevent queue flooding
         for (let i = 0; i < batches.length; i++) {
           await processBatch(batches[i], i);
+          if (hasErrors && lastError && isFatalError(lastError)) break;
         }
       } else {
         // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
@@ -127,15 +130,27 @@ export class OptimizedJsonHandler {
           }
           
         } catch (batchError) {
-          if (batchError.name === 'AbortError' || batchError.isCancelled) {
+          const errorType = matchErrorToType(batchError);
+          const isCancellation = batchError.name === 'AbortError' || 
+                               batchError.isCancelled || 
+                               errorType === ErrorTypes.USER_CANCELLED || 
+                               errorType === ErrorTypes.TRANSLATION_CANCELLED;
+
+          if (isCancellation) {
             return; // Exit silently on cancellation
           }
           
           logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
           hasErrors = true;
           lastError = batchError;
+          
           // Stream empty/original results on failure to keep progress moving
           await self._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
+          
+          // Stop all other batches if error is fatal (429, etc.)
+          if (isFatalError(batchError)) {
+            abortController.abort();
+          }
         }
       }
 
@@ -148,7 +163,14 @@ export class OptimizedJsonHandler {
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
-      return { success: !hasErrors, streaming: true, error: lastError };
+
+      const formattedError = lastError ? {
+        message: lastError.message || String(lastError),
+        type: lastError.type || 'TRANSLATION_ERROR',
+        statusCode: lastError.statusCode
+      } : null;
+
+      return { success: !hasErrors, streaming: true, error: formattedError };
     } finally {
       engine.lifecycleRegistry.unregisterRequest(messageId);
     }
@@ -320,7 +342,11 @@ export class OptimizedJsonHandler {
       messageId,
       data: {
         success: false,
-        error: lastError ? { message: lastError.message || String(lastError), type: lastError.type || 'TRANSLATION_ERROR' } : null,
+        error: lastError ? { 
+          message: lastError.message || String(lastError), 
+          type: lastError.type || 'TRANSLATION_ERROR',
+          statusCode: lastError.statusCode
+        } : null,
         sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,
