@@ -192,8 +192,11 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           const orig = segment[1] || "";
           
           // Identify if this segment is part of the delimiter pattern
-          // Delimiters usually consist of brackets, dashes, dots and whitespace
-          const isDelimiterPart = /^[\[\]\-\s\n\r…·・]+$/.test(orig) && (orig.includes('-') || orig.includes('[') || orig.includes(']'));
+          // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
+          const isDelimiterPart = /^[\[\]\s\n\r\-\.\—\–\…\ـ\·\・]+$/.test(orig) && 
+                                  (orig.includes('-') || orig.includes('.') || orig.includes('[') || orig.includes(']') || 
+                                   orig.includes('—') || orig.includes('–') || orig.includes('…') || orig.includes('ـ') || 
+                                   orig.includes('·') || orig.includes('・'));
           
           if (isDelimiterPart) {
             if (!inDelimiterZone) {

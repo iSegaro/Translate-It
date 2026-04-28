@@ -34,16 +34,14 @@ export const TraditionalTextProcessor = {
     if (!text || typeof text !== 'string') return text;
     
     // 1. Remove intact brackets with BIDI marks
-    // We replace with a space to prevent accidental word merging
-    let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, ' ');
+    // We don't replace with space here to be safe for segment reconstruction
+    let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, '');
     
     // 2. Remove isolated remnants (Safety layer for malformed delimiters)
-    // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
-    scrubbed = scrubbed.replace(/\[\[[\s\-\.\—\–\…\ـ\·\・]+/, ' ');
-    scrubbed = scrubbed.replace(/[\s\-\.\—\–\…\ـ\·\・]+\]\]/, ' ');
+    scrubbed = scrubbed.replace(/\[\[[\s\-\.\—\–\…\ـ\·\・]+/, '');
+    scrubbed = scrubbed.replace(/[\s\-\.\—\–\…\ـ\·\・]+\]\]/, '');
     
-    // 3. Final normalization (compact multiple spaces and trim)
-    return scrubbed.replace(/\s+/g, ' ').trim();
+    return scrubbed;
   },
 
   /**

@@ -39,8 +39,9 @@ export class TranslationSegmentMapper {
 
     // 0.5. Normalize common delimiter mangling (e.g. "[[ --- ]]" or "[[ ... ]]")
     if (typeof translatedText === 'string') {
-      // Aggressive Regex: Matches [[ with anything inside ]] and ALL surrounding hidden Unicode marks/spaces
-      const bracketPattern = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[^\]]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+      // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
+      // This preserves user content like [[Reference]] while allowing normalization of mangled delimiters.
+      const bracketPattern = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s\.\-\—\–\…\ـ\·\・]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
       if (bracketPattern.test(translatedText)) {
         translatedText = translatedText.replace(bracketPattern, delimiter);
       }
