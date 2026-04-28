@@ -34,7 +34,19 @@ export class TranslationSegmentMapper {
       return Array.isArray(translatedText) ? translatedText : [translatedText];
     }
 
-    // 0. Handle cases where translatedText is already an array (e.g. from a provider that returns arrays)
+    // 0.5. Normalize common delimiter mangling (e.g. "[[ --- ]]" or "[[ ... ]]")
+    // This is a CRITICAL fix for traditional providers that often add spaces or change dashes in the delimiter.
+    if (typeof translatedText === 'string') {
+      // Regex matches [[ followed by any combination of dashes, dots, ellipses, spaces, or Persian tatweel, then ]]
+      // Including optional surrounding whitespace to ensure clean replacement and prevent artifacts.
+      const bracketPattern = /\s*\[\[[\s.\-—–…ـ]+\]\]\s*/g;
+      if (bracketPattern.test(translatedText)) {
+        // We replace with the current delimiter to ensure the primary split below works perfectly.
+        translatedText = translatedText.replace(bracketPattern, delimiter);
+      }
+    }
+
+    // 0.6. Handle cases where translatedText is already an array (e.g. from a provider that returns arrays)
     if (Array.isArray(translatedText)) {
       if (translatedText.length === originalSegments.length) {
         return translatedText;
@@ -45,7 +57,9 @@ export class TranslationSegmentMapper {
 
     // 1. Try standard splitting
     let segments = translatedText.split(delimiter);
-    if (segments.length === originalSegments.length) return segments;
+    if (segments.length === originalSegments.length) {
+      return segments.map(s => s.trim());
+    }
 
     // 2. Try alternative common delimiters
     for (const altDelim of ALTERNATIVE_DELIMITERS) {
@@ -109,7 +123,14 @@ export class TranslationSegmentMapper {
     const bracketPattern = /\[\[[\s.\-—–…ـ]+\]\]/g;
     cleaned = cleaned.replace(bracketPattern, ' ');
 
-    // 3. Normalize whitespace (reduces multiple spaces/newlines to single space)
+    // 3. Clean up isolated bracket remnants and delimiter fragments at word boundaries
+    // This handles cases where only parts of the delimiter were mangled or preserved.
+    cleaned = cleaned.replace(/\[\[[\s\-\.]+/, ' ');
+    cleaned = cleaned.replace(/[\s\-\.]+\]\]/, ' ');
+    cleaned = cleaned.replace(/\s[\]\-\.]+\s/g, ' ');
+    cleaned = cleaned.replace(/\s[\[\-\.]+\s/g, ' ');
+
+    // 4. Normalize whitespace (reduces multiple spaces/newlines to single space)
     return cleaned.replace(/\s+/g, ' ').trim();
   }
 

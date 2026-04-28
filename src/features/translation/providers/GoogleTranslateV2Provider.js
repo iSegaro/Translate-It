@@ -163,19 +163,63 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         // Capture detected source language if available (usually at index 2 or index 8)
         this._setDetectedLanguage(data[2] || (data[8] && data[8][0] && data[8][0][0]));
 
-        // Combine segments back
-        const translatedText = data[0].map(segment => segment[0] || "").join('');
-        
-        let candidateText = "";
-        if (shouldIncludeDictionary && data[1]) {
-          candidateText = data[1].map((dict) => {
-            const pos = dict[0] || "";
-            const terms = dict[1] || [];
-            return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-          }).join("");
+        // For single segments, keep existing stable behavior
+        if (chunkTexts.length === 1) {
+          const translatedText = data[0].map(segment => segment[0] || "").join('');
+          
+          let candidateText = "";
+          if (shouldIncludeDictionary && data[1]) {
+            candidateText = data[1].map((dict) => {
+              const pos = dict[0] || "";
+              const terms = dict[1] || [];
+              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+            }).join("");
+          }
+
+          return { translatedText, candidateText: candidateText.trim() };
         }
 
-        return { translatedText, candidateText: candidateText.trim() };
+        // For multiple segments, reconstruct the array to prevent delimiter leakage.
+        // Google often splits our delimiters ([[---]]) and attaches brackets to adjacent text.
+        const segments = data[0];
+        const results = new Array(chunkTexts.length).fill("");
+        let currentIdx = 0;
+        let inDelimiterZone = false;
+
+        for (const segment of segments) {
+          const trans = segment[0] || "";
+          const orig = segment[1] || "";
+          
+          // Identify if this segment is part of the delimiter pattern
+          // Delimiters usually consist of brackets, dashes, dots and whitespace
+          const isDelimiterPart = /^[\[\]\-\s\n\r…·・]+$/.test(orig) && (orig.includes('-') || orig.includes('[') || orig.includes(']'));
+          
+          if (isDelimiterPart) {
+            if (!inDelimiterZone) {
+              currentIdx++;
+              inDelimiterZone = true;
+            }
+            continue;
+          }
+
+          inDelimiterZone = false;
+          if (currentIdx < results.length) {
+            // Clean any delimiter remnants (like isolated brackets) that leaked into the text segment
+            const cleanTrans = trans.replace(/^[\]\-\s\n\r…·・]+/, '').replace(/[\[\-\s\n\r…·・]+$/, '');
+            results[currentIdx] += cleanTrans;
+          }
+        }
+
+        // Fallback: If reconstruction resulted in empty segments for non-empty originals
+        // (which means Google merged segments unpredictably), fallback to joined string 
+        // and let the robust SegmentMapper handle it.
+        const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && chunkTexts[i].trim());
+        if (hasEmpty) {
+          const joinedResult = data[0].map(segment => segment[0] || "").join('');
+          return { translatedText: joinedResult, candidateText: "" };
+        }
+
+        return { translatedText: results, candidateText: "" };
       },
       context: 'googlev2-translate-chunk',
       abortController,
