@@ -847,10 +847,15 @@ function applyOptimizationLevel(config, level) {
 
   const result = { ...config, rateLimit: { ...config.rateLimit }, batching: { ...config.batching } };
 
+  // Multipliers for different optimization levels
+  const concurrentMultipliers = { 1: 0.4, 2: 0.7, 3: 1, 4: 1.5, 5: 2.0 };
+  const delayMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.7, 5: 0.4 };
+  const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
+  const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
+
   // 1. Scale Rate Limits
   // Concurrent requests multipliers: Level 1 (0.4), Level 2 (0.7), Level 3 (1.0), Level 4 (1.5), Level 5 (2.0)
   // We use floor for levels < 3 to be more conservative and ceil for levels > 3 to be more aggressive
-  const concurrentMultipliers = { 1: 0.4, 2: 0.7, 3: 1, 4: 1.5, 5: 2.0 };
   const baseConcurrent = config.rateLimit.maxConcurrent;
   
   if (safeLevel < 3) {
@@ -882,7 +887,6 @@ function applyOptimizationLevel(config, level) {
   }
 
   // Subsequent Delay multipliers: Level 1 (2.5), Level 2 (1.5), Level 3 (1.0), Level 4 (0.7), Level 5 (0.4)
-  const delayMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.7, 5: 0.4 };
   result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
   
   // Scale Batching Delays if present
@@ -897,7 +901,6 @@ function applyOptimizationLevel(config, level) {
     // AI Strategy: 
     // Level 1 (Economy): Large batches (multiplier 2.0x-2.5x) -> Minimizes Context/System Prompt overhead (Cost Efficient)
     // Level 5 (Turbo): Small batches (multiplier 0.3x-0.5x) -> Faster streaming/UI updates (Speed Efficient)
-    const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
     const multiplier = aiSizeMultipliers[safeLevel];
 
     result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * multiplier));
@@ -909,7 +912,6 @@ function applyOptimizationLevel(config, level) {
     }
   } else if (config.batching.strategy === 'character_limit') {
     // Traditional: Level 1 (Economy/Stability) -> Large chunks, Level 5 (Turbo) -> Small chunks
-    const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
     const multiplier = sizeMultipliers[safeLevel];
 
     result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * multiplier));
@@ -927,6 +929,65 @@ function applyOptimizationLevel(config, level) {
     
     if (config.batching.optimalSize) {
       result.batching.optimalSize = Math.max(15, Math.round(config.batching.optimalSize * multiplier));
+    }
+  }
+
+  // 3. Scale Mode Overrides (if present) - Ensures Select Element speed scales with optimization level
+  // Scale rateLimit.modeOverrides
+  if (config.rateLimit.modeOverrides) {
+    result.rateLimit.modeOverrides = {};
+    for (const mode in config.rateLimit.modeOverrides) {
+      const modeConfig = { ...config.rateLimit.modeOverrides[mode] };
+      
+      if (modeConfig.maxConcurrent) {
+        if (safeLevel < 3) {
+          modeConfig.maxConcurrent = Math.max(1, Math.floor(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
+        } else if (safeLevel > 3) {
+          modeConfig.maxConcurrent = Math.max(modeConfig.maxConcurrent, Math.ceil(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
+        }
+        modeConfig.maxConcurrent = Math.min(modeConfig.maxConcurrent, 12);
+      }
+      
+      if (modeConfig.burstLimit) {
+        if (safeLevel < 3) {
+          modeConfig.burstLimit = Math.max(1, Math.floor(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
+        } else if (safeLevel > 3) {
+          modeConfig.burstLimit = Math.max(modeConfig.burstLimit, Math.ceil(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
+        }
+      }
+      
+      if (modeConfig.subsequentDelay) {
+        modeConfig.subsequentDelay = Math.round(modeConfig.subsequentDelay * delayMultipliers[safeLevel]);
+      }
+      
+      result.rateLimit.modeOverrides[mode] = modeConfig;
+    }
+  }
+
+  // Scale batching.modeOverrides
+  if (config.batching.modeOverrides) {
+    result.batching.modeOverrides = {};
+    for (const mode in config.batching.modeOverrides) {
+      const modeConfig = { ...config.batching.modeOverrides[mode] };
+      
+      if (isAIStrategy) {
+        const multiplier = aiSizeMultipliers[safeLevel];
+        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
+        if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
+        if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));
+      } else if (config.batching.strategy === 'character_limit') {
+        const multiplier = sizeMultipliers[safeLevel];
+        if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(15, Math.round(modeConfig.optimalSize * multiplier));
+        
+        if (modeConfig.maxChunksPerBatch) {
+          const chunkMultiplier = safeLevel > 3 ? Math.max(0.8, multiplier) : multiplier;
+          modeConfig.maxChunksPerBatch = Math.max(25, Math.round(modeConfig.maxChunksPerBatch * chunkMultiplier));
+        }
+      }
+      
+      result.batching.modeOverrides[mode] = modeConfig;
     }
   }
 
