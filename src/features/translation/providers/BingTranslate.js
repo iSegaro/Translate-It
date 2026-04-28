@@ -237,15 +237,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
-      const isFatal = isFatalError(error) || isFatalError(errorType);
-
-      // CRITICAL: If it's a fatal error, don't attempt any retries
-      if (isFatal) {
-        if (!error.type) error.type = errorType;
-        throw error;
-      }
-
+      
       // Handle HTML response, JSON parsing errors, and Status 400 with retry
+      // We check these BEFORE the fatal check to allow adaptive chunking/retries
+      // for BingApiError (which is usually a 400 bad request that can be fixed by splitting).
       if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
         const maxRetries = providerConfig?.batching?.maxRetries || 3;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
@@ -292,6 +287,13 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         // This prevents one bad chunk from breaking the entire page translation.
         logger.error(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
         return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
+      }
+
+      const isFatal = isFatalError(error) || isFatalError(errorType);
+      // CRITICAL: If it's a fatal error, don't attempt any retries
+      if (isFatal) {
+        if (!error.type) error.type = errorType;
+        throw error;
       }
 
       if (error.name === 'BingApiError' || error instanceof SyntaxError) {
