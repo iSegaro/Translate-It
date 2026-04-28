@@ -440,7 +440,7 @@ const menuItems = computed(() => {
       id: 'translate_selection',
       label: t('desktop_fab_translate_selection_label'),
       icon: IconTranslateSelection,
-      closeMenu: true,
+      closeMenu: false,
       action: () => triggerTranslation()
     });
   }
@@ -478,7 +478,7 @@ const menuItems = computed(() => {
       icon: IconHourglass,
       showProgress: status.isTranslating,
       percent: status.percent,
-      closeMenu: true,
+      closeMenu: false,
       action: () => {
         logger.info('Stopping page translation from FAB');
         pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
