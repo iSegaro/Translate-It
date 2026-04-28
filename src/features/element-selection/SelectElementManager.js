@@ -242,7 +242,7 @@ class SelectElementManager extends ResourceTracker {
         silent = false,
         preserveTranslations = options.preserveTranslations !== undefined
           ? options.preserveTranslations
-          : reason !== 'error' // Default: preserve for everything except error
+          : true // Default: preserve translations in Select Element mode even on error
       } = options;
 
       this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
@@ -502,7 +502,7 @@ class SelectElementManager extends ResourceTracker {
       }
 
       if (isFatalError(error) && !isCancellation) {
-        this.deactivate({ preserveTranslations: false, reason: 'error' });
+        this.deactivate({ preserveTranslations: true, reason: 'error' });
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
       }
@@ -511,8 +511,8 @@ class SelectElementManager extends ResourceTracker {
 
   performPostTranslationCleanup(options = {}) {
     const reason = options.reason || 'success';
-    // For error case, we want to revert partial translations to avoid broken state
-    const preserveTranslations = reason !== 'error';
+    // In Select Element mode, we want to preserve partial translations even on error
+    const preserveTranslations = true;
 
     if (!this.isTopFrame) {
       try {
