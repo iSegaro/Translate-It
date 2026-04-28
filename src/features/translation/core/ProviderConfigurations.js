@@ -167,6 +167,14 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000, // 30 seconds max delay
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 600, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
     batching: {
@@ -319,6 +327,14 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 700, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
     batching: {
@@ -758,6 +774,14 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 800, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
     batching: {
