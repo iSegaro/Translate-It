@@ -431,16 +431,26 @@ export class PageTranslationScheduler extends ResourceTracker {
 
       batch.forEach((item, index) => {
         const translatedItem = translatedTexts[index];
-        let translatedText = (typeof translatedItem === 'object' && translatedItem !== null) 
-          ? (translatedItem.text || translatedItem.t || JSON.stringify(translatedItem))
-          : translatedItem;
+        let translatedText = "";
 
-        // Final safety check to ensure we never pass an object to domtranslator
-        if (typeof translatedText === 'object' && translatedText !== null) {
-          translatedText = translatedItem.text || translatedItem.t || JSON.stringify(translatedItem);
+        if (typeof translatedItem === 'string') {
+          translatedText = translatedItem;
+        } else if (typeof translatedItem === 'object' && translatedItem !== null) {
+          // Explicitly check for properties to avoid OR-gate fallthrough on empty strings
+          if (typeof translatedItem.text === 'string') translatedText = translatedItem.text;
+          else if (typeof translatedItem.t === 'string') translatedText = translatedItem.t;
+          else if (typeof translatedItem.translatedText === 'string') translatedText = translatedItem.translatedText;
+          else {
+            // CRITICAL: If no text property found, return empty string instead of JSON.stringify
+            // Artifacts like {"text":""} come from JSON.stringify being called on an object 
+            // where text property exists but is empty.
+            translatedText = "";
+          }
+        } else {
+          translatedText = String(translatedItem || "");
         }
 
-        item.resolve(String(translatedText || item.text));
+        item.resolve(translatedText || "");
         this.translatedCount++;
       });
 

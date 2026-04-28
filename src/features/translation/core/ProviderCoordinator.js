@@ -296,8 +296,17 @@ export class ProviderCoordinator {
       return JSON.stringify(translatedJson, null, 2);
     }
     
-    logger.error(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}`);
-    return Array.isArray(results) ? results.join('\n') : String(results);
+    if (results?.length !== jsonArray.length) {
+      logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
+    }
+
+    // Fallback: If results don't match, map what we can or return joined string
+    // But CRITICAL: ensure every part is processed via _ensureString to prevent JSON artifacts
+    if (Array.isArray(results)) {
+      return JSON.stringify(results.map(r => this._ensureString(r)));
+    }
+    
+    return this._ensureString(results);
   }
 
   /**
