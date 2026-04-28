@@ -57,13 +57,6 @@ export class PageTranslationBridge extends ResourceTracker {
 
       if (!text || !text.trim()) return text;
 
-      // Diagnostic Log: See what's being discovered
-      this.logger.debugLazy(() => [`Discovered node: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, {
-        score,
-        tagName: node?.parentElement?.tagName || node?.ownerElement?.tagName || 'UNKNOWN',
-        nodePresent: !!node
-      }]);
-
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
       const trailingMatch = text.match(/(\s*)$/);
