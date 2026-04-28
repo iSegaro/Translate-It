@@ -558,7 +558,7 @@ export const PROVIDER_CONFIGURATIONS = {
       maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
-      subsequentDelay: 2000, // 2 seconds between subsequent requests
+      subsequentDelay: 500, // 1 second between subsequent requests
       burstLimit: 2,
       burstWindow: 3000,
       adaptiveBackoff: {
