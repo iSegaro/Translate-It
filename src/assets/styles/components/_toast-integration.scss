@@ -12,12 +12,12 @@
   --normal-bg: var(--color-background);
   --normal-border: var(--color-border);
   --normal-text: var(--color-text);
-  --success-bg: var(--color-success-alpha);
+  --success-bg: var(--color-success-bg);
   --success-border: var(--color-success);
-  --success-text: var(--color-success);
-  --error-bg: var(--color-error-alpha);
+  --success-text: var(--color-success-text);
+  --error-bg: var(--color-error-bg);
   --error-border: var(--color-error);
-  --error-text: var(--color-error);
+  --error-text: var(--color-error-text);
   
   // Custom font from extension variables
   --font-sans: #{$font-family-base};
@@ -38,6 +38,22 @@
   
   // Responsive padding
   padding: $spacing-sm $spacing-base;
+
+  // Icon styling - Ensure icons are visible in both themes
+  [data-icon] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px; // Align with title line height
+
+    svg {
+      width: 18px;
+      height: 18px;
+      color: inherit; // Follow parent color (error-text, success-text, etc.)
+      fill: currentColor;
+    }
+  }
 
   // Content alignment and layout
   [data-content] {

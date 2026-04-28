@@ -139,8 +139,11 @@
   --color-border-light: rgb(0 0 0 / 5%);
   --color-primary: var(--link-color, #1a73e8);
   --color-error: #ef5350;
+  --color-error-bg: #fdecea;
+  --color-error-text: #d32f2f;
   --color-success: #4caf50;
-  --color-success-alpha: rgb(76 175 80 / 10%);
+  --color-success-bg: #edf7ed;
+  --color-success-text: #1e4620;
   --color-info: #1a73e8;
 }
 
@@ -218,8 +221,11 @@
   --color-border-light: rgb(255 255 255 / 10%);
   --color-primary: var(--link-color, #8ab4f8);
   --color-error: #ef5350;
+  --color-error-bg: #160b0b;
+  --color-error-text: #f4c7c7;
   --color-success: #66bb6a;
-  --color-success-alpha: rgb(102 187 106 / 10%);
+  --color-success-bg: #0c130d;
+  --color-success-text: #cce8cd;
   --color-info: #8ab4f8;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
