@@ -154,11 +154,16 @@ export class BaseAIProvider extends BaseProvider {
         }).catch(() => { /* ignore */ });
       }
       
+      const { matchErrorToType, isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      const errorType = error.type || matchErrorToType(error);
+      const isFatal = isFatalError(error) || isFatalError(errorType);
+
       logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
       
-      // CRITICAL FALLBACK: Return clean original text to prevent technical artifacts (JSON leaks)
-      // This ensures that even if AI fails, the UI gets clean text for mapping.
-      if (Array.isArray(texts)) {
+      // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal (like parsing error)
+      // For fatal errors (502, 429, 401), we MUST throw to inform the UI and stop the process.
+      if (!isFatal && Array.isArray(texts)) {
+        logger.warn(`[${this.providerName}] Non-fatal error, falling back to original text for mapping safety`);
         return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
       }
       

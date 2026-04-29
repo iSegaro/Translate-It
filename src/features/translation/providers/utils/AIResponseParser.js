@@ -18,31 +18,14 @@ const Healers = {
    * Pre-processing Pipeline: Fixes the raw string before any parsing attempt.
    */
   PreProcessors: [
-    // 1. Basic Cleanup
-    (text) => text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
+    // 1. Basic Cleanup - Keep ZWNJ (\u200C) for Persian support
+    (text) => text.replace(/[\u200B\u200D\uFEFF]/g, '').trim(),
 
-    // 2. SMART UNESCAPE: Handle multiple levels of escaping (\u0648, \\u0648, \\u000648, etc.)
+    // 2. SMART UNESCAPE: Handle multiple levels of escaping
+    // ONLY intended for raw string responses, not JSON strings before parsing
     (text) => {
-      if (!text.includes('\\u')) return text;
-      try {
-        let processed = text;
-        // Fix non-standard 6-digit/double-escaped escapes like \\u000648 -> \u0648
-        processed = processed.replace(/(?:\\\\|\\)u000([0-9a-fA-F]{3,4})/g, '\\u$1');
-        
-        // Unescape standard Unicode sequences (both \u0648 and \\u0648)
-        processed = processed.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
-          try {
-            return String.fromCharCode(parseInt(grp, 16));
-          } catch { return match; }
-        });
-        
-        // Strip remaining dangerous control characters (00-1F) except common ones
-        const lowRange = '\\x00-\\x08';
-        const midRange = '\\x0B-\\x0C';
-        const highRange = '\\x0E-\\x1F';
-        const controlPattern = new RegExp(`[${lowRange}${midRange}${highRange}]`, 'g');
-        return processed.replace(controlPattern, '');
-      } catch { return text; }
+      // Logic moved to be format-sensitive in cleanAIResponse
+      return text;
     },
 
     // 3. QUOTE HEALER: Fix AI using single quotes for JSON keys or values
@@ -128,11 +111,13 @@ export const AIResponseParser = {
   cleanAIResponse(result, expectedFormat = ResponseFormat.STRING) {
     if (!result || typeof result !== 'string') return result;
 
-    // Execute Pre-processing Pipeline
-    let processedResult = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
-
+    // Strategy 1: RAW STRING (Popup, Sidepanel, Field)
     if (expectedFormat === ResponseFormat.STRING) {
-      const stripped = this._stripMarkdown(processedResult);
+      // For raw strings, we apply the full pipeline including unescaping
+      let processed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
+      processed = this._unescapeRawString(processed);
+      
+      const stripped = this._stripMarkdown(processed);
       // Fallback: If AI returned JSON even though we asked for STRING
       if (stripped.startsWith('{') || stripped.startsWith('[')) {
         try {
@@ -149,13 +134,45 @@ export const AIResponseParser = {
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
+    // CRITICAL: We skip PreProcessors like unescape/cleanup for JSON to prevent structure corruption.
+    // We only use the JSON-specific healers if parsing fails.
+    let processedResult = result;
     let parsed = this._extractAndParseJson(processedResult, expectedFormat);
 
     // Execute Post-processing Pipeline
-    parsed = Healers.PostProcessors.deepUnescape(parsed, expectedFormat, this._extractAndParseJson.bind(this));
-    parsed = Healers.PostProcessors.formatBridge(parsed, expectedFormat);
+    if (parsed) {
+      parsed = Healers.PostProcessors.deepUnescape(parsed, expectedFormat, this._extractAndParseJson.bind(this));
+      parsed = Healers.PostProcessors.formatBridge(parsed, expectedFormat);
+    }
 
     return parsed;
+  },
+
+  /**
+   * Manual unescape for raw strings (Internal)
+   * @private
+   */
+  _unescapeRawString(text) {
+    if (!text || !text.includes('\\u')) return text;
+    try {
+      let processed = text;
+      // Fix non-standard 6-digit/double-escaped escapes like \\u000648 -> \u0648
+      processed = processed.replace(/(?:\\\\|\\)u000([0-9a-fA-F]{3,4})/g, '\\u$1');
+      
+      // Unescape standard Unicode sequences (both \u0648 and \\u0648)
+      processed = processed.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
+        try {
+          return String.fromCharCode(parseInt(grp, 16));
+        } catch { return match; }
+      });
+      
+      // Strip remaining dangerous control characters (00-1F) except common ones
+      const lowRange = '\\x00-\\x08';
+      const midRange = '\\x0B-\\x0C';
+      const highRange = '\\x0E-\\x1F';
+      const controlPattern = new RegExp(`[${lowRange}${midRange}${highRange}]`, 'g');
+      return processed.replace(controlPattern, '');
+    } catch { return text; }
   },
 
   /**

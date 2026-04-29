@@ -145,7 +145,12 @@ export class UnifiedResultDispatcher {
    * Dispatch select-element translation result (handles large payloads via broadcast).
    */
   async dispatchSelectElementResult({ messageId, result, request }) {
-    if (result.streaming || (result.translatedText && result.translatedText.length > 2000)) {
+    const shouldBroadcast = 
+      result.success === false || 
+      result.streaming || 
+      (result.translatedText && result.translatedText.length > 2000);
+
+    if (shouldBroadcast) {
       await this.broadcastResult({ messageId, result, request });
     }
   }
