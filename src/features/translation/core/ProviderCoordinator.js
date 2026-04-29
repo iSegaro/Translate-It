@@ -345,10 +345,18 @@ export class ProviderCoordinator {
 
     // If result is already an array, clean each element and ENSURE they are strings
     if (Array.isArray(result)) {
-      return result.map(item => {
+      const cleanedArray = result.map(item => {
         const cleaned = AIResponseParser.cleanAIResponse(item, ResponseFormat.STRING);
         return this._ensureString(cleaned);
       });
+
+      // CRITICAL: If we expected a single STRING but got an array (due to internal batching),
+      // we must join or unwrap it to satisfy the contract.
+      if (expectedFormat === ResponseFormat.STRING) {
+        return cleanedArray.length === 1 ? cleanedArray[0] : cleanedArray.join('\n');
+      }
+
+      return cleanedArray;
     }
 
     // Use the contract-aware cleaner
@@ -356,7 +364,14 @@ export class ProviderCoordinator {
     
     // If cleaning produced an array (e.g. from JSON_ARRAY), ensure its elements are strings
     if (Array.isArray(cleaned)) {
-      return cleaned.map(item => this._ensureString(item));
+      const strings = cleaned.map(item => this._ensureString(item));
+      
+      // Respect the STRING contract even if parser returned an array
+      if (expectedFormat === ResponseFormat.STRING) {
+        return strings.length === 1 ? strings[0] : strings.join('\n');
+      }
+      
+      return strings;
     }
 
     return this._ensureString(cleaned);
