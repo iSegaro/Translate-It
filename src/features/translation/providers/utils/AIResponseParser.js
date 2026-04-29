@@ -31,15 +31,16 @@ const Healers = {
     // 3. QUOTE HEALER: Fix AI using single quotes for JSON keys or values
     // This is common in weak models: {'id': '0'} -> {"id": "0"}
     (text) => {
-      if (!text.includes("'") && !text.includes('translations')) return text;
+      if (!text.includes("'")) return text;
       let processed = text;
       // Fix keys: 'id': -> "id":
       processed = processed.replace(/'(\w+)'\s*:/g, '"$1":');
       // Fix specific common key: translations':[ -> "translations":[
       processed = processed.replace(/translations'\s*:\s*\[/g, '"translations":[');
-      // Fix values: : 'value' -> : "value" (careful with Persian text containing apostrophes)
-      // We only target single quotes that are preceded by : and followed by , or } or ]
+      // Fix values: : 'value' -> : "value"
       processed = processed.replace(/:\s*'([^']*)'\s*([,}\]])/g, ': "$1"$2');
+      // Fix array items: ['item', 'item'] -> ["item", "item"]
+      processed = processed.replace(/([\[,])\s*'([^']*)'\s*([,\]])/g, '$1"$2"$3');
       return processed;
     },
 
@@ -134,10 +135,29 @@ export const AIResponseParser = {
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
-    // CRITICAL: We skip PreProcessors like unescape/cleanup for JSON to prevent structure corruption.
-    // We only use the JSON-specific healers if parsing fails.
-    let processedResult = result;
-    let parsed = this._extractAndParseJson(processedResult, expectedFormat);
+    // CRITICAL: We skip PreProcessors like unescape/cleanup for JSON initially to prevent structure corruption.
+    // If parsing fails, we then try the healers as a fallback.
+    let parsed = null;
+    try {
+      parsed = this._extractAndParseJson(result, expectedFormat);
+    } catch {
+      // Ignore initial error and try healing
+    }
+
+    if (!parsed) {
+      const healed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
+      if (healed !== result) {
+        try {
+          parsed = this._extractAndParseJson(healed, expectedFormat);
+        } catch (e) {
+          // If still fails, re-throw the error
+          throw e;
+        }
+      } else if (!parsed) {
+        // If no healing was possible and we still don't have a result, re-run to throw original error
+        parsed = this._extractAndParseJson(result, expectedFormat);
+      }
+    }
 
     // Execute Post-processing Pipeline
     if (parsed) {
@@ -383,8 +403,7 @@ export const AIResponseParser = {
     
     // SAFETY CHECK: Re-evaluate if this looks like JSON garbage (single or double quotes)
     const isJsonGarbage = (cleanText.startsWith('{') || cleanText.startsWith('[')) && 
-                          (cleanText.includes('":') || cleanText.includes('":') || 
-                           cleanText.includes("':") || cleanText.includes("' :"));
+                          (cleanText.includes('":') || cleanText.includes("':") || cleanText.includes("' :"));
 
     if (isJsonGarbage) {
       throw new Error(`AI returned malformed JSON that couldn't be parsed as ${expectedFormat}`);
