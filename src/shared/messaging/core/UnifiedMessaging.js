@@ -189,12 +189,39 @@ export async function sendRegularMessage(message, options = {}) {
       }
 
       // Safe error extraction
-      let errorMessage = 'An unknown error occurred';
+      let errorMessage = '';
       if (response.error) {
-        if (typeof response.error === 'string') errorMessage = response.error;
-        else if (typeof response.error === 'object') errorMessage = response.error.message || response.message || 'Object error';
+        if (typeof response.error === 'string') {
+          errorMessage = response.error;
+        } else if (typeof response.error === 'object') {
+          // Try to find the most descriptive error message in common fields
+          errorMessage = response.error.message || 
+                         response.error.error || 
+                         response.error.statusText ||
+                         response.error.reason ||
+                         response.message || 
+                         response.statusText;
+          
+          // If still no message but it's an object, try to stringify it (excluding large partial results)
+          if (!errorMessage && response.error !== null) {
+            try {
+              const cleanError = { ...response.error };
+              delete cleanError.partialResults;
+              errorMessage = JSON.stringify(cleanError);
+              if (errorMessage === '{}') errorMessage = '';
+            } catch {
+              errorMessage = '';
+            }
+          }
+        }
       } else if (response.message) {
         errorMessage = response.message;
+      }
+      
+      if (!errorMessage) {
+        errorMessage = (response.error && typeof response.error.toString === 'function' && response.error.toString() !== '[object Object]') 
+                        ? response.error.toString() 
+                        : 'Unknown technical error';
       }
       
       const error = new Error(String(errorMessage));

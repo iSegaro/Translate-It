@@ -65,7 +65,22 @@ export class ErrorHandler {
         if (err instanceof Error) {
           raw = err.message || err.name || 'Error object';
         } else if (err && typeof err === 'object') {
-          raw = typeof err.message === 'string' ? err.message : (err.type || err.code || 'Object error');
+          raw = err.message || err.error || err.statusText || err.reason || err.type || err.code;
+          
+          if (!raw && err !== null) {
+             try {
+               const cleanErr = { ...err };
+               delete cleanErr.partialResults;
+               raw = JSON.stringify(cleanErr);
+               if (raw === '{}') raw = '';
+             } catch {
+               raw = '';
+             }
+          }
+          
+          if (!raw) {
+            raw = (typeof err.toString === 'function' && err.toString() !== '[object Object]') ? err.toString() : 'Unknown technical error';
+          }
         } else {
           raw = String(err || 'Unknown error');
         }

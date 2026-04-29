@@ -69,7 +69,15 @@ export class OptimizedJsonHandler {
           
           // If first batch failed fatally, don't continue
           if (hasErrors && lastError && isFatalError(lastError)) {
-            return { success: false, streaming: true, error: lastError };
+            return { 
+              success: false, 
+              streaming: true, 
+              error: {
+                message: lastError.message || String(lastError),
+                type: lastError.type || matchErrorToType(lastError),
+                statusCode: lastError.statusCode
+              } 
+            };
           }
           startIndex = 1;
         }
@@ -179,7 +187,7 @@ export class OptimizedJsonHandler {
 
       const formattedError = lastError ? {
         message: lastError.message || String(lastError),
-        type: lastError.type || 'TRANSLATION_ERROR',
+        type: lastError.type || matchErrorToType(lastError),
         statusCode: lastError.statusCode
       } : null;
 
@@ -346,7 +354,7 @@ export class OptimizedJsonHandler {
         success: false,
         error: lastError ? { 
           message: lastError.message || String(lastError), 
-          type: lastError.type || 'TRANSLATION_ERROR',
+          type: lastError.type || matchErrorToType(lastError),
           statusCode: lastError.statusCode
         } : null,
         sourceLanguage,
