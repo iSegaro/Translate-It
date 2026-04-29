@@ -8,7 +8,7 @@
 
 - Fixed issues in language detection
 - Fixed an issue where canceling translation in `Select Element` mode did not work properly
-* Fixed issues with `Optimization Level` settings
+- Fixed issues with `Optimization Level` settings
 
 ##### Changed
 
