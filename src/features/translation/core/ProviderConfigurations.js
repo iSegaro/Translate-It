@@ -80,17 +80,33 @@ export const BASE_MAX_CHUNKS_PER_BATCH = {
   LINGVA: 30,
 };
 
+/**
+ * AI-specific batching limits
+ */
+export const AI_BATCHING_LIMITS = {
+  OPTIMAL_SIZE: 20,
+  MAX_COMPLEXITY: 350,
+  SINGLE_BATCH_THRESHOLD: 15,
+  CHARACTER_LIMIT: 5000,
+  // Select Element Overrides (Optimized for balance)
+  SELECT_OPTIMAL_SIZE: 25,
+  SELECT_MAX_COMPLEXITY: 500,
+  SELECT_SINGLE_BATCH_THRESHOLD: 20,
+  SELECT_CHARACTER_LIMIT: 3500,
+};
+
 const UNIFIED_AI_BATCHING_CONFIG = {
-  strategy: 'smart',
-  optimalSize: 20,
-  maxComplexity: 350,
-  singleBatchThreshold: 15,
+  strategy: 'json', // Default to JSON for all AI providers
+  optimalSize: AI_BATCHING_LIMITS.OPTIMAL_SIZE,
+  maxComplexity: AI_BATCHING_LIMITS.MAX_COMPLEXITY,
+  singleBatchThreshold: AI_BATCHING_LIMITS.SINGLE_BATCH_THRESHOLD,
+  characterLimit: AI_BATCHING_LIMITS.CHARACTER_LIMIT,
   modeOverrides: {
     select_element: {
-      optimalSize: 25,
-      maxComplexity: 500,
-      singleBatchThreshold: 20,
-      maxBatchSizeChars: 3500,
+      optimalSize: AI_BATCHING_LIMITS.SELECT_OPTIMAL_SIZE,
+      maxComplexity: AI_BATCHING_LIMITS.SELECT_MAX_COMPLEXITY,
+      singleBatchThreshold: AI_BATCHING_LIMITS.SELECT_SINGLE_BATCH_THRESHOLD,
+      characterLimit: AI_BATCHING_LIMITS.SELECT_CHARACTER_LIMIT,
       balancedBatching: true,
     },
   },
@@ -125,10 +141,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'adaptive', // Adapt chunk size based on complexity
@@ -183,10 +196,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'fixed', // Fixed chunk sizes work well
@@ -237,10 +247,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -289,10 +296,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Most models support streaming
       chunkSize: 'adaptive',
@@ -343,10 +347,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -796,10 +797,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
