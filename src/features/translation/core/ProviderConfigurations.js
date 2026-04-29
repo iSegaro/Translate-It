@@ -640,11 +640,11 @@ export const PROVIDER_CONFIGURATIONS = {
   // Microsoft Edge - Official Edge Browser translation service
   MicrosoftEdge: {
     rateLimit: {
-      maxConcurrent: 4,
+      maxConcurrent: 5, // Increased from 4
       delayBetweenRequests: 0,
       initialDelay: 0,
-      subsequentDelay: 200,
-      burstLimit: 10, // Increased burst limit
+      subsequentDelay: 100, // Reduced from 200 to match Google's speed
+      burstLimit: 12, // Increased from 10
       burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
