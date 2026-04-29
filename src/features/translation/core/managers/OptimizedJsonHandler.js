@@ -23,7 +23,8 @@ export class OptimizedJsonHandler {
     const { text, sourceLanguage, targetLanguage, mode, options } = data;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
-    const abortController = engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
+    const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
+                             engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
 
     let hasErrors = false;
     let lastError = null;
@@ -59,6 +60,7 @@ export class OptimizedJsonHandler {
         // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
         // Let RateLimitManager handle the actual concurrency and delays.
         
+        let startIndex = 0;
         // OPTIMIZATION: If source is auto, wait for the first batch to detect the language.
         // This prevents redundant detection calls for all subsequent batches.
         if (detectedSourceLanguage === 'auto' && batches.length > 0) {
@@ -69,10 +71,10 @@ export class OptimizedJsonHandler {
           if (hasErrors && lastError && isFatalError(lastError)) {
             return { success: false, streaming: true, error: lastError };
           }
+          startIndex = 1;
         }
 
         // Process remaining batches. They will be queued in RateLimitManager.
-        const startIndex = (detectedSourceLanguage !== 'auto' && batches.length > 1) ? 1 : 0;
         const batchPromises = batches.slice(startIndex).map((batch, i) => processBatch(batch, i + startIndex));
         await Promise.all(batchPromises);
       }

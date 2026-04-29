@@ -156,29 +156,37 @@ export class UnifiedTranslationCoordinator {
         const streamingResult = await streamingPromise;
 
         // Check if streaming failed (resolved with error instead of rejected to avoid uncaught promise)
-        if (streamingResult && !streamingResult.success) {
-          throw streamingResult.error;
+        if (streamingResult && streamingResult.success === false) {
+          if (streamingResult.cancelled) {
+            const cancelError = new Error(streamingResult.reason || 'Operation cancelled');
+            cancelError.type = ErrorTypes.USER_CANCELLED;
+            cancelError.isCancelled = true;
+            throw cancelError;
+          }
+          throw streamingResult.error || new Error('Streaming failed without explicit error');
         }
 
         return streamingResult;
       } else {
         // Not streaming, return regular response
-        if (messageId) streamingTimeoutManager.completeStreaming(messageId, initialResponse || {});
+        if (messageId) streamingTimeoutManager.completeStreaming(messageId, initialResponse || { success: true });
         return initialResponse;
       }
 
     } catch (error) {
       // Log cancellation as info instead of error using proper error management
-      const errorType = matchErrorToType(error);
+      const errorType = error ? matchErrorToType(error) : ErrorTypes.UNKNOWN;
+      const errorMessage = error?.message || (typeof error === 'string' ? error : 'Unknown error');
+      
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        logger.warn(`Streaming translation coordination failed for ${messageId}: ${error.message}`);
+        logger.warn(`Streaming translation coordination failed for ${messageId}: ${errorMessage}`);
       }
 
       // Cancel streaming if it was registered
       if (messageId && this.streamingOperations.has(messageId)) {
         const cancelReason = errorType === ErrorTypes.USER_CANCELLED
-          ? `User cancelled: ${error.message}`
-          : `Coordination error: ${error.message}`;
+          ? `User cancelled: ${errorMessage}`
+          : `Coordination error: ${errorMessage}`;
 
         try {
           streamingTimeoutManager.cancelStreaming(messageId, cancelReason);

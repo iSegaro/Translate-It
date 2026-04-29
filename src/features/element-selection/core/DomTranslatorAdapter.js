@@ -194,7 +194,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
               Object.assign(error, errObj);
               return safeResolve({ success: false, error });
             }
-            safeResolve({ success: true, targetLanguage: effectiveTargetLanguage });
+
+            // Capture final language from stream end metadata if available
+            const finalLang = data.targetLanguage || effectiveTargetLanguage;
+            safeResolve({ success: true, targetLanguage: finalLang });
           },
           onError: (error) => {
             if (isSettled || !this.currentMessageId) return;
@@ -236,6 +239,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
       } else {
         throw new Error(response?.error?.message || response?.error || 'Translation failed');
+      }
+
+      // Update effective target language from result if it changed
+      if (result?.targetLanguage) {
+        effectiveTargetLanguage = result.targetLanguage;
       }
 
       // If the result contains an error (from resolve-only pattern), throw it now
@@ -309,9 +317,21 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element) {
     try {
-      const parsed = JSON.parse(response.translatedText);
-      const results = Array.isArray(parsed) ? parsed : [parsed];
+      // Robust result extraction - handle both unified response and direct results
+      let rawResults = response.translatedText;
       
+      // If it's already an object/array, don't re-parse
+      if (typeof rawResults === 'string' && (rawResults.trim().startsWith('[') || rawResults.trim().startsWith('{'))) {
+        try {
+          rawResults = JSON.parse(rawResults);
+        } catch (e) {
+          this.logger.warn('Failed to parse translatedText as JSON:', e.message);
+        }
+      }
+      
+      const results = Array.isArray(rawResults) ? rawResults : [rawResults];
+      const finalTargetLanguage = response.targetLanguage || targetLanguage;
+
       results.forEach((item, i) => {
         // Handle abbreviated key 'i' for UID
         const uid = item?.i || item?.uid;
@@ -319,12 +339,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
         if (nodeData) {
           // Handle abbreviated key 't' for text
           const text = item?.t || item?.text || item;
-          this._applyTranslationToNode(nodeData.node, text, targetLanguage, element);
+          this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
         }
       });
 
-      return { success: true, isNonStreaming: true, translatedResults: results };
-    } catch {
+      return { 
+        success: true, 
+        isNonStreaming: true, 
+        translatedResults: results,
+        targetLanguage: finalTargetLanguage 
+      };
+    } catch (err) {
+      this.logger.error('Invalid translation format during direct handling:', err);
       throw new Error('Invalid translation format');
     }
   }
