@@ -119,9 +119,11 @@ export class GeminiProvider extends BaseAIProvider {
         abortController,
         sessionId,
         updateApiKey: (newKey, options) => {
-          const urlObj = new URL(options.url);
-          urlObj.searchParams.set('key', newKey);
-          options.url = urlObj.toString();
+          if (options.url) {
+            const urlObj = new URL(options.url);
+            urlObj.searchParams.set('key', newKey);
+            options.url = urlObj.toString();
+          }
         }
       });
 
@@ -145,11 +147,12 @@ export class GeminiProvider extends BaseAIProvider {
           abortController,
           sessionId,
           updateApiKey: (newKey, options) => {
-            const urlObj = new URL(options.url);
-            urlObj.searchParams.set('key', newKey);
-            options.url = urlObj.toString();
-          }
-        });
+            if (options.url) {
+              const urlObj = new URL(options.url);
+              urlObj.searchParams.set('key', newKey);
+              options.url = urlObj.toString();
+            }
+          }        });
       }
       throw error;
     }
@@ -198,11 +201,12 @@ export class GeminiProvider extends BaseAIProvider {
       abortController,
       sessionId,
       updateApiKey: (newKey, options) => {
-        const urlObj = new URL(options.url);
-        urlObj.searchParams.set('key', newKey);
-        options.url = urlObj.toString();
-      }
-    });
+        if (options.url) {
+          const urlObj = new URL(options.url);
+          urlObj.searchParams.set('key', newKey);
+          options.url = urlObj.toString();
+        }
+      }    });
   }
 }
 

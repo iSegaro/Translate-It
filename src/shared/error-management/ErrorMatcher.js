@@ -110,6 +110,7 @@ export const FATAL_ERRORS = new Set([
   ErrorTypes.PAGE_MOVED_TO_CACHE,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
   ErrorTypes.API_RESPONSE_INVALID,
+  ErrorTypes.API_ENDPOINT_INVALID,
   ErrorTypes.SETTINGS_LOADING_TIMEOUT,
   ErrorTypes.CONNECTION_LOST,
   ErrorTypes.BROWSER_API_UNAVAILABLE
@@ -276,10 +277,20 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("api response invalid") || msg.includes("invalid api response")) return ErrorTypes.API_RESPONSE_INVALID;
   if (msg.includes("already been translated")) return ErrorTypes.NODE_ALREADY_TRANSLATED;
+  
+  // URL Construction / Endpoint errors
+  if (msg.includes("failed to construct 'url'") || msg.includes("invalid url") || msg.includes("failed to construct url")) {
+    return ErrorTypes.API_ENDPOINT_INVALID;
+  }
 
   // Feature Blocked / Exclusion matching
   if (msg.includes("feature blocked") || msg.includes("blocked on this page") || msg.includes("blocked by exclusion")) {
     return ErrorTypes.FEATURE_BLOCKED;
+  }
+
+  // JavaScript / System errors
+  if (msg.includes("typeerror") || msg.includes("referenceerror") || msg.includes("syntaxerror")) {
+    return ErrorTypes.TRANSLATION_ERROR;
   }
 
   // String-based matching fallback

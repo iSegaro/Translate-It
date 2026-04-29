@@ -72,7 +72,9 @@ export class CustomProvider extends BaseAIProvider {
       abortController,
       sessionId,
       updateApiKey: (newKey, options) => {
-        options.headers.Authorization = `Bearer ${newKey}`;
+        if (options && options.headers) {
+          options.headers.Authorization = `Bearer ${newKey}`;
+        }
       }
     });
 
