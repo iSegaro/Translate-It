@@ -1,3 +1,13 @@
+#### v1.12.1 – Released on April 30, 2026
+
+##### Fixed
+
+- Fixed translation issues in popup, side panel, and window contexts
+- Fixed minor bugs
+- Fixed dictionary issues for AI providers
+
+---
+
 #### v1.12.0 – Released on April 29, 2026
 
 ##### Added
