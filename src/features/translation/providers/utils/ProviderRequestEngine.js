@@ -78,9 +78,8 @@ export const ProviderRequestEngine = {
 
         // 3. Success! Promote the working key
         if (attempt > 0 && provider.providerSettingKey) {
-          const authHeader = fetchOptions.headers?.Authorization || fetchOptions.headers?.authorization;
-          const currentKey = authHeader ? authHeader.replace(/^(Bearer |DeepL-Auth-Key )/i, '') : 
-                           (new URL(currentUrl).searchParams.get('key'));
+          // Get the key actually used in THIS successful attempt
+          const currentKey = (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
           
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
