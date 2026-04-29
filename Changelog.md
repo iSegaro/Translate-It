@@ -2,7 +2,7 @@
 
 ##### Fixed
 
-- Fixed translation issues in popup, side panel, and window contexts
+- **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Fixed translation issues in popup, side panel, and window contexts
 - Fixed minor bugs
 - Fixed dictionary issues for AI providers
 
