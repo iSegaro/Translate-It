@@ -822,6 +822,43 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsThinking: false,
       reliableJsonMode: false
     }
+  },
+
+  // Mock Provider - Used for development and testing
+  MockProvider: {
+    rateLimit: {
+      maxConcurrent: 5, // High for local mock testing
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 100, // Minimal delay for mock
+      burstLimit: 10,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 5000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
+    streaming: {
+      enabled: true,
+      chunkSize: 'fixed',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: ['rate_limit'],
+      retryStrategies: {
+        'rate_limit': { delay: 1000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsImageTranslation: true,
+      supportsBatchRequests: true,
+      supportsThinking: true,
+      reliableJsonMode: true
+    }
   }
 };
 
@@ -1050,6 +1087,8 @@ function normalizeProviderName(providerName) {
     'lingva-translate': ProviderNames.LINGVA,
     'browser': ProviderNames.BROWSER_API,
     'browserranslate': ProviderNames.BROWSER_API,
+    'mock': ProviderNames.MOCK,
+    'mockprovider': ProviderNames.MOCK,
     'custom': ProviderNames.CUSTOM,
     'custom-openai': ProviderNames.CUSTOM
   };
