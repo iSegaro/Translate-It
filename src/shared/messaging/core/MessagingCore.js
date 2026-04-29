@@ -6,6 +6,7 @@
 
 import { MessageActions } from './MessageActions.js';
 import { MessageContexts, ActionReasons } from './MessagingConstants.js';
+import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 
 /**
  * Message Format Utility
@@ -39,23 +40,26 @@ export const MessageFormat = {
    */
   createErrorResponse(error, messageId = null, options = {}) {
     let errorData;
+    const errorType = ErrorMatcher.matchErrorToType(error);
     
     if (error instanceof Error) {
       errorData = {
         message: error.message,
-        type: error.type,
+        type: error.type || errorType,
         statusCode: error.statusCode,
         ...options
       };
     } else if (error && typeof error === 'object') {
       errorData = {
         message: error.message || error.error || 'Unknown error',
+        type: error.type || errorType,
         ...error,
         ...options
       };
     } else {
       errorData = {
         message: String(error),
+        type: errorType,
         ...options
       };
     }

@@ -243,6 +243,12 @@ export function matchErrorToType(rawOrError = "") {
       if (code === 429) return ErrorTypes.RATE_LIMIT_REACHED;
       if (code === 456) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
       
+      if (code === 503 || code === 504 || code === 500) {
+        if (errorMsg.includes("overloaded") || errorMsg.includes("high demand") || errorMsg.includes("busy") || errorMsg.includes("unavailable")) {
+          return ErrorTypes.MODEL_OVERLOADED;
+        }
+      }
+
       if (code >= 500 && code <= 599) return ErrorTypes.SERVER_ERROR;
       return ErrorTypes.HTTP_ERROR;
     }

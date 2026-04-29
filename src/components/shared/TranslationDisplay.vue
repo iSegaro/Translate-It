@@ -358,6 +358,20 @@ const displayErrorMessage = computed(() => {
   const key = props.errorType.startsWith('ERRORS_') ? props.errorType : `ERRORS_${props.errorType}`;
   const translated = t(key);
   
+  // For specific technical errors, if we have a detailed message from the provider, show it
+  const useRawMessage = [
+    'SERVER_ERROR', 
+    'MODEL_OVERLOADED', 
+    'HTTP_ERROR', 
+    'TRANSLATION_ERROR', 
+    'API_RESPONSE_INVALID',
+    'UNKNOWN'
+  ].includes(props.errorType);
+
+  if (useRawMessage && props.error && props.error !== props.errorType) {
+    return props.error;
+  }
+
   // If translation exists, return it, otherwise fallback to static error prop
   return (translated && translated !== key) ? translated : props.error;
 });
