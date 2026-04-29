@@ -84,7 +84,6 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
     const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
-    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const result = await this._executeRequest({
       url: `${apiUrl}?${queryParams.toString()}`,

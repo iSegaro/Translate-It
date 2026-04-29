@@ -138,7 +138,6 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
     const body = new URLSearchParams();
     body.append("q", combinedText);
-    const originalCharCount = options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const responseObj = await this._executeApiCall({
       url: url.toString(),
@@ -193,7 +192,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           
           // Identify if this segment is part of the delimiter pattern
           // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
-          const isDelimiterPart = /^[\[\]\s\n\r\-\.\—\–\…\ـ\·\・]+$/.test(orig) && 
+          const isDelimiterPart = /^[[\]\s\n\r.——–…ـ·・-]+$/.test(orig) && 
                                   (orig.includes('-') || orig.includes('.') || orig.includes('[') || orig.includes(']') || 
                                    orig.includes('—') || orig.includes('–') || orig.includes('…') || orig.includes('ـ') || 
                                    orig.includes('·') || orig.includes('・'));

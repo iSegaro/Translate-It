@@ -19,7 +19,7 @@ const Healers = {
    */
   PreProcessors: [
     // 1. Basic Cleanup - Keep ZWNJ (\u200C) for Persian support
-    (text) => text.replace(/[\u200B\u200D\uFEFF]/g, '').trim(),
+    (text) => text.replace(/\u200B|\u200D|\uFEFF/g, '').trim(),
 
     // 2. SMART UNESCAPE: Handle multiple levels of escaping
     // ONLY intended for raw string responses, not JSON strings before parsing

@@ -438,7 +438,7 @@ export class RateLimitManager {
   clearPendingRequests(messageId = null) {
     logger.debug(`Clearing pending requests${messageId ? ` for messageId: ${messageId}` : ''}`);
     
-    for (const [providerName, state] of this.providerStates.entries()) {
+    for (const state of this.providerStates.values()) {
       [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
         const queue = state.queues[p];
         const remaining = [];

@@ -28,8 +28,8 @@ export class LanguageSwappingService {
     return await LanguageDetectionService.detect(text);
   }
 
-  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTargetLang = 'Farsi', options = {}) {
-    const { providerName = 'LanguageSwapping', useRegexFallback = true, mode } = options;
+  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', options = {}) {
+    const { providerName = 'LanguageSwapping', mode } = options;
 
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();

@@ -41,7 +41,7 @@ export class TranslationSegmentMapper {
     if (typeof translatedText === 'string') {
       // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
       // This preserves user content like [[Reference]] while allowing normalization of mangled delimiters.
-      const bracketPattern = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s\.\-\—\–\…\ـ\·\・]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+      const bracketPattern = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s.——–…ـ·・-]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
       if (bracketPattern.test(translatedText)) {
         translatedText = translatedText.replace(bracketPattern, delimiter);
       }
@@ -105,7 +105,7 @@ export class TranslationSegmentMapper {
     // 1. Aggressive Regex: Matches [[ with anything inside ]] and ALL surrounding hidden Unicode marks/spaces
     // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
     // This preserves user content like [[Reference]] while scrubbing [[ --- ]]
-    const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s\.\-\—\–\…\ـ\·\・]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+    const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s.——–…ـ·・-]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
     let cleaned = text.replace(BIDI_ARTIFACT_REGEX, ' ');
 
     // 2. Remove standard, primary, and common alternative delimiters
@@ -123,10 +123,10 @@ export class TranslationSegmentMapper {
 
     // 3. Clean up isolated bracket remnants and delimiter fragments at word boundaries
     // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
-    cleaned = cleaned.replace(/\[\[[\s\-\.\—\–\…\ـ\·\・]+/, ' ');
-    cleaned = cleaned.replace(/[\s\-\.\—\–\…\ـ\·\・]+\]\]/, ' ');
-    cleaned = cleaned.replace(/\s[\]\-\.\—\–\…\ـ\·\・]+\s/g, ' ');
-    cleaned = cleaned.replace(/\s[\[\-\.\—\–\…\ـ\·\・]+\s/g, ' ');
+    cleaned = cleaned.replace(/\[\[[\s.——–…ـ·・-]+/, ' ');
+    cleaned = cleaned.replace(/[\s.——–…ـ·・-]+\]\]/, ' ');
+    cleaned = cleaned.replace(/\s[\]——–…ـ·・-]+\s/g, ' ');
+    cleaned = cleaned.replace(/\s[[——–…ـ·・-]+\s/g, ' ');
 
     // 4. Final safety scrub using the BIDI regex again (handles cases where delimiters merged)
     cleaned = cleaned.replace(BIDI_ARTIFACT_REGEX, ' ');

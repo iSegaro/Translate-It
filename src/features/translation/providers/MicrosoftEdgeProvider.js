@@ -150,7 +150,6 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
 
       // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
       const body = chunkTexts.map(text => ({ Text: text }));
-      const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
       return await this._executeRequest({
         url: url.toString(),
