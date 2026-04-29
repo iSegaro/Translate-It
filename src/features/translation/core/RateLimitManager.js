@@ -87,6 +87,7 @@ export class RateLimitManager {
     
     const state = {
       config: { ...safeDefault, ...config },
+      isManualConfig: Object.keys(config).length > 0, // Mark as manual if config provided
       activeRequests: 0,
       lastRequestTime: 0,
       queues: {
@@ -129,17 +130,18 @@ export class RateLimitManager {
     // Resolve registry ID to name if necessary
     const name = registryIdToName(providerName) || providerName;
 
-    // Refresh state and configuration to ensure we're using the latest optimization level
+    // Refresh state and configuration only if it doesn't exist
     const state = await this._initializeProviderWithLevel(name);
     
-    // CRITICAL: Always re-fetch level to handle real-time setting changes between levels (e.g. 5 to 1)
-    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-    const currentLevel = await getProviderOptimizationLevelAsync(name);
-    
-    // Update config if it's different from what's in state (or always for safety during debug)
-    const latestConfig = getProviderConfiguration(name, currentLevel);
-    state.config = { ...state.config, ...latestConfig.rateLimit };
+    // Only update config if we're not in a manual/test state (or merge intelligently)
+    // For now, let's ensure we don't overwrite if we're already initialized with specific values
+    if (!state.isManualConfig) {
+      const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
+      const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
+      const currentLevel = await getProviderOptimizationLevelAsync(name);
+      const latestConfig = getProviderConfiguration(name, currentLevel);
+      state.config = { ...state.config, ...latestConfig.rateLimit };
+    }
 
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
@@ -201,9 +203,9 @@ export class RateLimitManager {
   /**
    * Main queue processing logic - respects priorities (HIGH > NORMAL > LOW)
    */
-  async _processQueue(providerName) {
+  _processQueue(providerName) {
     const state = this.providerStates.get(providerName);
-    if (!state || state.isProcessingQueue) return;
+    if (!state) return;
 
     // Stop processing if circuit is open
     if (this._isCircuitOpen(state)) {
@@ -211,48 +213,35 @@ export class RateLimitManager {
       return;
     }
 
-    state.isProcessingQueue = true;
+    // While we have capacity and pending requests, start them
+    while (state.activeRequests < state.config.maxConcurrent) {
+      // Check delay between requests
+      const now = Date.now();
+      const baseDelay = state.config.delayBetweenRequests || 0;
+      const adjustedDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const timeSinceLast = now - state.lastRequestTime;
 
-    try {
-      while (this._hasPendingRequests(state)) {
-        // Re-check circuit breaker inside loop
-        if (this._isCircuitOpen(state)) {
-          this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
-          break;
-        }
-
-        // Check concurrency
-        if (state.activeRequests >= state.config.maxConcurrent) break;
-
-        // Check delay between requests
-        const now = Date.now();
-        const baseDelay = state.config.delayBetweenRequests || 100;
-        const adjustedDelay = baseDelay * state.currentBackoffMultiplier;
-        const timeSinceLast = now - state.lastRequestTime;
-
-        if (timeSinceLast < adjustedDelay) {
-          const waitTime = Math.max(0, adjustedDelay - timeSinceLast);
-          await new Promise(r => setTimeout(r, waitTime));
-          continue; // Re-check conditions after wait
-        }
-
-        // Get next request by priority
-        const nextRequest = this._getNextRequest(state);
-        if (!nextRequest) break;
-
-        // Update stats and execute
-        state.activeRequests++;
-        state.lastRequestTime = Date.now();
-        
-        // Track wait time
-        const waitTime = Date.now() - nextRequest.enqueuedAt;
-        state.performanceStats.totalWaitTime += waitTime;
-        state.performanceStats.totalRequests++;
-
-        this._executeRequest(state, nextRequest, providerName, nextRequest.options);
+      if (timeSinceLast < adjustedDelay) {
+        const waitTime = Math.max(0, adjustedDelay - timeSinceLast);
+        if (state.nextProcessTimer) clearTimeout(state.nextProcessTimer);
+        state.nextProcessTimer = setTimeout(() => this._processQueue(providerName), waitTime);
+        break; 
       }
-    } finally {
-      state.isProcessingQueue = false;
+
+      // Get next request by priority
+      const nextRequest = this._getNextRequest(state);
+      if (!nextRequest) break;
+
+      // Update state and execute
+      state.activeRequests++;
+      state.lastRequestTime = Date.now();
+      
+      const waitTime = Date.now() - nextRequest.enqueuedAt;
+      state.performanceStats.totalWaitTime += waitTime;
+      state.performanceStats.totalRequests++;
+
+      // Execute without blocking the loop
+      this._executeRequest(state, nextRequest, providerName, nextRequest.options);
     }
   }
 
@@ -294,10 +283,13 @@ export class RateLimitManager {
     
     // Check if aborted before starting
     if (request.options?.abortController?.signal?.aborted) {
+      state.activeRequests--; // Decrease because it was increased before calling _executeRequest
       const abortError = new Error('Request aborted before execution');
       abortError.name = 'AbortError';
       abortError.isCancelled = true;
       request.reject(abortError);
+      // Immediately process next to keep concurrency high
+      this._processQueue(providerName);
       return;
     }
 
@@ -327,8 +319,8 @@ export class RateLimitManager {
       state.activeRequests--;
       this._updateDerivedStats(state);
       
-      // Process next in queue
-      setTimeout(() => this._processQueue(providerName), 10);
+      // Process next in queue IMMEDIATELY to preserve strict priority and concurrency
+      this._processQueue(providerName);
     }
   }
 
