@@ -22,8 +22,8 @@ const getTextInfo = (item) => {
 };
 
 // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
-// This preserves user content like [[Reference]] while scrubbing [[ --- ]]
-const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s.——–…ـ·・-]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+// This version is less aggressive with surrounding whitespace to prevent word-clumping
+const BIDI_ARTIFACT_REGEX = /\[\[[\s.——–…ـ·・-]+\]\]/g;
 
 export const TraditionalTextProcessor = {
   /**
@@ -33,11 +33,14 @@ export const TraditionalTextProcessor = {
   scrubBidiArtifacts(text) {
     if (!text || typeof text !== 'string') return text;
     
-    // 1. Remove intact brackets with BIDI marks
-    // We don't replace with space here to be safe for segment reconstruction
+    // 1. Remove intact brackets
     let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, '');
     
-    // 2. Remove isolated remnants (Safety layer for malformed delimiters)
+    // 2. Clean up any resulting double spaces or specific BIDI marks that might be left
+    scrubbed = scrubbed.replace(/[\u200B-\u200D\u200E\u200F\uFEFF]/g, '');
+    scrubbed = scrubbed.replace(/\s\s+/g, ' ').trim();
+    
+    // 3. Remove isolated remnants (Safety layer for malformed delimiters)
     scrubbed = scrubbed.replace(/\[\[[\s.—–…ـ·・-]+/, '');
     scrubbed = scrubbed.replace(/[\s.—–…ـ·・-]+\]\]/, '');
     
