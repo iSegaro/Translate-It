@@ -168,7 +168,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -219,7 +220,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: false,
-      reliableJsonMode: true
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -268,7 +270,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -319,7 +322,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: true, // Depends on model
       supportsBatchRequests: true,
       supportsThinking: false, // Varies by model
-      reliableJsonMode: true
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -370,7 +374,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: false, // Depends on model
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -522,7 +527,7 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
-      supportsDictionary: true // Yandex supports dictionary
+      supportsDictionary: false
     }
   },
 
@@ -820,7 +825,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: false, // Conservative default
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: false,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -857,7 +863,8 @@ export const PROVIDER_CONFIGURATIONS = {
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
-      reliableJsonMode: true
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   }
 };

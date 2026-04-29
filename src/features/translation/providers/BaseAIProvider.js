@@ -22,6 +22,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 export class BaseAIProvider extends BaseProvider {
   // AI-specific capabilities - to be overridden by subclasses
   static isAI = true;
+  static supportsDictionary = true;
 
   /**
    * Configuration Resolvers - Unified with ProviderConfigurations.js and User Levels

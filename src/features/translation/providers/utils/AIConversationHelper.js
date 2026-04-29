@@ -212,8 +212,9 @@ export const AIConversationHelper = {
     const targetName = getLanguageNameFromCode(targetLang) || targetLang;
 
     let promptTemplate;
+    const isDictionary = translateMode === TranslationMode.Dictionary_Translation;
 
-    if (isBatch) {
+    if (isBatch && !isDictionary) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
       
       if (sourceLang === 'auto') {
@@ -230,7 +231,9 @@ export const AIConversationHelper = {
         promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetName}.`;
       }
     } else {
-      promptTemplate = await buildPrompt("$_{TEXT}", sourceLang, targetLang, translateMode, providerType);
+      // For dictionary mode or single segments, use the standard buildPrompt logic
+      const promptText = Array.isArray(text) ? text[0] : text;
+      promptTemplate = await buildPrompt(promptText, sourceLang, targetLang, translateMode, providerType);
     }
 
     if (!promptTemplate.includes("$_{TEXT}")) {
@@ -253,8 +256,8 @@ export const AIConversationHelper = {
       .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
 
     // Determine if we should wrap the text in a JSON structure
-    // We wrap for batch requests or specific modes that use AI batch prompts
-    const shouldWrap = isBatch || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page;
+    // We wrap for batch requests (excluding dictionary) or specific modes that use AI batch prompts
+    const shouldWrap = (isBatch || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page) && !isDictionary;
 
     let userText;
     if (shouldWrap) {
