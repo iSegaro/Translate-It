@@ -1,4 +1,4 @@
-// SelectElementManager - Simplified Manager using domtranslator
+// SelectElementManager - Specialized Manager for Select Element
 // Single responsibility: Manage Select Element mode lifecycle and interactions
 
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -33,7 +33,8 @@ import { extractTextFromElement, isValidTextElement } from './utils/elementHelpe
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
 
 /**
- * Simplified SelectElementManager using domtranslator library
+ * SelectElementManager - Coordinates the interactive Select Element mode.
+ * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
  */
 class SelectElementManager extends ResourceTracker {
   constructor() {

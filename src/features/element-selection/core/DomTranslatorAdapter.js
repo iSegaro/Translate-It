@@ -1,6 +1,15 @@
 /**
- * DomTranslatorAdapter - Orchestrator for Select Element translation
- * Coordinates between background services and visual DOM management
+ * DomTranslatorAdapter - Specialized Orchestrator for "Select Element" Translation.
+ * 
+ * NOTE: This is NOT a wrapper for the 'DomTranslator' library used in Whole Page Translation.
+ * It is a custom, high-performance implementation specifically engineered for surgical 
+ * element selection.
+ * 
+ * Key Advantages over general library:
+ * 1. AI/DeepL Context Injection: Automatically gathers headings and metadata to improve LLM accuracy.
+ * 2. Structural Block Batching: Groups text nodes by semantic blocks (P, DIV) to prevent sentence fragmentation.
+ * 3. Token Optimization: Uses an abbreviated JSON protocol (t, i, b, r) saving ~75% overhead.
+ * 4. Resilient UID Mapping: Ensures 1:1 text node restoration even with asynchronous streaming updates.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -33,6 +42,10 @@ import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTra
 // Export state and revert logic for external use
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
+/**
+ * Specialized adapter that coordinates between background services and visual DOM management.
+ * Designed for low-latency, high-precision translation of specific DOM branches.
+ */
 export class DomTranslatorAdapter extends ResourceTracker {
   constructor() {
     super('dom-translator-adapter');
