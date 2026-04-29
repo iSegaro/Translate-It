@@ -62,6 +62,9 @@ export const BASE_CHARACTER_LIMITS = {
   BING: 4000,
   YANDEX: 10000,
   DEEPL: 10000,
+  EDGE: 5000,
+  BROWSER: 10000,
+  LINGVA: 1500,
 };
 
 /**
@@ -72,6 +75,9 @@ export const BASE_MAX_CHUNKS_PER_BATCH = {
   BING: 10,
   YANDEX: 100,
   DEEPL: 150,
+  EDGE: 100,
+  BROWSER: 50,
+  LINGVA: 30,
 };
 
 const UNIFIED_AI_BATCHING_CONFIG = {
@@ -386,6 +392,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
+      optimalSize: 40,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE,
       delimiter: DEFAULT_TEXT_DELIMITER // Standard resilient delimiter
     },
@@ -435,7 +442,8 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit',
       characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
-      maxChunksPerBatch: 15, // V2 has smaller segment limit per request
+      optimalSize: 40, // Base segment limit that scales with optimization level
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE, // Use standardized limit
       delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
@@ -484,6 +492,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.YANDEX,
+      optimalSize: 40,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.YANDEX,
       delimiter: null // Yandex uses array format
     },
@@ -535,6 +544,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.DEEPL,
+      optimalSize: 50,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.DEEPL,
       delimiter: null // DeepL uses array format
     },
@@ -587,6 +597,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.BING,
+      optimalSize: 20,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.BING,
       delimiter: DEFAULT_TEXT_DELIMITER, // Standard resilient delimiter
       adaptiveChunking: true, // Enable adaptive chunking for errors
@@ -643,9 +654,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 5000,
+      characterLimit: BASE_CHARACTER_LIMITS.EDGE,
       optimalSize: 40, // Base segment limit for Edge
-      maxChunksPerBatch: 100, // Increased from 20 to 100 - Edge API supports large batches
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.EDGE, // Edge API supports large batches
       delimiter: null // Uses JSON array
     },
     streaming: {
@@ -687,8 +698,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 10000,
-      maxChunksPerBatch: 50,
+      characterLimit: BASE_CHARACTER_LIMITS.BROWSER,
+      optimalSize: 50,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.BROWSER,
       delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
@@ -730,9 +742,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 1500, // Safe for GET URL lengths
+      characterLimit: BASE_CHARACTER_LIMITS.LINGVA, // Safe for GET URL lengths
       optimalSize: 15,      // Base segment limit
-      maxChunksPerBatch: 30,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.LINGVA,
       delimiter: null // Uses JSON POST in config, but GET in provider (provider overrides)
     },
     streaming: {
