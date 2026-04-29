@@ -74,8 +74,8 @@ export const AITextProcessor = {
     const totalSegments = texts.length;
     const totalComplexity = this.getTotalComplexity(texts);
     
-    // Smart batching logic
-    if (totalSegments <= Math.min(20, optimalSize) || totalComplexity < Math.min(300, maxComplexity)) {
+    // Smart batching logic - only avoid splitting if BOTH segments and complexity are low
+    if (totalSegments <= Math.min(20, optimalSize) && totalComplexity < Math.min(300, maxComplexity)) {
       logger.debug(`[${providerName}] Using single batch for ${totalSegments} segments (complexity: ${totalComplexity})`);
       return [texts];
     }
@@ -362,8 +362,11 @@ export const AITextProcessor = {
         chunkCount += matches.length;
       }
 
-      // Check for broken placeholders
-      const brokenPattern = /\[\[AIWC-\d+$|^\d+\]\]|\[\[AIWC-|AIWC-\d+\]\]/;
+      // Check for broken placeholders: 
+      // 1. Starts with end of placeholder: ^\d+\]\]
+      // 2. Ends with start of placeholder: \[\[AIWC-\d+$
+      // 3. Contains partial markers not forming a full placeholder
+      const brokenPattern = /\[\[AIWC-\d+$|^\d+\]\]/;
       if (brokenPattern.test(chunk)) {
         logger.error(`Found broken placeholder in chunk`);
         return false;
