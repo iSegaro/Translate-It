@@ -245,7 +245,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching & key abbreviation)
+  PROMPTS_VERSION: 3, // Version of the prompt templates (updated for logical batching & key abbreviation)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
@@ -500,12 +500,11 @@ Return only the JSON object, no additional text.`,
   PROMPT_BASE_DICTIONARY: `You are a professional dictionary service. Your task is to accurately translate the word or phrase from $_{SOURCE} into $_{TARGET}.
 
 Format your response exactly as follows using Markdown:
-**$_{TEXT}**
-   
-- **Main Translation**: [Primary meaning in $_{TARGET}]
-- **Noun**: [Meanings if it's a noun, separated by comma]
-- **Verb**: [Meanings if it's a verb, separated by comma]
-- **Adjective**: [Meanings if it's an adjective, separated by comma]
+- **Meaning**: [Primary meaning in $_{TARGET}]
+
+- **Noun**: Meanings if it's a noun, separated by comma
+- **Verb**: Meanings if it's a verb, separated by comma
+- **Adjective**: Meanings if it's an adjective, separated by comma
 
 Keep it very brief. Only include relevant parts of speech. No examples or explanations.
 All translations MUST be in $_{TARGET}.
