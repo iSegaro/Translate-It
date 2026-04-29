@@ -6,8 +6,7 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
-const isMobile = process.env.IS_MOBILE === 'true';
-const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`;
+const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}`;
 
 // Import production config for production builds
 let productionConfig = null;
@@ -51,8 +50,7 @@ export default defineConfig({
   define: {
     ...(finalConfig.define || {}),
     __BROWSER__: JSON.stringify('firefox'),
-    __MANIFEST_VERSION__: 3,
-    __IS_MOBILE__: isMobile
+    __MANIFEST_VERSION__: 3
   },
 
   build: {
