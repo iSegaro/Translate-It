@@ -251,10 +251,16 @@ export class TranslationHandler {
     return new Promise((resolve, reject) => {
       // Set timeout
       const timeout = setTimeout(() => {
+        // Double check if the request is still active before rejecting
+        if (!this.activeRequests.has(messageId)) return;
+        
+        const request = this.activeRequests.get(messageId);
         this.activeRequests.delete(messageId);
 
         // Create timeout error
         const timeoutError = new Error('Translation timeout');
+        timeoutError.type = 'TIMEOUT';
+        timeoutError.messageId = messageId;
 
         // Handle through ErrorHandler for proper error management
         if (ExtensionContextManager.isValidSync()) {
@@ -267,7 +273,9 @@ export class TranslationHandler {
           });
         }
 
-        reject(timeoutError);
+        if (request && typeof request.reject === 'function') {
+          request.reject(timeoutError);
+        }
       }, WindowsConfig.TIMEOUTS.TRANSLATION_TIMEOUT);
 
       // Store request info for central handler to find
