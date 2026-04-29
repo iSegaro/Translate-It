@@ -171,7 +171,8 @@ export class SimpleMarkdown {
     // Pattern to match label lines like:
     // - "**noun:** test, experiment" (markdown bold)
     // - "اسم: آزمایش" (regular labels)
-    const trimmedText = text.trim();
+    // - "- **Meaning**: آزمایش" (list item label)
+    const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
     
     // Check for markdown bold labels: **Label**: content
     // We look for ** at start, some characters, ** then a colon.
@@ -310,22 +311,44 @@ export class SimpleMarkdown {
     // Split into non-empty lines
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     
+    if (lines.length === 0) {
+      return "";
+    }
+
     if (lines.length <= 1) {
+      // If it's a single line and it's a label, try to extract the value
+      if (this._isLabelLine(lines[0])) {
+        const colonIndex = lines[0].indexOf(':');
+        if (colonIndex !== -1) {
+          return this.strip(lines[0].substring(colonIndex + 1));
+        }
+      }
       return this.strip(text);
     }
 
     // Structural Check: In dictionary mode, we typically have a main translation 
     // followed by lines with labels (Noun:, Verb:, etc.)
-    let isDictionary = false;
-    for (let i = 1; i < lines.length; i++) {
-      if (this._isLabelLine(lines[i])) {
-        isDictionary = true;
-        break;
+    // OR the first line itself is a label (Meaning: ...)
+    let isDictionary = this._isLabelLine(lines[0]);
+    
+    if (!isDictionary) {
+      for (let i = 1; i < lines.length; i++) {
+        if (this._isLabelLine(lines[i])) {
+          isDictionary = true;
+          break;
+        }
       }
     }
 
     if (isDictionary) {
-      // It's a dictionary entry - only return the first line (the primary meaning)
+      // It's a dictionary entry - only return the primary meaning (first line)
+      // Extract content after colon if the first line is a label
+      if (this._isLabelLine(lines[0])) {
+        const colonIndex = lines[0].indexOf(':');
+        if (colonIndex !== -1) {
+          return this.strip(lines[0].substring(colonIndex + 1));
+        }
+      }
       return this.strip(lines[0]);
     }
 
