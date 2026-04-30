@@ -28,13 +28,16 @@ export class LanguageSwappingService {
     return await LanguageDetectionService.detect(text);
   }
 
-  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', options = {}) {
+  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTarget = 'English', options = {}) {
     const { providerName = 'LanguageSwapping', mode } = options;
 
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const bilingualModes = await getBilingualTranslationModesAsync();
-      const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
+
+      // CRITICAL FIX: Only enable bilingual if mode is explicitly set to true
+      // getBilingualTranslationModesAsync already falls back to CONFIG defaults if not in storage
+      const isModeEnabled = mode ? (bilingualModes[mode] === true) : true;
 
       // If bilingual is disabled for this mode/globally, skip detection and return original languages
       if (!bilingualEnabled || !isModeEnabled) {
