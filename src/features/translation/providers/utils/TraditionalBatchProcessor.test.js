@@ -18,13 +18,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
-// Mock rateLimitManager to avoid complex singleton setup in unit test
-const mockRateLimitManager = {
-  executeWithRateLimit: vi.fn((provider, task) => task())
-};
-
 vi.mock('@/features/translation/core/RateLimitManager.js', () => ({
-  rateLimitManager: mockRateLimitManager,
+  rateLimitManager: {
+    executeWithRateLimit: vi.fn((provider, task) => task())
+  },
   TranslationPriority: { NORMAL: 5 }
 }));
 
