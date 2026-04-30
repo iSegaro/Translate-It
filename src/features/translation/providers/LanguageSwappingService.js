@@ -28,7 +28,7 @@ export class LanguageSwappingService {
     return await LanguageDetectionService.detect(text);
   }
 
-  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', originalTarget = 'English', options = {}) {
+  static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', options = {}) {
     const { providerName = 'LanguageSwapping', mode } = options;
 
     try {

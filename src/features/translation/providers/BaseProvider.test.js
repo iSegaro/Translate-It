@@ -224,8 +224,6 @@ describe('BaseProvider', () => {
     });
 
     it('should throw generic API error for other fields', () => {
-      const expectedType = ErrorTypes.API_CONFIG_INVALID; 
-      
       try {
         provider._validateConfig({}, ['otherField'], 'test-ctx');
         throw new Error('Should have thrown');

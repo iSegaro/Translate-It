@@ -24,10 +24,8 @@ vi.mock('@/shared/logging/logger.js', () => ({
 import { BaseTranslateProvider } from './BaseTranslateProvider.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { streamingManager } from '@/features/translation/core/StreamingManager.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TraditionalTextProcessor } from './utils/TraditionalTextProcessor.js';
 import { TraditionalStreamManager } from './utils/TraditionalStreamManager.js';
-import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 
 vi.mock('@/features/translation/core/StreamingManager.js', () => ({
   streamingManager: {

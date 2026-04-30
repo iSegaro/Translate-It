@@ -35,11 +35,11 @@ const chromeMock = {
   },
 };
 
-global.chrome = chromeMock;
-global.browser = chromeMock;
+globalThis.chrome = chromeMock;
+globalThis.browser = chromeMock;
 
 // Mock import.meta.env
-global.import = {
+globalThis.import = {
   meta: {
     env: {
       MODE: 'test',

@@ -40,7 +40,6 @@ vi.mock('@/core/memory/ResourceTracker.js', () => {
 describe('StreamingManager', () => {
   let streamingManager;
   let MessageActions;
-  let ErrorTypes;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -53,9 +52,6 @@ describe('StreamingManager', () => {
     
     const msgMod = await import('@/shared/messaging/core/MessageActions.js');
     MessageActions = msgMod.MessageActions;
-
-    const errMod = await import('@/shared/error-management/ErrorTypes.js');
-    ErrorTypes = errMod.ErrorTypes;
 
     // Reset singleton state
     streamingManager.cleanup();

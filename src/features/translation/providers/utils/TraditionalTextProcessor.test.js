@@ -37,7 +37,6 @@ describe('TraditionalTextProcessor', () => {
 
   describe('createChunks', () => {
     it('should split by character limit precisely', () => {
-      const delimiter = '[[---]]'; // length 7
       const texts = ['aaaa', 'bbbb', 'cccc']; // each 4 chars
       const charLimit = 15; // 4 + 7 + 4 = 15 (fits 2 segments). 3rd would be 15 + 7 + 4 = 26 (exceeds)
 

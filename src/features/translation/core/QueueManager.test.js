@@ -21,7 +21,6 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 describe('QueueManager', () => {
   let queueManager;
-  let QueueStatus;
   let ErrorTypes;
 
   beforeEach(async () => {
@@ -31,7 +30,6 @@ describe('QueueManager', () => {
     
     const mod = await import('./QueueManager.js');
     queueManager = mod.queueManager;
-    QueueStatus = mod.QueueStatus;
     
     const errMod = await import('@/shared/error-management/ErrorTypes.js');
     ErrorTypes = errMod.ErrorTypes;

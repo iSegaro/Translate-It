@@ -14,7 +14,6 @@ vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -101,7 +100,7 @@ describe('RateLimitManager', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await manager.executeWithRateLimit('TestProvider', failingTask);
-        } catch (e) {
+        } catch {
           // Ignore planned errors
         }
       }
@@ -116,7 +115,9 @@ describe('RateLimitManager', () => {
       // But for this test, let's just use a fresh error that is marked as fatal
       try {
         await manager.executeWithRateLimit('TestProvider', () => Promise.reject(new Error('FATAL')));
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
 
       await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
         .rejects.toThrow(/Circuit breaker open/);
@@ -154,7 +155,9 @@ describe('RateLimitManager', () => {
 
       try {
         await manager.executeWithRateLimit('TestProvider', () => Promise.reject(new Error('Error 429: Too Many Requests')));
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
 
       expect(state.currentBackoffMultiplier).toBe(2);
     });

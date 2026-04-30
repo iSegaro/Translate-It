@@ -3,7 +3,6 @@ import { FrameRegistry } from './FrameRegistry.js';
 
 describe('FrameRegistry', () => {
   let frameRegistry;
-  let addEventListenerSpy;
 
   beforeEach(() => {
     // Clean up global state before each test

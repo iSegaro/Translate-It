@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BingTranslateProvider } from './BingTranslate.js';
 import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({

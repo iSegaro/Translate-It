@@ -1,8 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createApp, nextTick, ref } from 'vue';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createApp } from 'vue';
 import { useTranslationError } from './useTranslationError.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
-import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import * as ErrorDisplayStrategies from '@/shared/error-management/ErrorDisplayStrategies.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 

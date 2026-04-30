@@ -19,9 +19,6 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import browser from "webextension-polyfill";
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({

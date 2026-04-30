@@ -57,7 +57,7 @@ describe('TraditionalBatchProcessor', () => {
       ];
       const translateChunk = vi.fn((chunk) => chunk.map(s => s + '_tr'));
 
-      const result = await TraditionalBatchProcessor.processInBatches(
+      await TraditionalBatchProcessor.processInBatches(
         mockProvider, segments, translateChunk, mockLimits
       );
 

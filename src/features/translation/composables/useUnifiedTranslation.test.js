@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createApp, nextTick, ref } from 'vue';
 import { getActivePinia, createPinia, setActivePinia, defineStore } from 'pinia';
 import { useUnifiedTranslation } from './useUnifiedTranslation.js';
-import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 // --- Mocks ---
 
@@ -124,12 +123,10 @@ function withSetup(composable) {
 }
 
 describe("useUnifiedTranslation", () => {
-  let settingsStore;
   let translationStore;
 
   beforeEach(() => {
     setActivePinia(createPinia());
-    settingsStore = useSettingsStore();
     translationStore = useTranslationStore();
     vi.useFakeTimers();
     vi.clearAllMocks();

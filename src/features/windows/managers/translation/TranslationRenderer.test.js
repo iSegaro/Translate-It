@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TranslationRenderer } from './TranslationRenderer.js';
-import { TranslationMode, CONFIG } from '@/shared/config/config.js';
+import { TranslationMode } from '@/shared/config/config.js';
 import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
 
 // Mock webextension-polyfill

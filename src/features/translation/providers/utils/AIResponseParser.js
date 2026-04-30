@@ -40,7 +40,7 @@ const Healers = {
       // Fix values: : 'value' -> : "value"
       processed = processed.replace(/:\s*'([^']*)'\s*([,}\]])/g, ': "$1"$2');
       // Fix array items: ['item', 'item'] -> ["item", "item"]
-      processed = processed.replace(/([\[,])\s*'([^']*)'\s*([,\]])/g, '$1"$2"$3');
+      processed = processed.replace(/([[,])\s*'([^']*)'\s*([,\]])/g, '$1"$2"$3');
       return processed;
     },
 
@@ -147,12 +147,7 @@ export const AIResponseParser = {
     if (!parsed) {
       const healed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
       if (healed !== result) {
-        try {
-          parsed = this._extractAndParseJson(healed, expectedFormat);
-        } catch (e) {
-          // If still fails, re-throw the error
-          throw e;
-        }
+        parsed = this._extractAndParseJson(healed, expectedFormat);
       } else if (!parsed) {
         // If no healing was possible and we still don't have a result, re-run to throw original error
         parsed = this._extractAndParseJson(result, expectedFormat);

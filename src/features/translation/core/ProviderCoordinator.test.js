@@ -11,13 +11,12 @@ vi.mock('webextension-polyfill', () => ({
 // Mock ErrorMatcher
 vi.mock("@/shared/error-management/ErrorMatcher.js", () => ({
   isFatalError: vi.fn((err) => err.message === 'FATAL'),
-  matchErrorToType: vi.fn((err) => 'API_ERROR')
+  matchErrorToType: vi.fn(() => 'API_ERROR')
 }));
 
 import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
-import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({

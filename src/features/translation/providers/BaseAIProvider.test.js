@@ -44,14 +44,6 @@ vi.mock("./utils/AIResponseParser.js", () => ({
 import { BaseAIProvider } from './BaseAIProvider.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { statsManager } from '../core/TranslationStatsManager.js';
-import { AIResponseParser } from "./utils/AIResponseParser.js";
-
-// 3. Define local constants to avoid circular mock issues
-const ResponseFormat = {
-  STRING: 'string',
-  JSON_ARRAY: 'json_array',
-  JSON_OBJECT: 'json_object'
-};
 
 // 4. Concrete implementation for testing
 class MockAIProvider extends BaseAIProvider {

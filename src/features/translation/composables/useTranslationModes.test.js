@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createApp, nextTick } from 'vue';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createApp } from 'vue';
 import { useSidepanelTranslation, useSelectElementTranslation, useSidepanelActions } from './useTranslationModes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 
 // --- Mocks ---
 
@@ -165,7 +164,7 @@ describe("useTranslationModes", () => {
 
   describe("useSelectElementTranslation", () => {
     it("should initialize and register listener on mount", async () => {
-      const [composable, app] = withSetup(() => useSelectElementTranslation());
+      const [composable] = withSetup(() => useSelectElementTranslation());
       
       // onMounted is called during withSetup's app.mount
       expect(composable.isSelectModeActive.value).toBe(false);

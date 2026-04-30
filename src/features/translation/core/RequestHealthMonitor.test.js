@@ -117,7 +117,6 @@ describe('RequestHealthMonitor', () => {
     });
 
     it('should filter old response times based on TTL', () => {
-      const now = Date.now();
       healthMonitor.recordSuccess('P1', 100);
       
       // Advance time beyond responseTimeWindowMs (5 mins)

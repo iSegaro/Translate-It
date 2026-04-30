@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SelectElementNotificationManager } from './SelectElementNotificationManager.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
 // Mock dependencies

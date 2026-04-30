@@ -126,7 +126,6 @@ export class FeatureManager extends ResourceTracker {
   async injectDependencies() {
     const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
     const selectElementManager = this.featureHandlers.get('selectElement');
-    const shortcutHandler = this.featureHandlers.get('shortcut');
 
     // Inject SelectElementManager into ContentMessageHandler for direct access
     if (contentMessageHandler && selectElementManager) {
