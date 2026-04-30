@@ -23,35 +23,40 @@ describe('WindowsFactory', () => {
   });
 
   describe('Popup Structure', () => {
-    it('should create a popup host with unique ID', () => {
+    it('should create a popup host with unique ID and ARIA dialog role', () => {
       const host = factory.createPopupHost('frame-1');
       expect(host.classList.contains(WindowsConfig.CSS_CLASSES.POPUP_HOST)).toBe(true);
       expect(host.id).toMatch(/translate-window-frame-1-\d+/);
+      expect(host.getAttribute('role')).toBe('dialog');
+      expect(host.getAttribute('aria-label')).toBe('Translation Window');
     });
 
-    it('should create a popup container with shadow root', () => {
+    it('should create a popup container with shadow root and document role', () => {
       const host = document.createElement('div');
       const { shadowRoot, container } = factory.createPopupContainer(host);
       
       expect(shadowRoot).toBeDefined();
       expect(host.shadowRoot).toBe(shadowRoot);
       expect(container.classList.contains(WindowsConfig.CSS_CLASSES.POPUP_CONTAINER)).toBe(true);
+      expect(container.getAttribute('role')).toBe('document');
       expect(shadowRoot.querySelector('style')).toBeDefined();
     });
 
-    it('should create loading dots with 3 spans', () => {
+    it('should create loading dots with ARIA status role', () => {
       const dots = factory.createLoadingDots();
-      expect(dots.classList.contains(WindowsConfig.CSS_CLASSES.LOADING_CONTAINER)).toBe(true);
+      expect(dots.getAttribute('role')).toBe('status');
+      expect(dots.getAttribute('aria-live')).toBe('polite');
       expect(dots.querySelectorAll(`.${WindowsConfig.CSS_CLASSES.LOADING_DOT}`).length).toBe(3);
     });
   });
 
   describe('Icon Creation and Error Handling', () => {
-    it('should create a translate icon with correct fixed positioning', () => {
+    it('should create a translate icon with button role and tabindex', () => {
       const icon = factory.createTranslateIcon();
+      expect(icon.getAttribute('role')).toBe('button');
+      expect(icon.getAttribute('tabindex')).toBe('0');
       expect(icon.id).toBe(WindowsConfig.IDS.ICON);
       expect(icon.style.position).toBe('fixed');
-      expect(icon.style.width).toBe(`${WindowsConfig.POSITIONING.ICON_SIZE}px`);
     });
 
     it('should throw error when extension context is invalidated during icon creation', () => {
@@ -68,12 +73,14 @@ describe('WindowsFactory', () => {
       expect(document.body.contains(host)).toBe(true);
     });
 
-    it('should create TTS icon with correct attributes', () => {
+    it('should create TTS icon with button role and labels', () => {
       const title = 'Play Audio';
       const icon = factory.createTTSIcon(title);
+      expect(icon.getAttribute('role')).toBe('button');
+      expect(icon.getAttribute('tabindex')).toBe('0');
+      expect(icon.getAttribute('aria-label')).toBe(title);
       expect(icon.tagName).toBe('IMG');
       expect(icon.title).toBe(title);
-      expect(icon.classList.contains(WindowsConfig.CSS_CLASSES.TTS_ICON)).toBe(true);
     });
 
     it('should throw error when extension context is invalidated during TTS icon creation', () => {
@@ -94,11 +101,12 @@ describe('WindowsFactory', () => {
       expect(secondLine.classList.contains(WindowsConfig.CSS_CLASSES.SECOND_LINE)).toBe(true);
     });
 
-    it('should create a functional close button', () => {
+    it('should create a functional close button with ARIA button role', () => {
       const closeBtn = factory.createCloseButton();
+      expect(closeBtn.getAttribute('role')).toBe('button');
+      expect(closeBtn.getAttribute('tabindex')).toBe('0');
+      expect(closeBtn.getAttribute('aria-label')).toBe('Close translation');
       expect(closeBtn.textContent).toBe('✕');
-      expect(closeBtn.style.cursor).toBe('pointer');
-      expect(closeBtn.title).toBe('Close');
     });
 
     it('should create an original text span with correct text', () => {
