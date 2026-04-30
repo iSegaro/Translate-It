@@ -16,8 +16,8 @@ export class WindowsConfig {
   };
 
   static POSITIONING = {
-    POPUP_WIDTH: 330,
-    POPUP_HEIGHT: 120,
+    POPUP_WIDTH: 280,
+    POPUP_HEIGHT: 160,
     ICON_SIZE: 24,
     VIEWPORT_MARGIN: 8, // Reduced for less aggressive repositioning
     SELECTION_OFFSET: 3, // Reduced offset for closer positioning to selection

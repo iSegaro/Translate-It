@@ -7,8 +7,8 @@
   display: flex !important;
   flex-direction: column !important;
   z-index: 2147483647 !important;
-  max-height: min(450px, 85vh) !important;
-  max-width: min(400px, 90vw) !important;
+  max-height: min(400px, 80vh) !important;
+  max-width: min(350px, 85vw) !important;
   overflow: visible !important; // Changed from hidden to allow dropdowns to pop out
 
   // Theme: Light
@@ -214,7 +214,7 @@
 
   .ti-window-translation-display {
     flex: 1 !important;
-    min-height: 60px !important;
+    min-height: 80px !important;
     position: relative !important;
     overflow: visible !important; // Let the parent body handle scrolling
     min-width: 0 !important;
