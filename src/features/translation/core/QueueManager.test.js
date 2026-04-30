@@ -116,16 +116,22 @@ describe('QueueManager', () => {
     });
 
     it('should fail permanently after max retries', async () => {
-      const mockError = { type: ErrorTypes.NETWORK_ERROR, message: 'Network' };
+      const mockError = new Error('Network');
+      mockError.type = ErrorTypes.NETWORK_ERROR;
+      
       // NETWORK_ERROR: maxRetries 4.
       const mockRequest = vi.fn().mockRejectedValue(mockError);
 
       const promise = queueManager.enqueue('fail-provider', mockRequest);
+      // Catch early to satisfy Vitest's unhandled rejection checker
+      promise.catch(() => {});
 
       // Advance long enough for all retries
-      await vi.advanceTimersByTimeAsync(100000);
+      for (let i = 0; i < 10; i++) {
+        await vi.advanceTimersByTimeAsync(10000);
+      }
 
-      await expect(promise).rejects.toMatchObject({ message: 'Network' });
+      await expect(promise).rejects.toThrow('Network');
       expect(mockRequest).toHaveBeenCalledTimes(4);
     });
   });
