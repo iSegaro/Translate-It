@@ -128,7 +128,7 @@ export class WindowsManager extends ResourceTracker {
 
         this.logger.info('[TTS] TTS functionality loaded');
       } catch (error) {
-        this.logger.error('[TTS] Failed to load TTS functionality:', error);
+        this.logger.warn('[TTS] Failed to load TTS functionality:', error.message);
         throw error;
       }
     }
@@ -271,7 +271,7 @@ export class WindowsManager extends ResourceTracker {
       await this.themeManager.initialize();
       this.logger.info('WindowsManager initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to initialize WindowsManager:', error);
+      this.logger.warn('Failed to initialize WindowsManager (non-critical):', error.message);
     }
   }
 
@@ -428,7 +428,7 @@ export class WindowsManager extends ResourceTracker {
       });
       
     } catch (error) {
-      this.logger.error('Error during mobile translation:', error);
+      this.logger.info('Mobile translation failed (handled via UI):', error.message);
       
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'mobile-translation');
       
@@ -713,10 +713,11 @@ export class WindowsManager extends ResourceTracker {
         this.logger.info('TTS stopped via unified composable');
       }
     } catch (error) {
-      this.logger.error('TTS error:', error);
+      this.logger.warn('TTS error (handled):', error.message);
+
       await this.errorHandler.handle(error, {
-        context: 'windows-manager-tts',
-        showToast: false
+        context: 'windows-tts',
+        showToast: true
       });
     }
   }
@@ -762,7 +763,11 @@ export class WindowsManager extends ResourceTracker {
       });
       
     } catch (error) {
-      this.logger.error('Error during translation retry:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'windows-translation-retry');
+      } else {
+        this.logger.info('Translation retry failed (handled via UI):', error.message);
+      }
       
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
       const fallbackProvider = this.translationHandler.getEffectiveProvider(textToTranslate, { provider: this.state.provider });
@@ -829,7 +834,7 @@ export class WindowsManager extends ResourceTracker {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'windows-manager:provider-change');
       } else {
-        this.logger.error('Error during provider change translation:', error);
+        this.logger.info('Provider change translation failed (handled via UI):', error.message);
       }
 
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');      
@@ -1221,7 +1226,7 @@ export class WindowsManager extends ResourceTracker {
           }
         })
         .catch(async (error) => {
-          this.logger.info('Translation process failed in cross-frame mode:', error);
+          this.logger.info('Translation process failed in cross-frame mode (handled via UI):', error.message);
 
           // Use ErrorHandler to get user-friendly error message (consistent with normal mode)
           const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
@@ -1265,7 +1270,7 @@ export class WindowsManager extends ResourceTracker {
       this.state.mainDocumentWindowId = data.windowId;
       this.clickManager.addOutsideClickListener();
     } else {
-      this.logger.error('Failed to create window in main document:', data.error);
+      this.logger.warn('Failed to create window in main document:', data.error);
     }
   }
 
@@ -1321,7 +1326,7 @@ export class WindowsManager extends ResourceTracker {
       await this.show(data.selectedText, adjustedPosition, data.options);
 
     } catch (error) {
-      this.logger.error('Failed to handle text selection window request from iframe:', error);
+      this.logger.warn('Failed to handle text selection window request from iframe:', error.message);
     }
   }
 
@@ -1373,7 +1378,7 @@ export class WindowsManager extends ResourceTracker {
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, context);
     } else {
-      this.logger.error(`Error in ${context}:`, error);
+      this.logger.info(`Managed error in ${context}:`, error.message);
     }
     
     if (this.translationHandler.errorHandler) {

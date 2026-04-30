@@ -76,7 +76,7 @@ function createTimeout(ms, action) {
   const promise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
       const timeoutError = new Error(`Operation '${action || 'unknown'}' timed out after ${ms}ms`);
-      timeoutError.type = 'OPERATION_TIMEOUT';
+      timeoutError.type = ErrorTypes.OPERATION_TIMEOUT;
 
       if (ExtensionContextManager.isValidSync()) {
         ErrorHandler.getInstance().handle(timeoutError, {

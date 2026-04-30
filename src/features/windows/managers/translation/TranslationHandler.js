@@ -259,7 +259,7 @@ export class TranslationHandler {
 
         // Create timeout error
         const timeoutError = new Error('Translation timeout');
-        timeoutError.type = 'TIMEOUT';
+        timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
         timeoutError.messageId = messageId;
 
         // Handle through ErrorHandler for proper error management
