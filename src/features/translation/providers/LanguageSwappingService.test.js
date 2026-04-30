@@ -20,7 +20,10 @@ vi.mock("@/shared/services/LanguageDetectionService.js", () => ({
 
 vi.mock("@/shared/config/config.js", () => ({
   getBilingualTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
-  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({ selection: true, popup: true }))
+  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({ selection: true, popup: true })),
+  TranslationMode: {
+    Dictionary_Translation: 'dictionary'
+  }
 }));
 
 vi.mock("@/shared/config/languageConstants.js", () => ({
@@ -48,7 +51,7 @@ describe('LanguageSwappingService', () => {
       getCanonicalCode.mockImplementation(l => l === 'fa' ? 'fa' : l);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام دنیا', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
+        'سلام دنیا', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
       );
 
       // Expected: Swap to Farsi -> English
@@ -63,7 +66,7 @@ describe('LanguageSwappingService', () => {
       LanguageDetectionService.detect.mockResolvedValue('en');
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'Hello World', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
+        'Hello World', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
       );
 
       // Expected: Keep Auto -> Farsi
@@ -78,7 +81,7 @@ describe('LanguageSwappingService', () => {
       LanguageDetectionService.detect.mockResolvedValue('fa');
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', 'en', 'fa', 'en', { mode: 'selection' }
+        'سلام', 'en', 'fa', 'en', 'fa', { mode: 'selection' }
       );
 
       // Expected: Keep English -> Farsi (respect user choice)
@@ -91,7 +94,7 @@ describe('LanguageSwappingService', () => {
       getBilingualTranslationEnabledAsync.mockResolvedValue(false);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
+        'سلام', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
       );
 
       expect(src).toBe(AUTO_DETECT_VALUE);
@@ -109,7 +112,7 @@ describe('LanguageSwappingService', () => {
       getCanonicalCode.mockImplementation(l => l);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', 'auto', 'fa', 'auto', { mode: 'selection' }
+        'سلام', 'auto', 'fa', 'auto', 'fa', { mode: 'selection' }
       );
 
       expect(src).toBe('fa');
