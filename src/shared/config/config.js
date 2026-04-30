@@ -76,7 +76,6 @@ export const CONFIG = {
     "latin-script": "none" // پیش‌فرض: هیچکدام (اجازه به تشخیص خودکار پرووایدر)
   },
   THEME: "auto",
-  TIMEOUT: 30000,
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
 
   COPY_REPLACE: "replace", // "copy",
