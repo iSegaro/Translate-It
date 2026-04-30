@@ -128,19 +128,8 @@ export class TextFieldHandler extends ResourceTracker {
 
   async initializeIconManager() {
     try {
-      // Import translation handler dynamically to avoid circular dependencies
-      const { getTranslationHandlerInstance } = await import('@/core/InstanceManager.js');
-      const translationHandler = getTranslationHandlerInstance();
-
-      if (translationHandler) {
-        this.textFieldIconManager.initialize({
-          translationHandler: translationHandler
-        });
-        logger.debug('TextFieldIconManager initialized with translationHandler');
-      } else {
-        this.textFieldIconManager.initialize();
-        logger.warn('TextFieldIconManager initialized without translationHandler');
-      }
+      this.textFieldIconManager.initialize();
+      logger.debug('TextFieldIconManager initialized');
     } catch (error) {
       logger.error('Failed to initialize TextFieldIconManager:', error);
       this.textFieldIconManager.initialize();

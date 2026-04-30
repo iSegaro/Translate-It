@@ -139,19 +139,6 @@ export class FeatureManager extends ResourceTracker {
         logger.error('Error injecting SelectElementManager into ContentMessageHandler:', error);
       }
     }
-
-    // Inject TranslationHandler into ShortcutHandler if available
-    if (shortcutHandler && contentMessageHandler) {
-      try {
-        const translationHandler = await contentMessageHandler.getTranslationHandler?.();
-        if (translationHandler && typeof shortcutHandler.setTranslationHandler === 'function') {
-          shortcutHandler.setTranslationHandler(translationHandler);
-          logger.debug('Injected TranslationHandler into ShortcutHandler');
-        }
-      } catch {
-        logger.debug('Could not inject TranslationHandler into ShortcutHandler - not needed for new implementation');
-      }
-    }
   }
 
   async shouldActivateFeature(featureName) {

@@ -44,7 +44,6 @@ export class TextFieldIconManager extends ResourceTracker {
       return textFieldIconManagerInstance;
     }
 
-    this.translationHandler = options.translationHandler;
     this.notifier = options.notifier;
     this.strategies = options.strategies;
     this.initialized = false;
@@ -93,36 +92,22 @@ export class TextFieldIconManager extends ResourceTracker {
     if (iconData && iconData.targetElement) {
       this.logger.debug('Triggering translation for element:', iconData.targetElement.tagName);
 
-      if (!this.translationHandler) {
-        this.logger.warn('Translation handler missing, attempting to recover...');
-        this.initializeTranslationHandler().then(() => {
-          if (this.translationHandler) this.executeTranslation(iconData);
-        });
-        return;
-      }
-
       this.executeTranslation(iconData);
     }
   }
 
-  async initializeTranslationHandler() {
+  async executeTranslation(iconData) {
     try {
-      const { getTranslationHandlerInstance } = await import('@/core/InstanceManager.js');
-      this.translationHandler = getTranslationHandlerInstance();
-    } catch (e) {
-      this.logger.error('Failed to recover translation handler', e);
-    }
-  }
-
-  executeTranslation(iconData) {
-    if (this.translationHandler && typeof this.translationHandler.processTranslation_with_CtrlSlash === 'function') {
-      this.translationHandler.processTranslation_with_CtrlSlash({
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+      
+      await translateFieldViaSmartHandler({
         text: iconData.targetElement.value || iconData.targetElement.textContent,
         target: iconData.targetElement,
       });
+      
       this.cleanupElement(iconData.targetElement);
-    } else {
-      this.logger.error('Translation handler invalid or missing processTranslation_with_CtrlSlash');
+    } catch (error) {
+      this.logger.error('Failed to execute translation:', error);
     }
   }
 
@@ -149,7 +134,6 @@ export class TextFieldIconManager extends ResourceTracker {
     }
 
     // Update dependencies if provided
-    if (dependencies.translationHandler) this.translationHandler = dependencies.translationHandler;
     if (dependencies.notifier) this.notifier = dependencies.notifier;
     if (dependencies.strategies) this.strategies = dependencies.strategies;
     if (dependencies.featureManager) this.featureManager = dependencies.featureManager;

@@ -12,14 +12,9 @@ export async function initializeLegacyHandlers(contentCore) {
 
   try {
     // Import legacy handlers
-    const { getTranslationHandlerInstance } = await import("@/core/InstanceManager.js");
     const { contentMessageHandler } = await import("@/handlers/content/index.js");
 
-    // Initialize core systems
-    const translationHandler = getTranslationHandlerInstance();
-
     // Store instances globally
-    window.translationHandlerInstance = translationHandler;
     window.contentMessageHandler = contentMessageHandler;
 
     // Get message handler from content core or create new one
