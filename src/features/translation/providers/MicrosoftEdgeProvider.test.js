@@ -16,7 +16,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
+    error: vi.fn(),
+    init: vi.fn(),
+    operation: vi.fn(),
+    performance: vi.fn(),
   })
 }));
 

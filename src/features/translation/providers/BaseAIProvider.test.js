@@ -14,7 +14,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    debugLazy: vi.fn()
+    debugLazy: vi.fn(),
+    init: vi.fn(),
+    operation: vi.fn(),
+    performance: vi.fn(),
   })
 }));
 
