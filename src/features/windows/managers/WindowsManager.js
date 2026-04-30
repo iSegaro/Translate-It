@@ -22,6 +22,7 @@ import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/co
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
+import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
 
 /**
@@ -290,7 +291,7 @@ export class WindowsManager extends ResourceTracker {
     return deviceDetector.shouldEnableMobileUI();
   }
 
-  async show(selectedText, position) {
+  async show(selectedText, position, options = {}) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, aborting show()');
       return;
@@ -307,11 +308,30 @@ export class WindowsManager extends ResourceTracker {
     
     this.logger.info('WindowsManager.show() called', {
       text: selectedText ? selectedText.substring(0, 30) + '...' : 'null',
-      position
+      position,
+      options
     });
 
-    // Get current mode from settings (fixed initialization order)
+    // 1. Check for structural permissions (Global Enable, Feature Enable, and URL Exclusions)
+    // This MUST come before interaction logic to respect user privacy and settings
+    const exclusionChecker = ExclusionChecker.getInstance();
+    const isAllowed = await exclusionChecker.isFeatureAllowed('windowsManager');
+    if (!isAllowed) {
+      this.logger.debug('WindowsManager not allowed: Permission check failed (Global, Feature, or URL)');
+      return;
+    }
+
+    // Get current mode from settings
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+
+    // 2. Check for interaction conditions (e.g., Ctrl requirement)
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+      const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
+      if (requireCtrl && options.ctrlPressed !== true) {
+        this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
+        return;
+      }
+    }
 
     // Prevent showing same text multiple times
     if (this._shouldSkipShow(selectedText)) {
