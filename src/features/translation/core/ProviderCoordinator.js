@@ -14,6 +14,8 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { queueManager } from "./QueueManager.js";
+import { TranslationPriority } from "./RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -104,15 +106,32 @@ export class ProviderCoordinator {
       await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
     }
 
-    // 6. Execute based on strategy
+    // 6. Execute based on strategy via QueueManager for retry and priority support
     try {
-      let result;
-      if (jsonInfo.isJson && !options.rawJsonPayload) {
-        logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
-        result = await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
-      } else {
-        result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+      // Map string priorities to numeric values recognized by QueueManager
+      let numericPriority = options.priority;
+      if (typeof numericPriority === 'string') {
+        const pMap = { 
+          'high': TranslationPriority.HIGH, 
+          'normal': TranslationPriority.NORMAL, 
+          'low': TranslationPriority.LOW 
+        };
+        numericPriority = pMap[numericPriority.toLowerCase()] || TranslationPriority.NORMAL;
+      } else if (numericPriority === undefined || numericPriority === null) {
+        numericPriority = TranslationPriority.NORMAL;
       }
+
+      const executeTask = async () => {
+        if (jsonInfo.isJson && !options.rawJsonPayload) {
+          logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
+          return await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
+        } else {
+          return await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+        }
+      };
+
+      // Enqueue the task - QueueManager handles retries and prioritization
+      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode);
 
       // If we are in coordinator-level streaming mode, we return a status object
       if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
