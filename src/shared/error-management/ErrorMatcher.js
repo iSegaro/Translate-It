@@ -28,7 +28,6 @@ export const SILENT_ERRORS = new Set([
  */
 export const SUPPRESS_CONSOLE_ERRORS = new Set([
   ...SILENT_ERRORS,
-  ErrorTypes.API,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_KEY_MISSING,
   ErrorTypes.API_URL_MISSING,
