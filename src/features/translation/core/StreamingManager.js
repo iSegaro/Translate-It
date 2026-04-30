@@ -313,9 +313,8 @@ export class StreamingManager extends ResourceTracker {
     }
     
     streamInfo.error = error.message;
-    streamInfo.status = 'error';
 
-    // Complete stream with error
+    // Complete stream with error - status will be updated to 'error' inside completeStream
     await this.completeStream(messageId, false, {
       error: {
         message: error.message,
