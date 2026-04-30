@@ -1424,6 +1424,12 @@
   "ERRORS_API_ENDPOINT_INVALID": {
     "message": "آدرس API اشتباه است (خطای ۴۰۴)."
   },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "پیکربندی API نامعتبر است. لطفا تنظیمات خود را بررسی کنید."
+  },
+  "ERRORS_API_ERROR": {
+    "message": "خطای API سرویس ترجمه."
+  },
   "ERRORS_MODEL_MISSING": {
     "message": "مدل هوش مصنوعی انتخاب شده نامعتبر یا پیدا نشده است."
   },

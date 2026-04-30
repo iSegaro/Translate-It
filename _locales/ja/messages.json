@@ -1424,6 +1424,12 @@
   "ERRORS_API_ENDPOINT_INVALID": {
     "message": "APIアドレスが無効です（404エラー）。"
   },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "API設定が無効です。設定を確認してください。"
+  },
+  "ERRORS_API_ERROR": {
+    "message": "翻訳サービスのAPIエラー。"
+  },
   "ERRORS_MODEL_MISSING": {
     "message": "選択したAIモデルが見つからないか無効です。"
   },

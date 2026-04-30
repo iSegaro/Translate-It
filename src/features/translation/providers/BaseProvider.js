@@ -148,7 +148,7 @@ export class BaseProvider {
           ? ErrorTypes.API_URL_MISSING
           : field.toLowerCase().includes('model')
           ? ErrorTypes.MODEL_MISSING
-          : ErrorTypes.API;
+          : ErrorTypes.API_CONFIG_INVALID;
 
         const err = new Error(errorType);
         err.type = errorType;

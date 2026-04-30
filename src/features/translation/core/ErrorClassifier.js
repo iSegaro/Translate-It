@@ -23,6 +23,7 @@ export class ErrorClassifier {
     ErrorTypes.API_KEY_MISSING,
     ErrorTypes.API_KEY_INVALID,
     ErrorTypes.API_URL_MISSING,
+    ErrorTypes.API_CONFIG_INVALID,
     ErrorTypes.MODEL_MISSING,
     
     // Validation Errors - Input validation failures
@@ -46,6 +47,7 @@ export class ErrorClassifier {
     // Network & Service Errors - These might resolve with retry
     ErrorTypes.NETWORK_ERROR,
     ErrorTypes.HTTP_ERROR,
+    ErrorTypes.API_ERROR,
     ErrorTypes.RATE_LIMIT_REACHED,
     ErrorTypes.QUOTA_EXCEEDED,
     ErrorTypes.SERVER_ERROR,

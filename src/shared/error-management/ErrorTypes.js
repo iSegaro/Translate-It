@@ -15,6 +15,8 @@ export class ErrorTypes {
   static CONNECTION_LOST = "CONNECTION_LOST";
   static UI = "UI";
   static INTEGRATION = "INTEGRATION";
+  static API_CONFIG_INVALID = "API_CONFIG_INVALID";
+  static API_ERROR = "API_ERROR";
   static SUBTITLE = "SUBTITLE";
   static SCREEN_CAPTURE = "SCREEN_CAPTURE";
   static FEATURE_BLOCKED = "FEATURE_BLOCKED";

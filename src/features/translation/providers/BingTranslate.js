@@ -363,7 +363,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
       logger.error(`[Bing] Failed to get access token:`, error);
-      if (!error.type) error.type = ErrorTypes.API;
+      if (!error.type) error.type = ErrorTypes.API_ERROR;
       error.context = `${this.providerName.toLowerCase()}-token-fetch`;
       throw error;
     }
