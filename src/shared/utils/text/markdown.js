@@ -9,8 +9,57 @@ export class SimpleMarkdown {
       return "";
     }
 
+    // Pre-process: Add line breaks before dictionary labels for traditional providers
+    // Pattern: "translation **label:** details" → "translation\n\n**label:** details"
+    let processedMarkdown = markdown;
+
+    // Check if the text is in the "traditional provider" format:
+    // - Single line (no newlines at all)
+    // - Has "**" pattern followed by text and ":"
+    if (!markdown.includes('\n')) {
+      const asteriskIndex = markdown.indexOf('**');
+
+      if (asteriskIndex > 0) {
+        // Found "**" after some content, split at that position
+        const before = markdown.substring(0, asteriskIndex).trim();
+        const after = markdown.substring(asteriskIndex);
+
+        if (before.length > 0 && after.includes(':')) {
+          // First separate the main translation from labels
+          processedMarkdown = before + '\n\n' + after;
+
+          // Then split all labels in the same line with newlines
+          // Simple approach: find all "**label:**" patterns and add newline before each (except first one)
+          const parts = after.split('**');
+          let processedAfter = '';
+          let isFirstLabel = true;
+
+          // Process each pair (label + content)
+          for (let i = 1; i < parts.length; i += 2) {
+            const label = parts[i] || '';
+            const content = parts[i + 1] || '';
+
+            if (label.trim().endsWith(':')) {
+              // This is a label line
+              const labelText = label.trim().slice(0, -1); // Remove trailing ':'
+              const contentText = content.trim();
+
+              if (!isFirstLabel) {
+                processedAfter += '\n';
+              }
+
+              processedAfter += '**' + labelText + '**: ' + contentText;
+              isFirstLabel = false;
+            }
+          }
+
+          processedMarkdown = before + '\n\n' + processedAfter;
+        }
+      }
+    }
+
     // Sanitize input to prevent XSS attacks
-    const sanitizedMarkdown = filterXSS(markdown, {
+    const sanitizedMarkdown = filterXSS(processedMarkdown, {
       whiteList: {}, // No HTML tags allowed in input
       stripIgnoreTag: true,
       stripIgnoreTagBody: ["script"],
@@ -29,9 +78,15 @@ export class SimpleMarkdown {
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Skip empty lines unless in a list
-      if (!trimmed && listItems.length === 0) {
-        if (currentSection) {
+      // Handle empty lines
+      if (!trimmed) {
+        if (listItems.length > 0) {
+          // Finish the current list
+          this._finishSection(container, currentSection, listItems);
+          currentSection = null;
+          listItems = [];
+        } else if (currentSection) {
+          // Finish the current section
           container.appendChild(currentSection);
           currentSection = null;
         }
@@ -81,7 +136,9 @@ export class SimpleMarkdown {
         const content = trimmed.replace(/^\s*([-*•])\s+/, '');
         li.appendChild(this._parseInline(content));
         listItems.push(li);
-      } else if (/^\d+\.\s/.test(trimmed)) {
+      }
+      // Ordered list items
+      else if (/^\d+\.\s/.test(trimmed)) {
         if (!currentSection || currentSection.tagName !== "OL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ol");
@@ -138,8 +195,9 @@ export class SimpleMarkdown {
       }
       // Regular paragraphs
       else if (trimmed) {
-        if (listItems.length > 0) {
-          // Continue list processing if we're in a list
+        // Only continue list if we're in a list and the line starts with whitespace (indented continuation)
+        if (listItems.length > 0 && line.startsWith(' ') && !trimmed.startsWith(line.trim())) {
+          // Continue list processing for indented lines
           continue;
         }
 
@@ -147,7 +205,7 @@ export class SimpleMarkdown {
         this._finishSection(container, currentSection, []);
         currentSection = document.createElement("p");
         listItems = [];
-        
+
         currentSection.appendChild(this._parseInline(trimmed));
       }
     }
@@ -173,42 +231,46 @@ export class SimpleMarkdown {
     // - "اسم: آزمایش" (regular labels)
     // - "- **Meaning**: آزمایش" (list item label)
     const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
-    
+
     // Check for markdown bold labels: **Label**: content
     // We look for ** at start, some characters, ** then a colon.
     const markdownLabelPattern = /^\*\*.*?\*\*\s*:\s*.*$/;
-    
+
     // Check for regular labels: Label: content
-    // We look for characters at the start followed immediately by a colon and then some content.
-    // This pattern is more inclusive for different languages.
-    const regularLabelPattern = /^[^:\n]+\s*:\s*.+$/;
-    
+    // More strict pattern: label should be at start of line, followed by colon and content
+    // The label part should not contain spaces (single word label)
+    const regularLabelPattern = /^(\S+)\s*:\s*.+$/;
+
     return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
   }
 
   static _parseLabelLine(text) {
     const span = document.createElement("span");
     const colonIndex = text.indexOf(':');
-    
+
     if (colonIndex === -1) {
       // Fallback - shouldn't happen since _isLabelLine checked this
       span.appendChild(this._parseInline(text));
       return span;
     }
-    
+
     // Get label and content parts
     const labelPart = text.substring(0, colonIndex).trim();
     const content = text.substring(colonIndex + 1).trim();
-    
+
     // Create a bold element for the label and strip any markdown markers
     // This ensures a clean label regardless of how the AI formatted the bolding.
     const labelElement = document.createElement("strong");
     labelElement.textContent = this.strip(labelPart);
-    
+
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
-    span.appendChild(this._parseInline(content));
-    
+
+    // Content after colon should NOT be parsed as markdown - treat as plain text
+    // This prevents nested labels from being bolded
+    const textNode = document.createTextNode(content);
+    span.appendChild(textNode);
+
     return span;
   }
 
