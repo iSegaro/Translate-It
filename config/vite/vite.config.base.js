@@ -214,7 +214,13 @@ export const createBaseConfig = (browser, options = {}) => {
     esbuild: {
       drop: (isProduction && !isWatchMode) ? ['console', 'debugger'] : [],
       legalComments: 'none',
-      treeShaking: true
+      treeShaking: true,
+      exclude: [
+        '**/*.test.js',
+        '**/*.spec.js',
+        '**/__tests__/**',
+        '**/tests/**'
+      ]
     }
   })
 }

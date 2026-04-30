@@ -66,7 +66,7 @@ for (const key of allKeys) {
     const manifestPath = path.join(projectRoot, 'manifest.json');
     const extraPaths = fs.existsSync(manifestPath) ? manifestPath : '';
     
-    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true`;
+    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude-dir=tests --exclude-dir=__tests__ --exclude="*.test.js" --exclude="*.spec.js" || true`;
     const result = execSync(command).toString();
     
     if (!result.trim()) {
