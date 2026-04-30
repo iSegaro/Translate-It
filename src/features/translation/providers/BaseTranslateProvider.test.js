@@ -68,6 +68,7 @@ vi.mock('@/shared/config/config.js', () => ({
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
+  PROVIDER_CONFIGURATIONS: {},
   getProviderBatching: vi.fn(() => ({
     strategy: 'character_limit',
     characterLimit: 5000,

@@ -25,7 +25,9 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 vi.mock("@/shared/config/config.js", () => ({
   getMicrosoftEdgeAuthUrlAsync: vi.fn().mockResolvedValue('https://auth.edge.com'),
-  getMicrosoftEdgeTranslateUrlAsync: vi.fn().mockResolvedValue('https://api.edge.com/translate')
+  getMicrosoftEdgeTranslateUrlAsync: vi.fn().mockResolvedValue('https://api.edge.com/translate'),
+  getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+  getSettingsAsync: vi.fn(() => Promise.resolve({})),
 }));
 
 // Partial mock for language constants
