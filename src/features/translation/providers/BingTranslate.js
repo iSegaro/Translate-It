@@ -10,6 +10,8 @@ import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
+import { getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 
@@ -61,12 +63,10 @@ export class BingTranslateProvider extends BaseTranslateProvider {
    async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
 
     const context = `${this.providerName.toLowerCase()}-translate-chunk${retryAttempt > 0 ? `-retry-${retryAttempt}` : ''}`;
-    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-    
+
     // Fetch user's preferred optimization level using the standard async utility
     const optimizationLevel = await getProviderOptimizationLevelAsync(this.providerName);
-    
+
     const providerConfig = getProviderConfiguration(this.providerName, optimizationLevel);
 
     // Add key info log for translation start

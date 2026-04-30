@@ -8,6 +8,7 @@ import { ProviderRequestEngine } from "@/features/translation/providers/utils/Pr
 import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
+import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 
@@ -105,9 +106,8 @@ export class BaseProvider {
    * @protected
    */
   async _executeWithRateLimit(task, context = "", priority = null, options = {}) {
-    const { rateLimitManager, TranslationPriority } = await import("@/features/translation/core/RateLimitManager.js");
     const targetPriority = priority || TranslationPriority.NORMAL;
-    
+
     // Pre-check
     if (options.abortController?.signal?.aborted) {
       throw new Error('Task aborted before execution');

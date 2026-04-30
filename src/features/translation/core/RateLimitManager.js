@@ -1,6 +1,6 @@
 /**
  * Rate Limit Manager - Intelligent request throttling with priority-based scheduling
- * Combines advanced stability (Circuit Breaker, Adaptive Backoff) with 
+ * Combines advanced stability (Circuit Breaker, Adaptive Backoff) with
  * priority-based queuing (HIGH, NORMAL, LOW).
  */
 
@@ -8,6 +8,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
+import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -46,9 +48,7 @@ export class RateLimitManager {
    */
   async reloadConfigurations() {
     this.providerStates.clear();
-    const { PROVIDER_CONFIGURATIONS, getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-    
+
     for (const name of Object.keys(PROVIDER_CONFIGURATIONS)) {
       const level = await getProviderOptimizationLevelAsync(name);
       const optimizedConfig = getProviderConfiguration(name, level);
@@ -58,19 +58,16 @@ export class RateLimitManager {
 
   /**
    * Initialize or get provider state
-   * Optimized to fetch configuration dynamically if not present
+   * Optimized to fetch configuration if not present
    */
   async _initializeProviderWithLevel(providerName) {
     if (this.providerStates.has(providerName)) {
       return this.providerStates.get(providerName);
     }
 
-    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-
     const level = await getProviderOptimizationLevelAsync(providerName);
     const optimizedConfig = getProviderConfiguration(providerName, level);
-    
+
     return this._initializeProvider(providerName, optimizedConfig.rateLimit);
   }
 
@@ -136,8 +133,6 @@ export class RateLimitManager {
     // Only update config if we're not in a manual/test state (or merge intelligently)
     // For now, let's ensure we don't overwrite if we're already initialized with specific values
     if (!state.isManualConfig) {
-      const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-      const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
       const currentLevel = await getProviderOptimizationLevelAsync(name);
       const latestConfig = getProviderConfiguration(name, currentLevel);
       state.config = { ...state.config, ...latestConfig.rateLimit };
