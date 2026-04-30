@@ -48,6 +48,12 @@ vi.mock("@/features/translation/providers/utils/AIResponseParser.js", () => ({
   }
 }));
 
+vi.mock("./QueueManager.js", () => ({
+  queueManager: {
+    enqueue: vi.fn((name, task) => task())
+  }
+}));
+
 describe('ProviderCoordinator', () => {
   let mockProvider;
 
