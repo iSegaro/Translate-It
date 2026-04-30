@@ -245,7 +245,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 3, // Version of the prompt templates (localized labels for dictionary)
+  PROMPTS_VERSION: 4, // Version of the prompt templates (localized labels for dictionary)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
@@ -502,10 +502,10 @@ Return only the JSON object, no additional text.`,
 Format your response exactly as follows using Markdown:
 [Primary meaning in $_{TARGET} directly on the first line]
 
-- **[Noun in $_{TARGET}]**: Meanings, separated by comma
-- **[Verb in $_{TARGET}]**: Meanings, separated by comma
-- **[Adjective in $_{TARGET}]**: Meanings, separated by comma
-- **[Synonyms label in $_{TARGET}]**: 2-3 common synonyms
+- **Noun**: Meanings, separated by comma
+- **Verb**: Meanings, separated by comma
+- **Adjective**: Meanings, separated by comma
+- **Synonyms**: 2-3 common synonyms
 
 Keep it very brief. All labels and content MUST be in $_{TARGET}. No examples or explanations.
 
