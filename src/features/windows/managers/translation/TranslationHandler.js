@@ -12,6 +12,7 @@ import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 
 /**
