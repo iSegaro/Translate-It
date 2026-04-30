@@ -2,7 +2,7 @@ import { LanguageDetectionService } from "@/shared/services/LanguageDetectionSer
 import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, TranslationMode, MessageContexts } from "@/shared/config/config.js";
+import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, TranslationMode } from "@/shared/config/config.js";
 import { LANGUAGE_NAME_TO_CODE_MAP, getCanonicalCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
