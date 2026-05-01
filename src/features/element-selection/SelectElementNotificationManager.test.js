@@ -150,13 +150,48 @@ describe('SelectElementNotificationManager', () => {
   describe('updateNotification', () => {
     it('should update notification when status is translating', async () => {
       manager.toastId = 'existing-toast';
-      
+
       await manager.updateNotification({ status: 'translating' });
-      
+
       expect(mockNotificationManager.update).toHaveBeenCalledWith(
         'existing-toast',
-        'Mocked_SELECT_ELEMENT_TRANSLATING',
-        expect.anything()
+        'Translating...',
+        {
+          actions: [
+            {
+              label: 'Mocked_SELECT_ELEMENT_CANCEL',
+              onClick: expect.any(Function),
+            },
+          ],
+          id: 'select-element-toast',
+          persistent: true,
+          type: 'status',
+        }
+      );
+    });
+
+    it('should update notification with progress when status is translating', async () => {
+      manager.toastId = 'existing-toast';
+
+      await manager.updateNotification({
+        status: 'translating',
+        progress: { completed: 2, total: 5, isRequestProgress: true }
+      });
+
+      expect(mockNotificationManager.update).toHaveBeenCalledWith(
+        'existing-toast',
+        'Translating (2/5 requests)...',
+        {
+          actions: [
+            {
+              label: 'Mocked_SELECT_ELEMENT_CANCEL',
+              onClick: expect.any(Function),
+            },
+          ],
+          id: 'select-element-toast',
+          persistent: true,
+          type: 'status',
+        }
       );
     });
   });
