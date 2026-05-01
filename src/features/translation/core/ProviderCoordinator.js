@@ -48,7 +48,6 @@ export class ProviderCoordinator {
         sourceLang,
         targetLang,
         originalSource,
-        originalTarget,
         { providerName, mode: translateMode }
       );
 
