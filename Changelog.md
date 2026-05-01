@@ -1,3 +1,12 @@
+#### v1.13.0 – Released on May XX, 2026
+
+##### Fixed
+
+- **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Fixed timeout issues in popup, side panel, and window contexts
+- Fix Dictionary Mode for Tradiational Providers (Google Translate)
+
+---
+
 #### v1.12.1 – Released on April 30, 2026
 
 ##### Fixed
