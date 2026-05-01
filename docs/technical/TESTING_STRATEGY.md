@@ -102,6 +102,140 @@ pnpm test:coverage # Generate coverage report
 
 ---
 
+## Coverage Strategy
+
+### Coverage Goals & Targets
+
+Different layers have different coverage expectations based on complexity and business impact:
+
+| Layer | Target Statements | Target Branches | Priority |
+|-------|-------------------|-----------------|----------|
+| **Utilities & Helpers** | 90%+ | 85%+ | High |
+| **Business Logic & Managers** | 85%+ | 80%+ | High |
+| **Vue Composables** | 80%+ | 75%+ | Medium |
+| **Providers** | 75%+ | 70%+ | Medium |
+| **UI Components** | 70%+ | 65%+ | Low |
+
+### Coverage Interpretation
+
+**Coverage Report Location**: `./tests/coverage/index.html`
+
+#### Understanding Metrics:
+- **Statements**: Percentage of executable lines tested
+- **Branches**: Percentage of conditional paths (if/else, switch) tested
+- **Functions**: Percentage of functions/methods with at least one test
+- **Lines**: Similar to statements, but excludes blank lines/comments
+
+#### Color Coding:
+- 🟢 **Green**: Fully covered (critical paths tested)
+- 🟡 **Yellow**: Partially covered (some edge cases missing)
+- 🔴 **Red**: Not covered (no tests for this code)
+
+### CI/CD Integration
+
+Configure coverage thresholds in `vitest.config.js`:
+
+```javascript
+coverage: {
+  provider: 'v8',
+  reporter: ['text', 'json', 'html'],
+  reportsDirectory: './tests/coverage',
+  thresholds: {
+    lines: 75,
+    functions: 80,
+    branches: 70,
+    statements: 75
+  }
+}
+```
+
+**Pipeline Integration Example**:
+```yaml
+# .github/workflows/test.yml
+- name: Run Tests with Coverage
+  run: pnpm test:coverage
+
+- name: Check Coverage Thresholds
+  run: |
+    if [ $? -ne 0 ]; then
+      echo "Coverage below threshold"
+      exit 1
+    fi
+```
+
+### Best Practices for Improving Coverage
+
+#### 1. **Focus on Critical Paths First**
+- Start with core business logic (translation, TTS, state management)
+- Prioritize error handling and edge cases
+- Test user-facing features before internal utilities
+
+#### 2. **Address Branch Coverage**
+```javascript
+// ❌ Incomplete: Only tests one path
+it('should translate text', () => {
+  expect(translate('hello')).toBe('سلام');
+});
+
+// ✅ Complete: Tests both success and error paths
+it('should translate text successfully', () => {
+  expect(translate('hello')).toBe('سلام');
+});
+
+it('should handle translation errors', () => {
+  expect(translate(null)).toThrow('Invalid input');
+});
+```
+
+#### 3. **Test Edge Cases Early**
+- Empty/null inputs
+- Special characters and Unicode
+- Network failures and timeouts
+- Browser API unavailability
+
+#### 4. **Use Coverage Reports Strategically**
+1. Run `pnpm test:coverage` regularly
+2. Open `./tests/coverage/index.html` in browser
+3. Click on red files to see uncovered lines
+4. Prioritize high-impact, low-effort improvements
+
+#### 5. **Avoid "Coverage for the Sake of Coverage"**
+- Don't test trivial getters/setters
+- Focus on meaningful behavior, not implementation details
+- 100% coverage ≠ bug-free code
+
+### Coverage Tools & Commands
+
+```bash
+# Generate full coverage report
+pnpm test:coverage
+
+# Coverage for specific file
+pnpm test:coverage src/shared/utils/text/markdown.test.js
+
+# Watch mode with coverage
+pnpm test:watch --coverage
+
+# Compare coverage over time
+pnpm test:coverage -- --compare
+```
+
+### Coverage Maintenance
+
+#### Monthly Coverage Review:
+1. Generate coverage report: `pnpm test:coverage`
+2. Identify decreasing coverage areas
+3. Create tickets for uncovered critical paths
+4. Update test suite before new features
+
+#### Pre-Release Checklist:
+- [ ] Coverage not decreased from baseline
+- [ ] New features have minimum 70% coverage
+- [ ] Critical paths have 85%+ coverage
+- [ ] No new untested error handlers
+
+---
+
 ## Developer Checklist for New Tests
 
 - [ ] Does it mock `browser.runtime.sendMessage`?
