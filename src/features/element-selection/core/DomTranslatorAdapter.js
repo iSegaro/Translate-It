@@ -15,9 +15,10 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { 
-  getTranslationApiAsync, 
-  getTargetLanguageAsync, 
+import { pageEventBus } from '@/core/PageEventBus.js';
+import {
+  getTranslationApiAsync,
+  getTargetLanguageAsync,
   getAIContextTranslationEnabledAsync,
   getSourceLanguageAsync
 } from '@/config.js';
@@ -97,6 +98,30 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const textNodesData = collectTextNodes(element);
       if (textNodesData.length === 0) throw new Error('No translatable text found');
 
+      // Validate segment count to prevent timeout issues
+      const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts
+      const WARNING_SEGMENTS = 200; // Warning threshold for large elements
+      if (textNodesData.length > MAX_SEGMENTS) {
+        this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, exceeding limit of ${MAX_SEGMENTS}`);
+        throw new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+      } else if (textNodesData.length > WARNING_SEGMENTS) {
+        this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, translation may take longer`);
+      }
+
+      // Store batch count for progress tracking (will be updated after receiving response)
+      this.batchCount = null;
+      this.totalSegments = textNodesData.length;
+      this.progressEmitted = false; // Flag to prevent duplicate progress emissions
+
+      this.logger.debug(`[DomTranslatorAdapter] Initial progress: 0/? batches (${this.totalSegments} segments)`);
+
+      // Emit initial progress (0/total batches) - will be updated after receiving response
+      pageEventBus.emit('select-element-translation-progress', {
+        completed: 0,
+        total: 1, // Default, will be updated after receiving batch count from response
+        isRequestProgress: true // Flag to indicate this is API request count
+      });
+
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
       const textsToTranslate = textNodesData.map(data => ({ 
@@ -172,12 +197,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 data.data.forEach((translatedItem, index) => {
                   // Handle both abbreviated and full keys for backward compatibility
                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
-                  
+
                   let nodeData = null;
                   if (uid) {
                     nodeData = nodeMap.get(uid);
-                  } 
-                  
+                  }
+
                   // Fallback to sequential index ONLY if UID mapping fails or is missing
                   if (!nodeData) {
                     nodeData = textNodesData[lastProcessedIndex++];
@@ -186,12 +211,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     const currentIdx = textNodesData.findIndex(d => d.uid === uid);
                     if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
                   }
-                  
+
                   if (nodeData && !processedUids.has(nodeData.uid)) {
                     // Extract text from abbreviated key 't' or full key 'text'
                     const text = translatedItem?.t || translatedItem?.text || translatedItem;
                     this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                     processedUids.add(nodeData.uid);
+
+                    // Emit progress update based on batch index if available
+                    if (data.batchIndex !== undefined && data.totalBatches !== undefined) {
+                      pageEventBus.emit('select-element-translation-progress', {
+                        completed: data.batchIndex + 1,
+                        total: data.totalBatches,
+                        isRequestProgress: true
+                      });
+                      this.progressEmitted = true; // Mark that progress has been emitted
+                    }
                   }
                 });
               }
@@ -247,7 +282,24 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
 
       let result;
+      this.logger.debug(`[DomTranslatorAdapter] Checking response - streaming: ${response?.streaming}, success: ${response?.success}`);
+
       if (response?.streaming) {
+        // Extract batch count from response metadata for accurate progress tracking
+        if (response?.metadata?.batchCount) {
+          this.batchCount = response.metadata.batchCount;
+          this.logger.debug(`[DomTranslatorAdapter] Received batch count from response: ${this.batchCount}`);
+
+          // Emit initial progress with correct batch count
+          pageEventBus.emit('select-element-translation-progress', {
+            completed: 0,
+            total: this.batchCount,
+            isRequestProgress: true
+          });
+        } else {
+          this.logger.debug(`[DomTranslatorAdapter] Streaming response but no batchCount in metadata`);
+        }
+
         result = await streamEndPromise;
       } else if (response?.success) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
@@ -330,10 +382,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element) {
+    this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
+
     try {
       // Robust result extraction - handle both unified response and direct results
       let rawResults = response.translatedText;
-      
+
       // If it's already an object/array, don't re-parse
       if (typeof rawResults === 'string' && (rawResults.trim().startsWith('[') || rawResults.trim().startsWith('{'))) {
         try {
@@ -342,7 +396,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           this.logger.warn('Failed to parse translatedText as JSON:', e.message);
         }
       }
-      
+
       const results = Array.isArray(rawResults) ? rawResults : [rawResults];
       const finalTargetLanguage = response.targetLanguage || targetLanguage;
 
@@ -357,11 +411,28 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
       });
 
-      return { 
-        success: true, 
-        isNonStreaming: true, 
+      // Emit final progress for non-streaming mode
+      // Use batch count if available, otherwise use 1 (single request)
+      const total = this.batchCount || 1;
+
+      // Prevent duplicate progress emissions (e.g., when streaming mode also calls this)
+      if (!this.progressEmitted || this.batchCount !== null) {
+        this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse emitting final progress: ${total}/${total} (batchCount: ${this.batchCount})`);
+        pageEventBus.emit('select-element-translation-progress', {
+          completed: total,
+          total: total,
+          isRequestProgress: true // Always use request progress for consistency
+        });
+        this.progressEmitted = true;
+      } else {
+        this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse skipping duplicate progress emit`);
+      }
+
+      return {
+        success: true,
+        isNonStreaming: true,
         translatedResults: results,
-        targetLanguage: finalTargetLanguage 
+        targetLanguage: finalTargetLanguage
       };
     } catch (err) {
       this.logger.error('Invalid translation format during direct handling:', err);

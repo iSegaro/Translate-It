@@ -191,7 +191,14 @@ export class OptimizedJsonHandler {
         statusCode: lastError.statusCode
       } : null;
 
-      return { success: !hasErrors, streaming: true, error: formattedError };
+      return {
+        success: !hasErrors,
+        streaming: true,
+        error: formattedError,
+        metadata: {
+          batchCount: batches.length
+        }
+      };
     } finally {
       engine.lifecycleRegistry.unregisterRequest(messageId);
     }

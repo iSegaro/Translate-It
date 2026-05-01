@@ -127,6 +127,15 @@ class SelectElementManager extends ResourceTracker {
         }
       });
 
+      // Listen for translation progress events
+      this.addEventListener(pageEventBus, 'select-element-translation-progress', (data) => {
+        if (data?.completed !== undefined && data?.total !== undefined) {
+          const progressType = data.isRequestProgress ? 'API requests' : 'items';
+          this.logger.debug(`[SelectElementManager] Progress update: ${data.completed}/${data.total} ${progressType}`);
+          this.updateNotificationForTranslationProgress(data.completed, data.total, data.isRequestProgress);
+        }
+      });
+
       this.isInitialized = true;
     } catch (error) {
       this.logger.warn('Error initializing SelectElementManager:', error);
@@ -458,7 +467,6 @@ class SelectElementManager extends ResourceTracker {
   async startTranslation(targetElement, options = {}) {
     try {
       if (!this.isActive) return;
-      if (this.isTopFrame) this.updateNotificationForTranslation();
 
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
         ...this.currentOptions,
@@ -554,8 +562,11 @@ class SelectElementManager extends ResourceTracker {
     });
   }
 
-  updateNotificationForTranslation() {
-    pageEventBus.emit('update-select-element-notification', { status: TRANSLATION_STATUS.TRANSLATING });
+  updateNotificationForTranslationProgress(completed, total, isRequestProgress = true) {
+    pageEventBus.emit('update-select-element-notification', {
+      status: TRANSLATION_STATUS.TRANSLATING,
+      progress: { completed, total, isRequestProgress }
+    });
   }
 
   dismissNotification() {

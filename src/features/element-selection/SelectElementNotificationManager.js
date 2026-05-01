@@ -91,13 +91,26 @@ class SelectElementNotificationManager extends ResourceTracker {
   
   async updateNotification(data = {}) {
     const isTopFrame = window === window.top;
-    if (!this.toastId || !isTopFrame) return;
+    if (!this.toastId || !isTopFrame) {
+      this.logger.debug(`[SelectElementNotificationManager] Skip update - toastId: ${this.toastId}, isTopFrame: ${isTopFrame}`);
+      return;
+    }
 
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const i18n = await utilsFactory.getI18nUtils();
-        const translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
-        
+        let translatingMessage = 'Translating...';
+
+        // Show progress based on API requests
+        if (data.progress && data.progress.completed !== undefined && data.progress.total !== undefined) {
+          const isRequestProgress = data.progress.isRequestProgress;
+          translatingMessage = isRequestProgress ?
+            `Translating (${data.progress.completed}/${data.progress.total} requests)...` :
+            `Translating (${data.progress.completed}/${data.progress.total})...`;
+
+          this.logger.debug(`[SelectElementNotificationManager] Updating toast with: ${translatingMessage}`);
+        }
+
         // CRITICAL: Re-check toastId after async await
         if (!this.toastId) return;
 
