@@ -50,6 +50,9 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async showNotification(data = {}) {
+    // Safety check for null data from events
+    if (!data) data = {};
+
     // Only show in top frame
     const isTopFrame = window === window.top;
     if (!isTopFrame) return;
@@ -90,6 +93,9 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async updateNotification(data = {}) {
+    // Safety check for null data from events
+    if (!data) data = {};
+
     const isTopFrame = window === window.top;
     if (!this.toastId || !isTopFrame) {
       this.logger.debug(`[SelectElementNotificationManager] Skip update - toastId: ${this.toastId}, isTopFrame: ${isTopFrame}`);
