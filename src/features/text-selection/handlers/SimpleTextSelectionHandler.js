@@ -6,7 +6,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { SelectionManager } from '../core/SelectionManager.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { SelectionTranslationMode } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');

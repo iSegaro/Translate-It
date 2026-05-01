@@ -11,7 +11,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-vi.mock('@/shared/config/constants.js', () => ({
+vi.mock('@/shared/constants/ui.js', () => ({
   UI_HOST_IDS: {
     MAIN: 'translate-it-ui-host',
     IFRAME: 'translate-it-iframe-host'

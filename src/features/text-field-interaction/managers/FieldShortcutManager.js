@@ -11,7 +11,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { TranslationMode } from '@/shared/config/config.js';
 
 export class FieldShortcutManager {

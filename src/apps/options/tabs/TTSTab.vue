@@ -77,7 +77,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { TTS_ENGINES } from '@/shared/config/constants.js'
+import { TTS_ENGINES } from '@/shared/constants/tts.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 

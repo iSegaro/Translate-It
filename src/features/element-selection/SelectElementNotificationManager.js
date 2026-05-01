@@ -5,7 +5,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
 

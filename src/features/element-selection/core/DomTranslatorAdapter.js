@@ -21,7 +21,8 @@ import {
   getAIContextTranslationEnabledAsync,
   getSourceLanguageAsync
 } from '@/config.js';
-import { AUTO_DETECT_VALUE, TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';

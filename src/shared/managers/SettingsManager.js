@@ -12,7 +12,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
