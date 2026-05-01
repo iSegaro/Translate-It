@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { revertSelectElementTranslation } from '@/features/element-selection/core/DomTranslatorAdapter.js';

@@ -3,7 +3,7 @@ import { ProviderNames } from "./ProviderConstants.js";
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getLingvaApiUrlAsync } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";

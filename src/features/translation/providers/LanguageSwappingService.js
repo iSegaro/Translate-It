@@ -1,5 +1,5 @@
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, TranslationMode } from "@/shared/config/config.js";

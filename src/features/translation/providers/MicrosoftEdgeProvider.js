@@ -4,7 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { 
   getMicrosoftEdgeAuthUrlAsync,
   getMicrosoftEdgeTranslateUrlAsync

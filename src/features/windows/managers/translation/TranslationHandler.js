@@ -7,7 +7,7 @@ import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";

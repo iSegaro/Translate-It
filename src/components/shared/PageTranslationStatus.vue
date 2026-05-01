@@ -3,7 +3,7 @@
 import { computed } from 'vue';
 import './PageTranslationStatus.scss'
 import { useMobileStore } from '@/store/modules/mobile.js';
-import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 
 const props = defineProps({
   // برای استفاده در Popup/Sidepanel که داده‌ها را دستی پاس می‌دهیم

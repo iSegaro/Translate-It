@@ -15,7 +15,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
 import { getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
-import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/constants/core.js";
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');

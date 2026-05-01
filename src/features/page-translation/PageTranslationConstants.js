@@ -26,7 +26,8 @@ export const PAGE_TRANSLATION_ATTRIBUTES = {
   TRANSLATE_NO_ATTR: 'translate',
 };
 
-import { NOTIFICATION_TIME, UI_HOST_IDS, TRANSLATION_HTML } from '@/shared/config/constants.js';
+import { NOTIFICATION_TIME, UI_HOST_IDS } from '@/shared/constants/ui.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 
 /**
  * Selector and class constants for internal UI elements

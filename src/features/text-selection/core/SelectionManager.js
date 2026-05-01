@@ -4,7 +4,7 @@ import { WindowsConfig } from "@/features/windows/managers/core/WindowsConfig.js
 import { ExtensionContextManager } from "@/core/extensionContext.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import settingsManager from '@/shared/managers/SettingsManager.js';

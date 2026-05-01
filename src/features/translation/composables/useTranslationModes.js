@@ -5,7 +5,7 @@ import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 
 import { useLanguages } from "@/composables/shared/useLanguages.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';

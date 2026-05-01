@@ -129,7 +129,7 @@ const MobileSheet = defineAsyncComponent(() => import('./components/mobile/Mobil
 const MobileFab = defineAsyncComponent(() => import('./components/mobile/MobileFab.vue'));
 const DesktopFabMenu = defineAsyncComponent(() => import('./components/desktop/DesktopFabMenu.vue'));
 
-import { TRANSLATION_HTML } from '@/shared/config/constants.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 

@@ -5,7 +5,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 
 /**
  * Manages click events and outside click detection for WindowsManager

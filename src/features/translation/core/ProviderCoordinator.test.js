@@ -16,7 +16,7 @@ vi.mock("@/shared/error-management/ErrorMatcher.js", () => ({
 
 import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({

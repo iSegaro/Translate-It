@@ -2,7 +2,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode, CONFIG } from '@/shared/config/config.js';
 import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';

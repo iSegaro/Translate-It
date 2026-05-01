@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClickManager } from './ClickManager.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 

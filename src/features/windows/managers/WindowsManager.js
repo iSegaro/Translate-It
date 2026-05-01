@@ -23,7 +23,9 @@ import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEven
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
-import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
 
 /**
  * Modular WindowsManager for translation windows and icons

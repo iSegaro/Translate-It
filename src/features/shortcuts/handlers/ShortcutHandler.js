@@ -5,7 +5,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
-import { INPUT_TYPES, NOTIFICATION_TIME } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from '@/shared/constants/detection.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const Platform = {

@@ -13,7 +13,7 @@ import { AIResponseParser } from "@/features/translation/providers/utils/AIRespo
 import { TranslationMode } from "@/shared/config/config.js";
 import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { queueManager } from "./QueueManager.js";
 import { TranslationPriority } from "./RateLimitManager.js";
 
