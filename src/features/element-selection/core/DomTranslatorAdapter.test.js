@@ -188,6 +188,209 @@ describe('DomTranslatorAdapter', () => {
       
       expect(errorHandlerMock.handle).toHaveBeenCalled();
     });
+
+    it('should throw error if no translatable text found', async () => {
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([]);
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('No translatable text found');
+    });
+
+    it('should handle fatal stream errors', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: false,
+            error: { message: 'Fatal API Error', type: 'API_ERROR' }
+          });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('Fatal API Error');
+    });
+
+    it('should handle stream cancellation', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamEnd({ cancelled: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const result = await adapter.translateElement(testElement);
+      expect(result.success).toBe(false);
+      expect(result.cancelled).toBe(true);
+    });
+
+    it('should update effective target language if provided in stream', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'こんにちは', i: 'n1' }],
+            targetLanguage: 'ja'
+          });
+          streamCallbacks.onStreamEnd({ success: true, targetLanguage: 'ja' });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const { applyElementDirection } = await import('@/utils/dom/DomDirectionManager.js');
+
+      await adapter.translateElement(testElement);
+      
+      // Verify finalization used the detected language
+      expect(applyElementDirection).toHaveBeenCalledWith(testElement, 'ja');
+    });
+
+    it('should fallback to sequential mapping if UID is missing in stream', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'سلام' }] // No UID
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await adapter.translateElement(testElement);
+      expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should send AI context when enabled', async () => {
+      const { getAIContextTranslationEnabledAsync } = await import('@/config.js');
+      getAIContextTranslationEnabledAsync.mockResolvedValue(true);
+
+      await adapter.translateElement(testElement);
+
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            contextMetadata: expect.any(Object),
+            contextSummary: 'test context'
+          })
+        })
+      );
+    });
+
+    it('should handle multiple stream updates with deduplication', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          // Batch 1
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'سلام', i: 'n1' }]
+          });
+          // Batch 2 (Redundant update for n1, should be ignored)
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'ignored', i: 'n1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await adapter.translateElement(testElement);
+      expect(testElement.textContent).toContain('سلام');
+      expect(testElement.textContent).not.toContain('ignored');
+    });
+
+    it('should cleanup session even if translation fails', async () => {
+      const cleanupSpy = vi.spyOn(adapter, '_cleanupCurrentSession');
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValue(new Error('Fail'));
+
+      try {
+        await adapter.translateElement(testElement);
+      } catch (e) {
+        // Expected
+      }
+
+      expect(cleanupSpy).toHaveBeenCalled();
+    });
+
+    it('should handle sequential fallback if direct response is not an array', async () => {
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: 'Plain text translation' // Not JSON
+      });
+
+      const result = await adapter.translateElement(testElement);
+      expect(result.success).toBe(true);
+      expect(testElement.textContent).toContain('Plain text translation');
+    });
+
+    it('should handle error in onStreamEnd', async () => {
+      let streamCallbacks;
+      registerTranslation.mockImplementation((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamEnd({ success: false, error: 'Final stream error' });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('Final stream error');
+    });
+
+    it('should not apply empty translation', () => {
+      const textNode = testElement.firstChild;
+      const originalValue = textNode.nodeValue;
+      
+      adapter._applyTranslationToNode(textNode, '   ', 'fa', testElement);
+      
+      expect(textNode.nodeValue).toBe(originalValue);
+    });
+
+    it('should throw error if direct response handling fails', async () => {
+      // Mock error during node application
+      vi.spyOn(adapter, '_applyTranslationToNode').mockImplementation(() => {
+        throw new Error('Apply failed');
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: 'Test'
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('Invalid translation format');
+    });
   });
 
   describe('cancelTranslation', () => {
@@ -278,6 +481,17 @@ describe('DomTranslatorAdapter', () => {
       expect(textNode.nodeValue).toContain('\u200fسلام\u200f');
       expect(hoverPreviewLookup.add).toHaveBeenCalledWith(textNode, originalText);
       expect(testElement.getAttribute('data-has-original')).toBe('true');
+    });
+
+    it('should apply LRM mark for LTR detection', async () => {
+      const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
+      detectDirectionFromContent.mockReturnValueOnce('ltr');
+
+      const textNode = testElement.firstChild;
+      adapter._applyTranslationToNode(textNode, 'Hello', 'en', testElement);
+
+      // LRM mark (\u200e) should be present
+      expect(textNode.nodeValue).toContain('\u200eHello\u200e');
     });
 
     it('should handle object formatted translated text', () => {
