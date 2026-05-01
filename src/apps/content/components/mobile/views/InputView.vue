@@ -145,7 +145,7 @@ import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
