@@ -116,6 +116,18 @@ describe('SelectElementNotificationManager', () => {
       );
     });
 
+    it('should handle null data gracefully', async () => {
+      deviceDetector.isMobile.mockReturnValue(false);
+      
+      // Should not throw
+      await manager.showNotification(null);
+      
+      expect(mockNotificationManager.showStatus).toHaveBeenCalledWith(
+        'Mocked_SELECT_ELEMENT_MODE_ACTIVATED',
+        expect.anything()
+      );
+    });
+
     it('should show mobile message when on mobile', async () => {
       deviceDetector.isMobile.mockReturnValue(true);
       
@@ -193,6 +205,13 @@ describe('SelectElementNotificationManager', () => {
           type: 'status',
         }
       );
+    });
+
+    it('should handle null data gracefully', async () => {
+      manager.toastId = 'existing-toast';
+      // Should not throw
+      await manager.updateNotification(null);
+      expect(mockNotificationManager.update).not.toHaveBeenCalled();
     });
   });
 
