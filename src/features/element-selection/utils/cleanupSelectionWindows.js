@@ -1,6 +1,6 @@
 // src/features/element-selection/utils/cleanupSelectionWindows.js
 
-import { browser } from "@/utils/browser-polyfill.js";
+import browser from "webextension-polyfill";
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
