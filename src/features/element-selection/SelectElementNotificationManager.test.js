@@ -61,6 +61,13 @@ describe('SelectElementNotificationManager', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    
+    // Ensure default mock behavior
+    const { utilsFactory } = await import('@/utils/UtilsFactory.js');
+    utilsFactory.getI18nUtils.mockResolvedValue({
+      getTranslationString: vi.fn(key => Promise.resolve(`Mocked_${key}`))
+    });
+
     mockNotificationManager = {
       showStatus: vi.fn(() => 'test-toast-id'),
       update: vi.fn(),
@@ -118,6 +125,25 @@ describe('SelectElementNotificationManager', () => {
         'Mocked_SELECT_ELEMENT_MODE_ACTIVATED_MOBILE',
         expect.anything()
       );
+    });
+
+    it('should cancel showing if dismissNotification called during async load', async () => {
+      // Simulate slow i18n loading
+      const { utilsFactory } = await import('@/utils/UtilsFactory.js');
+      let resolveI18n;
+      const i18nPromise = new Promise(resolve => { resolveI18n = resolve; });
+      utilsFactory.getI18nUtils.mockReturnValue(i18nPromise);
+
+      const showPromise = manager.showNotification();
+      
+      // Dismiss while still loading i18n
+      manager.dismissNotification();
+      
+      // Resolve i18n
+      resolveI18n({ getTranslationString: vi.fn(() => Promise.resolve('msg')) });
+      await showPromise;
+
+      expect(mockNotificationManager.showStatus).not.toHaveBeenCalled();
     });
   });
 

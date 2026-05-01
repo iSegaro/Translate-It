@@ -316,4 +316,67 @@ describe('SelectElementManager', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('advanced interactions', () => {
+    beforeEach(async () => {
+      await manager.initialize();
+      await manager.activateSelectElementMode();
+      manager.activationTime = 0;
+    });
+
+    it('should ignore mouseover on our own UI elements', () => {
+      const mockElement = document.createElement('div');
+      manager.elementSelector.isOurElement.mockReturnValue(true);
+      
+      const event = new MouseEvent('mouseover');
+      Object.defineProperty(event, 'target', { value: mockElement });
+      manager.hasInitialMovementOccurred = true;
+      
+      manager.handleMouseOver(event);
+      expect(manager.elementSelector.handleMouseOver).not.toHaveBeenCalled();
+    });
+
+    it('should handle deactivation message from iframe', () => {
+      manager.isTopFrame = true;
+      manager.setupEventListeners(); // Re-setup to bind iframeMessageHandler
+      
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'translate-it-deactivate-select-element' }
+      }));
+      
+      expect(manager.isActive).toBe(false);
+    });
+
+    it('should emit progress events during translation', async () => {
+      let progressCallback;
+      manager.domTranslatorAdapter.translateElement.mockImplementation((el, opts) => {
+        progressCallback = opts.onProgress;
+        return Promise.resolve({ success: true });
+      });
+
+      const mockElement = document.createElement('div');
+      mockElement.textContent = 'test';
+      manager.elementSelector.getHighlightedElement.mockReturnValue(mockElement);
+      
+      await manager.handleClick(new MouseEvent('click'));
+      
+      const { pageEventBus } = await import('@/core/PageEventBus.js');
+      await progressCallback();
+      
+      expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
+    });
+
+    it('should unlock page interaction immediately after click', async () => {
+      const mockElement = document.createElement('div');
+      mockElement.textContent = 'test';
+      manager.elementSelector.getHighlightedElement.mockReturnValue(mockElement);
+      
+      const removeSpy = vi.spyOn(manager, 'removeEventListeners');
+      
+      await manager.handleClick(new MouseEvent('click'));
+      
+      expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
+      expect(removeSpy).toHaveBeenCalled();
+    });
+  });
 });
