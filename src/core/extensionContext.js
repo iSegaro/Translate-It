@@ -539,9 +539,11 @@ export class ExtensionContextManager {
    * @returns {Object|null} Handling result
    */
   static handleRuntimeLastError(context = "unknown") {
-    if (!browser.runtime.lastError) return null;
+    // Safely check for lastError existence
+    const lastError = (browser.runtime && browser.runtime.lastError) ? browser.runtime.lastError : null;
+    if (!lastError) return null;
 
-    const errorMessage = browser.runtime.lastError.message;
+    const errorMessage = lastError.message;
     const errorType = matchErrorToType(errorMessage);
     const isContextError =
       errorType === ErrorTypes.CONTEXT ||
@@ -549,11 +551,11 @@ export class ExtensionContextManager {
 
     if (isContextError) {
       ExtensionContextManager.handleContextError(errorMessage, context);
-      void browser.runtime.lastError; // Clear the error
+      void browser.runtime?.lastError; // Clear the error safely
       return { handledSilently: true, isContextError: true };
     } else {
       logger.warn(`[${context}] Runtime lastError:`, errorMessage);
-      void browser.runtime.lastError; // Clear the error
+      void browser.runtime?.lastError; // Clear the error safely
       return { handledSilently: false, isContextError: false };
     }
   }
