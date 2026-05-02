@@ -283,20 +283,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
         context: MessageContexts.SELECT_ELEMENT,
       });
 
-      // The Unified Coordinator already awaits the streaming completion if streaming was used.
-      // So 'response' here is either the direct result OR the final streaming result.
-      let result = response;
-
-      // Log results for debugging
-      this.logger.debug(`[DomTranslatorAdapter] Translation response received`, { 
-        success: response?.success, 
-        streaming: response?.streaming,
-        type: response?.type
-      });
-
-      // If we got a direct response (not through streamEndPromise), we might need to apply it manually
-      if (response?.success && !response.type?.includes('stream')) {
+      // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
+      let result;
+      if (response?.success && response.streaming) {
+        result = await streamEndPromise;
+      } else if (response?.success) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
+      } else {
+        result = response;
       }
 
       // Update effective target language from result if it changed
