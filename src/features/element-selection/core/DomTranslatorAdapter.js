@@ -57,9 +57,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.isTranslating = false;
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
-    
-    // Persistent session ID for the duration of this adapter's life
-    this.sessionMessageId = `s${Math.random().toString(36).substr(2, 6)}`;
+    this.currentSessionId = null;
 
     // Cache for original settings
     this.originalSettings = null;
@@ -89,6 +87,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     try {
       this.isTranslating = true;
+      
+      // Generate a fresh session ID for this specific translation request
+      this.currentSessionId = `s${Math.random().toString(36).substr(2, 6)}`;
+      
       if (onProgress) await onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' });
 
       const originalHTML = element.innerHTML;
@@ -217,18 +219,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     const text = translatedItem?.t || translatedItem?.text || translatedItem;
                     this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                     processedUids.add(nodeData.uid);
-
-                    // Emit progress update based on batch index if available
-                    if (data.batchIndex !== undefined && data.totalBatches !== undefined) {
-                      pageEventBus.emit('select-element-translation-progress', {
-                        completed: data.batchIndex + 1,
-                        total: data.totalBatches,
-                        isRequestProgress: true
-                      });
-                      this.progressEmitted = true; // Mark that progress has been emitted
-                    }
                   }
                 });
+
+                // Emit progress update based on batch index if available (OUTSIDE the loop)
+                if (data.batchIndex !== undefined && data.totalBatches !== undefined) {
+                  pageEventBus.emit('select-element-translation-progress', {
+                    completed: data.batchIndex + 1,
+                    total: data.totalBatches,
+                    isRequestProgress: true
+                  });
+                  this.progressEmitted = true; // Mark that progress has been emitted
+                }
               }
             } catch (err) {
               this.logger.error('Error during onStreamUpdate processing:', err);
@@ -276,7 +278,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           contextMetadata: isAIContextEnabled ? contextMetadata : null,
           contextSummary: contextSummary,
           options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
-          sessionId: this.sessionMessageId, 
+          sessionId: this.currentSessionId, 
         },
         context: MessageContexts.SELECT_ELEMENT,
       });
@@ -308,7 +310,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
 
       return await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId
       });
 
     } catch (error) {
@@ -512,8 +514,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async revertTranslation() { return await revertSelectElementTranslation(); }
 
   async cleanup() {
-    if (this.sessionMessageId) {
-      sendRegularMessage({ action: MessageActions.CANCEL_SESSION, data: { sessionId: this.sessionMessageId } }).catch(() => {});
+    if (this.currentSessionId) {
+      sendRegularMessage({ action: MessageActions.CANCEL_SESSION, data: { sessionId: this.currentSessionId } }).catch(() => {});
     }
     super.cleanup();
   }
