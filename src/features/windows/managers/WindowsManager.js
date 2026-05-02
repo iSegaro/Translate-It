@@ -945,7 +945,7 @@ export class WindowsManager extends ResourceTracker {
 
     // PHASE 2: Perform translation and update window
     try {
-      const translationResult = await this._startTranslationProcess(selectedText);
+      const translationResult = await this._startTranslationProcess(selectedText, windowId);
 
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
@@ -992,9 +992,9 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Start translation process for a window
    */
-  async _startTranslationProcess(selectedText) {
+  async _startTranslationProcess(selectedText, windowId = null) {
     try {
-      const options = {};
+      const options = { windowId };
       if (this.state.provider) {
         options.provider = this.state.provider;
       }
@@ -1050,8 +1050,8 @@ export class WindowsManager extends ResourceTracker {
       
       this.logger.debug('Loading window creation event emitted', { windowId });
 
-      // Perform translation
-      const result = await this.translationHandler.performTranslation(selectedText);
+      // Perform translation - pass windowId for streaming updates
+      const result = await this.translationHandler.performTranslation(selectedText, { windowId });
       
       if (this.state.isTranslationCancelled) return;
 

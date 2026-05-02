@@ -15,7 +15,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";
-import { pageEventBus, WINDOWS_MANAGER_EVENTS } from "@/core/PageEventBus.js";
+import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from "@/core/PageEventBus.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -104,7 +104,7 @@ export class TranslationHandler {
       this.logger.debug("Sending translation request", payload);
 
       // Track accumulated streaming results
-      const accumulatedResults = [];
+      const accumulatedResults = new Map();
       const windowId = options.windowId;
 
       // Register for streaming and result updates via Unified System
@@ -112,18 +112,22 @@ export class TranslationHandler {
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
             if (data.data && Array.isArray(data.data)) {
-              accumulatedResults.push(...data.data);
+              // Store by batch index to handle ordering and duplicates correctly
+              const index = typeof data.batchIndex === 'number' ? data.batchIndex : accumulatedResults.size;
+              accumulatedResults.set(index, data.data.join(''));
+              
+              const partialText = Array.from(accumulatedResults.keys())
+                .sort((a, b) => a - b)
+                .map(i => accumulatedResults.get(i))
+                .join('');
               
               // Progressive UI update for streaming
               if (windowId) {
-                const partialText = accumulatedResults.join('');
-                pageEventBus.emit(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, {
-                  id: windowId,
-                  data: {
-                    initialTranslatedText: partialText,
-                    isStreaming: true,
-                    isLoading: false
-                  }
+                WindowsManagerEvents.updateWindow(windowId, {
+                  initialTranslatedText: partialText,
+                  isStreaming: true,
+                  isLoading: false,
+                  initialSize: 'normal'
                 });
               }
             }
@@ -134,9 +138,13 @@ export class TranslationHandler {
               return;
             }
             
+            // Reconstruct final text from all batches in order
+            const sortedIndices = Array.from(accumulatedResults.keys()).sort((a, b) => a - b);
+            const finalText = sortedIndices.map(i => accumulatedResults.get(i)).join('');
+
             // Resolve with accumulated text
             resolve({
-              translatedText: accumulatedResults.join(''),
+              translatedText: finalText,
               sourceLanguage: data.sourceLanguage || data.detectedSourceLanguage,
               targetLanguage: data.targetLanguage,
               success: true
