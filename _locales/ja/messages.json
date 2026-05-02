@@ -1401,7 +1401,10 @@
     "message": "タブが利用できません。"
   },
   "ERRORS_EMPTY_PROMPT": {
-    "message": "プロンプトが無効または空です。"
+    "message": "プロンプトが無効または空です."
+  },
+  "ERRORS_TEXT_TOO_LONG": {
+    "message": "選択されたテキストが長すぎます。より短い範囲を選択してください。"
   },
   "ERRORS_NETWORK_ERROR": {
     "message": "ネットワークエラー。インターネット接続を確認してください。"
