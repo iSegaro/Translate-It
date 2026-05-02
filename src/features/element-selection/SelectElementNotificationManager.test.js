@@ -167,7 +167,7 @@ describe('SelectElementNotificationManager', () => {
 
       expect(mockNotificationManager.update).toHaveBeenCalledWith(
         'existing-toast',
-        'Translating...',
+        'Mocked_SELECT_ELEMENT_TRANSLATING',
         {
           actions: [
             {
@@ -192,7 +192,7 @@ describe('SelectElementNotificationManager', () => {
 
       expect(mockNotificationManager.update).toHaveBeenCalledWith(
         'existing-toast',
-        'Translating (2/5 requests)...',
+        'Mocked_SELECT_ELEMENT_TRANSLATING (2/5)...',
         {
           actions: [
             {

@@ -105,14 +105,13 @@ class SelectElementNotificationManager extends ResourceTracker {
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const i18n = await utilsFactory.getI18nUtils();
-        let translatingMessage = 'Translating...';
+        let translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
 
         // Show progress based on API requests
         if (data.progress && data.progress.completed !== undefined && data.progress.total !== undefined) {
-          const isRequestProgress = data.progress.isRequestProgress;
-          translatingMessage = isRequestProgress ?
-            `Translating (${data.progress.completed}/${data.progress.total} requests)...` :
-            `Translating (${data.progress.completed}/${data.progress.total})...`;
+          // Remove the dots from the localized message to add progress in the middle
+          const baseMessage = translatingMessage.replace('...', '').trim();
+          translatingMessage = `${baseMessage} (${data.progress.completed}/${data.progress.total})...`;
 
           this.logger.debug(`[SelectElementNotificationManager] Updating toast with: ${translatingMessage}`);
         }
