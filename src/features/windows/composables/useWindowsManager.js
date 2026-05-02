@@ -226,7 +226,6 @@ export function useWindowsManager() {
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.on(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);
-    pageEventBus.on(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleGlobalSelectionChange);
 
     logger.debug('WindowsManager event listeners setup complete');
   };
@@ -240,7 +239,6 @@ export function useWindowsManager() {
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.SHOW_ICON, handleShowIcon);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, handleDismissWindow);
     pageEventBus.off(WINDOWS_MANAGER_EVENTS.DISMISS_ICON, handleDismissIcon);
-    pageEventBus.off(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, handleGlobalSelectionChange);
 
     logger.debug('WindowsManager event listeners cleaned up');
   };

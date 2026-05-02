@@ -68,6 +68,12 @@ function getTimeoutForAction(action, context = null) {
   if (action === 'TRANSLATE' && (context === 'select-element' || (typeof context === 'object' && context !== null && context.mode === 'select_element'))) {
     return 300000; 
   }
+  
+  // Higher timeout for generic translations to allow for AI model latency and queuing
+  if (action === 'TRANSLATE' || action === 'TRANSLATE_SELECTION' || action === 'TRANSLATE_TEXT') {
+    return 120000;
+  }
+
   return (action && OPERATION_TIMEOUTS[action]) || OPERATION_TIMEOUTS.DEFAULT || 8000;
 }
 
@@ -111,7 +117,7 @@ export async function sendMessage(message, options = {}) {
         try {
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',
-            messageId: message.messageId
+            data: { messageId: message.messageId }
           });
           if (checkResponse && checkResponse.completed) return checkResponse.results;
         } catch { /* ignore */ }

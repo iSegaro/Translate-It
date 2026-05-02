@@ -384,6 +384,29 @@ export class StreamingManager extends ResourceTracker {
   }
 
   /**
+   * Get the status and results of a streaming session.
+   * Used by handleCheckTranslationStatus to prevent redundant fallbacks.
+   * 
+   * @param {string} messageId - Message ID to check
+   * @returns {object|null} - Status info or null if not found
+   */
+  getStreamStatus(messageId) {
+    const streamInfo = this.activeStreams.get(messageId);
+    if (!streamInfo) return null;
+
+    const results = this.streamingResults.get(messageId) || [];
+    
+    return {
+      status: streamInfo.status === 'reported' ? 'completed' : streamInfo.status,
+      hasResults: results.length > 0,
+      results: results,
+      processedSegments: streamInfo.processedSegments,
+      totalSegments: streamInfo.totalSegments,
+      isComplete: streamInfo.status === 'completed' || streamInfo.status === 'reported'
+    };
+  }
+
+  /**
    * Get streaming statistics
    * @returns {object} - Streaming statistics
    */
