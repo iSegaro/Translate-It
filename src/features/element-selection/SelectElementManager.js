@@ -468,6 +468,9 @@ class SelectElementManager extends ResourceTracker {
     try {
       if (!this.isActive) return;
 
+      // Mark as translating for Memory Garbage Collector protection
+      window.isTranslationInProgress = true;
+
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
         ...this.currentOptions,
         ...options,
@@ -515,6 +518,9 @@ class SelectElementManager extends ResourceTracker {
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
       }
+    } finally {
+      // Clear flag after translation is complete (success or error)
+      window.isTranslationInProgress = false;
     }
   }
 

@@ -281,30 +281,20 @@ export class DomTranslatorAdapter extends ResourceTracker {
         context: MessageContexts.SELECT_ELEMENT,
       });
 
-      let result;
-      this.logger.debug(`[DomTranslatorAdapter] Checking response - streaming: ${response?.streaming}, success: ${response?.success}`);
+      // The Unified Coordinator already awaits the streaming completion if streaming was used.
+      // So 'response' here is either the direct result OR the final streaming result.
+      let result = response;
 
-      if (response?.streaming) {
-        // Extract batch count from response metadata for accurate progress tracking
-        if (response?.metadata?.batchCount) {
-          this.batchCount = response.metadata.batchCount;
-          this.logger.debug(`[DomTranslatorAdapter] Received batch count from response: ${this.batchCount}`);
+      // Log results for debugging
+      this.logger.debug(`[DomTranslatorAdapter] Translation response received`, { 
+        success: response?.success, 
+        streaming: response?.streaming,
+        type: response?.type
+      });
 
-          // Emit initial progress with correct batch count
-          pageEventBus.emit('select-element-translation-progress', {
-            completed: 0,
-            total: this.batchCount,
-            isRequestProgress: true
-          });
-        } else {
-          this.logger.debug(`[DomTranslatorAdapter] Streaming response but no batchCount in metadata`);
-        }
-
-        result = await streamEndPromise;
-      } else if (response?.success) {
+      // If we got a direct response (not through streamEndPromise), we might need to apply it manually
+      if (response?.success && !response.type?.includes('stream')) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
-      } else {
-        throw new Error(response?.error?.message || response?.error || 'Translation failed');
       }
 
       // Update effective target language from result if it changed
@@ -312,7 +302,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         effectiveTargetLanguage = result.targetLanguage;
       }
 
-      // If the result contains an error (from resolve-only pattern), throw it now
+      // If the result contains an error, throw it now
       if (result && result.success === false && result.error) {
         throw result.error;
       }
