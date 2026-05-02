@@ -114,6 +114,7 @@
           :target-language="actualTargetLanguage"
           :last-translation="lastTranslation"
           :is-loading="isTranslating"
+          :is-streaming="isStreaming"
           :error="translationError"
           :error-type="errorType"
           :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here')"
@@ -162,6 +163,7 @@ const {
   sourceLanguage,
   targetLanguage,
   isTranslating,
+  isStreaming,
   translationError,
   errorType,
   canTranslate,

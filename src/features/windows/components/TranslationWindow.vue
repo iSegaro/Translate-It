@@ -135,6 +135,7 @@
       <TranslationDisplay
         :content="translatedText"
         :is-loading="isLoading"
+        :is-streaming="props.isStreaming"
         :error="errorMessage"
         :error-type="props.errorType"
         :mode="'compact'"
@@ -187,6 +188,7 @@ const props = defineProps({
   initialTranslatedText: { type: String, default: '' },
   theme: { type: String, default: 'light' },
   isLoading: { type: Boolean, default: false },
+  isStreaming: { type: Boolean, default: false },
   isError: { type: Boolean, default: false },
   errorType: { type: String, default: null },
   canRetry: { type: Boolean, default: false },
@@ -211,6 +213,7 @@ const isFullscreen = computed(() => mobileStore.isFullscreen);
 
 // State
 const isLoading = computed(() => {
+  if (props.isStreaming && props.initialTranslatedText) return false;
   return props.isLoading || (!props.initialTranslatedText && !props.isError);
 });
 

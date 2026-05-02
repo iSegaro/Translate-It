@@ -34,6 +34,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
+    if (!lang || lang === AUTO_DETECT_VALUE) return "auto";
     return getProviderLanguageCode(lang, 'GOOGLE');
   }
 

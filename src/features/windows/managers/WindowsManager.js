@@ -457,6 +457,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.showMobileSheet({
         text: selectedText,
         isLoading: false,
+        isStreaming: false,
         isError: true,
         error: errorInfo.message
       });
@@ -767,7 +768,7 @@ export class WindowsManager extends ResourceTracker {
     });
 
     try {
-      const translationResult = await this._startTranslationProcess(textToTranslate);
+      const translationResult = await this._startTranslationProcess(textToTranslate, windowId);
 
       if (!translationResult) {
         this.logger.info('Retry translation cancelled by user');
@@ -777,6 +778,7 @@ export class WindowsManager extends ResourceTracker {
       // Update window with result
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
@@ -796,6 +798,7 @@ export class WindowsManager extends ResourceTracker {
       
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -834,7 +837,7 @@ export class WindowsManager extends ResourceTracker {
     });
 
     try {
-      const translationResult = await this._startTranslationProcess(textToTranslate);
+      const translationResult = await this._startTranslationProcess(textToTranslate, windowId);
 
       if (!translationResult) {
         this.logger.info('Provider change translation cancelled by user');
@@ -844,6 +847,7 @@ export class WindowsManager extends ResourceTracker {
       // Update window with result
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
@@ -862,6 +866,7 @@ export class WindowsManager extends ResourceTracker {
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');      
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -957,6 +962,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
+        isStreaming: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         detectedSourceLanguage: translationResult.sourceLanguage,
@@ -979,6 +985,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -1221,7 +1228,7 @@ export class WindowsManager extends ResourceTracker {
       this.state.setVisible(true);
       
       // Start translation process (fire-and-forget with error handling)
-      this._startTranslationProcess(data.selectedText)
+      this._startTranslationProcess(data.selectedText, windowId)
         .then(result => {
           // Update window with translation result
           if (result) {
@@ -1241,6 +1248,7 @@ export class WindowsManager extends ResourceTracker {
                 WindowsManagerEvents.updateWindow(windowId, {
                   initialSize: 'normal',
                   isLoading: false,
+                  isStreaming: false,
                   isError: true,
                   initialTranslatedText: errorInfo.message
                 });
@@ -1257,6 +1265,7 @@ export class WindowsManager extends ResourceTracker {
           WindowsManagerEvents.updateWindow(windowId, {
             initialSize: 'normal',
             isLoading: false,
+            isStreaming: false,
             isError: true,
             errorType: errorInfo.type,
             initialTranslatedText: errorInfo.message
@@ -1376,6 +1385,8 @@ export class WindowsManager extends ResourceTracker {
       initialTranslatedText: errorInfo.message,
       position: position,
       theme: theme,
+      isLoading: false,
+      isStreaming: false,
       isError: true,
       errorType: errorInfo.type,
       canRetry: errorInfo.canRetry,

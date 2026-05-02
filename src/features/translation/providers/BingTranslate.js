@@ -87,42 +87,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       const sl = this._getLangCode(sourceLang);
       const tl = this._getLangCode(targetLang);
 
-      // Additional size validation - be more strict with Bing's limits
-      const effectiveCharLimit = providerConfig.batching?.characterLimit || this.constructor.characterLimit;
-      
-      if (textToTranslate.length > effectiveCharLimit) {
-        logger.info(`[Bing] Text too long (${textToTranslate.length} chars, limit is ${effectiveCharLimit}), splitting`);
-
-        // Scenario A: Multiple segments - split the array
-        if (chunkTexts.length > 1) {
-          const midPoint = Math.ceil(chunkTexts.length / 2);
-          const firstHalf = chunkTexts.slice(0, midPoint);
-          const secondHalf = chunkTexts.slice(midPoint);
-
-          const firstResults = await this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
-          const secondResults = await this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
-
-          // Return joined string using delimiter
-          return [firstResults, secondResults].join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
-        } 
-        // Scenario B: Single node but too long - split the string itself
-        else if (chunkTexts.length === 1) {
-          const singleText = chunkTexts[0];
-          const parts = this._splitSingleLongString(singleText, effectiveCharLimit);
-
-          logger.info(`[Bing] Single long node split into ${parts.length} parts`);
-
-          const translatedParts = [];
-          for (const part of parts) {
-            const res = await this._translateChunk([part], sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options);
-            translatedParts.push(res);
-          }
-
-          return translatedParts.join(' ');
-        }
-      }
-
-      const formData = new URLSearchParams({        text: textToTranslate, 
+      const formData = new URLSearchParams({
+        text: textToTranslate, 
         fromLang: sl, 
         to: tl, 
         token: tokenData.token, 
@@ -371,55 +337,6 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
   static cleanup() {
     BingTranslateProvider.bingAccessToken = null;
-  }
-
-  /**
-   * Split a single long string into multiple parts that don't exceed limit
-   * This is used when a single node is too long for the provider
-   * @param {string} text - String to split
-   * @param {number} limit - Maximum length for each part
-   * @returns {string[]} - Array of smaller strings
-   */
-  _splitSingleLongString(text, limit) {
-    if (!text || text.length <= limit) return [text];
-    
-    const parts = [];
-    let remaining = text;
-    
-    while (remaining.length > limit) {
-      // Try to split by sentence markers first (ordered by semantic strength)
-      // Including East Asian markers: 。(Japanese/Chinese period), ！(East Asian exclamation), ？(East Asian question), 、(East Asian comma)
-      const sentenceMarkers = ['\n', '. ', '! ', '? ', '。', '！', '？', '، ', '؛ ', '、', '; '];
-      let splitIdx = -1;
-      
-      for (const marker of sentenceMarkers) {
-        const idx = remaining.lastIndexOf(marker, limit);
-        // We want the furthest possible marker that's still within the limit
-        if (idx > splitIdx) {
-          // For markers with space, include the space. For single char markers, include the char.
-          splitIdx = idx + marker.length;
-        }
-      }
-      
-      // Fallback to space
-      if (splitIdx <= 0) {
-        splitIdx = remaining.lastIndexOf(' ', limit);
-      }
-      
-      // Fallback to hard cut
-      if (splitIdx <= 0) {
-        splitIdx = limit;
-      }
-      
-      parts.push(remaining.substring(0, splitIdx).trim());
-      remaining = remaining.substring(splitIdx).trim();
-    }
-    
-    if (remaining.length > 0) {
-      parts.push(remaining);
-    }
-    
-    return parts;
   }
 
   resetSessionContext() {

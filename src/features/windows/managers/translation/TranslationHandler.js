@@ -111,10 +111,12 @@ export class TranslationHandler {
       const resultPromise = new Promise((resolve, reject) => {
         registerTranslation(messageId, {
           onStreamUpdate: (data) => {
-            if (data.data && Array.isArray(data.data)) {
+            if (data.data) {
+              const batchText = Array.isArray(data.data) ? data.data.join('') : String(data.data);
+              
               // Store by batch index to handle ordering and duplicates correctly
               const index = typeof data.batchIndex === 'number' ? data.batchIndex : accumulatedResults.size;
-              accumulatedResults.set(index, data.data.join(''));
+              accumulatedResults.set(index, batchText);
               
               const partialText = Array.from(accumulatedResults.keys())
                 .sort((a, b) => a - b)
@@ -124,10 +126,12 @@ export class TranslationHandler {
               // Progressive UI update for streaming
               if (windowId) {
                 WindowsManagerEvents.updateWindow(windowId, {
+                  translatedText: partialText,
                   initialTranslatedText: partialText,
                   isStreaming: true,
                   isLoading: false,
-                  initialSize: 'normal'
+                  initialSize: 'normal',
+                  frameId: ExtensionContextManager.isContentScript() ? null : options.frameId // Pass frameId if available
                 });
               }
             }

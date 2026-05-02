@@ -40,13 +40,15 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
   _getLangCode(lang) {
     if (!lang || lang === AUTO_DETECT_VALUE) return null; // Signal auto-detection
     
-    // Normalize to base code (e.g., 'en-US' -> 'en') unless it's a special Microsoft code
-    const baseCode = typeof lang === 'string' ? lang.split('-')[0].toLowerCase() : lang;
+    // Normalize to lowercase for mapping lookup
+    const normalized = typeof lang === 'string' ? lang.toLowerCase() : lang;
     
-    const mappedCode = getProviderLanguageCode(lang, 'BING') || 
-                       getProviderLanguageCode(baseCode, 'BING');
-                       
-    return mappedCode || baseCode;
+    // Try to get specific Microsoft mapping (e.g., 'zh-cn' -> 'zh-Hans')
+    const mappedCode = getProviderLanguageCode(normalized, 'BING');
+    if (mappedCode) return mappedCode;
+
+    // If not in map, return original (Bing/Edge often support regional codes like 'en-AU' directly)
+    return normalized;
   }
 
   /**

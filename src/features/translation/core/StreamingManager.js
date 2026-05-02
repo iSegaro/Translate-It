@@ -130,12 +130,15 @@ export class StreamingManager extends ResourceTracker {
       return;
     }
 
+    // Ensure results are in array format for the contract
+    const resultsArray = Array.isArray(batchResults) ? batchResults : [batchResults];
+
     // Update stream info
-    streamInfo.processedSegments += batchResults.length;
+    streamInfo.processedSegments += resultsArray.length;
     
     // Accumulate results
     const accumulatedResults = this.streamingResults.get(messageId) || [];
-    accumulatedResults.push(...batchResults);
+    accumulatedResults.push(...resultsArray);
     this.streamingResults.set(messageId, accumulatedResults);
 
     try {
@@ -144,8 +147,8 @@ export class StreamingManager extends ResourceTracker {
         MessageActions.TRANSLATION_STREAM_UPDATE,
         {
           success: true,
-          data: batchResults,
-          originalData: originalBatch,
+          data: resultsArray,
+          originalData: Array.isArray(originalBatch) ? originalBatch : [originalBatch],
           batchIndex: batchIndex,
           provider: streamInfo.providerName,
           processedSegments: streamInfo.processedSegments,
@@ -158,22 +161,23 @@ export class StreamingManager extends ResourceTracker {
         messageId
       );
 
-      // Send to content script
+      // Send to content script or internal extension page (popup, sidepanel, options)
       if (senderInfo.tab?.id) {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
-        
-        // Log individual batch stats using both counts
-        const networkChars = charCount !== null ? charCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
-        const originalChars = originalCharCount !== null ? originalCharCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
-        
-        statsManager.printSummary(streamInfo.sessionId, {
-          status: 'Batch',
-          batchChars: networkChars,
-          batchOriginalChars: originalChars
-        });
       } else {
-        logger.warn(`[StreamingManager] No tab ID for streaming messageId: ${messageId}`);
+        // Broadcast to internal extension pages
+        await browser.runtime.sendMessage(streamMessage);
       }
+
+      // Log individual batch stats using both counts
+      const networkChars = charCount !== null ? charCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
+      const originalChars = originalCharCount !== null ? originalCharCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
+      
+      statsManager.printSummary(streamInfo.sessionId, {
+        status: 'Batch',
+        batchChars: networkChars,
+        batchOriginalChars: originalChars
+      });
     } catch (error) {
       logger.error(`[StreamingManager] Failed to stream batch ${batchIndex}:`, error.message);
     }
@@ -212,12 +216,13 @@ export class StreamingManager extends ResourceTracker {
         messageId
       );
 
-      // Send to content script
+      // Send to content script or internal extension page
       if (senderInfo.tab?.id) {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamErrorMessage);
         logger.debug(`[StreamingManager] Streamed error for batch ${batchIndex} to tab ${senderInfo.tab.id}`);
       } else {
-        logger.warn(`[StreamingManager] No tab ID for streaming error messageId: ${messageId}`);
+        await browser.runtime.sendMessage(streamErrorMessage);
+        logger.debug(`[StreamingManager] Broadcast error for batch ${batchIndex} to internal pages`);
       }
     } catch (sendError) {
       logger.error(`[StreamingManager] Failed to stream error for batch ${batchIndex}:`, sendError);
@@ -278,6 +283,16 @@ export class StreamingManager extends ResourceTracker {
         await browser.tabs.sendMessage(senderInfo.tab.id, streamEndMessage);
         
         // Log Session Summary for streaming
+        statsManager.printSummary(streamInfo.sessionId, { 
+          status: 'Streaming', 
+          success, 
+          clear: true 
+        });
+      } else if (senderInfo) {
+        // Broadcast to internal extension pages
+        await browser.runtime.sendMessage(streamEndMessage);
+        
+        // Log Session Summary
         statsManager.printSummary(streamInfo.sessionId, { 
           status: 'Streaming', 
           success, 

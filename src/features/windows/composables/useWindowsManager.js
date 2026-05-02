@@ -153,11 +153,13 @@ export function useWindowsManager() {
       updatedWindows[existingWindowIndex] = {
         ...existingWindow,
         ...detail,
-        translatedText: detail.initialTranslatedText || detail.translatedText || existingWindow.translatedText,
+        translatedText: detail.translatedText || detail.initialTranslatedText || existingWindow.translatedText,
         sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || existingWindow.sourceLanguage,
         detectedSourceLanguage: detail.detectedSourceLanguage || detail.sourceLanguage || existingWindow.detectedSourceLanguage,
         targetLanguage: detail.targetLanguage || detail.to || detail.tl || existingWindow.targetLanguage,
-        initialSize: detail.initialSize || existingWindow.initialSize
+        initialSize: detail.initialSize || existingWindow.initialSize,
+        isLoading: typeof detail.isLoading !== 'undefined' ? detail.isLoading : existingWindow.isLoading,
+        isStreaming: typeof detail.isStreaming !== 'undefined' ? detail.isStreaming : (existingWindow.isStreaming || false)
       };
       
       translationWindows.value = updatedWindows;

@@ -377,8 +377,16 @@ const CANONICAL_CODE_MAP = {
  */
 export function getCanonicalCode(code) {
   if (!code) return code;
-  const normalized = code.toLowerCase().replace(/[-_]/g, '');
-  return CANONICAL_CODE_MAP[normalized] || normalized;
+  const lower = code.toLowerCase();
+  const stripped = lower.replace(/[-_]/g, '');
+  
+  // Only apply mapping if we have a specific rule for this variation
+  if (CANONICAL_CODE_MAP[stripped]) {
+    return CANONICAL_CODE_MAP[stripped];
+  }
+  
+  // Otherwise, return the lowercase version (preserving hyphens if present)
+  return lower;
 }
 
 export const PROVIDER_SUPPORTED_LANGUAGES = {

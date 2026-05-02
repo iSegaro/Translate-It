@@ -107,6 +107,22 @@ export class ExtensionContextManager {
   }
 
   /**
+   * Check if the current environment is a content script.
+   * @returns {boolean}
+   */
+  static isContentScript() {
+    return ExtensionContextManager.getActiveEnvironment() === ExtensionContextManager.ENVIRONMENTS.CONTENT;
+  }
+
+  /**
+   * Check if the current environment is the background script / service worker.
+   * @returns {boolean}
+   */
+  static isBackground() {
+    return ExtensionContextManager.getActiveEnvironment() === ExtensionContextManager.ENVIRONMENTS.BACKGROUND;
+  }
+
+  /**
    * Static state for tracking user-cancelled operations across the app.
    */
   static userCancelledOperations = new Set();

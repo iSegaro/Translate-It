@@ -55,6 +55,7 @@
         :initial-translated-text="window.translatedText"
         :theme="window.theme"
         :is-loading="window.isLoading"
+        :is-streaming="window.isStreaming"
         :is-error="window.isError"
         :error-type="window.errorType"
         :can-retry="window.canRetry"
