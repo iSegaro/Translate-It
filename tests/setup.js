@@ -38,6 +38,12 @@ const chromeMock = {
 globalThis.chrome = chromeMock;
 globalThis.browser = chromeMock;
 
+// Mock webextension-polyfill
+vi.mock('webextension-polyfill', () => ({
+  default: chromeMock,
+  ...chromeMock
+}));
+
 // Mock import.meta.env
 globalThis.import = {
   meta: {
