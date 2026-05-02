@@ -186,16 +186,20 @@ export const ProviderRequestEngine = {
       let responseData = null;
 
       // 1. Pre-process response data for logging (SMART LOGGING)
-      const clonedForLogging = typeof response.clone === 'function' ? response.clone() : response;
-      const contentType = clonedForLogging.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          responseData = await clonedForLogging.json();
-        } catch { /* ignore */ }
-      } else {
-        try {
-          responseData = await clonedForLogging.text();
-        } catch { /* ignore */ }
+      const canClone = typeof response.clone === 'function';
+      const clonedForLogging = canClone ? response.clone() : null;
+      
+      if (clonedForLogging) {
+        const contentType = clonedForLogging.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            responseData = await clonedForLogging.json();
+          } catch { /* ignore */ }
+        } else {
+          try {
+            responseData = await clonedForLogging.text();
+          } catch { /* ignore */ }
+        }
       }
 
       // CENTRALIZED SMART LOGGING: RESPONSE
@@ -225,6 +229,11 @@ export const ProviderRequestEngine = {
         } else if (responseData && typeof responseData === 'string') {
           try {
             body = JSON.parse(responseData);
+          } catch { /* ignore */ }
+        } else {
+          // If we didn't parse it for logging (e.g. clone() was missing), try reading it now
+          try {
+            body = await response.json();
           } catch { /* ignore */ }
         }
         
@@ -297,7 +306,13 @@ export const ProviderRequestEngine = {
         }
       }
 
-      // Fallback: If for some reason responseData wasn't useful, try reading one last time
+      // Fallback: If we didn't parse for logging or parsing failed, try reading now
+      const contentTypeSuccess = response.headers.get('content-type');
+      if (contentTypeSuccess && contentTypeSuccess.includes('application/json')) {
+        const data = await response.json();
+        return await extractResponse(data, response.status);
+      }
+
       const responseText = await response.text();
       return await extractResponse(responseText, response.status);
     } catch (err) {
