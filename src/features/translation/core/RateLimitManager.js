@@ -140,8 +140,17 @@ export class RateLimitManager {
 
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const error = new Error(`Circuit breaker open for ${name}. Too many failures.`);
+      const lastError = state.lastCircuitError;
+      const reason = lastError ? `: ${lastError.message || lastError}` : '';
+      const error = new Error(`Circuit breaker open for ${name}. Too many failures${reason}`);
       error.type = 'CIRCUIT_BREAKER_OPEN';
+      
+      // If the underlying error was fatal/retryable, preserve its characteristics safely
+      if (lastError) {
+        error.originalType = lastError.type;
+        if (lastError.statusCode) error.statusCode = lastError.statusCode;
+      }
+      
       throw error;
     }
 
@@ -376,6 +385,7 @@ export class RateLimitManager {
       if (!state.isCircuitOpen) {
         state.isCircuitOpen = true;
         state.circuitOpenTime = Date.now();
+        state.lastCircuitError = error; // Store the error that caused the break
         logger.error(`Circuit breaker OPENED for ${providerName} ${isFatal ? '(FATAL ERROR) ' : ''}after ${state.consecutiveFailures} failures. Error: ${error.message || error}`);
       }
     }

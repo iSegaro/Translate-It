@@ -115,7 +115,9 @@ class QueueItem {
         ErrorTypes.NETWORK_ERROR,
         ErrorTypes.HTTP_ERROR,
         ErrorTypes.SERVER_ERROR,
-        ErrorTypes.QUOTA_EXCEEDED
+        ErrorTypes.QUOTA_EXCEEDED,
+        ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        ErrorTypes.API_ERROR
       ];
 
       if (!retryableFatalTypes.includes(this.lastError.type) && 

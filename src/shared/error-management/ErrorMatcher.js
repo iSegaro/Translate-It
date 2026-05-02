@@ -90,7 +90,6 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
   ErrorTypes.INSUFFICIENT_BALANCE,
   ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN,
   ErrorTypes.SETTINGS_LOADING_TIMEOUT
 ]);
 
@@ -99,6 +98,7 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
  */
 export const FATAL_ERRORS = new Set([
   ...CRITICAL_CONFIG_ERRORS,
+  ErrorTypes.CIRCUIT_BREAKER_OPEN, // Moved here to ensure descriptive message is used while remaining fatal
   ErrorTypes.FORBIDDEN_ERROR,
   ErrorTypes.NETWORK_ERROR,
   ErrorTypes.HTTP_ERROR,
