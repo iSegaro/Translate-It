@@ -258,6 +258,7 @@ export const AITextProcessor = {
 
   /**
    * Smart chunking with placeholder boundary protection
+   * Ensures ALL resulting chunks are below the character limit
    * @param {string} text - Text to chunk
    * @param {number} limit - Character limit per chunk
    * @param {string} sourceLanguage - Source language code
@@ -268,20 +269,73 @@ export const AITextProcessor = {
       return [text];
     }
 
-    // Layer 1: Paragraph boundaries (double newlines)
+    // Phase 1: Split by Paragraphs
     let chunks = this._splitAtParagraphBoundaries(text, limit);
-    if (chunks.length > 1 && this.validatePlaceholderBoundaries(chunks, text)) {
-      return chunks;
+    
+    // Phase 2: If any chunk is still too large, split it by Sentences
+    if (this._hasOversizedChunks(chunks, limit)) {
+      let sentenceChunks = [];
+      for (const chunk of chunks) {
+        if (chunk.length > limit) {
+          const sentences = this.splitIntoSentences(chunk, sourceLanguage);
+          sentenceChunks.push(...this._groupSentencesIntoChunks(sentences, limit));
+        } else {
+          sentenceChunks.push(chunk);
+        }
+      }
+      chunks = sentenceChunks;
     }
 
-    // Layer 2: Sentence boundaries
-    const sentences = this.splitIntoSentences(text, sourceLanguage);
-    chunks = this._groupSentencesIntoChunks(sentences, limit);
+    // Phase 3: If any chunk is STILL too large, split it by Words
+    if (this._hasOversizedChunks(chunks, limit)) {
+      let wordChunks = [];
+      for (const chunk of chunks) {
+        if (chunk.length > limit) {
+          wordChunks.push(...this._splitAtWordBoundaries(chunk, limit));
+        } else {
+          wordChunks.push(chunk);
+        }
+      }
+      chunks = wordChunks;
+    }
 
-    // Layer 3: Validate placeholder boundaries
+    // Phase 4: Validate placeholder boundaries
     if (!this.validatePlaceholderBoundaries(chunks, text)) {
       logger.warn(`Cannot chunk without splitting placeholders, using single batch`);
       return [text];
+    }
+
+    return chunks;
+  },
+
+  /**
+   * Check if any chunk in the array exceeds the limit
+   * @private
+   */
+  _hasOversizedChunks(chunks, limit) {
+    return chunks.some(chunk => chunk.length > limit);
+  },
+
+  /**
+   * Split text at word boundaries (spaces)
+   * @private
+   */
+  _splitAtWordBoundaries(text, limit) {
+    const words = text.split(/\s+/);
+    const chunks = [];
+    let currentChunk = '';
+
+    for (const word of words) {
+      if ((currentChunk + ' ' + word).length > limit && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = word;
+      } else {
+        currentChunk += (currentChunk ? ' ' : '') + word;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
     }
 
     return chunks;

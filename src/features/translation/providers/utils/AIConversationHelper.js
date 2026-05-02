@@ -207,9 +207,10 @@ export const AIConversationHelper = {
       getAIContextTranslationEnabledAsync()
     ]);
 
-    const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js');
-    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(sourceLang) || sourceLang);
-    const targetName = getLanguageNameFromCode(targetLang) || targetLang;
+    const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js');
+    const canonicalSource = getCanonicalCode(sourceLang);
+    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(canonicalSource) || sourceLang);
+    const targetName = getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang;
 
     let promptTemplate;
     const isDictionary = translateMode === TranslationMode.Dictionary_Translation;

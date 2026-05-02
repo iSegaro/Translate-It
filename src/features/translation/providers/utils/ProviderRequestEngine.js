@@ -132,6 +132,20 @@ export const ProviderRequestEngine = {
     const finalOriginalCharCount = originalCharCount || 0;
 
     const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+
+    // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
+    if (url.startsWith('mock://')) {
+      const mockDuration = 100 + Math.random() * 200;
+      logger.debugLazy(() => {
+        return [`[Call #${globalCallId}] Mock Engine Bypass: 200 OK (${mockDuration.toFixed(0)}ms)`, {
+          status: 200,
+          duration: mockDuration,
+          context: 'mock-simulation'
+        }];
+      });
+      return { status: 200, ok: true, json: async () => ({ mock: true }) };
+    }
+
     const sessionTag = finalSessionId ? ` [Session: ${finalSessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
     
     // CENTRALIZED SMART LOGGING: REQUEST

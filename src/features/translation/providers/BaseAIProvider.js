@@ -226,7 +226,28 @@ export class BaseAIProvider extends BaseProvider {
 
     // Get batching configuration
     const batchingConfig = await this.getBatchingConfig(translateMode);
-    const batches = AITextProcessor.createOptimalBatches(texts, this.providerName, translateMode, batchingConfig);
+    const characterLimit = batchingConfig.characterLimit || 5000;
+
+    // 1. Pre-process segments: Split oversized single segments into multiple pieces
+    // This ensures that even a single 30k char text is streamed in multiple batches
+    const fragmentedTexts = [];
+    for (const text of texts) {
+      const isObject = typeof text === 'object' && text !== null;
+      const content = isObject ? (text.t || text.text || "") : text;
+      
+      if (typeof content === 'string' && content.length > characterLimit && !AITextProcessor.hasPlaceholders([text])) {
+        logger.debug(`[${this.providerName}] Splitting oversized segment (${content.length} chars) for streaming`);
+        const chunks = AITextProcessor.smartChunkWithPlaceholders(content, characterLimit);
+        
+        // Convert chunks back to the original format (preserving IDs if they were objects)
+        const typedChunks = chunks.map(chunk => isObject ? { ...text, t: chunk, text: chunk } : chunk);
+        fragmentedTexts.push(...typedChunks);
+      } else {
+        fragmentedTexts.push(text);
+      }
+    }
+
+    const batches = AITextProcessor.createOptimalBatches(fragmentedTexts, this.providerName, translateMode, batchingConfig);
     const allResults = [];
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {

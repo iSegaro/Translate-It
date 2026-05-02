@@ -1,144 +1,92 @@
 /**
  * AI Stream Manager - Handles streaming translation results and lifecycle
+ * Connects AI providers to the central StreamingManager for unified tracking and timeout prevention.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
-import browser from 'webextension-polyfill';
+import { streamingManager } from '@/features/translation/core/StreamingManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIStreamManager');
 
 export const AIStreamManager = {
   /**
-   * Stream batch results to content script
+   * Stream batch results to central manager
    */
   async streamBatchResults(providerName, batchResults, originalBatch, batchIndex, messageId, engine, sourceLanguage = null, targetLanguage = null) {
-    if (!engine || !messageId) {
-      logger.warn(`[${providerName}] Cannot stream results - missing engine or messageId`);
+    if (!messageId) {
+      logger.warn(`[${providerName}] Cannot stream results - missing messageId`);
       return;
     }
 
     try {
-      const streamMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_STREAM_UPDATE,
-        {
-          success: true,
-          data: batchResults,
-          originalData: originalBatch,
-          batchIndex: batchIndex,
-          provider: providerName,
-          sourceLanguage,
-          targetLanguage,
-          timestamp: Date.now()
-        },
-        'background-streaming',
-        messageId
+      // Delegate to central manager to ensure progress is tracked (prevents timeouts)
+      // Note: Central manager handles the actual browser messaging
+      await streamingManager.streamBatchResults(
+        messageId,
+        batchResults,
+        originalBatch,
+        batchIndex,
+        sourceLanguage,
+        targetLanguage
       );
-
-      const senderInfo = engine.getStreamingSender?.(messageId);
-      if (senderInfo && senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
-        logger.debug(`[${providerName}] Stream update sent to tab ${senderInfo.tab.id} for batch ${batchIndex}`);
-      }
+      
+      logger.debug(`[${providerName}] Stream results delegated to central manager for messageId: ${messageId}`);
     } catch (error) {
       logger.error(`[${providerName}] Failed to stream batch results:`, error);
     }
   },
 
   /**
-   * Send streaming end notification
+   * Send streaming end notification to central manager
    */
   async sendStreamEnd(providerName, messageId, engine, options = {}) {
-    if (!engine || !messageId) return;
+    if (!messageId) return;
 
     try {
-      const streamEndMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_STREAM_END,
-        {
-          success: !options.error,
-          completed: true,
-          error: options.error ? {
-            message: options.error.message || 'Translation failed',
-            type: options.error.type || matchErrorToType(options.error) || 'TRANSLATION_ERROR'
-          } : null,
-          provider: providerName,
-          targetLanguage: options.targetLanguage,
-          timestamp: Date.now()
-        },
-        'background-streaming',
-        messageId
-      );
-
-      const senderInfo = engine.getStreamingSender?.(messageId);
-      if (senderInfo && senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamEndMessage);
-        logger.debug(`[${providerName}] Stream end sent to tab ${senderInfo.tab.id}`);
-      }
+      // Delegate to central manager for proper lifecycle completion
+      await streamingManager.completeStream(messageId, !options.error, {
+        error: options.error,
+        targetLanguage: options.targetLanguage
+      });
+      
+      logger.debug(`[${providerName}] Stream end delegated to central manager for messageId: ${messageId}`);
     } catch (error) {
       logger.error(`[${providerName}] Failed to send stream end:`, error);
     }
   },
 
   /**
-   * Send error stream message to content script
+   * Send error stream message to central manager
    */
   async streamErrorResults(providerName, error, batchIndex, messageId, engine) {
-    if (!engine || !messageId) return;
+    if (!messageId) return;
     try {
-      const streamErrorMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_STREAM_UPDATE,
-        {
-          success: false,
-          error: {
-            message: error.message || 'Translation failed',
-            type: error.type || matchErrorToType(error) || 'TRANSLATION_ERROR'
-          },
-          batchIndex: batchIndex,
-          provider: providerName,
-          timestamp: Date.now()
-        },
-        'background-streaming',
-        messageId
-      );
-      const senderInfo = engine.getStreamingSender?.(messageId);
-      if (senderInfo && senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamErrorMessage);
-        logger.debug(`[${providerName}] Stream error sent to tab ${senderInfo.tab.id}`);
-      }
+      // Delegate to central manager
+      await streamingManager.streamBatchError(messageId, error, batchIndex);
+      logger.debug(`[${providerName}] Stream error delegated to central manager for messageId: ${messageId}`);
     } catch (sendError) {
       logger.error(`[${providerName}] Failed to send stream error:`, sendError);
     }
   },
 
   /**
-   * Stream fallback result to content script
+   * Stream fallback result to central manager
    */
   async streamFallbackResult(providerName, result, original, segmentIndex, messageId, engine, sourceLanguage = null, targetLanguage = null) {
+    if (!messageId) return;
     try {
-      const streamMessage = MessageFormat.create(
-        MessageActions.TRANSLATION_STREAM_UPDATE,
-        {
-          success: true,
-          data: result,
-          originalData: original,
-          batchIndex: segmentIndex,
-          provider: providerName,
-          sourceLanguage,
-          targetLanguage,
-          timestamp: Date.now()
-        },
-        'background-streaming',
-        messageId
+      // For fallbacks, we treat it as a single-segment batch update
+      await streamingManager.streamBatchResults(
+        messageId,
+        [result],
+        [original],
+        segmentIndex,
+        sourceLanguage,
+        targetLanguage
       );
-
-      const senderInfo = engine.getStreamingSender?.(messageId);
-      if (senderInfo && senderInfo.tab?.id) {
-        await browser.tabs.sendMessage(senderInfo.tab.id, streamMessage);
-        logger.debug(`[${providerName}] Fallback result streamed for segment ${segmentIndex + 1}`);
-      }
+      
+      logger.debug(`[${providerName}] Fallback result delegated for segment ${segmentIndex + 1}`);
     } catch (error) {
       logger.error(`[${providerName}] Failed to stream fallback result for segment ${segmentIndex + 1}:`, error);
     }
