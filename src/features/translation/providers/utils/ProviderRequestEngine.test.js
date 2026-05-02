@@ -67,6 +67,7 @@ describe('ProviderRequestEngine', () => {
           statusText: 'Unauthorized',
           json: async () => ({ error: { message: 'Invalid Key' } }),
           headers: new Map(),
+          clone: function() { return this; }
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -110,6 +111,7 @@ describe('ProviderRequestEngine', () => {
         statusText: 'Bad Request',
         json: async () => ({ message: 'Fatal Error' }),
         headers: new Map(),
+        clone: function() { return this; }
       });
 
       await expect(ProviderRequestEngine.executeRequest(mockProvider, {

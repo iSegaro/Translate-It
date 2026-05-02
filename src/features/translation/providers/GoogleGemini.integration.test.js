@@ -90,6 +90,7 @@ describe('GeminiProvider Internal Integration', () => {
         statusText: 'Unauthorized',
         json: async () => ({ error: { message: 'API_KEY_INVALID' } }),
         headers: new Map(),
+        clone: function() { return this; }
       })
       .mockResolvedValueOnce({
         ok: true,
