@@ -109,6 +109,71 @@ export class MockProvider extends BaseAIProvider {
   }
 
   /**
+   * Overridden to provide a realistic streaming/progressive rendering simulation for development.
+   * Kicks in for any text longer than 100 characters when messageId is present.
+   */
+  async _translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata = null, expectedFormat = null, priority = null) {
+    const textToProcess = Array.isArray(texts) ? (texts[0]?.t || texts[0]?.text || texts[0]) : texts;
+    const textLength = textToProcess?.length || 0;
+
+    // Trigger simulation if we have the necessary context and text is long enough for meaningful streaming
+    if (engine && messageId && textLength > 300) {
+      const { AIStreamManager } = await import("./utils/AIStreamManager.js");
+      
+      const fullMockResult = `(MOCK STREAMING) This is a simulated translation designed for UI verification. 
+It arrives progressively to test the WindowsManager's ability to handle multiple batches.
+Original input length: ${textLength} characters.
+Target Language: ${targetLang}.
+Current Timestamp: ${new Date().toLocaleTimeString()}.`;
+      
+      const parts = fullMockResult.split(' ');
+      const batchCount = 4;
+      const chunkSize = Math.ceil(parts.length / batchCount);
+      
+      logger.info(`[MockProvider] Simulating streaming for ${textLength} chars (${batchCount} batches)`);
+
+      // Initial delay to avoid Handshake race conditions in messaging
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      for (let i = 0; i < batchCount; i++) {
+        if (abortController?.signal?.aborted) {
+          logger.debug('[MockProvider] Simulation aborted');
+          break;
+        }
+
+        // Delay between batches to make it visible in the UI
+        await new Promise(resolve => setTimeout(resolve, 700));
+
+        const partialText = parts.slice(0, (i + 1) * chunkSize).join(' ');
+
+        // Send simulated batch update
+        // Note: For simulation, we send the cumulative text as many UI components expect 
+        // the provider to handle accumulation if they don't support delta-merging.
+        // However, TranslationHandler now supports both.
+        await AIStreamManager.streamBatchResults(
+          this.providerName,
+          [partialText],
+          Array.isArray(texts) ? texts : [texts],
+          i,
+          messageId,
+          engine,
+          sourceLang,
+          targetLang
+        );
+      }
+
+      // Final end signal
+      await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { targetLanguage: targetLang });
+
+      // Return the full result as the final "direct" answer
+      return Array.isArray(texts) ? [fullMockResult] : fullMockResult;
+    }
+
+    // Default behavior for short texts or non-streaming contexts
+    return super._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, contextMetadata, expectedFormat, priority);
+  }
+
+  /**
    * Transforms JSON structure to simulate translation (keeps IDs, updates text)
    * @private
    */
