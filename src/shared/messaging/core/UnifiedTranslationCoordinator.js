@@ -339,21 +339,31 @@ export class UnifiedTranslationCoordinator {
     // Enhanced timeouts for Select Element mode - allow longer processing times
     const isSelectElementMode = data?.mode === 'select_element' || data?.mode === 'select-element' || data?.options?.mode === 'select_element';
 
-    let baseTimeout, initialTimeout, progressTimeout, gracePeriod;
+    let initialTimeout, progressTimeout, gracePeriod;
 
     if (isSelectElementMode) {
-      // Select Element mode needs much longer timeouts due to batching and API delays
-      baseTimeout = Math.min(120000, Math.max(30000, segmentCount * 5000)); // 5s per segment, 30-120s range
-      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 4000)); // Up to 10 minutes
-      progressTimeout = Math.max(180000, segmentCount * 2000); // At least 3 minutes between progress
+      // Select Element mode needs much longer timeouts due to batching and API delays.
+      // We align this with the 90s system timeout but scale it with segments.
+      const baseTimeout = Math.max(90000, segmentCount * 6000); // 6s per segment, min 90s
+      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 5000)); // Up to 10 minutes
+      progressTimeout = Math.max(90000, segmentCount * 3000); // At least 90s between progress updates
       gracePeriod = Math.min(300000, segmentCount * 10000); // Up to 5 minutes grace period
     } else {
       // Standard timeouts for regular translation
-      baseTimeout = Math.min(60000, Math.max(30000, segmentCount * 5000)); // 5s per segment, 30-60s range
+      const baseTimeout = Math.max(60000, segmentCount * 5000); // 5s per segment, min 60s
       initialTimeout = customTimeout || Math.min(300000, baseTimeout + (segmentCount * 2000)); // Up to 5 minutes
-      progressTimeout = Math.max(60000, segmentCount * 1000); // At least 1 minute between progress
+      progressTimeout = Math.max(60000, segmentCount * 2000); // At least 1 minute between progress
       gracePeriod = Math.min(120000, segmentCount * 5000); // Up to 2 minutes grace period
     }
+
+    logger.debug(`Streaming timeouts calculated:`, {
+      mode: isSelectElementMode ? 'select-element' : 'regular',
+      segments: segmentCount,
+      textLength,
+      initialTimeout,
+      progressTimeout,
+      gracePeriod
+    });
 
     return {
       initialTimeout,
