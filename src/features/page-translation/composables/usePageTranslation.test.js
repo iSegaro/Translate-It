@@ -37,14 +37,31 @@ vi.mock('@/features/translation/stores/translation.js', () => ({
   }))
 }));
 
+// 5. Mock Vue lifecycle hooks to prevent warnings and test registration
+vi.mock('vue', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    onMounted: vi.fn((fn) => fn()), // Execute immediately for testing setup
+    onUnmounted: vi.fn(),
+  };
+});
+
 import { usePageTranslation } from './usePageTranslation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { onMounted } from 'vue';
 
 describe('usePageTranslation Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should initialize and register listeners in onMounted', () => {
+    usePageTranslation();
+    expect(onMounted).toHaveBeenCalled();
+    expect(pageEventBus.on).toHaveBeenCalled();
   });
 
   it('should initialize with correct default state', () => {
