@@ -102,6 +102,10 @@ export class ProviderCoordinator {
     // 5. Initialize Streaming if needed
     // Only enable coordinator-level streaming if not already handled by an orchestrator (rawJsonPayload)
     if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+      // FIX: Ensure both StreamingManager AND LifecycleRegistry (for AIStreamManager) have sender info
+      if (engine && typeof engine.registerStreamingSender === 'function') {
+        engine.registerStreamingSender(messageId, options.sender);
+      }
       await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
     }
 
@@ -132,11 +136,6 @@ export class ProviderCoordinator {
       // Enqueue the task - QueueManager handles retries and prioritization
       const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode);
 
-      // If we are in coordinator-level streaming mode, we return a status object
-      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
-        return { success: true, streaming: true, messageId };
-      }
-
       // 7. Post-processing & Normalization
       // Use the strict Response Contract to determine cleaning strategy
       let finalResult = result;
@@ -161,6 +160,20 @@ export class ProviderCoordinator {
             );
           }
         }
+      }
+
+      // If we are in coordinator-level streaming mode, we return a status object
+      // FIX: Also include the translatedText as a final fallback so the UI can resolve immediately
+      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+        return { 
+          success: true, 
+          streaming: true, 
+          messageId, 
+          translatedText: finalResult,
+          provider: providerName,
+          sourceLanguage: processedSourceLang,
+          targetLanguage: processedTargetLang
+        };
       }
 
       // 8. Capture Detected Language & Register Feedback

@@ -459,7 +459,10 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
-        this.logger.info(`Displaying result for ${translationMode} mode in notification.`);
+        this.logger.info(`Forwarding result for ${translationMode} mode to WindowsManager`);
+        if (window.windowsManagerInstance && window.windowsManagerInstance.translationHandler) {
+          return window.windowsManagerInstance.translationHandler.handleTranslationResult(message);
+        }
         return true;
 
       case TranslationMode.Page:

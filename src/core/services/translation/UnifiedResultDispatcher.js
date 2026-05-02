@@ -112,6 +112,8 @@ export class UnifiedResultDispatcher {
       await this.dispatchFieldResult({ messageId, result, request, originalMessage });
     } else if (request.mode === TranslationMode.Select_Element) {
       await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
+    } else if (request.mode === TranslationMode.Selection || request.mode === TranslationMode.Dictionary_Translation) {
+      await this.dispatchSelectionResult({ messageId, result, request, originalMessage });
     }
   }
 
@@ -137,6 +139,30 @@ export class UnifiedResultDispatcher {
         ExtensionContextManager.handleContextError(sendError, 'result-dispatcher');
       } else {
         logger.warn(`[ResultDispatcher] Failed to dispatch field result:`, sendError.message);
+      }
+    }
+  }
+
+  /**
+   * Dispatch selection or dictionary translation result back to the original tab.
+   */
+  async dispatchSelectionResult({ messageId, result, request }) {
+    try {
+      if (request?.sender?.tab?.id) {
+        await browser.tabs.sendMessage(request.sender.tab.id, {
+          action: MessageActions.TRANSLATION_RESULT_UPDATE,
+          messageId,
+          data: {
+            ...result,
+            translationMode: request.mode,
+            context: 'selection-direct',
+            isBroadcast: false
+          }
+        });
+      }
+    } catch (sendError) {
+      if (!ExtensionContextManager.isContextError(sendError)) {
+        logger.warn(`[ResultDispatcher] Failed to send selection result:`, sendError.message);
       }
     }
   }

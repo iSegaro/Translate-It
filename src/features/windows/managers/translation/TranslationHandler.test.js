@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TranslationHandler } from './TranslationHandler.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { registerTranslation, sendUnifiedTranslation } from '@/shared/messaging/core/ContentScriptIntegration.js';
+import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 
 // Mock ALL dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -45,12 +46,14 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
   }
 }));
 
-vi.mock('@/shared/config/constants.js', () => ({
+vi.mock('@/shared/constants/core.js', () => ({
   AUTO_DETECT_VALUE: 'auto'
 }));
 
-vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
-  sendMessage: vi.fn()
+vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
+  registerTranslation: vi.fn(),
+  sendUnifiedTranslation: vi.fn(),
+  cancelTranslation: vi.fn()
 }));
 
 vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
@@ -77,11 +80,21 @@ vi.mock('@/core/extensionContext.js', () => ({
   }
 }));
 
+vi.mock('@/core/PageEventBus.js', () => ({
+  pageEventBus: {
+    emit: vi.fn()
+  },
+  WINDOWS_MANAGER_EVENTS: {
+    UPDATE_WINDOW: 'UPDATE_WINDOW'
+  }
+}));
+
 describe('TranslationHandler', () => {
   let handler;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    registerTranslation.mockImplementation(() => {});
     vi.useFakeTimers();
     handler = new TranslationHandler();
   });
@@ -110,45 +123,69 @@ describe('TranslationHandler', () => {
     expect(provider).toBe('deepl');
   });
 
-  it('should handle direct translation result from sendMessage', async () => {
-    const mockResult = { translatedText: 'سلام', sourceLanguage: 'en', targetLanguage: 'fa' };
-    sendMessage.mockResolvedValue(mockResult);
+  it('should handle direct translation result from sendUnifiedTranslation', async () => {
+    const mockResult = { success: true, translatedText: 'سلام', sourceLanguage: 'en', targetLanguage: 'fa', streaming: false };
+    sendUnifiedTranslation.mockResolvedValue(mockResult);
 
     const result = await handler.performTranslation('hello');
 
     expect(result.translatedText).toBe('سلام');
-    expect(sendMessage).toHaveBeenCalled();
+    expect(sendUnifiedTranslation).toHaveBeenCalled();
   });
 
-  it('should handle port fallback result from sendMessage', async () => {
-    const mockResult = { result: { translatedText: 'سلام', success: true } };
-    sendMessage.mockResolvedValue(mockResult);
+  it('should handle streaming translation result', async () => {
+    // 1. Setup sendUnifiedTranslation to return streaming status
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
 
-    const result = await handler.performTranslation('hello');
+    // 2. Setup registerTranslation to simulate streaming updates and completion
+    registerTranslation.mockImplementation((id, callbacks) => {
+      // Simulate streaming update
+      setTimeout(() => {
+        callbacks.onStreamUpdate({ data: ['سلام'] });
+      }, 10);
+      
+      // Simulate streaming end
+      setTimeout(() => {
+        callbacks.onStreamEnd({ success: true, sourceLanguage: 'en', targetLanguage: 'fa' });
+      }, 20);
+    });
+
+    const translationPromise = handler.performTranslation('hello', { windowId: 'win-123' });
+
+    // Fast-forward timers to complete the stream
+    await vi.runAllTimersAsync();
+
+    const result = await translationPromise;
 
     expect(result.translatedText).toBe('سلام');
+    expect(pageEventBus.emit).toHaveBeenCalledWith(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, expect.objectContaining({
+      id: 'win-123',
+      data: expect.objectContaining({ initialTranslatedText: 'سلام' })
+    }));
   });
 
   it('should handle translation timeout', async () => {
-    sendMessage.mockResolvedValue({ type: 'ACK' }); // Not a result
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
+    // Don't simulate any streaming callbacks to force timeout
 
     const translationPromise = handler.performTranslation('hello');
     
     // Fast-forward to trigger timeout
-    vi.advanceTimersByTime(31000);
+    await vi.advanceTimersByTimeAsync(31000);
 
     await expect(translationPromise).rejects.toThrow('Translation timeout');
   });
 
   it('should handle cancellation', async () => {
-    sendMessage.mockResolvedValue({ type: 'ACK' });
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
     
     const translationPromise = handler.performTranslation('hello');
     
     // Cancel it
     handler.cancelTranslation('mock-msg-id');
 
-    await expect(translationPromise).rejects.toThrow('Translation cancelled');
+    const result = await translationPromise;
+    expect(result.cancelled).toBe(true);
   });
 
   it('should handle translation error message', async () => {
@@ -158,10 +195,10 @@ describe('TranslationHandler', () => {
     };
     
     // Start translation
-    sendMessage.mockResolvedValue({ type: 'ACK' });
+    sendUnifiedTranslation.mockResolvedValue({ success: true, streaming: true });
     const promise = handler.performTranslation('hello');
     
-    // Simulate result arrival
+    // Simulate result arrival (via handleTranslationResult fallback)
     handler.handleTranslationResult(message);
     
     await expect(promise).rejects.toThrow('API Error');

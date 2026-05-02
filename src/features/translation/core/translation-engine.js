@@ -243,6 +243,7 @@ export class TranslationEngine {
   async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
   async cancelAllTranslations() { return await this.lifecycleRegistry.cancelAllTranslations(); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
+  registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }
   isCancelled(messageId) { return this.lifecycleRegistry.isCancelled(messageId); }
   
