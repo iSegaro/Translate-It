@@ -112,6 +112,13 @@ export class TranslationHandler {
       // Create promise for result
       const resultPromise = this._createTranslationPromise(messageId);
 
+      // CRITICAL: Attach a silent catch handler to avoid "Uncaught (in promise)" 
+      // when timeout occurs while sendMessage is still pending.
+      // The error will still be caught by the real 'await resultPromise' later.
+      resultPromise.catch(err => {
+        this.logger.debug("resultPromise rejected before await (normal if timeout hits during sendMessage):", err.message);
+      });
+
       const isAIContextEnabled = settingsManager.get('AI_CONTEXT_TRANSLATION_ENABLED', true);
 
       // Prepare payload (force source language to 'auto')
