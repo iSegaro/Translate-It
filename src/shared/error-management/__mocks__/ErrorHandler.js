@@ -10,6 +10,9 @@ export const mockErrorHandlerInstance = {
   openOptionsPageCallback: vi.fn(),
 };
 
-export const ErrorHandler = {
-  getInstance: vi.fn(() => mockErrorHandlerInstance),
-};
+export const ErrorHandler = vi.fn().mockImplementation(function() {
+  return mockErrorHandlerInstance;
+});
+ErrorHandler.getInstance = vi.fn(() => mockErrorHandlerInstance);
+
+export const handleUIError = vi.fn().mockResolvedValue(null);
