@@ -253,7 +253,7 @@ export class StreamingTimeoutManager {
    */
   isStreaming(messageId) {
     const streamState = this.activeStreams.get(messageId);
-    return streamState && !streamState.isCompleted && !streamState.isCancelled;
+    return !!(streamState && !streamState.isCompleted && !streamState.isCancelled);
   }
 
   /**
@@ -263,7 +263,7 @@ export class StreamingTimeoutManager {
    */
   shouldContinue(messageId) {
     const streamState = this.activeStreams.get(messageId);
-    return streamState && !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut;
+    return !!(streamState && !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut);
   }
 
   /**
