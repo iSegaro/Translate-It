@@ -90,5 +90,13 @@ export const AIStreamManager = {
     } catch (error) {
       logger.error(`[${providerName}] Failed to stream fallback result for segment ${segmentIndex + 1}:`, error);
     }
+  },
+
+  /**
+   * Check if a streaming session is active for a messageId
+   */
+  isStreamActive(messageId) {
+    if (!messageId) return false;
+    return streamingManager.isStreamActive(messageId);
   }
 };

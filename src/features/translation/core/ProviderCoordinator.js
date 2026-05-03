@@ -90,7 +90,17 @@ export class ProviderCoordinator {
 
     // 3. Metadata Awareness
     const inputCount = Array.isArray(text) ? text.length : (jsonInfo.isJson ? jsonInfo.parsed.length : 1);
-    options.textLength = typeof text === 'string' ? text.length : (jsonInfo.isJson ? JSON.stringify(jsonInfo.parsed).length : 0);
+    
+    // FIX: Correctly calculate total character length for arrays, strings, and JSON structures
+    if (typeof text === 'string') {
+      options.textLength = text.length;
+    } else if (Array.isArray(text)) {
+      options.textLength = text.reduce((sum, s) => sum + (typeof s === 'string' ? s.length : (s?.t?.length || s?.text?.length || 0)), 0);
+    } else if (jsonInfo.isJson) {
+      options.textLength = JSON.stringify(jsonInfo.parsed).length;
+    } else {
+      options.textLength = 0;
+    }
 
     // 4. Resolve strategy and expected format
     const strategy = this._resolveExecutionStrategy(provider, jsonInfo.isJson, options);

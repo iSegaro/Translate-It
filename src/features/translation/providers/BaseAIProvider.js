@@ -60,7 +60,11 @@ export class BaseAIProvider extends BaseProvider {
     const batchStrategy = await this.getBatchStrategy(translateMode);
 
     // 1. Try streaming if supported and beneficial
-    if (supportsStreaming && await this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
+    // FIX: Only enter streaming path if thresholds are met OR if already initialized by coordinator
+    const shouldStream = await this._shouldUseStreaming(texts, messageId, engine, translateMode);
+    const isAlreadyStreaming = messageId && AIStreamManager.isStreamActive(messageId);
+
+    if (supportsStreaming && (shouldStream || isAlreadyStreaming)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
 
@@ -222,7 +226,29 @@ export class BaseAIProvider extends BaseProvider {
    * @protected
    */
   async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
-    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
+    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments`);
+
+    // Ensure streaming is initialized in the central manager
+    if (messageId && engine && !AIStreamManager.isStreamActive(messageId)) {
+      try {
+        const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
+        if (sender) {
+          // If we have sender info, we can safely initialize the stream even if coordinator skipped it
+          const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
+          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          logger.debug(`[${this.providerName}] Late-initialized stream for messageId: ${messageId}`);
+        }
+      } catch (err) {
+        logger.warn(`[${this.providerName}] Failed to late-initialize stream:`, err.message);
+      }
+    }
+
+    // Check one last time if we can actually stream
+    const canStream = messageId && AIStreamManager.isStreamActive(messageId);
+    if (!canStream) {
+      logger.debug(`[${this.providerName}] Streaming not active for ${messageId}, falling back to standard batch`);
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
+    }
 
     // Get batching configuration
     const batchingConfig = await this.getBatchingConfig(translateMode);
