@@ -83,10 +83,14 @@ export const CONFIG = {
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
   // --- Character Limits ---
+  /** Maximum characters allowed for popup translation */
   POPUP_MAX_CHARS: 5000,
+  /** Maximum characters allowed for sidepanel translation */
   SIDEPANEL_MAX_CHARS: 10000,
+  /** Maximum characters allowed for selection/floating window translation */
   SELECTION_MAX_CHARS: 5000,
-  SELECT_ELEMENT_MAX_CHARS: 300000, // Very high limit for select element mode
+  /** Maximum characters allowed for "Select Element" mode (usually higher for articles) */
+  SELECT_ELEMENT_MAX_CHARS: 300000,
 
 
   // --- API Settings ---
@@ -1291,4 +1295,30 @@ export const getWholePageScrollStopDelayAsync = async () => {
     "WHOLE_PAGE_SCROLL_STOP_DELAY",
     CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY
   );
+};
+
+// --- Character Limit Getters ---
+
+export const getPopupMaxCharsAsync = async () => {
+  return getSettingValueAsync("POPUP_MAX_CHARS", CONFIG.POPUP_MAX_CHARS);
+};
+
+export const getSidepanelMaxCharsAsync = async () => {
+  return getSettingValueAsync("SIDEPANEL_MAX_CHARS", CONFIG.SIDEPANEL_MAX_CHARS);
+};
+
+export const getSelectionMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECTION_MAX_CHARS", CONFIG.SELECTION_MAX_CHARS);
+};
+
+export const getSelectElementMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECT_ELEMENT_MAX_CHARS", CONFIG.SELECT_ELEMENT_MAX_CHARS);
+};
+
+export const getWholePageMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_MAX_CHARS", CONFIG.WHOLE_PAGE_MAX_CHARS);
+};
+
+export const getWholePageAiMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_AI_MAX_CHARS", CONFIG.WHOLE_PAGE_AI_MAX_CHARS);
 };

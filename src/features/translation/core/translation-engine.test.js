@@ -75,6 +75,10 @@ vi.mock("@/shared/config/config.js", () => ({
   },
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('auto')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
+  getPopupMaxCharsAsync: vi.fn(() => Promise.resolve(5000)),
+  getSidepanelMaxCharsAsync: vi.fn(() => Promise.resolve(10000)),
+  getSelectionMaxCharsAsync: vi.fn(() => Promise.resolve(5000)),
+  getSelectElementMaxCharsAsync: vi.fn(() => Promise.resolve(300000)),
   TranslationMode: { Selection: 'selection', Page: 'page', Dictionary_Translation: 'dictionary', Select_Element: 'select_element' }
 }));
 

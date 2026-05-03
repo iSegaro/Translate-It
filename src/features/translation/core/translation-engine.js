@@ -8,7 +8,15 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode, CONFIG } from "@/shared/config/config.js";
+import { 
+  getSourceLanguageAsync, 
+  getTargetLanguageAsync, 
+  TranslationMode,
+  getPopupMaxCharsAsync,
+  getSidepanelMaxCharsAsync,
+  getSelectionMaxCharsAsync,
+  getSelectElementMaxCharsAsync
+} from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
@@ -112,7 +120,7 @@ export class TranslationEngine {
     data.mode = mode;
 
     // 2. Length Validation
-    const lengthError = this._validateTextLength(text, mode, provider);
+    const lengthError = await this._validateTextLength(text, mode, provider);
     if (lengthError) return lengthError;
 
     // 3. Resolve global languages for context (Coordinator will handle swapping)
@@ -188,7 +196,7 @@ export class TranslationEngine {
    * Validate text length against mode-specific limits.
    * @private
    */
-  _validateTextLength(text, mode, provider) {
+  async _validateTextLength(text, mode, provider) {
     const isSelectElementMode = mode === TranslationMode.Select_Element;
     const isSelectionMode = mode === TranslationMode.Selection;
     const isPopupMode = mode === TranslationMode.Popup_Translate;
@@ -197,13 +205,13 @@ export class TranslationEngine {
     let maxChars = 50000; // Default safety limit
     
     if (isSelectElementMode) {
-      maxChars = CONFIG.SELECT_ELEMENT_MAX_CHARS;
+      maxChars = await getSelectElementMaxCharsAsync();
     } else if (isSidepanelMode) {
-      maxChars = CONFIG.SIDEPANEL_MAX_CHARS;
+      maxChars = await getSidepanelMaxCharsAsync();
     } else if (isPopupMode) {
-      maxChars = CONFIG.POPUP_MAX_CHARS;
+      maxChars = await getPopupMaxCharsAsync();
     } else if (isSelectionMode) {
-      maxChars = CONFIG.SELECTION_MAX_CHARS;
+      maxChars = await getSelectionMaxCharsAsync();
     }
 
     if (text.length > maxChars) {

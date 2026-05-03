@@ -92,6 +92,8 @@ vi.mock("@/shared/config/config.js", () => ({
   },
   getSourceLanguageAsync: vi.fn().mockResolvedValue("auto"),
   getTargetLanguageAsync: vi.fn().mockResolvedValue("en"),
+  getPopupMaxCharsAsync: vi.fn().mockResolvedValue(5000),
+  getSidepanelMaxCharsAsync: vi.fn().mockResolvedValue(10000),
   getSourceLanguage: vi.fn().mockReturnValue("auto"),
   getTargetLanguage: vi.fn().mockReturnValue("en"),
   TranslationMode: {

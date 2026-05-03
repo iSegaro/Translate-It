@@ -5,7 +5,15 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync, CONFIG } from '@/shared/config/config.js';
+import { 
+  TranslationMode, 
+  getModeProvidersAsync, 
+  getTranslationApiAsync, 
+  getPopupMaxCharsAsync,
+  getSidepanelMaxCharsAsync,
+  getSelectionMaxCharsAsync,
+  getSelectElementMaxCharsAsync
+} from '@/shared/config/config.js';
 import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
@@ -75,13 +83,13 @@ export class UnifiedTranslationService {
     // 1. Character Limit Validation
     let charLimit = 50000; // Default safety limit
     if (context === MessageContexts.POPUP) {
-      charLimit = CONFIG.POPUP_MAX_CHARS;
+      charLimit = await getPopupMaxCharsAsync();
     } else if (context === MessageContexts.SIDEPANEL) {
-      charLimit = CONFIG.SIDEPANEL_MAX_CHARS;
+      charLimit = await getSidepanelMaxCharsAsync();
     } else if (mode === TranslationMode.Select_Element) {
-      charLimit = CONFIG.SELECT_ELEMENT_MAX_CHARS;
+      charLimit = await getSelectElementMaxCharsAsync();
     } else if (mode === TranslationMode.Selection || context === MessageContexts.SELECTION_MANAGER) {
-      charLimit = CONFIG.SELECTION_MAX_CHARS;
+      charLimit = await getSelectionMaxCharsAsync();
     }
 
     if (estimatedChars > charLimit) {

@@ -58,6 +58,11 @@ class SettingsManager {
       ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false,
+      // Character Limits
+      POPUP_MAX_CHARS: 5000,
+      SIDEPANEL_MAX_CHARS: 10000,
+      SELECTION_MAX_CHARS: 5000,
+      SELECT_ELEMENT_MAX_CHARS: 300000,
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       SHOW_DESKTOP_FAB: true,
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },

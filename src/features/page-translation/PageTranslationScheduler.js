@@ -1,7 +1,12 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
-import { TranslationMode, CONFIG } from '@/shared/config/config.js';
-import { getTranslationApiAsync, getTargetLanguageAsync } from '@/config.js';
+import { TranslationMode } from '@/shared/config/config.js';
+import { 
+  getTranslationApiAsync, 
+  getTargetLanguageAsync,
+  getWholePageMaxCharsAsync,
+  getWholePageAiMaxCharsAsync
+} from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
@@ -514,7 +519,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       targetLanguage,
       chunkSize: Math.max(chunkSize, 5), // Ensure at least 5 segments per batch
       lazyLoading: this.settings.lazyLoading,
-      maxChars: isAI ? (providerConfig.batching?.maxBatchSizeChars || CONFIG.WHOLE_PAGE_AI_MAX_CHARS) : (providerConfig.batching?.characterLimit || CONFIG.WHOLE_PAGE_MAX_CHARS)
+      maxChars: isAI ? (providerConfig.batching?.maxBatchSizeChars || await getWholePageAiMaxCharsAsync()) : (providerConfig.batching?.characterLimit || await getWholePageMaxCharsAsync())
     };
   }
 

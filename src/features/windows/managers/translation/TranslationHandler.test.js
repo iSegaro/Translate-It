@@ -34,6 +34,7 @@ vi.mock('@/shared/config/config.js', () => ({
     SELECTION_MAX_CHARS: 5000,
     SELECT_ELEMENT_MAX_CHARS: 300000,
   },
+  getSelectionMaxCharsAsync: vi.fn(() => Promise.resolve(5000)),
   TranslationMode: {
     Selection: 'selection',
     Dictionary_Translation: 'dictionary'
