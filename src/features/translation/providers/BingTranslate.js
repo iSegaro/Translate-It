@@ -251,7 +251,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         // CRITICAL FINAL FALLBACK: If we've exhausted retries or can't split further, 
         // return the original text for THIS chunk instead of throwing.
         // This prevents one bad chunk from breaking the entire page translation.
-        logger.error(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
+        logger.debug(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
         return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
       }
 
