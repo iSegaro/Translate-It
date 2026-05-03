@@ -115,13 +115,7 @@ vi.mock('@/core/managers/core/NotificationManager.js', () => ({
   }
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn().mockReturnValue({
-      handle: vi.fn().mockResolvedValue(undefined)
-    })
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: {

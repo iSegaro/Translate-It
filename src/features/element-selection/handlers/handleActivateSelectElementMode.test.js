@@ -29,11 +29,7 @@ vi.mock('@/core/extensionContext.js', () => ({
   }
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: vi.fn().mockImplementation(function() {
-    this.handle = vi.fn();
-  })
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({

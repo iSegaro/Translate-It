@@ -25,13 +25,7 @@ vi.mock('@/core/extensionContext.js', () => ({
 }));
 
 // Mock ErrorHandler
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn(() => ({
-      handle: vi.fn(() => Promise.resolve())
-    }))
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 describe('PageTranslationEventManager', () => {
   let mockManager;

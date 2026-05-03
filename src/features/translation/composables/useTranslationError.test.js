@@ -3,14 +3,9 @@ import { createApp } from 'vue';
 import { useTranslationError } from './useTranslationError.js';
 import * as ErrorDisplayStrategies from '@/shared/error-management/ErrorDisplayStrategies.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { mockErrorHandlerInstance } from '@/shared/error-management/ErrorHandler.js';
 
 // --- Shared Mock Objects ---
-const mockErrorHandlerInstance = {
-  addUIErrorListener: vi.fn(() => vi.fn()), // returns unsubscribe function
-  openOptionsPageCallback: vi.fn(),
-  getErrorForUI: vi.fn()
-};
-
 const mockUseErrorHandler = {
   handleTranslationError: vi.fn(),
   getErrorForDisplay: vi.fn(),
@@ -32,26 +27,14 @@ vi.mock('@/shared/logging/logConstants.js', () => ({
   LOG_COMPONENTS: { UI: 'UI' }
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn(() => mockErrorHandlerInstance)
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
   useErrorHandler: vi.fn(() => mockUseErrorHandler)
 }));
 
-vi.mock('@/shared/error-management/ErrorDisplayStrategies.js', () => ({
-  getErrorDisplayStrategy: vi.fn(),
-  processErrorMessage: vi.fn((msg) => msg),
-  shouldShowRetry: vi.fn(),
-  shouldShowSettings: vi.fn()
-}));
-
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  matchErrorToType: vi.fn()
-}));
+vi.mock('@/shared/error-management/ErrorDisplayStrategies.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 // Helper to test composables
 function withSetup(composable) {

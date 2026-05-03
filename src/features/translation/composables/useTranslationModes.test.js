@@ -76,15 +76,8 @@ vi.mock("@/shared/messaging/core/MessageHandler.js", () => ({
   })),
 }));
 
-vi.mock("@/shared/error-management/ErrorMatcher.js", () => ({
-  matchErrorToType: vi.fn().mockReturnValue("unknown"),
-}));
-
-vi.mock("@/shared/error-management/ErrorTypes.js", () => ({
-  ErrorTypes: {
-    TAB_RESTRICTED: "tab-restricted",
-  },
-}));
+vi.mock("@/shared/error-management/ErrorMatcher.js");
+vi.mock("@/shared/error-management/ErrorTypes.js");
 
 vi.mock("@/shared/utils/text/textAnalysis.js", () => ({
   isSingleWordOrShortPhrase: vi.fn().mockReturnValue(false),

@@ -34,11 +34,7 @@ vi.mock('@/core/extensionContext.js', () => ({
   }
 }));
 
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn(() => false),
-  isCancellationError: vi.fn(() => false),
-  matchErrorToType: vi.fn(() => 'UNKNOWN')
-}));
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 vi.mock('@/shared/config/config.js', () => ({
   getSettingsAsync: vi.fn(() => Promise.resolve({})),

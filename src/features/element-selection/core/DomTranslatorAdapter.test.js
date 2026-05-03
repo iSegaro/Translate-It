@@ -52,28 +52,12 @@ vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
 // Re-export mocked functions for easy access in tests
 const { registerTranslation, contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
 
-const errorHandlerMock = {
-  handle: vi.fn()
-};
+vi.mock('@/shared/error-management/ErrorHandler.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js');
+vi.mock('@/shared/error-management/ErrorTypes.js');
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn(() => errorHandlerMock)
-  }
-}));
-
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn(() => false),
-  matchErrorToType: vi.fn(() => 'UNKNOWN'),
-  isCancellationError: vi.fn(() => false)
-}));
-
-vi.mock('@/shared/error-management/ErrorTypes.js', () => ({
-  ErrorTypes: {
-    USER_CANCELLED: 'USER_CANCELLED',
-    TRANSLATION_CANCELLED: 'TRANSLATION_CANCELLED'
-  }
-}));
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+const errorHandlerMock = ErrorHandler.getInstance();
 
 vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
   detectDirectionFromContent: vi.fn(() => 'rtl'),

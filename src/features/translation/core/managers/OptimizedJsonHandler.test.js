@@ -18,7 +18,10 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
+vi.mock('@/shared/error-management/ErrorMatcher.js');
+
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -35,11 +38,6 @@ vi.mock('@/features/translation/core/TranslationStatsManager.js', () => ({
     getSessionSummary: vi.fn(() => ({ chars: 100, originalChars: 80 })),
     printSummary: vi.fn()
   }
-}));
-
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn((err) => err?.isFatal || false),
-  matchErrorToType: vi.fn((err) => err?.type || 'UNKNOWN_ERROR')
 }));
 
 // Partial mocks for dynamic imports
@@ -70,6 +68,11 @@ describe('OptimizedJsonHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock behavior for ErrorMatcher
+    isFatalError.mockImplementation((err) => err?.isFatal || false);
+    matchErrorToType.mockImplementation((err) => err?.type || 'UNKNOWN_ERROR');
+
     handler = new OptimizedJsonHandler();
 
     mockAbortController = {

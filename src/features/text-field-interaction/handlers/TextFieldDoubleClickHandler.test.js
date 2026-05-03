@@ -11,13 +11,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn(() => ({
-      handle: vi.fn()
-    }))
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 vi.mock('../utils/IframePositionCalculator.js', () => ({
   default: class {

@@ -32,19 +32,8 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn(() => ({
-      handle: vi.fn(() => Promise.resolve())
-    }))
-  }
-}));
-
-vi.mock('@/shared/error-management/ErrorTypes.js', () => ({
-  ErrorTypes: {
-    TRANSLATION_FAILED: 'TRANSLATION_FAILED'
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
+vi.mock('@/shared/error-management/ErrorTypes.js');
 
 vi.mock('@/shared/managers/SettingsManager.js', () => ({
   settingsManager: {

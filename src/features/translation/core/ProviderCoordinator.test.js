@@ -9,14 +9,12 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 // Mock ErrorMatcher
-vi.mock("@/shared/error-management/ErrorMatcher.js", () => ({
-  isFatalError: vi.fn((err) => err.message === 'FATAL'),
-  matchErrorToType: vi.fn(() => 'API_ERROR')
-}));
+vi.mock("@/shared/error-management/ErrorMatcher.js");
 
 import { providerCoordinator } from './ProviderCoordinator.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
+import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -59,6 +57,10 @@ describe('ProviderCoordinator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     
+    // Default mock behavior for ErrorMatcher
+    matchErrorToType.mockReturnValue('API_ERROR');
+    isFatalError.mockImplementation((err) => err.message === 'FATAL');
+
     // Reset AIResponseParser to default identity function
     const { AIResponseParser } = await import("@/features/translation/providers/utils/AIResponseParser.js");
     AIResponseParser.cleanAIResponse.mockImplementation(res => res);

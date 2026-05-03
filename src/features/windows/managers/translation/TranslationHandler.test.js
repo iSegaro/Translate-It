@@ -73,13 +73,7 @@ vi.mock('@/shared/utils/text/textAnalysis.js', () => ({
   isSingleWordOrShortPhrase: vi.fn().mockReturnValue(false)
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: {
-    getInstance: vi.fn().mockImplementation(() => ({
-      handle: vi.fn().mockResolvedValue()
-    }))
-  }
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
 
 vi.mock('@/core/extensionContext.js', () => ({
   default: {

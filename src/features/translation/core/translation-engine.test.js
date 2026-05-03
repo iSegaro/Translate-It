@@ -82,6 +82,9 @@ vi.mock("@/shared/config/config.js", () => ({
   TranslationMode: { Selection: 'selection', Page: 'page', Dictionary_Translation: 'dictionary', Select_Element: 'select_element' }
 }));
 
+// Mock ErrorMatcher using central mock
+vi.mock('@/shared/error-management/ErrorMatcher.js');
+
 describe('TranslationEngine', () => {
   let engine;
 

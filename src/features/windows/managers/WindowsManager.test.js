@@ -124,18 +124,8 @@ vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: { Selection: 'selection', Dictionary: 'dictionary' }
 }));
 
-vi.mock('@/shared/error-management/ErrorHandler.js', () => ({ 
-  ErrorHandler: { 
-    getInstance: vi.fn(() => ({ 
-      getErrorForUI: vi.fn().mockResolvedValue({ message: 'Mock Error', canRetry: true }),
-      handle: vi.fn().mockResolvedValue()
-    })) 
-  } 
-}));
-
-vi.mock('@/shared/error-management/ErrorTypes.js', () => ({ 
-  ErrorTypes: { API_ERROR: 'api-error', USER_CANCELLED: 'user-cancelled' } 
-}));
+vi.mock('@/shared/error-management/ErrorHandler.js');
+vi.mock('@/shared/error-management/ErrorTypes.js');
 
 vi.mock('@/core/extensionContext.js', () => ({ 
   default: { isValidSync: vi.fn().mockReturnValue(true), isContextError: vi.fn().mockReturnValue(false) } 

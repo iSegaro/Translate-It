@@ -27,12 +27,11 @@ vi.mock('../core/TranslationStatsManager.js', () => ({
 }));
 
 // Mock ErrorMatcher
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn(() => false),
-  matchErrorToType: vi.fn(() => 'API_ERROR')
-}));
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
-// 2. Import BaseAIProvider and Constants
+import { BaseAIProvider } from './BaseAIProvider.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
   AIResponseParser: {
@@ -40,9 +39,6 @@ vi.mock("./utils/AIResponseParser.js", () => ({
     cleanAIResponse: vi.fn((res) => res)
   }
 }));
-
-import { BaseAIProvider } from './BaseAIProvider.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { statsManager } from '../core/TranslationStatsManager.js';
 
 // 4. Concrete implementation for testing

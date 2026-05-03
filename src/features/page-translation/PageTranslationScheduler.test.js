@@ -25,6 +25,7 @@ vi.mock('@/core/extensionContext.js', () => {
 });
 
 import { PageTranslationScheduler } from './PageTranslationScheduler.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
@@ -56,16 +57,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  matchErrorToType: vi.fn((err) => {
-    if (err?.type) return err.type;
-    return 'UNKNOWN';
-  }),
-  isFatalError: vi.fn((type) => {
-    return type === 'EXTENSION_CONTEXT_INVALIDATED';
-  }),
-  isSilentError: vi.fn(() => false)
-}));
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 vi.mock('@/config.js', () => ({
   getTranslationApiAsync: vi.fn(async () => 'google'),
@@ -77,6 +69,17 @@ describe('PageTranslationScheduler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Default mock behavior for ErrorMatcher
+    matchErrorToType.mockImplementation((err) => {
+      if (err?.type) return err.type;
+      if (err?.errorType) return err.errorType;
+      return 'UNKNOWN';
+    });
+    isFatalError.mockImplementation((type) => {
+      return type === 'EXTENSION_CONTEXT_INVALIDATED';
+    });
+
     scheduler = new PageTranslationScheduler();
     scheduler.setTranslationState(true, 'test-session-123', { pageTitle: 'Test Page' });
     

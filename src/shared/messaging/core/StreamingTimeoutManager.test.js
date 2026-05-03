@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamingTimeoutManager } from './StreamingTimeoutManager.js';
 
+// Mock ErrorHandler and ErrorMatcher using central mocks
+vi.mock('@/shared/error-management/ErrorHandler.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js');
+
 describe('StreamingTimeoutManager', () => {
   let manager;
 

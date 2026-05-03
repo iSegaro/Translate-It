@@ -56,6 +56,9 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
+// Mock ErrorHandler using central mocks
+vi.mock('@/shared/error-management/ErrorHandler.js');
+
 describe('UnifiedMessaging', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -2,23 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useErrorHandler } from './useErrorHandler.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 
-// Mock ErrorHandler
-vi.mock('@/shared/error-management/ErrorHandler.js', () => {
-  const mockInstance = {
-    handle: vi.fn(),
-    getErrorForUI: vi.fn().mockResolvedValue({ message: 'Mocked UI Message' })
-  };
-  return {
-    ErrorHandler: {
-      getInstance: vi.fn(() => mockInstance)
-    }
-  };
-});
-
-// Mock ErrorMatcher
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  matchErrorToType: vi.fn(() => 'UNKNOWN')
-}));
+// Mock ErrorHandler and ErrorMatcher using central mocks
+vi.mock('@/shared/error-management/ErrorHandler.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({

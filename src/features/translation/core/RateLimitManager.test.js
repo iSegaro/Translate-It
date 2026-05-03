@@ -9,11 +9,10 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 // Mock ErrorMatcher
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn((err) => err.message === 'FATAL'),
-}));
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
+import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -44,12 +43,16 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 describe('RateLimitManager', () => {
   let manager;
-
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Default mock behavior for ErrorMatcher
+    isFatalError.mockImplementation((err) => err.message === 'FATAL');
+
     // Reset singleton instance for clean tests
     RateLimitManager.instance = null;
     manager = new RateLimitManager();
+
     // Pre-initialize provider state
     manager._initializeProvider('TestProvider', { maxConcurrent: 1, delayBetweenRequests: 0 });
   });

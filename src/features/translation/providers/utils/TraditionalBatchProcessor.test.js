@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock ErrorMatcher
-vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  isFatalError: vi.fn(() => false),
-  matchErrorToType: vi.fn(() => 'GENERAL_ERROR')
-}));
+vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { TraditionalBatchProcessor } from './TraditionalBatchProcessor.js';
 import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
