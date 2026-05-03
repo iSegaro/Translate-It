@@ -108,4 +108,8 @@ describe('StreamingTimeoutManager', () => {
     expect(result.cancelled).toBe(true);
     expect(result.reason).toBe('Cancelled by test');
   });
+
+  it('should return true for shouldContinue when messageId is unknown', () => {
+    expect(manager.shouldContinue('unknown-id')).toBe(true);
+  });
 });
