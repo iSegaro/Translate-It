@@ -165,6 +165,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
@@ -217,6 +218,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -267,6 +269,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
@@ -319,6 +322,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true, // Depends on model
       supportsBatchRequests: true,
       supportsThinking: false, // Varies by model
@@ -371,6 +375,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Depends on model
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
@@ -421,6 +426,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -471,6 +477,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -523,6 +530,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -575,6 +583,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // DeepL supports batch requests
       supportsThinking: false,
@@ -634,6 +643,7 @@ export const PROVIDER_CONFIGURATIONS = {
       circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -684,6 +694,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
@@ -723,6 +734,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -770,6 +782,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -822,6 +835,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Conservative default
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: false,
@@ -864,6 +878,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,

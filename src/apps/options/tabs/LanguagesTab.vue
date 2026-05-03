@@ -178,6 +178,7 @@
                     mode="button"
                     :is-global="false"
                     allow-default
+                    required-feature="dictionary"
                     :disabled="!enableDictionary"
                   />
                 </div>

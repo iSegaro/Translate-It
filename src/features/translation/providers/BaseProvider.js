@@ -50,6 +50,7 @@ export class BaseProvider {
   // Provider capabilities
   static reliableJsonMode = false;
   static supportsDictionary = false;
+  static supportsTranslation = true;
 
   /**
    * Entry point for translation.

@@ -500,6 +500,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  requiredFeature: {
+    type: String,
+    default: 'translation'
+  },
   loading: {
     type: Boolean,
     default: false
@@ -643,7 +647,12 @@ const availableProviders = computed(() => {
   const debugMode = settingsStore.settings?.DEBUG_MODE || false;
   const providersFromRegistry = getProvidersForDropdown(debugMode);
   
-  const mappedProviders = providersFromRegistry.map(provider => ({
+  // Filter by required feature if provided
+  const filteredRegistry = props.requiredFeature 
+    ? providersFromRegistry.filter(p => p.features?.includes(props.requiredFeature))
+    : providersFromRegistry;
+
+  const mappedProviders = filteredRegistry.map(provider => ({
     id: provider.id,
     name: provider.name,
     icon: provider.icon
@@ -653,14 +662,20 @@ const availableProviders = computed(() => {
     const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
     const defaultProvider = getProviderById(defaultProviderId);
     
-    return [
-      { 
-        id: 'default', 
-        name: t('provider_default') || 'Default', 
-        icon: defaultProvider?.icon || 'providers/google.svg' 
-      },
-      ...mappedProviders
-    ];
+    // Only show default if it supports the required feature
+    const showDefault = !props.requiredFeature || 
+                       (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+
+    if (showDefault) {
+      return [
+        { 
+          id: 'default', 
+          name: t('provider_default') || 'Default', 
+          icon: defaultProvider?.icon || 'providers/google.svg' 
+        },
+        ...mappedProviders
+      ];
+    }
   }
   
   return mappedProviders;
