@@ -28,8 +28,6 @@ import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
-import { PageTranslationHelper } from './PageTranslationHelper.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({

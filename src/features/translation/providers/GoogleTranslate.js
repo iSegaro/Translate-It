@@ -11,6 +11,7 @@ import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 

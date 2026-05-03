@@ -5,7 +5,6 @@
 
 import { ref } from 'vue';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
-import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -19,37 +18,6 @@ export function useWindowsManager() {
   
   // Logger
   const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, 'useWindowsManager');
-
-  /**
-   * Handle global selection change (Coordinator Pattern)
-   */
-  const handleGlobalSelectionChange = async (detail) => {
-    // If there is no WindowsManager instance (the heavy class), 
-    // the composable can handle basic mobile UI orchestration
-    let windowsManager = window.windowsManagerInstance;
-
-    // If not globally available, try to get it via Singleton if it exists
-    if (!windowsManager) {
-      try {
-        const { WindowsManager } = await import('@/features/windows/managers/WindowsManager.js');
-        windowsManager = WindowsManager.getInstance();
-      } catch {
-        // Class not available yet
-      }
-    }
-
-    const hasManager = !!windowsManager;
-
-    logger.info('Global selection change received in useWindowsManager', { 
-      text: detail.text?.substring(0, 20),
-      hasManager 
-    });
-
-    // If we have the manager, let it handle the heavy lifting (logic, settings, positioning)
-    if (hasManager && typeof windowsManager.show === 'function') {
-      windowsManager.show(detail.text, detail.position, detail.options);
-    }
-  };
 
   /**
    * Event handlers

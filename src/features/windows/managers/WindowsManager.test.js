@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Create stable objects for mocks
-const { eventListeners, mockWindowsManagerEvents, mockPageEventBus } = vi.hoisted(() => {
+const { mockWindowsManagerEvents, mockPageEventBus } = vi.hoisted(() => {
   const listeners = {};
   return {
     eventListeners: listeners,
@@ -18,7 +18,7 @@ const { eventListeners, mockWindowsManagerEvents, mockPageEventBus } = vi.hoiste
       on: vi.fn((event, cb) => {
         listeners[event] = cb;
       }),
-      off: vi.fn((event) => {
+      off: vi.fn(() => {
       }),
       emit: vi.fn(async (event, data) => {
         if (listeners[event]) {

@@ -39,7 +39,7 @@ describe('PageTranslation Filters', () => {
     describe(`${FilterClass.name}`, () => {
       it('should prioritize viewport items', () => {
         // Mock Item 3 as in viewport, others not
-        PageTranslationHelper.isInViewportWithMargin.mockImplementation((node, margin) => {
+        PageTranslationHelper.isInViewportWithMargin.mockImplementation((node) => {
           if (node.id === 3) return true;
           return false;
         });

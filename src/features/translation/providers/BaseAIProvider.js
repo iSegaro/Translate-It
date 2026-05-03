@@ -258,7 +258,6 @@ export class BaseAIProvider extends BaseProvider {
       }
 
       const batch = batches[batchIndex];
-      const batchContext = `streaming-batch-${batchIndex + 1}/${batches.length}`;
 
       try {
         const batchResponse = await this._translateBatch(

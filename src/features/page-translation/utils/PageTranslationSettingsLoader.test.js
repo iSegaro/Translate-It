@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PageTranslationSettingsLoader } from './PageTranslationSettingsLoader.js';
-import { TranslationMode, CONFIG } from '@/config.js';
+import { TranslationMode } from '@/config.js';
 
 // Mock config functions
 vi.mock('@/config.js', () => ({

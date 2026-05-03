@@ -32,7 +32,7 @@ export class MockProvider extends BaseAIProvider {
    * @protected
    */
   async _callAI(systemPrompt, userText, options = {}) {
-    const { expectedFormat, isBatch, messageId, engine, sourceLang, targetLang } = options;
+    const { expectedFormat, isBatch } = options;
     
     // 1. Simulate network latency to make UI interactions feel realistic (LLMs usually take 2-5 seconds for batch/stream)
     const latency = 800 + Math.random() * 1200;
@@ -49,7 +49,7 @@ export class MockProvider extends BaseAIProvider {
         try {
           parsedInput = JSON.parse(userText);
           isJsonInput = true;
-        } catch (e) {
+        } catch {
           isJsonInput = false;
         }
       }
@@ -98,8 +98,7 @@ export class MockProvider extends BaseAIProvider {
           result = translatedText;
         }
       }
-    } catch (e) {
-      logger.error('[MockProvider] Error in mock processing:', e);
+    } catch {
       result = `[MOCK ERROR] ${userText}`;
     }
 
@@ -126,7 +125,7 @@ export class MockProvider extends BaseAIProvider {
    * Image translation simulation
    * Exercises the BaseAIProvider.translateImage flow
    */
-  async _translateImageInternal(base64Image, sourceLang, targetLang, options = {}) {
+  async _translateImageInternal(base64Image, sourceLang, targetLang) {
     await new Promise(resolve => setTimeout(resolve, 1500)); // Images take longer
     return `[MOCK IMAGE TRANSLATION] Simulated result for image (${sourceLang} -> ${targetLang})`;
   }

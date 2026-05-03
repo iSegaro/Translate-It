@@ -78,7 +78,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 import { PageTranslationBridge } from './PageTranslationBridge.js';
-import { BIDI_MARKS, isRTL, applyNodeDirection } from '@/utils/dom/DomDirectionManager.js';
+import { BIDI_MARKS, applyNodeDirection } from '@/utils/dom/DomDirectionManager.js';
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 
 describe('PageTranslationBridge', () => {

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenRouterProvider } from './OpenRouter.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({

@@ -3,7 +3,6 @@ import { PageTranslationEventManager } from './PageTranslationEventManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
 
 // Mock storageManager
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -36,7 +35,6 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 
 describe('PageTranslationEventManager', () => {
   let mockManager;
-  let eventManager;
   let mockBus;
 
   beforeEach(() => {

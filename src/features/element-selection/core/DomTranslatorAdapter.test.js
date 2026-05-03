@@ -333,7 +333,7 @@ describe('DomTranslatorAdapter', () => {
 
       try {
         await adapter.translateElement(testElement);
-      } catch (e) {
+      } catch {
         // Expected
       }
 

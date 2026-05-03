@@ -128,7 +128,6 @@ vi.mock('@/handlers/smartTranslationIntegration.js', () => ({
 // 2. Import after mocks
 import { TextFieldIconManager } from './TextFieldIconManager.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
-import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 import { state } from '@/shared/config/config.js';
 
 describe('TextFieldIconManager', () => {

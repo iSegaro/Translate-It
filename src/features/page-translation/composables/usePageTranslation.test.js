@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, nextTick } from 'vue';
 
 // 1. Mock webextension-polyfill FIRST
 vi.mock('webextension-polyfill', () => ({
@@ -126,12 +125,11 @@ describe('usePageTranslation Composable', () => {
       expect(isAutoTranslating.value).toBe(false);
     });
   });
-
   describe('Event Bus Handling', () => {
     it('should update progress when pageEventBus emits', () => {
       // Manual trigger of the listener if we were testing the live component
       // But we can test the internal updateProgress logic by getting the listener
-      const { progress, translatedCount } = usePageTranslation();
+      usePageTranslation();
       
       // Since usePageTranslation is called, it should have registered listeners
       // in onMounted. But we are calling it outside of a component.

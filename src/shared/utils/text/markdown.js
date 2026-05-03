@@ -378,11 +378,15 @@ export class SimpleMarkdown {
   static htmlToPlainText(html) {
     if (!html || typeof html !== "string") return "";
 
-    // Create a temporary div element to extract text content
-    if (typeof document !== 'undefined' && document.createElement) {
-      const div = document.createElement('div');
-      div.innerHTML = html;
-      return div.textContent || div.innerText || "";
+    // Create a temporary element to extract text content using DOMParser
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        return doc.body.textContent || doc.body.innerText || "";
+      } catch {
+        // Fallback if DOMParser fails
+      }
     }
 
     // Fallback: simple regex-based tag removal (less accurate but works in non-DOM environments)

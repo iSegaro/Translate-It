@@ -10,7 +10,6 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";

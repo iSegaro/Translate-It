@@ -170,7 +170,7 @@ export class UnifiedResultDispatcher {
   /**
    * Dispatch select-element translation result (handles large payloads surgically).
    */
-  async dispatchSelectElementResult({ messageId, result, request, originalMessage }) {
+  async dispatchSelectElementResult({ messageId, result, request }) {
     // Select Element results should ALWAYS be sent back to the original tab, not broadcast.
     // Broadcasting to ALL tabs (potentially hundreds) is extremely slow and causes background hangs.
     try {

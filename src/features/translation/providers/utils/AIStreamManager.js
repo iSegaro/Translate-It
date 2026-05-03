@@ -59,7 +59,7 @@ export const AIStreamManager = {
   /**
    * Send error stream message to central manager
    */
-  async streamErrorResults(providerName, error, batchIndex, messageId, engine) {
+  async streamErrorResults(providerName, error, batchIndex, messageId) {
     if (!messageId) return;
     try {
       // Delegate to central manager
