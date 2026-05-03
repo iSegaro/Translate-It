@@ -5,12 +5,13 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync } from '@/shared/config/config.js';
+import { TranslationMode, getModeProvidersAsync, getTranslationApiAsync, CONFIG } from '@/shared/config/config.js';
 import { MessageFormat, MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { translationRequestTracker, RequestStatus } from './TranslationRequestTracker.js';
 import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -69,7 +70,34 @@ export class UnifiedTranslationService {
     }
 
     const estimatedChars = typeof data?.text === 'string' ? data.text.length : 0;
-    logger.info(`Request: ${messageId} (${estimatedChars.toLocaleString()} chars, mode: ${data?.mode || 'unknown'}, provider: ${data?.provider || 'unknown'})`);
+    const mode = data?.mode || 'unknown';
+
+    // 1. Character Limit Validation
+    let charLimit = 50000; // Default safety limit
+    if (context === MessageContexts.POPUP) {
+      charLimit = CONFIG.POPUP_MAX_CHARS;
+    } else if (context === MessageContexts.SIDEPANEL) {
+      charLimit = CONFIG.SIDEPANEL_MAX_CHARS;
+    } else if (mode === TranslationMode.Select_Element) {
+      charLimit = CONFIG.SELECT_ELEMENT_MAX_CHARS;
+    } else if (mode === TranslationMode.Selection || context === MessageContexts.SELECTION_MANAGER) {
+      charLimit = CONFIG.SELECTION_MAX_CHARS;
+    }
+
+    if (estimatedChars > charLimit) {
+      logger.debug(`[UnifiedTranslationService] Text too long for context ${context}/mode ${mode}: ${estimatedChars} > ${charLimit}`);
+      return {
+        success: false,
+        error: {
+          type: ErrorTypes.TEXT_TOO_LONG,
+          message: `Text too long (${estimatedChars.toLocaleString()} chars). Max allowed for this context is ${charLimit.toLocaleString()} chars.`,
+          context: context,
+          timestamp: Date.now()
+        }
+      };
+    }
+
+    logger.info(`Request: ${messageId} (${estimatedChars.toLocaleString()} chars, mode: ${mode}, provider: ${data?.provider || 'unknown'})`);
 
     // Ensure dependencies are available
     if (!this.translationEngine || !this.backgroundService) {

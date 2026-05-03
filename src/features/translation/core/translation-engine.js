@@ -8,8 +8,9 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
+import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode, CONFIG } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
 import { TranslationHistoryManager } from "./managers/TranslationHistoryManager.js";
 import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
@@ -189,24 +190,43 @@ export class TranslationEngine {
    */
   _validateTextLength(text, mode, provider) {
     const isSelectElementMode = mode === TranslationMode.Select_Element;
-    const LIMITS = { WARNING: 10000, REGULAR_MAX: 50000, SELECT_MAX: 500000 };
+    const isSelectionMode = mode === TranslationMode.Selection;
+    const isPopupMode = mode === TranslationMode.Popup_Translate;
+    const isSidepanelMode = mode === TranslationMode.Sidepanel_Translate;
 
-    if (!isSelectElementMode && text.length > LIMITS.WARNING) {
-      if (text.length > LIMITS.REGULAR_MAX) {
-        return {
-          success: false,
-          error: `Text too long (${text.length} chars). Max: ${LIMITS.REGULAR_MAX}. Use "Select Element" for long texts.`,
-          translatedText: text, provider, mode
-        };
-      }
-      logger.warn(`[TranslationEngine] Large text detected (${text.length} chars).`);
-    } else if (isSelectElementMode && text.length > LIMITS.SELECT_MAX) {
+    let maxChars = 50000; // Default safety limit
+    
+    if (isSelectElementMode) {
+      maxChars = CONFIG.SELECT_ELEMENT_MAX_CHARS;
+    } else if (isSidepanelMode) {
+      maxChars = CONFIG.SIDEPANEL_MAX_CHARS;
+    } else if (isPopupMode) {
+      maxChars = CONFIG.POPUP_MAX_CHARS;
+    } else if (isSelectionMode) {
+      maxChars = CONFIG.SELECTION_MAX_CHARS;
+    }
+
+    if (text.length > maxChars) {
+      logger.warn(`[TranslationEngine] Text too long for mode ${mode}: ${text.length} > ${maxChars}`);
       return {
         success: false,
-        error: `Text too long even for Select Element (${text.length} chars). Max: ${LIMITS.SELECT_MAX}.`,
-        translatedText: text, provider, mode
+        error: {
+          type: ErrorTypes.TEXT_TOO_LONG,
+          message: `Text too long (${text.length.toLocaleString()} chars). Max allowed for this mode is ${maxChars.toLocaleString()} chars.`,
+          context: mode,
+          timestamp: Date.now()
+        },
+        translatedText: text, 
+        provider, 
+        mode
       };
     }
+
+    // Still log a warning for large texts even if within limits
+    if (text.length > 10000 && !isSelectElementMode) {
+      logger.warn(`[TranslationEngine] Large text detected (${text.length.toLocaleString()} chars).`);
+    }
+
     return null;
   }
 

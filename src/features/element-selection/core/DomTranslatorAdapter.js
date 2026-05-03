@@ -102,7 +102,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Validate segment count to prevent timeout issues
       const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts
-      const WARNING_SEGMENTS = 200; // Warning threshold for large elements
+      const WARNING_SEGMENTS = 500; // Increased from 200
       if (textNodesData.length > MAX_SEGMENTS) {
         this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, exceeding limit of ${MAX_SEGMENTS}`);
         throw new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);

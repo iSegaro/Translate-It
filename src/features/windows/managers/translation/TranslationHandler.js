@@ -4,18 +4,17 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import { generateTranslationMessageId } from "@/utils/messaging/messageId.js";
-import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode, CONFIG } from "@/shared/config/config.js";
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
-import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";
-import { pageEventBus, WINDOWS_MANAGER_EVENTS, WindowsManagerEvents } from "@/core/PageEventBus.js";
+import { WindowsManagerEvents } from "@/core/PageEventBus.js";
 
 /**
  * Handles translation requests and responses for WindowsManager
@@ -57,6 +56,16 @@ export class TranslationHandler {
    * Perform translation request
    */
   async performTranslation(selectedText, options = {}) {
+    // 1. Character Limit Validation
+    if (selectedText && selectedText.length > CONFIG.SELECTION_MAX_CHARS) {
+      this.logger.debug(`Text too long for selection translation: ${selectedText.length} > ${CONFIG.SELECTION_MAX_CHARS}`);
+      const error = new Error(`Text too long (${selectedText.length.toLocaleString()} chars). Max allowed for selection is ${CONFIG.SELECTION_MAX_CHARS.toLocaleString()} chars.`);
+      error.type = ErrorTypes.TEXT_TOO_LONG;
+      
+      // Throw the error so the caller (WindowsManager) can catch it and show it in the UI
+      throw error;
+    }
+
     let settings;
 
     settings = {

@@ -7,10 +7,11 @@ import { useBrowserAPI } from "@/composables/core/useBrowserAPI.js";
 import { useTranslationError } from "@/features/translation/composables/useTranslationError.js";
 import { generateMessageId } from "@/utils/messaging/messageId.js";
 import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
-import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode, CONFIG } from "@/shared/config/config.js";
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import browser from "webextension-polyfill";
@@ -235,6 +236,15 @@ export function useUnifiedTranslation(context = 'popup') {
   const triggerTranslation = async (sourceLang = null, targetLang = null, overrideProvider = null) => {
     if (!canTranslate.value) return false;
 
+    // 1. Early Character Limit Validation
+    const charLimit = context === 'popup' ? CONFIG.POPUP_MAX_CHARS : CONFIG.SIDEPANEL_MAX_CHARS;
+    if (sourceText.value.length > charLimit) {
+      const error = new Error(`Text too long (${sourceText.value.length.toLocaleString()} chars). Max allowed is ${charLimit.toLocaleString()} chars.`);
+      error.type = ErrorTypes.TEXT_TOO_LONG;
+      handleTranslationError(error);
+      return false;
+    }
+
     isTranslating.value = true;
     isStreaming.value = false;
     if (context === 'sidepanel') {
@@ -286,6 +296,7 @@ export function useUnifiedTranslation(context = 'popup') {
         },
         onError: (error) => {
           isStreaming.value = false;
+          logger.error(`[${context}] Streaming error for message ${messageId}:`, error);
         }
       });
 

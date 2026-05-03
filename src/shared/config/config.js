@@ -82,6 +82,12 @@ export const CONFIG = {
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
+  // --- Character Limits ---
+  POPUP_MAX_CHARS: 5000,
+  SIDEPANEL_MAX_CHARS: 10000,
+  SELECTION_MAX_CHARS: 5000,
+  SELECT_ELEMENT_MAX_CHARS: 300000, // Very high limit for select element mode
+
 
   // --- API Settings ---
   TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
