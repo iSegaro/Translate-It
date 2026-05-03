@@ -393,7 +393,8 @@ export default defineConfig({
       '**/*.test.js',
       '**/*.spec.js',
       '**/__tests__/**',
-      '**/tests/**'
+      '**/tests/**',
+      '**/__mocks__/**'
     ]
   }
 })

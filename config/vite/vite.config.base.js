@@ -219,7 +219,8 @@ export const createBaseConfig = (browser, options = {}) => {
         '**/*.test.js',
         '**/*.spec.js',
         '**/__tests__/**',
-        '**/tests/**'
+        '**/tests/**',
+        '**/__mocks__/**'
       ]
     }
   })
