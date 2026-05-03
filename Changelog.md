@@ -2,9 +2,9 @@
 
 ##### Fixed
 
-* **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Resolved timeout issues affecting popup, side panel, and window contexts
-* Fixed Dictionary Mode for traditional providers (e.g., Google Translate)
-* Addressed various major and minor bugs
+- **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Resolved timeout issues affecting popup, side panel, and window contexts
+- Fixed Dictionary Mode for traditional providers (e.g., Google Translate)
+- Addressed various major and minor bugs
 
 ---
 
