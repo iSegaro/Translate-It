@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { streamingManager } from "../core/StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCheckTranslationStatus');
 
@@ -54,7 +55,6 @@ export async function handleCheckTranslationStatus(request, sender) {
     // Check streaming manager first for active or recently completed translations
     let streamingStatus = null;
     try {
-      const { streamingManager } = await import("../core/StreamingManager.js");
       streamingStatus = streamingManager.getStreamStatus(messageId);
       logger.debug('[CheckTranslationStatus] Streaming status checked', {
         messageId,

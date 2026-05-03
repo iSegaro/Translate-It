@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { streamingManager } from "../StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
 
@@ -91,7 +92,6 @@ export class TranslationLifecycleRegistry {
 
     try {
       // Notify streaming manager to clean up resources
-      const { streamingManager } = await import("../StreamingManager.js");
       await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
     } catch { /* ignore */ }
 
@@ -115,7 +115,6 @@ export class TranslationLifecycleRegistry {
     }
 
     try {
-      const { streamingManager } = await import("../StreamingManager.js");
       await streamingManager.cancelAllStreams('All translations cancelled by user');
     } catch { /* ignore */ }
 

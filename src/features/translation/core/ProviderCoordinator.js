@@ -16,6 +16,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { queueManager } from "./QueueManager.js";
 import { TranslationPriority } from "./RateLimitManager.js";
+import { streamingManager } from "./StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -36,7 +37,6 @@ export class ProviderCoordinator {
     // We only swap if we have original languages (usually from TranslationEngine)
     // If not provided, we assume current source/target are the "original" ones
     const originalSource = options.originalSourceLang || sourceLang;
-    const originalTarget = options.originalTargetLang || targetLang;
 
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
@@ -289,7 +289,6 @@ export class ProviderCoordinator {
     if (!messageId || !engine) return;
 
     try {
-      const { streamingManager } = await import("./StreamingManager.js");
       const segments = Array.isArray(text) ? text : [text];
       
       streamingManager.initializeStream(messageId, sender, provider, segments, sessionId);
