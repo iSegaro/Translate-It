@@ -4,8 +4,7 @@ import {
   stripBiDiMarks, 
   applyNodeDirection, 
   applyElementDirection,
-  restoreElementDirection,
-  detectDirectionFromContent
+  restoreElementDirection
 } from './DomDirectionManager.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 

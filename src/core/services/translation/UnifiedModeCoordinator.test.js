@@ -14,8 +14,8 @@ vi.mock('@/features/translation/core/RateLimitManager.js', () => ({
 
 // Mock ErrorMatcher
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
-  matchErrorToType: vi.fn(err => 'UNKNOWN'),
-  isFatalError: vi.fn(err => false)
+  matchErrorToType: vi.fn(() => 'UNKNOWN'),
+  isFatalError: vi.fn(() => false)
 }));
 
 describe('UnifiedModeCoordinator', () => {

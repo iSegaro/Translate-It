@@ -25,7 +25,6 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
-import { defineComponent } from 'vue';
 import { mount } from '@vue/test-utils';
 
 describe('useStorage Composable', () => {
@@ -34,15 +33,13 @@ describe('useStorage Composable', () => {
   });
 
   it('should sync with external changes via events', async () => {
-    const TestComponent = defineComponent({
+    const wrapper = mount({
       setup() {
         const { data } = useStorage(['theme']);
         return { data };
       },
       template: '<div></div>'
     });
-
-    const wrapper = mount(TestComponent);
     
     // Now setupListeners should have been called in onMounted
     const listenerCall = storageCore.on.mock.calls.find(call => call[0] === 'change:theme');
@@ -58,7 +55,7 @@ describe('useStorage Composable', () => {
   it('should load data on mount if immediate is true', async () => {
     storageCore.get.mockResolvedValue({ theme: 'dark' });
     
-    const TestComponent = defineComponent({
+    const wrapper = mount({
       setup() {
         const { data, isLoading } = useStorage(['theme']);
         return { data, isLoading };
@@ -66,8 +63,6 @@ describe('useStorage Composable', () => {
       template: '<div></div>'
     });
 
-    const wrapper = mount(TestComponent);
-    
     // Wait for async load in onMounted
     await nextTick();
     await nextTick(); // Second tick for the internal promise resolution

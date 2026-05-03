@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useMessaging } from './useMessaging.js';
 import { sendMessage as sendUnifiedMessage } from '../core/UnifiedMessaging.js';
-import { MessageFormat } from '../core/MessagingCore.js';
 
 // Mock UnifiedMessaging
 vi.mock('../core/UnifiedMessaging.js', () => ({

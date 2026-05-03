@@ -58,7 +58,7 @@ vi.mock('../../../shared/config/config.js', () => ({
 vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
   MessageFormat: {
     validate: vi.fn().mockReturnValue(true),
-    createErrorResponse: vi.fn((err, id) => ({ success: false, error: err.message || err }))
+    createErrorResponse: vi.fn((err) => ({ success: false, error: err.message || err }))
   },
   MessageContexts: {
     POPUP: 'popup',
@@ -93,10 +93,8 @@ vi.mock('../../../shared/logging/logConstants.js', () => ({
 }));
 
 // 2. Imports second
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedTranslationService } from './UnifiedTranslationService.js';
-import { TranslationMode } from '../../../shared/config/config.js';
-import { MessageContexts } from '../../../shared/messaging/core/MessagingCore.js';
 import { ErrorTypes } from '../../../shared/error-management/ErrorTypes.js';
 import { translationRequestTracker } from './TranslationRequestTracker.js';
 

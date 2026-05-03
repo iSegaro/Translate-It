@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamingTimeoutManager } from './StreamingTimeoutManager.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('StreamingTimeoutManager', () => {
   let manager;

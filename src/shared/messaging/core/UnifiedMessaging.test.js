@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sendMessage, sendRegularMessage } from './UnifiedMessaging.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
