@@ -152,6 +152,17 @@ export class OptimizedJsonHandler {
 
           if (isCancellation) {
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
+            
+            // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
+            // to prevent them from even attempting to start.
+            if (providerInstance.providerName) {
+              import('@/features/translation/core/ProviderCoordinator.js').then(({ coordinator }) => {
+                if (coordinator && coordinator.queueManager) {
+                  coordinator.queueManager.cancelProvider(providerInstance.providerName);
+                }
+              }).catch(() => { /* ignore */ });
+            }
+            
             return; // Exit silently on cancellation
           }
           
@@ -191,7 +202,14 @@ export class OptimizedJsonHandler {
         statusCode: lastError.statusCode
       } : null;
 
-      return { success: !hasErrors, streaming: true, error: formattedError };
+      return {
+        success: !hasErrors,
+        streaming: true,
+        error: formattedError,
+        metadata: {
+          batchCount: batches.length
+        }
+      };
     } finally {
       engine.lifecycleRegistry.unregisterRequest(messageId);
     }
@@ -203,42 +221,20 @@ export class OptimizedJsonHandler {
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
       : (typeof batch === 'object' ? (batch.t || batch.text || '') : (batch || ''));
 
-    // Strategy 1: AI Providers with JSON support
-    if (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI) {
-      const response = await providerInstance.translate(
-        textsToTranslate,
-        source,
-        target,
-        {
-          mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
-          engine, sender, priority: 'high', rawJsonPayload: true,
-          expectedFormat: ResponseFormat.JSON_OBJECT
-        }
-      );
-      
-      // Extract the actual translated content from the unified response
-      return (response && typeof response === 'object' && response.translatedText !== undefined) 
-        ? response.translatedText 
-        : response;
-    } 
-    
-    // Strategy 2: Traditional Providers (Edge, Google, etc.)
-    const response = await providerInstance.translate(
+    const expectedFormat = (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI)
+      ? ResponseFormat.JSON_OBJECT
+      : ResponseFormat.STRING;
+
+    return await providerInstance.translate(
       textsToTranslate,
       source,
       target,
-      { 
-        mode, abortController, messageId, sessionId, 
-        contextMetadata, contextSummary, engine, sender,
-        rawJsonPayload: true, 
-        expectedFormat: ResponseFormat.STRING 
+      {
+        mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
+        engine, sender, priority: 'high', rawJsonPayload: true,
+        expectedFormat
       }
     );
-
-    // Extract text from unified response
-    return (response && typeof response === 'object' && response.translatedText !== undefined) 
-      ? response.translatedText 
-      : response;
   }
 
   _mapResults(originalBatch, translatedResults) {
@@ -293,7 +289,11 @@ export class OptimizedJsonHandler {
     }
 
     return originalBatch.map((item, idx) => {
-      const translatedContent = results[idx] !== undefined ? results[idx] : (typeof item === 'object' ? (item.t || item.text) : item);
+      // Use result if it exists and is not null (null means it was rejected by safety check)
+      const translatedContent = (results[idx] !== undefined && results[idx] !== null) 
+        ? results[idx] 
+        : (typeof item === 'object' ? (item.t || item.text) : item);
+        
       if (typeof item === 'object') {
         return { ...item, t: translatedContent, text: translatedContent };
       }

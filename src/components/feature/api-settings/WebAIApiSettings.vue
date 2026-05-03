@@ -43,7 +43,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
-import { REPO_URLS } from '@/shared/config/constants.js'
+import { REPO_URLS } from '@/shared/constants/core.js'
 
 const { t } = useI18n()
 

@@ -5,7 +5,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSVoiceService');
 

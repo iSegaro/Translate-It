@@ -388,6 +388,13 @@ export default defineConfig({
   esbuild: {
     drop: ['console', 'debugger'],
     legalComments: 'none',
-    treeShaking: true
+    treeShaking: true,
+    exclude: [
+      '**/*.test.js',
+      '**/*.spec.js',
+      '**/__tests__/**',
+      '**/tests/**',
+      '**/__mocks__/**'
+    ]
   }
 })

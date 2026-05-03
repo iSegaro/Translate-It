@@ -112,6 +112,8 @@ export class UnifiedResultDispatcher {
       await this.dispatchFieldResult({ messageId, result, request, originalMessage });
     } else if (request.mode === TranslationMode.Select_Element) {
       await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
+    } else if (request.mode === TranslationMode.Selection || request.mode === TranslationMode.Dictionary_Translation) {
+      await this.dispatchSelectionResult({ messageId, result, request, originalMessage });
     }
   }
 
@@ -142,16 +144,52 @@ export class UnifiedResultDispatcher {
   }
 
   /**
-   * Dispatch select-element translation result (handles large payloads via broadcast).
+   * Dispatch selection or dictionary translation result back to the original tab.
+   */
+  async dispatchSelectionResult({ messageId, result, request }) {
+    try {
+      if (request?.sender?.tab?.id) {
+        await browser.tabs.sendMessage(request.sender.tab.id, {
+          action: MessageActions.TRANSLATION_RESULT_UPDATE,
+          messageId,
+          data: {
+            ...result,
+            translationMode: request.mode,
+            context: 'selection-direct',
+            isBroadcast: false
+          }
+        });
+      }
+    } catch (sendError) {
+      if (!ExtensionContextManager.isContextError(sendError)) {
+        logger.warn(`[ResultDispatcher] Failed to send selection result:`, sendError.message);
+      }
+    }
+  }
+
+  /**
+   * Dispatch select-element translation result (handles large payloads surgically).
    */
   async dispatchSelectElementResult({ messageId, result, request }) {
-    const shouldBroadcast = 
-      result.success === false || 
-      result.streaming || 
-      (result.translatedText && result.translatedText.length > 2000);
-
-    if (shouldBroadcast) {
-      await this.broadcastResult({ messageId, result, request });
+    // Select Element results should ALWAYS be sent back to the original tab, not broadcast.
+    // Broadcasting to ALL tabs (potentially hundreds) is extremely slow and causes background hangs.
+    try {
+      if (request?.sender?.tab?.id) {
+        await browser.tabs.sendMessage(request.sender.tab.id, {
+          action: MessageActions.TRANSLATION_RESULT_UPDATE,
+          messageId,
+          data: {
+            ...result,
+            translationMode: TranslationMode.Select_Element,
+            context: 'select-element-direct',
+            isBroadcast: false
+          }
+        });
+      }
+    } catch (sendError) {
+      if (!ExtensionContextManager.isContextError(sendError)) {
+        logger.warn(`[ResultDispatcher] Failed to send select-element result:`, sendError.message);
+      }
     }
   }
 

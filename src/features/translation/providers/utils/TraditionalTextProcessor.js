@@ -22,8 +22,8 @@ const getTextInfo = (item) => {
 };
 
 // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
-// This preserves user content like [[Reference]] while scrubbing [[ --- ]]
-const BIDI_ARTIFACT_REGEX = /[\s\u200B-\u200D\u200E\u200F\uFEFF]*\[\[[\s.——–…ـ·・-]+\]\][\s\u200B-\u200D\u200E\u200F\uFEFF]*/g;
+// This version is less aggressive with surrounding whitespace to prevent word-clumping
+const BIDI_ARTIFACT_REGEX = /\[\[[\s.——–…ـ·・-]+\]\]/g;
 
 export const TraditionalTextProcessor = {
   /**
@@ -33,11 +33,14 @@ export const TraditionalTextProcessor = {
   scrubBidiArtifacts(text) {
     if (!text || typeof text !== 'string') return text;
     
-    // 1. Remove intact brackets with BIDI marks
-    // We don't replace with space here to be safe for segment reconstruction
+    // 1. Remove intact brackets
     let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, '');
     
-    // 2. Remove isolated remnants (Safety layer for malformed delimiters)
+    // 2. Clean up any resulting double spaces or specific BIDI marks that might be left
+    scrubbed = scrubbed.replace(/[\u200B-\u200D\u200E\u200F\uFEFF]/g, '');
+    scrubbed = scrubbed.replace(/\s\s+/g, ' ').trim();
+    
+    // 3. Remove isolated remnants (Safety layer for malformed delimiters)
     scrubbed = scrubbed.replace(/\[\[[\s.—–…ـ·・-]+/, '');
     scrubbed = scrubbed.replace(/[\s.—–…ـ·・-]+\]\]/, '');
     
@@ -45,7 +48,8 @@ export const TraditionalTextProcessor = {
   },
 
   /**
-   * Create chunks based on provider strategy
+   * Create chunks based on provider strategy.
+   * Enhanced to split single long strings that exceed the character limit.
    */
   createChunks(texts, providerName, strategy, charLimit, maxChunksPerBatch) {
     const chunks = [];
@@ -53,28 +57,47 @@ export const TraditionalTextProcessor = {
     const safeMaxChunks = maxChunksPerBatch || 50; // Defensive default
 
     if (strategy === 'character_limit') {
-      let currentChunk = [];
+      let currentChunkItems = [];
       let currentCharCount = 0;
 
       for (const item of texts) {
-        const { length } = getTextInfo(item);
-        const effectiveLength = length + (currentChunk.length > 0 ? delimiterLength : 0);
-        const wouldExceedCharLimit = currentChunk.length > 0 && currentCharCount + effectiveLength > charLimit;
-        const wouldExceedSegmentLimit = currentChunk.length >= safeMaxChunks;
+        const { text, length } = getTextInfo(item);
+        
+        // If a single item is already too long, split it into smaller parts
+        if (length > charLimit) {
+          // Flush current chunk if any
+          if (currentChunkItems.length > 0) {
+            chunks.push({ texts: currentChunkItems, charCount: currentCharCount });
+            currentChunkItems = [];
+            currentCharCount = 0;
+          }
+
+          const parts = this.splitSingleLongString(text, charLimit);
+          logger.debug(`[${providerName}] Single long item split into ${parts.length} parts`);
+          
+          for (const part of parts) {
+            chunks.push({ texts: [part], charCount: part.length });
+          }
+          continue;
+        }
+
+        const effectiveLength = length + (currentChunkItems.length > 0 ? delimiterLength : 0);
+        const wouldExceedCharLimit = currentChunkItems.length > 0 && currentCharCount + effectiveLength > charLimit;
+        const wouldExceedSegmentLimit = currentChunkItems.length >= safeMaxChunks;
 
         if (wouldExceedCharLimit || wouldExceedSegmentLimit) {
-          chunks.push({ texts: currentChunk, charCount: currentCharCount });
-          currentChunk = [];
+          chunks.push({ texts: currentChunkItems, charCount: currentCharCount });
+          currentChunkItems = [];
           currentCharCount = 0;
         }
         
-        const addedLength = length + (currentChunk.length > 0 ? delimiterLength : 0);
-        currentChunk.push(item);
+        const addedLength = length + (currentChunkItems.length > 0 ? delimiterLength : 0);
+        currentChunkItems.push(item);
         currentCharCount += addedLength;
       }
 
-      if (currentChunk.length > 0) {
-        chunks.push({ texts: currentChunk, charCount: currentCharCount });
+      if (currentChunkItems.length > 0) {
+        chunks.push({ texts: currentChunkItems, charCount: currentCharCount });
       }
     } else {
       for (let i = 0; i < texts.length; i += safeMaxChunks) {
@@ -87,6 +110,49 @@ export const TraditionalTextProcessor = {
 
     logger.debug(`[${providerName}] Created ${chunks.length} chunks from ${texts.length} items`);
     return chunks;
+  },
+
+  /**
+   * Split a single long string into multiple parts that don't exceed limit
+   * Uses sentence markers for clean semantic splits where possible.
+   */
+  splitSingleLongString(text, limit) {
+    if (!text || text.length <= limit) return [text];
+    
+    const parts = [];
+    let remaining = text;
+    
+    while (remaining.length > limit) {
+      // Try to split by sentence markers first (ordered by semantic strength)
+      const sentenceMarkers = ['\n', '. ', '! ', '? ', '。', '！', '？', '، ', '؛ ', '、', '; '];
+      let splitIdx = -1;
+      
+      for (const marker of sentenceMarkers) {
+        const idx = remaining.lastIndexOf(marker, limit);
+        if (idx > splitIdx) {
+          splitIdx = idx + marker.length;
+        }
+      }
+      
+      // Fallback to space
+      if (splitIdx <= 0) {
+        splitIdx = remaining.lastIndexOf(' ', limit);
+      }
+      
+      // Fallback to hard cut
+      if (splitIdx <= 0) {
+        splitIdx = limit;
+      }
+      
+      parts.push(remaining.substring(0, splitIdx).trim());
+      remaining = remaining.substring(splitIdx).trim();
+    }
+    
+    if (remaining.length > 0) {
+      parts.push(remaining);
+    }
+    
+    return parts;
   },
 
   /**

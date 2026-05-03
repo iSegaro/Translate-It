@@ -70,7 +70,12 @@ export class DeepSeekProvider extends BaseAIProvider {
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown DeepSeek Error'}`);
+        }
+        return data?.choices?.[0]?.message?.content;
+      },
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,

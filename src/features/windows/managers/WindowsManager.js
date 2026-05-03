@@ -22,7 +22,10 @@ import { WINDOWS_MANAGER_EVENTS, WindowsManagerEvents, pageEventBus } from '@/co
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { UI_HOST_IDS, TRANSLATION_HTML, MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
 
 /**
  * Modular WindowsManager for translation windows and icons
@@ -128,7 +131,7 @@ export class WindowsManager extends ResourceTracker {
 
         this.logger.info('[TTS] TTS functionality loaded');
       } catch (error) {
-        this.logger.error('[TTS] Failed to load TTS functionality:', error);
+        this.logger.warn('[TTS] Failed to load TTS functionality:', error.message);
         throw error;
       }
     }
@@ -271,7 +274,7 @@ export class WindowsManager extends ResourceTracker {
       await this.themeManager.initialize();
       this.logger.info('WindowsManager initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to initialize WindowsManager:', error);
+      this.logger.warn('Failed to initialize WindowsManager (non-critical):', error.message);
     }
   }
 
@@ -290,7 +293,7 @@ export class WindowsManager extends ResourceTracker {
     return deviceDetector.shouldEnableMobileUI();
   }
 
-  async show(selectedText, position) {
+  async show(selectedText, position, options = {}) {
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, aborting show()');
       return;
@@ -307,11 +310,30 @@ export class WindowsManager extends ResourceTracker {
     
     this.logger.info('WindowsManager.show() called', {
       text: selectedText ? selectedText.substring(0, 30) + '...' : 'null',
-      position
+      position,
+      options
     });
 
-    // Get current mode from settings (fixed initialization order)
+    // 1. Check for structural permissions (Global Enable, Feature Enable, and URL Exclusions)
+    // This MUST come before interaction logic to respect user privacy and settings
+    const exclusionChecker = ExclusionChecker.getInstance();
+    const isAllowed = await exclusionChecker.isFeatureAllowed('windowsManager');
+    if (!isAllowed) {
+      this.logger.debug('WindowsManager not allowed: Permission check failed (Global, Feature, or URL)');
+      return;
+    }
+
+    // Get current mode from settings
     const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+
+    // 2. Check for interaction conditions (e.g., Ctrl requirement)
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+      const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
+      if (requireCtrl && options.ctrlPressed !== true) {
+        this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
+        return;
+      }
+    }
 
     // Prevent showing same text multiple times
     if (this._shouldSkipShow(selectedText)) {
@@ -428,13 +450,14 @@ export class WindowsManager extends ResourceTracker {
       });
       
     } catch (error) {
-      this.logger.error('Error during mobile translation:', error);
+      this.logger.info('Mobile translation failed (handled via UI):', error.message);
       
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'mobile-translation');
       
       WindowsManagerEvents.showMobileSheet({
         text: selectedText,
         isLoading: false,
+        isStreaming: false,
         isError: true,
         error: errorInfo.message
       });
@@ -713,10 +736,11 @@ export class WindowsManager extends ResourceTracker {
         this.logger.info('TTS stopped via unified composable');
       }
     } catch (error) {
-      this.logger.error('TTS error:', error);
+      this.logger.warn('TTS error (handled):', error.message);
+
       await this.errorHandler.handle(error, {
-        context: 'windows-manager-tts',
-        showToast: false
+        context: 'windows-tts',
+        showToast: true
       });
     }
   }
@@ -744,7 +768,7 @@ export class WindowsManager extends ResourceTracker {
     });
 
     try {
-      const translationResult = await this._startTranslationProcess(textToTranslate);
+      const translationResult = await this._startTranslationProcess(textToTranslate, windowId);
 
       if (!translationResult) {
         this.logger.info('Retry translation cancelled by user');
@@ -754,6 +778,7 @@ export class WindowsManager extends ResourceTracker {
       // Update window with result
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
@@ -762,13 +787,18 @@ export class WindowsManager extends ResourceTracker {
       });
       
     } catch (error) {
-      this.logger.error('Error during translation retry:', error);
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'windows-translation-retry');
+      } else {
+        this.logger.info('Translation retry failed (handled via UI):', error.message);
+      }
       
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
       const fallbackProvider = this.translationHandler.getEffectiveProvider(textToTranslate, { provider: this.state.provider });
       
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -807,7 +837,7 @@ export class WindowsManager extends ResourceTracker {
     });
 
     try {
-      const translationResult = await this._startTranslationProcess(textToTranslate);
+      const translationResult = await this._startTranslationProcess(textToTranslate, windowId);
 
       if (!translationResult) {
         this.logger.info('Provider change translation cancelled by user');
@@ -817,6 +847,7 @@ export class WindowsManager extends ResourceTracker {
       // Update window with result
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
@@ -829,12 +860,13 @@ export class WindowsManager extends ResourceTracker {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'windows-manager:provider-change');
       } else {
-        this.logger.error('Error during provider change translation:', error);
+        this.logger.info('Provider change translation failed (handled via UI):', error.message);
       }
 
       const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation-retry');      
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -918,7 +950,7 @@ export class WindowsManager extends ResourceTracker {
 
     // PHASE 2: Perform translation and update window
     try {
-      const translationResult = await this._startTranslationProcess(selectedText);
+      const translationResult = await this._startTranslationProcess(selectedText, windowId);
 
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
@@ -930,6 +962,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
+        isStreaming: false,
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         detectedSourceLanguage: translationResult.sourceLanguage,
@@ -952,6 +985,7 @@ export class WindowsManager extends ResourceTracker {
       WindowsManagerEvents.updateWindow(windowId, {
         initialSize: 'normal',
         isLoading: false,
+        isStreaming: false,
         isError: true,
         errorType: errorInfo.type,
         canRetry: errorInfo.canRetry,
@@ -965,9 +999,9 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Start translation process for a window
    */
-  async _startTranslationProcess(selectedText) {
+  async _startTranslationProcess(selectedText, windowId = null) {
     try {
-      const options = {};
+      const options = { windowId };
       if (this.state.provider) {
         options.provider = this.state.provider;
       }
@@ -1023,8 +1057,8 @@ export class WindowsManager extends ResourceTracker {
       
       this.logger.debug('Loading window creation event emitted', { windowId });
 
-      // Perform translation
-      const result = await this.translationHandler.performTranslation(selectedText);
+      // Perform translation - pass windowId for streaming updates
+      const result = await this.translationHandler.performTranslation(selectedText, { windowId });
       
       if (this.state.isTranslationCancelled) return;
 
@@ -1194,7 +1228,7 @@ export class WindowsManager extends ResourceTracker {
       this.state.setVisible(true);
       
       // Start translation process (fire-and-forget with error handling)
-      this._startTranslationProcess(data.selectedText)
+      this._startTranslationProcess(data.selectedText, windowId)
         .then(result => {
           // Update window with translation result
           if (result) {
@@ -1214,6 +1248,7 @@ export class WindowsManager extends ResourceTracker {
                 WindowsManagerEvents.updateWindow(windowId, {
                   initialSize: 'normal',
                   isLoading: false,
+                  isStreaming: false,
                   isError: true,
                   initialTranslatedText: errorInfo.message
                 });
@@ -1221,7 +1256,7 @@ export class WindowsManager extends ResourceTracker {
           }
         })
         .catch(async (error) => {
-          this.logger.info('Translation process failed in cross-frame mode:', error);
+          this.logger.info('Translation process failed in cross-frame mode (handled via UI):', error.message);
 
           // Use ErrorHandler to get user-friendly error message (consistent with normal mode)
           const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
@@ -1230,6 +1265,7 @@ export class WindowsManager extends ResourceTracker {
           WindowsManagerEvents.updateWindow(windowId, {
             initialSize: 'normal',
             isLoading: false,
+            isStreaming: false,
             isError: true,
             errorType: errorInfo.type,
             initialTranslatedText: errorInfo.message
@@ -1265,7 +1301,7 @@ export class WindowsManager extends ResourceTracker {
       this.state.mainDocumentWindowId = data.windowId;
       this.clickManager.addOutsideClickListener();
     } else {
-      this.logger.error('Failed to create window in main document:', data.error);
+      this.logger.warn('Failed to create window in main document:', data.error);
     }
   }
 
@@ -1321,7 +1357,7 @@ export class WindowsManager extends ResourceTracker {
       await this.show(data.selectedText, adjustedPosition, data.options);
 
     } catch (error) {
-      this.logger.error('Failed to handle text selection window request from iframe:', error);
+      this.logger.warn('Failed to handle text selection window request from iframe:', error.message);
     }
   }
 
@@ -1349,6 +1385,8 @@ export class WindowsManager extends ResourceTracker {
       initialTranslatedText: errorInfo.message,
       position: position,
       theme: theme,
+      isLoading: false,
+      isStreaming: false,
       isError: true,
       errorType: errorInfo.type,
       canRetry: errorInfo.canRetry,
@@ -1373,7 +1411,7 @@ export class WindowsManager extends ResourceTracker {
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, context);
     } else {
-      this.logger.error(`Error in ${context}:`, error);
+      this.logger.info(`Managed error in ${context}:`, error.message);
     }
     
     if (this.translationHandler.errorHandler) {

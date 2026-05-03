@@ -5,7 +5,8 @@ import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js
 import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
 import { ARABIC_SCRIPT_LANGUAGES, CHINESE_SCRIPT_LANGUAGES, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
-import { AUTO_DETECT_VALUE, TTS_ENGINES } from '@/shared/config/constants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import storageCore from '@/shared/storage/core/StorageCore.js';

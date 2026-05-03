@@ -126,7 +126,6 @@ export class FeatureManager extends ResourceTracker {
   async injectDependencies() {
     const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
     const selectElementManager = this.featureHandlers.get('selectElement');
-    const shortcutHandler = this.featureHandlers.get('shortcut');
 
     // Inject SelectElementManager into ContentMessageHandler for direct access
     if (contentMessageHandler && selectElementManager) {
@@ -137,19 +136,6 @@ export class FeatureManager extends ResourceTracker {
         }
       } catch (error) {
         logger.error('Error injecting SelectElementManager into ContentMessageHandler:', error);
-      }
-    }
-
-    // Inject TranslationHandler into ShortcutHandler if available
-    if (shortcutHandler && contentMessageHandler) {
-      try {
-        const translationHandler = await contentMessageHandler.getTranslationHandler?.();
-        if (translationHandler && typeof shortcutHandler.setTranslationHandler === 'function') {
-          shortcutHandler.setTranslationHandler(translationHandler);
-          logger.debug('Injected TranslationHandler into ShortcutHandler');
-        }
-      } catch {
-        logger.debug('Could not inject TranslationHandler into ShortcutHandler - not needed for new implementation');
       }
     }
   }

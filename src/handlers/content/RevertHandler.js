@@ -4,13 +4,12 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { NOTIFICATION_TIME } from '../../shared/config/constants.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { revertSelectElementTranslation } from '@/features/element-selection/core/DomTranslatorAdapter.js';
 import { getActivePinia } from 'pinia';
 import { state } from '@/shared/config/config.js';
-import { getTranslationHandlerInstance } from "@/core/InstanceManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'RevertHandler');
 /**
@@ -199,14 +198,12 @@ export class RevertHandler extends ResourceTracker {
    */
   async revertLegacyTranslations() {
     try {
-      // Get translation handler for context
-      const translationHandler = await this.getTranslationHandler();
-
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      
       const context = {
         state,
-        errorHandler: translationHandler?.errorHandler,
-        notifier: translationHandler?.notifier,
-        // IconManager removed as it doesn't exist in the current architecture
+        errorHandler: ErrorHandler.getInstance(),
+        notifier: this.notificationManager,
       };
 
       // Element Selection revert system is now handled by SelectElementManager
@@ -279,25 +276,6 @@ export class RevertHandler extends ResourceTracker {
       return null;
     } catch (error) {
       logger.warn('Could not get SelectElementManager:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get TranslationHandler instance if available
-   * @returns {Promise<Object|null>} TranslationHandler instance
-   */
-  async getTranslationHandler() {
-    try {
-      // Try to get from global window object first
-      if (window.translationHandlerInstance) {
-        return window.translationHandlerInstance;
-      }
-      
-      // Fallback: use statically imported getter
-      return getTranslationHandlerInstance();
-    } catch (error) {
-      logger.warn('Could not get TranslationHandler:', error);
       return null;
     }
   }

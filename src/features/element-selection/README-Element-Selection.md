@@ -1,32 +1,33 @@
 # Element Selection Feature
 
-## 📋 Overview
+## Overview
 
 The Element Selection feature enables users to select and translate any text element on web pages by hovering and clicking. It provides visual feedback, handles different element types, and integrates with the translation system.
 
-## 🏗️ Architecture
+## Architecture
 
-### Managers
-- **`SelectElementManager.js`** - Main manager extending `ResourceTracker` for memory management
-- **`services/ElementHighlighter.js`** - Visual highlighting extending `ResourceTracker`
-- **`services/TranslationOrchestrator.js`** - Translation coordination extending `ResourceTracker`
-- **`services/StreamingTranslationEngine.js`** - Streaming translation with multi-segment support
-- **`services/TranslationUIManager.js`** - UI updates and multi-segment translation handling
-- **`services/TranslationRequestManager.js`** - Request lifecycle management
-- **`services/ModeManager.js`** - Mode switching extending `ResourceTracker`
+The feature has been refactored to a more modular and efficient architecture using a specialized `DomTranslatorAdapter`.
 
-### Services
-- **`TextExtractionService.js`** - Text extraction from DOM elements
-- **`ErrorHandlingService.js`** - Error handling and recovery
-- **`StateManager.js`** - State management for selection process
+### Core Services
+- **`SelectElementManager.js`** - Main coordinator extending `ResourceTracker` for memory management.
+- **`core/ElementSelector.js`** - High-performance element discovery and visual highlighting.
+- **`core/DomTranslatorAdapter.js`** - Optimized bridge between DOM and translation services using an abbreviated JSON protocol.
+- **`core/DomTranslatorState.js`** - Global state registry and surgical restoration (revert) logic.
+- **`core/DomTranslatorUtils.js`** - Specialized utilities for visible text node collection and context extraction.
+
+### Utilities & Helpers
+- **`utils/elementHelpers.js`** - Text extraction, element validation, and viewport checking.
+- **`utils/textDirection.js`** - RTL/LTR detection and management.
+- **`utils/timeoutCalculator.js`** - Dynamic timeout calculation based on content complexity.
+- **`SelectElementNotificationManager.js`** - Unified lifecycle management for user feedback.
 
 ### Handlers
-- **`handleActivateSelectElementMode.js`** - Activation handler
-- **`handleGetSelectElementState.js`** - State retrieval handler
-- **`handleSetSelectElementState.js`** - State update handler
-- **`selectElementStateManager.js`** - State management utilities
+- **`handlers/handleActivateSelectElementMode.js`** - Background activation coordinator.
+- **`handlers/selectElementStateManager.js`** - Per-tab state synchronization.
+- **`handlers/handleGetSelectElementState.js`** - State retrieval for cross-context syncing.
+- **`handlers/handleSetSelectElementState.js`** - State update for cross-context syncing.
 
-## 🧹 Memory Management
+## Memory Management
 
 This feature integrates with the **Memory Garbage Collector** system to prevent memory leaks:
 
@@ -47,7 +48,7 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 - **Keyboard Events**: Keydown, keyup, blur, and visibility change events
 - **Mouse Events**: Mouseover, mouseout, and click events with AbortController support
 
-## 🎯 Features
+## Features
 
 ### Element Selection
 - **Hover Detection**: Visual feedback when hovering over selectable elements
@@ -69,7 +70,7 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 - **Paragraph Preservation**: Maintains original structure with empty lines and formatting
 - **Mixed Content Handling**: Seamlessly processes text, hashtags, links, and emojis
 
-## 🔧 Configuration
+## Configuration
 
 ### Selection Modes
 - **Simple Mode**: Basic element selection
@@ -83,7 +84,7 @@ This feature integrates with the **Memory Garbage Collector** system to prevent 
 - **Cleanup Interval**: Periodic cleanup of old requests (5 minutes)
 - **Multi-Segment Timeout**: Extended timeout for complex content with multiple paragraphs
 
-## 🚀 Integration
+## Integration
 
 This feature integrates with:
 - **Translation System** - Sends extracted text for translation processing
@@ -91,20 +92,20 @@ This feature integrates with:
 - **Error Management** - Handles and reports selection errors
 - **Memory Garbage Collector** - Automatic resource cleanup and leak prevention
 
-## 📱 Platform Support
+## Platform Support
 
 - **Chrome MV3** - Full support with AbortController for clean event cancellation
 - **Firefox MV3** - Full support with compatibility layer
 - **Cross-browser** - Handles different browser event handling patterns
 
-## 🎨 Styling
+## Styling
 
 - Uses extension's CSS system for consistent theming
 - High-performance CSS class manipulation
 - Minimal DOM manipulation for optimal performance
 - Responsive design for different element sizes
 
-## 🧪 Testing
+## Testing
 
 ### Core Functionality
 - DOM event listener attachment and cleanup
@@ -135,7 +136,7 @@ This feature integrates with:
 - **Event Handling**: Responsiveness during active translation sessions
 - **Resource Cleanup**: Verification of complete resource deallocation
 
-## 🔗 Related Systems
+## Related Systems
 
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Resource tracking and cleanup
 - **[Translation System](TRANSLATION_SYSTEM.md)** - Text translation processing and streaming
@@ -145,7 +146,7 @@ This feature integrates with:
 - **[Toast Integration System](../../docs/TOAST_INTEGRATION_SYSTEM.md)** - Notification management
 - **[Messaging System](../../docs/MessagingSystem.md)** - Unified communication layer
 
-## 🎯 Recent Improvements (2025)
+## Recent Improvements (2025)
 
 ### Multi-Segment Translation Engine
 - **Smart Text Segmentation**: Intelligently splits content at sentence boundaries

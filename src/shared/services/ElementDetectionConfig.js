@@ -29,7 +29,7 @@ export const ICON_SELECTORS = [
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 
 /**
  * Host/container selectors

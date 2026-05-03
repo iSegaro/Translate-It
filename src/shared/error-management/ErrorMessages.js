@@ -73,6 +73,8 @@ export const errorMessages = {
   [ErrorTypes.INTEGRATION]: "Integration error",
   [ErrorTypes.SERVICE]: "Service error",
   [ErrorTypes.VALIDATION]: "Validation error",
+  [ErrorTypes.API_CONFIG_INVALID]: "Invalid API configuration. Please check your settings.",
+  [ErrorTypes.API_ERROR]: "Translation service API error",
 };
 
 /**

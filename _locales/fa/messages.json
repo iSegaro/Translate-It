@@ -1403,6 +1403,9 @@
   "ERRORS_EMPTY_PROMPT": {
     "message": "متن پرامپت خالی یا نامعتبر است."
   },
+  "ERRORS_TEXT_TOO_LONG": {
+    "message": "متن انتخاب شده بیش از حد طولانی است. لطفا بخش کوتاه‌تری را انتخاب کنید."
+  },
   "ERRORS_NETWORK_ERROR": {
     "message": "خطای شبکه. لطفا اتصال اینترنت خود را بررسی کنید."
   },
@@ -1423,6 +1426,12 @@
   },
   "ERRORS_API_ENDPOINT_INVALID": {
     "message": "آدرس API اشتباه است (خطای ۴۰۴)."
+  },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "پیکربندی API نامعتبر است. لطفا تنظیمات خود را بررسی کنید."
+  },
+  "ERRORS_API_ERROR": {
+    "message": "خطای API سرویس ترجمه."
   },
   "ERRORS_MODEL_MISSING": {
     "message": "مدل هوش مصنوعی انتخاب شده نامعتبر یا پیدا نشده است."

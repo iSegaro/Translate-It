@@ -112,8 +112,15 @@ export class ErrorHandler {
         const genericMsg = await getErrorMessage(type);
         
         // Decide whether to use raw message or localized generic message
-        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+        let shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
         
+        // EXCEPTION: If the error is an API error or a Circuit Breaker, prefer the specific technical message 
+        // if it exists and is descriptive enough, as it contains critical details for the user.
+        const preferSpecific = [ErrorTypes.API_ERROR, ErrorTypes.CIRCUIT_BREAKER_OPEN];
+        if (preferSpecific.includes(type) && typeof sanitizedRaw === 'string' && sanitizedRaw.length > 10) {
+          shouldUseGeneric = false;
+        }
+
         if (!shouldUseGeneric && typeof sanitizedRaw === 'string' && sanitizedRaw.length > 5 && 
             !sanitizedRaw.includes('[object Object]') && !sanitizedRaw.startsWith('Error:')) {
           msg = sanitizedRaw;
@@ -207,7 +214,13 @@ export class ErrorHandler {
       let msg;
       try {
         const localizedMsg = await getErrorMessage(type);
-        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+        let shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+
+        // Exception for API and Circuit Breaker errors to show descriptive technical details
+        const preferSpecific = [ErrorTypes.API_ERROR, ErrorTypes.CIRCUIT_BREAKER_OPEN];
+        if (preferSpecific.includes(type) && typeof raw === 'string' && raw.length > 10) {
+          shouldUseGeneric = false;
+        }
 
         if (!shouldUseGeneric && typeof raw === 'string' && raw.length > 5 && !raw.includes('[object Object]')) {
           msg = raw;

@@ -6,6 +6,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { matchErrorToType, isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TraditionalBatchProcessor');
 
@@ -15,7 +16,6 @@ export const TraditionalBatchProcessor = {
    */
   async processInBatches(provider, segments, translateChunk, limits, abortController = null, priority = null) {
     const { CHUNK_SIZE, CHAR_LIMIT } = limits;
-    const { TranslationPriority, rateLimitManager } = await import("@/features/translation/core/RateLimitManager.js");
     const targetPriority = priority || TranslationPriority.NORMAL;
 
     const chunks = [];

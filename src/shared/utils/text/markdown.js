@@ -9,8 +9,57 @@ export class SimpleMarkdown {
       return "";
     }
 
+    // Pre-process: Add line breaks before dictionary labels for traditional providers
+    // Pattern: "translation **label:** details" → "translation\n\n**label:** details"
+    let processedMarkdown = markdown;
+
+    // Check if the text is in the "traditional provider" format:
+    // - Single line (no newlines at all)
+    // - Has "**" pattern followed by text and ":"
+    if (!markdown.includes('\n')) {
+      const asteriskIndex = markdown.indexOf('**');
+
+      if (asteriskIndex > 0) {
+        // Found "**" after some content, split at that position
+        const before = markdown.substring(0, asteriskIndex).trim();
+        const after = markdown.substring(asteriskIndex);
+
+        if (before.length > 0 && after.includes(':')) {
+          // First separate the main translation from labels
+          processedMarkdown = before + '\n\n' + after;
+
+          // Then split all labels in the same line with newlines
+          // Simple approach: find all "**label:**" patterns and add newline before each (except first one)
+          const parts = after.split('**');
+          let processedAfter = '';
+          let isFirstLabel = true;
+
+          // Process each pair (label + content)
+          for (let i = 1; i < parts.length; i += 2) {
+            const label = parts[i] || '';
+            const content = parts[i + 1] || '';
+
+            if (label.trim().endsWith(':')) {
+              // This is a label line
+              const labelText = label.trim().slice(0, -1); // Remove trailing ':'
+              const contentText = content.trim();
+
+              if (!isFirstLabel) {
+                processedAfter += '\n';
+              }
+
+              processedAfter += '**' + labelText + '**: ' + contentText;
+              isFirstLabel = false;
+            }
+          }
+
+          processedMarkdown = before + '\n\n' + processedAfter;
+        }
+      }
+    }
+
     // Sanitize input to prevent XSS attacks
-    const sanitizedMarkdown = filterXSS(markdown, {
+    const sanitizedMarkdown = filterXSS(processedMarkdown, {
       whiteList: {}, // No HTML tags allowed in input
       stripIgnoreTag: true,
       stripIgnoreTagBody: ["script"],
@@ -29,9 +78,15 @@ export class SimpleMarkdown {
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Skip empty lines unless in a list
-      if (!trimmed && listItems.length === 0) {
-        if (currentSection) {
+      // Handle empty lines
+      if (!trimmed) {
+        if (listItems.length > 0) {
+          // Finish the current list
+          this._finishSection(container, currentSection, listItems);
+          currentSection = null;
+          listItems = [];
+        } else if (currentSection) {
+          // Finish the current section
           container.appendChild(currentSection);
           currentSection = null;
         }
@@ -81,7 +136,9 @@ export class SimpleMarkdown {
         const content = trimmed.replace(/^\s*([-*•])\s+/, '');
         li.appendChild(this._parseInline(content));
         listItems.push(li);
-      } else if (/^\d+\.\s/.test(trimmed)) {
+      }
+      // Ordered list items
+      else if (/^\d+\.\s/.test(trimmed)) {
         if (!currentSection || currentSection.tagName !== "OL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ol");
@@ -138,8 +195,9 @@ export class SimpleMarkdown {
       }
       // Regular paragraphs
       else if (trimmed) {
-        if (listItems.length > 0) {
-          // Continue list processing if we're in a list
+        // Only continue list if we're in a list and the line starts with whitespace (indented continuation)
+        if (listItems.length > 0 && line.startsWith(' ') && !trimmed.startsWith(line.trim())) {
+          // Continue list processing for indented lines
           continue;
         }
 
@@ -147,7 +205,7 @@ export class SimpleMarkdown {
         this._finishSection(container, currentSection, []);
         currentSection = document.createElement("p");
         listItems = [];
-        
+
         currentSection.appendChild(this._parseInline(trimmed));
       }
     }
@@ -173,42 +231,46 @@ export class SimpleMarkdown {
     // - "اسم: آزمایش" (regular labels)
     // - "- **Meaning**: آزمایش" (list item label)
     const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
-    
+
     // Check for markdown bold labels: **Label**: content
     // We look for ** at start, some characters, ** then a colon.
     const markdownLabelPattern = /^\*\*.*?\*\*\s*:\s*.*$/;
-    
+
     // Check for regular labels: Label: content
-    // We look for characters at the start followed immediately by a colon and then some content.
-    // This pattern is more inclusive for different languages.
-    const regularLabelPattern = /^[^:\n]+\s*:\s*.+$/;
-    
+    // More strict pattern: label should be at start of line, followed by colon and content
+    // The label part should not contain spaces (single word label)
+    const regularLabelPattern = /^(\S+)\s*:\s*.+$/;
+
     return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
   }
 
   static _parseLabelLine(text) {
     const span = document.createElement("span");
     const colonIndex = text.indexOf(':');
-    
+
     if (colonIndex === -1) {
       // Fallback - shouldn't happen since _isLabelLine checked this
       span.appendChild(this._parseInline(text));
       return span;
     }
-    
+
     // Get label and content parts
     const labelPart = text.substring(0, colonIndex).trim();
     const content = text.substring(colonIndex + 1).trim();
-    
+
     // Create a bold element for the label and strip any markdown markers
     // This ensures a clean label regardless of how the AI formatted the bolding.
     const labelElement = document.createElement("strong");
     labelElement.textContent = this.strip(labelPart);
-    
+
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
-    span.appendChild(this._parseInline(content));
-    
+
+    // Content after colon should NOT be parsed as markdown - treat as plain text
+    // This prevents nested labels from being bolded
+    const textNode = document.createTextNode(content);
+    span.appendChild(textNode);
+
     return span;
   }
 
@@ -298,9 +360,43 @@ export class SimpleMarkdown {
   }
 
   /**
+   * Check if the given text appears to be HTML rather than markdown
+   * @param {string} text - Text to check
+   * @returns {boolean} True if text appears to be HTML
+   */
+  static isHTML(text) {
+    if (!text || typeof text !== "string") return false;
+    // Check for common HTML patterns
+    return /<[a-z][\s\S]*>/i.test(text);
+  }
+
+  /**
+   * Extract plain text from HTML by removing all tags
+   * @param {string} html - HTML string
+   * @returns {string} Plain text without HTML tags
+   */
+  static htmlToPlainText(html) {
+    if (!html || typeof html !== "string") return "";
+
+    // Create a temporary element to extract text content using DOMParser
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        return doc.body.textContent || doc.body.innerText || "";
+      } catch {
+        // Fallback if DOMParser fails
+      }
+    }
+
+    // Fallback: simple regex-based tag removal (less accurate but works in non-DOM environments)
+    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
    * Extract only the primary translation/meaning, cleaning markdown and ignoring dictionary details if present.
    * Useful for TTS and "Clean Copy" operations.
-   * @param {string} text - The markdown text
+   * @param {string} text - The markdown text or HTML
    * @returns {string} Clean plain text of the primary meaning
    */
   static getCleanTranslation(text) {
@@ -308,52 +404,113 @@ export class SimpleMarkdown {
       return "";
     }
 
+    let processedText = text;
+
+    // Check if the input is HTML and convert it to plain text first
+    if (this.isHTML(text)) {
+      processedText = this.htmlToPlainText(text);
+    }
+
     // Split into non-empty lines
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    
+    const lines = processedText.split('\n').map(l => l.trim()).filter(l => l);
+
     if (lines.length === 0) {
       return "";
     }
 
-    if (lines.length <= 1) {
-      // If it's a single line and it's a label, try to extract the value
-      if (this._isLabelLine(lines[0])) {
-        const colonIndex = lines[0].indexOf(':');
+    // Helper function to check if a line contains a label pattern
+    const hasLabelPattern = (line) => {
+      if (!line) return false;
+
+      // Check for markdown bold labels: **Label**: anywhere in the line
+      if (/\*\*.*?\*\*\s*:/.test(line)) {
+        return true;
+      }
+
+      // Check for regular labels: word: anywhere in the line
+      // This catches patterns like "Noun:", "اسم:", etc.
+      if (/\b[A-Za-z]+\s*:/.test(line) || /\b[؀-ۿ]+\s*:/.test(line)) {
+        return true;
+      }
+
+      return false;
+    };
+
+    // Helper function to check if a line is purely a label (no content before label)
+    const isPureLabel = (line) => {
+      if (!line) return false;
+
+      // Check if line starts with markdown bold label
+      if (/^\*\*.*?\*\*\s*:/.test(line)) {
+        return true;
+      }
+
+      // Check if line starts with regular word label
+      if (/^[A-Za-z]+\s*:/.test(line) || /^[؀-ۿ]+\s*:/.test(line)) {
+        return true;
+      }
+
+      return false;
+    };
+
+    // Strategy 1: For single-line input
+    if (lines.length === 1) {
+      const line = lines[0];
+
+      // Check if it's a pure label line (no content before label)
+      if (isPureLabel(line)) {
+        // Extract content after the label
+        const colonIndex = line.indexOf(':');
         if (colonIndex !== -1) {
-          return this.strip(lines[0].substring(colonIndex + 1));
+          const afterColon = line.substring(colonIndex + 1).trim();
+          return this.strip(afterColon);
         }
       }
-      return this.strip(text);
+
+      // Check for markdown bold labels with content before: "text**Label**:"
+      const boldLabelMatch = line.match(/(.*?)\*\*.*?\*\*\s*:/);
+      if (boldLabelMatch && boldLabelMatch[1].trim().length > 0) {
+        return this.strip(boldLabelMatch[1].trim());
+      }
+
+      // Check for regular labels with content before: "text Label:"
+      const regularLabelMatch = line.match(/(.*?)[A-Za-z]+\s*:/) || line.match(/(.*?)[؀-ۿ]+\s*:/);
+      if (regularLabelMatch && regularLabelMatch[1].trim().length > 0) {
+        return this.strip(regularLabelMatch[1].trim());
+      }
+
+      // No label found or empty prefix, return stripped line
+      return this.strip(line);
     }
 
-    // Structural Check: In dictionary mode, we typically have a main translation 
-    // followed by lines with labels (Noun:, Verb:, etc.)
-    // OR the first line itself is a label (Meaning: ...)
-    let isDictionary = this._isLabelLine(lines[0]);
-    
-    if (!isDictionary) {
-      for (let i = 1; i < lines.length; i++) {
-        if (this._isLabelLine(lines[i])) {
-          isDictionary = true;
-          break;
-        }
+    // Strategy 2: For multi-line input, find the first line that's not a label
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Skip list markers at the start
+      const trimmedLine = line.replace(/^[-*•]\s*/, '').trim();
+
+      // Check if this line is purely a label
+      if (!hasLabelPattern(trimmedLine) || trimmedLine.length > 50) {
+        // Found a non-label line or a long line (likely a sentence)
+        return this.strip(trimmedLine);
       }
     }
 
-    if (isDictionary) {
-      // It's a dictionary entry - only return the primary meaning (first line)
-      // Extract content after colon if the first line is a label
-      if (this._isLabelLine(lines[0])) {
-        const colonIndex = lines[0].indexOf(':');
-        if (colonIndex !== -1) {
-          return this.strip(lines[0].substring(colonIndex + 1));
-        }
+    // Strategy 3: If all lines are labels, extract content from the first label
+    const firstLine = lines[0].replace(/^[-*•]\s*/, '').trim();
+
+    // Try to extract content after colon
+    const colonIndex = firstLine.indexOf(':');
+    if (colonIndex !== -1) {
+      const afterColon = firstLine.substring(colonIndex + 1).trim();
+      if (afterColon.length > 0) {
+        return this.strip(afterColon);
       }
-      return this.strip(lines[0]);
     }
 
-    // Not a dictionary entry (e.g. a paragraph) - strip markdown and return everything
-    return this.strip(text);
+    // Fallback: return first line stripped
+    return this.strip(firstLine);
   }
 
   /**

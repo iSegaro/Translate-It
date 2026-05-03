@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
@@ -96,6 +96,11 @@ function getDefaultSettings() {
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
     ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
+    // Character Limits
+    POPUP_MAX_CHARS: CONFIG.POPUP_MAX_CHARS || 5000,
+    SIDEPANEL_MAX_CHARS: CONFIG.SIDEPANEL_MAX_CHARS || 10000,
+    SELECTION_MAX_CHARS: CONFIG.SELECTION_MAX_CHARS || 5000,
+    SELECT_ELEMENT_MAX_CHARS: CONFIG.SELECT_ELEMENT_MAX_CHARS || 300000,
     MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
     MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: CONFIG.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ?? false,
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,

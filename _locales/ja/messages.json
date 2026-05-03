@@ -1401,7 +1401,10 @@
     "message": "タブが利用できません。"
   },
   "ERRORS_EMPTY_PROMPT": {
-    "message": "プロンプトが無効または空です。"
+    "message": "プロンプトが無効または空です."
+  },
+  "ERRORS_TEXT_TOO_LONG": {
+    "message": "選択されたテキストが長すぎます。より短い範囲を選択してください。"
   },
   "ERRORS_NETWORK_ERROR": {
     "message": "ネットワークエラー。インターネット接続を確認してください。"
@@ -1423,6 +1426,12 @@
   },
   "ERRORS_API_ENDPOINT_INVALID": {
     "message": "APIアドレスが無効です（404エラー）。"
+  },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "API設定が無効です。設定を確認してください。"
+  },
+  "ERRORS_API_ERROR": {
+    "message": "翻訳サービスのAPIエラー。"
   },
   "ERRORS_MODEL_MISSING": {
     "message": "選択したAIモデルが見つからないか無効です。"

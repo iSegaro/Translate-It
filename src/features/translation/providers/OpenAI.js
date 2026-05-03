@@ -71,7 +71,12 @@ export class OpenAIProvider extends BaseAIProvider {
       fetchOptions,
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown OpenAI Error'}`);
+        }
+        return data?.choices?.[0]?.message?.content;
+      },
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,
       sessionId,
@@ -136,7 +141,12 @@ export class OpenAIProvider extends BaseAIProvider {
       url: apiUrl,
       fetchOptions,
       charCount: AITextProcessor.calculatePayloadChars(messages),
-      extractResponse: (data) => data?.choices?.[0]?.message?.content,
+      extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown OpenAI Error'}`);
+        }
+        return data?.choices?.[0]?.message?.content;
+      },
       context: `${this.providerName.toLowerCase()}-image-translation`,
       abortController,
       sessionId,

@@ -15,7 +15,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'timeoutCalcula
 export const DEFAULT_TIMEOUT_CONFIG = {
   BASE_TIMEOUT: 60000,      // 1 minute base timeout
   TIME_PER_SEGMENT: 5000,   // 5 seconds per segment
-  MAX_TIMEOUT: 1800000,     // 30 minutes maximum timeout
+  MAX_TIMEOUT: 600000,      // 10 minutes maximum timeout (matches UnifiedTranslationCoordinator)
   MIN_TIMEOUT: 60000,       // 1 minute minimum timeout
   FALLBACK_TIMEOUT: 15000   // 15 seconds fallback for invalid inputs
 };

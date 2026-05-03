@@ -134,6 +134,11 @@ export class WindowsManagerHandler extends ResourceTracker {
         return true;
       }
 
+      // Remove global reference before nullifying local reference
+      if (window.windowsManagerInstance === this.windowsManager || !this.windowsManager) {
+        delete window.windowsManagerInstance;
+      }
+
       // Dismiss any open windows before deactivation
       if (this.windowsManager) {
         await this.windowsManager.dismiss();
@@ -142,11 +147,6 @@ export class WindowsManagerHandler extends ResourceTracker {
         WindowsManager.resetInstance();
 
         this.windowsManager = null;
-      }
-
-      // Remove global reference
-      if (window.windowsManagerInstance === this.windowsManager) {
-        delete window.windowsManagerInstance;
       }
 
       this.isActive = false;

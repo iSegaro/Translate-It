@@ -85,7 +85,7 @@ import browser from 'webextension-polyfill'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { REPO_URLS } from '@/shared/config/constants.js'
+import { REPO_URLS } from '@/shared/constants/core.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
 

@@ -28,10 +28,10 @@ export const SILENT_ERRORS = new Set([
  */
 export const SUPPRESS_CONSOLE_ERRORS = new Set([
   ...SILENT_ERRORS,
-  ErrorTypes.API,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_KEY_MISSING,
   ErrorTypes.API_URL_MISSING,
+  ErrorTypes.API_CONFIG_INVALID,
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.MODEL_OVERLOADED,
   ErrorTypes.QUOTA_EXCEEDED,
@@ -47,6 +47,8 @@ export const SUPPRESS_CONSOLE_ERRORS = new Set([
   ErrorTypes.TEXT_TOO_LONG,
   ErrorTypes.TRANSLATION_NOT_FOUND,
   ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.TRANSLATION_TIMEOUT,
+  ErrorTypes.OPERATION_TIMEOUT,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
   ErrorTypes.TAB_AVAILABILITY,
   ErrorTypes.IMPORT_PASSWORD_INCORRECT,
@@ -81,13 +83,13 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
   ErrorTypes.API_KEY_MISSING,
   ErrorTypes.API_KEY_INVALID,
   ErrorTypes.API_URL_MISSING,
+  ErrorTypes.API_CONFIG_INVALID,
   ErrorTypes.MODEL_MISSING,
   ErrorTypes.QUOTA_EXCEEDED,
   ErrorTypes.RATE_LIMIT_REACHED,
   ErrorTypes.INSUFFICIENT_BALANCE,
   ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   ErrorTypes.GEMINI_QUOTA_REGION,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN,
   ErrorTypes.SETTINGS_LOADING_TIMEOUT
 ]);
 
@@ -96,6 +98,7 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
  */
 export const FATAL_ERRORS = new Set([
   ...CRITICAL_CONFIG_ERRORS,
+  ErrorTypes.CIRCUIT_BREAKER_OPEN, // Moved here to ensure descriptive message is used while remaining fatal
   ErrorTypes.FORBIDDEN_ERROR,
   ErrorTypes.NETWORK_ERROR,
   ErrorTypes.HTTP_ERROR,
@@ -104,6 +107,7 @@ export const FATAL_ERRORS = new Set([
   ErrorTypes.INVALID_REQUEST,
   ErrorTypes.TRANSLATION_FAILED,
   ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.API_ERROR,
   ErrorTypes.USER_CANCELLED,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
   ErrorTypes.CONTEXT,

@@ -1,7 +1,8 @@
 import { onMounted } from 'vue';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';

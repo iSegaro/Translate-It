@@ -76,12 +76,21 @@ export const CONFIG = {
     "latin-script": "none" // پیش‌فرض: هیچکدام (اجازه به تشخیص خودکار پرووایدر)
   },
   THEME: "auto",
-  TIMEOUT: 30000,
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
+
+  // --- Character Limits ---
+  /** Maximum characters allowed for popup translation */
+  POPUP_MAX_CHARS: 5000,
+  /** Maximum characters allowed for sidepanel translation */
+  SIDEPANEL_MAX_CHARS: 10000,
+  /** Maximum characters allowed for selection/floating window translation */
+  SELECTION_MAX_CHARS: 5000,
+  /** Maximum characters allowed for "Select Element" mode (usually higher for articles) */
+  SELECT_ELEMENT_MAX_CHARS: 300000,
 
 
   // --- API Settings ---
@@ -245,7 +254,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 3, // Version of the prompt templates (localized labels for dictionary)
+  PROMPTS_VERSION: 4, // Version of the prompt templates (localized labels for dictionary)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
@@ -502,10 +511,10 @@ Return only the JSON object, no additional text.`,
 Format your response exactly as follows using Markdown:
 [Primary meaning in $_{TARGET} directly on the first line]
 
-- **[Noun in $_{TARGET}]**: Meanings, separated by comma
-- **[Verb in $_{TARGET}]**: Meanings, separated by comma
-- **[Adjective in $_{TARGET}]**: Meanings, separated by comma
-- **[Synonyms label in $_{TARGET}]**: 2-3 common synonyms
+- **Noun**: Meanings, separated by comma
+- **Verb**: Meanings, separated by comma
+- **Adjective**: Meanings, separated by comma
+- **Synonyms**: 2-3 common synonyms
 
 Keep it very brief. All labels and content MUST be in $_{TARGET}. No examples or explanations.
 
@@ -1286,4 +1295,30 @@ export const getWholePageScrollStopDelayAsync = async () => {
     "WHOLE_PAGE_SCROLL_STOP_DELAY",
     CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY
   );
+};
+
+// --- Character Limit Getters ---
+
+export const getPopupMaxCharsAsync = async () => {
+  return getSettingValueAsync("POPUP_MAX_CHARS", CONFIG.POPUP_MAX_CHARS);
+};
+
+export const getSidepanelMaxCharsAsync = async () => {
+  return getSettingValueAsync("SIDEPANEL_MAX_CHARS", CONFIG.SIDEPANEL_MAX_CHARS);
+};
+
+export const getSelectionMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECTION_MAX_CHARS", CONFIG.SELECTION_MAX_CHARS);
+};
+
+export const getSelectElementMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECT_ELEMENT_MAX_CHARS", CONFIG.SELECT_ELEMENT_MAX_CHARS);
+};
+
+export const getWholePageMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_MAX_CHARS", CONFIG.WHOLE_PAGE_MAX_CHARS);
+};
+
+export const getWholePageAiMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_AI_MAX_CHARS", CONFIG.WHOLE_PAGE_AI_MAX_CHARS);
 };

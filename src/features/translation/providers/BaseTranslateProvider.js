@@ -6,13 +6,14 @@
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { getProviderBatching } from "@/features/translation/core/ProviderConfigurations.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -62,8 +63,6 @@ export class BaseTranslateProvider extends BaseProvider {
    * Configuration Resolvers - Unified with ProviderConfigurations.js and User Levels
    */
   async getBatchingConfig(mode = null) {
-    const { getProviderOptimizationLevelAsync } = await import("@/shared/config/config.js");
-    const { getProviderBatching } = await import("@/features/translation/core/ProviderConfigurations.js");
     const level = await getProviderOptimizationLevelAsync(this.providerName);
     return getProviderBatching(this.providerName, mode, level);
   }

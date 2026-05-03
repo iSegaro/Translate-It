@@ -3,7 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { INPUT_TYPES } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { IFRAME_CONFIG, POSITION_CONFIG, ConfigUtils } from '../config/TextFieldConfig.js';
 import IframePositionCalculator from '../utils/IframePositionCalculator.js';
 import { pageEventBus } from '@/core/PageEventBus.js';

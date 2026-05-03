@@ -11,6 +11,10 @@ List of features, enhancements, and ideas planned for future development.
 
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
+- استفاده از Vajehyab
+https://engine.vajehyab.com/search?q=%D8%AF%D8%B1%D9%88%D8%AF&d=&l=5&o=0&s=all
+https://engine.vajehyab.com/suggestion?q=%D8%AF%D8%B1%D9%88%D8%AF
+
 - Integration Module: Gmail, Twitter, Goolge Docs
 
 - بهبود حالت نوشتن

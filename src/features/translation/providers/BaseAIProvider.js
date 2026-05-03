@@ -4,8 +4,8 @@
  */
 
 import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
-import { 
-  getProviderStreaming, 
+import {
+  getProviderStreaming,
   getProviderBatching,
   getProviderFeatures
 } from "@/features/translation/core/ProviderConfigurations.js";
@@ -16,6 +16,7 @@ import { AIConversationHelper } from "./utils/AIConversationHelper.js";
 import { AIResponseParser } from "./utils/AIResponseParser.js";
 import { AITextProcessor } from "./utils/AITextProcessor.js";
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
+import { AIStreamManager } from "./utils/AIStreamManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseAIProvider');
 
@@ -59,7 +60,11 @@ export class BaseAIProvider extends BaseProvider {
     const batchStrategy = await this.getBatchStrategy(translateMode);
 
     // 1. Try streaming if supported and beneficial
-    if (supportsStreaming && await this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
+    // FIX: Only enter streaming path if thresholds are met OR if already initialized by coordinator
+    const shouldStream = await this._shouldUseStreaming(texts, messageId, engine, translateMode);
+    const isAlreadyStreaming = messageId && AIStreamManager.isStreamActive(messageId);
+
+    if (supportsStreaming && (shouldStream || isAlreadyStreaming)) {
       return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
     }
 
@@ -217,11 +222,120 @@ export class BaseAIProvider extends BaseProvider {
 
   /**
    * Streaming batch translation implementation
-   * To be implemented by subclasses (e.g. OpenAI, Gemini)
+   * Sends segments in multiple batches for real-time updates
    * @protected
    */
-  async _streamingBatchTranslate() {
-    throw new Error(`_streamingBatchTranslate not implemented by ${this.providerName}`);
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+    logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments`);
+
+    // Ensure streaming is initialized in the central manager
+    if (messageId && engine && !AIStreamManager.isStreamActive(messageId)) {
+      try {
+        const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
+        if (sender) {
+          // If we have sender info, we can safely initialize the stream even if coordinator skipped it
+          const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
+          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          logger.debug(`[${this.providerName}] Late-initialized stream for messageId: ${messageId}`);
+        }
+      } catch (err) {
+        logger.warn(`[${this.providerName}] Failed to late-initialize stream:`, err.message);
+      }
+    }
+
+    // Check one last time if we can actually stream
+    const canStream = messageId && AIStreamManager.isStreamActive(messageId);
+    if (!canStream) {
+      logger.debug(`[${this.providerName}] Streaming not active for ${messageId}, falling back to standard batch`);
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
+    }
+
+    // Get batching configuration
+    const batchingConfig = await this.getBatchingConfig(translateMode);
+    const characterLimit = batchingConfig.characterLimit || 5000;
+
+    // 1. Pre-process segments: Split oversized single segments into multiple pieces
+    // This ensures that even a single 30k char text is streamed in multiple batches
+    const fragmentedTexts = [];
+    for (const text of texts) {
+      const isObject = typeof text === 'object' && text !== null;
+      const content = isObject ? (text.t || text.text || "") : text;
+      
+      if (typeof content === 'string' && content.length > characterLimit && !AITextProcessor.hasPlaceholders([text])) {
+        logger.debug(`[${this.providerName}] Splitting oversized segment (${content.length} chars) for streaming`);
+        const chunks = AITextProcessor.smartChunkWithPlaceholders(content, characterLimit);
+        
+        // Convert chunks back to the original format (preserving IDs if they were objects)
+        const typedChunks = chunks.map(chunk => isObject ? { ...text, t: chunk, text: chunk } : chunk);
+        fragmentedTexts.push(...typedChunks);
+      } else {
+        fragmentedTexts.push(text);
+      }
+    }
+
+    const batches = AITextProcessor.createOptimalBatches(fragmentedTexts, this.providerName, translateMode, batchingConfig);
+    const allResults = [];
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      if (abortController?.signal?.aborted || (engine && engine.isCancelled?.(messageId))) {
+        const cancelError = new Error('Translation cancelled by user');
+        cancelError.type = 'USER_CANCELLED';
+        throw cancelError;
+      }
+
+      const batch = batches[batchIndex];
+
+      try {
+        const batchResponse = await this._translateBatch(
+          batch,
+          sourceLang,
+          targetLang,
+          translateMode,
+          abortController,
+          engine,
+          messageId,
+          sessionId,
+          null,
+          expectedFormat,
+          priority
+        );
+
+        const batchResults = Array.isArray(batchResponse) ? batchResponse : [batchResponse];
+        allResults.push(...batchResults);
+
+        // Stream batch results to content script
+        if (engine && messageId) {
+          await AIStreamManager.streamBatchResults(
+            this.providerName,
+            batchResults,
+            batch,
+            batchIndex,
+            messageId,
+            engine,
+            sourceLang,
+            targetLang
+          );
+        }
+
+        logger.debug(`[${this.providerName}] Batch ${batchIndex + 1}/${batches.length} completed (${batchResults.length} segments)`);
+      } catch (error) {
+        logger.error(`[${this.providerName}] Batch ${batchIndex + 1} failed:`, error);
+
+        // Stream error to content script
+        if (engine && messageId) {
+          await AIStreamManager.streamErrorResults(this.providerName, error, batchIndex, messageId, engine);
+        }
+
+        throw error;
+      }
+    }
+
+    // Send stream end notification
+    if (engine && messageId) {
+      await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { targetLanguage: targetLang });
+    }
+
+    return allResults;
   }
 
   /**

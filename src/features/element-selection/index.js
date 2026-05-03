@@ -3,25 +3,30 @@
  * This file provides a central entry point for Element Selection functionality with lazy loading
  */
 
-// Export lazy loading factory
+// Export modern factory and composables
 export { ElementSelectionFactory } from './ElementSelectionFactory.js';
 export { useElementSelectionLazy } from './composables/useElementSelectionLazy.js';
 
-// Lazy loading functions for dynamic imports
+/**
+ * Lazy loading functions for core feature components
+ */
 export const loadElementSelectionCore = async () => {
-  const [manager, highlighter, extractor] = await Promise.all([
+  const [managerModule, selectorModule, adapterModule] = await Promise.all([
     import('./SelectElementManager.js'),
-    import('./managers/services/ElementHighlighter.js'),
-    import('./managers/services/TextExtractionService.js')
+    import('./core/ElementSelector.js'),
+    import('./core/DomTranslatorAdapter.js')
   ]);
 
   return {
-    SelectElementManager: manager.default || manager.SelectElementManager,
-    ElementHighlighter: highlighter.ElementHighlighter,
-    TextExtractionService: extractor.TextExtractionService
+    SelectElementManager: managerModule.SelectElementManager || managerModule.default,
+    ElementSelector: selectorModule.ElementSelector,
+    DomTranslatorAdapter: adapterModule.DomTranslatorAdapter
   };
 };
 
+/**
+ * Lazy loading for background handlers
+ */
 export const loadElementSelectionHandlers = () => {
   return Promise.all([
     import('./handlers/handleActivateSelectElementMode.js'),
@@ -31,32 +36,27 @@ export const loadElementSelectionHandlers = () => {
   ]);
 };
 
-export const loadElementSelectionServices = () => {
-  return Promise.all([
-    import('./managers/services/TranslationOrchestrator.js'),
-    import('./managers/services/ModeManager.js'),
-    import('./managers/services/StateManager.js'),
-    import('./managers/services/ErrorHandlingService.js')
-  ]);
-};
-
+/**
+ * Lazy loading for constants
+ */
 export const loadElementSelectionConstants = () => {
   return import('./constants/SelectElementModes.js');
 };
 
-// Backward compatibility - lazy loaded when accessed
-export const SelectElementManager = async () => {
-  const { SelectElementManager: Manager } = await loadElementSelectionCore();
-  return Manager;
+/**
+ * Backward compatibility - returns the Manager class via Promise
+ */
+export const getSelectElementManagerAsync = async () => {
+  const { SelectElementManager } = await loadElementSelectionCore();
+  return SelectElementManager;
 };
 
-// Default export for main Element Selection functionality
+// Default export for main Element Selection functionality facade
 export const ElementSelection = {
   loadCore: loadElementSelectionCore,
   loadHandlers: loadElementSelectionHandlers,
-  loadServices: loadElementSelectionServices,
   loadConstants: loadElementSelectionConstants,
-  SelectElementManager
+  getManagerAsync: getSelectElementManagerAsync
 };
 
 export default ElementSelection;

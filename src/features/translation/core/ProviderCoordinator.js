@@ -13,7 +13,10 @@ import { AIResponseParser } from "@/features/translation/providers/utils/AIRespo
 import { TranslationMode } from "@/shared/config/config.js";
 import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
+import { queueManager } from "./QueueManager.js";
+import { TranslationPriority } from "./RateLimitManager.js";
+import { streamingManager } from "./StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -34,7 +37,6 @@ export class ProviderCoordinator {
     // We only swap if we have original languages (usually from TranslationEngine)
     // If not provided, we assume current source/target are the "original" ones
     const originalSource = options.originalSourceLang || sourceLang;
-    const originalTarget = options.originalTargetLang || targetLang;
 
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
@@ -46,7 +48,6 @@ export class ProviderCoordinator {
         sourceLang,
         targetLang,
         originalSource,
-        originalTarget,
         { providerName, mode: translateMode }
       );
 
@@ -89,7 +90,17 @@ export class ProviderCoordinator {
 
     // 3. Metadata Awareness
     const inputCount = Array.isArray(text) ? text.length : (jsonInfo.isJson ? jsonInfo.parsed.length : 1);
-    options.textLength = typeof text === 'string' ? text.length : (jsonInfo.isJson ? JSON.stringify(jsonInfo.parsed).length : 0);
+    
+    // FIX: Correctly calculate total character length for arrays, strings, and JSON structures
+    if (typeof text === 'string') {
+      options.textLength = text.length;
+    } else if (Array.isArray(text)) {
+      options.textLength = text.reduce((sum, s) => sum + (typeof s === 'string' ? s.length : (s?.t?.length || s?.text?.length || 0)), 0);
+    } else if (jsonInfo.isJson) {
+      options.textLength = JSON.stringify(jsonInfo.parsed).length;
+    } else {
+      options.textLength = 0;
+    }
 
     // 4. Resolve strategy and expected format
     const strategy = this._resolveExecutionStrategy(provider, jsonInfo.isJson, options);
@@ -101,23 +112,39 @@ export class ProviderCoordinator {
     // 5. Initialize Streaming if needed
     // Only enable coordinator-level streaming if not already handled by an orchestrator (rawJsonPayload)
     if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+      // FIX: Ensure both StreamingManager AND LifecycleRegistry (for AIStreamManager) have sender info
+      if (engine && typeof engine.registerStreamingSender === 'function') {
+        engine.registerStreamingSender(messageId, options.sender);
+      }
       await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
     }
 
-    // 6. Execute based on strategy
+    // 6. Execute based on strategy via QueueManager for retry and priority support
     try {
-      let result;
-      if (jsonInfo.isJson && !options.rawJsonPayload) {
-        logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
-        result = await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
-      } else {
-        result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+      // Map string priorities to numeric values recognized by QueueManager
+      let numericPriority = options.priority;
+      if (typeof numericPriority === 'string') {
+        const pMap = { 
+          'high': TranslationPriority.HIGH, 
+          'normal': TranslationPriority.NORMAL, 
+          'low': TranslationPriority.LOW 
+        };
+        numericPriority = pMap[numericPriority.toLowerCase()] || TranslationPriority.NORMAL;
+      } else if (numericPriority === undefined || numericPriority === null) {
+        numericPriority = TranslationPriority.NORMAL;
       }
 
-      // If we are in coordinator-level streaming mode, we return a status object
-      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
-        return { success: true, streaming: true, messageId };
-      }
+      const executeTask = async () => {
+        if (jsonInfo.isJson && !options.rawJsonPayload) {
+          logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
+          return await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
+        } else {
+          return await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+        }
+      };
+
+      // Enqueue the task - QueueManager handles retries and prioritization
+      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode);
 
       // 7. Post-processing & Normalization
       // Use the strict Response Contract to determine cleaning strategy
@@ -143,6 +170,20 @@ export class ProviderCoordinator {
             );
           }
         }
+      }
+
+      // If we are in coordinator-level streaming mode, we return a status object
+      // FIX: Also include the translatedText as a final fallback so the UI can resolve immediately
+      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+        return { 
+          success: true, 
+          streaming: true, 
+          messageId, 
+          translatedText: finalResult,
+          provider: providerName,
+          sourceLanguage: processedSourceLang,
+          targetLanguage: processedTargetLang
+        };
       }
 
       // 8. Capture Detected Language & Register Feedback
@@ -258,7 +299,6 @@ export class ProviderCoordinator {
     if (!messageId || !engine) return;
 
     try {
-      const { streamingManager } = await import("./StreamingManager.js");
       const segments = Array.isArray(text) ? text : [text];
       
       streamingManager.initializeStream(messageId, sender, provider, segments, sessionId);

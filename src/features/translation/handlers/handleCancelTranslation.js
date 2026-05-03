@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { streamingManager } from "../core/StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCancelTranslation');
 
@@ -50,7 +51,6 @@ export async function handleCancelTranslation(request, sender) {
     
     // Step 2: Cancel streaming sessions (cleans up streaming state)
     try {
-      const { streamingManager } = await import("../core/StreamingManager.js");
       if (cancelAll) {
         await streamingManager.cancelAllStreams('All translations cancelled by user');
         logger.debug('[CancelTranslation] StreamingManager cancelled all streams');

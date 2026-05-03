@@ -10,7 +10,8 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { getSettingsAsync } from '@/shared/config/config.js';
-import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
@@ -123,6 +124,15 @@ class SelectElementManager extends ResourceTracker {
       this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
         if (this.isActive && data?.source !== 'select-element') {
           this.deactivate({ silent: true, reason: 'conflict' });
+        }
+      });
+
+      // Listen for translation progress events
+      this.addEventListener(pageEventBus, 'select-element-translation-progress', (data) => {
+        if (data?.completed !== undefined && data?.total !== undefined) {
+          const progressType = data.isRequestProgress ? 'API requests' : 'items';
+          this.logger.debug(`[SelectElementManager] Progress update: ${data.completed}/${data.total} ${progressType}`);
+          this.updateNotificationForTranslationProgress(data.completed, data.total, data.isRequestProgress);
         }
       });
 
@@ -457,7 +467,9 @@ class SelectElementManager extends ResourceTracker {
   async startTranslation(targetElement, options = {}) {
     try {
       if (!this.isActive) return;
-      if (this.isTopFrame) this.updateNotificationForTranslation();
+
+      // Mark as translating for Memory Garbage Collector protection
+      window.isTranslationInProgress = true;
 
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
         ...this.currentOptions,
@@ -506,6 +518,9 @@ class SelectElementManager extends ResourceTracker {
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
       }
+    } finally {
+      // Clear flag after translation is complete (success or error)
+      window.isTranslationInProgress = false;
     }
   }
 
@@ -553,8 +568,11 @@ class SelectElementManager extends ResourceTracker {
     });
   }
 
-  updateNotificationForTranslation() {
-    pageEventBus.emit('update-select-element-notification', { status: TRANSLATION_STATUS.TRANSLATING });
+  updateNotificationForTranslationProgress(completed, total, isRequestProgress = true) {
+    pageEventBus.emit('update-select-element-notification', {
+      status: TRANSLATION_STATUS.TRANSLATING,
+      progress: { completed, total, isRequestProgress }
+    });
   }
 
   dismissNotification() {

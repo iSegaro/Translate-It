@@ -1,7 +1,7 @@
 /**
  * TTS Providers Configuration - Centralized data for all TTS engines
  */
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 
 export const PROVIDER_CONFIGS = {
   // --- Microsoft Edge Neural TTS Data ---

@@ -33,6 +33,7 @@
       :target-language="actualTargetLanguage"
       :last-translation="lastTranslation"
       :is-loading="isTranslating"
+      :is-streaming="isStreaming"
       :error="translationError"
       :error-type="errorType"
       :placeholder="t('popup_target_text_placeholder') || 'Translation result will appear here'"
@@ -107,6 +108,7 @@ const {
   sourceText,
   translatedText,
   isTranslating,
+  isStreaming,
   translationError,
   errorType,
   canTranslate,

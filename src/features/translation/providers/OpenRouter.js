@@ -67,11 +67,24 @@ export class OpenRouterProvider extends BaseAIProvider {
       charCount: fetchOptions.body.length,
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => {
-        if (data?.error) {
-          const errorMsg = data.error.message || data.error.metadata?.raw || 'Unknown OpenRouter Error';
+        // Handle case where data might be a string (if parsing failed in engine but passed here)
+        let parsed = data;
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data); } catch { /* use raw string */ }
+        }
+
+        if (parsed?.error) {
+          const errorInfo = parsed.error;
+          const errorMsg = errorInfo.message || errorInfo.metadata?.raw || (typeof errorInfo === 'string' ? errorInfo : 'Unknown OpenRouter Error');
           throw new Error(`API_ERROR: ${errorMsg}`);
         }
-        return data?.choices?.[0]?.message?.content;
+
+        // OpenRouter sometimes returns an error object as the ONLY field in an object
+        if (parsed && Object.keys(parsed).length === 1 && parsed.error) {
+           throw new Error(`API_ERROR: ${parsed.error.message || 'Unknown OpenRouter Error'}`);
+        }
+
+        return parsed?.choices?.[0]?.message?.content;
       },
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,

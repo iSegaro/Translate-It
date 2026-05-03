@@ -5,7 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BrowserAPI');
 
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { 
   getProviderLanguageCode

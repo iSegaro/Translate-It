@@ -120,7 +120,7 @@ import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getTextDirection } from "@/features/element-selection/utils/textDirection.js";
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'

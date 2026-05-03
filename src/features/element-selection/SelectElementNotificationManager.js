@@ -5,7 +5,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getScopedLogger } from '../../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../../shared/logging/logConstants';
 
@@ -50,6 +50,9 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async showNotification(data = {}) {
+    // Safety check for null data from events
+    if (!data) data = {};
+
     // Only show in top frame
     const isTopFrame = window === window.top;
     if (!isTopFrame) return;
@@ -90,14 +93,29 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   async updateNotification(data = {}) {
+    // Safety check for null data from events
+    if (!data) data = {};
+
     const isTopFrame = window === window.top;
-    if (!this.toastId || !isTopFrame) return;
+    if (!this.toastId || !isTopFrame) {
+      this.logger.debug(`[SelectElementNotificationManager] Skip update - toastId: ${this.toastId}, isTopFrame: ${isTopFrame}`);
+      return;
+    }
 
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const i18n = await utilsFactory.getI18nUtils();
-        const translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
-        
+        let translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+
+        // Show progress based on API requests
+        if (data.progress && data.progress.completed !== undefined && data.progress.total !== undefined) {
+          // Remove the dots from the localized message to add progress in the middle
+          const baseMessage = translatingMessage.replace('...', '').trim();
+          translatingMessage = `${baseMessage} (${data.progress.completed}/${data.progress.total})...`;
+
+          this.logger.debug(`[SelectElementNotificationManager] Updating toast with: ${translatingMessage}`);
+        }
+
         // CRITICAL: Re-check toastId after async await
         if (!this.toastId) return;
 

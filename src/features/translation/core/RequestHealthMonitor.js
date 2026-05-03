@@ -124,6 +124,9 @@ export class RequestHealthMonitor {
     // Update health metrics
     this._updateHealthMetrics(providerName, health);
     
+    // Check for alerts (proactive monitoring for slow responses)
+    this._checkHealthAlerts(providerName, health);
+    
     // Success recorded
   }
   

@@ -33,11 +33,11 @@ const OPERATION_TIMEOUTS = {
   'DEACTIVATE_SELECT_ELEMENT_MODE': 2000,
   'GET_SELECTED_TEXT': 2000,
   'CANCEL_TRANSLATION': 2000,
-  'TRANSLATE': 20000,
-  'TRANSLATE_SELECTION': 15000,
-  'TRANSLATE_PAGE': 20000,
-  'TRANSLATE_TEXT': 15000,
-  'TRANSLATE_IMAGE': 18000,
+  'TRANSLATE': 60000,
+  'TRANSLATE_SELECTION': 45000,
+  'TRANSLATE_PAGE': 60000,
+  'TRANSLATE_TEXT': 45000,
+  'TRANSLATE_IMAGE': 35000,
   'page-translate-batch': 60000,
   'FETCH_TRANSLATION': 10000,
   'PROCESS_SELECTED_ELEMENT': 8000,
@@ -68,6 +68,12 @@ function getTimeoutForAction(action, context = null) {
   if (action === 'TRANSLATE' && (context === 'select-element' || (typeof context === 'object' && context !== null && context.mode === 'select_element'))) {
     return 300000; 
   }
+  
+  // Higher timeout for generic translations to allow for AI model latency and queuing
+  if (action === 'TRANSLATE' || action === 'TRANSLATE_SELECTION' || action === 'TRANSLATE_TEXT') {
+    return 120000;
+  }
+
   return (action && OPERATION_TIMEOUTS[action]) || OPERATION_TIMEOUTS.DEFAULT || 8000;
 }
 
@@ -76,7 +82,7 @@ function createTimeout(ms, action) {
   const promise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
       const timeoutError = new Error(`Operation '${action || 'unknown'}' timed out after ${ms}ms`);
-      timeoutError.type = 'OPERATION_TIMEOUT';
+      timeoutError.type = ErrorTypes.OPERATION_TIMEOUT;
 
       if (ExtensionContextManager.isValidSync()) {
         ErrorHandler.getInstance().handle(timeoutError, {
@@ -111,7 +117,7 @@ export async function sendMessage(message, options = {}) {
         try {
           const checkResponse = await browser.runtime.sendMessage({
             action: 'CHECK_TRANSLATION_STATUS',
-            messageId: message.messageId
+            data: { messageId: message.messageId }
           });
           if (checkResponse && checkResponse.completed) return checkResponse.results;
         } catch { /* ignore */ }

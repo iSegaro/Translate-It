@@ -1403,6 +1403,9 @@
   "ERRORS_EMPTY_PROMPT": {
     "message": "Invalid or missing prompt text."
   },
+  "ERRORS_TEXT_TOO_LONG": {
+    "message": "The selected text is too long. Please try a shorter selection."
+  },
   "ERRORS_NETWORK_ERROR": {
     "message": "Network Error. Please check your internet connection."
   },
@@ -1423,6 +1426,12 @@
   },
   "ERRORS_API_ENDPOINT_INVALID": {
     "message": "Invalid API address (404 error)."
+  },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "Invalid API configuration. Please check your settings."
+  },
+  "ERRORS_API_ERROR": {
+    "message": "Translation service API error."
   },
   "ERRORS_MODEL_MISSING": {
     "message": "The selected AI Model is missing or invalid."

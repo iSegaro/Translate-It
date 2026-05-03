@@ -22,7 +22,7 @@
   >
     <!-- Simplified Loading State -->
     <div
-      v-if="isLoading"
+      v-if="isLoading && !isStreaming"
       class="ti-loading-overlay"
     >
       <LoadingSpinner
@@ -205,6 +205,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isStreaming: {
+    type: Boolean,
+    default: false,
+  },
   error: {
     type: String,
     default: "",
@@ -346,7 +350,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
 // Computed
 const hasContent = computed(
-  () => props.content && props.content.trim().length > 0 && !props.isLoading,
+  () => (props.content && props.content.trim().length > 0 && !props.isLoading) || (props.isStreaming && props.content)
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
 

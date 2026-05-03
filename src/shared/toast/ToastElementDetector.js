@@ -1,6 +1,6 @@
 // ToastElementDetector - Centralized Vue Sonner element detection
 import { TOAST_SELECTORS, TOAST_ELEMENT_QUERIES, EXTENSION_SELECTORS } from './constants.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 
 export class ToastElementDetector {
   /**

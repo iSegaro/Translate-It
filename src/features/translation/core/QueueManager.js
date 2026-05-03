@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
 
@@ -24,8 +25,8 @@ export const QueueStatus = {
  * Retry strategies based on error types
  */
 const RETRY_STRATEGIES = {
-  // Rate limiting errors - exponential backoff
-  [ErrorTypes.API_QUOTA_EXCEEDED]: {
+  // Rate limiting errors - longer exponential backoff
+  [ErrorTypes.RATE_LIMIT_REACHED]: {
     maxRetries: 5,
     baseDelay: 2000,
     maxDelay: 30000,
@@ -33,9 +34,17 @@ const RETRY_STRATEGIES = {
     jitter: true
   },
   
-  // Network errors - shorter delays
-  [ErrorTypes.NETWORK_ERROR]: {
+  [ErrorTypes.QUOTA_EXCEEDED]: {
     maxRetries: 3,
+    baseDelay: 5000,
+    maxDelay: 60000,
+    exponentialFactor: 2,
+    jitter: true
+  },
+  
+  // Network errors - shorter delays with more retries
+  [ErrorTypes.NETWORK_ERROR]: {
+    maxRetries: 4,
     baseDelay: 1000,
     maxDelay: 10000,
     exponentialFactor: 1.5,
@@ -47,15 +56,6 @@ const RETRY_STRATEGIES = {
     maxRetries: 3,
     baseDelay: 1500,
     maxDelay: 15000,
-    exponentialFactor: 2,
-    jitter: false
-  },
-  
-  // API errors - limited retry
-  [ErrorTypes.API]: {
-    maxRetries: 2,
-    baseDelay: 1000,
-    maxDelay: 5000,
     exponentialFactor: 2,
     jitter: false
   },
@@ -106,6 +106,27 @@ class QueueItem {
    * Check if item should be retried
    */
   shouldRetry() {
+    // 1. If we have a fatal error (like invalid API key), do NOT retry
+    if (this.lastError && isFatalError(this.lastError)) {
+      // Exceptions: These are marked as fatal in ErrorMatcher to stop standard flows,
+      // but in QueueManager we WANT to retry them because they are often transient.
+      const retryableFatalTypes = [
+        ErrorTypes.RATE_LIMIT_REACHED,
+        ErrorTypes.NETWORK_ERROR,
+        ErrorTypes.HTTP_ERROR,
+        ErrorTypes.SERVER_ERROR,
+        ErrorTypes.QUOTA_EXCEEDED,
+        ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        ErrorTypes.API_ERROR
+      ];
+
+      if (!retryableFatalTypes.includes(this.lastError.type) && 
+          this.lastError.statusCode !== 429) {
+        return false;
+      }
+    }
+
+    // 2. Check against strategy limits
     const strategy = this.getRetryStrategy();
     return this.attempts < strategy.maxRetries;
   }
@@ -210,7 +231,7 @@ export class QueueManager {
     try {
       while (queue.length > 0) {
         const item = queue.find(item => 
-          item.status === QueueStatus.PENDING || item.status === QueueStatus.RETRYING
+          item.status === QueueStatus.PENDING
         );
         
         if (!item) {
@@ -290,7 +311,12 @@ export class QueueManager {
           item.callbacks.reject(error);
         }
         
-        logger.error(`Item ${item.id} failed permanently after ${item.attempts} attempts`, error);
+        // FIX: Log cancellations as debug instead of error to prevent log noise
+        if (isCancellationError(error)) {
+          logger.debug(`Item ${item.id} cancelled by user`);
+        } else {
+          logger.error(`Item ${item.id} failed permanently after ${item.attempts} attempts`, error);
+        }
       }
     }
   }

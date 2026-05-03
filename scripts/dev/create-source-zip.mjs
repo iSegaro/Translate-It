@@ -86,7 +86,17 @@ sourceFilesAndDirs.forEach((item) => {
   }
   
   if (fs.statSync(itemPath).isDirectory()) {
-    archive.directory(itemPath, item);
+    // افزودن دایرکتوری با فیلتر برای حذف فایل‌های تست
+    archive.directory(itemPath, item, (entry) => {
+      const isTestFile = /\.(test|spec)\.js$/.test(entry.name);
+      const isTestFolder = entry.name.includes('/tests/') || entry.name.startsWith('tests/');
+      
+      if (isTestFile || isTestFolder) {
+        // console.log(chalk.gray(`  - Excluding test asset: ${entry.name}`));
+        return false;
+      }
+      return entry;
+    });
   } else {
     archive.file(itemPath, { name: item });
   }

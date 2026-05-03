@@ -58,20 +58,6 @@ export class ContentMessageHandler extends ResourceTracker {
     this.pageTranslationManager = manager;
   }
 
-  /**
-   * Get the translation handler instance
-   * @returns {Promise<Object|null>} Translation handler instance
-   */
-  async getTranslationHandler() {
-    try {
-      const { getTranslationHandlerInstance } = await import('@/core/InstanceManager.js');
-      return getTranslationHandlerInstance();
-    } catch (error) {
-      this.logger.debug('Error getting translation handler:', error);
-      return null;
-    }
-  }
-
   initialize() {
     if (this.initialized) return;
     this.registerHandlers();
@@ -473,7 +459,10 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
-        this.logger.info(`Displaying result for ${translationMode} mode in notification.`);
+        this.logger.info(`Forwarding result for ${translationMode} mode to WindowsManager`);
+        if (window.windowsManagerInstance && window.windowsManagerInstance.translationHandler) {
+          return window.windowsManagerInstance.translationHandler.handleTranslationResult(message);
+        }
         return true;
 
       case TranslationMode.Page:

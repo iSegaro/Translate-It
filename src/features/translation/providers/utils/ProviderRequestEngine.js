@@ -78,9 +78,8 @@ export const ProviderRequestEngine = {
 
         // 3. Success! Promote the working key
         if (attempt > 0 && provider.providerSettingKey) {
-          const authHeader = fetchOptions.headers?.Authorization || fetchOptions.headers?.authorization;
-          const currentKey = authHeader ? authHeader.replace(/^(Bearer |DeepL-Auth-Key )/i, '') : 
-                           (new URL(currentUrl).searchParams.get('key'));
+          // Get the key actually used in THIS successful attempt
+          const currentKey = (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
           
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
@@ -133,6 +132,20 @@ export const ProviderRequestEngine = {
     const finalOriginalCharCount = originalCharCount || 0;
 
     const { globalCallId, sessionCallId } = statsManager.recordRequest(provider.providerName, finalSessionId, finalCharCount, finalOriginalCharCount);
+
+    // MOCK BYPASS: If URL is a mock protocol, skip actual fetch but keep stats and logs
+    if (url.startsWith('mock://')) {
+      const mockDuration = 100 + Math.random() * 200;
+      logger.debugLazy(() => {
+        return [`[Call #${globalCallId}] Mock Engine Bypass: 200 OK (${mockDuration.toFixed(0)}ms)`, {
+          status: 200,
+          duration: mockDuration,
+          context: 'mock-simulation'
+        }];
+      });
+      return { status: 200, ok: true, json: async () => ({ mock: true }) };
+    }
+
     const sessionTag = finalSessionId ? ` [Session: ${finalSessionId.substring(0, 8)}${sessionCallId > 0 ? ` #${sessionCallId}` : ''}]` : '';
     
     // CENTRALIZED SMART LOGGING: REQUEST
@@ -186,16 +199,19 @@ export const ProviderRequestEngine = {
       
       let responseData = null;
 
-      if (response.ok) {
-        const clonedResponse = response.clone();
-        const contentType = clonedResponse.headers.get('content-type');
+      // 1. Pre-process response data for logging (SMART LOGGING)
+      const canClone = typeof response.clone === 'function';
+      const clonedForLogging = canClone ? response.clone() : null;
+      
+      if (clonedForLogging) {
+        const contentType = clonedForLogging.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
           try {
-            responseData = await clonedResponse.json();
+            responseData = await clonedForLogging.json();
           } catch { /* ignore */ }
         } else {
           try {
-            responseData = await clonedResponse.text();
+            responseData = await clonedForLogging.text();
           } catch { /* ignore */ }
         }
       }
@@ -205,7 +221,6 @@ export const ProviderRequestEngine = {
         let resultPreview = '';
         if (responseData) {
           try {
-            // Try to extract a preview of the actual translation
             const preview = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
             resultPreview = preview.substring(0, 500);
           } catch { /* ignore */ }
@@ -219,11 +234,22 @@ export const ProviderRequestEngine = {
         }];
       });
 
+      // 2. Handle HTTP errors
       if (!response.ok) {
         let body = {};
-        try {
-          body = await response.json();
-        } catch { /* ignore */ }
+        // If we already parsed JSON for logging, use it
+        if (responseData && typeof responseData === 'object') {
+          body = responseData;
+        } else if (responseData && typeof responseData === 'string') {
+          try {
+            body = JSON.parse(responseData);
+          } catch { /* ignore */ }
+        } else {
+          // If we didn't parse it for logging (e.g. clone() was missing), try reading it now
+          try {
+            body = await response.json();
+          } catch { /* ignore */ }
+        }
         
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
         const isDeepL400 = provider.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
@@ -260,19 +286,22 @@ export const ProviderRequestEngine = {
         throw err;
       }
 
-      const contentType = response.headers.get('content-type');
+      // 3. Process successful response
       const isAsyncHandler = extractResponse.constructor.name === 'AsyncFunction';
       const wantsRawResponse = extractResponse.length > 2;
 
+      // Special case: If handler wants the raw response object, give it a fresh clone
       if (isAsyncHandler || wantsRawResponse) {
-        return await extractResponse(response, response.status, response);
+        const responseToPass = typeof response.clone === 'function' ? response.clone() : response;
+        return await extractResponse(responseToPass, response.status, responseToPass);
       }
 
-      const isJson = contentType && contentType.includes('application/json');
-      if (isJson) {
+      // If we already have the data parsed for logging, use it to avoid re-parsing
+      if (responseData !== null) {
         try {
-          const data = await response.json();
-          const result = await extractResponse(data, response.status);
+          // If the provider returned an error structure inside a 200 OK (common in some APIs)
+          // we treat it as an error to trigger failover/UI messaging.
+          const result = await extractResponse(responseData, response.status);
           
           if (result === undefined) {
             const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
@@ -282,21 +311,23 @@ export const ProviderRequestEngine = {
             throw err;
           }
           return result;
-        } catch (jsonErr) {
-          if (jsonErr.type === ErrorTypes.API_RESPONSE_INVALID) throw jsonErr;
-          logger.debug(`[${provider.providerName}] Failed to parse JSON even though content-type was JSON`, jsonErr);
+        } catch (extractErr) {
+          // If extractResponse threw an error (like API_ERROR), propagate it
+          if (extractErr.message && (extractErr.message.includes('API_ERROR') || extractErr.type)) {
+            throw extractErr;
+          }
+          logger.debug(`[${provider.providerName}] extractResponse failed with parsed data`, extractErr);
         }
       }
 
-      const responseText = await response.text();
-      if (!isJson) {
-        const err = new Error('API returned non-JSON response.');
-        err.type = ErrorTypes.API_RESPONSE_INVALID;
-        err.statusCode = response.status;
-        err.context = context;
-        throw err;
+      // Fallback: If we didn't parse for logging or parsing failed, try reading now
+      const contentTypeSuccess = response.headers.get('content-type');
+      if (contentTypeSuccess && contentTypeSuccess.includes('application/json')) {
+        const data = await response.json();
+        return await extractResponse(data, response.status);
       }
 
+      const responseText = await response.text();
       return await extractResponse(responseText, response.status);
     } catch (err) {
       // Record error in stats if it's not a cancellation

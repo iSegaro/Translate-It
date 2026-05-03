@@ -9,3 +9,4 @@ dist/firefox/*
 dist/*.zip
 dist/Publish/Source-*.zip
 temp/
+tests/coverage/

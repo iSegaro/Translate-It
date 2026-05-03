@@ -1,8 +1,8 @@
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } from "@/shared/config/config.js";
+import { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync, TranslationMode } from "@/shared/config/config.js";
 import { LANGUAGE_NAME_TO_CODE_MAP, getCanonicalCode } from "@/shared/config/languageConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'LanguageSwappingService');
@@ -34,7 +34,10 @@ export class LanguageSwappingService {
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const bilingualModes = await getBilingualTranslationModesAsync();
-      const isModeEnabled = mode ? (bilingualModes[mode] !== false) : true;
+
+      // CRITICAL FIX: Only enable bilingual if mode is explicitly set to true
+      // getBilingualTranslationModesAsync already falls back to CONFIG defaults if not in storage
+      const isModeEnabled = mode ? (bilingualModes[mode] === true) : true;
 
       // If bilingual is disabled for this mode/globally, skip detection and return original languages
       if (!bilingualEnabled || !isModeEnabled) {
@@ -57,7 +60,19 @@ export class LanguageSwappingService {
         // This prevents incorrect swaps when translating mixed-language text
         const shouldSwap = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
 
-        if (shouldSwap) {
+        // --- MANUAL SOURCE BILINGUAL ---
+        // When user manually sets a source language that doesn't match the detected language and target,
+        // we should swap to get the correct translation
+        const sourceCode = getCanonicalCode(sourceNorm);
+        const shouldSwapManual = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceCode !== detectedLangCode && sourceCode === targetLangCode;
+
+        // --- DICTIONARY MODE SPECIAL HANDLING ---
+        // In dictionary mode, if detected language matches target language, we MUST swap to get dictionary data
+        // Google Translate API doesn't return dictionary info when source and target are the same
+        const isDictionaryMode = mode === TranslationMode.Dictionary_Translation;
+        const shouldSwapForDictionary = isDictionaryMode && detectedLangCode === targetLangCode;
+
+        if (shouldSwap || shouldSwapManual || shouldSwapForDictionary) {
            let newTargetLang;
            if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
              newTargetLang = originalSourceLang;
@@ -66,7 +81,8 @@ export class LanguageSwappingService {
              newTargetLang = "en";
            }
 
-           logger.debug(`${providerName}: Bilingual swap applied for mode ${mode}. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
+           const swapReason = shouldSwapForDictionary ? 'Dictionary swap' : (shouldSwapManual ? 'Manual source swap' : 'Bilingual swap');
+           logger.debug(`${providerName}: ${swapReason} applied for mode ${mode}. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         } else {
           // CRITICAL FIX: No language swapping needed - return original languages WITHOUT calling fallback

@@ -23,8 +23,8 @@ export class ErrorClassifier {
     ErrorTypes.API_KEY_MISSING,
     ErrorTypes.API_KEY_INVALID,
     ErrorTypes.API_URL_MISSING,
+    ErrorTypes.API_CONFIG_INVALID,
     ErrorTypes.MODEL_MISSING,
-    ErrorTypes.AI_MODEL_MISSING,
     
     // Validation Errors - Input validation failures
     ErrorTypes.TEXT_EMPTY,
@@ -36,8 +36,7 @@ export class ErrorClassifier {
     ErrorTypes.CONTEXT,
     
     // Permanent API Errors
-    ErrorTypes.API_ENDPOINT_NOT_FOUND,
-    ErrorTypes.UNSUPPORTED_OPERATION
+    ErrorTypes.API_ENDPOINT_INVALID
   ];
 
   /**
@@ -48,13 +47,14 @@ export class ErrorClassifier {
     // Network & Service Errors - These might resolve with retry
     ErrorTypes.NETWORK_ERROR,
     ErrorTypes.HTTP_ERROR,
+    ErrorTypes.API_ERROR,
     ErrorTypes.RATE_LIMIT_REACHED,
     ErrorTypes.QUOTA_EXCEEDED,
-    ErrorTypes.SERVICE_UNAVAILABLE,
+    ErrorTypes.SERVER_ERROR,
+    ErrorTypes.MODEL_OVERLOADED,
     
     // Translation Processing Errors - These might be temporary
-    ErrorTypes.TRANSLATION_FAILED,
-    ErrorTypes.API // Generic API errors that might be temporary
+    ErrorTypes.TRANSLATION_FAILED
   ];
 
   /**

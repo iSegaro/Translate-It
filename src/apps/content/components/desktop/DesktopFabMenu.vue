@@ -249,7 +249,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import useSettingsStore from '@/features/settings/stores/settings.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';

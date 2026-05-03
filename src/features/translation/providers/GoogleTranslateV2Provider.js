@@ -7,7 +7,7 @@ import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
   getEnableDictionaryAsync,

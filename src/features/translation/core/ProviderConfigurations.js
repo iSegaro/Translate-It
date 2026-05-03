@@ -846,7 +846,11 @@ export const PROVIDER_CONFIGURATIONS = {
         resetAfterSuccess: 2
       }
     },
-    batching: UNIFIED_AI_BATCHING_CONFIG,
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      characterLimit: 2000,
+      optimalSize: 5
+    },
     streaming: {
       enabled: true,
       chunkSize: 'fixed',
