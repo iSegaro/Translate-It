@@ -56,11 +56,9 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 // 2. Import everything
 import { ErrorHandler } from './ErrorHandler.js';
-import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import * as ErrorMatcher from './ErrorMatcher.js';
 import * as ErrorDisplayStrategies from './ErrorDisplayStrategies.js';
-import { ErrorTypes } from './ErrorTypes.js';
 
 describe('ErrorHandler', () => {
   let errorHandler;

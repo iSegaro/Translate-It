@@ -3,8 +3,7 @@ import {
   getErrorDisplayStrategy, 
   getErrorToastType, 
   shouldShowRetry, 
-  shouldShowSettings,
-  CriticalErrorTypes
+  shouldShowSettings
 } from './ErrorDisplayStrategies.js';
 import { ErrorTypes } from './ErrorTypes.js';
 
