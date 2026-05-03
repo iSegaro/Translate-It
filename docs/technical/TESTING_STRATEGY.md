@@ -46,6 +46,12 @@ vi.mock('@/core/bridge', () => ({
 When testing components that inherit from `ResourceTracker`, always verify that `cleanup()` or `deactivate()` successfully removes listeners and timers.
 - Check `vi.getTimerCount()` or mock `removeEventListener`.
 
+### 4. Centralized Mocking (`__mocks__`)
+To maintain consistency and reduce boilerplate, utilize Vitest's automatic mock resolution. 
+- **Pattern**: Place mock implementations in a `__mocks__` folder adjacent to the source file.
+- **Usage**: Use `vi.mock('@/path/to/file.js')` without a second argument to trigger auto-loading from the `__mocks__` directory.
+- **Example**: Error management infrastructure (e.g., `ErrorHandler`, `ErrorMatcher`) uses centralized mocks in `src/shared/error-management/__mocks__/`. Avoid defining custom mock factories for these modules unless testing specific edge cases.
+
 ---
 
 ## Layer-Specific Strategies
