@@ -152,6 +152,17 @@ export class OptimizedJsonHandler {
 
           if (isCancellation) {
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
+            
+            // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
+            // to prevent them from even attempting to start.
+            if (providerInstance.providerName) {
+              import('@/features/translation/core/ProviderCoordinator.js').then(({ coordinator }) => {
+                if (coordinator && coordinator.queueManager) {
+                  coordinator.queueManager.cancelProvider(providerInstance.providerName);
+                }
+              }).catch(() => { /* ignore */ });
+            }
+            
             return; // Exit silently on cancellation
           }
           

@@ -6,7 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { isFatalError, isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'QueueManager');
 
@@ -311,7 +311,12 @@ export class QueueManager {
           item.callbacks.reject(error);
         }
         
-        logger.error(`Item ${item.id} failed permanently after ${item.attempts} attempts`, error);
+        // FIX: Log cancellations as debug instead of error to prevent log noise
+        if (isCancellationError(error)) {
+          logger.debug(`Item ${item.id} cancelled by user`);
+        } else {
+          logger.error(`Item ${item.id} failed permanently after ${item.attempts} attempts`, error);
+        }
       }
     }
   }
