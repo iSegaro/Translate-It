@@ -84,6 +84,12 @@ vi.mock("@/utils/messaging/messageId.js", () => ({
 }));
 
 vi.mock("@/shared/config/config.js", () => ({
+  CONFIG: {
+    POPUP_MAX_CHARS: 5000,
+    SIDEPANEL_MAX_CHARS: 10000,
+    SELECTION_MAX_CHARS: 5000,
+    SELECT_ELEMENT_MAX_CHARS: 300000,
+  },
   getSourceLanguageAsync: vi.fn().mockResolvedValue("auto"),
   getTargetLanguageAsync: vi.fn().mockResolvedValue("en"),
   getSourceLanguage: vi.fn().mockReturnValue("auto"),

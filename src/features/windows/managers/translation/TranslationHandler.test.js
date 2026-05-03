@@ -28,6 +28,12 @@ vi.mock('@/utils/messaging/messageId.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
+  CONFIG: {
+    POPUP_MAX_CHARS: 5000,
+    SIDEPANEL_MAX_CHARS: 10000,
+    SELECTION_MAX_CHARS: 5000,
+    SELECT_ELEMENT_MAX_CHARS: 300000,
+  },
   TranslationMode: {
     Selection: 'selection',
     Dictionary_Translation: 'dictionary'
@@ -76,7 +82,8 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 
 vi.mock('@/core/extensionContext.js', () => ({
   default: {
-    isValidSync: vi.fn().mockReturnValue(true)
+    isValidSync: vi.fn().mockReturnValue(true),
+    isContentScript: vi.fn().mockReturnValue(true)
   }
 }));
 
@@ -86,6 +93,9 @@ vi.mock('@/core/PageEventBus.js', () => ({
   },
   WINDOWS_MANAGER_EVENTS: {
     UPDATE_WINDOW: 'UPDATE_WINDOW'
+  },
+  WindowsManagerEvents: {
+    updateWindow: vi.fn((id, detail) => pageEventBus.emit('UPDATE_WINDOW', { id, ...detail }))
   }
 }));
 
@@ -160,7 +170,7 @@ describe('TranslationHandler', () => {
     expect(result.translatedText).toBe('سلام');
     expect(pageEventBus.emit).toHaveBeenCalledWith(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, expect.objectContaining({
       id: 'win-123',
-      data: expect.objectContaining({ initialTranslatedText: 'سلام' })
+      initialTranslatedText: 'سلام'
     }));
   });
 
@@ -170,10 +180,14 @@ describe('TranslationHandler', () => {
 
     const translationPromise = handler.performTranslation('hello');
     
+    // Create the rejection expectation promise BEFORE advancing timers
+    const rejectionExpectation = expect(translationPromise).rejects.toThrow('Translation timeout');
+
     // Fast-forward to trigger timeout
     await vi.advanceTimersByTimeAsync(31000);
 
-    await expect(translationPromise).rejects.toThrow('Translation timeout');
+    // Now await the expectation
+    await rejectionExpectation;
   });
 
   it('should handle cancellation', async () => {

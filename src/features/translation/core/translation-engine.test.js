@@ -67,6 +67,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock("@/shared/config/config.js", () => ({
+  CONFIG: {
+    SELECTION_MAX_CHARS: 5000,
+    POPUP_MAX_CHARS: 5000,
+    SIDEPANEL_MAX_CHARS: 10000,
+    SELECT_ELEMENT_MAX_CHARS: 300000,
+  },
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('auto')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   TranslationMode: { Selection: 'selection', Page: 'page', Dictionary_Translation: 'dictionary', Select_Element: 'select_element' }
@@ -126,7 +132,7 @@ describe('TranslationEngine', () => {
       const result = await engine.handleMessage(request, {});
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Text too long');
+      expect(result.error.message).toContain('Text too long');
     });
   });
 

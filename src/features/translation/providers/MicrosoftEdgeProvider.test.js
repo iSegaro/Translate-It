@@ -36,7 +36,7 @@ vi.mock("@/shared/config/languageConstants.js", async (importOriginal) => {
   return {
     ...actual,
     getProviderLanguageCode: vi.fn((lang) => {
-      if (lang === 'en-US') return 'en';
+      if (lang.toLowerCase() === 'en-us') return 'en';
       return lang;
     })
   };

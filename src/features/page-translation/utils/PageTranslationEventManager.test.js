@@ -36,6 +36,7 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 describe('PageTranslationEventManager', () => {
   let mockManager;
   let mockBus;
+  let eventManager;
 
   beforeEach(() => {
     vi.clearAllMocks();

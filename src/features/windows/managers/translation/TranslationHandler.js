@@ -181,6 +181,7 @@ export class TranslationHandler {
           if (this.activeRequests.has(messageId)) {
             const timeoutError = new Error('Translation timeout');
             timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+            this._cleanupRequest(messageId);
             reject(timeoutError);
           }
         }, WindowsConfig.TIMEOUTS.TRANSLATION_TIMEOUT);
