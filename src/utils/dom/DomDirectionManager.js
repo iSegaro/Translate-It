@@ -209,7 +209,7 @@ export function applyNodeDirection(textNode, targetLanguage, rootElement = null)
 
     // Surgical stops
     if (rootElement && container === rootElement) break;
-    if (rootElement && !container.contains(rootElement) && container !== rootElement) break;
+    if (rootElement && !rootElement.contains(container)) break;
     
     container = container.parentElement;
     level++;
