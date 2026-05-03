@@ -36,7 +36,6 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 describe('PageTranslationEventManager', () => {
   let mockManager;
   let mockBus;
-  let eventManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,7 +73,7 @@ describe('PageTranslationEventManager', () => {
       _broadcastEvent: vi.fn()
     };
 
-    eventManager = new PageTranslationEventManager(mockManager);
+    new PageTranslationEventManager(mockManager);
   });
 
   describe('Storage Listeners', () => {
