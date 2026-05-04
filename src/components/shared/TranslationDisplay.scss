@@ -79,6 +79,11 @@
       padding: 12px !important;
       min-height: auto !important;
       font-size: 14px !important;
+
+      // Fix for extra space when first element is a heading (e.g. Vajehyab)
+      .simple-markdown > :first-child {
+        margin-top: 0 !important;
+      }
     }
   }
 
@@ -92,6 +97,11 @@
       padding: 0 !important;
       min-height: auto !important;
       overflow: visible !important;
+
+      // Fix for extra space when first element is a heading (e.g. Vajehyab)
+      .simple-markdown > :first-child {
+        margin-top: 0 !important;
+      }
     }
   }
 
