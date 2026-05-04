@@ -71,7 +71,18 @@
       class="ti-smart-language-badge"
       :title="autoLanguageTitle"
     >
-      <span class="ti-smart-text">{{ autoLanguageLabel }}</span>
+      <template v-if="vajehyabSearchUrl">
+        <a 
+          :href="vajehyabSearchUrl" 
+          target="_blank" 
+          class="ti-smart-link"
+          @click.stop
+        >
+          {{ autoLanguageLabel }}
+          <span class="ti-external-icon">↗</span>
+        </a>
+      </template>
+      <span v-else class="ti-smart-text">{{ autoLanguageLabel }}</span>
     </div>
   </div>
 </template>
@@ -149,6 +160,10 @@ const props = defineProps({
   autoLanguageTitle: {
     type: String,
     default: 'This provider handles language detection automatically'
+  },
+  lastKeyword: {
+    type: String,
+    default: ''
   }
 })
 
@@ -178,6 +193,12 @@ const targetLanguage = computed({
 const providerInfo = computed(() => findProviderById(props.provider))
 const hasAutoDetect = computed(() => providerInfo.value?.features?.includes('autoDetect'))
 const isAutoLanguageProvider = computed(() => providerInfo.value?.features?.includes('autoLanguage'))
+
+const isVajehyab = computed(() => props.provider?.toLowerCase() === 'vajehyab')
+const vajehyabSearchUrl = computed(() => {
+  if (!isVajehyab.value || !props.lastKeyword) return ''
+  return `https://vajehyab.com/?q=${encodeURIComponent(props.lastKeyword)}`
+})
 
 /**
  * Base list of languages supported by the provider's general capabilities.

@@ -12,6 +12,7 @@
           v-model:source-language="sourceLanguage"
           v-model:target-language="targetLanguage"
           :provider="currentProviderLocal"
+          :last-keyword="lastTranslation?.source"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
           :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
