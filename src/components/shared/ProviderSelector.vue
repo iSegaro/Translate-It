@@ -662,11 +662,14 @@ const availableProviders = computed(() => {
     const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
     const defaultProvider = getProviderById(defaultProviderId);
     
-    // Only show default if it supports the required feature
-    const showDefault = !props.requiredFeature || 
-                       (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+    // Default provider logic: 
+    // 1. If no specific feature is required, always show Default.
+    // 2. If a feature is required, only show Default if the global provider supports it.
+    // This prevents dictionary-only providers (like Vajehyab) from being used for page translation via 'Default'.
+    const defaultSupportsFeature = !props.requiredFeature || 
+                                 (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
 
-    if (showDefault) {
+    if (defaultSupportsFeature) {
       return [
         { 
           id: 'default', 
