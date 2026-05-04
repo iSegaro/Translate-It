@@ -76,8 +76,34 @@ Implement `_callAI(systemPrompt, userText, options)`.
 Implement `_translateChunk(chunkTexts, source, target, options)`.
 - Respect `characterLimit` and `maxChunksPerBatch`.
 
+#### C. Dictionary & Specialized Providers (Inherit from `BaseProvider`)
+For providers that require specialized text processing (e.g., Dictionary lookups like Vajehyab):
+- Implement the `_batchTranslate` method even for single-word lookups. This ensures the provider stays within the **Golden Chain** (Coordinator -> Queue -> StatsManager).
+- Use `_executeApiCall` with explicit `sessionId` and `charCount` reporting to maintain statistical accuracy.
+- Ensure the result adheres to the **Unified Response Contract**.
+
 ### 3. Register in the Manifest (`ProviderManifest.js`)
-Add to `PROVIDER_MANIFEST`. This handles UI registration and icon mapping.
+Add to `PROVIDER_MANIFEST`. This handles UI registration, icon mapping, and **Capability Gating**.
+
+#### Provider Features (Capabilities)
+The `features` array defines what the UI and Orchestrators allow for this provider. Use these flags to gate functionality:
+
+| Feature | Description | Use Case |
+| :--- | :--- | :--- |
+| `translation` | Standard text-to-text translation. | Basic requirement for all translation engines. |
+| `text` | Supports plain text processing. | Standard for almost all providers. |
+| `autoDetect` | Provider can detect the source language natively. | Enables "Auto" source option without using local detection. |
+| `bulk` | Supports high-volume, batch translation. | Required for **Page Translation** and **Select Element**. |
+| `dictionary` | Provides rich definitions, kind (noun/verb), and pronunciation. | Enables formatted dictionary UI in Popup/Sidepanel. |
+| `bilingual` | Enables the **Language Swapping Service**. | Allows auto-swapping Target to Source when input matches Target. |
+| `smart` | Advanced AI processing capabilities. | Enables Smart Context and AI-specific UI enhancements. |
+| `image` | Supports OCR or Multi-modal image translation. | Future support for translating text inside images. |
+| `offline` | Works without an external internet connection. | For Local LLMs or Native Browser APIs. |
+| `context` | Supports injecting Page Titles/Headings as context. | Used by AI providers to improve accuracy based on surrounding text. |
+| `streaming` | Supports real-time chunked response delivery. | Required for the "Typing Effect" in UI during long translations. |
+| `formality` | Supports Formal/Informal tone settings. | Specifically for DeepL and advanced AI prompts. |
+| `configurable` | Supports custom API URLs and model selections. | Used for OpenAI-compatible and Custom providers. |
+| `autoLanguage` | Specialized dictionary-centric language detection. | Used by Vajehyab to prioritize Persian context. |
 
 ---
 
@@ -85,10 +111,9 @@ Add to `PROVIDER_MANIFEST`. This handles UI registration and icon mapping.
 
 ### 1. Coordination Principle
 **NEVER override the `translate()` method.** 
-The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`. To implement custom logic, override `_batchTranslate` or specialized internal methods.
+The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, which orchestrates critical services like Language Detection, Bilingual Swapping, and Stats Tracking. All custom logic—including specialized dictionary preprocessing—must be implemented within `_batchTranslate` or lower-level utilities.
 
-### 2. Optimization Level Awareness
-Providers must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
+### 2. Optimization Level AwarenessProviders must be "Optimization-Aware." Use the `getProviderOptimizationLevelAsync` helper to adjust behavior:
 - **Level 1 (Economy)**: Large batches, low concurrency.
 - **Level 5 (Turbo)**: Small batches, high concurrency, enabled streaming.
 
@@ -132,4 +157,4 @@ If all available keys fail or the provider is consistently unstable, the **RateL
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: May 2026
