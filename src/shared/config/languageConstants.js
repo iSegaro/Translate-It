@@ -116,6 +116,19 @@ export const GLOBAL_TRUSTED_LANGUAGES = [
 ];
 
 /**
+ * Provider-Specific Language Pair Restrictions
+ * Used for providers that don't support "any-to-any" translation (like Vajehyab).
+ * Format: { providerId: { sourceCode: [targetCodes] } }
+ */
+export const PROVIDER_LANGUAGE_PAIRS = {
+  vajehyab: {
+    'fa': ['en', 'ar', 'tr'],
+    'en': ['fa'],
+    'ar': ['fa']
+  }
+};
+
+/**
  * Standard RTL (Right-to-Left) language codes.
  * This is the Single Source of Truth for the entire extension.
  */

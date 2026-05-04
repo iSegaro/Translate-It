@@ -2134,5 +2134,11 @@
   },
   "dutch_language_name": {
     "message": "Dutch"
+  },
+  "smart_language_title": {
+    "message": "Vajehyab Dictionary"
+  },
+  "smart_language_description": {
+    "message": "This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish)."
   }
 }

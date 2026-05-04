@@ -2134,5 +2134,11 @@
   },
   "dutch_language_name": {
     "message": "オランダ語"
+  },
+  "smart_language_title": {
+    "message": "Vajehyab"
+  },
+  "smart_language_description": {
+    "message": "このプロバイダーは入力言語を自動的に検出し、最適な辞書結果（ペルシャ語、英語، アラビア語、トルコ語）を提供します。"
   }
 }

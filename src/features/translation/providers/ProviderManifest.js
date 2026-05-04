@@ -210,7 +210,7 @@ const getRawManifest = () => [
     category: ProviderCategories.FREE,
     icon: "vajehyab.png",
     importFunction: () => import("./VajehyabProvider.js").then(m => ({ default: m.VajehyabProvider })),
-    features: ["translation", "dictionary"],
+    features: ["translation", "dictionary", "autoLanguage"],
     needsApiKey: false,
     supported: true,
   },

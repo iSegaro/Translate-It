@@ -2134,5 +2134,11 @@
   },
   "dutch_language_name": {
     "message": "هلندی"
+  },
+  "smart_language_title": {
+    "message": "واژه‌یاب"
+  },
+  "smart_language_description": {
+    "message": "این سرویس به صورت خودکار زبان ورودی را تشخیص داده و بهترین نتایج لغت‌نامه را (فارسی، انگلیسی، عربی و ترکی) ارائه می‌دهد."
   }
 }
