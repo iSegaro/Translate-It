@@ -10,7 +10,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'VajehyabProvider');
 /**
  * Vajehyab Dictionary Provider
  * A Persian-to-Persian (and more) dictionary service.
- * Only supports dictionary lookups, not general translation.
+ * Specialized: Only supports dictionary lookups for single words.
  */
 export class VajehyabProvider extends BaseProvider {
   static type = "translate";
@@ -23,29 +23,39 @@ export class VajehyabProvider extends BaseProvider {
     super(ProviderNames.VAJEHYAB);
   }
 
+  /**
+   * Internal helper for language mapping.
+   * Required by BaseProvider structure.
+   */
   _getLangCode(lang) {
     if (!lang || lang === AUTO_DETECT_VALUE) return "fa";
     return getProviderLanguageCode(lang, 'VAJEHYAB');
   }
 
   /**
-   * Main entry point for translation (dictionary lookup in this case).
-   * Since this is a dictionary-only provider, we override the standard translate method
-   * to handle its specialized behavior.
+   * Maps standard ISO codes to Vajehyab-specific codes.
+   * Called by ProviderCoordinator.
    */
-  async translate(text, sourceLang, targetLang, options = {}) {
+  convertLanguage(lang) {
+    return this._getLangCode(lang);
+  }
+
+  /**
+   * Specialized batch translation for Vajehyab.
+   * Since this is a dictionary, it only processes the first segment and first word.
+   */
+  async _batchTranslate(texts, sourceLang, targetLang, mode, engine, messageId, abortController, priority, sessionId) {
+    const text = texts[0] || "";
+    
     // 1. Take only the first word
     const words = String(text).trim().split(/\s+/);
     const targetWord = words[0] || "";
     
     if (!targetWord) {
-      return text;
+      return texts; // Return original array if no word found
     }
 
-    const sl = this._getLangCode(sourceLang);
-    const tl = this._getLangCode(targetLang);
-
-    logger.debug(`[Vajehyab] Looking up: "${targetWord}" (${sl} -> ${tl})`);
+    logger.debug(`[Vajehyab] Looking up: "${targetWord}" (${sourceLang} -> ${targetLang})`);
 
     const url = `https://engine.vajehyab.com/magicword?q=${encodeURIComponent(targetWord)}`;
 
@@ -60,29 +70,26 @@ export class VajehyabProvider extends BaseProvider {
         },
         context: 'vajehyab-lookup',
         extractResponse: (data) => data,
-        abortController: options.abortController
+        abortController,
+        sessionId,
+        charCount: targetWord.length,
+        originalCharCount: text.length
       });
 
       if (!result || !result.hit || Object.keys(result.hit).length === 0) {
         logger.debug(`[Vajehyab] Word not found: "${targetWord}"`);
-        return {
-          translatedText: `Word not found in Vajehyab dictionary.`,
-          detectedLanguage: sl,
-          provider: this.providerName,
-          sourceLanguage: sl,
-          targetLanguage: tl
-        };
+        const notFoundMsg = `Word not found in Vajehyab dictionary.`;
+        return texts.map((t, idx) => idx === 0 ? notFoundMsg : t);
       }
 
       const finalResult = this._formatDictionaryResponse(result.hit);
       
-      return {
-        translatedText: finalResult,
-        detectedLanguage: sl === 'auto' ? 'fa' : sl, // Vajehyab is mostly Persian
-        provider: this.providerName,
-        sourceLanguage: sl,
-        targetLanguage: tl
-      };
+      // Update last detected language for Coordinator
+      this.lastDetectedLanguage = sourceLang === 'auto' ? 'fa' : sourceLang;
+
+      // Return array matching input texts (only first one translated)
+      return texts.map((t, idx) => idx === 0 ? finalResult : t);
+      
     } catch (error) {
       logger.error(`[Vajehyab] Error during lookup:`, error);
       throw error;

@@ -41,18 +41,27 @@ export class ProviderCoordinator {
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
 
-      // 1a. Apply Language Swapping (Bilingual Logic)
-      // This will only perform detection if bilingual is enabled
-      const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
-        sampleText,
-        sourceLang,
-        targetLang,
-        originalSource,
-        { providerName, mode: translateMode }
-      );
+      // Check if provider supports bilingual swapping (e.g. specialized dictionaries like Vajehyab may not)
+      const { findProviderById } = await import("@/features/translation/providers/ProviderManifest.js");
+      const { nameToRegistryId } = await import("@/features/translation/providers/ProviderConstants.js");
+      
+      const providerId = nameToRegistryId(providerName) || providerName;
+      const manifest = findProviderById(providerId);
+      const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
 
-      processedSourceLang = swappedSource;
-      processedTargetLang = swappedTarget;
+      // 1a. Apply Language Swapping (Bilingual Logic)
+      if (supportsBilingual) {
+        const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
+          sampleText,
+          sourceLang,
+          targetLang,
+          originalSource,
+          { providerName, mode: translateMode }
+        );
+
+        processedSourceLang = swappedSource;
+        processedTargetLang = swappedTarget;
+      }
 
       // 1b. Auto-Detection Fallback
       // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),

@@ -76,9 +76,9 @@ describe('VajehyabProvider', () => {
     });
   });
 
-  describe('translate', () => {
+  describe('_batchTranslate', () => {
     it('should look up only the first word', async () => {
-      await provider.translate('سلام دنیا', 'en', 'fa');
+      await provider._batchTranslate(['سلام دنیا'], 'en', 'fa');
       
       expect(provider._executeApiCall).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -88,33 +88,32 @@ describe('VajehyabProvider', () => {
     });
 
     it('should return formatted result on success', async () => {
-      const result = await provider.translate('سلام', 'auto', 'fa');
+      const result = await provider._batchTranslate(['سلام'], 'auto', 'fa');
 
-      expect(result.translatedText).toContain('سلام');
-      expect(result.translatedText).toContain('لغت‌نامه عمید');
-      expect(result.detectedLanguage).toBe('fa'); // sl is auto, so detectedLanguage becomes fa
-      expect(result.provider).toBe(ProviderNames.VAJEHYAB);
+      expect(result[0]).toContain('سلام');
+      expect(result[0]).toContain('لغت‌نامه عمید');
+      expect(provider.lastDetectedLanguage).toBe('fa');
     });
 
     it('should return fallback message when word is not found', async () => {
       vi.spyOn(provider, '_executeApiCall').mockResolvedValue({ hit: {} });
       
-      const result = await provider.translate('unknownword', 'en', 'fa');
+      const result = await provider._batchTranslate(['unknownword'], 'en', 'fa');
       
-      expect(result.translatedText).toContain('Word not found');
-      expect(result.detectedLanguage).toBe('en');
+      expect(result[0]).toContain('Word not found');
     });
 
-    it('should return original text if target word is empty', async () => {
-      const result = await provider.translate('   ', 'en', 'fa');
-      expect(result).toBe('   ');
+    it('should return original texts if target word is empty', async () => {
+      const input = ['   '];
+      const result = await provider._batchTranslate(input, 'en', 'fa');
+      expect(result).toBe(input);
       expect(provider._executeApiCall).not.toHaveBeenCalled();
     });
 
     it('should propagate API errors', async () => {
       vi.spyOn(provider, '_executeApiCall').mockRejectedValue(new Error('API Failure'));
       
-      await expect(provider.translate('word', 'en', 'fa')).rejects.toThrow('API Failure');
+      await expect(provider._batchTranslate(['word'], 'en', 'fa')).rejects.toThrow('API Failure');
     });
   });
 
