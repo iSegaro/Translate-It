@@ -4,6 +4,7 @@ import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
+import { getTranslationString } from "@/utils/i18n/i18n.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'VajehyabProvider');
 
@@ -78,7 +79,7 @@ export class VajehyabProvider extends BaseProvider {
 
       if (!result || !result.hit || Object.keys(result.hit).length === 0) {
         logger.debug(`[Vajehyab] Word not found: "${targetWord}"`);
-        const notFoundMsg = `Word not found in Vajehyab dictionary.`;
+        const notFoundMsg = (await getTranslationString('vajehyab_word_not_found')) || `Word not found in Vajehyab dictionary`;
         return texts.map((t, idx) => idx === 0 ? notFoundMsg : t);
       }
 

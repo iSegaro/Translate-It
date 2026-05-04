@@ -188,6 +188,9 @@
   "provider_vajehyab_description": {
     "message": "لغت‌نامه چندزبانه فارسی. مناسب برای کلمات تکی. بدون نیاز به کلید API."
   },
+  "vajehyab_word_not_found": {
+    "message": "کلمه در لغت‌نامه واژه‌یاب یافت نشد"
+  },
   "provider_does_not_support_bulk": {
     "message": "این سرویس از ترجمه صفحه و حالت انتخاب المان پشتیبانی نمی‌کند."
   },
