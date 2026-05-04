@@ -2145,7 +2145,7 @@
     "message": "Vajehyab Dictionary"
   },
   "smart_language_description": {
-    "message": "This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish)."
+    "message": "This provider is specialized for the Persian language, providing dictionary results for English, Arabic, and Turkish in relation to Persian."
   },
   "smart_language_fallback_note": {
     "message": "Note: These settings apply to features like Text Field Translation where manual language selection is required."

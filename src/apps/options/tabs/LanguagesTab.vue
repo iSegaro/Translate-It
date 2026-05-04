@@ -16,7 +16,7 @@
         >
           <div class="banner-content">
             <h3>{{ t('smart_language_title') || 'Smart Language Handling' }}</h3>
-            <p>{{ t('smart_language_description') || 'This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish).' }}</p>
+            <p>{{ t('smart_language_description') || 'This provider is specialized for the Persian language, providing dictionary results for English, Arabic, and Turkish in relation to Persian.' }}</p>
           </div>
         </div>
 
