@@ -252,7 +252,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';
+import { getDesktopFabPositionAsync, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
@@ -262,6 +262,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
@@ -433,6 +434,22 @@ const handleMouseLeave = () => {
   }, ANIMATION_CONFIG.LEAVE_DELAY);
 };
 
+/**
+ * Checks if the provider for a specific mode supports bulk operations
+ */
+const supportsBulk = (mode) => {
+  // Use mode-specific settings or fallback to global provider
+  const providerId = settingsStore.settings?.MODE_PROVIDERS?.[mode] || 
+                    settingsStore.settings?.TRANSLATION_API || 
+                    'googlev2';
+  
+  const provider = findProviderById(providerId);
+  return provider?.features?.includes('bulk') ?? true;
+};
+
+const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element));
+const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page));
+
 const menuItems = computed(() => {
   const items = [];
   if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
@@ -449,7 +466,9 @@ const menuItems = computed(() => {
     items.push({
       id: 'select_element',
       label: t('desktop_fab_select_element_label'),
+      tooltip: !isSelectElementSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب المان پشتیبانی نمی‌کند') : '',
       icon: IconSelectElement,
+      disabled: !isSelectElementSupported.value,
       closeMenu: true,
       action: async () => {
         try {
@@ -496,7 +515,9 @@ const menuItems = computed(() => {
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
+      tooltip: !isPageTranslationSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از ترجمه صفحه پشتیبانی نمی‌کند') : '',
       icon: IconTranslatePage,
+      disabled: !isPageTranslationSupported.value,
       closeMenu: false,
       action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
     });

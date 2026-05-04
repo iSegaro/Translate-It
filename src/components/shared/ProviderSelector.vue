@@ -92,8 +92,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -112,8 +117,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -206,8 +216,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -226,8 +241,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -312,8 +332,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -332,8 +357,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -703,6 +733,21 @@ const currentProviderIcon = computed(() => {
 const currentProviderName = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return provider?.name || 'Google Translate'
+})
+
+/**
+ * Checks if the currently selected provider supports bulk operations (required for Page/Element sync)
+ */
+const canSyncToBulk = computed(() => {
+  let providerId = currentProvider.value
+  
+  // Resolve 'default' to actual provider
+  if (providerId === 'default') {
+    providerId = settingsStore.settings?.TRANSLATION_API || 'googlev2'
+  }
+  
+  const provider = getProviderById(providerId)
+  return provider?.features?.includes('bulk') || false
 })
 
 /**

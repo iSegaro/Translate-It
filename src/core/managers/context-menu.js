@@ -14,7 +14,7 @@ import {
 } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { providerRegistry } from '@/features/translation/providers/ProviderRegistry.js';
-import { PROVIDER_MANIFEST } from '@/features/translation/providers/ProviderManifest.js';
+import { PROVIDER_MANIFEST, findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { handleActivateSelectElementModeLazy } from '@/core/background/handlers/lazy/handleElementSelectionLazy.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
@@ -350,21 +350,28 @@ export class ContextMenuManager extends ResourceTracker {
       this.createdMenus.clear();
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
-      // Get the currently active API to set the 'checked' state
-      const currentApi = await getTranslationApiAsync();
-
-      // Get commands for keyboard shortcuts
-      const commands = await browser.commands.getAll();
-
       // Get settings for feature enablement
       const settings = await storageManager.get([
         'TRANSLATE_WITH_SELECT_ELEMENT', 
         'EXTENSION_ENABLED',
-        'CONTEXT_MENU_VISIBILITY'
+        'CONTEXT_MENU_VISIBILITY',
+        'TRANSLATION_API'
       ]);
+      
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
-      const isSelectElementEnabled = isExtensionEnabled && (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false);
+      const currentApi = settings.TRANSLATION_API || await getTranslationApiAsync();
+
+      // Check if current provider supports bulk features (Select Element is a bulk feature)
+      const provider = findProviderById(currentApi);
+      const isBulkSupported = provider?.features?.includes('bulk') ?? false;
+
+      const isSelectElementEnabled = isExtensionEnabled && 
+                                   (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
+                                   isBulkSupported;
       const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
+
+      // Get commands for keyboard shortcuts
+      const commands = await browser.commands.getAll();
 
       // --- 1. Create Page Context Menu ---
       if (isSelectElementEnabled && visibility.PAGE_CONTEXT_SELECT_ELEMENT) {

@@ -8,6 +8,7 @@
       <button
         v-if="allowedFeatures.pageTranslation"
         class="ti-m-action-btn"
+        :class="{ 'is-disabled': !isBulkSupported }"
         @click="translatePage"
       >
         <div class="ti-m-icon-container ti-m-icon-translate-page">
@@ -24,6 +25,7 @@
       <button
         v-if="allowedFeatures.selectElement"
         class="ti-m-action-btn"
+        :class="{ 'is-disabled': !isBulkSupported }"
         @click="activateSelectElement"
       >
         <div class="ti-m-icon-container ti-m-icon-select-element">
@@ -161,6 +163,9 @@ import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
@@ -185,9 +190,28 @@ const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
+const { handleError } = useErrorHandler();
 const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
 const exclusionChecker = ExclusionChecker.getInstance();
+
+const activeProvider = computed(() => {
+  const mode = settingsStore.settings.TRANSLATION_MODE || 'general';
+  return settingsStore.settings.MODE_PROVIDERS?.[mode] || settingsStore.settings.TRANSLATION_API || 'googlev2';
+});
+
+const isBulkSupported = computed(() => {
+  const provider = findProviderById(activeProvider.value);
+  return provider?.features?.includes('bulk') ?? false;
+});
+
+const handleBulkNotSupported = async () => {
+  mobileStore.closeSheet();
+  await handleError(t('provider_does_not_support_bulk') || 'این سرویس از قابلیت‌های دسته‌ای پشتیبانی نمی‌کند', 'mobile-dashboard:bulk-check', { 
+    showToast: true,
+    type: ErrorTypes.VALIDATION
+  });
+};
 
 const allowedFeatures = ref({
   selectElement: true,
@@ -220,6 +244,10 @@ const isTTSVisible = computed(() => pendingSelection.value.hasSelection || tts.i
 
 const translatePage = (event) => {
   try {
+    if (!isBulkSupported.value) {
+      handleBulkNotSupported();
+      return;
+    }
     if (event) { event.preventDefault(); event.stopPropagation(); }
     logger.info('Page translation requested from Mobile Dashboard');
     const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
@@ -248,6 +276,10 @@ const translatePage = (event) => {
 
 const activateSelectElement = async () => {
   try {
+    if (!isBulkSupported.value) {
+      handleBulkNotSupported();
+      return;
+    }
     logger.info('Select Element mode requested from Mobile Dashboard');
     mobileStore.closeSheet();
     await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });

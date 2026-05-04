@@ -194,6 +194,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -205,7 +209,7 @@ const {
   isAutoTranslating,
   progress,
   message,
-  canTranslate,
+  canTranslate: baseCanTranslate,
   canRestore,
   hasError,
   translatePage,
@@ -215,6 +219,7 @@ const {
 } = usePageTranslation();
 
 // Computed properties
+const canTranslate = computed(() => baseCanTranslate.value && !props.disabled);
 const showProgress = computed(() => isTranslating.value && progress.value > 0);
 
 const progressText = computed(() => {
@@ -243,6 +248,9 @@ const restoreButtonText = computed(() => {
 });
 
 const translateButtonTitle = computed(() => {
+  if (props.disabled) {
+    return t('provider_does_not_support_bulk') || 'This provider does not support page/element translation';
+  }
   if (!canTranslate.value) {
     return isTranslating.value || isAutoTranslating.value ? 'Translation in progress...' : 'Translate entire page';
   }
