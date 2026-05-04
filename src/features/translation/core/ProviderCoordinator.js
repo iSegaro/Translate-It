@@ -4,7 +4,8 @@
  */
 
 import { TRANSLATION_CONSTANTS, ResponseFormat } from "@/shared/config/translationConstants.js";
-import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
+import { ProviderTypes, nameToRegistryId } from "@/features/translation/providers/ProviderConstants.js";
+import { findProviderById } from "@/features/translation/providers/ProviderManifest.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -42,9 +43,6 @@ export class ProviderCoordinator {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
 
       // Check if provider supports bilingual swapping (e.g. specialized dictionaries like Vajehyab may not)
-      const { findProviderById } = await import("@/features/translation/providers/ProviderManifest.js");
-      const { nameToRegistryId } = await import("@/features/translation/providers/ProviderConstants.js");
-      
       const providerId = nameToRegistryId(providerName) || providerName;
       const manifest = findProviderById(providerId);
       const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
