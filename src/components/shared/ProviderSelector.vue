@@ -485,6 +485,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { getProvidersForDropdown, getProviderById } from '@/core/provider-registry.js'
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js'
 import IconButton from './IconButton.vue'
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
@@ -535,6 +536,10 @@ const props = defineProps({
     default: 'translation'
   },
   loading: {
+    type: Boolean,
+    default: false
+  },
+  onlyConfigured: {
     type: Boolean,
     default: false
   }
@@ -678,9 +683,14 @@ const availableProviders = computed(() => {
   const providersFromRegistry = getProvidersForDropdown(debugMode);
   
   // Filter by required feature if provided
-  const filteredRegistry = props.requiredFeature 
+  let filteredRegistry = props.requiredFeature 
     ? providersFromRegistry.filter(p => p.features?.includes(props.requiredFeature))
     : providersFromRegistry;
+
+  // Filter by configuration status if requested
+  if (props.onlyConfigured) {
+    filteredRegistry = filteredRegistry.filter(p => isProviderConfigured(p.id, settingsStore.settings));
+  }
 
   const mappedProviders = filteredRegistry.map(provider => ({
     id: provider.id,
@@ -695,13 +705,18 @@ const availableProviders = computed(() => {
     // Default provider logic: 
     // 1. If no specific feature is required, always show Default.
     // 2. If a feature is required, only show Default if the global provider supports it.
-    // 3. SPECIAL CASE: If the current selection IS 'default', we MUST show it 
+    // 3. If onlyConfigured is true, only show Default if global provider is configured.
+    // 4. SPECIAL CASE: If the current selection IS 'default', we MUST show it 
     //    to prevent the UI from displaying wrong names/icons.
+    
     const defaultSupportsFeature = !props.requiredFeature || 
                                  (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+    
+    const isDefaultConfigured = !props.onlyConfigured || isProviderConfigured(defaultProviderId, settingsStore.settings);
+    
     const isCurrentlyDefault = currentProvider.value === 'default';
 
-    if (defaultSupportsFeature || isCurrentlyDefault) {
+    if ((defaultSupportsFeature && isDefaultConfigured) || isCurrentlyDefault) {
       return [
         { 
           id: 'default', 

@@ -172,7 +172,7 @@ const getRawManifest = () => [
     importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
     features: ["translation", "text", "context", "configurable", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
-    requiredSettings: ['CUSTOM_API_KEY', 'CUSTOM_API_URL'],
+    requiredSettings: ['CUSTOM_API_KEY', 'CUSTOM_API_URL', 'CUSTOM_API_MODEL'],
     supported: true,
   },
 

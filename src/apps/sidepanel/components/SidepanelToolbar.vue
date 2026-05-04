@@ -48,10 +48,11 @@
 
       <div class="toolbar-separator" />
 
-      <ProviderSelector 
+      <ProviderSelector
         v-model="currentProviderLocal"
         mode="icon-only"
-        :is-global="true"
+        :is-global="false"
+        only-configured
         @provider-change="handleProviderChange"
       />
       <button

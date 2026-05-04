@@ -47,6 +47,7 @@
               mode="split"
               :is-global="false"
               :show-sync="true"
+              only-configured
               :loading="translationFormRef?.isTranslating"
               @translate="handleTranslate"
               @cancel="handleCancel"

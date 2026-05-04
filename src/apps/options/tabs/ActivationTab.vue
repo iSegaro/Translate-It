@@ -57,6 +57,7 @@
             allow-default
             mode="button"
             required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
           />
@@ -148,6 +149,7 @@
             allow-default
             mode="button"
             required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !translateWithSelectElement"
           />
@@ -213,6 +215,7 @@
             v-model="selectionProvider"
             allow-default
             mode="button"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !translateOnTextSelection"
           />
@@ -309,6 +312,7 @@
             allow-default
             mode="button"
             required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !wholePageEnabled"
           />

@@ -16,7 +16,8 @@ import {
 } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { providerRegistry } from '@/features/translation/providers/ProviderRegistry.js';
-import { PROVIDER_MANIFEST, findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { findProviderById, PROVIDER_MANIFEST } from '@/features/translation/providers/ProviderManifest.js';
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { handleActivateSelectElementModeLazy } from '@/core/background/handlers/lazy/handleElementSelectionLazy.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
@@ -37,16 +38,19 @@ const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 
 // --- Get API Providers from Registry ---
-async function getApiProviders() {
+async function getApiProviders(settings = {}) {
   try {
     // Get current debug mode from storage to correctly filter Mock provider
-    const isDebug = await getDebugModeAsync();
+    const isDebug = settings.DEBUG_MODE ?? await getDebugModeAsync();
 
     // Get available providers with dynamic debug mode override
-    const availableProviders = providerRegistry.getAllAvailable().filter(p => {
+    let availableProviders = providerRegistry.getAllAvailable().filter(p => {
       if (p.id === 'mock' && !isDebug) return false;
       return true;
     });
+
+    // Filter by configuration status (API keys, etc.)
+    availableProviders = availableProviders.filter(p => isProviderConfigured(p.id, settings));
 
     // Log provider structure for debugging
     logger.info("Processing available providers for context menu", {
@@ -353,12 +357,7 @@ export class ContextMenuManager extends ResourceTracker {
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
       // Get settings for feature enablement
-      const settings = await storageManager.get([
-        'TRANSLATE_WITH_SELECT_ELEMENT', 
-        'EXTENSION_ENABLED',
-        'CONTEXT_MENU_VISIBILITY',
-        'TRANSLATION_API'
-      ]);
+      const settings = await storageManager.get(null); // Get all settings to ensure configuration check works
       
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
       
@@ -433,7 +432,7 @@ export class ContextMenuManager extends ResourceTracker {
         logger.debug("Created API Provider parent menu");
 
         // --- API Provider Sub-Menus (Radio Buttons) ---
-        const apiProviders = await getApiProviders();
+        const apiProviders = await getApiProviders(settings);
         logger.debug(`[ContextMenuManager] Found ${apiProviders.length} providers`);
 
         let lastCategory = null;

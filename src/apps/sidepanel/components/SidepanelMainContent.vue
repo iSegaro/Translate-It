@@ -38,10 +38,11 @@
             >
           </button>
           <ProviderSelector
-            v-model="currentProviderLocal"
+            v-model="currentProvider"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"
@@ -67,10 +68,11 @@
         </button>
         <div class="center-spacer">
           <ProviderSelector
-            v-model="currentProviderLocal"
+            v-model="currentProvider"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"

@@ -94,6 +94,7 @@
             mode="mobile"
             :is-global="false"
             :show-sync="false"
+            only-configured
             :loading="isLoading"
             @cancel="handleCancel"
           />
