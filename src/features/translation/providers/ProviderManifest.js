@@ -202,6 +202,18 @@ const getRawManifest = () => [
     needsApiKey: false,
     supported: true,
   },
+  {
+    id: ProviderRegistryIds.VAJEHYAB,
+    name: ProviderNames.VAJEHYAB,
+    displayName: "Vajehyab Dictionary",
+    type: ProviderTypes.TRANSLATE,
+    category: ProviderCategories.FREE,
+    icon: "vajehyab.png",
+    importFunction: () => import("./VajehyabProvider.js").then(m => ({ default: m.VajehyabProvider })),
+    features: ["translation", "dictionary"],
+    needsApiKey: false,
+    supported: true,
+  },
 
   // --- Group: DEVELOPMENT ---
   {

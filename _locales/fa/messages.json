@@ -179,6 +179,12 @@
   "provider_mock_description": {
     "message": "یک پرووایدر شبیه‌سازی شده برای اهداف توسعه و تست."
   },
+  "provider_vajehyab_title": {
+    "message": "واژه‌یاب (Vajehyab)"
+  },
+  "provider_vajehyab_description": {
+    "message": "لغت‌نامه چندزبانه فارسی. مناسب برای کلمات تکی. بدون نیاز به کلید API."
+  },
   "options_page_title": {
     "message": "تنظیمات"
   },

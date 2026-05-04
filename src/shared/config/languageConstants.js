@@ -340,6 +340,15 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'tt': 'TT', 'te': 'TE', 'ts': 'TS', 'tn': 'TN', 'tk': 'TK', 'ur': 'UR', 'uz': 'UZ', 
     'vi': 'VI', 'cy': 'CY', 'wo': 'WO', 'xh': 'XH', 'yi': 'YI', 'zu': 'ZU'
   },
+
+  // Vajehyab Dictionary - Persian, English, Arabic, Turkish
+  VAJEHYAB: {
+    ...LANGUAGE_NAME_TO_CODE_MAP,
+    "fa": "fa",
+    "en": "en",
+    "ar": "ar",
+    "tr": "tr"
+  },
 };
 
 /**
@@ -437,20 +446,23 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     // Standard languages
     'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
     'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
-    'sv', 'tr', 'uk', 'zh', 'zh-cn', 'zh-tw',
+    'zh', 'zh-cn', 'zh-tw',
     // Beta languages (new extensive list)
     'ace', 'af', 'an', 'as', 'ay', 'az', 'ba', 'be', 'bho', 'bn', 'br', 'bs', 'ca',
     'ceb', 'ckb', 'cy', 'eo', 'eu', 'fa', 'ga', 'gl', 'gn', 'gom', 'gu', 'ha', 'hi',
-    'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ky', 'la', 'lb', 'lmo',
-    'ln', 'mai', 'mg', 'mi', 'mk', 'mn', 'ms', 'mt', 'my', 'oc', 'pag',
-    'pam', 'prs', 'ps', 'qu', 'sa', 'scn', 'sq', 'sr', 'su', 'sw', 'ta', 'te', 'tg',
-    'tk', 'tl', 'tn', 'ts', 'tt', 'ur', 'uz', 'wo', 'xh', 'yue', 'yi', 'zu', 'om',
+    'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ckb', 'ky', 'la',
+    'ln', 'lmo', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'ne', 'oc',
+    'om', 'pag', 'ps', 'fa', 'pa', 'qu', 'sa', 'sr', 'st', 'scn', 'su', 'sw', 'tg', 'ta',
+    'tt', 'te', 'ts', 'tn', 'tk', 'ur', 'uz', 'vi', 'cy', 'wo', 'xh', 'yue', 'yi', 'zu', 'om',
     'pa', 'st', 'sn'
-  ],
+    ],
 
-  // AI Providers (Gemini, OpenAI, OpenRouter, DeepSeek, WebAI, Custom)
-  // These support virtually all languages through LLM capabilities
-  gemini: null, // null = supports all languages
+    // Vajehyab - Persian dictionary service
+    vajehyab: ['fa', 'en', 'ar', 'tr'],
+
+    // AI Providers (Gemini, OpenAI, OpenRouter, DeepSeek, WebAI, Custom)
+    // These support virtually all languages through LLM capabilities
+    gemini: null, // null = supports all languages
   openai: null,
   openrouter: null,
   deepseek: null,

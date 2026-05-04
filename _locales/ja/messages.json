@@ -179,6 +179,12 @@
   "provider_mock_description": {
     "message": "開発およびテストに使用されるシミュレーションプロバイダーです。"
   },
+  "provider_vajehyab_title": {
+    "message": "Vajehyab 辞書"
+  },
+  "provider_vajehyab_description": {
+    "message": "多言語ペルシャ語辞書。単語の検索に最適です。APIキー不要。"
+  },
   "options_page_title": {
     "message": "設定"
   },

@@ -179,6 +179,12 @@
   "provider_mock_description": {
     "message": "A simulated provider used for development and testing."
   },
+  "provider_vajehyab_title": {
+    "message": "Vajehyab Dictionary"
+  },
+  "provider_vajehyab_description": {
+    "message": "Multilingual Persian dictionary. Best for single words. No API key required."
+  },
   "options_page_title": {
     "message": "Settings"
   },
