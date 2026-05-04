@@ -438,11 +438,7 @@ const handleMouseLeave = () => {
  * Checks if the provider for a specific mode supports bulk operations
  */
 const supportsBulk = (mode) => {
-  // Use mode-specific settings or fallback to global provider
-  const providerId = settingsStore.settings?.MODE_PROVIDERS?.[mode] || 
-                    settingsStore.settings?.TRANSLATION_API || 
-                    'googlev2';
-  
+  const providerId = settingsStore.getEffectiveProvider(mode);
   const provider = findProviderById(providerId);
   return provider?.features?.includes('bulk') ?? true;
 };
@@ -463,6 +459,7 @@ const menuItems = computed(() => {
   }
 
   if (allowedFeatures.value.selectElement) {
+    const provider = settingsStore.getEffectiveProvider(TranslationMode.Select_Element);
     items.push({
       id: 'select_element',
       label: t('desktop_fab_select_element_label'),
@@ -472,7 +469,10 @@ const menuItems = computed(() => {
       closeMenu: true,
       action: async () => {
         try {
-          await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+          await sendMessage({ 
+            action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+            data: { provider }
+          });
         } catch (err) {
           if (ExtensionContextManager.isContextError(err)) {
             ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
@@ -512,6 +512,7 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
   } else if (isPageTranslationAllowed) {
+    const provider = settingsStore.getEffectiveProvider(TranslationMode.Page);
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
@@ -519,7 +520,7 @@ const menuItems = computed(() => {
       icon: IconTranslatePage,
       disabled: !isPageTranslationSupported.value,
       closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider })
     });
   }
 

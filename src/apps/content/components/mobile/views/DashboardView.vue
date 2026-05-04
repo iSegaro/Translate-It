@@ -8,7 +8,7 @@
       <button
         v-if="allowedFeatures.pageTranslation"
         class="ti-m-action-btn"
-        :class="{ 'is-disabled': !isBulkSupported }"
+        :class="{ 'is-disabled': !isPageTranslationSupported }"
         @click="translatePage"
       >
         <div class="ti-m-icon-container ti-m-icon-translate-page">
@@ -25,7 +25,7 @@
       <button
         v-if="allowedFeatures.selectElement"
         class="ti-m-action-btn"
-        :class="{ 'is-disabled': !isBulkSupported }"
+        :class="{ 'is-disabled': !isSelectElementSupported }"
         @click="activateSelectElement"
       >
         <div class="ti-m-icon-container ti-m-icon-select-element">
@@ -171,6 +171,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { TranslationMode } from '@/shared/config/config.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -195,15 +196,20 @@ const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
 const exclusionChecker = ExclusionChecker.getInstance();
 
-const activeProvider = computed(() => {
-  const mode = settingsStore.settings.TRANSLATION_MODE || 'general';
+const getProviderForMode = (mode) => {
   return settingsStore.settings.MODE_PROVIDERS?.[mode] || settingsStore.settings.TRANSLATION_API || 'googlev2';
-});
+};
 
-const isBulkSupported = computed(() => {
-  const provider = findProviderById(activeProvider.value);
+const pageProvider = computed(() => getProviderForMode(TranslationMode.Page));
+const selectElementProvider = computed(() => getProviderForMode(TranslationMode.Select_Element));
+
+const checkBulkSupport = (providerId) => {
+  const provider = findProviderById(providerId);
   return provider?.features?.includes('bulk') ?? false;
-});
+};
+
+const isPageTranslationSupported = computed(() => checkBulkSupport(pageProvider.value));
+const isSelectElementSupported = computed(() => checkBulkSupport(selectElementProvider.value));
 
 const handleBulkNotSupported = async () => {
   mobileStore.closeSheet();
@@ -244,18 +250,19 @@ const isTTSVisible = computed(() => pendingSelection.value.hasSelection || tts.i
 
 const translatePage = (event) => {
   try {
-    if (!isBulkSupported.value) {
+    const provider = pageProvider.value;
+    if (!checkBulkSupport(provider)) {
       handleBulkNotSupported();
       return;
     }
     if (event) { event.preventDefault(); event.stopPropagation(); }
-    logger.info('Page translation requested from Mobile Dashboard');
+    logger.info('Page translation requested from Mobile Dashboard', { provider });
     const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
 
     if (isCurrentlyTranslating) {
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
     } else {
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE);
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider });
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
 
       // Respect the auto-close setting
@@ -276,13 +283,17 @@ const translatePage = (event) => {
 
 const activateSelectElement = async () => {
   try {
-    if (!isBulkSupported.value) {
+    const provider = selectElementProvider.value;
+    if (!checkBulkSupport(provider)) {
       handleBulkNotSupported();
       return;
     }
-    logger.info('Select Element mode requested from Mobile Dashboard');
+    logger.info('Select Element mode requested from Mobile Dashboard', { provider });
     mobileStore.closeSheet();
-    await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+    await sendMessage({ 
+      action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      data: { provider }
+    });
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
       ExtensionContextManager.handleContextError(err, 'mobile-dashboard:select-element');

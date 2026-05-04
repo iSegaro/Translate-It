@@ -10,6 +10,8 @@ import {
   getTranslationApiAsync, 
   getDebugModeAsync, 
   getTargetLanguageAsync,
+  getEffectiveProviderAsync,
+  TranslationMode,
   CONFIG 
 } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
@@ -359,10 +361,12 @@ export class ContextMenuManager extends ResourceTracker {
       ]);
       
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
-      const currentApi = settings.TRANSLATION_API || await getTranslationApiAsync();
+      
+      // Get effective provider for Select Element to check for bulk support
+      const selectElementApi = await getEffectiveProviderAsync(TranslationMode.Select_Element);
 
-      // Check if current provider supports bulk features (Select Element is a bulk feature)
-      const provider = findProviderById(currentApi);
+      // Check if the effective provider supports bulk features (Select Element is a bulk feature)
+      const provider = findProviderById(selectElementApi);
       const isBulkSupported = provider?.features?.includes('bulk') ?? false;
 
       const isSelectElementEnabled = isExtensionEnabled && 
@@ -454,12 +458,12 @@ export class ContextMenuManager extends ResourceTracker {
             parentId: API_PROVIDER_PARENT_ID,
             title: provider.defaultTitle,
             type: "checkbox",
-            checked: provider.id === currentApi,
+            checked: provider.id === settings.TRANSLATION_API,
             contexts: ["action"],
           });
         }
         logger.debug(
-          `Created ${apiProviders.length} API Provider sub-menus. Current API: ${currentApi}`
+          `Created ${apiProviders.length} API Provider sub-menus. Current API: ${settings.TRANSLATION_API}`
         );
 
         // --- Options Menu ---
@@ -648,13 +652,16 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       logger.info(`Activating select mode for tab ${tab.id} via central handler`);
-      
-      const targetLanguage = await getTargetLanguageAsync();
+
+      const [targetLanguage, provider] = await Promise.all([
+        getTargetLanguageAsync(),
+        getEffectiveProviderAsync(TranslationMode.Select_Element)
+      ]);
 
       const message = {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'context-menu',
-        data: { active: true, tabId: tab.id, targetLanguage }
+        data: { active: true, tabId: tab.id, targetLanguage, provider }
       };
       const sender = { tab };
 

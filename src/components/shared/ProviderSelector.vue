@@ -695,11 +695,13 @@ const availableProviders = computed(() => {
     // Default provider logic: 
     // 1. If no specific feature is required, always show Default.
     // 2. If a feature is required, only show Default if the global provider supports it.
-    // This prevents dictionary-only providers (like Vajehyab) from being used for page translation via 'Default'.
+    // 3. SPECIAL CASE: If the current selection IS 'default', we MUST show it 
+    //    to prevent the UI from displaying wrong names/icons.
     const defaultSupportsFeature = !props.requiredFeature || 
                                  (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+    const isCurrentlyDefault = currentProvider.value === 'default';
 
-    if (defaultSupportsFeature) {
+    if (defaultSupportsFeature || isCurrentlyDefault) {
       return [
         { 
           id: 'default', 
@@ -725,12 +727,30 @@ const currentProvider = computed(() => {
   return settingsStore.settings.TRANSLATION_API
 })
 
+/**
+ * Checks if the 'Default' selection is actually valid for this mode's requirements
+ */
+const isDefaultInvalid = computed(() => {
+  if (currentProvider.value !== 'default' && props.modelValue !== 'default') return false;
+  
+  const globalId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
+  const globalProvider = getProviderById(globalId);
+  
+  return props.requiredFeature && 
+         globalProvider && 
+         !globalProvider.features?.includes(props.requiredFeature);
+})
+
 const currentProviderIcon = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return getProviderIcon(provider?.icon || 'providers/google.svg')
 })
 
 const currentProviderName = computed(() => {
+  if (currentProvider.value === 'default') {
+    const baseName = t('provider_default') || 'Default';
+    return isDefaultInvalid.value ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
+  }
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return provider?.name || 'Google Translate'
 })

@@ -20,7 +20,8 @@ import {
   getTranslationApiAsync,
   getTargetLanguageAsync,
   getAIContextTranslationEnabledAsync,
-  getSourceLanguageAsync
+  getSourceLanguageAsync,
+  getEffectiveProviderAsync
 } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -142,7 +143,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const isAIContextEnabled = await getAIContextTranslationEnabledAsync();
 
       const [provider, targetLanguage] = await Promise.all([
-        options.provider || getTranslationApiAsync(),
+        options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
         options.targetLanguage || getTargetLanguageAsync()
       ]);
 

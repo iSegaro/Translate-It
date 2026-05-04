@@ -1,5 +1,6 @@
 // src/config.js
 import { ProviderRegistryIds, nameToRegistryId } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -856,6 +857,60 @@ export const getTranslationApiAsync = async () => {
 
 export const getModeProvidersAsync = async () => {
   return getSettingValueAsync("MODE_PROVIDERS", CONFIG.MODE_PROVIDERS);
+};
+
+/**
+ * Resolves the effective provider for a specific translation mode.
+ * Returns the mode-specific provider if configured, otherwise falls back 
+ * to related modes (e.g., Dictionary -> Selection) or the global translation API.
+ * 
+ * Includes feature validation: If the resolved provider doesn't support 
+ * the mode's requirements (e.g. Bulk for Page Translation), it falls back 
+ * to the system default (googlev2).
+ * 
+ * @param {string} mode - The translation mode (from TranslationMode enum)
+ * @returns {Promise<string>} - The effective provider ID
+ */
+export const getEffectiveProviderAsync = async (mode) => {
+  try {
+    const [modeProviders, globalApi] = await Promise.all([
+      getModeProvidersAsync(),
+      getTranslationApiAsync()
+    ]);
+    
+    const systemDefault = ProviderRegistryIds.GOOGLE_V2;
+    let resolvedId = globalApi || systemDefault;
+    
+    // 1. Check direct mode-specific setting
+    if (mode && modeProviders && modeProviders[mode]) {
+      resolvedId = modeProviders[mode];
+    } 
+    // 2. Hierarchical Fallbacks
+    // Dictionary mode falls back to Selection provider if not explicitly set
+    else if (mode === TranslationMode.Dictionary_Translation && modeProviders?.[TranslationMode.Selection]) {
+      resolvedId = modeProviders[TranslationMode.Selection];
+    }
+    
+    // 3. Validation: Ensure the resolved provider supports the mode's requirements
+    const provider = findProviderById(resolvedId);
+    
+    // Mode-specific requirements
+    const needsBulk = [
+      TranslationMode.Page, 
+      TranslationMode.Select_Element, 
+      TranslationMode.Field
+    ].includes(mode);
+
+    if (needsBulk && provider && !provider.features?.includes('bulk')) {
+      logger.warn(`Resolved provider ${resolvedId} for mode ${mode} does not support bulk. Falling back to ${systemDefault}.`);
+      return systemDefault;
+    }
+    
+    return resolvedId;
+  } catch (error) {
+    logger.error(`Error resolving effective provider for mode ${mode}:`, error);
+    return ProviderRegistryIds.GOOGLE_V2;
+  }
 };
 
 // WebAI Specific

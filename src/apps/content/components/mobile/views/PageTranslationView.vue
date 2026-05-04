@@ -133,6 +133,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { TranslationMode } from '@/shared/config/config.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
@@ -152,13 +153,12 @@ const { t } = useUnifiedI18n()
 const { handleError } = useErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
 
-const activeProvider = computed(() => {
-  const mode = settingsStore.settings.TRANSLATION_MODE || 'general';
-  return settingsStore.settings.MODE_PROVIDERS?.[mode] || settingsStore.settings.TRANSLATION_API || 'googlev2';
+const pageProvider = computed(() => {
+  return settingsStore.getEffectiveProvider(TranslationMode.Page);
 });
 
 const isBulkSupported = computed(() => {
-  const provider = findProviderById(activeProvider.value);
+  const provider = findProviderById(pageProvider.value);
   return provider?.features?.includes('bulk') ?? false;
 });
 
@@ -238,18 +238,19 @@ const toggleAutoClose = async () => {
 }
 
 const startTranslation = () => { 
-  if (!isBulkSupported.value) {
+  const provider = pageProvider.value;
+  if (!findProviderById(provider)?.features?.includes('bulk')) {
     handleBulkNotSupported();
     return;
   }
-  logger.info('Starting page translation from Mobile View');
+  logger.info('Starting page translation from Mobile View', { provider });
   
   // Reset error state before retrying
   if (pageTranslationData.value.status === 'error') {
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
   }
 
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider }); 
   if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
     mobileStore.closeSheet() 
   }

@@ -12,7 +12,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { TranslationMode, getEffectiveProviderAsync } from '@/shared/config/config.js';
 
 export class FieldShortcutManager {
   constructor() {
@@ -154,26 +154,29 @@ export class FieldShortcutManager {
           type: 'ctrl-slash'
         };
       }
-
       this.logger.debug(`Translating text via Ctrl+/: "${text.substring(0, 50)}..."`);
+
+      // Resolve effective provider for field translation
+      const provider = await getEffectiveProviderAsync(TranslationMode.Field);
 
       // Send translation request using UnifiedMessaging
       const message = MessageFormat.create(
         MessageActions.TRANSLATE,
         {
           text: text,
-          provider: settingsManager.get('TRANSLATION_API', 'google-translate'),
+          provider,
           sourceLanguage: settingsManager.get('SOURCE_LANGUAGE', 'auto'),
           targetLanguage: settingsManager.get('TARGET_LANGUAGE', 'fa'),
           mode: TranslationMode.Field,
           options: {
             element: activeElement.tagName,
-            fieldType: activeElement.type || 'text'
+            type: activeElement.type || 'contenteditable',
+            url: window.location.href,
+            timestamp: Date.now()
           }
         },
         MessagingContexts.CONTENT
       );
-
       // Use UnifiedMessaging with appropriate timeout
       const response = await sendMessage(message, { timeout: 15000 });
 

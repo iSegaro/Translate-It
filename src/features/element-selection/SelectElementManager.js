@@ -9,7 +9,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
-import { getSettingsAsync } from '@/shared/config/config.js';
+import { getSettingsAsync, getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -192,10 +192,11 @@ class SelectElementManager extends ResourceTracker {
 
       if (this.isTopFrame) {
         this.showNotification();
-        const [settings, bingWarning, lingvaWarning] = await Promise.all([
+        const [settings, bingWarning, lingvaWarning, effectiveProvider] = await Promise.all([
           getSettingsAsync(),
           getTranslationString('BING_WPT_WARNING'),
-          getTranslationString('LINGVA_WPT_WARNING')
+          getTranslationString('LINGVA_WPT_WARNING'),
+          options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element)
         ]);
 
         // RE-CHECK again after another set of async calls
@@ -204,7 +205,7 @@ class SelectElementManager extends ResourceTracker {
           return { isActive: false };
         }
 
-        const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
+        const activeProvider = effectiveProvider;
         if (activeProvider === ProviderRegistryIds.BING) {
           if (await shouldShowProviderWarning('Bing')) {
             this.baseNotificationManager.show(
