@@ -22,6 +22,16 @@
         margin-bottom: $spacing-xs;
       }
     }
+
+    .smart-language-fallback-note {
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      text-align: center;
+      margin-top: $spacing-sm;
+      line-height: 1.5;
+      opacity: 0.8;
+      max-width: 420px;
+    }
   }
 
   // CRITICAL FIX: Allow dropdowns to overflow the tab container
@@ -531,7 +541,7 @@
   }
 
   .smart-language-info-banner {
-    margin: $spacing-lg 28px $spacing-xl;
+    margin: $spacing-lg 28px $spacing-sm;
     padding: $spacing-md $spacing-lg;
     background: var(--color-background-alt, rgba(var(--color-primary-rgb), 0.05));
     border: 1px solid var(--color-primary-alpha, rgba(var(--color-primary-rgb), 0.1));
@@ -539,6 +549,10 @@
     display: flex;
     align-items: center;
     gap: $spacing-md;
+
+    & + .languages-selectors-container {
+      margin-top: 0;
+    }
 
     .banner-content {
       h3 {

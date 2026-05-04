@@ -89,6 +89,9 @@
   "provider_default": {
     "message": "デフォルト"
   },
+  "incompatible_label": {
+    "message": "互換性なし"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -2143,5 +2146,8 @@
   },
   "smart_language_description": {
     "message": "このプロバイダーは入力言語を自動的に検出し、最適な辞書結果（ペルシャ語、英語، アラビア語、トルコ語）を提供します。"
+  },
+  "smart_language_fallback_note": {
+    "message": "注：これらの設定は、手動で言語を選択する必要があるテキストフィールド翻訳などの機能に適用されます。"
   }
-}
+  }

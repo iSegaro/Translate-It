@@ -89,6 +89,9 @@
   "provider_default": {
     "message": "Default"
   },
+  "incompatible_label": {
+    "message": "Incompatible"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -2143,5 +2146,8 @@
   },
   "smart_language_description": {
     "message": "This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish)."
+  },
+  "smart_language_fallback_note": {
+    "message": "Note: These settings apply to features like Text Field Translation where manual language selection is required."
   }
 }

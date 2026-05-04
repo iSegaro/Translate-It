@@ -11,9 +11,16 @@
       </div>
       <template v-else>
         <div 
-          v-if="!isAutoLanguageProvider"
-          class="languages-selectors-container"
+          v-if="isAutoLanguageProvider" 
+          class="smart-language-info-banner"
         >
+          <div class="banner-content">
+            <h3>{{ t('smart_language_title') || 'Smart Language Handling' }}</h3>
+            <p>{{ t('smart_language_description') || 'This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish).' }}</p>
+          </div>
+        </div>
+
+        <div class="languages-selectors-container">
           <div class="setting-group">
             <label>{{ t('source_language_label') || 'Source Language' }}</label>
             <LanguageDropdown
@@ -33,22 +40,16 @@
               class="language-dropdown"
             />
           </div>
+
+          <p 
+            v-if="isAutoLanguageProvider" 
+            class="smart-language-fallback-note"
+          >
+            {{ t('smart_language_fallback_note') }}
+          </p>
         </div>
 
-        <div 
-          v-else 
-          class="smart-language-info-banner"
-        >
-          <div class="banner-content">
-            <h3>{{ t('smart_language_title') || 'Smart Language Handling' }}</h3>
-            <p>{{ t('smart_language_description') || 'This provider automatically detects the input language and provides the best dictionary results (Farsi, English, Arabic, and Turkish).' }}</p>
-          </div>
-        </div>
-
-        <div 
-          v-if="!isAutoLanguageProvider" 
-          class="section-separator" 
-        />
+        <div class="section-separator" />
 
         <!-- Validation errors -->
         <Transition name="fade-slide">
@@ -540,6 +541,15 @@ const getFilteredLanguages = (type) => {
   
   if (!languages.length) {
     return type === 'source' && hasAutoDetect ? [{ code: 'auto', name: 'Auto-Detect' }] : []
+  }
+
+  // Bypass filtering for smart auto-language providers (like Vajehyab)
+  // as the selected languages will be used as fallbacks for other features
+  if (isAutoLanguageProvider.value) {
+    if (type === 'source') {
+      return hasAutoDetect ? [{ code: 'auto', name: 'Auto-Detect' }, ...languages] : languages
+    }
+    return languages
   }
 
   // 2. Filter base languages supported by the provider
