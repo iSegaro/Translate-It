@@ -530,6 +530,33 @@
     opacity: 0;
   }
 
+  .smart-language-info-banner {
+    margin: $spacing-lg 28px $spacing-xl;
+    padding: $spacing-md $spacing-lg;
+    background: var(--color-background-alt, rgba(var(--color-primary-rgb), 0.05));
+    border: 1px solid var(--color-primary-alpha, rgba(var(--color-primary-rgb), 0.1));
+    border-radius: $border-radius-lg;
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+
+    .banner-content {
+      h3 {
+        font-size: $font-size-base;
+        font-weight: $font-weight-bold;
+        margin-bottom: 4px;
+        color: var(--color-primary);
+      }
+
+      p {
+        font-size: $font-size-sm;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        margin: 0;
+      }
+    }
+  }
+
   // API Info inside provider settings
   .api-info {
     margin-bottom: $spacing-lg;

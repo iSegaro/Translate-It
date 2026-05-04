@@ -45,6 +45,11 @@
           </div>
         </div>
 
+        <div 
+          v-if="!isAutoLanguageProvider" 
+          class="section-separator" 
+        />
+
         <!-- Validation errors -->
         <Transition name="fade-slide">
           <div
@@ -88,54 +93,56 @@
                       class="provider-settings"
                     >
                       <!-- Optimization Level Section -->
-                      <div 
-                        id="OPTIMIZATION_LEVELS_SECTION"
-                        class="optimization-control-area"
-                      >
-                        <div class="opt-control-group">
-                          <div class="label-with-value">
-                            <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                            <span
-                              class="level-badge"
-                              :class="'level-' + currentOptimizationLevel"
-                            >
-                              {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                            </span>
-                          </div>
-                        
-                          <div class="slider-wrapper">
-                            <input 
-                              v-model.number="currentOptimizationLevel" 
-                              type="range" 
-                              min="1" 
-                              max="5"
-                              class="ti-range-slider"
-                            >
-                            <div class="slider-labels">
-                              <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                      <template v-if="!isAutoLanguageProvider">
+                        <div 
+                          id="OPTIMIZATION_LEVELS_SECTION"
+                          class="optimization-control-area"
+                        >
+                          <div class="opt-control-group">
+                            <div class="label-with-value">
+                              <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
                               <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 2"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                              <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 4"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                                class="level-badge"
+                                :class="'level-' + currentOptimizationLevel"
+                              >
+                                {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                              </span>
                             </div>
+                          
+                            <div class="slider-wrapper">
+                              <input 
+                                v-model.number="currentOptimizationLevel" 
+                                type="range" 
+                                min="1" 
+                                max="5"
+                                class="ti-range-slider"
+                              >
+                              <div class="slider-labels">
+                                <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                                <span
+                                  class="slider-tick"
+                                  @click="currentOptimizationLevel = 2"
+                                >|</span>
+                                <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                                <span
+                                  class="slider-tick"
+                                  @click="currentOptimizationLevel = 4"
+                                >|</span>
+                                <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                              </div>
+                            </div>
+                          
+                            <p class="opt-description">
+                              {{ isAIProvider 
+                                ? t('optimization_description_ai') 
+                                : t('optimization_description_traditional') 
+                              }}
+                            </p>
                           </div>
-                        
-                          <p class="opt-description">
-                            {{ isAIProvider 
-                              ? t('optimization_description_ai') 
-                              : t('optimization_description_traditional') 
-                            }}
-                          </p>
                         </div>
-                      </div>
 
-                      <div class="section-separator mini" />
+                        <div class="section-separator mini" />
+                      </template>
 
                       <div
                         v-if="selectedProviderInfo && !providerSettingsComponent"
