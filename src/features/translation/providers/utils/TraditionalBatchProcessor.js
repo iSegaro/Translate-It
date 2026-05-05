@@ -5,7 +5,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { matchErrorToType, isFatalError } from "@/shared/error-management/ErrorMatcher.js";
+import { matchErrorToType, isFatalError, isTransientError } from "@/shared/error-management/ErrorMatcher.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TraditionalBatchProcessor');
@@ -99,7 +99,10 @@ export const TraditionalBatchProcessor = {
         const errorType = error.type || matchErrorToType(error);
         if (!error.type) error.type = errorType;
 
-        if (isFatalError(error) || isFatalError(errorType)) {
+        const isFatal = isFatalError(error) || isFatalError(errorType);
+        const isTransient = isTransientError(error) || isTransientError(errorType);
+
+        if (isFatal || isTransient) {
           throw error;
         }
 

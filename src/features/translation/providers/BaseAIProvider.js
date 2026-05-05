@@ -160,15 +160,17 @@ export class BaseAIProvider extends BaseProvider {
         }).catch(() => { /* ignore */ });
       }
       
-      const { matchErrorToType, isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      const { matchErrorToType, isFatalError, isTransientError } = await import('@/shared/error-management/ErrorMatcher.js');
       const errorType = error.type || matchErrorToType(error);
       const isFatal = isFatalError(error) || isFatalError(errorType);
+      const isTransient = isTransientError(error) || isTransientError(errorType);
 
       logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
       
-      // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal (like parsing error)
-      // For fatal errors (502, 429, 401), we MUST throw to inform the UI and stop the process.
-      if (!isFatal && Array.isArray(texts)) {
+      // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal AND non-transient.
+      // If it is transient (Network, 429, 5xx), we MUST throw so QueueManager can retry.
+      // For fatal errors (401, 403), we MUST throw to inform the UI and stop the process.
+      if (!isFatal && !isTransient && Array.isArray(texts)) {
         logger.warn(`[${this.providerName}] Non-fatal error, falling back to original text for mapping safety`);
         return texts.map(t => typeof t === 'object' ? (t.t || t.text || "") : (t || ""));
       }

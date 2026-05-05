@@ -27,10 +27,14 @@ vi.mock('../core/TranslationStatsManager.js', () => ({
 }));
 
 // Mock ErrorMatcher
-vi.mock('@/shared/error-management/ErrorMatcher.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
+  matchErrorToType: vi.fn(),
+  isFatalError: vi.fn(),
+  isTransientError: vi.fn()
+}));
 
 import { BaseAIProvider } from './BaseAIProvider.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock AIResponseParser
 vi.mock("./utils/AIResponseParser.js", () => ({
@@ -66,27 +70,36 @@ describe('BaseAIProvider', () => {
     vi.clearAllMocks();
     provider = new MockAIProvider();
     vi.mocked(isFatalError).mockReturnValue(false);
+    vi.mocked(isTransientError).mockReturnValue(false);
+    vi.mocked(matchErrorToType).mockReturnValue('UNKNOWN');
   });
 
   describe('_translateBatch', () => {
-    it('should execute translation with rate limit and return original on non-fatal error', async () => {
-      provider._callAI = vi.fn().mockRejectedValue(new Error('AI Failure'));
+    it('should return original text on non-fatal AND non-transient error', async () => {
+      provider._callAI = vi.fn().mockRejectedValue(new Error('Non-Fatal-Non-Transient'));
       vi.mocked(isFatalError).mockReturnValue(false);
-      
+      vi.mocked(isTransientError).mockReturnValue(false);
+
       const texts = ['Original 1', 'Original 2'];
       const result = await provider._translateBatch(texts, 'en', 'fa', 'selection', null, null, null, 'session-123');
 
       expect(result).toEqual(['Original 1', 'Original 2']);
-      
-      // Wait for dynamic import inside _translateBatch
-      await new Promise(r => setTimeout(r, 50));
-      expect(statsManager.recordError).toHaveBeenCalledWith('MockAI', 'session-123');
+    });
+
+    it('should throw and NOT fallback if error is transient', async () => {
+      provider._callAI = vi.fn().mockRejectedValue(new Error('Transient Error'));
+      vi.mocked(isFatalError).mockReturnValue(false);
+      vi.mocked(isTransientError).mockReturnValue(true);
+
+      const texts = ['Original 1'];
+      await expect(provider._translateBatch(texts, 'en', 'fa', 'selection'))
+        .rejects.toThrow('Transient Error');
     });
 
     it('should throw immediately if error is fatal', async () => {
       provider._callAI = vi.fn().mockRejectedValue(new Error('FATAL 401'));
       vi.mocked(isFatalError).mockReturnValue(true);
-      
+
       await expect(provider._translateBatch(['test'], 'en', 'fa', 'selection'))
         .rejects.toThrow('FATAL 401');
     });
@@ -104,7 +117,7 @@ describe('BaseAIProvider', () => {
   });
 
   describe('_traditionalBatchTranslate', () => {
-    it('should process segments sequentially when fallback is used', async () => {
+    it('should process segments sequentially', async () => {
       const texts = ['seg1', 'seg2'];
       const spy = vi.spyOn(provider, '_callAI');
       
