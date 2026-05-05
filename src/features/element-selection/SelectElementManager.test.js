@@ -42,7 +42,11 @@ vi.mock('@/shared/config/config.js', () => ({
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getTranslationApiAsync: vi.fn(() => Promise.resolve('google')),
-  getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true))
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
+  TranslationMode: {
+    Select_Element: 'select_element'
+  }
 }));
 
 vi.mock('@/shared/config/constants.js', () => ({

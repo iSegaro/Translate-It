@@ -126,6 +126,22 @@
     img { filter: brightness(0) invert(1) !important; }
   }
 
+  &.is-disabled {
+    opacity: 0.4 !important;
+    filter: grayscale(1) !important;
+    cursor: default !important;
+    box-shadow: none !important;
+    pointer-events: auto !important; /* CRITICAL: Must be auto for Toast */
+
+    &:active {
+      transform: translate(-50%, -50%) !important; /* Prevent scale down effect */
+    }
+
+    * {
+      pointer-events: none !important;
+    }
+  }
+
   &[data-status='translating'] {
     background: var(--ti-mobile-warning-bg) !important;
     color: var(--ti-mobile-warning) !important;

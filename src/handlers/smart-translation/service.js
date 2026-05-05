@@ -7,7 +7,7 @@ import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
-import { TranslationMode, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
+import { TranslationMode, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from "@/shared/config/config.js";
 import { detectOS as detectPlatform } from "@/utils/browser/compatibility.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -45,7 +45,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   let currentToastId = toastId;
 
   try {
-    const currentProvider = await getTranslationApiAsync();
+    const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
     const currentSourceLang = await getSourceLanguageAsync();
     const currentTargetLang = await getTargetLanguageAsync();
 

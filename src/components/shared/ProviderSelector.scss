@@ -330,6 +330,23 @@ img.ti-dropdown-arrow,
     span { color: var(--color-primary) !important; font-weight: 600 !important; }
   }
 
+  &.is-disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    filter: grayscale(0.8) !important;
+    border-color: transparent !important;
+    background-color: transparent !important;
+    
+    &:hover {
+      background-color: transparent !important;
+      border-color: transparent !important;
+    }
+
+    * {
+      pointer-events: none !important;
+    }
+  }
+
   /* Dark theme override for buttons inside footer */
   :root.is-dark &, .is-dark &, :root.theme-dark &, .theme-dark & {
     background-color: var(--color-surface, #0f172a) !important;

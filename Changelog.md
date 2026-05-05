@@ -1,10 +1,27 @@
+#### v1.14.0 – Released on May XX, 2026
+
+##### Added
+
+- Added [`Vajehyab`](https://vajehyab.com) Persian dictionary for specialized dictionary results
+
+##### Fixed
+
+- Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
+
+##### Changed
+
+- Improved the UI for selecting dictionary providers in settings with real-time compatibility feedback
+- Implemented smart provider filtering to only display configured and ready-to-use translation providers across the UI.
+
+---
+
 #### v1.13.0 – Released on May 03, 2026
 
 ##### Fixed
 
-* **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Resolved timeout issues affecting popup, side panel, and window contexts
-* Fixed Dictionary Mode for traditional providers (e.g., Google Translate)
-* Addressed various major and minor bugs
+- **[#102](https://github.com/iSegaro/Translate-It/issues/102)**: Resolved timeout issues affecting popup, side panel, and window contexts
+- Fixed Dictionary Mode for traditional providers (e.g., Google Translate)
+- Addressed various major and minor bugs
 
 ---
 

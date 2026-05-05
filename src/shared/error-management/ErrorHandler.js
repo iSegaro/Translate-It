@@ -1,4 +1,4 @@
-// File: src/error-management/ErrorHandler.js
+// File: src/shared/error-management/ErrorHandler.js
 
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { getErrorMessage } from "./ErrorMessages.js";
@@ -59,6 +59,9 @@ export class ErrorHandler {
     this.handling = true;
     
     try {
+      // Prioritize explicit type from meta for suppression and display logic
+      const type = meta.type || matchErrorToType(err);
+
       // Safely extract raw error message without triggering infinite recursion or stack depth
       let raw = 'Unknown Error';
       try {
@@ -103,8 +106,6 @@ export class ErrorHandler {
         ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
         return err;
       }
-
-      const type = matchErrorToType(err);
       
       // Determine message to display
       let msg;

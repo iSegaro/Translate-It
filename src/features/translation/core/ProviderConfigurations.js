@@ -165,6 +165,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
@@ -217,6 +218,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -267,6 +269,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
@@ -319,6 +322,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true, // Depends on model
       supportsBatchRequests: true,
       supportsThinking: false, // Varies by model
@@ -371,6 +375,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Depends on model
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
@@ -421,6 +426,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -471,6 +477,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -523,6 +530,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -575,6 +583,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // DeepL supports batch requests
       supportsThinking: false,
@@ -634,6 +643,7 @@ export const PROVIDER_CONFIGURATIONS = {
       circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -684,6 +694,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
@@ -723,10 +734,51 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
       reliableJsonMode: true
+    }
+  },
+
+  // Vajehyab - Persian dictionary service
+  Vajehyab: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 1000,
+      initialDelay: 0,
+      subsequentDelay: 1000,
+      burstLimit: 5,
+      burstWindow: 60000
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 100, // Small limit for dictionary words
+      optimalSize: 1,
+      maxChunksPerBatch: 1,
+      delimiter: DEFAULT_TEXT_DELIMITER
+    },
+    streaming: {
+      enabled: false,
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: ['rate_limit', 'word_not_found'],
+      retryStrategies: {
+        'rate_limit': { delay: 60000, temporary: true },
+        'word_not_found': { delay: 0, temporary: false }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsTranslation: true,
+      supportsImageTranslation: false,
+      supportsBatchRequests: false,
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -770,6 +822,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -822,6 +875,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Conservative default
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: false,
@@ -864,6 +918,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
@@ -1098,6 +1153,7 @@ function normalizeProviderName(providerName) {
     'lingva-translate': ProviderNames.LINGVA,
     'browser': ProviderNames.BROWSER_API,
     'browserranslate': ProviderNames.BROWSER_API,
+    'vajehyab': ProviderNames.VAJEHYAB,
     'mock': ProviderNames.MOCK,
     'mockprovider': ProviderNames.MOCK,
     'custom': ProviderNames.CUSTOM,

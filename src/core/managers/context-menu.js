@@ -7,14 +7,16 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { 
-  getTranslationApiAsync, 
   getDebugModeAsync, 
   getTargetLanguageAsync,
+  getEffectiveProviderAsync,
+  TranslationMode,
   CONFIG 
 } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { providerRegistry } from '@/features/translation/providers/ProviderRegistry.js';
-import { PROVIDER_MANIFEST } from '@/features/translation/providers/ProviderManifest.js';
+import { findProviderById, PROVIDER_MANIFEST } from '@/features/translation/providers/ProviderManifest.js';
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { handleActivateSelectElementModeLazy } from '@/core/background/handlers/lazy/handleElementSelectionLazy.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 // Element selection handler will be loaded lazily when needed
@@ -35,16 +37,19 @@ const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 
 // --- Get API Providers from Registry ---
-async function getApiProviders() {
+async function getApiProviders(settings = {}) {
   try {
     // Get current debug mode from storage to correctly filter Mock provider
-    const isDebug = await getDebugModeAsync();
+    const isDebug = settings.DEBUG_MODE ?? await getDebugModeAsync();
 
     // Get available providers with dynamic debug mode override
-    const availableProviders = providerRegistry.getAllAvailable().filter(p => {
+    let availableProviders = providerRegistry.getAllAvailable().filter(p => {
       if (p.id === 'mock' && !isDebug) return false;
       return true;
     });
+
+    // Filter by configuration status (API keys, etc.)
+    availableProviders = availableProviders.filter(p => isProviderConfigured(p.id, settings));
 
     // Log provider structure for debugging
     logger.info("Processing available providers for context menu", {
@@ -350,21 +355,25 @@ export class ContextMenuManager extends ResourceTracker {
       this.createdMenus.clear();
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
-      // Get the currently active API to set the 'checked' state
-      const currentApi = await getTranslationApiAsync();
+      // Get settings for feature enablement
+      const settings = await storageManager.get(null); // Get all settings to ensure configuration check works
+      
+      const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
+      
+      // Get effective provider for Select Element to check for bulk support
+      const selectElementApi = await getEffectiveProviderAsync(TranslationMode.Select_Element);
+
+      // Check if the effective provider supports bulk features (Select Element is a bulk feature)
+      const provider = findProviderById(selectElementApi);
+      const isBulkSupported = provider?.features?.includes('bulk') ?? false;
+
+      const isSelectElementEnabled = isExtensionEnabled && 
+                                   (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
+                                   isBulkSupported;
+      const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // Get commands for keyboard shortcuts
       const commands = await browser.commands.getAll();
-
-      // Get settings for feature enablement
-      const settings = await storageManager.get([
-        'TRANSLATE_WITH_SELECT_ELEMENT', 
-        'EXTENSION_ENABLED',
-        'CONTEXT_MENU_VISIBILITY'
-      ]);
-      const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
-      const isSelectElementEnabled = isExtensionEnabled && (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false);
-      const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // --- 1. Create Page Context Menu ---
       if (isSelectElementEnabled && visibility.PAGE_CONTEXT_SELECT_ELEMENT) {
@@ -422,7 +431,7 @@ export class ContextMenuManager extends ResourceTracker {
         logger.debug("Created API Provider parent menu");
 
         // --- API Provider Sub-Menus (Radio Buttons) ---
-        const apiProviders = await getApiProviders();
+        const apiProviders = await getApiProviders(settings);
         logger.debug(`[ContextMenuManager] Found ${apiProviders.length} providers`);
 
         let lastCategory = null;
@@ -447,12 +456,12 @@ export class ContextMenuManager extends ResourceTracker {
             parentId: API_PROVIDER_PARENT_ID,
             title: provider.defaultTitle,
             type: "checkbox",
-            checked: provider.id === currentApi,
+            checked: provider.id === settings.TRANSLATION_API,
             contexts: ["action"],
           });
         }
         logger.debug(
-          `Created ${apiProviders.length} API Provider sub-menus. Current API: ${currentApi}`
+          `Created ${apiProviders.length} API Provider sub-menus. Current API: ${settings.TRANSLATION_API}`
         );
 
         // --- Options Menu ---
@@ -641,13 +650,16 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       logger.info(`Activating select mode for tab ${tab.id} via central handler`);
-      
-      const targetLanguage = await getTargetLanguageAsync();
+
+      const [targetLanguage, provider] = await Promise.all([
+        getTargetLanguageAsync(),
+        getEffectiveProviderAsync(TranslationMode.Select_Element)
+      ]);
 
       const message = {
         action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
         context: 'context-menu',
-        data: { active: true, tabId: tab.id, targetLanguage }
+        data: { active: true, tabId: tab.id, targetLanguage, provider }
       };
       const sender = { tab };
 

@@ -42,13 +42,44 @@ export function useUnifiedTranslation(context = 'popup') {
   const targetLanguage = ref(DEFAULT_TARGET_LANGUAGE);
   const isTranslating = ref(false);
   const isStreaming = ref(false);
-  const lastTranslation = ref(null);
+  
+  // Computed lastTranslation that proxies the store to ensure all instances are in sync immediately
+  const lastTranslation = computed({
+    get: () => {
+      const ct = translationStore.currentTranslation;
+      if (!ct) return null;
+      return {
+        source: ct.sourceText,
+        target: ct.translatedText,
+        sourceLanguage: ct.sourceLanguage,
+        targetLanguage: ct.targetLanguage,
+        provider: ct.provider,
+        timestamp: ct.timestamp
+      };
+    },
+    set: (val) => {
+      if (!val) {
+        translationStore.currentTranslation = null;
+        return;
+      }
+      translationStore.currentTranslation = {
+        sourceText: val.source,
+        translatedText: val.target,
+        sourceLanguage: val.sourceLanguage,
+        targetLanguage: val.targetLanguage,
+        provider: val.provider,
+        timestamp: val.timestamp
+      };
+    }
+  });
+
   const actualSourceLanguage = ref(AUTO_DETECT_VALUE);
   const actualTargetLanguage = ref(DEFAULT_TARGET_LANGUAGE);
   
   const pendingRequests = ref(new Set());
   const loadingStartTime = ref(null);
   const currentMessageId = ref(null);
+  const lastSyncedTimestamp = ref(0);
   const MINIMUM_LOADING_DURATION = 100;
 
   /**
@@ -140,6 +171,11 @@ export function useUnifiedTranslation(context = 'popup') {
   // We keep translatedText as-is to prevent immediate UI clearing (better UX)
   watch(sourceText, (newVal, oldVal) => {
     if (newVal !== oldVal) {
+      // Don't clear if this change came from a store sync (source matches store)
+      const ct = translationStore.currentTranslation;
+      if (ct && ct.sourceText === newVal && ct.timestamp === lastSyncedTimestamp.value) {
+        return;
+      }
       lastTranslation.value = null;
     }
   });
@@ -192,13 +228,15 @@ export function useUnifiedTranslation(context = 'popup') {
     if (resultData.targetLanguage) actualTargetLanguage.value = resultData.targetLanguage;
 
     // Update last translation metadata
-    // We keep the actual source/target languages from the result for TTS and ActionToolbar labels
-    // but we NO LONGER update the reactive targetLanguage/sourceLanguage refs to keep the dropdowns stable.
+    // Setting this will automatically sync with translationStore via the computed property
+    const timestamp = resultData.timestamp || Date.now();
+    lastSyncedTimestamp.value = timestamp;
+    
     lastTranslation.value = {
       source: resultData.originalText || sourceText.value,
       target: resultData.translatedText,
       provider: resultData.provider,
-      timestamp: resultData.timestamp || Date.now(),
+      timestamp: timestamp,
       sourceLanguage: resultData.sourceLanguage,
       targetLanguage: resultData.targetLanguage
     };
@@ -217,6 +255,7 @@ export function useUnifiedTranslation(context = 'popup') {
     errorManager.handleError(error);
     translatedText.value = "";
     lastTranslation.value = null;
+    lastSyncedTimestamp.value = 0;
     
     if (messageId && context === 'sidepanel') {
       pendingRequests.value.delete(messageId);
@@ -380,6 +419,7 @@ export function useUnifiedTranslation(context = 'popup') {
     translatedText.value = "";
     errorManager.clearError();
     lastTranslation.value = null;
+    lastSyncedTimestamp.value = 0;
     await resetLanguagesToDefaults();
   };
 
@@ -387,14 +427,15 @@ export function useUnifiedTranslation(context = 'popup') {
     if (lastTranslation.value) {
       sourceText.value = lastTranslation.value.source;
       translatedText.value = lastTranslation.value.target;
+      lastSyncedTimestamp.value = lastTranslation.value.timestamp;
     }
   };
 
   // --- Lifecycle & Watchers ---
   watch(() => translationStore.currentTranslation, async (newTranslation) => {
-    if (newTranslation) {
+    if (newTranslation && newTranslation.timestamp !== lastSyncedTimestamp.value) {
       const { findLanguageCode } = await utilsFactory.getI18nUtils();
-      logger.debug(`[${context}] Syncing with store currentTranslation:`, newTranslation);
+      lastSyncedTimestamp.value = newTranslation.timestamp || 0;
       sourceText.value = newTranslation.sourceText || '';
       translatedText.value = newTranslation.translatedText || '';
       sourceLanguage.value = await findLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;

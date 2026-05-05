@@ -165,14 +165,6 @@ const handleTranslate = async (manualProvider) => {
     
     logger.debug("Languages:", sourceLanguage, "→", targetLanguage);
     
-    // Store last translation for revert functionality
-    lastTranslation.value = {
-      source: sourceText.value,
-      target: translatedText.value,
-      sourceLanguage,
-      targetLanguage
-    }
-    
     // Use composable translation function with determined provider
     logger.debug("Triggering translation...", { provider: effectiveProvider });
     const success = await triggerTranslation(sourceLanguage, targetLanguage, effectiveProvider)    

@@ -42,6 +42,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
+vi.mock('@/shared/config/settingsMigrations.js', () => ({
+  runSettingsMigrations: vi.fn().mockResolvedValue({ updates: { THEME: 'dark' }, logs: [] })
+}));
+
 describe('Settings Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -133,18 +137,12 @@ describe('Settings Store', () => {
     it('importSettings should merge defaults and run migrations', async () => {
       const mockImportData = { THEME: 'dark', TRANSLATION_API: 'google' };
       const store = useSettingsStore();
-      
-      // Mock migration logic
-      vi.mock('@/shared/config/settingsMigrations.js', () => ({
-        runSettingsMigrations: vi.fn().mockResolvedValue({ updates: { THEME: 'dark' }, logs: [] })
-      }));
 
       await store.importSettings(mockImportData);
-      
+
       expect(store.settings.THEME).toBe('dark');
       expect(storageManager.set).toHaveBeenCalled();
-    });
-  });
+    });  });
 
   describe('Strict Validation', () => {
     it('validateSettings should reject prompt without placeholder', () => {

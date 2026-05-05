@@ -5,6 +5,7 @@
       v-if="isWholePageEnabled"
       text-only
       :target-language="targetLanguage"
+      :disabled="!isPageTranslationSupported"
       class="ti-page-translate-btn"
     />
 
@@ -61,9 +62,10 @@
       v-if="isSelectElementEnabled"
       icon="select.png"
       :alt="t('popup_select_element_alt_icon') || 'Select Element'"
-      :title="t('popup_select_element_title_icon') || 'حالت انتخاب با موس'"
+      :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
       type="toolbar"
       :active="isSelectModeActive"
+      :disabled="!isSelectElementSupported"
       class="ti-btn-select"
       @click="handleSelectElement"
     />
@@ -89,6 +91,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { TranslationMode } from '@/shared/config/config.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'
@@ -147,6 +150,33 @@ const isExtensionEnabledGlobal = computed(() => {
   return settingsStore.settings?.EXTENSION_ENABLED ?? true
 })
 
+/**
+ * Gets the effective provider for a specific mode, accounting for synchronization
+ */
+const getEffectiveProvider = (mode) => {
+  const syncKey = mode === TranslationMode.Page ? 'page' : 'element'
+  if (translationStore.ephemeralSync[syncKey] && translationStore.selectedProvider) {
+    return translationStore.selectedProvider
+  }
+  
+  // Fallback to mode-specific settings or global provider
+  return settingsStore.settings?.MODE_PROVIDERS?.[mode] || 
+         settingsStore.settings.TRANSLATION_API || 
+         'googlev2'
+}
+
+/**
+ * Checks if the provider for a specific mode supports bulk operations
+ */
+const supportsBulk = (mode) => {
+  const providerId = getEffectiveProvider(mode)
+  const provider = findProviderById(providerId)
+  return provider?.features?.includes('bulk') ?? true
+}
+
+const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element))
+const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page))
+
 const isSelectElementEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true)
 })
@@ -157,17 +187,12 @@ const isWholePageEnabled = computed(() => {
 
 // Methods
 const handleSelectElement = async () => {
+  if (!isSelectElementSupported.value) return
+
   logger.debug('Select Element button clicked!')
   
   try {
-    let effectiveProvider;
-    if (translationStore.ephemeralSync.element && translationStore.selectedProvider) {
-      effectiveProvider = translationStore.selectedProvider;
-    } else {
-      const modeKey = TranslationMode.Select_Element;
-      const settingProvider = settingsStore.settings?.MODE_PROVIDERS?.[modeKey];
-      effectiveProvider = settingProvider || props.provider;
-    }
+    const effectiveProvider = getEffectiveProvider(TranslationMode.Select_Element)
 
     const success = await toggleSelectElement({ 
       targetLanguage: props.targetLanguage,
