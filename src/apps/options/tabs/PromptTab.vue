@@ -151,6 +151,7 @@ const loadingExamples = ref(false)
 
 // Sample text for preview
 const SAMPLE_TEXT = "Hello, how are you today? This is a sample text for previewing translation prompts."
+const SAMPLE_WORD = "Discovery"
 
 // Sample JSON for Select Element mode
 const SAMPLE_JSON = JSON.stringify([
@@ -310,7 +311,7 @@ const generatePromptExamples = async () => {
     // Popup / Sidepanel mode
     examples.push({
       mode: 'Popup / Sidepanel Translation',
-      description: 'Popup window or sidepanel translation interface',
+      description: 'Popup window or Sidepanel translation interface',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
     })
 
@@ -339,6 +340,13 @@ const generatePromptExamples = async () => {
       mode: 'Screen Capture',
       description: 'OCR and translation of text from images',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.ScreenCapture, 'translate')
+    })
+
+    // Dictionary mode
+    examples.push({
+      mode: 'Dictionary Translation',
+      description: 'Brief word definitions and synonyms (Note: This mode uses a fixed format)',
+      prompt: await buildPromptWithCurrentTemplate(SAMPLE_WORD, sourceLang, targetLang, TranslationMode.Dictionary_Translation, 'ai')
     })
 
     promptExamples.value = examples
