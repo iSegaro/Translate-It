@@ -711,7 +711,7 @@
     "message": "プロンプトテンプレートを入力してください。$_{SOURCE}、$_{TARGET}、$_{TEXT} などのキーワードが使用できます。"
   },
   "prompt_template_help": {
-    "message": "プロンプトテンプレートで使用できるキーワード："
+    "message": "プロンプトテンプレートで使用する必要があるキーワード："
   },
   "api_section_title": {
     "message": "翻訳API"

@@ -711,7 +711,7 @@
     "message": "Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}."
   },
   "prompt_template_help": {
-    "message": "You can use the following keywords in your prompt template:"
+    "message": "You must use the following keywords in your prompt template:"
   },
   "api_section_title": {
     "message": "Translation API"
