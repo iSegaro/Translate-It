@@ -65,6 +65,7 @@ vi.mock('@/shared/constants/detection.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
   TranslationMode: {
     Field: 'field'
   }

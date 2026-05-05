@@ -13,6 +13,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 vi.mock('@/config.js', () => ({
   getTranslationApiAsync: vi.fn(() => Promise.resolve('google')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en'))
@@ -28,6 +29,7 @@ vi.mock('@/shared/config/constants.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
   TranslationMode: {
     Select_Element: 'select-element'
   }

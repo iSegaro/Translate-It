@@ -25,6 +25,8 @@ vi.mock('@/shared/logging/logger.js', () => ({
 vi.mock('@/shared/config/config.js', () => ({
   getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getApplication_LocalizeAsync: vi.fn(() => Promise.resolve('fa')),
   TranslationMode: {
     General: 'general',
     Page: 'page',
