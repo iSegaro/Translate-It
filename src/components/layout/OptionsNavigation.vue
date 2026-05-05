@@ -107,10 +107,14 @@ const saveAllSettings = async () => {
       return
     }
 
-    // For other errors, show a general message for now
+    // For other errors, show the specific error message to help debugging
     statusType.value = 'error'
-    statusMessage.value = t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
-    setTimeout(() => { statusMessage.value = ''; statusType.value = ''; }, 3000)
+    const firstError = validation.errors[0]
+    
+    // Try to translate the error key, or use a default if it fails
+    statusMessage.value = t(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+    
+    setTimeout(() => { statusMessage.value = ''; statusType.value = ''; }, 5000)
     return
   }
 

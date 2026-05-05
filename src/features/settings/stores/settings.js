@@ -525,32 +525,63 @@ export const useSettingsStore = defineStore('settings', () => {
   const validateSettings = () => {
     const errors = []
     
-    // Validate languages
-    if (!settings.value.SOURCE_LANGUAGE) {
-      errors.push('Source language is required')
+    // 1. Validate languages
+    const sLang = settings.value.SOURCE_LANGUAGE;
+    const tLang = settings.value.TARGET_LANGUAGE;
+
+    if (!sLang || sLang.toString().trim() === '') {
+      errors.push('validation_source_language_empty')
     }
     
-    if (!settings.value.TARGET_LANGUAGE) {
-      errors.push('Target language is required')
+    if (!tLang || tLang.toString().trim() === '') {
+      errors.push('validation_target_language_empty')
     }
     
-    if (settings.value.SOURCE_LANGUAGE !== 'auto' && settings.value.SOURCE_LANGUAGE === settings.value.TARGET_LANGUAGE) {
-      errors.push('Source and target languages cannot be the same')
+    if (sLang && tLang && sLang !== 'auto' && sLang === tLang) {
+      errors.push('validation_same_languages')
     }
     
-    // Validate API keys and configuration for selected provider
-    const missingKey = getFirstMissingSetting(settings.value.TRANSLATION_API, settings.value);
-    if (missingKey) {
-      errors.push(`Configuration missing for ${settings.value.TRANSLATION_API}: ${missingKey}`);
+    // 2. Validate Global Translation Provider
+    const apiProvider = settings.value.TRANSLATION_API;
+    if (apiProvider) {
+      const missingKey = getFirstMissingSetting(apiProvider, settings.value);
+      if (missingKey) {
+        errors.push('ERRORS_API_CONFIG_INVALID')
+      }
     }
     
-    // Validate prompt templates
-    if (!settings.value.PROMPT_TEMPLATE || !settings.value.PROMPT_TEMPLATE.includes('$_{TEXT}')) {
-      errors.push('Prompt template must include $_{TEXT} placeholder')
+    // 3. Validate Mode-Specific Providers
+    if (settings.value.MODE_PROVIDERS) {
+      Object.entries(settings.value.MODE_PROVIDERS).forEach(([mode, providerId]) => {
+        if (providerId && providerId !== 'default' && providerId !== null) {
+          const modeMissingKey = getFirstMissingSetting(providerId, settings.value);
+          if (modeMissingKey) {
+            errors.push('ERRORS_API_CONFIG_INVALID');
+          }
+        }
+      });
     }
     
-    if (settings.value.PROMPT_TEMPLATE_AUTO && !settings.value.PROMPT_TEMPLATE_AUTO.includes('$_{TEXT}')) {
-      errors.push('Auto prompt template must include $_{TEXT} placeholder if provided')
+    // 4. Validate Prompt Templates
+    const prompt = settings.value.PROMPT_TEMPLATE;
+    if (!prompt || prompt.toString().trim() === '') {
+      errors.push('validation_prompt_template_empty');
+    } else if (!prompt.toString().includes('$_{TEXT}')) {
+      errors.push('validation_prompt_template_missing_placeholders');
+    }
+
+    const autoPrompt = settings.value.PROMPT_TEMPLATE_AUTO;
+    if (autoPrompt && autoPrompt.toString().trim() !== '' && !autoPrompt.toString().includes('$_{TEXT}')) {
+      errors.push('validation_prompt_template_missing_placeholders');
+    }
+    
+    // 5. Validate Proxy
+    if (settings.value.PROXY_ENABLED && (!settings.value.PROXY_HOST || settings.value.PROXY_HOST.trim() === '')) {
+      errors.push('proxy_host_invalid')
+    }
+
+    if (errors.length > 0) {
+      logger.warn('Settings validation failed:', errors);
     }
     
     return {
