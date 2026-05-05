@@ -94,7 +94,10 @@
                   <span class="example-mode">{{ example.mode }}</span>
                   <span class="example-desc">{{ example.description }}</span>
                 </div>
-                <pre class="example-prompt">{{ example.prompt }}</pre>
+                <pre
+                  class="example-prompt"
+                  dir="ltr"
+                >{{ example.prompt }}</pre>
               </div>
             </template>
           </div>

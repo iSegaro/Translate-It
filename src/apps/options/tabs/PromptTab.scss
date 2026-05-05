@@ -50,6 +50,8 @@
     .prompt-template-input {
       width: 100%;
       position: relative;
+      direction: ltr !important;
+      text-align: left !important;
       
       :deep(textarea) {
         font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Ubuntu Mono', 'Consolas', monospace;
@@ -314,6 +316,8 @@
           max-height: 300px;
           overflow-y: auto;
           font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+          direction: ltr !important;
+          text-align: left !important;
         }
       }
     }
