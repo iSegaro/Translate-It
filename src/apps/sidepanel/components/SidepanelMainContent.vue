@@ -38,7 +38,7 @@
             >
           </button>
           <ProviderSelector
-            v-model="currentProvider"
+            v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
             show-sync
@@ -68,7 +68,7 @@
         </button>
         <div class="center-spacer">
           <ProviderSelector
-            v-model="currentProvider"
+            v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
             show-sync
@@ -193,16 +193,12 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits(['can-translate-change', 'update:provider'])
+const emit = defineEmits(['can-translate-change', 'update:provider'])
 
 // State
-const currentProviderLocal = ref(props.provider)
-
-// Watch for prop changes to sync local state
-watch(() => props.provider, (newVal) => {
-  if (newVal && newVal !== currentProviderLocal.value) {
-    currentProviderLocal.value = newVal
-  }
+const currentProviderLocal = computed({
+  get: () => props.provider,
+  set: (value) => emit('update:provider', value)
 })
 
 // Language state management
