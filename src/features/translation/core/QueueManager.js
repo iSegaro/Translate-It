@@ -42,6 +42,24 @@ const RETRY_STRATEGIES = {
     jitter: true
   },
   
+  // Model overloaded - similar to rate limiting but slightly shorter window
+  [ErrorTypes.MODEL_OVERLOADED]: {
+    maxRetries: 4,
+    baseDelay: 2000,
+    maxDelay: 20000,
+    exponentialFactor: 2,
+    jitter: true
+  },
+  
+  // Server errors (500, etc) - moderate retry
+  [ErrorTypes.SERVER_ERROR]: {
+    maxRetries: 3,
+    baseDelay: 2000,
+    maxDelay: 15000,
+    exponentialFactor: 2,
+    jitter: true
+  },
+  
   // Network errors - shorter delays with more retries
   [ErrorTypes.NETWORK_ERROR]: {
     maxRetries: 4,
