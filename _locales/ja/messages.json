@@ -2164,5 +2164,41 @@
   },
   "smart_language_fallback_note": {
     "message": "注：これらの設定は、手動で言語を選択する必要があるテキストフィールド翻訳などの機能に適用されます。"
+  },
+  "prompt_preview_mode_field": {
+    "message": "テキストフィールド翻訳"
+  },
+  "prompt_preview_desc_field": {
+    "message": "入力ボックスやテキストエリアでの翻訳"
+  },
+  "prompt_preview_mode_popup": {
+    "message": "ポップアップ / サイドパネル翻訳"
+  },
+  "prompt_preview_desc_popup": {
+    "message": "ポップアップウィンドウまたはサイドパネルでの翻訳"
+  },
+  "prompt_preview_mode_selection": {
+    "message": "テキスト選択翻訳"
+  },
+  "prompt_preview_desc_selection": {
+    "message": "ページ上の選択したテキストの翻訳"
+  },
+  "prompt_preview_mode_batch": {
+    "message": "要素選択 / ページ全体翻訳"
+  },
+  "prompt_preview_desc_batch": {
+    "message": "JSON形式による複数要素またはページ全体の翻訳"
+  },
+  "prompt_preview_mode_screen_capture": {
+    "message": "スクリーンキャプチャ翻訳"
+  },
+  "prompt_preview_desc_screen_capture": {
+    "message": "画像からのテキスト抽出と翻訳"
+  },
+  "prompt_preview_mode_dictionary": {
+    "message": "辞書翻訳"
+  },
+  "prompt_preview_desc_dictionary": {
+    "message": "単語の定義と類義語（注：このモードは固定形式を使用します）"
   }
 }

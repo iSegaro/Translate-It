@@ -2164,5 +2164,41 @@
   },
   "smart_language_fallback_note": {
     "message": "نکته: این تنظیمات برای ویژگی‌هایی مانند ترجمه در فیلد متنی (که ممکن است توسط پرووایدر فعلی پشتیبانی نشوند) استفاده می‌شود."
+  },
+  "prompt_preview_mode_field": {
+    "message": "ترجمه فیلد متنی"
+  },
+  "prompt_preview_desc_field": {
+    "message": "ترجمه در فیلدهای ورودی (مثل جعبه متن، فیلد ایمیل)"
+  },
+  "prompt_preview_mode_popup": {
+    "message": "ترجمه پاپ‌آپ / سایدپنل"
+  },
+  "prompt_preview_desc_popup": {
+    "message": "پاپ‌آپ و پنل کناری"
+  },
+  "prompt_preview_mode_selection": {
+    "message": "انتخاب متن"
+  },
+  "prompt_preview_desc_selection": {
+    "message": "ترجمه متن انتخاب شده در صفحات وب"
+  },
+  "prompt_preview_mode_batch": {
+    "message": "انتخاب المان / ترجمه صفحه"
+  },
+  "prompt_preview_desc_batch": {
+    "message": "ترجمه دسته‌ای چندین المان یا کل صفحه وب در قالب JSON"
+  },
+  "prompt_preview_mode_screen_capture": {
+    "message": "ترجمه از روی تصویر"
+  },
+  "prompt_preview_desc_screen_capture": {
+    "message": "استخراج متن و ترجمه از تصاویر اسکرین‌شات"
+  },
+  "prompt_preview_mode_dictionary": {
+    "message": "ترجمه دیکشنری"
+  },
+  "prompt_preview_desc_dictionary": {
+    "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
   }
 }

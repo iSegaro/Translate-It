@@ -2164,5 +2164,41 @@
   },
   "smart_language_fallback_note": {
     "message": "Note: These settings apply to features like Text Field Translation where manual language selection is required."
+  },
+  "prompt_preview_mode_field": {
+    "message": "Field Translation"
+  },
+  "prompt_preview_desc_field": {
+    "message": "Text field translation (e.g., input boxes, text areas)"
+  },
+  "prompt_preview_mode_popup": {
+    "message": "Popup / Sidepanel Translation"
+  },
+  "prompt_preview_desc_popup": {
+    "message": "Popup window or Sidepanel translation interface"
+  },
+  "prompt_preview_mode_selection": {
+    "message": "Text Selection"
+  },
+  "prompt_preview_desc_selection": {
+    "message": "Selected text translation on the page"
+  },
+  "prompt_preview_mode_batch": {
+    "message": "Select Element / Page Translate"
+  },
+  "prompt_preview_desc_batch": {
+    "message": "Multiple elements or whole page translation in JSON format"
+  },
+  "prompt_preview_mode_screen_capture": {
+    "message": "Screen Capture"
+  },
+  "prompt_preview_desc_screen_capture": {
+    "message": "OCR and translation of text from images"
+  },
+  "prompt_preview_mode_dictionary": {
+    "message": "Dictionary Translation"
+  },
+  "prompt_preview_desc_dictionary": {
+    "message": "Brief word definitions and synonyms (Note: This mode uses a fixed format)"
   }
 }

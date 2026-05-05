@@ -306,29 +306,29 @@ const generatePromptExamples = async () => {
 
     // Field mode
     examples.push({
-      mode: 'Field Translation',
-      description: 'Text field translation (e.g., input boxes, text areas)',
+      mode: t('prompt_preview_mode_field') || 'Field Translation',
+      description: t('prompt_preview_desc_field') || 'Text field translation (e.g., input boxes, text areas)',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'ai')
     })
 
     // Popup / Sidepanel mode
     examples.push({
-      mode: 'Popup / Sidepanel Translation',
-      description: 'Popup window or Sidepanel translation interface',
+      mode: t('prompt_preview_mode_popup') || 'Popup / Sidepanel Translation',
+      description: t('prompt_preview_desc_popup') || 'Popup window or Sidepanel translation interface',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
     })
 
     // Selection mode
     examples.push({
-      mode: 'Text Selection',
-      description: 'Selected text translation on the page',
+      mode: t('prompt_preview_mode_selection') || 'Text Selection',
+      description: t('prompt_preview_desc_selection') || 'Selected text translation on the page',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Selection, 'translate')
     })
 
     // Select Element / Page mode (JSON)
     examples.push({
-      mode: 'Select Element / Page Translate',
-      description: 'Multiple elements or whole page translation in JSON format',
+      mode: t('prompt_preview_mode_batch') || 'Select Element / Page Translate',
+      description: t('prompt_preview_desc_batch') || 'Multiple elements or whole page translation in JSON format',
       prompt: await buildPromptWithCurrentTemplate(
         SAMPLE_JSON,
         sourceLang,
@@ -340,15 +340,15 @@ const generatePromptExamples = async () => {
 
     // Screen Capture mode
     examples.push({
-      mode: 'Screen Capture',
-      description: 'OCR and translation of text from images',
+      mode: t('prompt_preview_mode_screen_capture') || 'Screen Capture',
+      description: t('prompt_preview_desc_screen_capture') || 'OCR and translation of text from images',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.ScreenCapture, 'translate')
     })
 
     // Dictionary mode
     examples.push({
-      mode: 'Dictionary Translation',
-      description: 'Brief word definitions and synonyms (Note: This mode uses a fixed format)',
+      mode: t('prompt_preview_mode_dictionary') || 'Dictionary Translation',
+      description: t('prompt_preview_desc_dictionary') || 'Brief word definitions and synonyms (Note: This mode uses a fixed format)',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_WORD, sourceLang, targetLang, TranslationMode.Dictionary_Translation, 'ai')
     })
 
@@ -394,6 +394,13 @@ const resetPrompt = async () => {
 // Watch for prompt changes and regenerate examples if preview is open
 watch(promptTemplate, async () => {
   if (showPreview.value && !loadingExamples.value) {
+    await generatePromptExamples()
+  }
+})
+
+// Watch for UI language changes to refresh localized labels in examples
+watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, async (newVal, oldVal) => {
+  if (newVal && oldVal && newVal !== oldVal && showPreview.value && !loadingExamples.value) {
     await generatePromptExamples()
   }
 })
