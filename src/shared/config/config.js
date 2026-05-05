@@ -255,7 +255,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 4, // Version of the prompt templates (localized labels for dictionary)
+  PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
