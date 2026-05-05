@@ -67,10 +67,10 @@
         <div class="prompt-preview-section">
           <button
             type="button"
-            class="prompt-preview-toggle"
-            @click="togglePreview"
+            class="prompt-preview-button-action"
+            @click="refreshPreview"
           >
-            <span class="toggle-icon">{{ showPreview ? '▼' : '▶' }}</span>
+            <span class="button-icon">🔍</span>
             <span>{{ t('prompt_preview_button') || 'Preview Generated Prompts' }}</span>
           </button>
 
@@ -133,15 +133,7 @@ const validationErrorKey = ref('')
 const validationError = computed(() => validationErrorKey.value ? getFirstErrorTranslated('promptTemplate', t) : '')
 
 // Prompt template setting
-const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT, {
-  onChanged: () => {
-    validatePrompt()
-    // Only regenerate examples if preview is already open
-    if (showPreview.value) {
-      generatePromptExamples()
-    }
-  }
-})
+const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT)
 
 // Language names for help text
 const sourceLanguageName = computed(() => settingsStore.settings?.SOURCE_LANGUAGE || 'Auto')
@@ -360,12 +352,12 @@ const generatePromptExamples = async () => {
   }
 }
 
-// Toggle preview section
-const togglePreview = () => {
-  showPreview.value = !showPreview.value
-  if (showPreview.value && promptExamples.value.length === 0) {
-    generatePromptExamples()
-  }
+// Refresh preview section
+const refreshPreview = async () => {
+  showPreview.value = true
+  // Perform validation and (re)generate examples
+  await validatePrompt()
+  await generatePromptExamples()
 }
 
 // Validation function
@@ -379,7 +371,11 @@ const validatePrompt = async () => {
 // Reset prompt to default
 const resetPrompt = async () => {
   promptTemplate.value = DEFAULT_PROMPT
-  await validatePrompt()
+  
+  if (showPreview.value) {
+    await validatePrompt()
+    await generatePromptExamples()
+  }
 
   // Add highlight effect
   const textarea = document.querySelector('.prompt-template-input textarea')
@@ -390,13 +386,6 @@ const resetPrompt = async () => {
     }, 800)
   }
 }
-
-// Watch for prompt changes and regenerate examples if preview is open
-watch(promptTemplate, async () => {
-  if (showPreview.value && !loadingExamples.value) {
-    await generatePromptExamples()
-  }
-})
 
 // Watch for UI language changes to refresh localized labels in examples
 watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, async (newVal, oldVal) => {
