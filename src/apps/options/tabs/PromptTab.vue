@@ -16,6 +16,7 @@
         </div>
         
         <BaseTextarea
+          id="PROMPT_TEMPLATE"
           v-model="promptTemplate"
           :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
           :rows="10"
@@ -109,12 +110,13 @@
 
 <script setup>
 import './PromptTab.scss'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { useValidation } from '@/core/validation.js'
 import { CONFIG, TranslationMode } from '@/shared/config/config.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
@@ -124,6 +126,7 @@ const { t } = useUnifiedI18n()
 const logger = { debug: (...args) => console.debug('[PromptTab]', ...args) }
 const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
+const { highlightElement } = useHighlightManager()
 
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
@@ -362,11 +365,40 @@ const refreshPreview = async () => {
   await generatePromptExamples()
 }
 
+// Validation feedback listener
+const handleValidationFeedback = (e) => {
+  const { field } = e.detail || {};
+  
+  if (field === 'prompt' || field === 'PROMPT_TEMPLATE') {
+    // Explicitly trigger validation feedback display
+    validatePrompt(true);
+    
+    // Focus and highlight logic
+    setTimeout(() => {
+      highlightElement('PROMPT_TEMPLATE');
+    }, 400);
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
 // Validation function
-const validatePrompt = async () => {
+const validatePrompt = async (showFeedback = false) => {
   clearErrors()
   const isValid = await validate(promptTemplate.value)
-  validationErrorKey.value = isValid ? '' : (getFirstError('promptTemplate') || '')
+  
+  if (!isValid && showFeedback) {
+    validationErrorKey.value = getFirstError('promptTemplate') || ''
+  } else if (isValid) {
+    validationErrorKey.value = ''
+  }
+  
   return isValid
 }
 

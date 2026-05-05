@@ -24,6 +24,7 @@
           <div class="setting-group">
             <label>{{ t('source_language_label') || 'Source Language' }}</label>
             <LanguageDropdown
+              id="SOURCE_LANGUAGE"
               v-model="sourceLanguage"
               :languages="filteredSourceLanguages"
               type="source"
@@ -34,6 +35,7 @@
           <div class="setting-group">
             <label>{{ t('target_language_label') || 'Target Language' }}</label>
             <LanguageDropdown
+              id="TARGET_LANGUAGE"
               v-model="targetLanguage"
               :languages="filteredTargetLanguages"
               type="target"
@@ -64,6 +66,7 @@
 
         <!-- API Settings Accordion -->
         <BaseAccordion
+          id="TRANSLATION_API"
           :is-open="activeAccordion === 'api'"
           item-class="api-settings-accordion"
           @toggle="toggleAccordion('api')"

@@ -107,6 +107,28 @@ const saveAllSettings = async () => {
       return
     }
 
+    // Handle prompt validation errors
+    if (validation.errors.some(e => e.includes('prompt'))) {
+      if (router.currentRoute.value.name !== 'prompt') {
+        await router.push({ name: 'prompt' })
+      }
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+        detail: { field: 'prompt' } 
+      }))
+      return
+    }
+
+    // Handle proxy validation errors
+    if (validation.errors.some(e => e.includes('proxy'))) {
+      if (router.currentRoute.value.name !== 'advance') {
+        await router.push({ name: 'advance' })
+      }
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+        detail: { field: 'proxy' } 
+      }))
+      return
+    }
+
     // For other errors, show the specific error message to help debugging
     statusType.value = 'error'
     const firstError = validation.errors[0]
