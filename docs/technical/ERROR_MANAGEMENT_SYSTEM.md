@@ -75,7 +75,8 @@ To add a new error pattern (e.g., from a new Provider like Anthropic):
 2.  **Classify (The Matcher)**:
     - Open `src/shared/error-management/ErrorMatcher.js`.
     - Add the error's text pattern to `matchErrorToType()`.
-    - Add the Type to `FATAL_ERRORS`, `CRITICAL_CONFIG_ERRORS`, or `SILENT_ERRORS` if needed.
+    - Add the Type to `FATAL_ERRORS`, `TRANSIENT_ERRORS`, or `CRITICAL_CONFIG_ERRORS`.
+    - Ensure `isTransientError()` or `isConfigError()` correctly identifies the new type if it has custom status codes.
 3.  **Decide (The Strategy)**:
     - Open `src/shared/error-management/ErrorDisplayStrategies.js`.
     - Map the new Type to a context-specific strategy (Toast, UI, Severity level).
@@ -94,6 +95,28 @@ To add a new error pattern (e.g., from a new Provider like Anthropic):
 | `ErrorHandler.js` | **Logic Controller**. Coordinates Matcher, Strategy, and Messages to deliver final UI output. |
 | `ExtensionContextManager.js` | **Context Shield**. Handles reloads, environment detection, and asset safety. |
 
+## Stability & Resilience
+
+The system includes advanced mechanisms to handle transient failures and prevent infrastructure overloading.
+
+### 1. Error Classifications (The Matcher)
+The `ErrorMatcher` categorizes all errors into three main functional categories:
+- **Fatal Errors**: Critical failures (e.g., `FORBIDDEN_ERROR`). These trigger an immediate stop and can trip the Circuit Breaker.
+- **Transient Errors**: Temporary issues (e.g., `NETWORK_ERROR`, `SERVER_ERROR`, `MODEL_OVERLOADED`). These allow for automated retries.
+- **Config Errors**: User-side configuration issues (e.g., `API_KEY_MISSING`, `INSUFFICIENT_BALANCE`). These fail immediately but **do not** trip the Circuit Breaker.
+
+### 2. Circuit Breaker (RateLimitManager)
+To protect both the user's experience and the provider's infrastructure, a Circuit Breaker is implemented:
+- **Trigger**: Opens after 5 consecutive transient failures or 1 fatal (non-config) failure.
+- **Behavior**: While "Open", all requests to that provider fail immediately with a `CIRCUIT_BREAKER_OPEN` error, preventing redundant network traffic.
+- **Recovery**: Automatically attempts to close after a cooldown period (default: 30s).
+
+### 3. Intelligent Retries (QueueManager)
+Requests are managed via a priority queue with smart retry logic:
+- **Exponential Backoff**: Retries use an increasing delay (e.g., 2s -> 4s -> 8s -> 10s for network errors).
+- **Jitter**: Adds randomness to retry timing to prevent "Thundering Herd" problems.
+- **First-Error Preservation**: The system remembers the original cause of failure to show the user the most relevant error message, even if subsequent retries fail due to the Circuit Breaker.
+
 ---
 
 ## Usage in Vue.js (Composables)
@@ -111,4 +134,4 @@ setup() {
 }
 ```
 
-**Last Updated**: April 2026
+**Last Updated**: May 2026
