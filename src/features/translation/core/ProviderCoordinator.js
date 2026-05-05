@@ -12,7 +12,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { queueManager } from "./QueueManager.js";
@@ -221,6 +221,7 @@ export class ProviderCoordinator {
       };
     } catch (error) {
       const errorType = matchErrorToType(error);
+      const isTransient = isTransientError(error) || isTransientError(errorType);
       
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
@@ -228,7 +229,7 @@ export class ProviderCoordinator {
         logger.error(`[Coordinator] Execution failed for ${providerName}:`, error.message);
       }
 
-      if (isFatalError(error)) throw error;
+      if (isFatalError(error) || isTransient) throw error;
       return Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
     }
   }

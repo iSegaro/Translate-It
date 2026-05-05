@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { TraditionalBatchProcessor } from './TraditionalBatchProcessor.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, isTransientError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -28,6 +28,8 @@ describe('TraditionalBatchProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isFatalError).mockReturnValue(false);
+    vi.mocked(isTransientError).mockReturnValue(false);
   });
 
   describe('Batch Splitting Logic', () => {

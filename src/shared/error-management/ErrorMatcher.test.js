@@ -3,6 +3,7 @@ import {
   matchErrorToType, 
   isSilentError, 
   isFatalError, 
+  isTransientError,
   isRetryableError, 
   isCancellationError,
   needsSettings,
@@ -94,13 +95,22 @@ describe('ErrorMatcher', () => {
 
     it('isFatalError should identify fatal errors', () => {
       expect(isFatalError(ErrorTypes.API_KEY_INVALID)).toBe(true);
-      expect(isFatalError(ErrorTypes.NETWORK_ERROR)).toBe(true);
-      expect(isFatalError({ statusCode: 429 })).toBe(true);
+      expect(isFatalError(ErrorTypes.NETWORK_ERROR)).toBe(false); // Changed: Network is now transient
+      expect(isFatalError({ statusCode: 429 })).toBe(false); // Changed: Rate limit is now transient
+      expect(isFatalError({ statusCode: 401 })).toBe(true);
       expect(isFatalError(ErrorTypes.VALIDATION)).toBe(false);
     });
 
-    it('isRetryableError should be the opposite of isFatalError for standard types', () => {
+    it('isTransientError should identify transient errors', () => {
+      expect(isTransientError(ErrorTypes.NETWORK_ERROR)).toBe(true);
+      expect(isTransientError(ErrorTypes.SERVER_ERROR)).toBe(true);
+      expect(isTransientError({ statusCode: 429 })).toBe(true);
+      expect(isTransientError(ErrorTypes.API_KEY_INVALID)).toBe(false);
+    });
+
+    it('isRetryableError should include transient errors and non-fatal errors', () => {
       expect(isRetryableError(ErrorTypes.VALIDATION)).toBe(true);
+      expect(isRetryableError(ErrorTypes.NETWORK_ERROR)).toBe(true);
       expect(isRetryableError(ErrorTypes.API_KEY_INVALID)).toBe(false);
     });
 

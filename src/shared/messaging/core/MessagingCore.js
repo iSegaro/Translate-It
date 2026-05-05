@@ -46,6 +46,7 @@ export const MessageFormat = {
       errorData = {
         message: error.message,
         type: error.type || errorType,
+        originalType: error.originalType, // Preserve original type for Circuit Breaker
         statusCode: error.statusCode,
         ...options
       };
@@ -53,6 +54,7 @@ export const MessageFormat = {
       errorData = {
         message: error.message || error.error || 'Unknown error',
         type: error.type || errorType,
+        originalType: error.originalType, // Preserve original type if present
         ...error,
         ...options
       };
