@@ -291,24 +291,26 @@ const generatePromptExamples = async () => {
   const targetLang = settingsStore.settings?.TARGET_LANGUAGE || 'en'
 
   try {
+    /* Commented out as it's currently unused by any provider
     // Field mode (translate provider)
     examples.push({
-      mode: 'Field Translation',
+      mode: 'Field Translation (Low LLM Capability)',
       description: 'Text field translation (e.g., input boxes, text areas)',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'translate')
     })
+    */
 
-    // Field mode (AI provider)
+    // Field mode
     examples.push({
-      mode: 'Field Translation (AI)',
-      description: 'Same field mode but with AI provider',
+      mode: 'Field Translation',
+      description: 'Text field translation (e.g., input boxes, text areas)',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'ai')
     })
 
-    // Popup mode
+    // Popup / Sidepanel mode
     examples.push({
-      mode: 'Popup Translation',
-      description: 'Popup window translation interface',
+      mode: 'Popup / Sidepanel Translation',
+      description: 'Popup window or sidepanel translation interface',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
     })
 
@@ -319,10 +321,10 @@ const generatePromptExamples = async () => {
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Selection, 'translate')
     })
 
-    // Select Element mode (JSON)
+    // Select Element / Page mode (JSON)
     examples.push({
-      mode: 'Select Element (JSON)',
-      description: 'Multiple elements translation in JSON format',
+      mode: 'Select Element / Page Translate',
+      description: 'Multiple elements or whole page translation in JSON format',
       prompt: await buildPromptWithCurrentTemplate(
         SAMPLE_JSON,
         sourceLang,
