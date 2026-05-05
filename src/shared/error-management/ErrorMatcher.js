@@ -139,9 +139,19 @@ export class ErrorMatcher {
   static isSilent(type) { return isSilentError(type); }
   static isFatal(type) { return isFatalError(type); }
   static isTransient(type) { return isTransientError(type); }
+  static isConfig(type) { return isConfigError(type); }
   static needsSettings(type) { return needsSettings(type); }
   static shouldSuppressConsole(type) { return shouldSuppressConsole(type); }
   static isCancellation(error) { return isCancellationError(error); }
+}
+
+/**
+ * Determines if an error is a configuration error that requires user intervention
+ */
+export function isConfigError(errorOrType) {
+  if (!errorOrType) return false;
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType?.type || matchErrorToType(errorOrType));
+  return CRITICAL_CONFIG_ERRORS.has(type);
 }
 
 /**

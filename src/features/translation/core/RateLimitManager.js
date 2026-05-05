@@ -7,7 +7,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
@@ -369,7 +369,13 @@ export class RateLimitManager {
 
   _recordFailure(state, error, providerName) {
     state.performanceStats.failedRequests++;
-    state.consecutiveFailures++;
+    
+    // Config errors (API key missing, etc.) should NOT count towards circuit breaking
+    // because they are client-side issues, not provider health issues.
+    const isConfig = isConfigError(error);
+    if (!isConfig) {
+      state.consecutiveFailures++;
+    }
     
     // Adaptive Backoff: Increase delay on 429 or quota errors
     const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
@@ -378,10 +384,10 @@ export class RateLimitManager {
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 
-    // CRITICAL: Open circuit breaker immediately on fatal errors
+    // CRITICAL: Open circuit breaker immediately on fatal errors (excluding config errors)
     const isFatal = isFatalError(error);
 
-    if (isFatal || state.consecutiveFailures >= state.circuitBreakThreshold) {
+    if ((isFatal && !isConfig) || state.consecutiveFailures >= state.circuitBreakThreshold) {
       if (!state.isCircuitOpen) {
         state.isCircuitOpen = true;
         state.circuitOpenTime = Date.now();

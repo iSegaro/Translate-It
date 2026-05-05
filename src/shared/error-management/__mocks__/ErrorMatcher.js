@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 export const matchErrorToType = vi.fn(() => 'UNKNOWN');
 export const isFatalError = vi.fn(() => false);
 export const isTransientError = vi.fn(() => false);
+export const isConfigError = vi.fn(() => false);
 export const isCancellationError = vi.fn(() => false);
 export const getProviderErrorPattern = vi.fn(() => null);
 export const isRetryableError = vi.fn(() => true);
@@ -18,6 +19,7 @@ export const ErrorMatcher = {
   matchErrorToType,
   isFatal: isFatalError,
   isTransient: isTransientError,
+  isConfig: isConfigError,
   isSilent: isSilentError,
   isCancellation: isCancellationError,
   needsSettings,
