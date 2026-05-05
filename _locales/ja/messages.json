@@ -1355,6 +1355,9 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "保存に失敗しました :("
   },
+  "OPTIONS_STATUS_VALIDATION_FAILED": {
+    "message": "保存する前にエラーを修正してください"
+  },
   "browser_api_settings_title": {
     "message": "ブラウザ設定"
   },
@@ -2153,4 +2156,4 @@
   "smart_language_fallback_note": {
     "message": "注：これらの設定は、手動で言語を選択する必要があるテキストフィールド翻訳などの機能に適用されます。"
   }
-  }
+}

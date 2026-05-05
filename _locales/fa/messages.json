@@ -1355,6 +1355,9 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "ذخیره نشد :("
   },
+  "OPTIONS_STATUS_VALIDATION_FAILED": {
+    "message": "ابتدا خطاهای موجود را برطرف کنید"
+  },
   "browser_api_settings_title": {
     "message": "تنظیمات مرورگر"
   },

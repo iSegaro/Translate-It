@@ -352,7 +352,7 @@
 
 <script setup>
 import './LanguagesTab.scss'
-import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, defineAsyncComponent } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -637,19 +637,78 @@ watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (isEnabled, pr
 
 const validationErrorKey = ref('')
 const validationError = computed(() => {
-  return validationErrorKey.value ? (getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t)) : ''
+  if (!validationErrorKey.value) return ''
+
+  // 1. Check for provider configuration errors if that's the current error state
+  if (validationErrorKey.value === 'PROVIDER_CONFIG_ERROR') {
+    const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings)
+    if (missingKey) {
+      return t('validation_api_key_empty', { provider: selectedProviderInfo.value?.name || selectedProvider.value }) || 'Provider not configured'
+    }
+    return ''
+  }
+
+  // 2. Otherwise show language validation errors (validationErrorKey holds the error key)
+  return getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t) || ''
 })
 
 watch(validationError, (err) => {
   // Sync with global store state
   settingsStore.isSettingsValid = !err
 }, { immediate: true })
-const validateLanguages = async () => {
+
+const validateLanguages = async (showFeedback = false) => {
   clearErrors()
+  
+  // 1. Standard language validation
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
-  validationErrorKey.value = isValid ? '' : (getFirstError('sourceLanguage') || getFirstError('targetLanguage') || '')
-  return isValid
+  if (!isValid) {
+    if (showFeedback) {
+      validationErrorKey.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage') || ''
+    }
+    return false
+  }
+
+  // 2. Provider configuration validation
+  const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings);
+  if (missingKey) {
+    if (showFeedback) {
+      validationErrorKey.value = 'PROVIDER_CONFIG_ERROR'
+    }
+    return false
+  }
+
+  // Clear error display if everything is valid
+  validationErrorKey.value = ''
+  return true
 }
+
+// Validation feedback listener
+const handleValidationFeedback = (e) => {
+  const { field } = e.detail || {};
+  
+  // Explicitly trigger validation feedback display
+  validateLanguages(true);
+
+  // Focus and highlight logic
+  const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings);
+  if (field === missingKey || field === 'provider') {
+    activeAccordion.value = 'api';
+    setTimeout(() => {
+      highlightElement(missingKey || 'TRANSLATION_API');
+    }, 400);
+  } else if (field === 'languages') {
+    highlightElement('SOURCE_LANGUAGE');
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
 
 onMounted(async () => { await loadLanguages(); await validateLanguages() })
 defineExpose({ validate: validateLanguages })

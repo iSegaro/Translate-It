@@ -1355,6 +1355,9 @@
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "Save failed :("
   },
+  "OPTIONS_STATUS_VALIDATION_FAILED": {
+    "message": "Please fix errors before saving"
+  },
   "browser_api_settings_title": {
     "message": "Browser Settings"
   },

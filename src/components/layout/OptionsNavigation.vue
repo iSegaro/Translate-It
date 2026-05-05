@@ -17,7 +17,7 @@
       </div>
       <button 
         id="saveSettings" 
-        :disabled="isSaving || !settingsStore.isSettingsValid"
+        :disabled="isSaving"
         class="save-button"
         @click="saveAllSettings"
       >
@@ -30,6 +30,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import './OptionsNavigation.scss'
+import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -37,12 +38,14 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
 const { t, locale } = useUnifiedI18n()
 
 const settingsStore = useSettingsStore()
+const router = useRouter()
 
 // Navigation items, labels are reactive to language changes
 const navigationItems = ref([
@@ -70,6 +73,47 @@ const isSaving = ref(false)
 // Save all settings
 const saveAllSettings = async () => {
   logger.debug('Save All Settings clicked!')
+  
+  // 1. Validate all critical settings before proceeding
+  const validation = settingsStore.validateSettings()
+  if (!validation.isValid) {
+    logger.warn('Cannot save settings: Validation failed', validation.errors)
+    
+    // Check if it's a provider configuration error
+    const missingKey = getFirstMissingSetting(settingsStore.settings.TRANSLATION_API, settingsStore.settings)
+    
+    if (missingKey) {
+      // Redirect to languages tab with highlight parameter if not already there
+      const currentRoute = router.currentRoute.value.name
+      if (currentRoute !== 'languages') {
+        await router.push({ name: 'languages', query: { highlight: missingKey } })
+      } else {
+        // Already on languages tab, just dispatch the event
+        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+          detail: { field: missingKey } 
+        }))
+      }
+      return
+    }
+
+    // Handle language validation errors
+    if (validation.errors.some(e => e.includes('language'))) {
+      if (router.currentRoute.value.name !== 'languages') {
+        await router.push({ name: 'languages' })
+      }
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+        detail: { field: 'languages' } 
+      }))
+      return
+    }
+
+    // For other errors, show a general message for now
+    statusType.value = 'error'
+    statusMessage.value = t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+    setTimeout(() => { statusMessage.value = ''; statusType.value = ''; }, 3000)
+    return
+  }
+
   isSaving.value = true
   statusType.value = ''
   statusMessage.value = ''

@@ -9,6 +9,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
+import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -533,17 +534,14 @@ export const useSettingsStore = defineStore('settings', () => {
       errors.push('Target language is required')
     }
     
-    if (settings.value.SOURCE_LANGUAGE === settings.value.TARGET_LANGUAGE) {
+    if (settings.value.SOURCE_LANGUAGE !== 'auto' && settings.value.SOURCE_LANGUAGE === settings.value.TARGET_LANGUAGE) {
       errors.push('Source and target languages cannot be the same')
     }
     
-    // Validate API keys for selected provider
-  const provider = settings.value.TRANSLATION_API
-    if (['gemini', 'openai', 'openrouter', 'deepseek', 'custom'].includes(provider)) {
-      const keyField = provider === 'custom' ? 'CUSTOM_API_KEY' : 'API_KEY'
-      if (!settings.value[keyField]) {
-        errors.push(`API key is required for ${provider}`)
-      }
+    // Validate API keys and configuration for selected provider
+    const missingKey = getFirstMissingSetting(settings.value.TRANSLATION_API, settings.value);
+    if (missingKey) {
+      errors.push(`Configuration missing for ${settings.value.TRANSLATION_API}: ${missingKey}`);
     }
     
     // Validate prompt templates
