@@ -1,7 +1,6 @@
 <template>
   <div
     class="sidepanel-container"
-    @keydown="handleKeydown"
   >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
@@ -16,7 +15,7 @@
       <!-- Main Content -->
       <SidepanelMainContent
         ref="mainContentRef"
-        :provider="currentProvider"
+        v-model:provider="currentProvider"
       />
 
       <!-- History Panel -->

@@ -7,6 +7,9 @@
 ##### Fixed
 
 - Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
+-  پیغام Circuit breaker غیر منطقی ظاهر میشه. مثلا وقتی یکبار از WebAI استفاده کنیم در
+         WindowsManager ، همون بار اول این پیغام رو نمایش میده. بجای نمایش پیغام صحیح که عدم اتصال به این
+         سرویس است.
 
 ##### Changed
 

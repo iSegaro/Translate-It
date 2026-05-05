@@ -9,6 +9,12 @@ List of features, enhancements, and ideas planned for future development.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.
 
+- وقتی خطایی در Page Translate رخ بده ، در FAB Desktop حالت Stop Auto Translating تبدیل میشه. باید وضعیتش reset بشه. حتی وقتی روش کلیک میکنم هم متوقف نمیشه.
+
+- Provider WebAI در source Auto نداره
+
+- در صفحه تنظیمات در تب LanguagesTab وقتی پرووایدری انتخاب میشه  قبل از ذخیره شدن، باید بررسی بشه پرووایدر انتخاب شده آیا تنظیم شده است یا خیر. اگه تنظیم نشده، باید روش فوکوس بشه و هایلایت بشه قسمتی که نیاز به تنظیم داره.
+
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
 - استفاده از Vajehyab

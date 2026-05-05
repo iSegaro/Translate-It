@@ -76,7 +76,8 @@ export const SETTINGS_REQUIRED_ERRORS = new Set([
 ]);
 
 /**
- * Critical configuration errors that should always use localized generic messages
+ * Critical configuration errors that should always use localized generic messages.
+ * These are truly fatal as they require user intervention or settings change.
  */
 export const CRITICAL_CONFIG_ERRORS = new Set([
   ErrorTypes.BROWSER_API_UNAVAILABLE,
@@ -85,8 +86,6 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
   ErrorTypes.API_URL_MISSING,
   ErrorTypes.API_CONFIG_INVALID,
   ErrorTypes.MODEL_MISSING,
-  ErrorTypes.QUOTA_EXCEEDED,
-  ErrorTypes.RATE_LIMIT_REACHED,
   ErrorTypes.INSUFFICIENT_BALANCE,
   ErrorTypes.DEEPL_QUOTA_EXCEEDED,
   ErrorTypes.GEMINI_QUOTA_REGION,
@@ -94,30 +93,41 @@ export const CRITICAL_CONFIG_ERRORS = new Set([
 ]);
 
 /**
- * Errors that are generally non-recoverable without user intervention or configuration change
+ * Errors that are generally non-recoverable without user intervention or configuration change.
+ * These will trigger an immediate Circuit Breaker open in RateLimitManager.
  */
 export const FATAL_ERRORS = new Set([
   ...CRITICAL_CONFIG_ERRORS,
-  ErrorTypes.CIRCUIT_BREAKER_OPEN, // Moved here to ensure descriptive message is used while remaining fatal
+  ErrorTypes.CIRCUIT_BREAKER_OPEN,
   ErrorTypes.FORBIDDEN_ERROR,
-  ErrorTypes.NETWORK_ERROR,
-  ErrorTypes.HTTP_ERROR,
-  ErrorTypes.SERVER_ERROR,
-  ErrorTypes.MODEL_OVERLOADED,
   ErrorTypes.INVALID_REQUEST,
-  ErrorTypes.TRANSLATION_FAILED,
-  ErrorTypes.TRANSLATION_ERROR,
-  ErrorTypes.API_ERROR,
   ErrorTypes.USER_CANCELLED,
   ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
   ErrorTypes.CONTEXT,
   ErrorTypes.PAGE_MOVED_TO_CACHE,
   ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
-  ErrorTypes.API_RESPONSE_INVALID,
   ErrorTypes.API_ENDPOINT_INVALID,
-  ErrorTypes.SETTINGS_LOADING_TIMEOUT,
-  ErrorTypes.CONNECTION_LOST,
   ErrorTypes.BROWSER_API_UNAVAILABLE
+]);
+
+/**
+ * Errors that are potentially transient and should allow retries.
+ * These will only trigger Circuit Breaker after multiple consecutive failures.
+ */
+export const TRANSIENT_ERRORS = new Set([
+  ErrorTypes.NETWORK_ERROR,
+  ErrorTypes.HTTP_ERROR,
+  ErrorTypes.SERVER_ERROR,
+  ErrorTypes.MODEL_OVERLOADED,
+  ErrorTypes.RATE_LIMIT_REACHED,
+  ErrorTypes.QUOTA_EXCEEDED,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.API_ERROR,
+  ErrorTypes.API_RESPONSE_INVALID,
+  ErrorTypes.CONNECTION_LOST,
+  ErrorTypes.TRANSLATION_TIMEOUT,
+  ErrorTypes.OPERATION_TIMEOUT
 ]);
 
 /**
@@ -128,9 +138,20 @@ export class ErrorMatcher {
   static matchErrorToType(error) { return matchErrorToType(error); }
   static isSilent(type) { return isSilentError(type); }
   static isFatal(type) { return isFatalError(type); }
+  static isTransient(type) { return isTransientError(type); }
+  static isConfig(type) { return isConfigError(type); }
   static needsSettings(type) { return needsSettings(type); }
   static shouldSuppressConsole(type) { return shouldSuppressConsole(type); }
   static isCancellation(error) { return isCancellationError(error); }
+}
+
+/**
+ * Determines if an error is a configuration error that requires user intervention
+ */
+export function isConfigError(errorOrType) {
+  if (!errorOrType) return false;
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType?.type || matchErrorToType(errorOrType));
+  return CRITICAL_CONFIG_ERRORS.has(type);
 }
 
 /**
@@ -145,7 +166,7 @@ export function isCancellationError(error) {
 }
 
 /**
- * Determines if an error is considered "fatal" (should stop translation process)
+ * Determines if an error is considered "fatal" (should stop translation process immediately)
  */
 export function isFatalError(errorOrType) {
   if (!errorOrType) return false;
@@ -154,17 +175,31 @@ export function isFatalError(errorOrType) {
     ? errorOrType 
     : (errorOrType.type || matchErrorToType(errorOrType));
 
+  // 429 is Rate Limit, which is transient, not fatal.
   const isFatalStatusCode = errorOrType && typeof errorOrType === 'object' && 
-    [401, 402, 403, 404, 429].includes(errorOrType.statusCode);
+    [401, 402, 403, 404].includes(errorOrType.statusCode);
 
   return FATAL_ERRORS.has(type) || isFatalStatusCode;
+}
+
+/**
+ * Determines if an error is transient (potentially recoverable via retry)
+ */
+export function isTransientError(errorOrType) {
+  if (!errorOrType) return false;
+  const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType.type || matchErrorToType(errorOrType));
+  
+  const isTransientStatusCode = errorOrType && typeof errorOrType === 'object' && 
+    [429, 500, 502, 503, 504].includes(errorOrType.statusCode);
+    
+  return TRANSIENT_ERRORS.has(type) || isTransientStatusCode;
 }
 
 /**
  * Determines if an error should trigger a retry or fallback
  */
 export function isRetryableError(errorOrType) {
-  return !isFatalError(errorOrType);
+  return isTransientError(errorOrType) || !isFatalError(errorOrType);
 }
 
 /**
@@ -277,13 +312,16 @@ export function matchErrorToType(rawOrError = "") {
     msg = "unknown error";
   }
 
-  // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا
+  // Priority 3: Technical fallbacks
   if (typeof rawOrError === "string") {
     const rawKey = rawOrError.trim();
     if (Object.values(ErrorTypes).includes(rawKey)) {
       return rawKey;
     }
   }
+
+  // Priority 4: Circuit Breaker (must be checked before generic keywords like 'fetch' or 'quota')
+  if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   if (msg.includes("api response invalid") || msg.includes("invalid api response")) return ErrorTypes.API_RESPONSE_INVALID;
   if (msg.includes("already been translated")) return ErrorTypes.NODE_ALREADY_TRANSLATED;
@@ -350,7 +388,6 @@ export function matchErrorToType(rawOrError = "") {
   if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg === "api_url_missing") return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
   if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded") || msg.includes("high demand") || msg.includes("service unavailable")) return ErrorTypes.MODEL_OVERLOADED;
-  if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   if ((msg.includes("quota exceeded") && msg.includes("region")) || msg.includes("location is not supported") || msg.includes("gemini_quota_region")) return ErrorTypes.GEMINI_QUOTA_REGION;
   if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("quota_exceeded") || msg.includes("limit exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
