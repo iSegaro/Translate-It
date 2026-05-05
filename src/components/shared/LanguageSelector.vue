@@ -297,8 +297,8 @@ const isSwapPossible = computed(() => {
   const currentTarget = targetLanguage.value;
 
   // Swap is possible if the target can become a source, 
-  // AND the current source is a valid target for that new source.
-  return !!restrictedMap[currentTarget] && restrictedMap[currentTarget].includes(currentSource);
+  // AND the current source is a valid target for that new source (or is auto-detect).
+  return !!restrictedMap[currentTarget] && (currentSource === AUTO_DETECT_VALUE || restrictedMap[currentTarget].includes(currentSource));
 })
 
 // Reactive data for responsive layout (only for sidepanel)
