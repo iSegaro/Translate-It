@@ -84,6 +84,7 @@ class QueueItem {
     this.createdAt = Date.now();
     this.attempts = 0;
     this.lastAttemptAt = null;
+    this.firstError = null; // Store the first error that occurred
     this.lastError = null;
     this.result = null;
     this.callbacks = {
@@ -108,6 +109,12 @@ class QueueItem {
   shouldRetry() {
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {
+      // CIRCUIT_BREAKER_OPEN is considered fatal in ErrorMatcher.
+      // In QueueManager, we should NOT retry if the circuit is already open.
+      if (this.lastError.type === ErrorTypes.CIRCUIT_BREAKER_OPEN) {
+        return false;
+      }
+
       // Exceptions: These are marked as fatal in ErrorMatcher to stop standard flows,
       // but in QueueManager we WANT to retry them because they are often transient.
       const retryableFatalTypes = [
@@ -116,7 +123,6 @@ class QueueItem {
         ErrorTypes.HTTP_ERROR,
         ErrorTypes.SERVER_ERROR,
         ErrorTypes.QUOTA_EXCEEDED,
-        ErrorTypes.CIRCUIT_BREAKER_OPEN,
         ErrorTypes.API_ERROR
       ];
 
@@ -285,6 +291,9 @@ export class QueueManager {
       
     } catch (error) {
       item.lastError = error;
+      if (!item.firstError) {
+        item.firstError = error;
+      }
       
       if (item.shouldRetry()) {
         // Schedule retry
@@ -308,7 +317,13 @@ export class QueueManager {
         item.status = QueueStatus.FAILED;
         
         if (item.callbacks.reject) {
-          item.callbacks.reject(error);
+          // If we hit a circuit breaker during a retry, prefer showing the original error
+          // that caused the problem in the first place.
+          const errorToReport = (item.attempts > 1 && error.type === ErrorTypes.CIRCUIT_BREAKER_OPEN && item.firstError)
+            ? item.firstError
+            : error;
+          
+          item.callbacks.reject(errorToReport);
         }
         
         // FIX: Log cancellations as debug instead of error to prevent log noise

@@ -7,7 +7,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
@@ -147,7 +147,7 @@ export class RateLimitManager {
       
       // If the underlying error was fatal/retryable, preserve its characteristics safely
       if (lastError) {
-        error.originalType = lastError.type;
+        error.originalType = lastError.type || matchErrorToType(lastError);
         if (lastError.statusCode) error.statusCode = lastError.statusCode;
       }
       

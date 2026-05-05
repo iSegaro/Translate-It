@@ -302,13 +302,16 @@ export function matchErrorToType(rawOrError = "") {
     msg = "unknown error";
   }
 
-  // اولویت ۳: فال‌بک به روش قدیمی مبتنی بر متن خطا
+  // Priority 3: Technical fallbacks
   if (typeof rawOrError === "string") {
     const rawKey = rawOrError.trim();
     if (Object.values(ErrorTypes).includes(rawKey)) {
       return rawKey;
     }
   }
+
+  // Priority 4: Circuit Breaker (must be checked before generic keywords like 'fetch' or 'quota')
+  if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   if (msg.includes("api response invalid") || msg.includes("invalid api response")) return ErrorTypes.API_RESPONSE_INVALID;
   if (msg.includes("already been translated")) return ErrorTypes.NODE_ALREADY_TRANSLATED;
@@ -375,7 +378,6 @@ export function matchErrorToType(rawOrError = "") {
   if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg === "api_url_missing") return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
   if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded") || msg.includes("high demand") || msg.includes("service unavailable")) return ErrorTypes.MODEL_OVERLOADED;
-  if (msg.includes("circuit breaker open")) return ErrorTypes.CIRCUIT_BREAKER_OPEN;
 
   if ((msg.includes("quota exceeded") && msg.includes("region")) || msg.includes("location is not supported") || msg.includes("gemini_quota_region")) return ErrorTypes.GEMINI_QUOTA_REGION;
   if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("quota_exceeded") || msg.includes("limit exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
