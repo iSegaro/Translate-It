@@ -135,12 +135,17 @@ export async function buildPrompt(
   }
 
   // Now, build the final prompt by injecting languages and instructions.
-  const promptTemplate = sourceLang === 'auto' 
-    ? await getPromptAutoAsync() 
+  const promptTemplate = sourceLang === 'auto'
+    ? await getPromptAutoAsync()
     : await getPromptAsync();
-  
+
+  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
+  const promptInstructionsWithoutText = promptTemplate
+    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
+    .replace(/\n\s*$/g, '')        // Remove trailing empty lines
+
   // IMPORTANT: The placeholder format is $_{VAR}, not ${\\_\_VAR}.
-  const promptInstructions = promptTemplate
+  const promptInstructions = promptInstructionsWithoutText
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName);
 

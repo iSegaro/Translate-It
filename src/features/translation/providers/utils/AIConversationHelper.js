@@ -282,7 +282,12 @@ export const AIConversationHelper = {
       ? await getPromptAutoAsync()
       : await getPromptAsync();
 
-    const promptInstructions = promptInstructionsTemplate
+    // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
+    const promptInstructionsWithoutText = promptInstructionsTemplate
+      .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
+      .replace(/\n\s*$/g, '');        // Remove trailing empty lines
+
+    const promptInstructions = promptInstructionsWithoutText
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName);
 
