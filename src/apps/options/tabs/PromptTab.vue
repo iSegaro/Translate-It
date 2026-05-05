@@ -180,12 +180,21 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
 
   const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js')
 
+  // Helper function to check JSON format (same as in AIConversationHelper)
+  const isSpecificTextJsonFormat = (obj) => {
+    return (
+      Array.isArray(obj) &&
+      obj.length > 0 &&
+      obj.every(
+        (item) => typeof item === 'object' && item !== null && typeof item.text === 'string'
+      )
+    )
+  }
+
   let isJsonMode = false
   try {
     const parsedText = JSON.parse(text)
-    if (Array.isArray(parsedText) && parsedText.length > 0 && parsedText.every(
-      (item) => typeof item === 'object' && item !== null && typeof item.text === 'string'
-    )) {
+    if (isSpecificTextJsonFormat(parsedText)) {
       isJsonMode = true
     }
   } catch {
@@ -207,7 +216,14 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
   const currentPromptTemplate = promptTemplate.value
 
   // Handle AI provider batch translation - MIRRORS AIConversationHelper logic
-  if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
+  // Use batch prompt for Select_Element, Page, or JSON input (excluding dictionary)
+  const shouldUseBatchPrompt = isAI && (
+    translateMode === TranslationMode.Select_Element ||
+    translateMode === TranslationMode.Page ||
+    isJsonMode
+  )
+
+  if (shouldUseBatchPrompt) {
     const batchPromptTemplate = sourceLang === 'auto'
       ? await getPromptBASEAIBatchAutoAsync()
       : await getPromptBASEAIBatchAsync()

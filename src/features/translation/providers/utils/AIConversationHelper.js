@@ -21,6 +21,26 @@ import {
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
 
+/**
+ * Checks if the parsed JSON object matches the specific format
+ * (array of objects where each object has a 'text' property as string)
+ *
+ * @param {any} obj - The object to check
+ * @returns {boolean}
+ */
+function isSpecificTextJsonFormat(obj) {
+  return (
+    Array.isArray(obj) &&
+    obj.length > 0 &&
+    obj.every(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.text === "string"
+    )
+  );
+}
+
 export const AIConversationHelper = {
   /**
    * Internal helper to truncate text intelligently at sentence or word boundaries
@@ -215,51 +235,81 @@ export const AIConversationHelper = {
     let promptTemplate;
     const isDictionary = translateMode === TranslationMode.Dictionary_Translation;
 
-    if (isBatch && !isDictionary) {
+    // Detect if the input is in the specific JSON format (array of objects with 'text' property)
+    let isJsonMode = false;
+    const textToCheck = Array.isArray(text) ? text[0] : text;
+    try {
+      const parsedText = JSON.parse(textToCheck);
+      if (isSpecificTextJsonFormat(parsedText)) {
+        isJsonMode = true;
+      }
+    } catch {
+      // Not JSON
+    }
+
+    // Determine if we should use AI batch prompt
+    // Use batch prompt for Select_Element mode OR when input is in JSON format
+    const shouldUseBatchPrompt = !isDictionary && (
+      translateMode === TranslationMode.Select_Element ||
+      translateMode === TranslationMode.Page ||
+      isJsonMode
+    );
+
+    if (shouldUseBatchPrompt) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
-      
+
       if (sourceLang === 'auto') {
-        promptTemplate = useFollowup 
-          ? await getPromptBASEAIFollowupAutoAsync() 
+        promptTemplate = useFollowup
+          ? await getPromptBASEAIFollowupAutoAsync()
           : await getPromptBASEAIBatchAutoAsync();
       } else {
-        promptTemplate = useFollowup 
-          ? await getPromptBASEAIFollowupAsync() 
+        promptTemplate = useFollowup
+          ? await getPromptBASEAIFollowupAsync()
           : await getPromptBASEAIBatchAsync();
       }
-        
+
       if (useFollowup) {
         promptTemplate += `\n\nCRITICAL: Keep original JSON structure. Result must be ONLY JSON. Target Language: ${targetName}.`;
       }
     } else {
-      // For dictionary mode or single segments, use the standard buildPrompt logic
+      // For other modes (Popup, Sidepanel, Field, Selection, ScreenCapture), use the standard buildPrompt logic
       const promptText = Array.isArray(text) ? text[0] : text;
       promptTemplate = await buildPrompt(promptText, sourceLang, targetLang, translateMode, providerType);
     }
 
-    // All prompt templates must now include $_{TEXT} placeholder
-    if (!promptTemplate.includes("$_{TEXT}")) {
-      throw new Error('Prompt template must include $_{TEXT} placeholder');
-    }
-
     // Resolve instructions from template even for AI batch prompts
-    const promptInstructionsTemplate = sourceLang === 'auto' 
-      ? await getPromptAutoAsync() 
+    const promptInstructionsTemplate = sourceLang === 'auto'
+      ? await getPromptAutoAsync()
       : await getPromptAsync();
-    
+
     const promptInstructions = promptInstructionsTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName);
 
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
-    const systemPrompt = promptTemplate
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+    let systemPrompt;
+    if (shouldUseBatchPrompt) {
+      // For batch prompts, we need to inject instructions and verify $_{TEXT} exists
+      // All prompt templates must include $_{TEXT} placeholder
+      if (!promptTemplate.includes("$_{TEXT}")) {
+        throw new Error('Prompt template must include $_{TEXT} placeholder');
+      }
+
+      systemPrompt = promptTemplate
+        .replace(/\$_{SOURCE}/g, sourceName)
+        .replace(/\$_{TARGET}/g, targetName)
+        .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+    } else {
+      // For non-batch prompts (from buildPrompt), the text is already injected
+      // We only need to replace language placeholders if they haven't been replaced yet
+      systemPrompt = promptTemplate
+        .replace(/\$_{SOURCE}/g, sourceName)
+        .replace(/\$_{TARGET}/g, targetName);
+    }
 
     // Determine if we should wrap the text in a JSON structure
-    // We wrap for batch requests (excluding dictionary) or specific modes that use AI batch prompts
-    const shouldWrap = (isBatch || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.Page) && !isDictionary;
+    // We wrap for batch requests (Select_Element, Page) or JSON input (excluding dictionary)
+    const shouldWrap = shouldUseBatchPrompt && !isDictionary;
 
     let userText;
     if (shouldWrap) {
@@ -278,14 +328,16 @@ export const AIConversationHelper = {
         })
       });
     } else {
-      userText = typeof text === 'string' ? text : JSON.stringify(text);
+      // For non-batch prompts, the text is already injected into systemPrompt via buildPrompt
+      // User text should be empty or a simple placeholder message
+      userText = "";
     }
 
     let finalSystemPrompt = systemPrompt;
 
     // Inject context only for DOM-related modes if enabled
-    const contextSupportedMode = translateMode === TranslationMode.Select_Element || 
-                                translateMode === TranslationMode.Page || 
+    const contextSupportedMode = translateMode === TranslationMode.Select_Element ||
+                                translateMode === TranslationMode.Page ||
                                 translateMode === TranslationMode.Selection;
 
     if (contextMetadata && contextEnabled && contextSupportedMode) {
@@ -293,9 +345,15 @@ export const AIConversationHelper = {
     }
 
     // Replace text placeholder according to project standard $_{TEXT} with global regex
-    const resultPrompt = finalSystemPrompt
-      .replace(/\$_{TEXT}/g, "the text provided in the user message")
-      .trim();
+    // Only for batch prompts - non-batch prompts already have text injected via buildPrompt
+    let resultPrompt;
+    if (shouldUseBatchPrompt) {
+      resultPrompt = finalSystemPrompt
+        .replace(/\$_{TEXT}/g, "the text provided in the user message")
+        .trim();
+    } else {
+      resultPrompt = finalSystemPrompt.trim();
+    }
 
     return {
       systemPrompt: resultPrompt,
