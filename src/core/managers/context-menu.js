@@ -7,7 +7,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { 
-  getTranslationApiAsync, 
   getDebugModeAsync, 
   getTargetLanguageAsync,
   getEffectiveProviderAsync,

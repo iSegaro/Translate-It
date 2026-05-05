@@ -17,7 +17,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import {
-  getTranslationApiAsync,
   getTargetLanguageAsync,
   getAIContextTranslationEnabledAsync,
   getSourceLanguageAsync,

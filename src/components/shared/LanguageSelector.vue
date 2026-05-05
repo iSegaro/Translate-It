@@ -82,7 +82,10 @@
           <span class="ti-external-icon">↗</span>
         </a>
       </template>
-      <span v-else class="ti-smart-text">{{ autoLanguageLabel }}</span>
+      <span
+        v-else
+        class="ti-smart-text"
+      >{{ autoLanguageLabel }}</span>
     </div>
   </div>
 </template>

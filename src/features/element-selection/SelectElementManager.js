@@ -9,7 +9,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
-import { getSettingsAsync, getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
+import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
@@ -192,8 +192,7 @@ class SelectElementManager extends ResourceTracker {
 
       if (this.isTopFrame) {
         this.showNotification();
-        const [settings, bingWarning, lingvaWarning, effectiveProvider] = await Promise.all([
-          getSettingsAsync(),
+        const [bingWarning, lingvaWarning, effectiveProvider] = await Promise.all([
           getTranslationString('BING_WPT_WARNING'),
           getTranslationString('LINGVA_WPT_WARNING'),
           options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element)
