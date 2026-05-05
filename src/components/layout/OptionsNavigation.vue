@@ -77,7 +77,7 @@ const saveAllSettings = async () => {
   // 1. Validate all critical settings before proceeding
   const validation = settingsStore.validateSettings()
   if (!validation.isValid) {
-    logger.warn('Cannot save settings: Validation failed', validation.errors)
+    logger.debug('Cannot save settings: Validation failed', validation.errors)
     
     // Check if it's a provider configuration error
     const missingKey = getFirstMissingSetting(settingsStore.settings.TRANSLATION_API, settingsStore.settings)

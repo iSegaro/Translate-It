@@ -581,7 +581,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     if (errors.length > 0) {
-      logger.warn('Settings validation failed:', errors);
+      logger.debug('Settings validation failed:', errors);
     }
     
     return {
