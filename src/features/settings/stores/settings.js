@@ -8,6 +8,7 @@ import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -185,6 +186,42 @@ export const useSettingsStore = defineStore('settings', () => {
   const targetLanguage = computed(() => settings.value.TARGET_LANGUAGE)
   const selectedProvider = computed(() => settings.value.TRANSLATION_API)
   
+  /**
+   * Helper to get the effective provider for a mode from reactive state.
+   * Follows the same logic as getEffectiveProviderAsync in config.js.
+   * Includes feature validation to ensure the provider is suitable for the mode.
+   */
+  const getEffectiveProvider = (mode) => {
+    const modeProviders = settings.value.MODE_PROVIDERS || {};
+    const globalApi = settings.value.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+    const systemDefault = ProviderRegistryIds.GOOGLE_V2;
+
+    let resolvedId = globalApi;
+
+    // 1. Direct mode-specific setting
+    if (mode && modeProviders[mode]) {
+      resolvedId = modeProviders[mode];
+    } 
+    // 2. Hierarchical Fallbacks
+    else if (mode === TranslationMode.Dictionary_Translation && modeProviders[TranslationMode.Selection]) {
+      resolvedId = modeProviders[TranslationMode.Selection];
+    }
+
+    // 3. Validation
+    const provider = findProviderById(resolvedId);
+    const needsBulk = [
+      TranslationMode.Page, 
+      TranslationMode.Select_Element, 
+      TranslationMode.Field
+    ].includes(mode);
+
+    if (needsBulk && provider && !provider.features?.includes('bulk')) {
+      return systemDefault;
+    }
+
+    return resolvedId;
+  };
+
   // Font settings getters
   const fontFamily = computed(() => settings.value.TRANSLATION_FONT_FAMILY)
   const fontSize = computed(() => settings.value.TRANSLATION_FONT_SIZE)
@@ -305,14 +342,30 @@ export const useSettingsStore = defineStore('settings', () => {
       // SMART CLEANUP: If Debug Mode is disabled while Mock provider is active, 
       // automatically switch to the system default provider.
       if (key === 'DEBUG_MODE' && value === false) {
-        const currentApi = settings.value['TRANSLATION_API'];
-        if (currentApi === 'mock') {
-          const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
-          
+        const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
+        let hasChanges = false;
+
+        // Cleanup Global Provider
+        if (settings.value['TRANSLATION_API'] === 'mock') {
           settings.value['TRANSLATION_API'] = defaultApi;
           updates['TRANSLATION_API'] = defaultApi;
+          hasChanges = true;
+          logger.info(`Debug mode disabled: Reverted global provider from Mock to default: ${defaultApi}`);
+        }
+
+        // Cleanup Mode-Specific Providers
+        if (settings.value.MODE_PROVIDERS) {
+          Object.keys(settings.value.MODE_PROVIDERS).forEach(mode => {
+            if (settings.value.MODE_PROVIDERS[mode] === 'mock') {
+              settings.value.MODE_PROVIDERS[mode] = null; // Revert to fallback (Global)
+              hasChanges = true;
+              logger.info(`Debug mode disabled: Reverted ${mode} provider from Mock to fallback`);
+            }
+          });
           
-          logger.info(`Debug mode disabled while Mock was active. Reverting provider to default: ${defaultApi}`);
+          if (hasChanges) {
+            updates['MODE_PROVIDERS'] = { ...settings.value.MODE_PROVIDERS };
+          }
         }
       }
 
@@ -640,6 +693,7 @@ export const useSettingsStore = defineStore('settings', () => {
     sourceLanguage,
     targetLanguage,
     selectedProvider,
+    getEffectiveProvider,
     fontFamily,
     fontSize,
     

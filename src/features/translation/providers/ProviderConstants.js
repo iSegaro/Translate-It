@@ -35,6 +35,7 @@ export const ProviderNames = {
 
   // Browser & Custom
   BROWSER_API: 'browserTranslate',
+  VAJEHYAB: 'Vajehyab',
   CUSTOM: 'Custom',
   MOCK: 'MockProvider',
 
@@ -61,6 +62,7 @@ export const ProviderRegistryIds = {
   OPENROUTER: 'openrouter',
   WEBAI: 'webai',
   BROWSER: 'browser',
+  VAJEHYAB: 'vajehyab',
   CUSTOM: 'custom',
   MOCK: 'mock',
 };
@@ -108,6 +110,7 @@ export function isProviderType(providerName, type) {
     [ProviderNames.OPENROUTER]: ProviderTypes.AI,
     [ProviderNames.WEBAI]: ProviderTypes.AI,
     [ProviderNames.BROWSER_API]: ProviderTypes.NATIVE,
+    [ProviderNames.VAJEHYAB]: ProviderTypes.TRANSLATE,
     [ProviderNames.CUSTOM]: ProviderTypes.CUSTOM,
     [ProviderNames.MOCK]: ProviderTypes.MOCK,
   };
@@ -134,6 +137,7 @@ export function registryIdToName(registryId) {
     [ProviderRegistryIds.OPENROUTER]: ProviderNames.OPENROUTER,
     [ProviderRegistryIds.WEBAI]: ProviderNames.WEBAI,
     [ProviderRegistryIds.BROWSER]: ProviderNames.BROWSER_API,
+    [ProviderRegistryIds.VAJEHYAB]: ProviderNames.VAJEHYAB,
     [ProviderRegistryIds.CUSTOM]: ProviderNames.CUSTOM,
     [ProviderRegistryIds.MOCK]: ProviderNames.MOCK,
   };
@@ -160,6 +164,7 @@ export function nameToRegistryId(providerName) {
     [ProviderNames.OPENROUTER]: ProviderRegistryIds.OPENROUTER,
     [ProviderNames.WEBAI]: ProviderRegistryIds.WEBAI,
     [ProviderNames.BROWSER_API]: ProviderRegistryIds.BROWSER,
+    [ProviderNames.VAJEHYAB]: ProviderRegistryIds.VAJEHYAB,
     [ProviderNames.CUSTOM]: ProviderRegistryIds.CUSTOM,
     [ProviderNames.MOCK]: ProviderRegistryIds.MOCK,
   };

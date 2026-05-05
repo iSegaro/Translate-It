@@ -92,8 +92,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -112,8 +117,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -206,8 +216,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -226,8 +241,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -312,8 +332,13 @@
       >
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.page }"
-          @click.stop="toggleSync('page')"
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -332,8 +357,13 @@
         
         <button 
           class="ti-sync-row" 
-          :class="{ 'is-active': ephemeralSync.element }"
-          @click.stop="toggleSync('element')"
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
         >
           <div class="ti-sync-info">
             <Icon 
@@ -455,6 +485,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { getProvidersForDropdown, getProviderById } from '@/core/provider-registry.js'
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js'
 import IconButton from './IconButton.vue'
 import { Icon } from '@iconify/vue'
 import browser from 'webextension-polyfill'
@@ -505,6 +536,10 @@ const props = defineProps({
     default: 'translation'
   },
   loading: {
+    type: Boolean,
+    default: false
+  },
+  onlyConfigured: {
     type: Boolean,
     default: false
   }
@@ -648,9 +683,14 @@ const availableProviders = computed(() => {
   const providersFromRegistry = getProvidersForDropdown(debugMode);
   
   // Filter by required feature if provided
-  const filteredRegistry = props.requiredFeature 
+  let filteredRegistry = props.requiredFeature 
     ? providersFromRegistry.filter(p => p.features?.includes(props.requiredFeature))
     : providersFromRegistry;
+
+  // Filter by configuration status if requested
+  if (props.onlyConfigured) {
+    filteredRegistry = filteredRegistry.filter(p => isProviderConfigured(p.id, settingsStore.settings));
+  }
 
   const mappedProviders = filteredRegistry.map(provider => ({
     id: provider.id,
@@ -662,11 +702,21 @@ const availableProviders = computed(() => {
     const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
     const defaultProvider = getProviderById(defaultProviderId);
     
-    // Only show default if it supports the required feature
-    const showDefault = !props.requiredFeature || 
-                       (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+    // Default provider logic: 
+    // 1. If no specific feature is required, always show Default.
+    // 2. If a feature is required, only show Default if the global provider supports it.
+    // 3. If onlyConfigured is true, only show Default if global provider is configured.
+    // 4. SPECIAL CASE: If the current selection IS 'default', we MUST show it 
+    //    to prevent the UI from displaying wrong names/icons.
+    
+    const defaultSupportsFeature = !props.requiredFeature || 
+                                 (defaultProvider && defaultProvider.features?.includes(props.requiredFeature));
+    
+    const isDefaultConfigured = !props.onlyConfigured || isProviderConfigured(defaultProviderId, settingsStore.settings);
+    
+    const isCurrentlyDefault = currentProvider.value === 'default';
 
-    if (showDefault) {
+    if ((defaultSupportsFeature && isDefaultConfigured) || isCurrentlyDefault) {
       return [
         { 
           id: 'default', 
@@ -692,14 +742,47 @@ const currentProvider = computed(() => {
   return settingsStore.settings.TRANSLATION_API
 })
 
+/**
+ * Checks if the 'Default' selection is actually valid for this mode's requirements
+ */
+const isDefaultInvalid = computed(() => {
+  if (currentProvider.value !== 'default' && props.modelValue !== 'default') return false;
+  
+  const globalId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
+  const globalProvider = getProviderById(globalId);
+  
+  return props.requiredFeature && 
+         globalProvider && 
+         !globalProvider.features?.includes(props.requiredFeature);
+})
+
 const currentProviderIcon = computed(() => {
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return getProviderIcon(provider?.icon || 'providers/google.svg')
 })
 
 const currentProviderName = computed(() => {
+  if (currentProvider.value === 'default') {
+    const baseName = t('provider_default') || 'Default';
+    return isDefaultInvalid.value ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
+  }
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
   return provider?.name || 'Google Translate'
+})
+
+/**
+ * Checks if the currently selected provider supports bulk operations (required for Page/Element sync)
+ */
+const canSyncToBulk = computed(() => {
+  let providerId = currentProvider.value
+  
+  // Resolve 'default' to actual provider
+  if (providerId === 'default') {
+    providerId = settingsStore.settings?.TRANSLATION_API || 'googlev2'
+  }
+  
+  const provider = getProviderById(providerId)
+  return provider?.features?.includes('bulk') || false
 })
 
 /**

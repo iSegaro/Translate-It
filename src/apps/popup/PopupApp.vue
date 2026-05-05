@@ -47,6 +47,7 @@
               mode="split"
               :is-global="false"
               :show-sync="true"
+              only-configured
               :loading="translationFormRef?.isTranslating"
               @translate="handleTranslate"
               @cancel="handleCancel"
@@ -57,6 +58,7 @@
               v-model:source-language="sourceLanguage"
               v-model:target-language="targetLanguage"
               :provider="currentProvider"
+              :last-keyword="lastTranslation?.source"
               :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
               :source-title="t('popup_source_language_title') || 'زبان مبدا'"
               :target-title="t('popup_target_language_title') || 'زبان مقصد'"
@@ -129,7 +131,8 @@ const { t } = useUnifiedI18n()
 const { 
   sourceLanguage,
   targetLanguage,
-  clearTranslation
+  clearTranslation,
+  lastTranslation
 } = useUnifiedTranslation('popup');
 
 // TTS Global Manager for cross-context lifecycle management

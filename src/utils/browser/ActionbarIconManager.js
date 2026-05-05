@@ -2,6 +2,7 @@ import browser from 'webextension-polyfill';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -87,7 +88,6 @@ export class ActionbarIconManager {
    * Get icon path for provider
    */
   async getProviderIconPath(provider) {
-    const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
     const providerConfig = findProviderById(provider);
     
     if (providerConfig && providerConfig.icon) {

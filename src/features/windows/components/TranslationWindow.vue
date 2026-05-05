@@ -41,6 +41,7 @@
           :model-value="props.provider"
           mode="icon-only"
           :is-global="false"
+          only-configured
           class="ti-window-provider-selector"
           @update:model-value="handleProviderChange"
           @mousedown.stop

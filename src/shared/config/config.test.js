@@ -37,6 +37,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
+vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
+  ApiKeyManager: {
+    getKeys: vi.fn().mockResolvedValue(['key1', 'key2'])
+  }
+}));
+
 describe('Config Module', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,17 +101,10 @@ describe('Config Module', () => {
 
     it('getOpenAIApiKeysAsync should retrieve keys via ApiKeyManager', async () => {
       // Note: We need to mock the dynamic import result
-      const mockKeys = ['key1', 'key2'];
-      vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
-        ApiKeyManager: {
-          getKeys: vi.fn().mockResolvedValue(['key1', 'key2'])
-        }
-      }));
-
       const { getOpenAIApiKeysAsync } = await import('./config.js');
       const keys = await getOpenAIApiKeysAsync();
-      
-      expect(keys).toEqual(mockKeys);
+
+      expect(keys).toEqual(['key1', 'key2']);
     });
   });
 

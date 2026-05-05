@@ -7,55 +7,86 @@
       'ti-compact-mode': compact 
     }"
   >
-    <!-- Target Language Dropdown -->
-    <select
-      v-model="targetLanguage"
-      class="ti-language-select"
-      :title="targetTitle"
-      :disabled="disabled"
-      @click="handleDropdownClick"
-    >
-      <option
-        v-for="language in targetLanguages"
-        :key="language.code"
-        :value="language.code"
+    <!-- Regular Language Selection -->
+    <template v-if="!isAutoLanguageProvider">
+      <!-- Target Language Dropdown -->
+      <select
+        v-model="targetLanguage"
+        class="ti-language-select"
+        :title="targetTitle"
+        :disabled="disabled"
+        @click="handleDropdownClick"
       >
-        {{ language.name }}
-      </option>
-    </select>
+        <option
+          v-for="language in targetLanguages"
+          :key="language.code"
+          :value="language.code"
+        >
+          {{ language.name }}
+        </option>
+      </select>
 
-    <!-- Swap Button -->
-    <button
-      type="button"
-      class="ti-swap-button"
-      :title="swapTitle"
-      @click="handleSwapLanguages"
-    >
-      <img
-        :src="swapIcon"
-        :alt="swapAlt"
+      <!-- Swap Button -->
+      <button
+        type="button"
+        class="ti-swap-button"
+        :title="swapTitle"
+        :disabled="disabled || !isSwapPossible"
+        :class="{ 'ti-swap-button--disabled': !isSwapPossible }"
+        @click="handleSwapLanguages"
       >
-    </button>
+        <img
+          :src="swapIcon"
+          :alt="swapAlt"
+        >
+      </button>
 
-    <!-- Source Language Dropdown -->
-    <select
-      v-model="sourceLanguage"
-      class="ti-language-select"
-      :title="sourceTitle"
-      :disabled="disabled"
-      @click="handleDropdownClick"
-    >
-      <option value="auto">
-        {{ autoDetectLabel }}
-      </option>
-      <option
-        v-for="language in availableLanguages"
-        :key="language.code"
-        :value="language.code"
+      <!-- Source Language Dropdown -->
+      <select
+        v-model="sourceLanguage"
+        class="ti-language-select"
+        :title="sourceTitle"
+        :disabled="disabled"
+        @click="handleDropdownClick"
       >
-        {{ language.name }}
-      </option>
-    </select>
+        <option 
+          v-if="hasAutoDetect"
+          value="auto"
+        >
+          {{ autoDetectLabel }}
+        </option>
+        <option
+          v-for="language in availableLanguages"
+          :key="language.code"
+          :value="language.code"
+        >
+          {{ language.name }}
+        </option>
+      </select>
+    </template>
+
+    <!-- Smart Language Indicator (e.g. for Vajehyab) -->
+    <div 
+      v-else 
+      class="ti-smart-language-badge"
+      :title="autoLanguageTitle"
+    >
+      <template v-if="vajehyabSearchUrl">
+        <a 
+          :href="vajehyabSearchUrl" 
+          target="_blank" 
+          class="ti-smart-link"
+          @click.stop
+        >
+          {{ autoLanguageLabel }}
+          <span class="ti-external-icon">↗</span>
+        </a>
+      </template>
+      <span
+        v-else
+        class="ti-smart-text"
+      >{{ autoLanguageLabel }}</span>
+    </div>
   </div>
 </template>
 
@@ -70,7 +101,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { CONFIG } from '@/shared/config/config.js'
 import { AUTO_DETECT_VALUE } from '../../shared/config/constants'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
-import { PROVIDER_SUPPORTED_LANGUAGES, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, PROVIDER_LANGUAGE_PAIRS, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 
 // Import adjacent SCSS
 import './LanguageSelector.scss'
@@ -123,6 +155,18 @@ const props = defineProps({
   swapAlt: {
     type: String,
     default: 'Swap'
+  },
+  autoLanguageLabel: {
+    type: String,
+    default: 'واژه‌یاب'
+  },
+  autoLanguageTitle: {
+    type: String,
+    default: 'This provider handles language detection automatically'
+  },
+  lastKeyword: {
+    type: String,
+    default: ''
   }
 })
 
@@ -149,11 +193,25 @@ const targetLanguage = computed({
   set: (value) => emit('update:targetLanguage', value)
 })
 
-const availableLanguages = computed(() => {
+const providerInfo = computed(() => findProviderById(props.provider))
+const hasAutoDetect = computed(() => providerInfo.value?.features?.includes('autoDetect'))
+const isAutoLanguageProvider = computed(() => providerInfo.value?.features?.includes('autoLanguage'))
+
+const isVajehyab = computed(() => props.provider?.toLowerCase() === 'vajehyab')
+const vajehyabSearchUrl = computed(() => {
+  if (!isVajehyab.value || !props.lastKeyword) return ''
+  return `https://vajehyab.com/?q=${encodeURIComponent(props.lastKeyword)}`
+})
+
+/**
+ * Base list of languages supported by the provider's general capabilities.
+ * Does not include source/target specific pair restrictions yet.
+ */
+const providerBaseLanguages = computed(() => {
   const all = languages.allLanguages.value || [];
   if (!props.provider) return all;
 
-  // Resolve effective keys
+  // Resolve effective keys for standard providers
   let providerKey = props.provider.toLowerCase();
   let mappingKey = 'GOOGLE';
   
@@ -178,25 +236,69 @@ const availableLanguages = computed(() => {
   }
 
   const supportedCodes = PROVIDER_SUPPORTED_LANGUAGES[providerKey];
-  if (!supportedCodes) return all;
+  if (supportedCodes) {
+    return all.filter(lang => {
+      const providerCode = getProviderLanguageCode(lang.code, mappingKey);
+      return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
+    });
+  }
 
-  // Filter languages: check if the provider-specific code for this language is supported
-  return all.filter(lang => {
-    // 1. Get the code this provider uses for this language
-    const providerCode = getProviderLanguageCode(lang.code, mappingKey);
-    
-    // 2. Check if that code (or the original) is in the supported list
-    return supportedCodes.includes(providerCode) || supportedCodes.includes(lang.code);
-  });
+  return all;
 })
 
+/**
+ * Filtered languages for the SOURCE dropdown.
+ */
+const availableLanguages = computed(() => {
+  let filtered = providerBaseLanguages.value;
+
+  // Apply restricted source mapping if applicable (e.g., Vajehyab)
+  const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
+  if (restrictedMap) {
+    filtered = filtered.filter(l => !!restrictedMap[l.code]);
+  }
+
+  return filtered;
+})
+
+/**
+ * Filtered languages for the TARGET dropdown.
+ */
 const targetLanguages = computed(() => {
-  // Filter out Auto-Detect from target languages
-  return availableLanguages.value.filter(lang => lang.code !== AUTO_DETECT_VALUE)
+  const base = providerBaseLanguages.value;
+  const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
+
+  if (restrictedMap) {
+    const currentSource = sourceLanguage.value;
+    // For specialized providers, filter targets based on the current source
+    if (currentSource !== AUTO_DETECT_VALUE && restrictedMap[currentSource]) {
+      const allowedTargets = restrictedMap[currentSource];
+      return base.filter(l => allowedTargets.includes(l.code));
+    } else if (currentSource === AUTO_DETECT_VALUE) {
+      // If source is auto (and somehow allowed), show union of all possible targets
+      const allPossibleTargets = new Set(Object.values(restrictedMap).flat());
+      return base.filter(l => allPossibleTargets.has(l.code));
+    }
+  }
+
+  // Standard provider: Just filter out Auto-Detect from target languages
+  return base.filter(lang => lang.code !== AUTO_DETECT_VALUE)
 })
 
 const swapIcon = computed(() => {
   return browser.runtime.getURL('icons/ui/swap.png')
+})
+
+const isSwapPossible = computed(() => {
+  const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
+  if (!restrictedMap) return true;
+
+  const currentSource = sourceLanguage.value;
+  const currentTarget = targetLanguage.value;
+
+  // Swap is possible if the target can become a source, 
+  // AND the current source is a valid target for that new source.
+  return !!restrictedMap[currentTarget] && restrictedMap[currentTarget].includes(currentSource);
 })
 
 // Reactive data for responsive layout (only for sidepanel)
@@ -261,6 +363,11 @@ const cleanupResizeObserver = () => {
 
 // Methods
 const handleSwapLanguages = async () => {
+  if (!isSwapPossible.value) {
+    logger.debug('[LanguageSelector] Swap blocked: target not supported as source for this provider.');
+    return;
+  }
+
   try {
     const { getLanguageCodeForTTS: getLanguageCode } = await utilsFactory.getI18nUtils();
     const defaultTarget = await getLanguageCode(CONFIG?.TARGET_LANGUAGE) || 'en';

@@ -8,6 +8,7 @@
       <button
         v-if="allowedFeatures.pageTranslation"
         class="ti-m-action-btn"
+        :class="{ 'is-disabled': !isPageTranslationSupported }"
         @click="translatePage"
       >
         <div class="ti-m-icon-container ti-m-icon-translate-page">
@@ -24,6 +25,7 @@
       <button
         v-if="allowedFeatures.selectElement"
         class="ti-m-action-btn"
+        :class="{ 'is-disabled': !isSelectElementSupported }"
         @click="activateSelectElement"
       >
         <div class="ti-m-icon-container ti-m-icon-select-element">
@@ -161,11 +163,15 @@ import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { TranslationMode } from '@/shared/config/config.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -185,9 +191,33 @@ const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { hasElementTranslations } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
+const { handleError } = useErrorHandler();
 const pageEventBus = window.pageEventBus
 const tts = useTTSSmart();
 const exclusionChecker = ExclusionChecker.getInstance();
+
+const getProviderForMode = (mode) => {
+  return settingsStore.settings.MODE_PROVIDERS?.[mode] || settingsStore.settings.TRANSLATION_API || 'googlev2';
+};
+
+const pageProvider = computed(() => getProviderForMode(TranslationMode.Page));
+const selectElementProvider = computed(() => getProviderForMode(TranslationMode.Select_Element));
+
+const checkBulkSupport = (providerId) => {
+  const provider = findProviderById(providerId);
+  return provider?.features?.includes('bulk') ?? false;
+};
+
+const isPageTranslationSupported = computed(() => checkBulkSupport(pageProvider.value));
+const isSelectElementSupported = computed(() => checkBulkSupport(selectElementProvider.value));
+
+const handleBulkNotSupported = async () => {
+  mobileStore.closeSheet();
+  await handleError(t('provider_does_not_support_bulk') || 'این سرویس از قابلیت‌های دسته‌ای پشتیبانی نمی‌کند', 'mobile-dashboard:bulk-check', { 
+    showToast: true,
+    type: ErrorTypes.VALIDATION
+  });
+};
 
 const allowedFeatures = ref({
   selectElement: true,
@@ -220,14 +250,19 @@ const isTTSVisible = computed(() => pendingSelection.value.hasSelection || tts.i
 
 const translatePage = (event) => {
   try {
+    const provider = pageProvider.value;
+    if (!checkBulkSupport(provider)) {
+      handleBulkNotSupported();
+      return;
+    }
     if (event) { event.preventDefault(); event.stopPropagation(); }
-    logger.info('Page translation requested from Mobile Dashboard');
+    logger.info('Page translation requested from Mobile Dashboard', { provider });
     const isCurrentlyTranslating = mobileStore.pageTranslationData.isTranslating || mobileStore.pageTranslationData.isAutoTranslating || mobileStore.pageTranslationData.isTranslated;
 
     if (isCurrentlyTranslating) {
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
     } else {
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE);
+      pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider });
       mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION);
 
       // Respect the auto-close setting
@@ -248,9 +283,17 @@ const translatePage = (event) => {
 
 const activateSelectElement = async () => {
   try {
-    logger.info('Select Element mode requested from Mobile Dashboard');
+    const provider = selectElementProvider.value;
+    if (!checkBulkSupport(provider)) {
+      handleBulkNotSupported();
+      return;
+    }
+    logger.info('Select Element mode requested from Mobile Dashboard', { provider });
     mobileStore.closeSheet();
-    await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+    await sendMessage({ 
+      action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      data: { provider }
+    });
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
       ExtensionContextManager.handleContextError(err, 'mobile-dashboard:select-element');

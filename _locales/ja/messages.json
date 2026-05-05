@@ -89,6 +89,9 @@
   "provider_default": {
     "message": "デフォルト"
   },
+  "incompatible_label": {
+    "message": "互換性なし"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -178,6 +181,18 @@
   },
   "provider_mock_description": {
     "message": "開発およびテストに使用されるシミュレーションプロバイダーです。"
+  },
+  "provider_vajehyab_title": {
+    "message": "Vajehyab 辞書"
+  },
+  "provider_vajehyab_description": {
+    "message": "多言語ペルシャ語辞書。単一の単語に最適です。APIキーは不要です。"
+  },
+  "vajehyab_word_not_found": {
+    "message": "Vajehyab辞書に単語が見つかりませんでした"
+  },
+  "provider_does_not_support_bulk": {
+    "message": "このプロバイダーは、ページ翻訳または要素選択モードをサポートしていません。"
   },
   "options_page_title": {
     "message": "設定"
@@ -2128,5 +2143,14 @@
   },
   "dutch_language_name": {
     "message": "オランダ語"
+  },
+  "smart_language_title": {
+    "message": "Vajehyab"
+  },
+  "smart_language_description": {
+    "message": "このプロバイダーはペルシャ語に特化しており、ペルシャ語に関連する英語、アラビア語、およびトルコ語の辞書結果を提供します。"
+  },
+  "smart_language_fallback_note": {
+    "message": "注：これらの設定は、手動で言語を選択する必要があるテキストフィールド翻訳などの機能に適用されます。"
   }
-}
+  }

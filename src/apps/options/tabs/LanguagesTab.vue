@@ -10,6 +10,16 @@
         Loading languages...
       </div>
       <template v-else>
+        <div 
+          v-if="isAutoLanguageProvider" 
+          class="smart-language-info-banner"
+        >
+          <div class="banner-content">
+            <h3>{{ t('smart_language_title') || 'Smart Language Handling' }}</h3>
+            <p>{{ t('smart_language_description') || 'This provider is specialized for the Persian language, providing dictionary results for English, Arabic, and Turkish in relation to Persian.' }}</p>
+          </div>
+        </div>
+
         <div class="languages-selectors-container">
           <div class="setting-group">
             <label>{{ t('source_language_label') || 'Source Language' }}</label>
@@ -30,7 +40,16 @@
               class="language-dropdown"
             />
           </div>
+
+          <p 
+            v-if="isAutoLanguageProvider" 
+            class="smart-language-fallback-note"
+          >
+            {{ t('smart_language_fallback_note') }}
+          </p>
         </div>
+
+        <div class="section-separator" />
 
         <!-- Validation errors -->
         <Transition name="fade-slide">
@@ -75,54 +94,56 @@
                       class="provider-settings"
                     >
                       <!-- Optimization Level Section -->
-                      <div 
-                        id="OPTIMIZATION_LEVELS_SECTION"
-                        class="optimization-control-area"
-                      >
-                        <div class="opt-control-group">
-                          <div class="label-with-value">
-                            <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                            <span
-                              class="level-badge"
-                              :class="'level-' + currentOptimizationLevel"
-                            >
-                              {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                            </span>
-                          </div>
-                        
-                          <div class="slider-wrapper">
-                            <input 
-                              v-model.number="currentOptimizationLevel" 
-                              type="range" 
-                              min="1" 
-                              max="5"
-                              class="ti-range-slider"
-                            >
-                            <div class="slider-labels">
-                              <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                      <template v-if="!isAutoLanguageProvider">
+                        <div 
+                          id="OPTIMIZATION_LEVELS_SECTION"
+                          class="optimization-control-area"
+                        >
+                          <div class="opt-control-group">
+                            <div class="label-with-value">
+                              <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
                               <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 2"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                              <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 4"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                                class="level-badge"
+                                :class="'level-' + currentOptimizationLevel"
+                              >
+                                {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                              </span>
                             </div>
+                          
+                            <div class="slider-wrapper">
+                              <input 
+                                v-model.number="currentOptimizationLevel" 
+                                type="range" 
+                                min="1" 
+                                max="5"
+                                class="ti-range-slider"
+                              >
+                              <div class="slider-labels">
+                                <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                                <span
+                                  class="slider-tick"
+                                  @click="currentOptimizationLevel = 2"
+                                >|</span>
+                                <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                                <span
+                                  class="slider-tick"
+                                  @click="currentOptimizationLevel = 4"
+                                >|</span>
+                                <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
+                              </div>
+                            </div>
+                          
+                            <p class="opt-description">
+                              {{ isAIProvider 
+                                ? t('optimization_description_ai') 
+                                : t('optimization_description_traditional') 
+                              }}
+                            </p>
                           </div>
-                        
-                          <p class="opt-description">
-                            {{ isAIProvider 
-                              ? t('optimization_description_ai') 
-                              : t('optimization_description_traditional') 
-                            }}
-                          </p>
                         </div>
-                      </div>
 
-                      <div class="section-separator mini" />
+                        <div class="section-separator mini" />
+                      </template>
 
                       <div
                         v-if="selectedProviderInfo && !providerSettingsComponent"
@@ -342,7 +363,7 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, PROVIDER_LANGUAGE_PAIRS, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 
@@ -502,6 +523,7 @@ const latinScriptOptions = computed(() => [
 // --- Provider & Language Logic ---
 
 const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value))
+const isAutoLanguageProvider = computed(() => selectedProviderInfo.value?.features?.includes('autoLanguage'))
 const selectedProviderInfo = computed(() => findProviderById(selectedProvider.value))
 const providerSettingsComponent = computed(() => {
   const p = selectedProvider.value
@@ -511,39 +533,95 @@ const providerSettingsComponent = computed(() => {
 
 const getFilteredLanguages = (type) => {
   const provider = selectedProvider.value
+  const providerInfo = findProviderById(provider)
   const languages = allLanguages.value || []
-  if (!languages.length) return type === 'source' ? [{ code: 'auto', name: 'Auto-Detect' }] : []
-  if (isAIProvider.value) return type === 'source' ? [{ code: 'auto', name: 'Auto-Detect' }, ...languages] : languages
-
-  let providerKey = provider.toLowerCase().includes('deepl') ? (settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ? 'deepl_beta' : 'deepl') : provider.toLowerCase()
-  const mappingKey = providerKey.includes('google') || providerKey.includes('lingva') ? 'GOOGLE' : providerKey.includes('bing') || providerKey.includes('edge') ? 'BING' : providerKey.includes('deepl') ? 'DEEPL' : providerKey.includes('yandex') ? 'YANDEX' : 'BROWSER'
   
-  if (providerKey.includes('google') || providerKey.includes('lingva')) providerKey = 'google'
-  if (providerKey.includes('bing') || providerKey.includes('edge')) providerKey = 'bing'
+  // 1. Determine if Auto-Detect should be available based on provider features
+  const hasAutoDetect = providerInfo?.features?.includes('autoDetect')
   
-  const supported = PROVIDER_SUPPORTED_LANGUAGES[providerKey]
-  if (!supported) return type === 'source' ? [{ code: 'auto', name: 'Auto-Detect' }, ...languages] : languages
+  if (!languages.length) {
+    return type === 'source' && hasAutoDetect ? [{ code: 'auto', name: 'Auto-Detect' }] : []
+  }
 
-  const filtered = languages.filter(l => supported.includes(getProviderLanguageCode(l.code, mappingKey)) || supported.includes(l.code))
-  return type === 'source' ? [{ code: 'auto', name: 'Auto-Detect' }, ...filtered] : filtered
+  // Bypass filtering for smart auto-language providers (like Vajehyab)
+  // as the selected languages will be used as fallbacks for other features
+  if (isAutoLanguageProvider.value) {
+    if (type === 'source') {
+      return hasAutoDetect ? [{ code: 'auto', name: 'Auto-Detect' }, ...languages] : languages
+    }
+    return languages
+  }
+
+  // 2. Filter base languages supported by the provider
+  let filtered = languages
+  if (!isAIProvider.value) {
+    let providerKey = provider.toLowerCase().includes('deepl') ? (settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ? 'deepl_beta' : 'deepl') : provider.toLowerCase()
+    const mappingKey = providerKey.includes('google') || providerKey.includes('lingva') ? 'GOOGLE' : providerKey.includes('bing') || providerKey.includes('edge') ? 'BING' : providerKey.includes('deepl') ? 'DEEPL' : providerKey.includes('yandex') ? 'YANDEX' : 'BROWSER'
+    
+    if (providerKey.includes('google') || providerKey.includes('lingva')) providerKey = 'google'
+    if (providerKey.includes('bing') || providerKey.includes('edge')) providerKey = 'bing'
+    
+    const supported = PROVIDER_SUPPORTED_LANGUAGES[providerKey]
+    if (supported) {
+      filtered = languages.filter(l => supported.includes(getProviderLanguageCode(l.code, mappingKey)) || supported.includes(l.code))
+    }
+  }
+
+  // 3. Handle Source specifically (Auto-Detect logic & Source Restrictions)
+  if (type === 'source') {
+    // If provider has restricted pairs, only show languages that can act as a source
+    const restrictedMap = PROVIDER_LANGUAGE_PAIRS[provider]
+    if (restrictedMap) {
+      filtered = filtered.filter(l => !!restrictedMap[l.code])
+    }
+
+    return hasAutoDetect ? [{ code: 'auto', name: 'Auto-Detect' }, ...filtered] : filtered
+  }
+
+  // 4. Handle Target specifically (Pair-based filtering)
+  const restrictedMap = PROVIDER_LANGUAGE_PAIRS[provider]
+  if (restrictedMap) {
+    const currentSource = sourceLanguage.value
+    // If we have a restricted map and a specific source is selected, filter targets
+    if (currentSource !== 'auto' && restrictedMap[currentSource]) {
+      const allowedTargets = restrictedMap[currentSource]
+      filtered = filtered.filter(l => allowedTargets.includes(l.code))
+    } else if (currentSource === 'auto') {
+      // If source is auto (and somehow allowed), show union of all possible targets
+      const allPossibleTargets = new Set(Object.values(restrictedMap).flat())
+      filtered = filtered.filter(l => allPossibleTargets.has(l.code))
+    }
+  }
+
+  return filtered
 }
 
 const filteredSourceLanguages = computed(() => getFilteredLanguages('source'))
 const filteredTargetLanguages = computed(() => getFilteredLanguages('target'))
 
 const syncLanguagesWithProviderSupport = ({ clearInvalidTarget = false } = {}) => {
-  if (!filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) {
-    sourceLanguage.value = 'auto'
+  const provider = selectedProvider.value
+  const providerInfo = findProviderById(provider)
+  const hasAutoDetect = providerInfo?.features?.includes('autoDetect')
+
+  // 1. Correct Source Language
+  if (sourceLanguage.value === 'auto' && !hasAutoDetect) {
+    // Switch to first available source (e.g., 'fa' or 'en' for Vajehyab)
+    sourceLanguage.value = filteredSourceLanguages.value[0]?.code || 'en'
+  } else if (!filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) {
+    // If current source is not supported, default to first available
+    sourceLanguage.value = hasAutoDetect ? 'auto' : (filteredSourceLanguages.value[0]?.code || 'en')
   }
 
+  // 2. Correct Target Language based on Source
   if (!filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)) {
     targetLanguage.value = clearInvalidTarget
       ? ''
-      : (filteredTargetLanguages.value.find(l => l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || filteredTargetLanguages.value[0]?.code || 'en')
+      : (filteredTargetLanguages.value.find(l => l.code === 'fa' || l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || filteredTargetLanguages.value[0]?.code || 'en')
   }
 }
 
-watch(selectedProvider, () => {
+watch([selectedProvider, sourceLanguage], () => {
   syncLanguagesWithProviderSupport()
 })
 

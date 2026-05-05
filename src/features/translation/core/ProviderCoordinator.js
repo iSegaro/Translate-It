@@ -4,7 +4,8 @@
  */
 
 import { TRANSLATION_CONSTANTS, ResponseFormat } from "@/shared/config/translationConstants.js";
-import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
+import { ProviderTypes, nameToRegistryId } from "@/features/translation/providers/ProviderConstants.js";
+import { findProviderById } from "@/features/translation/providers/ProviderManifest.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -41,18 +42,24 @@ export class ProviderCoordinator {
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
 
-      // 1a. Apply Language Swapping (Bilingual Logic)
-      // This will only perform detection if bilingual is enabled
-      const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
-        sampleText,
-        sourceLang,
-        targetLang,
-        originalSource,
-        { providerName, mode: translateMode }
-      );
+      // Check if provider supports bilingual swapping (e.g. specialized dictionaries like Vajehyab may not)
+      const providerId = nameToRegistryId(providerName) || providerName;
+      const manifest = findProviderById(providerId);
+      const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
 
-      processedSourceLang = swappedSource;
-      processedTargetLang = swappedTarget;
+      // 1a. Apply Language Swapping (Bilingual Logic)
+      if (supportsBilingual) {
+        const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
+          sampleText,
+          sourceLang,
+          targetLang,
+          originalSource,
+          { providerName, mode: translateMode }
+        );
+
+        processedSourceLang = swappedSource;
+        processedTargetLang = swappedTarget;
+      }
 
       // 1b. Auto-Detection Fallback
       // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),

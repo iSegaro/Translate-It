@@ -163,6 +163,46 @@
   }
 }
 
+.ti-smart-language-badge {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--ti-smart-badge-bg, rgba(0, 123, 255, 0.08)) !important;
+  border: 1px solid var(--ti-smart-badge-border, rgba(0, 123, 255, 0.15)) !important;
+  border-radius: 4px !important;
+  padding: 4px 10px !important;
+  min-height: 28px !important;
+  box-sizing: border-box !important;
+
+  .ti-smart-text {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--primary-color, #007bff) !important;
+  }
+
+  .ti-smart-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--primary-color, #007bff) !important;
+    text-decoration: none !important;
+    transition: opacity 0.2s ease !important;
+
+    &:hover {
+      text-decoration: underline !important;
+      opacity: 0.8 !important;
+    }
+
+    .ti-external-icon {
+      font-size: 10px !important;
+      opacity: 0.7 !important;
+      margin-top: -2px !important;
+    }
+  }
+}
+
 /* Context-specific adjustments */
 
 // Popup Mode

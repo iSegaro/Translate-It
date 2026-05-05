@@ -126,7 +126,7 @@ export const ProviderRequestEngine = {
   /**
    * Executes a fetch call and normalizes errors
    */
-  async executeApiCall(provider, { url, fetchOptions, extractResponse, context, abortController, sessionId, charCount, originalCharCount }) {
+  async executeApiCall(provider, { url, fetchOptions, extractResponse = (data) => data, context, abortController, sessionId, charCount, originalCharCount }) {
     const finalSessionId = sessionId || abortController?.sessionId || null;
     const finalCharCount = charCount || 0;
     const finalOriginalCharCount = originalCharCount || 0;

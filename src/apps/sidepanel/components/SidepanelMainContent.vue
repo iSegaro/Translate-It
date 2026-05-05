@@ -12,6 +12,7 @@
           v-model:source-language="sourceLanguage"
           v-model:target-language="targetLanguage"
           :provider="currentProviderLocal"
+          :last-keyword="lastTranslation?.source"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
           :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
@@ -37,10 +38,11 @@
             >
           </button>
           <ProviderSelector
-            v-model="currentProviderLocal"
+            v-model="currentProvider"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"
@@ -66,10 +68,11 @@
         </button>
         <div class="center-spacer">
           <ProviderSelector
-            v-model="currentProviderLocal"
+            v-model="currentProvider"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"
