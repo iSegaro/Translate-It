@@ -487,12 +487,14 @@ $_{TEXT}
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
   PROMPT_BASE_AI_FOLLOWUP: `Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
-  
+
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
-Return only the JSON object, no additional text.`,
+Return only the JSON object, no additional text.
+
+$_{TEXT}`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
@@ -502,7 +504,9 @@ Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
-Return only the JSON object, no additional text.`,
+Return only the JSON object, no additional text.
+
+$_{TEXT}`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
 
 
@@ -575,21 +579,27 @@ $_{TEXT}
    - Maintain **consistency** in terminology throughout the translation
    - Handle **special characters, numbers, and symbols** appropriately
 
-**Important:** Output ONLY the translated text content. Do not include any analysis, descriptions, or additional commentary.`,
+**Important:** Output ONLY the translated text content. Do not include any analysis, descriptions, or additional commentary.
+
+$_{TEXT}`,
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
 - Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
-- If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.`,
+- If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.
+
+$_{TEXT}`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   /*--- Start PROMPT_TEMPLATE_AUTO ---*/
   PROMPT_TEMPLATE_AUTO: `- Translate the input text into $_{TARGET}.
 - Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
-- If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.`,
+- If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.
+
+$_{TEXT}`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/
 };
 

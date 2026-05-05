@@ -237,8 +237,9 @@ export const AIConversationHelper = {
       promptTemplate = await buildPrompt(promptText, sourceLang, targetLang, translateMode, providerType);
     }
 
+    // All prompt templates must now include $_{TEXT} placeholder
     if (!promptTemplate.includes("$_{TEXT}")) {
-      promptTemplate += "\n\nText to translate:\n$_{TEXT}";
+      throw new Error('Prompt template must include $_{TEXT} placeholder');
     }
 
     // Resolve instructions from template even for AI batch prompts

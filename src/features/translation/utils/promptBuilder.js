@@ -150,15 +150,11 @@ export async function buildPrompt(
     .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
 
   // Inject the actual text to be translated.
-  let finalPrompt;
-  if (finalPromptWithInstructions.includes("$_{TEXT}")) {
-    finalPrompt = finalPromptWithInstructions.replace(
-      /\$_{TEXT}/g,
-      text,
-    );
-  } else {
-    finalPrompt = `${finalPromptWithInstructions}\n\n${text}\n\n`;
-  }
+  // $_{TEXT} is now required in the prompt template, so we can safely replace it.
+  const finalPrompt = finalPromptWithInstructions.replace(
+    /\$_{TEXT}/g,
+    text,
+  );
 
   return finalPrompt;
 }

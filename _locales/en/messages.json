@@ -1514,6 +1514,15 @@
   "prompt_text_help": {
     "message": "Enter the text you want to translate or process."
   },
+  "prompt_preview_button": {
+    "message": "Preview Generated Prompts"
+  },
+  "prompt_preview_loading": {
+    "message": "Generating prompts..."
+  },
+  "prompt_preview_note": {
+    "message": "These examples show how your template is used in different translation modes"
+  },
   "export_success_plaintext": {
     "message": "Settings exported successfully (API keys saved in plain text)."
   },

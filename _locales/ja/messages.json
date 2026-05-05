@@ -1514,6 +1514,15 @@
   "prompt_text_help": {
     "message": "翻訳または処理したいテキストを入力してください。"
   },
+  "prompt_preview_button": {
+    "message": "生成されたプロンプトをプレビュー"
+  },
+  "prompt_preview_loading": {
+    "message": "プロンプトを生成中..."
+  },
+  "prompt_preview_note": {
+    "message": "これらの例は、テンプレートが異なる翻訳モードでどのように使用されるかを示しています"
+  },
   "export_success_plaintext": {
     "message": "設定をエクスポートしました（APIキーは平文で保存されています）。"
   },
