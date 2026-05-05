@@ -45,9 +45,9 @@ const RETRY_STRATEGIES = {
   // Network errors - shorter delays with more retries
   [ErrorTypes.NETWORK_ERROR]: {
     maxRetries: 4,
-    baseDelay: 1000,
+    baseDelay: 2000,
     maxDelay: 10000,
-    exponentialFactor: 1.5,
+    exponentialFactor: 2,
     jitter: true
   },
   
