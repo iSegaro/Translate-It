@@ -343,12 +343,6 @@ export const CONFIG = {
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Translation quality requirements:
-- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
-- Prioritize clarity, tone, and readability over literal or word-for-word translation.
-- Maintain the original formatting, structure, and line breaks exactly.
-- Do **not** include any additional explanations, comments, markdown, or extra content.
-
 Output only the translated text:
 
 $_{TEXT}
@@ -360,12 +354,6 @@ $_{TEXT}
 
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
-
-Translation quality requirements:
-- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
-- Prioritize clarity, tone, and readability over literal or word-for-word translation.
-- Maintain the original formatting, structure, and line breaks exactly.
-- Do **not** include any additional explanations, comments, markdown, or extra content.
 
 Output only the translated text:
 
@@ -534,12 +522,6 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Translation quality requirements:
-  - Automatically detect the input language.
-  - Translate the content into $_{TARGET}.
-  - Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical.
-  - Prioritize clarity, smooth flow, and accurate meaning, without changing the original structure or layout.
-
 Return **only** the translated text. Do not include explanations, markdown, or any other content.
 
 Now, please translate the following texts:
@@ -562,8 +544,7 @@ $_{TEXT}
    - Strictly follow these instructions: $_{PROMPT_INSTRUCTIONS}
    - Automatically detect the language of extracted text
    - Translate all extracted text into $_{TARGET}
-   - Maintain **natural, fluent, and idiomatic** translations
-   - Preserve the **original meaning and context**
+   - Maintain the **original meaning and context**
    - Use **appropriate terminology** for the content type (technical, casual, formal, etc.)
    - Keep **spatial relationships** when multiple text elements exist
 
@@ -586,18 +567,22 @@ $_{TEXT}`,
 
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
-- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
+- Maintain the original formatting, structure, and line breaks exactly.
 - If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.
+- Do **not** include any additional explanations, comments, markdown, or extra content.
 
 $_{TEXT}`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   /*--- Start PROMPT_TEMPLATE_AUTO ---*/
   PROMPT_TEMPLATE_AUTO: `- Translate the input text into $_{TARGET}.
-- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
+- Maintain the original formatting, structure, and line breaks exactly.
 - If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.
+- Do **not** include any additional explanations, comments, markdown, or extra content.
 
 $_{TEXT}`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/

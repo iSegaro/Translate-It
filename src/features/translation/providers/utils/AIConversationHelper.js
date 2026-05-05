@@ -228,9 +228,18 @@ export const AIConversationHelper = {
     ]);
 
     const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js');
-    const canonicalSource = getCanonicalCode(sourceLang);
-    const sourceName = sourceLang === 'auto' ? 'automatically detected language' : (getLanguageNameFromCode(canonicalSource) || sourceLang);
-    const targetName = getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang;
+    const { getSourceLanguageAsync } = await import('@/shared/config/config.js');
+    
+    // Use consistent language name logic with capitalization (matches promptBuilder.js)
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    
+    let actualSourceLang = sourceLang === 'auto' ? await getSourceLanguageAsync() : sourceLang;
+    if (actualSourceLang === 'auto') {
+      actualSourceLang = 'en';
+    }
+
+    const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang);
+    const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang);
 
     let promptTemplate;
     const isDictionary = translateMode === TranslationMode.Dictionary_Translation;

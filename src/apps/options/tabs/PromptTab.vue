@@ -178,7 +178,7 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
     getPromptAutoAsync,
   } = await import('@/shared/config/config.js')
 
-  const { getLanguageNameFromCode } = await import('@/shared/config/languageConstants.js')
+  const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js')
 
   // Helper function to check JSON format (same as in AIConversationHelper)
   const isSpecificTextJsonFormat = (obj) => {
@@ -209,11 +209,20 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
     actualSourceLang = 'en'
   }
 
-  const sourceName = capitalize(getLanguageNameFromCode(actualSourceLang) || actualSourceLang)
-  const targetName = capitalize(getLanguageNameFromCode(targetLang) || targetLang)
+  const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang)
+  const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang)
 
   // Use current template value from the input field (not from storage)
   const currentPromptTemplate = promptTemplate.value
+
+  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
+  const promptInstructionsWithoutText = currentPromptTemplate
+    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
+    .replace(/\n\s*$/g, '')        // Remove trailing empty lines
+
+  const promptInstructions = promptInstructionsWithoutText
+    .replace(/\$_{SOURCE}/g, sourceName)
+    .replace(/\$_{TARGET}/g, targetName)
 
   // Handle AI provider batch translation - MIRRORS AIConversationHelper logic
   // Use batch prompt for Select_Element, Page, or JSON input (excluding dictionary)
@@ -228,27 +237,10 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
       ? await getPromptBASEAIBatchAutoAsync()
       : await getPromptBASEAIBatchAsync()
 
-    // Resolve instructions from current template (not storage)
-    const promptInstructionsTemplate = sourceLang === 'auto'
-      ? await getPromptAutoAsync()
-      : await getPromptAsync()
-
-    // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
-    const promptInstructionsWithoutText = promptInstructionsTemplate
-      .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
-      .replace(/\n\s*$/g, '')        // Remove trailing empty lines
-
-    const promptInstructions = promptInstructionsWithoutText
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, currentPromptTemplate
-        .replace(/\$_{SOURCE}/g, sourceName)
-        .replace(/\$_{TARGET}/g, targetName)
-      )
+      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
       .replace(/\$_{TEXT}/g, text)
   }
 
@@ -256,7 +248,9 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
   if (translateMode === TranslationMode.Select_Element && !isJsonMode) {
     const batchPromptTemplate = await getPromptBASEBatchAsync()
     return batchPromptTemplate
+      .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
+      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
       .replace(/\$_{TEXT}/g, text)
   }
 
@@ -275,16 +269,6 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
       promptBase = sourceLang === 'auto' ? await getPromptBASEFieldAutoAsync() : await getPromptBASEFieldAsync()
     }
   }
-
-  // Build prompt instructions using current template value (not from storage)
-  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
-  const promptInstructionsWithoutText = currentPromptTemplate
-    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
-    .replace(/\n\s*$/g, '')        // Remove trailing empty lines
-
-  const promptInstructions = promptInstructionsWithoutText
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName)
 
   let finalPromptWithInstructions = promptBase
     .replace(/\$_{SOURCE}/g, sourceName)
