@@ -1,3 +1,20 @@
+#### v1.14.0 – Released on May XX, 2026
+
+##### Added
+
+- Added [`Vajehyab`](https://vajehyab.com) Persian dictionary for specialized dictionary results
+
+##### Fixed
+
+- Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
+
+##### Changed
+
+- Improved the UI for selecting dictionary providers in settings with real-time compatibility feedback
+- Implemented smart provider filtering to only display configured and ready-to-use translation providers across the UI.
+
+---
+
 #### v1.13.0 – Released on May 03, 2026
 
 ##### Fixed
