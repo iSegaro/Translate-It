@@ -330,12 +330,14 @@ const generatePromptExamples = async () => {
       )
     })
 
+    /* Commented out as it's currently unused by any provider
     // Screen Capture mode
     examples.push({
       mode: t('prompt_preview_mode_screen_capture') || 'Screen Capture',
       description: t('prompt_preview_desc_screen_capture') || 'OCR and translation of text from images',
       prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.ScreenCapture, 'translate')
     })
+    */
 
     // Dictionary mode
     examples.push({
