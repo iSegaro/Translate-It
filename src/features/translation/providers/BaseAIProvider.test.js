@@ -43,7 +43,6 @@ vi.mock("./utils/AIResponseParser.js", () => ({
     cleanAIResponse: vi.fn((res) => res)
   }
 }));
-import { statsManager } from '../core/TranslationStatsManager.js';
 
 // 4. Concrete implementation for testing
 class MockAIProvider extends BaseAIProvider {

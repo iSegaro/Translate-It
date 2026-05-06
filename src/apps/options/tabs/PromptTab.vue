@@ -75,9 +75,15 @@
             <span>{{ t('prompt_preview_button') || 'Preview Generated Prompts' }}</span>
           </button>
 
-          <div v-if="showPreview" class="prompt-preview-content">
-            <div v-if="loadingExamples" class="loading-indicator">
-              <div class="spinner"></div>
+          <div
+            v-if="showPreview"
+            class="prompt-preview-content"
+          >
+            <div
+              v-if="loadingExamples"
+              class="loading-indicator"
+            >
+              <div class="spinner" />
               <span>{{ t('prompt_preview_loading') || 'Generating prompts...' }}</span>
             </div>
 
@@ -173,8 +179,6 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
     getEnableDictionaryAsync,
     getPromptDictionaryAsync,
     getSourceLanguageAsync,
-    getPromptAsync,
-    getPromptAutoAsync,
   } = await import('@/shared/config/config.js')
 
   const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js')

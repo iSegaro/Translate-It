@@ -220,7 +220,7 @@ export const AIConversationHelper = {
   /**
    * Helper to prepare system prompt and user text for AI providers
    */
-  async preparePromptAndText(text, sourceLang, targetLang, translateMode, providerType, sessionId = null, isBatch = false, contextMetadata = null) {
+  async preparePromptAndText(text, sourceLang, targetLang, translateMode, providerType, sessionId = null, contextMetadata = null) {
     const firstTurn = await this.isFirstTurn(sessionId);
     const [historyEnabled, contextEnabled] = await Promise.all([
       getAIConversationHistoryEnabledAsync(),

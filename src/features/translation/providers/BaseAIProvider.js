@@ -345,8 +345,7 @@ export class BaseAIProvider extends BaseProvider {
    * @protected
    */
   async _preparePromptAndText(texts, sourceLang, targetLang, translateMode, contextMetadata, sessionId = null) {
-    const isBatch = Array.isArray(texts);
-    return await AIConversationHelper.preparePromptAndText(texts, sourceLang, targetLang, translateMode, this.constructor.type, sessionId, isBatch, contextMetadata);
+    return await AIConversationHelper.preparePromptAndText(texts, sourceLang, targetLang, translateMode, this.constructor.type, sessionId, contextMetadata);
   }
 
   /**
