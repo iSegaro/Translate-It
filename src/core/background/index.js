@@ -27,6 +27,7 @@ import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 
 // --- Diagnostic Logging ---
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
+const errorHandler = ErrorHandler.getInstance();
 
 // --- Port Lifecycle Management ---
 
@@ -34,6 +35,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
  * Shared cleanup logic for UI ports (popup, sidepanel)
  */
 async function performUiCleanup(context, sender) {
+  // Exit early if extension context is invalidated to avoid "Extension context invalidated" errors
+  if (!ExtensionContextManager.isValidSync()) {
+    return;
+  }
+
   logger.info(`[Background] Starting cleanup for context: ${context}`);
   
   try {
@@ -71,12 +77,15 @@ async function performUiCleanup(context, sender) {
           try {
             const { queueManager } = await import("@/features/translation/core/QueueManager.js");
             queueManager.cancelByUiContext(context);
-          } catch (e) { /* ignore */ }
+          } catch { /* ignore */ }
         }
       }
     }
   } catch (error) {
-    logger.error(`[Background] Cleanup error for ${context}:`, error);
+    errorHandler.handle(error, {
+      context: `background-cleanup-${context}`,
+      showToast: false
+    });
   }
 }
 
@@ -100,12 +109,18 @@ runtime.onConnect.addListener((port) => {
       port.onDisconnect.addListener(() => {
         logger.info(`[Background] Port DISCONNECTED: ${port.name}`);
         performUiCleanup(context, port.sender).catch(err => {
-          logger.error('[Background] Async cleanup failed:', err);
+          errorHandler.handle(err, {
+            context: `background-port-disconnect-${context}`,
+            showToast: false
+          });
         });
       });
     }
   } catch (err) {
-    logger.error('[Background] Error in onConnect handler:', err);
+    errorHandler.handle(err, {
+      context: 'background-onConnect',
+      showToast: false
+    });
   }
 });
 
@@ -116,8 +131,6 @@ registerAllProviders();
 
 const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
-
-const errorHandler = ErrorHandler.getInstance();
 
 
 // Handle extension installation
@@ -169,20 +182,29 @@ backgroundService.initialize().then(async () => {
             try {
               await handleCommandEvent(command, tab);
             } catch (error) {
-              logger.error(`Error handling command ${command}:`, error);
+              errorHandler.handle(error, {
+                context: `background-command-${command}`,
+                showToast: false
+              });
             }
           });
 
           logger.info("Keyboard shortcuts listener registered successfully");
         }
       } catch (error) {
-        logger.error("Failed to register keyboard shortcuts listener:", error);
+        errorHandler.handle(error, {
+          context: 'background-shortcuts-init',
+          showToast: false
+        });
       }
     })();
   }
 
 }).catch((error) => {
-  logger.error("[Background] Background service initialization failed:", error);
+  errorHandler.handle(error, {
+    context: 'background-init',
+    showToast: false
+  });
 });
 
 export { backgroundService };
