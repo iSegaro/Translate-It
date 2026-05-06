@@ -151,7 +151,7 @@ describe('Settings Store', () => {
       
       const result = store.validateSettings();
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Prompt template must include $_{TEXT} placeholder');
+      expect(result.errors).toContain('validation_prompt_template_missing_placeholders');
     });
   });
 

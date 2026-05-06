@@ -27,19 +27,26 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import { mount } from '@vue/test-utils';
 
+// Helper to test composables
+function withSetup(composable) {
+  let result;
+  const wrapper = mount({
+    setup() {
+      result = composable();
+      return () => {};
+    },
+    template: '<div></div>'
+  });
+  return [result, wrapper];
+}
+
 describe('useStorage Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should sync with external changes via events', async () => {
-    const wrapper = mount({
-      setup() {
-        const { data } = useStorage(['theme']);
-        return { data };
-      },
-      template: '<div></div>'
-    });
+    const [{ data }] = withSetup(() => useStorage(['theme']));
     
     // Now setupListeners should have been called in onMounted
     const listenerCall = storageCore.on.mock.calls.find(call => call[0] === 'change:theme');
@@ -49,30 +56,24 @@ describe('useStorage Composable', () => {
     // Simulate external change
     listener({ newValue: 'auto' });
     
-    expect(wrapper.vm.data.theme).toBe('auto');
+    expect(data.theme).toBe('auto');
   });
 
   it('should load data on mount if immediate is true', async () => {
     storageCore.get.mockResolvedValue({ theme: 'dark' });
     
-    const wrapper = mount({
-      setup() {
-        const { data, isLoading } = useStorage(['theme']);
-        return { data, isLoading };
-      },
-      template: '<div></div>'
-    });
+    const [{ data }] = withSetup(() => useStorage(['theme']));
 
     // Wait for async load in onMounted
     await nextTick();
     await nextTick(); // Second tick for the internal promise resolution
     
-    expect(wrapper.vm.data.theme).toBe('dark');
+    expect(data.theme).toBe('dark');
   });
 
   it('should update reactive data when save is called', async () => {
     storageCore.set.mockResolvedValue(true);
-    const { data, save } = useStorage(['theme']);
+    const [{ data, save }] = withSetup(() => useStorage(['theme']));
     
     await save({ theme: 'light' });
     
@@ -82,7 +83,7 @@ describe('useStorage Composable', () => {
 
   it('should remove keys from reactive data', async () => {
     storageCore.remove.mockResolvedValue(true);
-    const { data, remove } = useStorage(['theme']);
+    const [{ data, remove }] = withSetup(() => useStorage(['theme']));
     data.theme = 'dark';
     
     await remove('theme');
@@ -97,13 +98,11 @@ describe('useStorageItem Composable', () => {
     storageCore.get.mockResolvedValue({ theme: 'auto' });
     storageCore.set.mockResolvedValue(true);
     
-    const { value } = useStorageItem('theme', 'auto');
+    const [{ value }] = withSetup(() => useStorageItem('theme', 'auto', { debounceMs: 0, immediate: false }));
     
-    // Wait for initial load if any (though we mock)
     value.value = 'dark';
     
     // Watchers are async in Vue
-    await nextTick();
     await nextTick();
     
     expect(storageCore.set).toHaveBeenCalledWith({ theme: 'dark' });
