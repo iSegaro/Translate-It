@@ -187,7 +187,7 @@ const getRawManifest = () => [
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     features: ["translation", "text", "autoDetect", "context", "offline", "dictionary", "bulk", "bilingual"],
     needsApiKey: false,
-    requiredSettings: ['WEBAI_API_URL'],
+    requiredSettings: ['WEBAI_API_URL', 'WEBAI_API_MODEL'],
     supported: true,
   },
   {
