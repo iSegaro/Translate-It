@@ -264,7 +264,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         const partOfSpeech = line.substring(0, colonIndex).trim();
         const terms = line.substring(colonIndex + 1).trim();
         if (partOfSpeech && terms) {
-          markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
+          markdownOutput += `**${partOfSpeech}**: ${terms}\n\n`;
         }
       } else if (line.trim()) {
         markdownOutput += `**${line.trim()}**\n\n`;

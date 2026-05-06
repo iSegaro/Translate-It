@@ -127,6 +127,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  isDictionary: {
+    type: Boolean,
+    default: false
+  },
 })
 
 // Emits
@@ -249,7 +253,7 @@ const handleClick = async () => {
         // Generate a temporary ID or use a marker to stay active during speak()
         localTTSId.value = `pending_${Date.now()}`
         
-        result = await tts.speak(props.text, props.language)
+        result = await tts.speak(props.text, props.language, { isDictionary: props.isDictionary })
         
         if (result) {
           // Sync with the actual ID from the store after success
@@ -275,7 +279,7 @@ const handleClick = async () => {
         // Priority: Use speak() with current text instead of rigid retry()
         // This allows user to change text/language and try again
         localTTSId.value = `pending_retry_${Date.now()}`
-        result = await tts.speak(props.text, props.language)
+        result = await tts.speak(props.text, props.language, { isDictionary: props.isDictionary })
         
         if (result) {
           localTTSId.value = tts.currentTTSId.value

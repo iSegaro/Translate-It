@@ -10,7 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
+import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
@@ -62,8 +62,11 @@ export function useTTSSmart() {
 
   /**
    * Starts a speech request
+   * @param {string} text - The text to speak
+   * @param {string} lang - The language code
+   * @param {Object} options - Additional options (e.g., { isDictionary: boolean })
    */
-  const speak = async (text, lang = "auto") => {
+  const speak = async (text, lang = "auto", options = {}) => {
     if (!text || !text.trim()) {
       logger.warn("[useTTSSmart] No text provided for TTS");
       return false;
@@ -94,7 +97,10 @@ export function useTTSSmart() {
         language = await getLanguageCodeForTTS(lang) || "en";
       }
       
-      const cleanText = SimpleMarkdown.getCleanTranslation(text);
+      // Determine extraction strategy based on options
+      const strategy = options.isDictionary ? ExtractionStrategy.PRIMARY_ONLY : ExtractionStrategy.FULL_TEXT;
+      const cleanText = SimpleMarkdown.getCleanTranslation(text, strategy);
+      
       lastText.value = text;
       lastLanguage.value = lang;
 

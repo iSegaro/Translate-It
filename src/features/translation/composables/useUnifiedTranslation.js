@@ -54,6 +54,7 @@ export function useUnifiedTranslation(context = 'popup') {
         sourceLanguage: ct.sourceLanguage,
         targetLanguage: ct.targetLanguage,
         provider: ct.provider,
+        mode: ct.mode, // Added mode for UI logic
         timestamp: ct.timestamp
       };
     },
@@ -68,6 +69,7 @@ export function useUnifiedTranslation(context = 'popup') {
         sourceLanguage: val.sourceLanguage,
         targetLanguage: val.targetLanguage,
         provider: val.provider,
+        mode: val.mode, // Added mode for persistence
         timestamp: val.timestamp
       };
     }
@@ -236,6 +238,7 @@ export function useUnifiedTranslation(context = 'popup') {
       source: resultData.originalText || sourceText.value,
       target: resultData.translatedText,
       provider: resultData.provider,
+      mode: resultData.mode, // Capture mode from response
       timestamp: timestamp,
       sourceLanguage: resultData.sourceLanguage,
       targetLanguage: resultData.targetLanguage

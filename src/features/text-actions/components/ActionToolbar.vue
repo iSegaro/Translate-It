@@ -18,6 +18,7 @@
         :title="computedCopyTitle"
         :aria-label="computedCopyAriaLabel"
         :disabled="copyDisabled"
+        :is-dictionary="isDictionary"
         @copied="handleCopied"
         @copy-failed="handleCopyFailed"
       />
@@ -29,6 +30,7 @@
         :size="buttonSize"
         :variant="buttonVariant"
         :disabled="ttsDisabled"
+        :is-dictionary="isDictionary"
         @tts-started="handleTTSStarted"
         @tts-stopped="handleTTSStopped"
         @tts-error="handleTTSFailed"
@@ -92,6 +94,10 @@ const props = defineProps({
   detectedLanguage: {
     type: String,
     default: undefined
+  },
+  isDictionary: {
+    type: Boolean,
+    default: false
   },
   
   // Display control

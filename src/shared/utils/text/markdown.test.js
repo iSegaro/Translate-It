@@ -1,8 +1,39 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SimpleMarkdown } from './markdown.js';
+import { SimpleMarkdown, ExtractionStrategy } from './markdown.js';
 
 describe('SimpleMarkdown', () => {
   describe('getCleanTranslation', () => {
+    describe('Extraction Strategies', () => {
+      const dictionaryInput = 'رزرو کردن\n\n- **فعل**: رزرو کردن، ذخیره کردن\n- **اسم**: رزرو، ذخیره‌گاه';
+      const normalInput = 'First paragraph.\n\nSecond paragraph with **bold**.';
+
+      it('should use FULL_TEXT strategy correctly', () => {
+        const result = SimpleMarkdown.getCleanTranslation(normalInput, ExtractionStrategy.FULL_TEXT);
+        expect(result).toContain('First paragraph.');
+        expect(result).toContain('Second paragraph with bold.');
+        expect(result).not.toContain('**');
+      });
+
+      it('should use PRIMARY_ONLY strategy correctly (Default)', () => {
+        const result = SimpleMarkdown.getCleanTranslation(dictionaryInput, ExtractionStrategy.PRIMARY_ONLY);
+        expect(result).toBe('رزرو کردن');
+      });
+
+      it('should use CLEAN_DICT strategy correctly', () => {
+        const result = SimpleMarkdown.getCleanTranslation(dictionaryInput, ExtractionStrategy.CLEAN_DICT);
+        expect(result).toContain('رزرو کردن');
+        expect(result).toContain('فعل: رزرو کردن، ذخیره کردن');
+        expect(result).toContain('اسم: رزرو، ذخیره‌گاه');
+        expect(result).not.toContain('**');
+      });
+
+      it('should handle traditional format with strategies', () => {
+        const input = 'اخبار**اسم**: اخبار, خبر';
+        expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.PRIMARY_ONLY)).toBe('اخبار');
+        expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.FULL_TEXT)).toBe('اخباراسم: اخبار, خبر');
+      });
+    });
+
     describe('Traditional Provider Format', () => {
       it('should extract translation before label for single line with bold label', () => {
         const input = 'اخبار**اسم**: اخبار, خبر, اوازه';

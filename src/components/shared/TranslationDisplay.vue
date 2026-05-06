@@ -38,6 +38,7 @@
         :text="content"
         :language="lastTranslation?.targetLanguage || targetLanguage"
         :mode="mode === 'sidepanel' ? 'sidepanel' : 'output'"
+        :is-dictionary="isDictionary"
         class="ti-display-toolbar"
         :show-copy="showCopyButton"
         :show-paste="false"
@@ -175,7 +176,8 @@ import './TranslationDisplay.scss';
 import { ref, computed, watch, onMounted } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTextDirection } from "@/composables/shared/useTextDirection.js";
-import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
+import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
+import { TranslationMode } from "@/shared/config/config.js";
 import DOMPurify from "dompurify";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
 import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
@@ -353,6 +355,12 @@ const hasContent = computed(
   () => (props.content && props.content.trim().length > 0 && !props.isLoading) || (props.isStreaming && props.content)
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
+
+// Check if current translation is in dictionary mode
+const isDictionary = computed(() => {
+  const mode = props.lastTranslation?.mode || props.mode;
+  return mode === TranslationMode.Dictionary_Translation || mode === TranslationMode.LEGACY_DICTIONARY;
+});
 
 // Reactive error message display
 const displayErrorMessage = computed(() => {
@@ -537,7 +545,9 @@ const handleMobileSpeak = () => {
 };
 
 const handleMobileCopy = async () => {
-  const textToCopy = SimpleMarkdown.strip ? SimpleMarkdown.strip(props.content) : props.content;
+  const strategy = isDictionary.value ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
+  const textToCopy = SimpleMarkdown.getCleanTranslation(props.content, strategy);
+  
   try {
     await navigator.clipboard.writeText(textToCopy);
     emit('text-copied', textToCopy);
