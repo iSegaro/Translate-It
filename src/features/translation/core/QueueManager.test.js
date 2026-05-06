@@ -135,7 +135,7 @@ describe('QueueManager', () => {
   });
 
   describe('Cancellation', () => {
-    it('should cancel all pending items for a provider', async () => {
+    it('should cancel all items (including processing) for a provider', async () => {
       const mockRequest1 = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R1'), 1000)));
       const mockRequest2 = vi.fn().mockResolvedValue('R2');
       
@@ -145,12 +145,41 @@ describe('QueueManager', () => {
       await vi.advanceTimersByTimeAsync(150);
       
       const cancelledCount = queueManager.cancelProvider('cancel-provider');
-      expect(cancelledCount).toBe(1); 
+      expect(cancelledCount).toBe(2); 
 
+      await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
       await expect(p2).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+
+    it('should cancel items by UI context', async () => {
+      const mockRequest1 = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R1'), 1000)));
+      const mockRequest2 = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R2'), 1000)));
       
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(await p1).toBe('R1');
+      const p1 = queueManager.enqueue('p1', mockRequest1, 0, 'context', { uiContext: 'popup' });
+      const p2 = queueManager.enqueue('p2', mockRequest2, 0, 'context', { uiContext: 'sidepanel' });
+
+      await vi.advanceTimersByTimeAsync(150);
+      
+      const cancelledCount = queueManager.cancelByUiContext('popup');
+      expect(cancelledCount).toBe(1);
+
+      await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      
+      // p2 should still be processing/pending
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await p2).toBe('R2');
+    });
+
+    it('should cancel items by messageId', async () => {
+      const mockRequest = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('R'), 1000)));
+      const p1 = queueManager.enqueue('p', mockRequest, 0, 'context', { messageId: 'm1' });
+      
+      await vi.advanceTimersByTimeAsync(150);
+      
+      const cancelledCount = queueManager.cancelByMessageId('m1');
+      expect(cancelledCount).toBe(1);
+
+      await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
     });
   });
 });
