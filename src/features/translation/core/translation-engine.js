@@ -74,11 +74,11 @@ export class TranslationEngine {
     const messageId = request.messageId || data.messageId || `msg-${Date.now()}`;
     data.messageId = messageId;
 
-    // Register and detect duplicate
-    this.lifecycleRegistry.registerRequest(messageId, data.text);
+    // Register and detect duplicate with context awareness
+    this.lifecycleRegistry.registerRequest(messageId, data.text, context);
 
     try {
-      const result = await this.executeTranslation(data, sender);
+      const result = await this.executeTranslation(data, sender, context);
 
       if (!result || typeof result !== "object") {
         throw new Error(`Translation failed: invalid result format (${typeof result})`);
@@ -99,7 +99,7 @@ export class TranslationEngine {
   /**
    * Core translation execution logic with streaming and JSON optimization support
    */
-  async executeTranslation(data, sender) {
+  async executeTranslation(data, sender, uiContext = 'unknown') {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
@@ -133,12 +133,13 @@ export class TranslationEngine {
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     if (isSelectJson) {
       logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender);
+      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
     }
 
     // 5. Standard execution via ProviderCoordinator
     const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
       mode: mode,
+      uiContext: uiContext, // Pass UI context (popup, sidepanel, etc.)
       originalSourceLang,
       originalTargetLang,
       messageId: data.messageId,
@@ -269,7 +270,7 @@ export class TranslationEngine {
   // --- Delegation Methods ---
   
   async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
-  async cancelAllTranslations() { return await this.lifecycleRegistry.cancelAllTranslations(); }
+  async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
   registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }

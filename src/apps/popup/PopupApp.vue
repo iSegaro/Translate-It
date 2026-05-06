@@ -262,10 +262,15 @@ onMounted(() => {
    * Establish a port connection to the background script.
    * Disconnection of this port is the most reliable way to detect popup closure.
    */
-  const port = browser.runtime.connect({ name: 'popup-lifecycle' })
-  port.postMessage({ action: 'POPUP_OPENED', data: { timestamp: Date.now() } })
-  
-  window.__popupPort = port
+  try {
+    const port = browser.runtime.connect({ name: 'popup-lifecycle' })
+    
+    port.postMessage({ action: 'POPUP_OPENED', data: { timestamp: Date.now() } })
+    
+    window.__popupPort = port
+  } catch (error) {
+    logger.error('[PopupApp] Failed to establish lifecycle port:', error)
+  }
   
   // Start the initialization sequence
   initialize()

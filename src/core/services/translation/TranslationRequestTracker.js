@@ -70,11 +70,12 @@ export class TranslationRequestTracker {
   /**
    * Create and track a new translation request
    */
-  createRequest({ messageId, data, sender, options = {} }) {
+  createRequest({ messageId, data, sender, context, options = {} }) {
     const request = {
       messageId,
       data,
       sender,
+      context: context || options.context || 'unknown',
       status: RequestStatus.PENDING,
       priority: options.priority || this.determinePriority(data),
       mode: this.detectMode(data),

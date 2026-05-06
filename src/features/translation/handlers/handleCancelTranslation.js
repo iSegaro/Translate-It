@@ -35,17 +35,17 @@ export async function handleCancelTranslation(request, sender) {
     // Step 1: Cancel active translations in TranslationEngine (stops network requests)
     let cancelledCount = 0;
     if (cancelAll) {
-      logger.debug('[CancelTranslation] Cancelling all active translations');
-      cancelledCount = await translationEngine.cancelAllTranslations?.() || 0;
-      logger.debug('[CancelTranslation] Engine cancelled all translations', { cancelledCount });
+      logger.info(`[CancelTranslation] Cancelling all active translations for context: ${context || 'all'}`);
+      cancelledCount = await translationEngine.cancelAllTranslations?.(context) || 0;
+      logger.info(`[CancelTranslation] Engine cancelled ${cancelledCount} translations for context: ${context || 'all'}`);
     } else if (messageId) {
-      logger.debug('[CancelTranslation] Cancelling specific translation', { messageId });
+      logger.info(`[CancelTranslation] Cancelling specific translation: ${messageId}`);
       const cancelled = await translationEngine.cancelTranslation(messageId);
       if (cancelled) {
         cancelledCount = 1;
-        logger.debug('[CancelTranslation] Engine successfully cancelled translation', { messageId });
+        logger.info(`[CancelTranslation] Engine successfully cancelled translation: ${messageId}`);
       } else {
-        logger.debug('[CancelTranslation] Translation was not active or already completed', { messageId });
+        logger.info(`[CancelTranslation] Translation ${messageId} was not active or already completed`);
       }
     }
     
@@ -66,7 +66,7 @@ export async function handleCancelTranslation(request, sender) {
     try {
       const { rateLimitManager } = await import("../core/RateLimitManager.js");
       if (cancelAll) {
-        logger.info('[CancelTranslation] Clearing all pending requests in RateLimitManager');
+        logger.info(`[CancelTranslation] Clearing all pending requests in RateLimitManager for context: ${context || 'all'}`);
         rateLimitManager.clearPendingRequests();
       } else if (messageId) {
         logger.info(`[CancelTranslation] Clearing pending requests for messageId: ${messageId}`);
@@ -74,6 +74,24 @@ export async function handleCancelTranslation(request, sender) {
       }
     } catch (error) {
       logger.error('[CancelTranslation] RateLimitManager cleanup failed:', error);
+    }
+
+    // Step 4: Clear pending retries in QueueManager
+    try {
+      const { queueManager } = await import("../core/QueueManager.js");
+      if (cancelAll && context) {
+        logger.info(`[CancelTranslation] Clearing pending retries in QueueManager for context: ${context}`);
+        queueManager.cancelByUiContext(context);
+      } else if (messageId) {
+        logger.info(`[CancelTranslation] Clearing pending retries in QueueManager for messageId: ${messageId}`);
+        queueManager.cancelByMessageId(messageId);
+      } else if (cancelAll) {
+        logger.info('[CancelTranslation] Clearing ALL pending retries in QueueManager (no context provided)');
+        // If we want to be safe and clear everything when cancelAll is true but no context
+        // we can call a general clear, but usually context is popup/sidepanel
+      }
+    } catch (error) {
+      logger.error('[CancelTranslation] QueueManager cleanup failed:', error);
     }
 
     // Always return success since the cancellation intent is acknowledged

@@ -151,7 +151,10 @@ export class ProviderCoordinator {
       };
 
       // Enqueue the task - QueueManager handles retries and prioritization
-      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode);
+      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode, {
+        messageId: options.messageId,
+        uiContext: options.uiContext
+      });
 
       // 7. Post-processing & Normalization
       // Use the strict Response Contract to determine cleaning strategy

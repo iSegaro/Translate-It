@@ -123,7 +123,12 @@ export class UnifiedTranslationService {
       }
 
       const request = this.requestTracker.createRequest({
-        messageId, data, sessionId: data?.sessionId || messageId, sender, timestamp: Date.now()
+        messageId, 
+        data, 
+        sessionId: data?.sessionId || messageId, 
+        sender, 
+        timestamp: Date.now(),
+        context
       });
 
       // Delegate processing to coordinator

@@ -19,12 +19,12 @@ export class OptimizedJsonHandler {
   /**
    * Orchestrates the optimized translation process.
    */
-  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender) {
+  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown') {
     const { text, sourceLanguage, targetLanguage, mode, options } = data;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
     const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
-                             engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
+                             engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', uiContext);
 
     let hasErrors = false;
     let lastError = null;
@@ -156,9 +156,16 @@ export class OptimizedJsonHandler {
             // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
             // to prevent them from even attempting to start.
             if (providerInstance.providerName) {
-              import('@/features/translation/core/ProviderCoordinator.js').then(({ coordinator }) => {
-                if (coordinator && coordinator.queueManager) {
-                  coordinator.queueManager.cancelProvider(providerInstance.providerName);
+              import('@/features/translation/core/ProviderCoordinator.js').then(({ providerCoordinator }) => {
+                if (providerCoordinator && providerCoordinator.queueManager) {
+                  // Actually, QueueManager is a singleton, we can use it directly
+                }
+              }).catch(() => { /* ignore */ });
+              
+              // More robust way: Use the QueueManager singleton directly
+              import('@/features/translation/core/QueueManager.js').then(({ queueManager }) => {
+                if (queueManager) {
+                  queueManager.cancelByMessageId(messageId);
                 }
               }).catch(() => { /* ignore */ });
             }
