@@ -22,6 +22,8 @@ export const NewlineManager = {
   protect(text) {
     if (!text || typeof text !== 'string') return text;
 
+    logger.debug('Protecting newlines in text', { length: text.length });
+
     // 1. Replace double (or more) newlines first
     let processed = text.replace(/\n\n+/g, (match) => {
       // For \n\n\n, we could use <n2/><n1/>, but usually <n2/> is enough for paragraphs
@@ -43,6 +45,8 @@ export const NewlineManager = {
    */
   restore(text) {
     if (!text || typeof text !== 'string') return text;
+
+    logger.debug('Restoring newlines from markers', { length: text.length });
 
     let restored = text;
 
