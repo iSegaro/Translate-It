@@ -1,8 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.js';
-import { handleGoogleTTSSpeak } from '@/features/tts/handlers/handleGoogleTTS.js';
-import { handleEdgeTTSSpeak } from '@/features/tts/handlers/handleEdgeTTS.js';
 import { areLanguagesSimilar } from '@/shared/utils/language/languageUtils.js';
 import { ARABIC_SCRIPT_LANGUAGES, CHINESE_SCRIPT_LANGUAGES, DEVANAGARI_SCRIPT_LANGUAGES } from '@/shared/utils/text/textAnalysis.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
@@ -10,6 +8,7 @@ import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import storageCore from '@/shared/storage/core/StorageCore.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 
@@ -127,57 +126,12 @@ export class TTSDispatcher {
 
       // 3. Resolve BEST ENGINE with Circuit Breaker awareness
       resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled);
-      let response;
-      if (resolution.engine === TTS_ENGINES.EDGE) {
-        response = await handleEdgeTTSSpeak(message, sender, resolution.language);
-        
-        // 5. Smart Recovery (If Edge returns empty audio)
-        if (!response.success && fallbackEnabled && response.error?.includes('empty audio data')) {
-          logger.info('[TTSDispatcher] Edge failed. Fallback is ENABLED, attempting recovery...');
-          
-          // Check if Google is at least allowed before trying recovery
-          if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.GOOGLE)) {
-            const redetected = await LanguageDetectionService.detect(text);
-            
-            // Apply similar language logic here too
-            const shouldSwitch = redetected && 
-                                redetected !== resolution.language && 
-                                !areLanguagesSimilar(resolution.language, redetected);
+      
+      // Update state manager with the resolved language for accurate broadcasting
+      ttsStateManager.lastTTSLanguage = resolution.language;
 
-            if (shouldSwitch) {
-              logger.debug(`[TTSDispatcher] Recovery: Switching from ${resolution.language} to ${redetected}`);
-              const retryRes = TTSLanguageService.resolveTTSSettings(redetected, preferredEngine, fallbackEnabled);
-              response = await (retryRes.engine === TTS_ENGINES.EDGE ? handleEdgeTTSSpeak : handleGoogleTTSSpeak)(message, sender, retryRes.language);
-            } else {
-              response = await handleGoogleTTSSpeak(message, sender, resolution.language);
-            }
-          }
-        }
-      } else if (resolution.engine === TTS_ENGINES.GOOGLE) {
-        // Explicitly try Google if resolved
-        response = await handleGoogleTTSSpeak(message, sender, resolution.language);
-        
-        // If Google fails (e.g. Unsupported language) AND fallback is allowed
-        if (!response.success && fallbackEnabled && response.unsupportedLanguage) {
-          // Check if Edge is allowed
-          if (await ttsCircuitBreaker.isAllowed(TTS_ENGINES.EDGE)) {
-            logger.info(`[TTSDispatcher] Google doesn't support ${resolution.language}. Falling back to ${TTS_ENGINES.EDGE}.`);
-            response = await handleEdgeTTSSpeak(message, sender, resolution.language);
-          }
-        }
-      } else {
-        throw new Error(`Unsupported TTS engine: ${resolution.engine}`);
-      }
-
-      // If finally it failed, notify listeners
-      if (response && !response.success) {
-        await ttsStateManager.notifyTTSEnded('error', { 
-          error: response.error, 
-          errorType: response.errorType 
-        });
-      }
-
-      return response;
+      // CRITICAL: Start playback via QueueManager to support chunking for large texts
+      return await ttsQueueManager.start(text, resolution.language, resolution.engine, message, sender);
     } catch (error) {
       logger.error('[TTSDispatcher] Dispatch critical failure:', error);
       await ttsStateManager.notifyTTSEnded('error', { error: error.message });
@@ -185,4 +139,3 @@ export class TTSDispatcher {
     }
   }
 }
-

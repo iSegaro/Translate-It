@@ -4,6 +4,7 @@ import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSStateManager');
 
@@ -93,7 +94,7 @@ class TTSStateManager {
   resetSpeakState() {
     this.currentTTSRequest = null;
     this.lastTTSText = null;
-    this.lastTTSLanguage = null;
+    // lastTTSLanguage is preserved for the final completion notification
   }
 
   /**
@@ -103,6 +104,7 @@ class TTSStateManager {
     this.resetSpeakState();
     this.currentTTSSender = null;
     this.currentTTSId = null;
+    this.lastTTSLanguage = null;
   }
 
   /**
@@ -153,14 +155,20 @@ class TTSStateManager {
    * Notify the requester that TTS has ended
    */
   async notifyTTSEnded(reason = 'completed', errorData = null) {
-    const status = reason === 'error' ? 'error' : 'idle';
-    
-    // Always broadcast status for independent UI updates
-    await this.broadcastStatus(status, { 
-      reason, 
-      ...(errorData || {}) 
-    });
+    // CRITICAL: Check with QueueManager first. If there are more chunks, 
+    // it will handle the next playback and we DON'T notify the UI yet.
+    if (reason === 'completed' && ttsQueueManager.chunks.length > 0 && ttsQueueManager.currentIndex < ttsQueueManager.chunks.length - 1) {
+      await ttsQueueManager.onChunkEnded('completed');
+      return;
+    }
 
+    const status = reason === 'error' ? 'error' : 'idle';
+
+    // Always broadcast status for independent UI updates
+    await this.broadcastStatus(status, {
+      reason,
+      ...(errorData || {})
+    });
     if (!this.currentTTSSender) return;
 
     try {

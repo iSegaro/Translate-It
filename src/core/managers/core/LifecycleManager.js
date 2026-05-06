@@ -149,6 +149,7 @@ class LifecycleManager {
       'TTS_SPEAK': Handlers.handleTTSSpeakLazy,
       [MessageActions.TTS_STOP]: Handlers.handleTTSStopLazy,
       [MessageActions.GOOGLE_TTS_ENDED]: Handlers.handleTTSEndedLazy,
+      [MessageActions.INTERNAL_TTS_CHUNK_FINISHED]: Handlers.handleTTSEndedLazy,
       [MessageActions.OFFSCREEN_READY]: Handlers.handleOffscreenReadyLazy,
       'clearTTSHandlerCache': Handlers.clearTTSHandlerCache,
       'getTTSHandlerStats': Handlers.getTTSHandlerStats,
