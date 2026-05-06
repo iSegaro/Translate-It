@@ -38,8 +38,17 @@ class TTSQueueManager {
     this.currentSender = sender;
     this.originalMessage = message;
     
+    // Safety Limit: Truncate extremely large texts to prevent IP blocking/Rate limiting
+    // 30,000 chars is roughly 15-20 pages of text, safe for providers.
+    const MAX_TOTAL_CHARS = 30000;
+    let finalEffectText = text;
+    if (text.length > MAX_TOTAL_CHARS) {
+      logger.debug(`[TTSQueueManager] Text exceeds safety limit (${text.length} > ${MAX_TOTAL_CHARS}). Truncating.`);
+      finalEffectText = text.substring(0, MAX_TOTAL_CHARS);
+    }
+
     // 1. Chunking text into logical segments (sentences)
-    this.chunks = this._splitIntoChunks(text, 200); // 200 is safe for Google and good for Edge TTFB
+    this.chunks = this._splitIntoChunks(finalEffectText, 200); // 200 is safe for Google and good for Edge TTFB
     this.currentIndex = 0;
 
     if (this.chunks.length === 0) {
