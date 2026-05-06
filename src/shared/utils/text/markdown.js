@@ -516,6 +516,12 @@ export class SimpleMarkdown {
       .replace(/```[\s\S]*?```/g, (match) => {
         return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
       })
+      // Strip markdown links [text](url) keeping only text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      // Strip pronunciation guides like [go(a)vāhi] or [n(y)o͞oz]
+      // Matches brackets that are NOT followed by (url)
+      // Range includes: basic latin, latin extended, combining diacritics, and phonetic extensions
+      .replace(/\[[a-zA-Z0-9\(\)\s'āēīōū\u00C0-\u017F\u0300-\u036F\u02B0-\u02FF]+\](?!\()/g, "")
       // Strip headers (# header)
       .replace(/^#+\s?/gm, "")
       // Strip blockquotes (> quote)
@@ -530,8 +536,6 @@ export class SimpleMarkdown {
       .replace(/^\s*\[[ xX]\]\s+/gm, "")
       // Strip bold/italic markers (**bold**, __bold__, *italic*, _italic_)
       .replace(/(\*\*|__|\*|_)/g, "")
-      // Strip markdown links [text](url) keeping only text
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       // Strip inline code markers (`code`)
       .replace(/`([^`]+)`/g, "$1")
       // Normalize multiple newlines to double newlines, then trim

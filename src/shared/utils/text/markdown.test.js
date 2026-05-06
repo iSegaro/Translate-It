@@ -288,6 +288,13 @@ describe('SimpleMarkdown', () => {
       expect(SimpleMarkdown.strip('[Google](https://google.com)')).toBe('Google');
     });
 
+    it('should strip pronunciation guides in brackets (Vajehyab style)', () => {
+      expect(SimpleMarkdown.strip('گواهی [go(a)vāhi]')).toBe('گواهی');
+      expect(SimpleMarkdown.strip('news [n(y)o͞oz]')).toBe('news');
+      expect(SimpleMarkdown.strip('متعدد [mote(a)\'added]')).toBe('متعدد');
+      expect(SimpleMarkdown.strip('word [phonetic] and more')).toBe('word  and more');
+    });
+
     it('should handle mixed markdown', () => {
       const input = '# Header\n\nThis is **bold** and *italic* with `code` and [link](url).';
       const expected = 'Header\n\nThis is bold and italic with code and link.';
