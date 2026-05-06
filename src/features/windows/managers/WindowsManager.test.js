@@ -230,6 +230,32 @@ describe('WindowsManager', () => {
       
       expect(mockWindowsManagerEvents.dismissIcon).toHaveBeenCalled();
     });
+
+    it('should respect Ctrl requirement in IMMEDIATE mode', async () => {
+      vi.mocked(settingsManager.get).mockImplementation((key, def) => {
+        if (key === 'selectionTranslationMode') return 'immediate';
+        if (key === 'REQUIRE_CTRL_FOR_TEXT_SELECTION') return true;
+        return def;
+      });
+      
+      // 1. Test when Ctrl is NOT pressed (options provided but ctrlPressed false)
+      await mockPageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, { 
+        text: 'test', 
+        position: {x:1, y:1},
+        options: { ctrlPressed: false }
+      });
+      await vi.runAllTimersAsync();
+      expect(mockWindowsManagerEvents.showWindow).not.toHaveBeenCalled();
+
+      // 2. Test when Ctrl IS pressed
+      await mockPageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, { 
+        text: 'test', 
+        position: {x:1, y:1},
+        options: { ctrlPressed: true }
+      });
+      await vi.runAllTimersAsync();
+      expect(mockWindowsManagerEvents.showWindow).toHaveBeenCalled();
+    });
   });
 
   describe('Translation Flow', () => {
@@ -246,6 +272,11 @@ describe('WindowsManager', () => {
       const { deviceDetector } = await import('@/utils/browser/compatibility.js');
       vi.mocked(deviceDetector.shouldEnableMobileUI).mockReturnValue(true);
       
+      vi.mocked(settingsManager.get).mockImplementation((key, def) => {
+        if (key === 'selectionTranslationMode') return 'immediate';
+        return def;
+      });
+
       await windowsManager.show('mob', {x:0, y:0});
       expect(mockWindowsManagerEvents.showMobileSheet).toHaveBeenCalled();
     });

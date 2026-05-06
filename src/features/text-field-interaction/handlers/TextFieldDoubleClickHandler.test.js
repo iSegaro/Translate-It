@@ -169,7 +169,8 @@ describe('TextFieldDoubleClickHandler', () => {
       
       expect(pageEventBus.emit).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
         text: 'hello',
-        position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })
+        position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+        options: expect.objectContaining({ ctrlPressed: true, isTextField: true })
       }));
     });
 

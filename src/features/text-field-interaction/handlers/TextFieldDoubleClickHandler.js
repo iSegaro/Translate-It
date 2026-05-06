@@ -850,6 +850,11 @@ export class TextFieldDoubleClickHandler extends ResourceTracker {
       text: selectedText,
       position: position,
       mode: selectionTranslationMode,
+      options: {
+        ctrlPressed: true, // Always treat as pressed for double-click in text fields
+        shiftPressed: false,
+        isTextField: true
+      },
       context: {
         isTextField: true,
         isIframe: window !== window.top
