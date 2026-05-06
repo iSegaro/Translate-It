@@ -68,11 +68,11 @@ export class PageTranslationBridge extends ResourceTracker {
       // We pass the node as the 4th argument
       const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
       
-      // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) if the provider returned a "cleaned" version
-      // of the same text. If they are identical after stripping ZWNJ, we prefer the 
-      // original trimmedText as it contains the correct typography.
+      // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) and Tatweel (ـ) if the provider returned 
+      // a "cleaned" or slightly re-formatted version of the same text.
+      const normalizeForComparison = (s) => s ? s.replace(/[\u200c\u0640]/g, '').replace(/\s+/g, ' ').trim() : '';
       const isFunctionallyIdentical = translated && 
-        translated.replace(/\u200c/g, '') === trimmedText.replace(/\u200c/g, '');
+        normalizeForComparison(translated) === normalizeForComparison(trimmedText);
 
       // FIX: Only apply marks if the text was actually translated (different from original)
       // and not just a ZWNJ-stripped version of the original.

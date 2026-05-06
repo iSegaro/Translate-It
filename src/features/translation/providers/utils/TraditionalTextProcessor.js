@@ -23,7 +23,7 @@ const getTextInfo = (item) => {
 
 // Selective Regex: Matches [[ only when it contains delimiter-like characters (dashes, dots, etc.)
 // This version is less aggressive with surrounding whitespace to prevent word-clumping
-const BIDI_ARTIFACT_REGEX = /\[\[[\s.——–…ـ·・-]+\]\]/g;
+const BIDI_ARTIFACT_REGEX = /\[\[[\s.——–…·・-]+\]\]/g;
 
 export const TraditionalTextProcessor = {
   /**
@@ -52,8 +52,8 @@ export const TraditionalTextProcessor = {
     scrubbed = scrubbed.replace(/[^\S\n\r]{2,}/g, ' ');
     
     // 4. Remove isolated remnants (Safety layer for malformed delimiters)
-    scrubbed = scrubbed.replace(/\[\[[\s.—–…ـ·・-]+/, '');
-    scrubbed = scrubbed.replace(/[\s.—–…ـ·・-]+\]\]/, '');
+    scrubbed = scrubbed.replace(/\[\[[\s.—–…·・-]+/, '');
+    scrubbed = scrubbed.replace(/[\s.—–…·・-]+\]\]/, '');
     
     return scrubbed;
   },

@@ -352,10 +352,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
     const trimmedOriginal = originalText.trim();
 
-    // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) if the provider returned a "cleaned" version
-    // of the same text. If they are identical after stripping ZWNJ, we prefer the 
-    // original trimmedOriginal as it contains the correct typography.
-    const isFunctionallyIdentical = finalTranslation.trim().replace(/\u200c/g, '') === trimmedOriginal.replace(/\u200c/g, '');
+    // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) and Tatweel (ـ) if the provider returned 
+    // a "cleaned" or slightly re-formatted version of the same text.
+    const normalizeForComparison = (s) => s ? s.replace(/[\u200c\u0640]/g, '').replace(/\s+/g, ' ').trim() : '';
+    const isFunctionallyIdentical = normalizeForComparison(finalTranslation) === normalizeForComparison(trimmedOriginal);
     if (isFunctionallyIdentical) {
       finalTranslation = trimmedOriginal;
     }
