@@ -62,6 +62,7 @@ export function useHistory() {
         translatedText: translationData.translatedText,
         sourceLanguage: translationData.sourceLanguage,
         targetLanguage: translationData.targetLanguage,
+        mode: translationData.mode,
         timestamp: Date.now(),
       };
 

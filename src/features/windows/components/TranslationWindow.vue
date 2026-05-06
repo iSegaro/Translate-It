@@ -68,6 +68,7 @@
         <TTSButton
           :text="currentTTSText"
           :language="currentTTSLang"
+          :is-dictionary="isDictionary"
           size="sm"
           variant="secondary"
           class="ti-smart-tts-btn"
@@ -173,7 +174,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
 // Import adjacent SCSS
@@ -223,6 +224,13 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
+
+// Check if current translation is in dictionary mode
+const isDictionary = computed(() => {
+  return props.provider === 'vajehyab' || 
+         (props.initialTranslatedText && props.initialTranslatedText.includes('**')) || 
+         (props.initialTranslatedText && props.initialTranslatedText.startsWith('###'));
+});
 
 const detectedLanguageName = computed(() => {
   const code = props.detectedSourceLanguage;
@@ -336,7 +344,8 @@ const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
 const handleCopy = async () => {
   if (!translatedText.value) return;
   try {
-    const textToCopy = SimpleMarkdown.getCleanTranslation(translatedText.value);
+    const strategy = isDictionary.value ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
+    const textToCopy = SimpleMarkdown.getCleanTranslation(translatedText.value, strategy);
     await navigator.clipboard.writeText(textToCopy);
     logger.debug(`Text copied successfully (cleaned)`);
   } catch (error) {

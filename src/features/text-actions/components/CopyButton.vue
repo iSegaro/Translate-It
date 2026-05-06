@@ -42,7 +42,7 @@ import browser from 'webextension-polyfill'
 import { useI18n } from 'vue-i18n'
 import BaseActionButton from './BaseActionButton.vue'
 import { useCopyAction } from '@/features/text-actions/composables/useCopyAction.js'
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js'
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'CopyButton')
@@ -97,6 +97,10 @@ const props = defineProps({
   clean: {
     type: Boolean,
     default: true
+  },
+  isDictionary: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -146,7 +150,11 @@ const handleCopy = async (event) => {
   }
 
   // Clean text if requested
-  const textToCopy = props.clean ? SimpleMarkdown.getCleanTranslation(props.text) : props.text
+  let textToCopy = props.text;
+  if (props.clean) {
+    const strategy = props.isDictionary ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
+    textToCopy = SimpleMarkdown.getCleanTranslation(props.text, strategy);
+  }
   
   // Log click event
   logger.debug('📋 Copy button clicked!', {

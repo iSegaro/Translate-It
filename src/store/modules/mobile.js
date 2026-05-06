@@ -22,7 +22,8 @@ export const useMobileStore = defineStore('mobile', () => {
     sourceLang: 'auto',
     targetLang: 'en',
     isLoading: false,
-    error: null
+    error: null,
+    mode: null
   })
 
   // Page Translation State
@@ -119,7 +120,8 @@ export const useMobileStore = defineStore('mobile', () => {
       sourceLang: 'auto',
       targetLang: 'en',
       isLoading: false,
-      error: null
+      error: null,
+      mode: null
     }
   }
 

@@ -236,7 +236,8 @@ const selectItem = (item) => {
     text: item.sourceText,
     translation: item.translatedText,
     sourceLang: item.sourceLanguage,
-    targetLang: item.targetLanguage
+    targetLang: item.targetLanguage,
+    mode: item.mode
   })
   mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT)
 }

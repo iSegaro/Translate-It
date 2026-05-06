@@ -19,6 +19,7 @@ import { storePendingTranslationData, getPendingTranslationData, clearPendingTra
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
+import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationService');
 const notificationManager = new NotificationManager();
@@ -183,6 +184,10 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     clearPendingNotificationData('failed');
     throw new Error(errorMessage);
   }
+
+  // Clean the translated text before application or copy
+  // Since this is for text-fields, we always want FULL_TEXT cleaning (no markdown, keep paragraphs)
+  const cleanTranslatedText = SimpleMarkdown.getCleanTranslation(translatedText, ExtractionStrategy.FULL_TEXT);
   
   try {
     const currentTime = Date.now();
@@ -218,8 +223,8 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const isReplaceMode = await determineReplaceMode(mode, platform);
     
     if (isReplaceMode && target && isEditableElement(target)) {
-      const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target, toastId);
-      
+      const wasApplied = await applyTranslation(cleanTranslatedText, selectionRange, platform, tabId, target, toastId);
+
       if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)) {
         const data = pendingTranslationByToastId.get(toastId);
         data.processed = true;
@@ -230,7 +235,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
       }
       return { applied: wasApplied, mode: 'replace' };
     } else {
-      await copyToClipboard(translatedText, toastId);
+      await copyToClipboard(cleanTranslatedText, toastId);
       clearPendingTranslationData(toastId);
       return { applied: true, mode: 'copy' };
     }
