@@ -220,7 +220,7 @@ const {
 
 // Computed properties
 const canTranslate = computed(() => baseCanTranslate.value && !props.disabled);
-const showProgress = computed(() => isTranslating.value && progress.value > 0);
+const showProgress = computed(() => isTranslating.value && progress.value > 0 && !props.compact);
 
 const progressText = computed(() => {
   if (message.value) return message.value;
