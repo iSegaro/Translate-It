@@ -4,7 +4,7 @@
   >
     <!-- Side Toolbar -->
     <SidepanelToolbar 
-      v-model:current-provider="currentProvider"
+      v-model:current-provider="globalProvider"
       :is-history-visible="isHistoryVisible"
       @history-toggle="handleHistoryToggle"
       @clear-fields="handleClearFields"
@@ -15,7 +15,7 @@
       <!-- Main Content -->
       <SidepanelMainContent
         ref="mainContentRef"
-        v-model:provider="currentProvider"
+        v-model:provider="manualProvider"
       />
 
       <!-- History Panel -->
@@ -57,9 +57,10 @@ const mainContentRef = ref(null);
 
 // Shared state between components
 const isHistoryVisible = ref(false)
-const currentProvider = ref('')
+const globalProvider = ref('')
+const manualProvider = ref('')
 
-// Ensure history panel is closed on mount and initialize provider
+// Ensure history panel is closed on mount and initialize providers
 onMounted(async () => {
   isHistoryVisible.value = false
   setHistoryPanelOpen(false)
@@ -69,18 +70,32 @@ onMounted(async () => {
     await settingsStore.loadSettings()
   }
 
-  // Initialize current provider from settings
-  if (settingsStore.settings.TRANSLATION_API && !currentProvider.value) {
-    currentProvider.value = settingsStore.settings.TRANSLATION_API
-    logger.debug('[SidepanelLayout] Initialized local provider:', currentProvider.value)
+  // Initialize providers from settings
+  const defaultProvider = settingsStore.settings.TRANSLATION_API || 'googlev2'
+  
+  if (!globalProvider.value) {
+    globalProvider.value = defaultProvider
+  }
+  
+  if (!manualProvider.value) {
+    manualProvider.value = defaultProvider
+    logger.debug('[SidepanelLayout] Initialized manual translation provider:', manualProvider.value)
   }
 })
 
-// Watch for settings changes to keep local provider in sync when global setting changes
+// Watch for settings changes to keep global provider in sync
 watch(() => settingsStore.settings.TRANSLATION_API, (newVal) => {
-  if (newVal && newVal !== currentProvider.value) {
-    currentProvider.value = newVal
-    logger.debug('[SidepanelLayout] Local provider synced with global change:', newVal)
+  if (newVal && newVal !== globalProvider.value) {
+    globalProvider.value = newVal
+    logger.debug('[SidepanelLayout] Global provider synced with settings change:', newVal)
+  }
+})
+
+// Sync manual provider whenever global provider changes
+watch(globalProvider, (newVal) => {
+  if (newVal && newVal !== manualProvider.value) {
+    manualProvider.value = newVal
+    logger.debug('[SidepanelLayout] Manual provider synced with global change:', newVal)
   }
 })
 

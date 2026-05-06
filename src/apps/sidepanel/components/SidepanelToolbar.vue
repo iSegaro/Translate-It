@@ -51,7 +51,7 @@
       <ProviderSelector
         v-model="currentProviderLocal"
         mode="icon-only"
-        :is-global="false"
+        :is-global="true"
         only-configured
         @provider-change="handleProviderChange"
       />
