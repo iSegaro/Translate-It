@@ -38,8 +38,6 @@ Error during translation: Error: This request requires more credits, or fewer ma
 
 - اضافه کردن grok به پرووایدرها
 
-- برای توسعه ، از WebAI to API استفاده کنم.
-
 ---
 
 ## Research and Resources
