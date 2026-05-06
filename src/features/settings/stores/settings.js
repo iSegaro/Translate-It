@@ -552,11 +552,31 @@ export const useSettingsStore = defineStore('settings', () => {
     
     // 3. Validate Mode-Specific Providers
     if (settings.value.MODE_PROVIDERS) {
+      const isExtEnabled = settings.value.EXTENSION_ENABLED !== false;
+      
       Object.entries(settings.value.MODE_PROVIDERS).forEach(([mode, providerId]) => {
         if (providerId && providerId !== 'default' && providerId !== null) {
-          const modeMissingKey = getFirstMissingSetting(providerId, settings.value);
-          if (modeMissingKey) {
-            errors.push('ERRORS_API_CONFIG_INVALID');
+          // Determine if the feature for this mode is enabled
+          let isFeatureEnabled = true;
+          
+          if (mode === TranslationMode.Field) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_ON_TEXT_FIELDS;
+          } else if (mode === TranslationMode.Select_Element) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_WITH_SELECT_ELEMENT;
+          } else if (mode === TranslationMode.Selection) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_ON_TEXT_SELECTION;
+          } else if (mode === TranslationMode.Page) {
+            isFeatureEnabled = isExtEnabled && settings.value.WHOLE_PAGE_TRANSLATION_ENABLED;
+          } else if (mode === TranslationMode.ScreenCapture) {
+            isFeatureEnabled = isExtEnabled && (settings.value.ENABLE_SCREEN_CAPTURE !== false);
+          }
+          // Popup, Sidepanel, and Dictionary are always considered active features if extension is installed
+
+          if (isFeatureEnabled) {
+            const modeMissingKey = getFirstMissingSetting(providerId, settings.value);
+            if (modeMissingKey) {
+              errors.push('ERRORS_API_CONFIG_INVALID');
+            }
           }
         }
       });
@@ -578,6 +598,34 @@ export const useSettingsStore = defineStore('settings', () => {
     // 5. Validate Proxy
     if (settings.value.PROXY_ENABLED && (!settings.value.PROXY_HOST || settings.value.PROXY_HOST.trim() === '')) {
       errors.push('proxy_host_invalid')
+    }
+
+    // 6. Validate Whole Page Translation Settings
+    const scrollDelay = settings.value.WHOLE_PAGE_SCROLL_STOP_DELAY;
+    if (scrollDelay !== undefined && (scrollDelay < 100 || scrollDelay > 5000)) {
+      if (settings.value.WHOLE_PAGE_TRANSLATION_ENABLED && settings.value.EXTENSION_ENABLED !== false) {
+        errors.push('validation_scroll_delay_invalid');
+      } else {
+        // Reset to default if feature is disabled
+        const defaults = getDefaultSettings();
+        settings.value.WHOLE_PAGE_SCROLL_STOP_DELAY = defaults.WHOLE_PAGE_SCROLL_STOP_DELAY;
+      }
+    }
+
+    // 7. Validate Font Settings
+    const fontSize = settings.value.TRANSLATION_FONT_SIZE;
+    if (fontSize !== undefined) {
+      const sizeNum = parseInt(fontSize);
+      if (isNaN(sizeNum) || sizeNum < 10 || sizeNum > 30) {
+        const defaults = getDefaultSettings();
+        settings.value.TRANSLATION_FONT_SIZE = defaults.TRANSLATION_FONT_SIZE;
+      }
+    }
+
+    const fontFamily = settings.value.TRANSLATION_FONT_FAMILY;
+    if (!fontFamily || fontFamily.toString().trim() === '') {
+      const defaults = getDefaultSettings();
+      settings.value.TRANSLATION_FONT_FAMILY = defaults.TRANSLATION_FONT_FAMILY;
     }
 
     if (errors.length > 0) {

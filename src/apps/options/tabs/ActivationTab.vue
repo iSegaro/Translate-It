@@ -45,7 +45,10 @@
     </BaseFieldset>
 
     <!-- Text Field Translation -->
-    <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
+    <BaseFieldset 
+      id="activation_group_text_fields"
+      :legend="t('activation_group_text_fields_title') || 'Text Field Translation'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -137,7 +140,10 @@
     </BaseFieldset>
 
     <!-- Select Element -->
-    <BaseFieldset :legend="t('activation_group_select_element_title') || 'Select Element'">
+    <BaseFieldset 
+      id="activation_group_select_element"
+      :legend="t('activation_group_select_element_title') || 'Select Element'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -204,7 +210,10 @@
     </BaseFieldset>
 
     <!-- On-Page Selection -->
-    <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
+    <BaseFieldset 
+      id="activation_group_page_selection"
+      :legend="t('activation_group_page_selection_title') || 'On-Page Selection'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -436,6 +445,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { onMounted, onUnmounted } from 'vue'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -446,6 +457,7 @@ import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 const settingsStore = useSettingsStore()
+const { highlightElement } = useHighlightManager()
 const { t } = useUnifiedI18n()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
 
@@ -517,5 +529,34 @@ const fieldProvider = createProviderSetting(TranslationMode.Field)
 const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)
 const selectionProvider = createProviderSetting(TranslationMode.Selection)
 const pageProvider = createProviderSetting(TranslationMode.Page)
+
+// --- Validation Feedback ---
+
+const handleValidationFeedback = (e) => {
+  const { field, mode } = e.detail || {};
+  
+  if (field === 'provider' && mode) {
+    // Map mode to fieldset ID
+    const modeToId = {
+      [TranslationMode.Field]: 'activation_group_text_fields',
+      [TranslationMode.Select_Element]: 'activation_group_select_element',
+      [TranslationMode.Selection]: 'activation_group_page_selection',
+      [TranslationMode.Page]: 'FIELDSET_WHOLE_PAGE'
+    };
+    
+    const id = modeToId[mode];
+    if (id) highlightElement(id);
+  } else if (field === 'WHOLE_PAGE_SCROLL_STOP_DELAY') {
+    highlightElement('WHOLE_PAGE_TRIGGER_MODE');
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
 
 </script>

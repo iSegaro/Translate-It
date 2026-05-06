@@ -80,7 +80,8 @@ const saveAllSettings = async () => {
     logger.debug('Cannot save settings: Validation failed', validation.errors)
     
     // Check if it's a provider configuration error
-    const missingKey = getFirstMissingSetting(settingsStore.settings.TRANSLATION_API, settingsStore.settings)
+    const globalProvider = settingsStore.settings.TRANSLATION_API;
+    const missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
     
     if (missingKey) {
       // Redirect to languages tab with highlight parameter if not already there
@@ -94,6 +95,26 @@ const saveAllSettings = async () => {
         }))
       }
       return
+    }
+
+    // Check mode-specific providers for Activation tab
+    if (settingsStore.settings.MODE_PROVIDERS) {
+      for (const [mode, providerId] of Object.entries(settingsStore.settings.MODE_PROVIDERS)) {
+        if (providerId && providerId !== 'default') {
+          const modeMissingKey = getFirstMissingSetting(providerId, settingsStore.settings);
+          if (modeMissingKey) {
+            // Redirect to activation tab if it's a mode managed there
+            const currentRoute = router.currentRoute.value.name
+            if (currentRoute !== 'activation') {
+              await router.push({ name: 'activation' })
+            }
+            window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+              detail: { field: 'provider', mode } 
+            }))
+            return
+          }
+        }
+      }
     }
 
     // Handle language validation errors
@@ -114,6 +135,28 @@ const saveAllSettings = async () => {
       }
       window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
         detail: { field: 'prompt' } 
+      }))
+      return
+    }
+
+    // Handle activation tab validation errors (scroll delay)
+    if (validation.errors.includes('validation_scroll_delay_invalid')) {
+      if (router.currentRoute.value.name !== 'activation') {
+        await router.push({ name: 'activation' })
+      }
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+        detail: { field: 'WHOLE_PAGE_SCROLL_STOP_DELAY' } 
+      }))
+      return
+    }
+
+    // Handle font validation errors
+    if (validation.errors.includes('font_size_range_error') || validation.errors.includes('font_family_required')) {
+      if (router.currentRoute.value.name !== 'appearance') {
+        await router.push({ name: 'appearance' })
+      }
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+        detail: { field: 'font_settings' } 
       }))
       return
     }
