@@ -89,7 +89,7 @@ export class PageTranslationEventManager {
 
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
       this.manager.isTranslating = false;
-      this.manager.isTranslated = true;
+      this.manager.isTranslated = data.translatedCount > 0;
       
       sendRegularMessage({ 
         action: MessageActions.PAGE_TRANSLATE_COMPLETE, 

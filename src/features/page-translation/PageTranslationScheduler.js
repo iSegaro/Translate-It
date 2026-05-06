@@ -34,6 +34,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.queue = []; // Tasks: { text, score, resolve, reject, context, node }
     this.batchTimer = null;
     this.translatedCount = 0;
+    this.failedCount = 0;
     this.totalTasks = 0;
     this.activeFlushes = 0;
     this.fatalErrorOccurred = false;
@@ -87,6 +88,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   reset() {
     this.stop();
     this.translatedCount = 0;
+    this.failedCount = 0;
     this.totalTasks = 0;
     this.highPriorityCount = 0;
     this.isWaitingForVisibility = false;
@@ -340,6 +342,7 @@ export class PageTranslationScheduler extends ResourceTracker {
                 this.highPriorityCount = Math.max(0, this.highPriorityCount - 1);
               }
               try { item.resolve(item.text); } catch { /* ignore */ }
+              this.failedCount++;
             });
           }
         } else {
@@ -528,7 +531,13 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     // Preserve original error identity as per guidelines
     const errorType = matchErrorToType(error);
-    const isFatal = isFatalError(errorType);
+    
+    // Page Translation Specific: If a batch fails PERMANENTLY (after all internal retries)
+    // due to network or server issues, we treat it as fatal for the session to prevent
+    // continuous failing requests in Auto-translate mode and avoid Circuit Breaker deadlock.
+    let isFatal = isFatalError(errorType) || 
+                  errorType === 'NETWORK_ERROR' || 
+                  errorType === 'SERVER_ERROR';
 
     if (isFatal) {
       this.fatalErrorOccurred = true;
@@ -537,6 +546,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     // Resolve current batch items with original text to unblock domtranslator
     batch.forEach(item => { 
       try { item.resolve(item.text); } catch { /* ignore */ } 
+      this.failedCount++;
     });
 
     // Emit internal event for the Manager to handle feedback and broadcasting
@@ -566,7 +576,8 @@ export class PageTranslationScheduler extends ResourceTracker {
       pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
         translatedCount: this.translatedCount, 
         totalCount: this.totalTasks,
-        isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
+        failedCount: this.failedCount,
+        isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges && this.isTranslated
       });
       return;
     }
@@ -589,24 +600,30 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.trackTimeout(() => {
       if (!this.isTranslated || this.activeFlushes > 0) return;
 
+      const processedCount = this.translatedCount + this.failedCount;
+      const isAuto = !!this.settings.autoTranslateOnDOMChanges && this.isTranslated;
+
       // Case 1: Pure Completion (Everything in queue is done)
-      if (this.queue.length === 0 && this.totalTasks > 0 && this.translatedCount >= this.totalTasks) {
+      if (this.queue.length === 0 && this.totalTasks > 0 && processedCount >= this.totalTasks) {
         // If auto-translating, we are never "truly" complete, just idle/watching
-        if (this.settings.autoTranslateOnDOMChanges) {
+        if (isAuto) {
           this.logger.debug('Scheduler detected completion of current queue in Auto mode, signaling idle');
           pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
+            failedCount: this.failedCount,
             isAutoTranslating: true
           });
         } else {
           this.logger.info('Scheduler detected total completion', { 
             translated: this.translatedCount, 
-            total: this.totalTasks 
+            total: this.totalTasks,
+            failed: this.failedCount
           });
           pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
+            failedCount: this.failedCount,
             isAutoTranslating: false
           });
         }
@@ -616,12 +633,14 @@ export class PageTranslationScheduler extends ResourceTracker {
 
       // Case 2: Partial Completion / Idle (Visible content done, but more invisible items exist)
       // This is triggered if the last flush attempt found NO visible content.
-      if (this.isWaitingForVisibility && this.translatedCount > 0) {
+      // We allow idle even if some failed or nothing successfully translated yet.
+      if (this.isWaitingForVisibility && processedCount >= 0) {
         this.logger.debug('Scheduler entering idle state (Visible content processed)');
         pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
           translatedCount: this.translatedCount,
           totalCount: this.totalTasks,
-          isAutoTranslating: !!this.settings.autoTranslateOnDOMChanges
+          failedCount: this.failedCount,
+          isAutoTranslating: isAuto
         });
       }
     }, 500);

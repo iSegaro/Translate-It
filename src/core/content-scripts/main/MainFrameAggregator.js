@@ -42,6 +42,7 @@ export class MainFrameAggregator {
    */
   getGlobalPageTranslationStatus() {
     let grandTotalTranslated = 0;
+    let grandTotalFailed = 0;
     let grandTotalCount = 0;
     let anyAutoTranslating = false;
     let anyActiveTranslating = false;
@@ -49,6 +50,7 @@ export class MainFrameAggregator {
     
     for (const progress of this.frameProgressMap.values()) {
       grandTotalTranslated += progress.translatedCount || 0;
+      grandTotalFailed += progress.failedCount || progress.failed || 0;
       grandTotalCount += progress.totalCount || 0;
       
       if (progress.isAutoTranslating) anyAutoTranslating = true;
@@ -56,7 +58,8 @@ export class MainFrameAggregator {
       
       // A frame is actively translating if it hasn't signaled 'idle' and has remaining tasks
       const isExplicitlyIdle = progress.status === 'idle' || progress.isTranslating === false;
-      if (!isExplicitlyIdle && (progress.translatedCount < progress.totalCount || progress.totalCount === 0)) {
+      const processed = (progress.translatedCount || 0) + (progress.failedCount || progress.failed || 0);
+      if (!isExplicitlyIdle && (processed < progress.totalCount || progress.totalCount === 0)) {
         anyActiveTranslating = true;
       }
     }
@@ -68,6 +71,7 @@ export class MainFrameAggregator {
       isTranslated: isTranslated,
       isAutoTranslating: anyAutoTranslating,
       translatedCount: grandTotalTranslated,
+      failedCount: grandTotalFailed,
       totalCount: grandTotalCount,
       currentUrl: window.location.href
     };
@@ -88,6 +92,7 @@ export class MainFrameAggregator {
         ...extraData,
         // Override with aggregated values to ensure they are not overwritten by frame-specific data
         translatedCount: status.translatedCount,
+        failedCount: status.failedCount,
         totalCount: status.totalCount,
         isAutoTranslating: status.isAutoTranslating,
         isTranslating: status.isTranslating,
@@ -105,6 +110,7 @@ export class MainFrameAggregator {
         payload.isTranslating = false;
         payload.isAutoTranslating = false;
         payload.translatedCount = 0;
+        payload.failedCount = 0;
         payload.totalCount = 0;
         payload.status = 'idle';
         payload.url = window.location.href;

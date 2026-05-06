@@ -130,6 +130,7 @@ export class MainFrameCoordinator {
               isAutoTranslating: false,
               status: 'idle',
               translatedCount: 0,
+              failedCount: 0,
               totalCount: 0
             });
             // Emit aggregated restore complete to update UI state
@@ -306,6 +307,7 @@ export class MainFrameCoordinator {
           isTranslated: false,
           isAutoTranslating: false,
           translatedCount: 0,
+          failedCount: 0,
           totalCount: 0
         });
       }

@@ -546,7 +546,8 @@ const pageTranslationStatus = computed(() => {
   const isError = data.status === TRANSLATION_STATUS.ERROR;
   
   const isActive = isTranslating || isAuto || isCompleted || isError;
-  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
+  const processedCount = (data.translatedCount || 0) + (data.failedCount || 0);
+  const percent = data.totalCount > 0 ? Math.round((processedCount / data.totalCount) * 100) : 0;
   
   return {
     isActive,

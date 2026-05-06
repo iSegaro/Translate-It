@@ -21,11 +21,18 @@ export function usePageTranslation() {
   const isTranslating = ref(false);
   const isTranslated = ref(false);
   const isAutoTranslating = ref(false); // Persistent state (NEW)
-  const progress = ref(0);
   const translatedCount = ref(0);
+  const failedCount = ref(0);
   const totalNodes = ref(0);
   const message = ref('');
   const error = ref(null);
+
+  const progress = computed(() => {
+    if (error.value && !isTranslating.value && !isAutoTranslating.value) return 0;
+    if (!totalNodes.value || totalNodes.value === 0) return 0;
+    const processed = translatedCount.value + failedCount.value;
+    return Math.min(100, Math.round((processed / totalNodes.value) * 100));
+  });
 
   // Event listeners
   let progressListener = null;
@@ -42,8 +49,8 @@ export function usePageTranslation() {
     isTranslating.value = false;
     isTranslated.value = false;
     isAutoTranslating.value = false;
-    progress.value = 0;
     translatedCount.value = 0;
+    failedCount.value = 0;
     totalNodes.value = 0;
     error.value = null;
     message.value = restrictedMessage;
@@ -67,6 +74,12 @@ export function usePageTranslation() {
         // Update progress if available
         if (result.translatedCount !== undefined) {
           translatedCount.value = result.translatedCount;
+        }
+        if (result.failedCount !== undefined) {
+          failedCount.value = result.failedCount;
+        }
+        if (result.totalCount !== undefined) {
+          totalNodes.value = result.totalCount;
         }
       } else if (result?.isRestrictedPage) {
         applyRestrictedPageState(result);
@@ -96,7 +109,8 @@ export function usePageTranslation() {
     isTranslating.value = true;
     // Don't set isAutoTranslating here based on data.isAuto
     // Wait for manager response to confirm persistence state
-    progress.value = 0;
+    translatedCount.value = 0;
+    failedCount.value = 0;
     message.value = 'Starting translation...';
     error.value = null;
 
@@ -123,7 +137,8 @@ export function usePageTranslation() {
       if (result.success) {
         isTranslated.value = true;
         translatedCount.value = result.translatedCount || 0;
-        totalNodes.value = result.totalNodes;
+        failedCount.value = result.failedCount || 0;
+        totalNodes.value = result.totalNodes || result.totalCount || 0;
         // Only update if the result explicitly tells us the state
         if (result.isAutoTranslating !== undefined) {
           isAutoTranslating.value = !!result.isAutoTranslating;
@@ -173,8 +188,8 @@ export function usePageTranslation() {
         isAutoTranslating.value = false;
         message.value = `Restored ${result.restoredCount} elements`;
         translatedCount.value = 0;
+        failedCount.value = 0;
         totalNodes.value = 0;
-        progress.value = 0;
       } else {
         throw new Error(result.reason || 'Restore failed');
       }
@@ -209,6 +224,10 @@ export function usePageTranslation() {
         // If result has translatedCount, use it to determine isTranslated
         if (result.translatedCount !== undefined) {
           isTranslated.value = result.translatedCount > 0;
+          translatedCount.value = result.translatedCount;
+        }
+        if (result.failedCount !== undefined) {
+          failedCount.value = result.failedCount;
         }
         message.value = 'Auto-translation stopped';
       }
@@ -230,6 +249,8 @@ export function usePageTranslation() {
       });
       isTranslating.value = false;
       isAutoTranslating.value = false;
+      translatedCount.value = 0;
+      failedCount.value = 0;
       message.value = 'Translation cancelled';
     }
   }
@@ -238,22 +259,35 @@ export function usePageTranslation() {
    * Update progress
    */
   function updateProgress(data) {
-    if (data.status === 'idle' || data.status === 'error') {
+    if (data.status === 'error') {
       isTranslating.value = false;
       isAutoTranslating.value = false;
-      progress.value = 0;
       return;
     }
 
-    if (data.progress !== undefined) {
-      progress.value = data.progress;
+    // IDLE means active processing stopped, but we might still be in Auto mode
+    if (data.status === 'idle') {
+      isTranslating.value = false;
     }
+
     if (data.translated !== undefined) {
       translatedCount.value = data.translated;
+    } else if (data.translatedCount !== undefined) {
+      translatedCount.value = data.translatedCount;
     }
+
+    if (data.failed !== undefined) {
+      failedCount.value = data.failed;
+    } else if (data.failedCount !== undefined) {
+      failedCount.value = data.failedCount;
+    }
+
     if (data.total !== undefined) {
       totalNodes.value = data.total;
+    } else if (data.totalCount !== undefined) {
+      totalNodes.value = data.totalCount;
     }
+
     if (data.message !== undefined) {
       message.value = data.message;
     }
@@ -280,7 +314,7 @@ export function usePageTranslation() {
     // Skip empty/invalid messages - they might come from iframes or initialization
     // BUT: process if it is aggregated as it represents the whole page state
     // OR: if we are in the main frame/popup context
-    if (!data.isAggregated && !isMainFrame && (!data || (data.translatedCount === 0 && !data.isTranslated))) {
+    if (!data.isAggregated && !isMainFrame && (!data || (data.translatedCount === 0 && data.failedCount === 0 && !data.isTranslated))) {
       // Refresh status to get accurate state from content script
       refreshStatus().catch(() => {});
       return;
@@ -301,9 +335,10 @@ export function usePageTranslation() {
       isAutoTranslating.value = !!data.isAutoTranslating;
     }
 
-    progress.value = 100;
     if (data.translatedCount !== undefined) translatedCount.value = data.translatedCount;
+    if (data.failedCount !== undefined) failedCount.value = data.failedCount;
     if (data.totalNodes !== undefined) totalNodes.value = data.totalNodes;
+    else if (data.totalCount !== undefined) totalNodes.value = data.totalCount;
   }
 
   /**
@@ -323,8 +358,8 @@ export function usePageTranslation() {
     isTranslating.value = false;
     isTranslated.value = false;
     isAutoTranslating.value = false;
-    progress.value = 0;
     translatedCount.value = 0;
+    failedCount.value = 0;
     totalNodes.value = 0;
     message.value = `Restore complete! ${data.restoredCount} elements restored`;
   }
@@ -402,7 +437,6 @@ export function usePageTranslation() {
         if (message.data && message.data.isAutoTranslating !== undefined) {
           isAutoTranslating.value = message.data.isAutoTranslating;
         }
-        progress.value = 0;
         break;
       case MessageActions.PAGE_TRANSLATE_PROGRESS:
       case MessageActions.PAGE_TRANSLATE_IDLE:

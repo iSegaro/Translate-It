@@ -83,10 +83,11 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       }
 
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount || detail.failed || 0;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
 
       // Use status from aggregator if available, otherwise calculate based on counts
-      let finalStatus = detail.status || (translatedCount >= totalCount ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING);
+      let finalStatus = detail.status || ((translatedCount + failedCount) >= totalCount ? TRANSLATION_STATUS.COMPLETED : TRANSLATION_STATUS.TRANSLATING);
 
       // Map 'idle' status to COMPLETED for UI purposes (shows the badge/restore button)
       if (finalStatus === 'idle') {
@@ -95,6 +96,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
       mobileStore.setPageTranslation({
         translatedCount,
+        failedCount,
         totalCount,
         isTranslating: detail.isTranslating !== undefined ? detail.isTranslating : mobileStore.pageTranslationData.isTranslating,
         isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
@@ -111,11 +113,13 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       }
 
       const translatedCount = detail.translatedCount || detail.translated || mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount || detail.failed || 0;
       const totalCount = detail.totalCount || mobileStore.pageTranslationData.totalCount;
 
       // IDLE means visible content is done but more might be hidden - show as COMPLETED for UI
       mobileStore.setPageTranslation({
         translatedCount,
+        failedCount,
         totalCount,
         isTranslating: false,
         isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
@@ -127,28 +131,34 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
       // Skip empty/invalid completion messages - they might come from iframes or initialization
       // BUT: process if it is aggregated as it represents the whole page state
-      if (!detail.isAggregated && (!detail || (detail.translatedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating))) {
+      if (!detail.isAggregated && (!detail || (detail.translatedCount === 0 && detail.failedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating))) {
         logger.debug('Skipping empty PAGE_TRANSLATE_COMPLETE message:', detail);
         return;
       }
 
+      const translatedCount = detail.translatedCount || mobileStore.pageTranslationData.translatedCount;
+      const failedCount = detail.failedCount || detail.failed || 0;
+
       mobileStore.setPageTranslation({
         isTranslating: false,
-        isTranslated: true,
+        isTranslated: translatedCount > 0,
         isAutoTranslating: detail.isAutoTranslating !== undefined ? detail.isAutoTranslating : mobileStore.pageTranslationData.isAutoTranslating,
         status: TRANSLATION_STATUS.COMPLETED,
-        translatedCount: detail.translatedCount || mobileStore.pageTranslationData.translatedCount,
-        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || detail.translatedCount
+        translatedCount,
+        failedCount,
+        totalCount: detail.totalCount || mobileStore.pageTranslationData.totalCount || (translatedCount + failedCount)
       });
     });
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_ERROR, async (detail) => {
       const errorInfo = await getErrorForDisplay(detail.error || 'Translation failed', 'page-translation-content');
+      const isFatal = detail.isFatal !== false;
+
       mobileStore.setPageTranslation({ 
-        isTranslating: false, 
-        isTranslated: false, 
-        isAutoTranslating: false, 
-        status: TRANSLATION_STATUS.ERROR,
+        isTranslating: isFatal ? false : mobileStore.pageTranslationData.isTranslating, 
+        isAutoTranslating: isFatal ? false : mobileStore.pageTranslationData.isAutoTranslating,
+        isTranslated: isFatal ? false : mobileStore.pageTranslationData.isTranslated,
+        status: isFatal ? TRANSLATION_STATUS.ERROR : mobileStore.pageTranslationData.status,
         errorMessage: errorInfo.message
       });
     });

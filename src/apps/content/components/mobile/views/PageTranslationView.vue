@@ -174,7 +174,8 @@ const computedProgress = computed(() => {
   if (pageTranslationData.value.status === 'error') return 0;
   if (pageTranslationData.value.status === 'completed') return 100;
   if (!pageTranslationData.value.totalCount || pageTranslationData.value.totalCount === 0) return 0;
-  return Math.round((pageTranslationData.value.translatedCount / pageTranslationData.value.totalCount) * 100);
+  const processed = (pageTranslationData.value.translatedCount || 0) + (pageTranslationData.value.failedCount || 0);
+  return Math.min(100, Math.round((processed / pageTranslationData.value.totalCount) * 100));
 })
 
 const primaryAction = computed(() => {

@@ -341,13 +341,15 @@ export class PageTranslationManager extends ResourceTracker {
       this.logger.warn('Fatal error. Stopping page translation.', error.message);
     }
 
+    // CRITICAL: Stop further translation without restoring the page.
+    // We call this BEFORE resetting local flags to ensure its internal guards pass.
+    this.stopAutoTranslation().catch(err => {
+      this.logger.debug('stopAutoTranslation failed in fatal handler (expected if already stopped):', err);
+    });
+
     this.isTranslating = false;
     this.isAutoTranslating = false;
     this.isFatalErrorHandling = false;
-
-    // CRITICAL: Stop further translation without restoring the page.
-    // This ensures already translated parts remain visible.
-    this.stopAutoTranslation().catch(() => {});
 
     // Use centralized ErrorHandler to manage notification and logging
     ErrorHandler.getInstance().handle(error, {
@@ -372,6 +374,7 @@ export class PageTranslationManager extends ResourceTracker {
     pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, {
       status: 'idle',
       isTranslating: false,
+      isAutoTranslating: false,
       percent: 0,
       isInternal: true
     });

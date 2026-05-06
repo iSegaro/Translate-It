@@ -31,6 +31,7 @@ export const useMobileStore = defineStore('mobile', () => {
     isTranslated: false,
     isAutoTranslating: false,
     translatedCount: 0,
+    failedCount: 0,
     totalCount: 0,
     status: TRANSLATION_STATUS.IDLE, // 'idle' | 'translating' | 'completed' | 'error'
     errorMessage: null
