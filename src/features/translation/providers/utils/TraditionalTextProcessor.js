@@ -41,6 +41,9 @@ export const TraditionalTextProcessor = {
     // 2. Clean up specific BIDI marks and invisible characters
     // CRITICAL: We MUST preserve \u200C (ZWNJ) for Persian language support (نیم‌فاصله).
     // We only remove \u200B (ZWSP), \u200D (ZWJ), and BiDi marks.
+    // NOTE: We disable no-misleading-character-class because including control/BIDI marks
+    // in a character class is intentional here for technical cleanup.
+    // eslint-disable-next-line no-misleading-character-class
     scrubbed = scrubbed.replace(/[\u200B\u200D\u200E\u200F\uFEFF]/g, '');
 
     // 3. COLLAPSE HORIZONTAL WHITESPACE ONLY

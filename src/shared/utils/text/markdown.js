@@ -521,7 +521,10 @@ export class SimpleMarkdown {
       // Strip pronunciation guides like [go(a)vāhi] or [n(y)o͞oz]
       // Matches brackets that are NOT followed by (url)
       // Range includes: basic latin, latin extended, combining diacritics, and phonetic extensions
-      .replace(/\[[a-zA-Z0-9\(\)\s'āēīōū\u00C0-\u017F\u0300-\u036F\u02B0-\u02FF]+\](?!\()/g, "")
+      // NOTE: We disable no-misleading-character-class because we intentionally include 
+      // combining diacritics (\u0300-\u036F) to strip them from pronunciation guides.
+      // eslint-disable-next-line no-misleading-character-class
+      .replace(/\[[a-zA-Z0-9()\s'\u00C0-\u017F\u0300-\u036F\u02B0-\u02FF]+\](?!\()/g, "")
       // Strip headers (# header)
       .replace(/^#+\s?/gm, "")
       // Strip blockquotes (> quote)
