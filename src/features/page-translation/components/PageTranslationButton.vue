@@ -39,7 +39,7 @@
         :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canTranslate"
         :title="translateButtonTitle"
-        :class="{ 'is-compact-icon': compact }"
+        :class="{ 'is-compact-icon': compact, 'is-translate-btn': true }"
         @click="handleTranslate"
       >
         <div class="ti-btn-status-container">
@@ -134,7 +134,7 @@
         :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canRestore"
         :title="restoreButtonTitle"
-        :class="{ 'is-compact-icon': compact }"
+        :class="{ 'is-compact-icon': compact, 'is-restore-btn': true }"
         @click="handleRestore"
       >
         <div class="ti-btn-status-container">

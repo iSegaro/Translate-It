@@ -107,9 +107,20 @@
         opacity: 1 !important;
       }
 
-      /* Ensure colored icons stay original */
-      .ti-provider-icon-only,
-      .ti-btn-status-container img {
+      /* Protect colored icons (Translate button) */
+      &.is-translate-btn .ti-btn-status-container img {
+        filter: none !important;
+        opacity: 1 !important;
+      }
+
+      /* Invert utility icons (Restore button and standard utility buttons) */
+      &.is-restore-btn .toolbar-icon {
+        filter: brightness(0) invert(1) !important;
+        opacity: 0.8 !important;
+      }
+
+      /* Ensure provider icons stay original */
+      .ti-provider-icon-only {
         filter: none !important;
         opacity: 1 !important;
       }
