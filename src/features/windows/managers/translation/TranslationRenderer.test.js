@@ -31,6 +31,11 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
 vi.mock('@/shared/utils/text/markdown.js', () => ({
   SimpleMarkdown: {
     getCleanTranslation: vi.fn((t) => t)
+  },
+  ExtractionStrategy: {
+    FULL_TEXT: 'FULL_TEXT',
+    PRIMARY_ONLY: 'PRIMARY_ONLY',
+    CLEAN_DICT: 'CLEAN_DICT'
   }
 }));
 
@@ -131,7 +136,7 @@ describe('TranslationRenderer', () => {
       
       await copyIcon.dispatchEvent(new MouseEvent('click'));
       
-      expect(SimpleMarkdown.getCleanTranslation).toHaveBeenCalledWith('text to copy');
+      expect(SimpleMarkdown.getCleanTranslation).toHaveBeenCalledWith('text to copy', 'FULL_TEXT');
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('text to copy');
     });
   });
