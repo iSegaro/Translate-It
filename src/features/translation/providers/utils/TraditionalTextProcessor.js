@@ -39,12 +39,9 @@ export const TraditionalTextProcessor = {
     let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, '');
     
     // 2. Clean up specific BIDI marks and invisible characters
-    // CRITICAL: We MUST preserve \u200C (ZWNJ) for Persian language support (نیم‌فاصله).
-    // We only remove \u200B (ZWSP), \u200D (ZWJ), and BiDi marks.
-    // NOTE: We disable no-misleading-character-class because including control/BIDI marks
-    // in a character class is intentional here for technical cleanup.
-    // eslint-disable-next-line no-misleading-character-class
-    scrubbed = scrubbed.replace(/[\u200B\u200D\u200E\u200F\uFEFF]/g, '');
+    // CRITICAL: We MUST preserve \u200C (ZWNJ) for Persian support and \u200D (ZWJ) for Emojis.
+    // We only remove \u200B (ZWSP) and BiDi marks (LRM/RLM).
+    scrubbed = scrubbed.replace(/[\u200B\u200E\u200F\uFEFF]/g, '');
 
     // 3. COLLAPSE HORIZONTAL WHITESPACE ONLY
     // We use [^\\S\\n\\r] to match all whitespace EXCEPT newlines.
@@ -52,8 +49,9 @@ export const TraditionalTextProcessor = {
     scrubbed = scrubbed.replace(/[^\S\n\r]{2,}/g, ' ');
     
     // 4. Remove isolated remnants (Safety layer for malformed delimiters)
-    scrubbed = scrubbed.replace(/\[\[[\s.—–…·・-]+/, '');
-    scrubbed = scrubbed.replace(/[\s.—–…·・-]+\]\]/, '');
+    // We only strip dashes and dots if they are clearly part of a broken [[ or ]] marker.
+    scrubbed = scrubbed.replace(/\[\[[\s.-]+/, '');
+    scrubbed = scrubbed.replace(/[\s.-]+\]\]/, '');
     
     return scrubbed;
   },

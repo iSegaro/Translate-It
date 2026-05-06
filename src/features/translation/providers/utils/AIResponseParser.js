@@ -19,8 +19,8 @@ const Healers = {
    * Pre-processing Pipeline: Fixes the raw string before any parsing attempt.
    */
   PreProcessors: [
-    // 1. Basic Cleanup - Keep ZWNJ (\u200C) for Persian support
-    (text) => text.replace(/\u200B|\u200D|\uFEFF/g, '').trim(),
+    // 1. Basic Cleanup - Keep ZWNJ (\u200C) and ZWJ (\u200D) for Persian support and Emojis
+    (text) => text.replace(/\u200B|\uFEFF/g, '').trim(),
 
     // 2. SMART UNESCAPE: Handle multiple levels of escaping
     // ONLY intended for raw string responses, not JSON strings before parsing
