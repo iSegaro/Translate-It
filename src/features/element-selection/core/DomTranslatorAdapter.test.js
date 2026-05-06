@@ -485,5 +485,20 @@ describe('DomTranslatorAdapter', () => {
       adapter._applyTranslationToNode(textNode, { text: 'سلام' }, 'fa', testElement);
       expect(textNode.nodeValue).toContain('سلام');
     });
+
+    it('should preserve original ZWNJ if translation is functionally identical (cleaned ZWNJ)', () => {
+      const textNode = testElement.firstChild;
+      const originalWithZWNJ = 'می\u200cروم';
+      textNode.nodeValue = originalWithZWNJ;
+      
+      const cleanedFromProvider = 'میروم';
+      
+      adapter._applyTranslationToNode(textNode, cleanedFromProvider, 'fa', testElement);
+      
+      // Should return the original text with ZWNJ, and BiDi marks (because it still applies markers)
+      // Wait, let's check the code: it re-adds bidiMark
+      expect(textNode.nodeValue).toContain(originalWithZWNJ);
+      expect(textNode.nodeValue).toContain('\u200c');
+    });
   });
 });

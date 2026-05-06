@@ -151,6 +151,22 @@ describe('PageTranslationBridge', () => {
       
       expect(result).toBe('Hello');
     });
+
+    it('should preserve original ZWNJ if translation is functionally identical (cleaned ZWNJ)', async () => {
+      // Original has ZWNJ, but provider returns version without it
+      const originalWithZWNJ = 'می\u200cروم';
+      const cleanedFromProvider = 'میروم';
+      onTranslateCallback.mockResolvedValue(cleanedFromProvider);
+      
+      await bridge.initialize(mockSettings, onTranslateCallback);
+      const translateWithContext = bridge.session.nodesTranslator.callback;
+      const result = await translateWithContext(originalWithZWNJ, 1);
+      
+      // Should return the original text with ZWNJ, and NO BiDi marks (because functionally identical)
+      expect(result).toBe(originalWithZWNJ);
+      expect(result).toContain('\u200c');
+      expect(result).not.toContain(BIDI_MARKS.RLM);
+    });
   });
 
   describe('DOM Marking and Direction', () => {

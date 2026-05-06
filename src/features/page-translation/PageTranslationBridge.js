@@ -68,15 +68,23 @@ export class PageTranslationBridge extends ResourceTracker {
       // We pass the node as the 4th argument
       const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
       
+      // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) if the provider returned a "cleaned" version
+      // of the same text. If they are identical after stripping ZWNJ, we prefer the 
+      // original trimmedText as it contains the correct typography.
+      const isFunctionallyIdentical = translated && 
+        translated.replace(/\u200c/g, '') === trimmedText.replace(/\u200c/g, '');
+
       // FIX: Only apply marks if the text was actually translated (different from original)
-      if (translated && translated !== trimmedText) {
+      // and not just a ZWNJ-stripped version of the original.
+      if (translated && translated !== trimmedText && !isFunctionallyIdentical) {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
         const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         
         return leadingWhitespace + mark + translated + trailingWhitespace;
       }
       
-      return leadingWhitespace + (translated || trimmedText) + trailingWhitespace;
+      // Use trimmedText if functionally identical to preserve ZWNJ
+      return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated || trimmedText)) + trailingWhitespace;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);

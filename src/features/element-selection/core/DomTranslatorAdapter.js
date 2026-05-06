@@ -350,6 +350,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const trailingMatch = originalText.match(/(\s*)$/);
     const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
     const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
+    const trimmedOriginal = originalText.trim();
+
+    // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) if the provider returned a "cleaned" version
+    // of the same text. If they are identical after stripping ZWNJ, we prefer the 
+    // original trimmedOriginal as it contains the correct typography.
+    const isFunctionallyIdentical = finalTranslation.trim().replace(/\u200c/g, '') === trimmedOriginal.replace(/\u200c/g, '');
+    if (isFunctionallyIdentical) {
+      finalTranslation = trimmedOriginal;
+    }
     
     const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
     const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
