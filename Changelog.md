@@ -2,19 +2,21 @@
 
 ##### Added
 
-- Added [`Vajehyab`](https://vajehyab.com) Persian dictionary for specialized dictionary results
+- Added [Vajehyab](https://vajehyab.com) Persian dictionary for specialized [`dictionary`](#/languages?highlight=DICTIONARY_SECTION) results
+- Added [`Prompt Preview`](#/prompt?highlight=PROMPT_PREVIEW_BUTTON) in the Prompt Settings tab
 
 ##### Fixed
 
 - Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
--  پیغام Circuit breaker غیر منطقی ظاهر میشه. مثلا وقتی یکبار از WebAI استفاده کنیم در
-         WindowsManager ، همون بار اول این پیغام رو نمایش میده. بجای نمایش پیغام صحیح که عدم اتصال به این
-         سرویس است.
+- Fixed incorrect Circuit Breaker trigger conditions
+- Fixed an issue where page translation would stop working after an error
 
 ##### Changed
 
-- Improved the UI for selecting dictionary providers in settings with real-time compatibility feedback
+- Improved the UI for selecting dictionary providers in settings
 - Implemented smart provider filtering to only display configured and ready-to-use translation providers across the UI.
+- Improved Settings page UX by validating mandatory configurations before saving
+- Improved popup performance
 
 ---
 
