@@ -78,6 +78,7 @@
             :is-loading="selectionData.isLoading"
             :tts-status="tts.ttsState.value"
             :error="selectionData.error"
+            :is-dictionary="isDictionary"
             :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
             :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
             @text-copied="onTextCopied"
@@ -131,6 +132,12 @@ const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
 const tts = useTTSSmart()
 
+const isDictionary = computed(() => {
+  return selectionData.value.mode === 'dictionary' || 
+         (selectionData.value.translation && selectionData.value.translation.includes('**')) ||
+         (selectionData.value.translation && selectionData.value.translation.startsWith('###'));
+});
+
 const sourceName = computed(() => {
   const code = selectionData.value.sourceLang;
   if (!code || code === 'auto') return t('mobile_selection_auto_label') || 'Auto';
@@ -162,7 +169,12 @@ const expandSheet = () => { if (sheetState.value === MOBILE_CONSTANTS.SHEET_STAT
 const handleSourceTextClick = () => { if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT); else expandSheet() }
 const goBack = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) }
 const closeView = () => { mobileStore.closeSheet() }
-const onSpeak = async (data) => { const text = data?.text || selectionData.value.translation; const lang = data?.language || selectionData.value.targetLang; if (text) await tts.speak(text, lang); }
+const onSpeak = async (data) => { 
+  const text = data?.text || selectionData.value.translation; 
+  const lang = data?.language || selectionData.value.targetLang; 
+  const isDict = data?.isDictionary ?? isDictionary.value;
+  if (text) await tts.speak(text, lang, { isDictionary: isDict }); 
+}
 const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_selection_copied_message') || 'Copied', type: 'success' }) }
 const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 </script>

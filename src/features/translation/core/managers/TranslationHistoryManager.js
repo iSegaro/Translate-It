@@ -36,6 +36,7 @@ export class TranslationHistoryManager {
         translatedText: result.translatedText,
         sourceLanguage: data.sourceLanguage,
         targetLanguage: data.targetLanguage,
+        mode: result.mode,
         timestamp: Date.now()
       };
 

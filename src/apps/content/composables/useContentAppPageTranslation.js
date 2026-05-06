@@ -42,7 +42,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
           targetLang: detail.targetLang || detail.targetLanguage || 'en',
           isLoading: detail.isLoading || false,
           isError: detail.isError || false,
-          error: detail.error || null
+          error: detail.error || null,
+          mode: detail.mode || null
         });
       }
 

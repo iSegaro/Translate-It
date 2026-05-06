@@ -124,6 +124,7 @@
           :is-loading="isLoading"
           :tts-status="tts.ttsState.value"
           :error="isError ? resultText : ''"
+          :is-dictionary="isDictionary"
           :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
           :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
           @text-copied="onTextCopied"
@@ -172,7 +173,14 @@ const currentProvider = ref(settingsStore.settings.TRANSLATION_API || 'google')
 const isLoading = ref(false)
 const currentMessageId = ref(null)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
+const resultMode = ref(mobileStore.selectionData.mode || null)
 const isError = ref(!!mobileStore.selectionData.error)
+
+const isDictionary = computed(() => {
+  return resultMode.value === TranslationMode.Dictionary_Translation || 
+         (resultText.value && resultText.value.includes('**')) ||
+         (resultText.value && resultText.value.startsWith('###'));
+});
 
 const isTranslateDisabled = computed(() => {
   const text = inputText.value || '';
@@ -242,10 +250,18 @@ const handleTranslate = async () => {
     const response = await sendMessage(message);
     
     if (response && response.success) {
-      const translated = response.translatedText || (response.data && response.data.translatedText) || (response.result && response.result.translatedText);
+      const resultData = response.result || response.data || response;
+      const translated = resultData.translatedText;
       if (translated) {
         logger.debug('Manual translation successful');
         resultText.value = translated;
+        resultMode.value = resultData.mode;
+        
+        // Update store for persistence across view changes
+        mobileStore.updateSelectionData({
+          translation: translated,
+          mode: resultData.mode
+        });
       } else {
         logger.info('Manual translation returned empty result');
         resultText.value = t('mobile_input_no_result_error') || "No translation found.";
@@ -302,6 +318,11 @@ const handleCancel = async () => {
 }
 
 const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message') || 'Copied', type: 'success' }) }
-const onSpeak = async (data) => { const text = data?.text || resultText.value; const lang = data?.language || targetLang.value; if (text) await tts.speak(text, lang); }
+const onSpeak = async (data) => { 
+  const text = data?.text || resultText.value; 
+  const lang = data?.language || targetLang.value; 
+  const isDict = data?.isDictionary ?? isDictionary.value;
+  if (text) await tts.speak(text, lang, { isDictionary: isDict }); 
+}
 const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL); }
 </script>
