@@ -391,19 +391,28 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Injects minimal CSS fixes to ensure layout stability during translation.
+   * Injects surgical CSS fixes to ensure layout stability during translation.
    * 
-   * Strategy: "Non-Intrusive Protection"
-   * 1. Uses 'overflow-x: clip' to prevent horizontal scrollbars without triggering scroll resets.
-   * 2. Uses 'max-width: 100%' to keep the body within viewport bounds (fixes Wikipedia FAB drift).
-   * 3. Neutralizes 'transform/filter' on body to protect 'position: fixed' elements (Toasts, FAB).
-   * 4. Strictly avoids touching the <html> tag to prevent the browser from jumping to the top.
+   * STRATEGY: "Hybrid Content Management"
+   * This method solves the "Scroll Conflict" problem where some sites (Wikipedia) 
+   * need aggressive horizontal clipping, while others (Twitter/SPAs) break if 
+   * their scroll containers or 'fixed' elements are tampered with.
+   * 
+   * Why these specific properties?
+   * 1. overflow-x: clip -> Superior to 'hidden' as it prevents horizontal scroll 
+   *    without creating a new scroll container or affecting vertical scroll logic.
+   * 2. position: relative -> Establishes a safe containing block for absolute elements 
+   *    (like our UI Host/Toasts) without the destructive side effects of 'contain: paint'.
+   * 3. overflow-wrap: break-word -> Prevents long translated strings (e.g., German/Farsi) 
+   *    from forcing the body to expand horizontally.
+   * 4. Media Query (Mobile/Touch) -> Wikipedia's mobile site forces overflow at the 
+   *    <html> level; we clip it there ONLY for mobile to keep Twitter-desktop stable.
    * 
    * @private
    */
   _injectLayoutFix() {
     try {
-      // Mark both html and body for maximum specificity without triggering scroll jumps
+      // Mark html for specificity and styling hooks
       document.documentElement.classList.add('ti-translation-active');
 
       if (!document.getElementById('ti-translation-layout-fix')) {
@@ -411,25 +420,39 @@ export class PageTranslationManager extends ResourceTracker {
         style.id = 'ti-translation-layout-fix';
         style.textContent = `
           /**
-           * UNIVERSAL LAYOUT STABILITY FIX
+           * 1. UNIVERSAL BODY PROTECTION
+           * Prevents horizontal expansion caused by long translations.
            */
           html.ti-translation-active body {
-            /* Basic protection for all devices */
+            /* Clip horizontal overflow without killing vertical scroll */
             overflow-x: clip !important;
+            max-width: 100% !important;
+            
+            /* Ensure absolute children are clipped/positioned within body bounds */
+            position: relative !important;
+
+            /* Prevent long words from breaking the layout */
+            overflow-wrap: break-word !important;
+            word-wrap: break-word !important;
           }
 
           /**
-           * MOBILE & TOUCH SPECIFIC FIX
-           * We use containment on mobile/tablet or touch devices to solve persistent 
-           * horizontal scrollbars (like on Wikipedia) without causing layout jumps 
-           * on desktop (like Twitter).
-           * Since UI Host is attached to <html>, containment on <body> won't break 
-           * the fixed position of the FAB/Sheet.
+           * 2. MOBILE & TOUCH SPECIFIC PROTECTION
+           * Solves Wikipedia/Mobile-Web horizontal scroll issues.
            */
           @media (max-width: 1024px), (pointer: coarse) {
+            html.ti-translation-active {
+              /* Force horizontal clip at root level to trap wide tables/elements */
+              overflow-x: hidden !important;
+              width: 100% !important;
+              position: relative !important;
+            }
+
             html.ti-translation-active body {
-              contain: paint !important;
-              max-width: 100% !important;
+              /* Ensure body fills viewport correctly on touch devices */
+              width: 100% !important;
+              margin: 0 !important;
+              overflow-x: clip !important;
             }
           }
         `;
