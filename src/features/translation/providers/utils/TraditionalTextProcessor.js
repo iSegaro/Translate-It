@@ -28,19 +28,25 @@ const BIDI_ARTIFACT_REGEX = /\[\[[\s.——–…ـ·・-]+\]\]/g;
 export const TraditionalTextProcessor = {
   /**
    * Universal scrubbing for technical artifacts (brackets, BIDI marks)
-   * This is a "Last Resort" safety layer to ensure no technical leak reaches the UI
+   * This is a "Last Resort" safety layer to ensure no technical leak reaches the UI.
+   * 
+   * CRITICAL: Must preserve newlines (\\n) while cleaning up technical artifacts.
    */
   scrubBidiArtifacts(text) {
     if (!text || typeof text !== 'string') return text;
     
-    // 1. Remove intact brackets
+    // 1. Remove intact brackets (technical delimiters)
     let scrubbed = text.replace(BIDI_ARTIFACT_REGEX, '');
     
-    // 2. Clean up any resulting double spaces or specific BIDI marks that might be left
+    // 2. Clean up specific BIDI marks and invisible characters
     scrubbed = scrubbed.replace(/[\u200B-\u200D\u200E\u200F\uFEFF]/g, '');
-    scrubbed = scrubbed.replace(/\s\s+/g, ' ').trim();
+
+    // 3. COLLAPSE HORIZONTAL WHITESPACE ONLY
+    // We use [^\\S\\n\\r] to match all whitespace EXCEPT newlines.
+    // This prevents \n\n from being collapsed into a single space.
+    scrubbed = scrubbed.replace(/[^\S\n\r]{2,}/g, ' ');
     
-    // 3. Remove isolated remnants (Safety layer for malformed delimiters)
+    // 4. Remove isolated remnants (Safety layer for malformed delimiters)
     scrubbed = scrubbed.replace(/\[\[[\s.—–…ـ·・-]+/, '');
     scrubbed = scrubbed.replace(/[\s.—–…ـ·・-]+\]\]/, '');
     

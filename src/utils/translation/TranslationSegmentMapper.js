@@ -131,8 +131,8 @@ export class TranslationSegmentMapper {
     // 4. Final safety scrub using the BIDI regex again (handles cases where delimiters merged)
     cleaned = cleaned.replace(BIDI_ARTIFACT_REGEX, ' ');
 
-    // 5. Normalize whitespace
-    return cleaned.replace(/\s+/g, ' ').trim();
+    // 5. Normalize horizontal whitespace only (preserve newlines)
+    return cleaned.replace(/[^\S\n\r]+/g, ' ').trim();
   }
 
 /**

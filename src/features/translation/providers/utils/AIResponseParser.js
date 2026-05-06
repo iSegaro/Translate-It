@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
 
@@ -295,6 +296,11 @@ export const AIResponseParser = {
     // FINAL SAFETY: Ensure text is always a string to prevent [object Object] leaks in the UI
     if (text !== null && typeof text === 'object') {
       text = text.t || text.text || text.translation || Object.values(text)[0] || JSON.stringify(text);
+    }
+
+    // Restore newlines from markers if present
+    if (typeof text === 'string' && NewlineManager.hasMarkers(text)) {
+      text = NewlineManager.restore(text);
     }
 
     return { text: String(text || ''), id };

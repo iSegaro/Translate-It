@@ -18,6 +18,7 @@ import {
   getAIContextTranslationEnabledAsync,
   getAIConversationHistoryEnabledAsync
 } from '@/shared/config/config.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
 
@@ -333,12 +334,14 @@ export const AIConversationHelper = {
       userText = JSON.stringify({
         translations: textsArray.map((t, idx) => {
           if (typeof t === 'object' && t !== null) {
+            const originalText = t.t || t.text || '';
+            const protectedText = NewlineManager.protect(originalText);
             return {
               id: String(t.i || t.id || idx),
-              text: t.t || t.text || ''
+              text: protectedText
             };
           }
-          return { id: String(idx), text: String(t) };
+          return { id: String(idx), text: NewlineManager.protect(String(t)) };
         })
       });
     } else {

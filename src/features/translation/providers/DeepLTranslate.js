@@ -19,6 +19,7 @@ import {
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 
@@ -294,25 +295,12 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       return sanitized;
     };
 
-    // CRITICAL: Use XML-based markers to preserve ALL newlines
-    // This is much safer than text markers like " @ " which can confuse DeepL
-    const BLANK_LINE_MARKER = '<n2/>';  // Marker for \n\n
-    const SINGLE_NEWLINE_MARKER = '<n1/>';  // Marker for \n
-
     const textsToTranslate = validTexts.map(text => {
       // CRITICAL: Sanitize text before processing to remove problematic characters
       const sanitizedText = sanitizeText(text);
 
-      // Step 1: Replace blank lines (\n\n) with their marker
-      let processed = sanitizedText.replace(/\n\n+/g, (match) => {
-        const blankLineCount = Math.floor(match.length / 2);
-        return BLANK_LINE_MARKER.repeat(blankLineCount);
-      });
-
-      // Step 2: Replace remaining single newlines (\n) with their marker
-      processed = processed.replace(/\n/g, SINGLE_NEWLINE_MARKER);
-
-      return processed;
+      // Protect newlines using the unified NewlineManager
+      return NewlineManager.protect(sanitizedText);
     });
 
     // Get beta languages setting
@@ -450,21 +438,12 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
             logger.debug('[DeepL] XML placeholder validation passed for all translations');
           }
 
-          // Restore ALL newlines by replacing XML markers with their original format
+          // Restore ALL newlines using the unified NewlineManager
           const restoredTranslations = validTranslations.map(translation => {
-            let restored = translation;
+            // Step 1: Restore newlines from markers
+            let restored = NewlineManager.restore(translation);
 
-            // Step 1: Restore blank lines first (<n2/> → \n\n)
-            if (restored.includes('<n2/>')) {
-              restored = restored.replace(/<n2\s*\/?>/g, '\n\n');
-            }
-
-            // Step 2: Then restore single newlines (<n1/> → \n)
-            if (restored.includes('<n1/>')) {
-              restored = restored.replace(/<n1\s*\/?>/g, '\n');
-            }
-
-            // Step 3: Unescape XML entities back to original characters
+            // Step 2: Unescape XML entities back to original characters
             restored = unescapeXML(restored);
 
             return restored;

@@ -378,9 +378,11 @@ Example:
 Input: [{"t": "Hello", "i": "n1", "b": "b1", "r": "h1"}]
 Output: [{"t": "سلام", "i": "n1", "b": "b1", "r": "h1"}]
 
-CRITICAL - Placeholder Preservation:
-  1. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
-  2. DO NOT translate placeholders or renumber them.
+CRITICAL - Formatting & Structure:
+  1. Strictly preserve all line breaks (\n), indentation, and formatting.
+  2. If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  3. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
+  4. DO NOT translate placeholders or renumber them.
 
 Return **only** the translated JSON array. No explanations or markdown.
 
@@ -446,8 +448,10 @@ $_{PROMPT_INSTRUCTIONS}
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-CRITICAL - Placeholder Preservation:
-  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -464,8 +468,10 @@ $_{PROMPT_INSTRUCTIONS}
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-CRITICAL - Placeholder Preservation:
-  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -479,10 +485,15 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
 Return only the JSON object, no additional text.
 
-$_{TEXT}`,
+$_{TEXT}
+`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
@@ -491,10 +502,15 @@ $_{TEXT}`,
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
 Return only the JSON object, no additional text.
 
-$_{TEXT}`,
+$_{TEXT}
+`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
 
 
@@ -521,6 +537,10 @@ $_{TEXT}
 
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
+
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
 
 Return **only** the translated text. Do not include explanations, markdown, or any other content.
 

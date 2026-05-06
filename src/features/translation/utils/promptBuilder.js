@@ -20,6 +20,7 @@ import { getLanguageNameFromCode, getCanonicalCode } from '@/shared/config/langu
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
 
 
@@ -159,9 +160,10 @@ export async function buildPrompt(
 
   // Inject the actual text to be translated.
   // $_{TEXT} is now required in the prompt template, so we can safely replace it.
+  const protectedText = isAI ? NewlineManager.protect(text) : text;
   const finalPrompt = finalPromptWithInstructions.replace(
     /\$_{TEXT}/g,
-    text,
+    protectedText,
   );
 
   return finalPrompt;
