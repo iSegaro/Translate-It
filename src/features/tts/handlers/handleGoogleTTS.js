@@ -9,6 +9,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
@@ -143,6 +144,9 @@ export const handleGoogleTTSStopAll = async (message) => {
     if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
       return { success: true, skipped: true };
     }
+    
+    // Stop any active queue
+    ttsQueueManager.stop();
     
     await ttsStateManager.notifyTTSEnded('stopped');
     ttsStateManager.fullReset();

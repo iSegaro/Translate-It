@@ -5,6 +5,7 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { isChromium } from '@/core/browserHandlers.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSHandler');
 
@@ -97,6 +98,9 @@ export const handleEdgeTTSStopAll = async (message) => {
     if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
       return { success: true, skipped: true };
     }
+    
+    // Stop any active queue
+    ttsQueueManager.stop();
     
     // notifyTTSEnded will check sender internal state
     await ttsStateManager.notifyTTSEnded('stopped');

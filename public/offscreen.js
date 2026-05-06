@@ -574,9 +574,9 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         currentAudio = null;
         isPlaying = false; // Reset playing state
         
-        // Always notify frontend that TTS ended (real completion)
-        chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
-          console.log("[Offscreen] Failed to send TTS ended notification:", err);
+        // Notify background that this chunk ended (internal only)
+        chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(err => {
+          console.log("[Offscreen] Failed to send internal chunk ended notification:", err);
         });
       });
 
@@ -865,13 +865,12 @@ function handleAudioPlayback(url, sendResponse) {
           logger.info("Audio playback ended");
           URL.revokeObjectURL(audioUrl);
           currentAudio = null;
-          
-          // Send completion notification to frontend
-          chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(err => {
-            logger.error("Failed to send TTS ended notification:", err);
+
+          // Notify background that this chunk ended (internal only)
+          chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(err => {
+            logger.error("Failed to send internal chunk ended notification:", err);
           });
         });
-
         resourceTracker.addEventListener(currentAudio, "error", (e) => {
           logger.error("Audio playback error:", e);
           URL.revokeObjectURL(audioUrl);
@@ -1008,7 +1007,7 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
       URL.revokeObjectURL(audioUrl); // Clean up memory
       currentAudio = null;
       isPlaying = false; // Reset playing state
-      chrome.runtime.sendMessage({ action: 'GOOGLE_TTS_ENDED' }).catch(() => {});
+      chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(() => {});
     });
 
     resourceTracker.addEventListener(currentAudio, "error", (e) => {
