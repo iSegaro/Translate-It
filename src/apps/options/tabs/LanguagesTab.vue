@@ -169,6 +169,7 @@
 
         <!-- Dictionary Mode -->
         <BaseAccordion
+          id="DICTIONARY_SECTION"
           :is-open="activeAccordion === 'dictionary'"
           item-class="dictionary-mode-setting"
           @toggle="toggleAccordion('dictionary')"

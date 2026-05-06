@@ -67,6 +67,7 @@
         <!-- Preview Prompts Section -->
         <div class="prompt-preview-section">
           <button
+            id="PROMPT_PREVIEW_BUTTON"
             type="button"
             class="prompt-preview-button-action"
             @click="refreshPreview"
