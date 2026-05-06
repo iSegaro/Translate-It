@@ -114,6 +114,7 @@ export class SelectionManager extends ResourceTracker {
       text: selectedText,
       position: position,
       mode: selectionTranslationMode,
+      options: options, // Pass keyboard state (ctrlPressed, shiftPressed)
       context: {
         frameId: this.frameId,
         isIframe: window !== window.top
