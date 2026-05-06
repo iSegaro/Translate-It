@@ -8,6 +8,7 @@
 
 ##### Fixed
 
+- Fixed an issue where the translation window would not appear when the `Require Ctrl` setting was enabled
 - Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
 - Fixed incorrect Circuit Breaker trigger conditions
 - Fixed an issue where page translation would stop working after an error
