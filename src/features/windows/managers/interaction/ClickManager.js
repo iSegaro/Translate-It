@@ -132,9 +132,14 @@ export class ClickManager extends ResourceTracker {
    * Determine if outside click should trigger dismissal
    */
   _shouldDismissOnOutsideClick(e) {
-    // Skip if currently dragging a translation window
-    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true) {
-      this.logger.debug('Skipping outside click check due to active window dragging');
+    // Skip if currently dragging or just finished dragging a translation window
+    // This prevents accidental dismissal after fast drag operations where the click
+    // event might register outside the window due to cursor overshoot.
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) {
+      this.logger.debug('Skipping outside click check due to active or recent window dragging', {
+        isDragging: window.__TRANSLATION_WINDOW_IS_DRAGGING,
+        justDragged: window.__TRANSLATION_WINDOW_JUST_DRAGGED
+      });
       return false;
     }
     
