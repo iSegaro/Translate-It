@@ -2004,7 +2004,13 @@
     "message": "翻訳遅延時間"
   },
   "whole_page_scroll_stop_delay_unit": {
-    "message": "ミリ秒"
+    "message": "ms"
+  },
+  "whole_page_token_warning_label": {
+    "message": "トークン消費プロバイダーの警告を表示する"
+  },
+  "whole_page_token_warning_description": {
+    "message": "プロバイダーがクレジットやトークンを消費する場合（Gemini、OpenAI、DeepLなど）、ページ全体を翻訳する前に確認ダイアログを表示します。"
   },
   "ai_optimization_section_title": {
     "message": "AIの最適化"

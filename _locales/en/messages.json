@@ -2006,6 +2006,12 @@
   "whole_page_scroll_stop_delay_unit": {
     "message": "ms"
   },
+  "whole_page_token_warning_label": {
+    "message": "Show warning for token-consuming providers"
+  },
+  "whole_page_token_warning_description": {
+    "message": "Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL)."
+  },
   "ai_optimization_section_title": {
     "message": "AI Optimization"
   },
