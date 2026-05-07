@@ -77,11 +77,12 @@ export class PageTranslationScheduler extends ResourceTracker {
   }
 
   setTranslationState(isTranslated, sessionId, sessionContext = null) {
-    this.isTranslated = isTranslated;
-    this.translationSessionId = sessionId;
-    this.sessionContext = sessionContext;
     if (!isTranslated) {
       this.stop();
+    } else {
+      this.isTranslated = isTranslated;
+      this.translationSessionId = sessionId;
+      this.sessionContext = sessionContext;
     }
   }
 
@@ -112,13 +113,20 @@ export class PageTranslationScheduler extends ResourceTracker {
     
     // CRITICAL: Notify background to abort any pending batch for this session
     if (wasTranslating && this.translationSessionId) {
+      this.logger.debug(`[Scheduler] Sending cancel signal for session: ${this.translationSessionId}`);
       sendRegularMessage({
         action: MessageActions.CANCEL_TRANSLATION,
         data: { 
-          messageId: this.translationSessionId,
+          cancelAll: true,
+          context: MessageContexts.PAGE_TRANSLATION_BATCH,
+          sessionId: this.translationSessionId,
           reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
         }
-      }).catch(() => {});
+      }).then(response => {
+        this.logger.debug('[Scheduler] Cancel signal acknowledged by background:', response);
+      }).catch(err => {
+        this.logger.error('[Scheduler] Failed to send cancel signal:', err);
+      });
     }
 
     if (this.batchTimer) {
@@ -397,7 +405,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         options: { rawJsonPayload: true },
         sessionId: this.translationSessionId 
       },
-      MessageContexts.CONTENT
+      MessageContexts.PAGE_TRANSLATION_BATCH
     );
 
     try {

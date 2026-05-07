@@ -3,6 +3,8 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingManager } from "../core/StreamingManager.js";
+import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCancelTranslation');
 
@@ -30,75 +32,71 @@ export async function handleCancelTranslation(request, sender) {
     }
 
     // Cancel operations with proper order: Engine → Streaming → RateLimit
-    const { cancelAll, reason, context } = request.data || {};
+    const { cancelAll, reason, context, sessionId } = request.data || {};
+    const tabId = sender?.tab?.id;
     
-    // Step 1: Cancel active translations in TranslationEngine (stops network requests)
-    let cancelledCount = 0;
-    if (cancelAll) {
-      logger.info(`[CancelTranslation] Cancelling all active translations for context: ${context || 'all'}`);
-      cancelledCount = await translationEngine.cancelAllTranslations?.(context) || 0;
-      logger.info(`[CancelTranslation] Engine cancelled ${cancelledCount} translations for context: ${context || 'all'}`);
+    // Step 1: Identify messageIds to cancel
+    let messageIdsToCancel = [];
+    logger.debug(`[CancelTranslation] Processing cancel request: cancelAll=${cancelAll}, context=${context}, sessionId=${sessionId}, tabId=${tabId}`);
+
+    if (cancelAll && tabId) {
+      // Precise surgical cancellation: Find all active requests for this tab 
+      // that match the context and sessionId.
+      const tabRequests = translationRequestTracker.getTabRequests(tabId);
+      logger.debug(`[CancelTranslation] Tab ${tabId} has ${tabRequests.length} tracked requests`);
+
+      messageIdsToCancel = tabRequests
+        .filter(req => {
+          const contextMatch = !context || req.context === context;
+          const sessionMatch = !sessionId || req.data?.sessionId === sessionId || req.metadata?.sessionId === sessionId;
+          
+          if (!contextMatch || !sessionMatch) {
+            logger.debug(`[CancelTranslation] Request ${req.messageId} mismatch: context(${req.context} vs ${context}), session(${req.data?.sessionId || req.metadata?.sessionId} vs ${sessionId})`);
+          }
+          
+          return contextMatch && sessionMatch;
+        })
+        .map(req => req.messageId);
+      
+      logger.debug(`[CancelTranslation] Identified ${messageIdsToCancel.length} messageIds to cancel for tab ${tabId}`);
     } else if (messageId) {
-      logger.info(`[CancelTranslation] Cancelling specific translation: ${messageId}`);
-      const cancelled = await translationEngine.cancelTranslation(messageId);
-      if (cancelled) {
-        cancelledCount = 1;
-        logger.info(`[CancelTranslation] Engine successfully cancelled translation: ${messageId}`);
-      } else {
-        logger.info(`[CancelTranslation] Translation ${messageId} was not active or already completed`);
-      }
-    }
-    
-    // Step 2: Cancel streaming sessions (cleans up streaming state)
-    try {
-      if (cancelAll) {
-        await streamingManager.cancelAllStreams('All translations cancelled by user');
-        logger.debug('[CancelTranslation] StreamingManager cancelled all streams');
-      } else if (messageId) {
-        await streamingManager.cancelStream(messageId, 'Translation cancelled by user');
-        logger.debug('[CancelTranslation] StreamingManager cancelled stream', { messageId });
-      }
-    } catch (error) {
-      logger.debug('[CancelTranslation] StreamingManager cleanup failed (may not be available):', error);
-    }
-    
-    // Step 3: Clear pending requests in RateLimitManager (clears queues)
-    try {
-      const { rateLimitManager } = await import("../core/RateLimitManager.js");
-      if (cancelAll) {
-        logger.info(`[CancelTranslation] Clearing all pending requests in RateLimitManager for context: ${context || 'all'}`);
-        rateLimitManager.clearPendingRequests();
-      } else if (messageId) {
-        logger.info(`[CancelTranslation] Clearing pending requests for messageId: ${messageId}`);
-        rateLimitManager.clearPendingRequests(messageId);
-      }
-    } catch (error) {
-      logger.error('[CancelTranslation] RateLimitManager cleanup failed:', error);
+      messageIdsToCancel = [messageId];
+    } else if (cancelAll) {
+      // Fallback for non-tab contexts (like background cleanup)
+      logger.info(`[CancelTranslation] Falling back to global cancellation for context: ${context || 'all'}`);
+      return await translationEngine.cancelAllTranslations?.(context) || { success: true };
     }
 
-    // Step 4: Clear pending retries in QueueManager
-    try {
-      const { queueManager } = await import("../core/QueueManager.js");
-      if (cancelAll && context) {
-        logger.info(`[CancelTranslation] Clearing pending retries in QueueManager for context: ${context}`);
-        queueManager.cancelByUiContext(context);
-      } else if (messageId) {
-        logger.info(`[CancelTranslation] Clearing pending retries in QueueManager for messageId: ${messageId}`);
-        queueManager.cancelByMessageId(messageId);
-      } else if (cancelAll) {
-        logger.info('[CancelTranslation] Clearing ALL pending retries in QueueManager (no context provided)');
-        // If we want to be safe and clear everything when cancelAll is true but no context
-        // we can call a general clear, but usually context is popup/sidepanel
-      }
-    } catch (error) {
-      logger.error('[CancelTranslation] QueueManager cleanup failed:', error);
+    let totalCancelledCount = 0;
+    const { queueManager } = await import("../core/QueueManager.js");
+    const { rateLimitManager } = await import("../core/RateLimitManager.js");
+
+    // Process each messageId for cancellation across all systems
+    for (const id of messageIdsToCancel) {
+      // 1. Engine & AbortController
+      const cancelled = await translationEngine.cancelTranslation(id);
+      if (cancelled) totalCancelledCount++;
+
+      // 2. StreamingManager
+      try {
+        await streamingManager.cancelStream(id, reason || 'Translation cancelled by user');
+      } catch { /* ignore */ }
+
+      // 3. RateLimitManager
+      try {
+        rateLimitManager.clearPendingRequests(id);
+      } catch { /* ignore */ }
+
+      // 4. QueueManager
+      try {
+        queueManager.cancelByMessageId(id);
+      } catch { /* ignore */ }
     }
 
     // Always return success since the cancellation intent is acknowledged
     return {
       success: true,
-      messageId,
-      cancelledCount,
+      cancelledCount: totalCancelledCount,
       reason: reason || 'user_request',
       context: context || 'background',
       message: 'Translation cancellation acknowledged'
