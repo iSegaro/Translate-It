@@ -463,11 +463,10 @@
 
 <script setup>
 import './ActivationTab.scss'
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
-import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
@@ -479,7 +478,6 @@ import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
-import BaseButton from '@/components/base/BaseButton.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -488,7 +486,6 @@ const settingsStore = useSettingsStore()
 const { highlightElement } = useHighlightManager()
 const { t } = useUnifiedI18n()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
-const { api: browserAPI } = useBrowserAPI('Options:ActivationTab')
 
 // --- Actions ---
 
