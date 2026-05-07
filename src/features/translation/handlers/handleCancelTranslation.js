@@ -4,9 +4,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingManager } from "../core/StreamingManager.js";
 import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCancelTranslation');
+const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'handleCancelTranslation');
 
 /**
  * Handle translation cancellation requests from content scripts
