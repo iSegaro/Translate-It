@@ -352,9 +352,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
     const trimmedOriginal = originalText.trim();
 
-    // OPTIMIZATION: Preserve ZWNJ (نیم‌فاصله) and Tatweel (ـ) if the provider returned 
-    // a "cleaned" or slightly re-formatted version of the same text.
-    const normalizeForComparison = (s) => s ? s.replace(/[\u200c\u0640]/g, '').replace(/\s+/g, ' ').trim() : '';
+    // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
+    // returned a "cleaned" version of the same text.
+    // We ignore: ZWSP(\u200b), ZWNJ(\u200c), ZWJ(\u200d), LRM(\u200e), RLM(\u200f), BOM(\ufeff), Tatweel(\u0640), EnDash(\u2013), EmDash(\u2014)
+    const normalizeForComparison = (s) => s ? s.replace(/[\u200b-\u200f\uFEFF\u0640\u2013\u2014]/g, '').replace(/\s+/g, ' ').trim() : '';
     const isFunctionallyIdentical = normalizeForComparison(finalTranslation) === normalizeForComparison(trimmedOriginal);
     if (isFunctionallyIdentical) {
       finalTranslation = trimmedOriginal;
