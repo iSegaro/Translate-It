@@ -1,27 +1,26 @@
-#### v1.14.0 – Released on May XX, 2026
+#### v1.14.0 – Released on May 07, 2026
 
 ##### Added
 
-- Added support for reading **unlimited text length** in Text-to-Speech, allowing you to listen to long translations smoothly and without any interruptions.
-- Added [Vajehyab](https://vajehyab.com) Persian dictionary for specialized [dictionary](#/languages?highlight=DICTIONARY_SECTION) results
-- Added [Prompt Preview](#/prompt?highlight=PROMPT_PREVIEW_BUTTON) in the Prompt Settings tab
-- Added a confirmation notification before starting `Page Translation` when using paid providers. This can be configured in the [Settings page](#/activation?highlight=WHOLE_PAGE_TOKEN_WARNING_HIDDEN)
-- Added a dynamic shortcut configuration button to the [Select Element](#/activation?highlight=SELECT_ELEMENT_CONFIGURE_SHORTCUTS) section, allowing users to view and manage keyboard shortcuts directly from the extension settings.
+- Text-to-Speech can now read very long translations smoothly without stopping
+- Added the [Vajehyab](#/languages?highlight=DICTIONARY_SECTION) Persian dictionary for better dictionary results ([vajehyab.com](https://vajehyab.com))
+- Added a [Prompt Preview](#/prompt?highlight=PROMPT_PREVIEW_BUTTON) feature in the Prompt Settings tab
+- Added a [warning notification](#/activation?highlight=WHOLE_PAGE_TOKEN_WARNING_HIDDEN) before starting `Page Translation` with paid providers.
+- Added a [shortcut management](#/activation?highlight=SELECT_ELEMENT_CONFIGURE_SHORTCUTS) button for the Select Element feature in Settings
 
 ##### Fixed
 
-- Fixed an issue where the translation window would not appear when the `Require Ctrl` setting was enabled
-- Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
-- Fixed incorrect Circuit Breaker trigger conditions
-- Fixed an issue where page translation would stop working after an error
-- Fixed formatting issues in translated text, including missing Persian half-spaces (نیم‌فاصله) and extra line breaks
-- Fixed issues with long Text-to-Speech translations and improved dictionary result formatting
+- Fixed an issue where the translation window would not open when the `Require Ctrl` setting was enabled
+- Fixed issues where some translation modes were not using the correct provider
+- Fixed cases where `Page Translation` stopped working after an error
+- Fixed formatting problems in translated text, including missing Persian half-spaces (نیم‌فاصله) and extra line breaks
+- Fixed several stability and reliability issues
 
 ##### Changed
 
-- Improved the UI for selecting dictionary providers in settings
-- Implemented smart provider filtering to only display configured and ready-to-use translation providers across the UI.
-- Improved Settings page UX by validating mandatory configurations before saving
+- Improved dictionary provider selection in Settings
+- Improved provider selection to only show available and configured providers
+- Improved Settings validation before saving
 - Improved popup performance
 
 ---
