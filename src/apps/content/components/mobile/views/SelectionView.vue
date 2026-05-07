@@ -34,7 +34,7 @@
           <img
             src="@/icons/ui/swap.png"
             class="ti-m-swap-icon ti-m-icon-img"
-            :alt="t('mobile_swap_languages_alt') || 'to'"
+            :alt="t('mobile_swap_languages_alt', 'to')"
           >
           <span class="ti-m-lang-target">{{ targetName }}</span>
         </div>
@@ -47,7 +47,7 @@
         >
           <img
             src="@/icons/ui/close.png"
-            :alt="t('mobile_close_button_alt') || 'Close'"
+            :alt="t('mobile_close_button_alt', 'Close')"
             class="ti-m-icon-img ti-m-close-icon"
           >
         </button>
@@ -61,7 +61,7 @@
         class="ti-m-loading-container"
       >
         <div class="ti-m-spinner" />
-        <span>{{ t('mobile_selection_translating_label') || 'Translating...' }}</span>
+        <span>{{ t('mobile_selection_translating_label', 'Translating...') }}</span>
       </div>
       
       <!-- Combined Result and Original using Shared Component -->
@@ -79,8 +79,8 @@
             :tts-status="tts.ttsState.value"
             :error="selectionData.error"
             :is-dictionary="isDictionary"
-            :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
-            :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+            :copy-title="t('mobile_selection_copy_tooltip', 'Copy')"
+            :tts-title="t('mobile_selection_speak_tooltip', 'Speak')"
             @text-copied="onTextCopied"
             @tts-started="onSpeak"
             @tts-stopped="tts.stop()"
@@ -96,7 +96,7 @@
           @click="handleSourceTextClick"
         >
           <div class="ti-m-original-title">
-            {{ t('mobile_selection_source_text_title') || 'Source Text' }}
+            {{ t('mobile_selection_source_text_title', 'Source Text') }}
           </div>
           <div 
             class="ti-m-original-text" 
@@ -140,7 +140,7 @@ const isDictionary = computed(() => {
 
 const sourceName = computed(() => {
   const code = selectionData.value.sourceLang;
-  if (!code || code === 'auto') return t('mobile_selection_auto_label') || 'Auto';
+  if (!code || code === 'auto') return t('mobile_selection_auto_label', 'Auto');
   const name = getLanguageNameFromCode(code);
   return name ? name.charAt(0).toUpperCase() + name.slice(1) : code;
 });
@@ -175,6 +175,6 @@ const onSpeak = async (data) => {
   const isDict = data?.isDictionary ?? isDictionary.value;
   if (text) await tts.speak(text, lang, { isDictionary: isDict }); 
 }
-const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_selection_copied_message') || 'Copied', type: 'success' }) }
+const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_selection_copied_message', 'Copied'), type: 'success' }) }
 const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 </script>

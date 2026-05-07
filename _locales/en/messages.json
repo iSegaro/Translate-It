@@ -545,21 +545,6 @@
   "mobile_page_unknown_error": {
     "message": "Unknown translation error"
   },
-  "mobile_page_translating_status": {
-    "message": "Translating Page..."
-  },
-  "mobile_page_auto_translating_status": {
-    "message": "Auto-Translating"
-  },
-  "mobile_page_translated_status": {
-    "message": "Page Translated"
-  },
-  "mobile_page_translation_failed": {
-    "message": "Translation Failed"
-  },
-  "mobile_page_ready_status": {
-    "message": "Ready to Translate"
-  },
   "mobile_page_retry_btn": {
     "message": "Retry Translation"
   },
@@ -610,9 +595,6 @@
   },
   "desktop_fab_translate_selection_label": {
     "message": "Translate Selection"
-  },
-  "desktop_fab_translating_label": {
-    "message": "Translating..."
   },
   "desktop_fab_stop_auto_translating_label": {
     "message": "Stop Auto Translating"
@@ -703,9 +685,6 @@
   },
   "enhanced_triple_click_drag_description": {
     "message": "When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs."
-  },
-  "enable_dictionary_translation_label": {
-    "message": "Enable Dictionary Translation"
   },
   "enable_dictionary_translation_description": {
     "message": "When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations."
@@ -1534,9 +1513,6 @@
   },
   "prompt_preview_note": {
     "message": "These examples show how your template is used in different translation modes"
-  },
-  "export_success_plaintext": {
-    "message": "Settings exported successfully (API keys saved in plain text)."
   },
   "import_error_generic": {
     "message": "Failed to import settings."

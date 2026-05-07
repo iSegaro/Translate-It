@@ -18,7 +18,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_page_label') || 'Page' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_page_label', 'Page') }}</span>
       </button>
 
       <!-- Select Element Button -->
@@ -35,7 +35,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_select_label') || 'Select' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_select_label', 'Select') }}</span>
       </button>
 
       <!-- Manual Translation Button -->
@@ -50,7 +50,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_input_label') || 'Input' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_input_label', 'Input') }}</span>
       </button>
 
       <!-- History Button -->
@@ -65,7 +65,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_history_label') || 'History' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_history_label', 'History') }}</span>
       </button>
 
       <!-- TTS Button (Dynamic) -->
@@ -135,7 +135,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_revert_label') || 'Revert' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_revert_label', 'Revert') }}</span>
       </button>
 
       <!-- Settings Button -->
@@ -150,7 +150,7 @@
             class="ti-toolbar-icon"
           >
         </div>
-        <span class="ti-m-action-label">{{ t('mobile_dashboard_settings_label') || 'Settings' }}</span>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_settings_label', 'Settings') }}</span>
       </button>
     </div>
   </div>
@@ -213,7 +213,7 @@ const isSelectElementSupported = computed(() => checkBulkSupport(selectElementPr
 
 const handleBulkNotSupported = async () => {
   mobileStore.closeSheet();
-  await handleError(t('provider_does_not_support_bulk') || 'این سرویس از قابلیت‌های دسته‌ای پشتیبانی نمی‌کند', 'mobile-dashboard:bulk-check', { 
+  await handleError(t('provider_does_not_support_bulk', 'این سرویس از قابلیت‌های دسته‌ای پشتیبانی نمی‌کند'), 'mobile-dashboard:bulk-check', { 
     showToast: true,
     type: ErrorTypes.VALIDATION
   });

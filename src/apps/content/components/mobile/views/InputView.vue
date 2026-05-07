@@ -28,14 +28,14 @@
       <span
         class="ti-m-header-title"
         @click="goBack"
-      >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+      >{{ t('mobile_input_header_title', 'Manual Input') }}</span>
     </div>
 
     <!-- Input Card -->
     <div class="ti-m-input-card">
       <div class="ti-m-card-label-row">
         <div class="ti-m-card-label">
-          {{ t('mobile_input_source_text_label') || 'Source Text' }}
+          {{ t('mobile_input_source_text_label', 'Source Text') }}
         </div>
         
         <div class="ti-m-card-actions">
@@ -47,7 +47,7 @@
               src="@/icons/ui/paste.png"
               class="ti-m-icon-img-small"
             >
-            {{ t('action_paste_from_clipboard') || 'Paste' }}
+            {{ t('action_paste_from_clipboard', 'Paste') }}
           </button>
           
           <button 
@@ -55,14 +55,14 @@
             class="ti-m-input-action-btn ti-m-clear-btn" 
             @click="inputText = ''"
           >
-            {{ t('mobile_input_clear_btn') || 'Clear' }}
+            {{ t('mobile_input_clear_btn', 'Clear') }}
           </button>
         </div>
       </div>
       
       <textarea
         v-model="inputText"
-        :placeholder="t('mobile_input_placeholder') || 'Type here...'"
+        :placeholder="t('mobile_input_placeholder', 'Type here...')"
         :dir="inputDir"
         class="ti-m-textarea"
         @focus="onFocus"
@@ -79,10 +79,10 @@
           compact
           :provider="currentProvider"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
-          :source-title="t('popup_source_language_title') || 'Source'"
-          :target-title="t('popup_target_language_title') || 'Target'"
-          :swap-title="t('popup_swap_languages_title') || 'Swap'"
-          :auto-detect-label="t('auto_detect') || 'Auto-Detect'"
+          :source-title="t('popup_source_language_title', 'Source')"
+          :target-title="t('popup_target_language_title', 'Target')"
+          :swap-title="t('popup_swap_languages_title', 'Swap')"
+          :auto-detect-label="t('auto_detect', 'Auto-Detect')"
         />
       </div>
       
@@ -106,7 +106,7 @@
           :class="{ 'ti-m-stop-btn': isLoading }"
           @click="isLoading ? handleCancel() : handleTranslate()"
         >
-          {{ isLoading ? (t('popup_stop_button_text') || 'توقف') : (t('mobile_input_translate_btn') || 'ترجمه') }}
+          {{ isLoading ? t('mobile_selection_stop_label', 'توقف') : t('mobile_input_translate_btn', 'ترجمه') }}
         </button>
       </div>
     </div>
@@ -125,8 +125,8 @@
           :tts-status="tts.ttsState.value"
           :error="isError ? resultText : ''"
           :is-dictionary="isDictionary"
-          :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
-          :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+          :copy-title="t('mobile_selection_copy_tooltip', 'Copy')"
+          :tts-title="t('mobile_selection_speak_tooltip', 'Speak')"
           @text-copied="onTextCopied"
           @tts-started="onSpeak"
           @tts-stopped="tts.stop()"
@@ -264,7 +264,7 @@ const handleTranslate = async () => {
         });
       } else {
         logger.info('Manual translation returned empty result');
-        resultText.value = t('mobile_input_no_result_error') || "No translation found.";
+        resultText.value = t('mobile_input_no_result_error', "No translation found.");
       }
     } else {
       // Check if it was cancelled
@@ -289,7 +289,7 @@ const handleTranslate = async () => {
     if (ExtensionContextManager.isContextError(error)) {
       mobileStore.closeSheet();
       ExtensionContextManager.handleContextError(error, 'mobile-input:translate');
-      resultText.value = t('mobile_input_context_error') || "Extension context unavailable. Please refresh the page.";
+      resultText.value = t('mobile_input_context_error', "Extension context unavailable. Please refresh the page.");
     } else {
       isError.value = true;
       const errorInfo = await getErrorForDisplay(error, 'mobile-input');
@@ -317,7 +317,7 @@ const handleCancel = async () => {
   }
 }
 
-const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message') || 'Copied', type: 'success' }) }
+const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message', 'Copied'), type: 'success' }) }
 const onSpeak = async (data) => { 
   const text = data?.text || resultText.value; 
   const lang = data?.language || targetLang.value; 

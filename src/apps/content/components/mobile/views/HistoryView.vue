@@ -28,7 +28,7 @@
       <span
         class="ti-m-header-title"
         @click="goBack"
-      >{{ t('history_title') || 'Translation History' }}</span>
+      >{{ t('history_title', 'Translation History') }}</span>
       
       <div
         v-if="hasHistory"
@@ -41,7 +41,7 @@
               src="@/icons/ui/copy.png"
               class="ti-m-export-icon-img"
             >
-            {{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}
+            {{ t('SIDEPANEL_EXPORT_HISTORY', 'Export') }}
           </div>
           
           <!-- Native Select Overlay (Invisible but clickable) -->
@@ -54,19 +54,19 @@
               disabled
               selected
             >
-              {{ t('SIDEPANEL_EXPORT_HISTORY') || 'Export' }}
+              {{ t('SIDEPANEL_EXPORT_HISTORY', 'Export') }}
             </option>
             <option value="json_clean">
-              {{ t('SIDEPANEL_EXPORT_JSON_CLEAN') || 'JSON (Clean)' }}
+              {{ t('SIDEPANEL_EXPORT_JSON_CLEAN', 'JSON (Clean)') }}
             </option>
             <option value="json_raw">
-              {{ t('SIDEPANEL_EXPORT_JSON_RAW') || 'JSON (Raw)' }}
+              {{ t('SIDEPANEL_EXPORT_JSON_RAW', 'JSON (Raw)') }}
             </option>
             <option value="csv">
-              {{ t('SIDEPANEL_EXPORT_CSV') || 'CSV' }}
+              {{ t('SIDEPANEL_EXPORT_CSV', 'CSV') }}
             </option>
             <option value="anki">
-              {{ t('SIDEPANEL_EXPORT_ANKI') || 'Anki' }}
+              {{ t('SIDEPANEL_EXPORT_ANKI', 'Anki') }}
             </option>
           </select>
         </div>
@@ -75,7 +75,7 @@
           class="ti-m-clear-all-btn" 
           @click="clearAll"
         >
-          {{ t('history_clear_all') || 'Clear All' }}
+          {{ t('history_clear_all', 'Clear All') }}
         </button>
       </div>
     </div>
@@ -97,7 +97,7 @@
           src="@/icons/ui/history.svg"
           class="ti-m-empty-icon"
         >
-        <span>{{ t('history_no_history') || 'No translation history yet' }}</span>
+        <span>{{ t('history_no_history', 'No translation history yet') }}</span>
       </div>
 
       <TransitionGroup 
