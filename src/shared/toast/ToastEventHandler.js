@@ -77,6 +77,17 @@ export class ToastEventHandler {
       // Not a toast click, let it pass through
       return;
     }
+
+    // Check if the element explicitly asks to be ignored by the toast handler
+    // This is useful for custom multi-action buttons
+    const shouldIgnore = path.some(el => 
+      el && el.hasAttribute && el.hasAttribute('data-translate-it-ignore-toast-handler')
+    );
+
+    if (shouldIgnore) {
+      this.logger.debug('[ToastHandler] Click on element with ignore attribute - letting it pass through');
+      return;
+    }
     
     this.isProcessingClick = true;
     
@@ -88,25 +99,27 @@ export class ToastEventHandler {
       pathLength: path.length
     });
     
-    // Prevent the click from reaching other handlers
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    
     // Check if it's a cancel button click using direct detection
     const isCancelButton = this.isCancelButtonClickDirect(event);
     
     if (isCancelButton) {
       this.logger.info('[ToastHandler] Cancel button clicked');
       
+      // Prevent the click from reaching other handlers only if we are handling it
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
       if (this.onCancelClick) {
         this.onCancelClick(event);
       }
-      
-      // Note: Don't emit cancel-select-element-mode event here to avoid duplicates
-      // The event will be emitted by the onCancelClick callback in ContentApp
     } else {
-      this.logger.debug('[ToastHandler] General toast click (non-cancel)');
+      this.logger.debug('[ToastHandler] General toast click (non-cancel) - letting it pass through');
+      
+      // We don't prevent default or stop propagation here anymore.
+      // This allows custom buttons (like in token warnings) to handle their own clicks.
+      // Other managers (like SelectElementManager) will ignore this click 
+      // because they use ElementSelector.isOurElement() which recognizes toasts.
       
       if (this.onToastClick) {
         this.onToastClick(event);

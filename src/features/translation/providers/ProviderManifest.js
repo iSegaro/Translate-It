@@ -57,6 +57,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "formality", "bulk", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['DEEPL_API_KEY'],
+    consumesTokens: true,
     supported: true,
   },
   {
@@ -121,6 +122,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "context", "smart", "bulk", "image", "dictionary", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['GEMINI_API_KEY'],
+    consumesTokens: true,
     supported: true,
   },
   {
@@ -134,6 +136,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "context", "smart", "image", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['OPENAI_API_KEY'],
+    consumesTokens: true,
     supported: true,
   },
   {
@@ -147,6 +150,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "context", "smart", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['OPENROUTER_API_KEY'],
+    consumesTokens: true,
     supported: true,
   },
   {
@@ -160,6 +164,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "context", "smart", "thinking", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['DEEPSEEK_API_KEY'],
+    consumesTokens: true,
     supported: true,
   },
   {
@@ -173,6 +178,7 @@ const getRawManifest = () => [
     features: ["translation", "text", "autoDetect", "context", "configurable", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
     requiredSettings: ['CUSTOM_API_KEY', 'CUSTOM_API_URL', 'CUSTOM_API_MODEL'],
+    consumesTokens: true,
     supported: true,
   },
 
@@ -226,6 +232,7 @@ const getRawManifest = () => [
     importFunction: () => import("./MockProvider.js").then(m => ({ default: m.MockProvider })),
     features: ["translation", "text", "autoDetect", "context", "smart", "bulk", "streaming", "dictionary", "bilingual"],
     needsApiKey: false,
+    consumesTokens: true,
     supported: true, // Enable it here, we will filter it in the registry
   },
 ];

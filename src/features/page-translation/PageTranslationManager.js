@@ -15,6 +15,7 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Internal components
@@ -121,6 +122,29 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this.settings = await PageTranslationSettingsLoader.load(options);
+
+      // Token Usage Warning: AI and DeepL providers consume tokens/credits.
+      // Whole Page Translation is very heavy, so we warn the user to avoid surprise costs.
+      const providerId = this.settings.translationApi;
+      const provider = findProviderById(providerId);
+      
+      // Use the explicit manifest flag to identify potentially costly services.
+      // This is the clean-code way as it centralizes the configuration in the manifest.
+      const isTokenHeavy = provider && provider.consumesTokens;
+
+      this.logger.debug('Checking token usage warning:', { providerId, isTokenHeavy, isAuto: options.isAuto });
+
+      // Show warning for token-heavy providers. 
+      // We show it even for auto-translation to ensure user is aware, but limited to 2 times total.
+      if (isTokenHeavy) {
+        const confirmed = await this._confirmTokenUsage(providerId, provider.displayName);
+        if (!confirmed) {
+          this.logger.info('Page translation cancelled: User declined token usage');
+          this.isTranslating = false;
+          this.isAutoTranslating = false;
+          return { success: false, reason: ActionReasons.USER_CANCELLED };
+        }
+      }
 
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { 
         url: this.currentUrl, 
@@ -326,6 +350,55 @@ export class PageTranslationManager extends ResourceTracker {
     } finally {
       this._isCancelling = false;
     }
+  }
+
+  /**
+   * Shows a confirmation dialog for token-heavy providers (AI, DeepL) 
+   * to warn the user about potential high usage in Page Translation.
+   * 
+   * @param {string} providerId - The provider registry ID
+   * @param {string} providerName - Display name of the provider
+   * @returns {Promise<boolean>} True if user confirms, false if cancelled
+   * @private
+   */
+  async _confirmTokenUsage(providerId, providerName) {
+    const WARNING_KEY = 'wpt_token_usage_warning';
+    // Limit to 2 times as per requirements
+    if (!(await shouldShowProviderWarning(WARNING_KEY, 2))) {
+      this.logger.debug('Token usage warning limit reached, skipping confirmation');
+      return true;
+    }
+
+    this.logger.info(`Showing token usage warning for provider: ${providerName}`);
+
+    return new Promise(async (resolve) => {
+      const rawMessage = await getTranslationString('page_translation_token_warning');
+      const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
+        .replace('{provider}', providerName);
+      
+      const confirmLabel = await getTranslationString('page_translation_token_confirm');
+      const cancelLabel = await getTranslationString('page_translation_token_cancel');
+
+      const toastId = this.notificationManager.show(message, 'warning', Infinity, {
+        persistent: true,
+        actions: [
+          {
+            label: confirmLabel || 'Translate Anyway',
+            onClick: () => {
+              this.logger.info('User confirmed token usage');
+              resolve(true);
+            }
+          },
+          {
+            label: cancelLabel || 'Cancel',
+            onClick: () => {
+              this.logger.info('User cancelled translation due to token warning');
+              resolve(false);
+            }
+          }
+        ]
+      });
+    });
   }
 
   _handleFatalError(error, errorType, localizedMessage = null) {

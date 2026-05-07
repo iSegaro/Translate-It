@@ -197,6 +197,15 @@
   "options_page_title": {
     "message": "Settings"
   },
+  "page_translation_token_warning": {
+    "message": "The selected provider ({provider}) uses tokens/credits. Translating the entire page may consume a significant amount of your quota. Do you want to proceed?"
+  },
+  "page_translation_token_confirm": {
+    "message": "Translate Anyway"
+  },
+  "page_translation_token_cancel": {
+    "message": "Cancel"
+  },
   "options_description": {
     "message": "Translate Everywhere. Simply."
   },

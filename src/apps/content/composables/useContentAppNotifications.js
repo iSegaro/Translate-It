@@ -119,6 +119,7 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
             justifyContent: toastRTL.value ? 'flex-end' : 'flex-start'
           } 
         }, actions.map(action => h('button', {
+          'data-translate-it-ignore-toast-handler': 'true',
           style: {
             padding: '4px 8px',
             borderRadius: '4px',

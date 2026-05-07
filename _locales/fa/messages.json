@@ -197,6 +197,15 @@
   "options_page_title": {
     "message": "تنظیمات"
   },
+  "page_translation_token_warning": {
+    "message": "پرووایدر انتخاب شده ({provider}) از توکن/اعتبار استفاده می‌کند. ترجمه کامل صفحه ممکن است بخش زیادی از سهمیه شما را مصرف کند. آیا مایل به ادامه هستید؟"
+  },
+  "page_translation_token_confirm": {
+    "message": "به هر حال ترجمه کن"
+  },
+  "page_translation_token_cancel": {
+    "message": "انصراف"
+  },
   "options_description": {
     "message": "همه چیز رو ترجمه کنید، به سادگی."
   },

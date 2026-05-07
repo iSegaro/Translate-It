@@ -197,6 +197,15 @@
   "options_page_title": {
     "message": "設定"
   },
+  "page_translation_token_warning": {
+    "message": "選択されたプロバイダー（{provider}）はトークン/クレジットを消費します。ページ全体を翻訳すると、クォータを大幅に消費する可能性があります。続行しますか？"
+  },
+  "page_translation_token_confirm": {
+    "message": "翻訳を続行"
+  },
+  "page_translation_token_cancel": {
+    "message": "キャンセル"
+  },
   "options_description": {
     "message": "どこでも翻訳。シンプルに。"
   },
