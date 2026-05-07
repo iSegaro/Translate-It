@@ -197,6 +197,18 @@
   "options_page_title": {
     "message": "Settings"
   },
+  "page_translation_token_warning": {
+    "message": "The selected provider ({provider}) uses tokens/credits. Translating the entire page may consume a significant amount of your quota. Do you want to proceed?"
+  },
+  "page_translation_token_confirm": {
+    "message": "Translate Anyway"
+  },
+  "page_translation_token_cancel": {
+    "message": "Cancel"
+  },
+  "dont_show_again": {
+    "message": "Don't show again"
+  },
   "options_description": {
     "message": "Translate Everywhere. Simply."
   },
@@ -1993,6 +2005,12 @@
   },
   "whole_page_scroll_stop_delay_unit": {
     "message": "ms"
+  },
+  "whole_page_token_warning_label": {
+    "message": "Show warning for token-consuming providers"
+  },
+  "whole_page_token_warning_description": {
+    "message": "Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL)."
   },
   "ai_optimization_section_title": {
     "message": "AI Optimization"

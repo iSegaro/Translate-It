@@ -197,6 +197,18 @@
   "options_page_title": {
     "message": "تنظیمات"
   },
+  "page_translation_token_warning": {
+    "message": "پرووایدر انتخاب شده ({provider}) از توکن/اعتبار استفاده می‌کند. ترجمه کامل صفحه ممکن است بخش زیادی از سهمیه شما را مصرف کند. آیا مایل به ادامه هستید؟"
+  },
+  "page_translation_token_confirm": {
+    "message": "به هر حال ترجمه کن"
+  },
+  "page_translation_token_cancel": {
+    "message": "انصراف"
+  },
+  "dont_show_again": {
+    "message": "دیگر نشان نده"
+  },
   "options_description": {
     "message": "همه چیز رو ترجمه کنید، به سادگی."
   },
@@ -633,7 +645,7 @@
     "message": "ورودی دستی"
   },
   "mobile_input_source_text_label": {
-    "message": "متن مبدأ"
+    "message": "متن مبدا"
   },
   "mobile_input_placeholder": {
     "message": "اینجا تایپ کنید..."
@@ -1566,7 +1578,7 @@
     "message": "خطا در به‌روزرسانی اندازه فونت"
   },
   "font_validation_failed": {
-    "message": "تأیید اعتبار تنظیمات فونت با شکست مواجه شد"
+    "message": "تایید اعتبار تنظیمات فونت با شکست مواجه شد"
   },
   "search_fonts_placeholder": {
     "message": "جستجوی فونت..."
@@ -1992,7 +2004,13 @@
     "message": "تاخیر در ترجمه"
   },
   "whole_page_scroll_stop_delay_unit": {
-    "message": "میلی ثانیه"
+    "message": "ms"
+  },
+  "whole_page_token_warning_label": {
+    "message": "نمایش هشدار برای سرویس‌های مصرف‌کننده توکن"
+  },
+  "whole_page_token_warning_description": {
+    "message": "نمایش یک کادر تایید قبل از ترجمه کل صفحه، زمانی که سرویس انتخابی از اعتبار یا توکن شما استفاده می‌کند (مانند Gemini، OpenAI، DeepL)."
   },
   "ai_optimization_section_title": {
     "message": "بهینه‌سازی هوش مصنوعی"

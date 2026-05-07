@@ -197,6 +197,18 @@
   "options_page_title": {
     "message": "設定"
   },
+  "page_translation_token_warning": {
+    "message": "選択されたプロバイダー（{provider}）はトークン/クレジットを消費します。ページ全体を翻訳すると、クォータを大幅に消費する可能性があります。続行しますか？"
+  },
+  "page_translation_token_confirm": {
+    "message": "翻訳を続行"
+  },
+  "page_translation_token_cancel": {
+    "message": "キャンセル"
+  },
+  "dont_show_again": {
+    "message": "次回から表示しない"
+  },
   "options_description": {
     "message": "どこでも翻訳。シンプルに。"
   },
@@ -1992,7 +2004,13 @@
     "message": "翻訳遅延時間"
   },
   "whole_page_scroll_stop_delay_unit": {
-    "message": "ミリ秒"
+    "message": "ms"
+  },
+  "whole_page_token_warning_label": {
+    "message": "トークン消費プロバイダーの警告を表示する"
+  },
+  "whole_page_token_warning_description": {
+    "message": "プロバイダーがクレジットやトークンを消費する場合（Gemini、OpenAI、DeepLなど）、ページ全体を翻訳する前に確認ダイアログを表示します。"
   },
   "ai_optimization_section_title": {
     "message": "AIの最適化"

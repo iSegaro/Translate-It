@@ -429,6 +429,20 @@
               {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
             </span>
           </div>
+
+          <div 
+            id="WHOLE_PAGE_TOKEN_WARNING_HIDDEN"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="wholePageTokenWarningEnabled"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_token_warning_label') || 'Show token usage warning'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_token_warning_description') || 'Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL).' }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -524,6 +538,10 @@ const wholePageAutoTranslate = createSetting('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_C
 const wholePageShowOriginal = createSetting('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', false)
 const wholePageTranslateAfterScrollStop = createSetting('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', false)
 const wholePageScrollStopDelay = createSetting('WHOLE_PAGE_SCROLL_STOP_DELAY', 500)
+const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HIDDEN', false, {
+  transformGet: (v) => !v,
+  transformSet: (v) => !v
+})
 
 const fieldProvider = createProviderSetting(TranslationMode.Field)
 const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)

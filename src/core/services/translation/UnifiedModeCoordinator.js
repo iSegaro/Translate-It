@@ -103,12 +103,16 @@ export class UnifiedModeCoordinator {
         error: null
       };
     } catch (error) {
-      const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+      const { isFatalError, matchErrorToType, isCancellationError } = await import('@/shared/error-management/ErrorMatcher.js');
       const errorType = matchErrorToType(error);
       const isFatal = isFatalError(error);
 
-      // Log the specific failure
-      logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
+      // Log the specific failure - Use debug for cancellations, warn for actual errors
+      if (isCancellationError(error)) {
+        logger.debug(`[UnifiedCoordinator] Page translation cancelled: ${error.message}`);
+      } else {
+        logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
+      }
       
       const fallbackResults = segments.map(s => ({ text: s }));
       

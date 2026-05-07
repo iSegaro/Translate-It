@@ -301,6 +301,7 @@ export const CONFIG = {
   SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
   WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
   WHOLE_PAGE_SCROLL_STOP_DELAY: 500, // تاخیر برای توقف اسکرول (ms)
+  WHOLE_PAGE_TOKEN_WARNING_HIDDEN: false, // پنهان کردن هشدار مصرف توکن در ترجمه صفحه
 
   // --- Proxy Settings ---
   PROXY_ENABLED: false, // فعال بودن proxy
@@ -1364,6 +1365,13 @@ export const getWholePageScrollStopDelayAsync = async () => {
   return getSettingValueAsync(
     "WHOLE_PAGE_SCROLL_STOP_DELAY",
     CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY
+  );
+};
+
+export const getWholePageTokenWarningHiddenAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_TOKEN_WARNING_HIDDEN",
+    CONFIG.WHOLE_PAGE_TOKEN_WARNING_HIDDEN
   );
 };
 

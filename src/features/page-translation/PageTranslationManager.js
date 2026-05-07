@@ -1,3 +1,4 @@
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -15,6 +16,7 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Internal components
@@ -121,6 +123,29 @@ export class PageTranslationManager extends ResourceTracker {
 
     try {
       this.settings = await PageTranslationSettingsLoader.load(options);
+
+      // Token Usage Warning: AI and DeepL providers consume tokens/credits.
+      // Whole Page Translation is very heavy, so we warn the user to avoid surprise costs.
+      const providerId = this.settings.translationApi;
+      const provider = findProviderById(providerId);
+      
+      // Use the explicit manifest flag to identify potentially costly services.
+      // This is the clean-code way as it centralizes the configuration in the manifest.
+      const isTokenHeavy = provider && provider.consumesTokens;
+
+      this.logger.debug('Checking token usage warning:', { providerId, isTokenHeavy, isAuto: options.isAuto });
+
+      // Show warning for token-heavy providers. 
+      // We show it even for auto-translation to ensure user is aware, but limited to 2 times total.
+      if (isTokenHeavy) {
+        const confirmed = await this._confirmTokenUsage(providerId, provider.displayName);
+        if (!confirmed) {
+          this.logger.info('Page translation cancelled: User declined token usage');
+          this.isTranslating = false;
+          this.isAutoTranslating = false;
+          return { success: false, reason: ActionReasons.USER_CANCELLED };
+        }
+      }
 
       this._broadcastEvent(MessageActions.PAGE_TRANSLATE_START, { 
         url: this.currentUrl, 
@@ -326,6 +351,65 @@ export class PageTranslationManager extends ResourceTracker {
     } finally {
       this._isCancelling = false;
     }
+  }
+
+  /**
+   * Shows a confirmation dialog for token-heavy providers (AI, DeepL) 
+   * to warn the user about potential high usage in Page Translation.
+   * 
+   * @param {string} providerId - The provider registry ID
+   * @param {string} providerName - Display name of the provider
+   * @returns {Promise<boolean>} True if user confirms, false if cancelled
+   * @private
+   */
+  async _confirmTokenUsage(providerId, providerName) {
+    // 1. Check if the warning is permanently hidden in settings
+    if (this.settings.tokenWarningHidden) {
+      this.logger.debug('Token usage warning is permanently hidden in settings');
+      return true;
+    }
+
+    this.logger.info(`Showing token usage warning for provider: ${providerName}`);
+
+    return new Promise((resolve) => {
+      (async () => {
+        const rawMessage = await getTranslationString('page_translation_token_warning');
+        const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
+          .replace('{provider}', providerName);
+        
+        const confirmLabel = await getTranslationString('page_translation_token_confirm');
+        const cancelLabel = await getTranslationString('page_translation_token_cancel');
+        const dontShowAgainLabel = await getTranslationString('dont_show_again');
+
+        this.notificationManager.show(message, 'warning', Infinity, {
+          persistent: true,
+          hasCheckbox: true,
+          checkboxLabel: dontShowAgainLabel || "Don't show again",
+          actions: [
+            {
+              label: confirmLabel || 'Translate Anyway',
+              onClick: (dontShowAgain) => {
+                this.logger.info('User confirmed token usage', { dontShowAgain });
+                if (dontShowAgain) {
+                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                }
+                resolve(true);
+              }
+            },
+            {
+              label: cancelLabel || 'Cancel',
+              onClick: (dontShowAgain) => {
+                this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
+                if (dontShowAgain) {
+                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                }
+                resolve(false);
+              }
+            }
+          ]
+        });
+      })();
+    });
   }
 
   _handleFatalError(error, errorType, localizedMessage = null) {

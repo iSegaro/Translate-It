@@ -72,6 +72,7 @@ export class UnifiedTranslationService {
    */
   async handleTranslationRequest(message, sender) {
     const { messageId, data, context } = message;
+    logger.debug(`[UnifiedTranslationService] Received request: ${messageId}, context: ${context}, sessionId: ${data?.sessionId}`);
 
     if (data) {
       data.provider = await this._resolveEffectiveProvider(data, context);
@@ -125,7 +126,7 @@ export class UnifiedTranslationService {
       const request = this.requestTracker.createRequest({
         messageId, 
         data, 
-        sessionId: data?.sessionId || messageId, 
+        sessionId: data?.sessionId || message.sessionId || messageId, 
         sender, 
         timestamp: Date.now(),
         context

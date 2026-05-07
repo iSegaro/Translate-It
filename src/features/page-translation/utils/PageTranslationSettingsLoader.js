@@ -7,6 +7,7 @@ import {
   getWholePageShowOriginalOnHoverAsync, 
   getWholePageTranslateAfterScrollStopAsync,
   getWholePageScrollStopDelayAsync,
+  getWholePageTokenWarningHiddenAsync,
   getTranslationApiAsync, 
   getTargetLanguageAsync,
   getModeProvidersAsync,
@@ -43,6 +44,7 @@ export class PageTranslationSettingsLoader {
       getWholePageShowOriginalOnHoverAsync(),
       getWholePageTranslateAfterScrollStopAsync(),
       getWholePageScrollStopDelayAsync(),
+      getWholePageTokenWarningHiddenAsync(),
       getAIContextTranslationEnabledAsync()
     ]);
 
@@ -58,6 +60,7 @@ export class PageTranslationSettingsLoader {
       showOriginalOnHover,
       translateAfterScrollStop,
       scrollStopDelay,
+      tokenWarningHidden,
       aiContextTranslationEnabled
     ] = settingsData;
 
@@ -83,6 +86,7 @@ export class PageTranslationSettingsLoader {
       showOriginalOnHover: !!showOriginalOnHover,
       translateAfterScrollStop: !!translateAfterScrollStop,
       scrollStopDelay: Number(scrollStopDelay) || 500,
+      tokenWarningHidden: !!tokenWarningHidden,
       aiContextTranslationEnabled: !!aiContextTranslationEnabled,
       chunkSize: CONFIG.WHOLE_PAGE_CHUNK_SIZE,
       maxConcurrentFlushes: CONFIG.WHOLE_PAGE_MAX_CONCURRENT_REQUESTS

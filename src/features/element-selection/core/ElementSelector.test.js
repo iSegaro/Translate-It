@@ -60,7 +60,7 @@ describe('ElementSelector', () => {
 
     it('should identify toast/notification classes', () => {
       const el = document.createElement('div');
-      el.classList.add('translate-it-toast');
+      el.classList.add('sonner-toast');
       expect(selector.isOurElement(el)).toBe(true);
     });
 
