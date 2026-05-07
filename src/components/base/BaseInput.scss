@@ -67,6 +67,7 @@
   
   &::placeholder {
     color: var(--color-text-muted) !important;
+    opacity: 0.6 !important;
   }
 
   &[dir="ltr"]::placeholder {
