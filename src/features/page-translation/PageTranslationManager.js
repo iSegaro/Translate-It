@@ -1,3 +1,4 @@
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -12,7 +13,7 @@ import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { shouldShowProviderWarning, setWarningHidden, isWarningHidden } from '@/shared/utils/warning-manager.js';
+import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { findProviderById, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
@@ -362,11 +363,9 @@ export class PageTranslationManager extends ResourceTracker {
    * @private
    */
   async _confirmTokenUsage(providerId, providerName) {
-    const WARNING_KEY = 'wpt_token_usage_warning';
-    
-    // Check if the warning is permanently hidden by the user
-    if (await isWarningHidden(WARNING_KEY)) {
-      this.logger.debug('Token usage warning is permanently hidden');
+    // 1. Check if the warning is permanently hidden in settings
+    if (this.settings.tokenWarningHidden) {
+      this.logger.debug('Token usage warning is permanently hidden in settings');
       return true;
     }
 
@@ -391,7 +390,7 @@ export class PageTranslationManager extends ResourceTracker {
             onClick: (dontShowAgain) => {
               this.logger.info('User confirmed token usage', { dontShowAgain });
               if (dontShowAgain) {
-                setWarningHidden(WARNING_KEY, true);
+                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
               }
               resolve(true);
             }
@@ -401,7 +400,7 @@ export class PageTranslationManager extends ResourceTracker {
             onClick: (dontShowAgain) => {
               this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
               if (dontShowAgain) {
-                setWarningHidden(WARNING_KEY, true);
+                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
               }
               resolve(false);
             }
