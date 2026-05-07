@@ -12,7 +12,7 @@
 - Fixed an issue where mode-specific providers (Mobile, Context Menu, and Text Field) were not properly applied
 - Fixed incorrect Circuit Breaker trigger conditions
 - Fixed an issue where page translation would stop working after an error
-- Fixed an issue where Persian half-spaces (نیم‌فاصله) and connectors (ـ) were accidentally removed during page translation and element selection
+- Fixed formatting issues in translated text, including missing Persian half-spaces (نیم‌فاصله) and extra line breaks
 - Fixed issues with long Text-to-Speech translations and improved dictionary result formatting
 
 ##### Changed
