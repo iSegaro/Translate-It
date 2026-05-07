@@ -168,10 +168,15 @@
             :disabled="!extensionEnabled"
             :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
           />
-          <ConfigureShortcutButton
-            command-name="SELECT-ELEMENT-COMMAND"
-            :disabled="!extensionEnabled"
-          />
+          <div 
+            class="shortcut-picker-animated-wrapper"
+            :class="{ open: translateWithSelectElement }"
+          >
+            <ConfigureShortcutButton
+              command-name="SELECT-ELEMENT-COMMAND"
+              :disabled="!extensionEnabled"
+            />
+          </div>
         </div>
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}

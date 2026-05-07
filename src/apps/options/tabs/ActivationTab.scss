@@ -95,6 +95,10 @@
     }
   }
 
+  .configure-shortcut-button {
+    // No top margin here as it will be handled by the wrapper's alignment
+  }
+
   .shortcut-picker-animated-wrapper {
     display: flex !important;
     align-items: center !important;
@@ -106,6 +110,10 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     pointer-events: none !important;
     flex-shrink: 0 !important;
+
+    &:has(.configure-shortcut-button) {
+      margin-top: 14px !important;
+    }
 
     &.open {
       max-width: 220px !important;
