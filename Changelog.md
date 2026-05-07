@@ -5,6 +5,7 @@
 - Added support for reading **unlimited text length** in Text-to-Speech, allowing you to listen to long translations smoothly and without any interruptions.
 - Added [Vajehyab](https://vajehyab.com) Persian dictionary for specialized [`dictionary`](#/languages?highlight=DICTIONARY_SECTION) results
 - Added [`Prompt Preview`](#/prompt?highlight=PROMPT_PREVIEW_BUTTON) in the Prompt Settings tab
+- Added a confirmation notification before starting `Page Translation` when using paid providers. This can be configured in the [Settings page](#/activation?highlight=WHOLE_PAGE_TOKEN_WARNING_HIDDEN)
 
 ##### Fixed
 
