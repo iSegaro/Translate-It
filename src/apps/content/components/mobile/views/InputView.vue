@@ -106,7 +106,10 @@
           :class="{ 'ti-m-stop-btn': isLoading }"
           @click="isLoading ? handleCancel() : handleTranslate()"
         >
-          {{ isLoading ? t('mobile_selection_stop_label', 'توقف') : t('mobile_input_translate_btn', 'ترجمه') }}
+          <div class="ti-m-btn-content-stack">
+            <span :class="isLoading ? 'ti-m-btn-label-hidden' : 'ti-m-btn-label-visible'">{{ t('mobile_input_translate_btn', 'ترجمه') }}</span>
+            <span :class="!isLoading ? 'ti-m-btn-label-hidden' : 'ti-m-btn-label-visible'">{{ t('mobile_selection_stop_label', 'توقف') }}</span>
+          </div>
         </button>
       </div>
     </div>
