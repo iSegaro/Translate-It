@@ -9,10 +9,14 @@ List of features, enhancements, and ideas planned for future development.
 - **Code Cleanup**: Remove unused `compact` mode from `ProviderSelector.vue` to improve maintainability.
 - **Error Handling Refactoring**: The error handling logic is still inherited from a legacy version. Although the system currently functions correctly, it is architecturally unsound as both lower and upper layers are redundantly handling errors. Detailed information can be found in `ERROR_MANAGMENT_ISSUE.md`.
 
+- Integration Module: Gmail, Twitter, Goolge Docs
+
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
-
-- Integration Module: Gmail, Twitter, Goolge Docs
+- در FAB Desktop وقتی تلفظی در حال پخش است، اگه پاپ‌اپ رو باز کنم و ببندم، تلفظ قطع میشود.
+توی پاپ‌اپ کدی وجود داره که موقع بسته شدن، تلفظ های در حال پخش رو قطع میکنه.
+برای ایکه این مشکل پیش نیاد باید موقع تلفظ، کانتکس ارسال بشه، تا پاپ‌‌آپ فقط تلفظ های خودش رو قطع کنه.
+این مشکل احتمالا در سایدپنل هم وجود داره.
 
 - بهبود حالت نوشتن
 
