@@ -169,6 +169,7 @@
             :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
           />
           <div 
+            id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
             class="shortcut-picker-animated-wrapper"
             :class="{ open: translateWithSelectElement }"
           >
