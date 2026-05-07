@@ -12,6 +12,7 @@ vi.mock('@/config.js', () => ({
   getWholePageShowOriginalOnHoverAsync: vi.fn(),
   getWholePageTranslateAfterScrollStopAsync: vi.fn(),
   getWholePageScrollStopDelayAsync: vi.fn(),
+  getWholePageTokenWarningHiddenAsync: vi.fn(),
   getTranslationApiAsync: vi.fn(),
   getTargetLanguageAsync: vi.fn(),
   getModeProvidersAsync: vi.fn(),
@@ -48,6 +49,7 @@ describe('PageTranslationSettingsLoader', () => {
     config.getWholePageShowOriginalOnHoverAsync.mockResolvedValue(true);
     config.getWholePageTranslateAfterScrollStopAsync.mockResolvedValue(true);
     config.getWholePageScrollStopDelayAsync.mockResolvedValue(500);
+    config.getWholePageTokenWarningHiddenAsync.mockResolvedValue(false);
     config.getAIContextTranslationEnabledAsync.mockResolvedValue(true);
   });
 
@@ -65,6 +67,7 @@ describe('PageTranslationSettingsLoader', () => {
       showOriginalOnHover: true,
       translateAfterScrollStop: true,
       scrollStopDelay: 500,
+      tokenWarningHidden: false,
       aiContextTranslationEnabled: true,
       chunkSize: 100,
       maxConcurrentFlushes: 3
