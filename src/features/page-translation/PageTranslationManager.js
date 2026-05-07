@@ -16,7 +16,7 @@ import { getTranslationString } from '@/utils/i18n/i18n.js';
 import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
-import { findProviderById, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Internal components
@@ -371,42 +371,44 @@ export class PageTranslationManager extends ResourceTracker {
 
     this.logger.info(`Showing token usage warning for provider: ${providerName}`);
 
-    return new Promise(async (resolve) => {
-      const rawMessage = await getTranslationString('page_translation_token_warning');
-      const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
-        .replace('{provider}', providerName);
-      
-      const confirmLabel = await getTranslationString('page_translation_token_confirm');
-      const cancelLabel = await getTranslationString('page_translation_token_cancel');
-      const dontShowAgainLabel = await getTranslationString('dont_show_again');
+    return new Promise((resolve) => {
+      (async () => {
+        const rawMessage = await getTranslationString('page_translation_token_warning');
+        const message = (rawMessage || 'The selected provider ({provider}) uses tokens/credits. Do you want to proceed?')
+          .replace('{provider}', providerName);
+        
+        const confirmLabel = await getTranslationString('page_translation_token_confirm');
+        const cancelLabel = await getTranslationString('page_translation_token_cancel');
+        const dontShowAgainLabel = await getTranslationString('dont_show_again');
 
-      this.notificationManager.show(message, 'warning', Infinity, {
-        persistent: true,
-        hasCheckbox: true,
-        checkboxLabel: dontShowAgainLabel || "Don't show again",
-        actions: [
-          {
-            label: confirmLabel || 'Translate Anyway',
-            onClick: (dontShowAgain) => {
-              this.logger.info('User confirmed token usage', { dontShowAgain });
-              if (dontShowAgain) {
-                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+        this.notificationManager.show(message, 'warning', Infinity, {
+          persistent: true,
+          hasCheckbox: true,
+          checkboxLabel: dontShowAgainLabel || "Don't show again",
+          actions: [
+            {
+              label: confirmLabel || 'Translate Anyway',
+              onClick: (dontShowAgain) => {
+                this.logger.info('User confirmed token usage', { dontShowAgain });
+                if (dontShowAgain) {
+                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                }
+                resolve(true);
               }
-              resolve(true);
-            }
-          },
-          {
-            label: cancelLabel || 'Cancel',
-            onClick: (dontShowAgain) => {
-              this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
-              if (dontShowAgain) {
-                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+            },
+            {
+              label: cancelLabel || 'Cancel',
+              onClick: (dontShowAgain) => {
+                this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
+                if (dontShowAgain) {
+                  storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                }
+                resolve(false);
               }
-              resolve(false);
             }
-          }
-        ]
-      });
+          ]
+        });
+      })();
     });
   }
 
