@@ -136,7 +136,7 @@ export class BaseTranslateProvider extends BaseProvider {
       } catch (error) {
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
-        else logger.error(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
+        else logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
 
         await TraditionalStreamManager.streamChunkError(this.providerName, error, chunkIndex, messageId);
         await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error: { message: error.message, type: error.type || errorType } });

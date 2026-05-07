@@ -179,7 +179,7 @@ export class UnifiedTranslationCoordinator {
       const errorMessage = error?.message || (typeof error === 'string' ? error : 'Unknown error');
       
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        logger.warn(`Streaming translation coordination failed for ${messageId}: ${errorMessage}`);
+        logger.debug(`Streaming translation coordination failed for ${messageId}: ${errorMessage}`);
       }
 
       // Cancel streaming if it was registered

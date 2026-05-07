@@ -229,7 +229,7 @@ export class ProviderCoordinator {
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
       } else {
-        logger.error(`[Coordinator] Execution failed for ${providerName}:`, error.message);
+        logger.debug(`[Coordinator] Execution failed for ${providerName}:`, error.message);
       }
 
       if (isFatalError(error) || isTransient) throw error;

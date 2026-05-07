@@ -105,7 +105,7 @@ export class ContentScriptIntegration {
       if (isCancellationError(error)) {
         logger.debug(`Translation request cancelled:`, message.messageId);
       } else {
-        logger.error(`Translation request failed:`, error);
+        logger.debug(`Translation request failed:`, error);
       }
       throw error;
     }

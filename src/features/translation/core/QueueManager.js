@@ -372,7 +372,7 @@ export class QueueManager {
         if (isCancellationError(error)) {
           logger.debug(`Item ${item.id} cancelled by user`);
         } else {
-          logger.error(`Item ${item.id} failed permanently after ${item.attempts} attempts`, error);
+          logger.debug(`Item ${item.id} failed permanently after ${item.attempts} attempts:`, error);
         }
       }
     }

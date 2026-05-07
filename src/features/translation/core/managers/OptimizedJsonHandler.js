@@ -173,7 +173,7 @@ export class OptimizedJsonHandler {
             return; // Exit silently on cancellation
           }
           
-          logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+          logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
           hasErrors = true;
           lastError = batchError;
           

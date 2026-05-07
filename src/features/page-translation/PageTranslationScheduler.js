@@ -423,7 +423,7 @@ export class PageTranslationScheduler extends ResourceTracker {
 
       // Detect failure or Soft-Failure with error details
       if (!result?.success || result?.hasError) {
-        this.logger.warn('Batch failed:', result?.error || 'Unknown error');
+        this.logger.debug('Batch failed:', result?.error || 'Unknown error');
         const rawErrorMessage = result?.error || '';
         const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
           ? new Error(rawErrorMessage || 'Extension context invalidated')

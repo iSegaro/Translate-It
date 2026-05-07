@@ -165,7 +165,7 @@ export class BaseAIProvider extends BaseProvider {
       const isFatal = isFatalError(error) || isFatalError(errorType);
       const isTransient = isTransientError(error) || isTransientError(errorType);
 
-      logger.error(`[${this.providerName}] Batch translation failed:`, error.message);
+      logger.debug(`[${this.providerName}] Batch translation failed:`, error.message);
       
       // CRITICAL FALLBACK: ONLY return clean original text if the error is non-fatal AND non-transient.
       // If it is transient (Network, 429, 5xx), we MUST throw so QueueManager can retry.
