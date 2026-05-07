@@ -22,7 +22,7 @@ export const NewlineManager = {
   protect(text) {
     if (!text || typeof text !== 'string') return text;
 
-    logger.debug('Protecting newlines in text', { length: text.length });
+    // logger.debug('Protecting newlines in text', { length: text.length });
 
     // 1. Replace double (or more) newlines first
     let processed = text.replace(/\n\n+/g, (match) => {
