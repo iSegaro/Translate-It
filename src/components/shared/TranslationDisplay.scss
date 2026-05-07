@@ -53,14 +53,14 @@
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: visible !important;
+    overflow: hidden !important;
 
     .ti-translation-content {
-      height: 100% !important;
       flex-grow: 1 !important;
+      min-height: 0 !important;
       border: none !important;
       border-radius: 8px !important;
-      padding: 42px 5px 0px 5px !important;
+      padding: 42px 8px 12px 8px !important;
     }
   }
 
