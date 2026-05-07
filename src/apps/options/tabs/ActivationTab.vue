@@ -162,11 +162,17 @@
         </div>
       </template>
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateWithSelectElement"
-          :disabled="!extensionEnabled"
-          :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
-        />
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="translateWithSelectElement"
+            :disabled="!extensionEnabled"
+            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+          />
+          <ConfigureShortcutButton
+            command-name="SELECT-ELEMENT-COMMAND"
+            :disabled="!extensionEnabled"
+          />
+        </div>
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
         </span>
@@ -451,29 +457,34 @@
 
 <script setup>
 import './ActivationTab.scss'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
+import { useBrowserAPI } from '@/composables/core/useBrowserAPI.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
-import { onMounted, onUnmounted } from 'vue'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
+import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 const settingsStore = useSettingsStore()
 const { highlightElement } = useHighlightManager()
 const { t } = useUnifiedI18n()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
+const { api: browserAPI } = useBrowserAPI('Options:ActivationTab')
+
+// --- Actions ---
 
 // --- State ---
 // --- Settings Definitions ---
@@ -569,7 +580,7 @@ const handleValidationFeedback = (e) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
 })
 
