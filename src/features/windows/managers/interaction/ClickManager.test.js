@@ -173,15 +173,25 @@ describe('ClickManager', () => {
       expect(shouldDismiss).toBe(false);
     });
 
-    it('should dismiss if clicking outside everything', () => {
+    it('should NOT dismiss if clicking outside everything', () => {
       vi.mocked(ElementDetectionService.isUIElement).mockReturnValue(false);
       const target = document.createElement('div');
       document.body.appendChild(target);
-      
+
       const event = { target };
-      
+
       const shouldDismiss = clickManager._shouldDismissOnOutsideClick(event);
       expect(shouldDismiss).toBe(true);
+    });
+
+    it('should NOT dismiss if translation window was just recently dragged', () => {
+      window.__TRANSLATION_WINDOW_JUST_DRAGGED = true;
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const event = { target };
+
+      const shouldDismiss = clickManager._shouldDismissOnOutsideClick(event);
+      expect(shouldDismiss).toBe(false);
     });
 
     it('should trigger onOutsideClick handler when it should dismiss', () => {

@@ -577,6 +577,12 @@ export class WindowsManager extends ResourceTracker {
       // Handle icon mode or visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
 
+      // Skip if currently dragging or just finished dragging a translation window
+      // This prevents accidental dismissal after fast drag operations
+      if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) {
+        return;
+      }
+
       // Don't dismiss during Shift+Click operations
       if (this._isInShiftClickOperation || window.translateItShiftClickOperation) {
         return;
@@ -1109,6 +1115,12 @@ export class WindowsManager extends ResourceTracker {
    * Handle cross-frame outside click
    */
   async _handleCrossFrameOutsideClick() {
+    // Prevent dismissal during or immediately after drag operations
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) {
+      this.logger.debug('Cross-frame outside click ignored due to window dragging');
+      return;
+    }
+
     if (this.state.hasActiveElements) {
       await this.dismiss(true);
     }
@@ -1119,6 +1131,12 @@ export class WindowsManager extends ResourceTracker {
    */
   async _handleOutsideClick() {
     if (this.state.shouldPreventDismissal) return;
+
+    // Prevent dismissal during or immediately after drag operations
+    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) {
+      this.logger.debug('Outside click ignored due to window dragging in _handleOutsideClick');
+      return;
+    }
 
     // Check for drag operations - get reference to textSelectionManager if available
     let textSelectionManager = null;
