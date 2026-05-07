@@ -303,7 +303,7 @@ export const AIResponseParser = {
       text = NewlineManager.restore(text);
     }
 
-    return { text: String(text || ''), id };
+    return { text: String(text || '').trim(), id };
   },
 
   /**

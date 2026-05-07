@@ -50,10 +50,12 @@ export const TraditionalTextProcessor = {
     
     // 4. Remove isolated remnants (Safety layer for malformed delimiters)
     // We only strip dashes and dots if they are clearly part of a broken [[ or ]] marker.
+    // 4. Remove isolated remnants (Safety layer for malformed delimiters)
+    // We only strip dashes and dots if they are clearly part of a broken [[ or ]] marker.
     scrubbed = scrubbed.replace(/\[\[[\s.-]+/, '');
     scrubbed = scrubbed.replace(/[\s.-]+\]\]/, '');
     
-    return scrubbed;
+    return scrubbed.trim();
   },
 
   /**

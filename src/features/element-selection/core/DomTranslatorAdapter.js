@@ -359,6 +359,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const isFunctionallyIdentical = normalizeForComparison(finalTranslation) === normalizeForComparison(trimmedOriginal);
     if (isFunctionallyIdentical) {
       finalTranslation = trimmedOriginal;
+    } else {
+      finalTranslation = finalTranslation.trim();
     }
     
     const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);

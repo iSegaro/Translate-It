@@ -81,11 +81,11 @@ export class PageTranslationBridge extends ResourceTracker {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
         const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         
-        return leadingWhitespace + mark + translated + trailingWhitespace;
+        return leadingWhitespace + mark + translated.trim() + trailingWhitespace;
       }
       
       // Use trimmedText if functionally identical to preserve ZWNJ
-      return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated || trimmedText)) + trailingWhitespace;
+      return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated ? translated.trim() : trimmedText)) + trailingWhitespace;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);
