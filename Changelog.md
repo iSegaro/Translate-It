@@ -1,3 +1,11 @@
+#### v1.14.1 – Released on X XX, 2026
+
+##### Fixed
+
+- **[#113](https://github.com/iSegaro/Translate-It/issues/113)**: Fixed an issue where the translation window could close unexpectedly when dragging it quickly
+
+---
+
 #### v1.14.0 – Released on May 07, 2026
 
 ##### Added
