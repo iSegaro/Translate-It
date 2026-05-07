@@ -22,9 +22,11 @@
             />
             <BaseButton
               :loading="isExporting"
+              variant="primary"
               class="export-button"
               @click="exportSettings"
             >
+              <span class="button-icon">📤</span>
               {{ t('export_settings_button') || 'Export Settings' }}
             </BaseButton>
           </div>
@@ -59,9 +61,11 @@
             />
             <BaseButton
               :loading="isImporting"
+              variant="primary"
               class="import-button"
               @click="importSettings"
             >
+              <span class="button-icon">📥</span>
               {{ t('import_settings_button') || 'Import Settings' }}
             </BaseButton>
           </div>
