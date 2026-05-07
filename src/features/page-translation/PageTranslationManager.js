@@ -12,7 +12,7 @@ import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
-import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
+import { shouldShowProviderWarning, setWarningHidden, isWarningHidden } from '@/shared/utils/warning-manager.js';
 import { delay } from '@/core/helpers.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { findProviderById, ProviderCategories } from '@/features/translation/providers/ProviderManifest.js';
@@ -363,9 +363,10 @@ export class PageTranslationManager extends ResourceTracker {
    */
   async _confirmTokenUsage(providerId, providerName) {
     const WARNING_KEY = 'wpt_token_usage_warning';
-    // Limit to 2 times as per requirements
-    if (!(await shouldShowProviderWarning(WARNING_KEY, 2))) {
-      this.logger.debug('Token usage warning limit reached, skipping confirmation');
+    
+    // Check if the warning is permanently hidden by the user
+    if (await isWarningHidden(WARNING_KEY)) {
+      this.logger.debug('Token usage warning is permanently hidden');
       return true;
     }
 
@@ -378,21 +379,30 @@ export class PageTranslationManager extends ResourceTracker {
       
       const confirmLabel = await getTranslationString('page_translation_token_confirm');
       const cancelLabel = await getTranslationString('page_translation_token_cancel');
+      const dontShowAgainLabel = await getTranslationString('dont_show_again');
 
-      const toastId = this.notificationManager.show(message, 'warning', Infinity, {
+      this.notificationManager.show(message, 'warning', Infinity, {
         persistent: true,
+        hasCheckbox: true,
+        checkboxLabel: dontShowAgainLabel || "Don't show again",
         actions: [
           {
             label: confirmLabel || 'Translate Anyway',
-            onClick: () => {
-              this.logger.info('User confirmed token usage');
+            onClick: (dontShowAgain) => {
+              this.logger.info('User confirmed token usage', { dontShowAgain });
+              if (dontShowAgain) {
+                setWarningHidden(WARNING_KEY, true);
+              }
               resolve(true);
             }
           },
           {
             label: cancelLabel || 'Cancel',
-            onClick: () => {
-              this.logger.info('User cancelled translation due to token warning');
+            onClick: (dontShowAgain) => {
+              this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
+              if (dontShowAgain) {
+                setWarningHidden(WARNING_KEY, true);
+              }
               resolve(false);
             }
           }

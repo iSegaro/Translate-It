@@ -26,6 +26,8 @@ export default class NotificationManager extends ResourceTracker {
    * @param {number|null} [duration=4000] The duration in ms. Use Infinity for persistent notifications.
    * @param {Object} [options={}] Additional options for the notification.
    * @param {boolean} [options.persistent=false] Whether the notification should be persistent.
+   * @param {boolean} [options.hasCheckbox=false] Whether to show a checkbox.
+   * @param {string} [options.checkboxLabel=''] Label for the checkbox.
    * @param {Array} [options.actions=[]] Array of action objects {label, eventName, onClick, handler}.
    * @param {string} [options.id] Optional specific ID for the notification.
    * @returns {string} A unique ID for the notification.
@@ -39,6 +41,8 @@ export default class NotificationManager extends ResourceTracker {
       type,
       duration: options.persistent || duration === Infinity || duration === 0 ? Infinity : duration,
       persistent: options.persistent || duration === Infinity || duration === 0 || false,
+      hasCheckbox: options.hasCheckbox || false,
+      checkboxLabel: options.checkboxLabel || '',
       actions: options.actions || []
     };
 

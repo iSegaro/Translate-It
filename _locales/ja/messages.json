@@ -206,6 +206,9 @@
   "page_translation_token_cancel": {
     "message": "キャンセル"
   },
+  "dont_show_again": {
+    "message": "次回から表示しない"
+  },
   "options_description": {
     "message": "どこでも翻訳。シンプルに。"
   },

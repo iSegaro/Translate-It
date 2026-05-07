@@ -206,6 +206,9 @@
   "page_translation_token_cancel": {
     "message": "Cancel"
   },
+  "dont_show_again": {
+    "message": "Don't show again"
+  },
   "options_description": {
     "message": "Translate Everywhere. Simply."
   },

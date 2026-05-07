@@ -27,3 +27,34 @@ export async function shouldShowProviderWarning(providerId, limit = 3) {
     return true; // Default to showing if error occurs
   }
 }
+
+/**
+ * Checks if a specific warning is permanently hidden.
+ * @param {string} warningKey - Unique key for the warning
+ * @returns {Promise<boolean>} - True if the warning is hidden
+ */
+export async function isWarningHidden(warningKey) {
+  try {
+    const key = `warning_hidden_${warningKey.toLowerCase()}`;
+    const result = await storageManager.get({ [key]: false });
+    return !!result[key];
+  } catch (error) {
+    logger.error('Error checking if warning is hidden:', error);
+    return false;
+  }
+}
+
+/**
+ * Permanently hides or shows a specific warning.
+ * @param {string} warningKey - Unique key for the warning
+ * @param {boolean} hidden - Whether to hide the warning (default: true)
+ */
+export async function setWarningHidden(warningKey, hidden = true) {
+  try {
+    const key = `warning_hidden_${warningKey.toLowerCase()}`;
+    await storageManager.set({ [key]: !!hidden });
+    logger.info(`Warning "${warningKey}" visibility set to: ${!hidden}`);
+  } catch (error) {
+    logger.error('Error setting warning visibility:', error);
+  }
+}

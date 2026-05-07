@@ -206,6 +206,9 @@
   "page_translation_token_cancel": {
     "message": "انصراف"
   },
+  "dont_show_again": {
+    "message": "دیگر نشان نده"
+  },
   "options_description": {
     "message": "همه چیز رو ترجمه کنید، به سادگی."
   },
