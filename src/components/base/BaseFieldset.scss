@@ -41,6 +41,13 @@
     position: absolute;
     top: -1px; /* Align precisely with the border line */
     right: 1.25rem;
+
+    /* RTL Support: Move actions to the left when direction is RTL */
+    :is([dir="rtl"], html[dir="rtl"], .rtl) & {
+      right: auto;
+      left: 1.25rem;
+    }
+
     transform: translateY(-50%);
     background: var(--color-background);
     padding: 0 0.5rem;
