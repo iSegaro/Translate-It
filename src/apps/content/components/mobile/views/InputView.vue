@@ -28,14 +28,14 @@
       <span
         class="ti-m-header-title"
         @click="goBack"
-      >{{ t('mobile_input_header_title') || 'Manual Input' }}</span>
+      >{{ t('mobile_input_header_title', 'Manual Input') }}</span>
     </div>
 
     <!-- Input Card -->
     <div class="ti-m-input-card">
       <div class="ti-m-card-label-row">
         <div class="ti-m-card-label">
-          {{ t('mobile_input_source_text_label') || 'Source Text' }}
+          {{ t('mobile_input_source_text_label', 'Source Text') }}
         </div>
         
         <div class="ti-m-card-actions">
@@ -47,7 +47,7 @@
               src="@/icons/ui/paste.png"
               class="ti-m-icon-img-small"
             >
-            {{ t('action_paste_from_clipboard') || 'Paste' }}
+            {{ t('action_paste_from_clipboard', 'Paste') }}
           </button>
           
           <button 
@@ -55,14 +55,14 @@
             class="ti-m-input-action-btn ti-m-clear-btn" 
             @click="inputText = ''"
           >
-            {{ t('mobile_input_clear_btn') || 'Clear' }}
+            {{ t('mobile_input_clear_btn', 'Clear') }}
           </button>
         </div>
       </div>
       
       <textarea
         v-model="inputText"
-        :placeholder="t('mobile_input_placeholder') || 'Type here...'"
+        :placeholder="t('mobile_input_placeholder', 'Type here...')"
         :dir="inputDir"
         class="ti-m-textarea"
         @focus="onFocus"
@@ -79,10 +79,10 @@
           compact
           :provider="currentProvider"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
-          :source-title="t('popup_source_language_title') || 'Source'"
-          :target-title="t('popup_target_language_title') || 'Target'"
-          :swap-title="t('popup_swap_languages_title') || 'Swap'"
-          :auto-detect-label="t('auto_detect') || 'Auto-Detect'"
+          :source-title="t('popup_source_language_title', 'Source')"
+          :target-title="t('popup_target_language_title', 'Target')"
+          :swap-title="t('popup_swap_languages_title', 'Swap')"
+          :auto-detect-label="t('auto_detect', 'Auto-Detect')"
         />
       </div>
       
@@ -94,6 +94,7 @@
             mode="mobile"
             :is-global="false"
             :show-sync="false"
+            only-configured
             :loading="isLoading"
             @cancel="handleCancel"
           />
@@ -105,7 +106,10 @@
           :class="{ 'ti-m-stop-btn': isLoading }"
           @click="isLoading ? handleCancel() : handleTranslate()"
         >
-          {{ isLoading ? (t('popup_stop_button_text') || 'توقف') : (t('mobile_input_translate_btn') || 'ترجمه') }}
+          <div class="ti-m-btn-content-stack">
+            <span :class="isLoading ? 'ti-m-btn-label-hidden' : 'ti-m-btn-label-visible'">{{ t('mobile_input_translate_btn', 'ترجمه') }}</span>
+            <span :class="!isLoading ? 'ti-m-btn-label-hidden' : 'ti-m-btn-label-visible'">{{ t('mobile_selection_stop_label', 'توقف') }}</span>
+          </div>
         </button>
       </div>
     </div>
@@ -123,8 +127,9 @@
           :is-loading="isLoading"
           :tts-status="tts.ttsState.value"
           :error="isError ? resultText : ''"
-          :copy-title="t('mobile_selection_copy_tooltip') || 'Copy'"
-          :tts-title="t('mobile_selection_speak_tooltip') || 'Speak'"
+          :is-dictionary="isDictionary"
+          :copy-title="t('mobile_selection_copy_tooltip', 'Copy')"
+          :tts-title="t('mobile_selection_speak_tooltip', 'Speak')"
           @text-copied="onTextCopied"
           @tts-started="onSpeak"
           @tts-stopped="tts.stop()"
@@ -145,7 +150,7 @@ import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
@@ -171,7 +176,14 @@ const currentProvider = ref(settingsStore.settings.TRANSLATION_API || 'google')
 const isLoading = ref(false)
 const currentMessageId = ref(null)
 const resultText = ref(mobileStore.selectionData.error || mobileStore.selectionData.translation || '')
+const resultMode = ref(mobileStore.selectionData.mode || null)
 const isError = ref(!!mobileStore.selectionData.error)
+
+const isDictionary = computed(() => {
+  return resultMode.value === TranslationMode.Dictionary_Translation || 
+         (resultText.value && resultText.value.includes('**')) ||
+         (resultText.value && resultText.value.startsWith('###'));
+});
 
 const isTranslateDisabled = computed(() => {
   const text = inputText.value || '';
@@ -241,13 +253,21 @@ const handleTranslate = async () => {
     const response = await sendMessage(message);
     
     if (response && response.success) {
-      const translated = response.translatedText || (response.data && response.data.translatedText) || (response.result && response.result.translatedText);
+      const resultData = response.result || response.data || response;
+      const translated = resultData.translatedText;
       if (translated) {
         logger.debug('Manual translation successful');
         resultText.value = translated;
+        resultMode.value = resultData.mode;
+        
+        // Update store for persistence across view changes
+        mobileStore.updateSelectionData({
+          translation: translated,
+          mode: resultData.mode
+        });
       } else {
         logger.info('Manual translation returned empty result');
-        resultText.value = t('mobile_input_no_result_error') || "No translation found.";
+        resultText.value = t('mobile_input_no_result_error', "No translation found.");
       }
     } else {
       // Check if it was cancelled
@@ -272,7 +292,7 @@ const handleTranslate = async () => {
     if (ExtensionContextManager.isContextError(error)) {
       mobileStore.closeSheet();
       ExtensionContextManager.handleContextError(error, 'mobile-input:translate');
-      resultText.value = t('mobile_input_context_error') || "Extension context unavailable. Please refresh the page.";
+      resultText.value = t('mobile_input_context_error', "Extension context unavailable. Please refresh the page.");
     } else {
       isError.value = true;
       const errorInfo = await getErrorForDisplay(error, 'mobile-input');
@@ -300,7 +320,12 @@ const handleCancel = async () => {
   }
 }
 
-const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message') || 'Copied', type: 'success' }) }
-const onSpeak = async (data) => { const text = data?.text || resultText.value; const lang = data?.language || targetLang.value; if (text) await tts.speak(text, lang); }
+const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_input_copied_message', 'Copied'), type: 'success' }) }
+const onSpeak = async (data) => { 
+  const text = data?.text || resultText.value; 
+  const lang = data?.language || targetLang.value; 
+  const isDict = data?.isDictionary ?? isDictionary.value;
+  if (text) await tts.speak(text, lang, { isDictionary: isDict }); 
+}
 const onHistory = () => { mobileStore.setView(MOBILE_CONSTANTS.VIEWS.HISTORY); mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL); }
 </script>

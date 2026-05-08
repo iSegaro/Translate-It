@@ -80,6 +80,12 @@ export function useHighlightManager() {
         if (id.startsWith('BILINGUAL_')) return 'bilingual';
         if (id.startsWith('AI_OPT_')) return 'ai';
         if (id.startsWith('OPTIMIZATION_')) return 'api';
+        
+        // Provider specific settings (API Keys, URLs, Models) should open the 'api' (Service) accordion
+        if (id.includes('_API_KEY') || id.includes('_API_URL') || id.includes('_API_MODEL') || id === 'API_KEY' || id === 'GEMINI_MODEL') {
+          return 'api';
+        }
+        
         return null;
       };
 

@@ -27,7 +27,8 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
   };
 
   /**
-   * Initializes global notification tracking sets
+   * Initializes global notification tracking sets.
+   * Ensures necessary data structures exist on the window object for cross-frame coordination.
    */
   const initializeGlobalTrackers = () => {
     // Use a global Set to prevent duplicate notifications
@@ -39,37 +40,137 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
     if (!window.translateItDismissedNotifications) {
       window.translateItDismissedNotifications = new Set();
     }
+
+    // Track checkbox states for interactive notifications
+    if (!window.translateItToastStates) {
+      window.translateItToastStates = new Map();
+    }
   };
 
   /**
-   * Main handler for showing notifications
+   * Checks if a notification is a duplicate within a recent window (1s).
+   * 
+   * @param {string} message - Notification message
+   * @param {string} type - Notification type
+   * @returns {boolean} True if it's a duplicate
    */
-  const handleShowNotification = async (detail) => {
-    // Only process notifications if this frame is responsible for showing global UI
-    if (!shouldShowGlobalUI.value) return;
-
-    // Create a unique key for this notification
-    const notificationKey = `${detail.message}-${detail.type}-${Date.now()}`;
-
-    // Check if this notification was already shown recently (within 1 second)
+  const isDuplicateNotification = (message, type) => {
     const recentKeys = Array.from(window.translateItShownNotifications).filter(key => {
       const timestamp = parseInt(key.split('-').pop());
       return Date.now() - timestamp < 1000; // 1 second window
     });
 
-    const isDuplicate = recentKeys.some(key =>
-      key.startsWith(`${detail.message}-${detail.type}`)
+    return recentKeys.some(key =>
+      key.startsWith(`${message}-${type}`)
     );
+  };
+
+  /**
+   * Builds the interactive description VNode containing checkboxes and action buttons.
+   * This allows for complex layouts within the standard toast notification.
+   * 
+   * @param {Object} detail - Notification detail object
+   * @returns {VNode|null} The rendered actions or null
+   */
+  const renderToastActions = (detail) => {
+    const { id, actions, hasCheckbox, checkboxLabel } = detail;
+    const children = [];
+
+    // 1. Render Checkbox if requested (e.g., "Don't show again")
+    if (hasCheckbox) {
+      children.push(h('div', {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          marginBottom: '8px',
+          fontSize: '12px',
+          color: '#666',
+          cursor: 'pointer',
+          userSelect: 'none'
+        },
+        onClick: (e) => {
+          e.stopPropagation();
+          const state = window.translateItToastStates.get(id);
+          if (state) {
+            state.checkboxChecked = !state.checkboxChecked;
+            const checkbox = e.currentTarget.querySelector('input');
+            if (checkbox) checkbox.checked = state.checkboxChecked;
+          }
+        }
+      }, [
+        h('input', {
+          type: 'checkbox',
+          style: { cursor: 'pointer', margin: 0 },
+          onClick: (e) => e.stopPropagation(), // Prevent double toggle
+          onChange: (e) => {
+            const state = window.translateItToastStates.get(id);
+            if (state) state.checkboxChecked = e.target.checked;
+          }
+        }),
+        h('span', checkboxLabel)
+      ]));
+    }
+
+    // 2. Render Action Buttons (Multi-action support)
+    if (actions && actions.length > 0) {
+      children.push(h('div', { 
+        style: { 
+          display: 'flex', 
+          gap: '8px', 
+          justifyContent: toastRTL.value ? 'flex-end' : 'flex-start'
+        } 
+      }, actions.map(action => h('button', {
+        'data-translate-it-ignore-toast-handler': 'true',
+        style: {
+          padding: '4px 8px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          cursor: 'pointer',
+          border: '1px solid #ddd',
+          backgroundColor: '#fff',
+          color: '#333'
+        },
+        onClick: (event) => {
+          if (event) event.preventDefault();
+          const state = window.translateItToastStates.get(id);
+          const checkboxChecked = state ? state.checkboxChecked : false;
+          
+          if (action.handler) action.handler(checkboxChecked);
+          if (action.onClick) action.onClick(checkboxChecked);
+          if (action.eventName && window.pageEventBus) {
+            window.pageEventBus.emit(action.eventName, { checkboxChecked });
+          }
+          toast.dismiss(id);
+        }
+      }, action.label))));
+    }
+
+    return children.length > 0 ? h('div', { style: { marginTop: '8px' } }, children) : null;
+  };
+
+  /**
+   * Main handler for showing notifications.
+   * Coordinates duplication check, state management, and final display logic.
+   * 
+   * @param {Object} detail - Notification details from the event bus
+   */
+  const handleShowNotification = async (detail) => {
+    // Only process notifications if this frame is responsible for showing global UI
+    if (!shouldShowGlobalUI.value) return;
+
+    const { id, message, type, duration, persistent } = detail;
 
     // Skip duplicate check for updates
-    if (isDuplicate && !detail.isUpdate) {
+    if (isDuplicateNotification(message, type) && !detail.isUpdate) {
       return;
     }
 
-    // Add to set and show notification
+    // Add to tracking set
+    const notificationKey = `${message}-${type}-${Date.now()}`;
     window.translateItShownNotifications.add(notificationKey);
 
-    // Clean up old entries (keep only last 10)
+    // Clean up old entries (keep only last 10) to manage memory
     if (window.translateItShownNotifications.size > 10) {
       const entries = Array.from(window.translateItShownNotifications);
       entries.slice(0, -10).forEach(key => {
@@ -77,7 +178,9 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       });
     }
 
-    const { id, message, type, duration, actions, persistent } = detail;
+    // Initialize state management for this specific toast
+    window.translateItToastStates.set(id, { checkboxChecked: false });
+
     const toastFn = toastMap[type] || toast.info;
 
     // CRITICAL: Use reactive RTL value (SYNC - optimal performance)
@@ -89,69 +192,23 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       style: {
         direction: detectedDirection,
         textAlign: toastRTL.value ? 'right' : 'left'
-      }
+      },
+      // Use description slot for custom layout (checkbox + buttons)
+      description: renderToastActions(detail)
     };
-
-    // Enhanced Multi-Action Support
-    if (actions && actions.length > 0) {
-      if (actions.length === 1) {
-        // Standard single action
-        toastOptions.action = {
-          label: actions[0].label,
-          onClick: (event) => {
-            if (event) event.preventDefault();
-            if (actions[0].handler) actions[0].handler();
-            if (actions[0].onClick) actions[0].onClick();
-            if (actions[0].eventName && window.pageEventBus) {
-              window.pageEventBus.emit(actions[0].eventName);
-            }
-            toast.dismiss(id);
-          }
-        };
-      } else {
-        // Multi-action: Render custom VNode for actions
-        // We use the 'description' slot to render additional buttons or a custom layout
-        toastOptions.description = h('div', { 
-          style: { 
-            display: 'flex', 
-            gap: '8px', 
-            marginTop: '8px',
-            justifyContent: toastRTL.value ? 'flex-end' : 'flex-start'
-          } 
-        }, actions.map(action => h('button', {
-          style: {
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: 'pointer',
-            border: '1px solid #ddd',
-            backgroundColor: '#fff',
-            color: '#333'
-          },
-          onClick: (event) => {
-            if (event) event.preventDefault();
-            if (action.handler) action.handler();
-            if (action.onClick) action.onClick();
-            if (action.eventName && window.pageEventBus) {
-              window.pageEventBus.emit(action.eventName);
-            }
-            toast.dismiss(id);
-          }
-        }, action.label)));
-      }
-    }
     
     toastFn(message, toastOptions);
   };
 
   /**
-   * Main handler for dismissing specific notifications
+   * Main handler for dismissing specific notifications.
+   * Ensures clean state removal for tracking and interactive data.
+   * 
+   * @param {Object} detail - Dismissal details containing the ID
    */
   const handleDismissNotification = (detail) => {
     logger.info('Received dismiss_notification event:', detail);
 
-    // Standardized dismissal for all types (including select-element)
-    
     // Prevent double dismissal
     if (window.translateItDismissedNotifications.has(detail.id)) {
       logger.debug('Notification already dismissed, ignoring:', detail.id);
@@ -160,13 +217,16 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
 
     window.translateItDismissedNotifications.add(detail.id);
 
-    // Force dismiss - try multiple methods to ensure cleanup
+    // Force dismiss
     toast.dismiss(detail.id);
 
-    // Clean up after a delay
+    // Clean up tracking sets after a delay to allow animations to finish
     setTimeout(() => {
       if (window.translateItDismissedNotifications) {
         window.translateItDismissedNotifications.delete(detail.id);
+      }
+      if (window.translateItToastStates) {
+        window.translateItToastStates.delete(detail.id);
       }
     }, 2000);
   };
@@ -180,7 +240,6 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       tracker.addEventListener(pageEventBus, 'dismiss_notification', handleDismissNotification);
       tracker.addEventListener(pageEventBus, 'dismiss_all_notifications', () => {
         logger.info('Received dismiss_all_notifications event');
-        // Dismiss all notifications
         toast.dismiss();
       });
     }

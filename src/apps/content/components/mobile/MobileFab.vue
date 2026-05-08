@@ -17,15 +17,25 @@
     @click="onMobileFabClick"
     @mousedown="onFabDragStart"
     @touchstart="onFabDragStart"
-    @touchmove="onFabDragMove"
-    @touchend="onFabDragEnd"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
   >
-    <img 
-      src="@/icons/extension/extension_icon_64.svg" 
-      :alt="t('mobile_fab_alt') || 'Translate'" 
-    >
+    <div class="mobile-fab-inner">
+      <img 
+        src="@/icons/extension/extension_icon_64.svg" 
+        :alt="t('mobile_fab_alt') || 'Translate'" 
+      >
+
+      <!-- Page Translation Status Badge -->
+      <Transition
+        name="fade-scale"
+      >
+        <PageTranslationStatus 
+          v-if="pageTranslationStatus.isActive" 
+          mode="desktop-fab" 
+        />
+      </Transition>
+    </div>
   </div>
 </template>
 
@@ -36,13 +46,16 @@ import { useMobileStore } from '@/store/modules/mobile.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
 const { t } = useUnifiedI18n();
@@ -62,6 +75,26 @@ const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
 const isViewportUnstable = ref(false);
+
+// Page Translation Status (Mirroring Desktop FAB)
+const pageTranslationStatus = computed(() => {
+  const data = mobileStore.pageTranslationData;
+  const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
+  const isAuto = data.isAutoTranslating;
+  
+  const isCompleted = !isTranslating && !isAuto && (
+    data.isTranslated || 
+    data.status === TRANSLATION_STATUS.COMPLETED || 
+    (data.totalCount > 0 && data.translatedCount >= data.totalCount)
+  );
+  
+  const isError = data.status === TRANSLATION_STATUS.ERROR;
+  const isActive = isTranslating || isAuto || isCompleted || isError;
+  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
+  
+  return { isActive, isTranslating, isAuto, isCompleted, isError, percent };
+});
+
 const side = ref(null); 
 const isSelectionDirty = ref(false);
 const pendingText = ref('');
@@ -75,13 +108,18 @@ let instabilityTimer = null;
 let fabIdleTimerId = null;
 
 const checkBounds = () => {
-  if (typeof window === 'undefined' || !userPreferredY.value) return;
+  if (typeof window === 'undefined' || userPreferredY.value === null) return;
   
   // Use VisualViewport for more accurate visible area height on mobile
   const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const maxY = viewportHeight - 60;
   
-  fabPosition.value.y = Math.max(50, Math.min(userPreferredY.value, maxY));
+  if (userPreferredY.value === -1) {
+    fabPosition.value.y = Math.round(viewportHeight / 2);
+    return;
+  }
+
+  const maxY = viewportHeight - 80;
+  fabPosition.value.y = Math.max(20, Math.min(userPreferredY.value, maxY));
 };
 
 const updateViewport = () => {
@@ -157,9 +195,24 @@ onMounted(async () => {
     }
 
     checkBounds();
+    
+    // Settle position before showing to prevent jumps
     tracker.trackTimeout(() => {
       isReady.value = true;
-      tracker.trackTimeout(() => { isPositioning.value = false; }, 500);
+      
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // If position not saved, settle it now based on current calculated default
+          // ONLY if it was not already a default centered position (-1)
+          if (fabPosition.value.y !== null && userPreferredY.value !== -1) {
+            userPreferredY.value = fabPosition.value.y;
+          }
+          
+          tracker.trackTimeout(() => {
+            isPositioning.value = false;
+          }, 150);
+        });
+      });
     }, 150);
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
@@ -174,6 +227,13 @@ onMounted(async () => {
     side.value = MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     isReady.value = true;
   }
+
+  // Listen for error resets to ensure UI stays in sync
+  tracker.trackResource('error-reset-sync', pageEventBus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+    if (pageTranslationStatus.value.isError) {
+      logger.debug('Mobile FAB Error state reset via event');
+    }
+  }));
 });
 
 /**
@@ -203,13 +263,7 @@ const dynamicVars = computed(() => {
   if (isFabDragging.value && fabPosition.value.x !== null) {
     // When dragging, use explicit left coordinate
     vars['--fab-left'] = `${fabPosition.value.x}px`;
-  } else {
-    // When snapped, use side-based left/margin values
-    if (side.value === MOBILE_CONSTANTS.FAB.SIDE.LEFT) {
-      vars['--fab-left'] = '0';
-    } else {
-      vars['--fab-left'] = '100%';
-    }
+    vars['--fab-right'] = 'auto';
   }
 
   return vars;
@@ -220,8 +274,8 @@ const onFabDragStart = (e) => {
   const isMouseEvent = e.type === 'mousedown';
   if (isMouseEvent && e.button !== 0) return;
   
-  // PREVENT SELECTION CLEAR: This ensures clicking the FAB doesn't kill the page selection
-  if (isMouseEvent) {
+  // CRITICAL: Prevent focus shift and selection loss
+  if (e.cancelable) {
     e.preventDefault();
   }
   
@@ -237,6 +291,11 @@ const onFabDragStart = (e) => {
   if (isMouseEvent) {
     tracker.addEventListener(window, 'mousemove', onFabDragMove);
     tracker.addEventListener(window, 'mouseup', onFabDragEnd);
+  } else {
+    // For touch, we must use window listeners with passive: false to allow preventDefault
+    tracker.addEventListener(window, 'touchmove', onFabDragMove, { passive: false });
+    tracker.addEventListener(window, 'touchend', onFabDragEnd);
+    tracker.addEventListener(window, 'touchcancel', onFabDragEnd);
   }
   
   isFabIdle.value = false;
@@ -245,25 +304,38 @@ const onFabDragStart = (e) => {
 const onFabDragMove = (e) => {
   const isMouseEvent = e.type === 'mousemove';
   const point = isMouseEvent ? e : e.touches[0];
+  
+  // CRITICAL: Prevent page scroll during FAB drag
+  if (!isMouseEvent && e.cancelable) {
+    e.preventDefault();
+  }
+
   const currentX = point.clientX;
   const currentY = point.clientY;
 
   // Drag Threshold: Only start dragging if moved more than 5px from start
   if (!isFabDragging.value) {
-    const moveDist = Math.sqrt(Math.pow(currentX - dragStartX, 2) + Math.pow(currentY - dragStartY, 2));
-    if (moveDist > 5) {
+    const dx = currentX - dragStartX;
+    const dy = currentY - dragStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
       isFabDragging.value = true;
+      
+      // Re-sync starting coordinates to current point to ensure smooth transition from threshold
+      dragStartX = currentX;
+      dragStartY = currentY;
+      initialFabY = fabPosition.value.y;
     } else {
       return;
     }
   }
   
-  if (e.cancelable) e.preventDefault();
-  
   if (!animationFrameId) {
     animationFrameId = requestAnimationFrame(() => {
+      // Inverted delta because we are controlling 'bottom' property
+      // Moving finger UP (smaller currentY) should INCREASE 'bottom'
       const deltaY = dragStartY - currentY;
-      fabPosition.value.y = Math.max(50, Math.min(window.innerHeight - 50, initialFabY + deltaY));
+      const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      fabPosition.value.y = Math.max(20, Math.min(viewportHeight - 80, initialFabY + deltaY));
       
       const snapThreshold = window.innerWidth / 2;
       side.value = currentX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
@@ -277,14 +349,25 @@ const onFabDragMove = (e) => {
 };
 
 const onFabDragEnd = async (e) => {
-  if (!isFabDragging.value) return;
-  isFabDragging.value = false;
+  const isMouseEvent = e && (e.type === 'mouseup' || e.type === 'mousemove');
   
-  const isMouseEvent = e && e.type === 'mouseup';
   if (isMouseEvent) {
     tracker.removeEventListener(window, 'mousemove', onFabDragMove);
     tracker.removeEventListener(window, 'mouseup', onFabDragEnd);
+  } else {
+    tracker.removeEventListener(window, 'touchmove', onFabDragMove);
+    tracker.removeEventListener(window, 'touchend', onFabDragEnd);
+    tracker.removeEventListener(window, 'touchcancel', onFabDragEnd);
   }
+
+  if (!isFabDragging.value) {
+    // If it was a touch event, manually trigger click because touchstart was prevented
+    if (e && (e.type === 'touchend')) {
+      onMobileFabClick();
+    }
+    return;
+  }
+  isFabDragging.value = false;
 
   try {
     userPreferredY.value = fabPosition.value.y;

@@ -34,7 +34,9 @@
   
   // Component-specific variables (mapped from theme)  
   --color-bg-secondary: var(--sidebar-bg-color, #f8f9fa);
+  --color-background-muted: var(--color-surface, #f5f5f5);
   --color-text-placeholder: var(--placeholder-color, #9aa0a6);
+  --color-text-muted: var(--placeholder-color, #9aa0a6);
     
   // Default fallback values for provider icon filtering (light theme bias)
   --provider-icon-active-filter: brightness(1.4) contrast(1.8) saturate(0.8);
@@ -129,6 +131,7 @@
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);
   --color-text-secondary: var(--placeholder-color, #9aa0a6);
+  --color-text-muted: var(--placeholder-color, #9aa0a6);
   --color-background: var(--bg-color, #fff);
   --color-background-secondary: var(--bg-result-color, #f8f9fa);
   --color-background-soft: var(--sidebar-bg-color, #fffbe6);
@@ -139,8 +142,11 @@
   --color-border-light: rgb(0 0 0 / 5%);
   --color-primary: var(--link-color, #1a73e8);
   --color-error: #ef5350;
+  --color-error-bg: #fdecea;
+  --color-error-text: #d32f2f;
   --color-success: #4caf50;
-  --color-success-alpha: rgb(76 175 80 / 10%);
+  --color-success-bg: #edf7ed;
+  --color-success-text: #1e4620;
   --color-info: #1a73e8;
 }
 
@@ -211,6 +217,7 @@
   // Additional color variables for components
   --color-text: var(--text-color, #e8eaed);
   --color-text-secondary: var(--placeholder-color, #888);
+  --color-text-muted: var(--placeholder-color, #888);
   --color-background: var(--bg-color, #202124);
   --color-background-secondary: var(--bg-result-color, #0e0e0e);
   --color-background-soft: var(--sidebar-bg-color, #303741);
@@ -218,8 +225,11 @@
   --color-border-light: rgb(255 255 255 / 10%);
   --color-primary: var(--link-color, #8ab4f8);
   --color-error: #ef5350;
+  --color-error-bg: #160b0b;
+  --color-error-text: #f4c7c7;
   --color-success: #66bb6a;
-  --color-success-alpha: rgb(102 187 106 / 10%);
+  --color-success-bg: #0c130d;
+  --color-success-text: #cce8cd;
   --color-info: #8ab4f8;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);

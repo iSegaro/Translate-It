@@ -26,7 +26,8 @@ export const PAGE_TRANSLATION_ATTRIBUTES = {
   TRANSLATE_NO_ATTR: 'translate',
 };
 
-import { NOTIFICATION_TIME, UI_HOST_IDS, TRANSLATION_HTML } from '@/shared/config/constants.js';
+import { NOTIFICATION_TIME, UI_HOST_IDS } from '@/shared/constants/ui.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 
 /**
  * Selector and class constants for internal UI elements
@@ -47,7 +48,7 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   chunkSize: 250,
   maxConcurrentFlushes: 1,
   lazyLoading: true,
-  rootMargin: '150px',
+  rootMargin: '75px',
   priorityThreshold: 1
 };
 
@@ -70,5 +71,5 @@ export const PAGE_TRANSLATION_TIMING = {
   DOM_STABILIZATION_DELAY: 50,
   
   // Scroll stop detection
-  VIEWPORT_BUFFER_PX: 100
+  VIEWPORT_BUFFER_PX: 50
 };

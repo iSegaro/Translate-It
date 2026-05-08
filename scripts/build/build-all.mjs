@@ -12,8 +12,6 @@ const rootDir = path.resolve(__dirname, '../..')
 
 // Check if parallel mode is enabled
 const isParallel = process.argv.includes('--parallel') || process.argv.includes('--p')
-// Check if mobile mode is enabled
-const isMobile = process.argv.includes('--mobile') || process.argv.includes('--m')
 
 /**
  * Build Chrome extension asynchronously
@@ -24,7 +22,6 @@ async function buildChromeAsync() {
     let stderr = ''
 
     const args = ['scripts/build/build-chrome.mjs']
-    if (isMobile) args.push('--mobile')
 
     const child = spawn('node', args, {
       cwd: rootDir,
@@ -62,7 +59,6 @@ async function buildFirefoxAsync() {
     let stderr = ''
 
     const args = ['scripts/build/build-firefox.mjs']
-    if (isMobile) args.push('--mobile')
 
     const child = spawn('node', args, {
       cwd: rootDir,
@@ -102,7 +98,7 @@ async function buildAll() {
 
     // Build extensions (parallel or sequential based on flag)
     if (isParallel) {
-      logStep(`Building Chrome and Firefox extensions in parallel${isMobile ? ' (Mobile)' : ''}...`)
+      logStep(`Building Chrome and Firefox extensions in parallel...`)
 
       // Run builds in parallel and capture outputs
       const [chromeResult, firefoxResult] = await Promise.all([
@@ -127,15 +123,15 @@ async function buildAll() {
       }
     } else {
       // Step 1: Build Chrome
-      logStep(`Building Chrome extension${isMobile ? ' (Mobile)' : ''}...`)
-      execSync(`node scripts/build/build-chrome.mjs ${isMobile ? '--mobile' : ''}`, {
+      logStep(`Building Chrome extension...`)
+      execSync(`node scripts/build/build-chrome.mjs`, {
         cwd: rootDir,
         stdio: 'inherit'
       })
 
       // Step 2: Build Firefox
-      logStep(`Building Firefox extension${isMobile ? ' (Mobile)' : ''}...`)
-      execSync(`node scripts/build/build-firefox.mjs ${isMobile ? '--mobile' : ''}`, {
+      logStep(`Building Firefox extension...`)
+      execSync(`node scripts/build/build-firefox.mjs`, {
         cwd: rootDir,
         stdio: 'inherit'
       })

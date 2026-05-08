@@ -97,7 +97,7 @@ export const openOptionsPage = (anchor = null) => {
 
 export const openOptionsPage_from_Background = (message) => {
   const anchor = message.data?.anchor;
-  const optionsPath = "html/options.html";
+  const optionsPath = "src/html/options.html";
   const baseUrl = browser.runtime.getURL(optionsPath);
   const finalUrl = anchor ? `${baseUrl}#${anchor}` : baseUrl;
   focusOrCreateTab(finalUrl);

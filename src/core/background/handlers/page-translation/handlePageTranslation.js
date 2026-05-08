@@ -63,7 +63,8 @@ export async function handlePageTranslation(message, sender) {
       if (message.action === MessageActions.PAGE_TRANSLATE_COMPLETE) {
         const data = message.data || {};
         // Skip completion messages with no meaningful data
-        if (!data.translatedCount && !data.totalCount && !data.isTranslated && !data.messageId) {
+        // BUT: Always allow if isAutoTranslating is false (signaling a stop)
+        if (!data.translatedCount && !data.totalCount && !data.isTranslated && !data.messageId && data.isAutoTranslating !== false) {
           logger.debug('Skipping empty PAGE_TRANSLATE_COMPLETE message');
           return { success: true };
         }
@@ -72,8 +73,9 @@ export async function handlePageTranslation(message, sender) {
       // Filter out empty/invalid auto-restore complete messages
       if (message.action === MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
         const data = message.data || {};
-        // Skip auto-restore messages with no translation data unless they have explicit isTranslated flag
-        if (!data.translatedCount && !data.isTranslated) {
+        // Skip auto-restore messages with no translation data
+        // BUT: Always allow if isAutoTranslating is false (signaling a stop)
+        if (!data.translatedCount && !data.isTranslated && data.isAutoTranslating !== false) {
           logger.debug('Skipping empty PAGE_AUTO_RESTORE_COMPLETE message');
           return { success: true };
         }

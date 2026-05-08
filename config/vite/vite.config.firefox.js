@@ -6,8 +6,7 @@ import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
 
-const isMobile = process.env.IS_MOBILE === 'true';
-const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`;
+const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}`;
 
 // Import production config for production builds
 let productionConfig = null;
@@ -51,13 +50,13 @@ export default defineConfig({
   define: {
     ...(finalConfig.define || {}),
     __BROWSER__: JSON.stringify('firefox'),
-    __MANIFEST_VERSION__: 3,
-    __IS_MOBILE__: isMobile
+    __MANIFEST_VERSION__: 3
   },
 
   build: {
     ...(finalConfig.build || {}),
     outDir: baseOutDir,
+    sourcemap: false,
   },
   
   plugins: [
@@ -84,6 +83,7 @@ export default defineConfig({
           ...baseConfig.build,
           outDir: baseOutDir,
           modulePreload: false,
+          sourcemap: false,
           rollupOptions: {
             output: {
               ...baseConfig.build?.rollupOptions?.output,
@@ -117,6 +117,7 @@ export default defineConfig({
           ...baseConfig.build,
           outDir: baseOutDir,
           emptyOutDir: false,
+          sourcemap: false,
           rollupOptions: {
             ...baseConfig.build?.rollupOptions,
             manualChunks: undefined,
@@ -133,11 +134,11 @@ export default defineConfig({
       transformManifest: async (manifest) => {
         const outDir = baseOutDir;
         await fs.ensureDir(outDir);
-        await fs.ensureDir(resolve(outDir, 'html'));
+        await fs.ensureDir(resolve(outDir, 'src/html'));
         
         // Copy required assets
         const srcDir = process.cwd();
-        await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
+        await fs.copy(resolve(srcDir, 'src/_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'src/icons'), resolve(outDir, 'icons'));
         
         // Copy CSS files for content scripts (CRITICAL FIX)
@@ -150,13 +151,14 @@ export default defineConfig({
         }
         
         // Copy Changelog.md for About page
-        const changelogSrc = resolve(srcDir, 'Changelog.md');
-        const changelogDest = resolve(outDir, 'Changelog.md');
+        const changelogSrc = resolve(srcDir, 'docs/Changelog.md');
+        const changelogDest = resolve(outDir, 'docs/Changelog.md');
         if (await fs.pathExists(changelogSrc)) {
+          await fs.ensureDir(resolve(outDir, 'docs'));
           await fs.copy(changelogSrc, changelogDest);
         }
         
-        // Move HTML files to html/ directory and fix their paths
+        // Move HTML files to src/html/ directory and fix their paths
         const htmlFiles = [
           { file: 'popup.html', jsFile: 'popup.js', cssFile: 'popup.css' },
           { file: 'sidepanel.html', jsFile: 'sidepanel.js', cssFile: 'sidepanel.css' },
@@ -165,24 +167,24 @@ export default defineConfig({
         
         for (const {file, jsFile, cssFile} of htmlFiles) {
           const srcFile = resolve(outDir, file);
-          const destFile = resolve(outDir, 'html', file);
+          const destFile = resolve(outDir, 'src/html', file);
           
           if (await fs.pathExists(srcFile)) {
             // Read HTML content
             let htmlContent = await fs.readFile(srcFile, 'utf-8');
             
             // Fix all absolute paths to relative paths
-            htmlContent = htmlContent.replace(/src="\//g, 'src="../');
-            htmlContent = htmlContent.replace(/href="\//g, 'href="../');
-            htmlContent = htmlContent.replace(/src='\//g, "src='../");
-            htmlContent = htmlContent.replace(/href='\//g, "href='../");
-            // Fix double html/ paths
-            htmlContent = htmlContent.replace(/src="..\/ html\//g, 'src="../');
-            htmlContent = htmlContent.replace(/href="..\/ html\//g, 'href="../');
-            htmlContent = htmlContent.replace(/src='..\/ html\//g, "src='../");
-            htmlContent = htmlContent.replace(/href='..\/ html\//g, "href='../");
+            htmlContent = htmlContent.replace(/src="\//g, 'src="../../');
+            htmlContent = htmlContent.replace(/href="\//g, 'href="../../');
+            htmlContent = htmlContent.replace(/src='\//g, "src='../../");
+            htmlContent = htmlContent.replace(/href='\//g, "href='../../");
+            // Fix double src/html/ paths
+            htmlContent = htmlContent.replace(/src="..\/..\/ src\/html\//g, 'src="../../');
+            htmlContent = htmlContent.replace(/href="..\/..\/ src\/html\//g, 'href="../../');
+            htmlContent = htmlContent.replace(/src='..\/..\/ src\/html\//g, "src='../../");
+            htmlContent = htmlContent.replace(/href='..\/..\/ src\/html\//g, "href='../../");
             
-            // Write corrected HTML to html/ directory
+            // Write corrected HTML to src/html/ directory
             await fs.writeFile(destFile, htmlContent);
             
             // Remove original file

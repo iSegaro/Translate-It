@@ -135,7 +135,7 @@ export const handleTTSStopLazy = async (message, sender) => {
  */
 export const handleTTSEndedLazy = async (message, sender) => {
   try {
-    logger.info('[TTSLazyHandler] GOOGLE_TTS_ENDED requested');
+    logger.info(`[TTSLazyHandler] TTS completion action requested: ${message.action}`);
 
     const { handleGoogleTTSEnded } = await loadTTSHandlers();
 

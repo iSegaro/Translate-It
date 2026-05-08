@@ -3,7 +3,7 @@
 
 import { ErrorTypes } from './ErrorTypes.js'
 import { isSilentError, needsSettings } from './ErrorMatcher.js'
-import { NOTIFICATION_TIME } from '@/shared/config/constants.js'
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js'
 
 /**
  * Error display strategies for different contexts

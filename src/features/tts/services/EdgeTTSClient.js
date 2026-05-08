@@ -4,7 +4,7 @@
  */
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
 import { ttsCircuitBreaker } from '@/features/tts/services/TTSCircuitBreaker.js';
 

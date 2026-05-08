@@ -41,6 +41,7 @@
           :model-value="props.provider"
           mode="icon-only"
           :is-global="false"
+          only-configured
           class="ti-window-provider-selector"
           @update:model-value="handleProviderChange"
           @mousedown.stop
@@ -67,6 +68,7 @@
         <TTSButton
           :text="currentTTSText"
           :language="currentTTSLang"
+          :is-dictionary="isDictionary"
           size="sm"
           variant="secondary"
           class="ti-smart-tts-btn"
@@ -135,6 +137,7 @@
       <TranslationDisplay
         :content="translatedText"
         :is-loading="isLoading"
+        :is-streaming="props.isStreaming"
         :error="errorMessage"
         :error-type="props.errorType"
         :mode="'compact'"
@@ -171,7 +174,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
 // Import adjacent SCSS
@@ -187,6 +190,7 @@ const props = defineProps({
   initialTranslatedText: { type: String, default: '' },
   theme: { type: String, default: 'light' },
   isLoading: { type: Boolean, default: false },
+  isStreaming: { type: Boolean, default: false },
   isError: { type: Boolean, default: false },
   errorType: { type: String, default: null },
   canRetry: { type: Boolean, default: false },
@@ -211,6 +215,7 @@ const isFullscreen = computed(() => mobileStore.isFullscreen);
 
 // State
 const isLoading = computed(() => {
+  if (props.isStreaming && props.initialTranslatedText) return false;
   return props.isLoading || (!props.initialTranslatedText && !props.isError);
 });
 
@@ -219,6 +224,13 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
+
+// Check if current translation is in dictionary mode
+const isDictionary = computed(() => {
+  return props.provider === 'vajehyab' || 
+         (props.initialTranslatedText && props.initialTranslatedText.includes('**')) || 
+         (props.initialTranslatedText && props.initialTranslatedText.startsWith('###'));
+});
 
 const detectedLanguageName = computed(() => {
   const code = props.detectedSourceLanguage;
@@ -322,7 +334,7 @@ onMounted(async () => {
   // Track all resources for automatic cleanup
   tracker.trackResource('positioning', () => cleanupPositioning());
   tracker.trackResource('tts-stop', () => {
-    tts.stopAll().catch(() => {});
+    tts.stopAll({ stopOnlyIfOwner: true }).catch(() => {});
   });
 });
 
@@ -332,7 +344,8 @@ const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
 const handleCopy = async () => {
   if (!translatedText.value) return;
   try {
-    const textToCopy = SimpleMarkdown.getCleanTranslation(translatedText.value);
+    const strategy = isDictionary.value ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
+    const textToCopy = SimpleMarkdown.getCleanTranslation(translatedText.value, strategy);
     await navigator.clipboard.writeText(textToCopy);
     logger.debug(`Text copied successfully (cleaned)`);
   } catch (error) {

@@ -62,6 +62,9 @@ export const BASE_CHARACTER_LIMITS = {
   BING: 4000,
   YANDEX: 10000,
   DEEPL: 10000,
+  EDGE: 5000,
+  BROWSER: 10000,
+  LINGVA: 1500,
 };
 
 /**
@@ -72,19 +75,38 @@ export const BASE_MAX_CHUNKS_PER_BATCH = {
   BING: 10,
   YANDEX: 100,
   DEEPL: 150,
+  EDGE: 100,
+  BROWSER: 50,
+  LINGVA: 30,
+};
+
+/**
+ * AI-specific batching limits
+ */
+export const AI_BATCHING_LIMITS = {
+  OPTIMAL_SIZE: 20,
+  MAX_COMPLEXITY: 350,
+  SINGLE_BATCH_THRESHOLD: 15,
+  CHARACTER_LIMIT: 5000,
+  // Select Element Overrides (Optimized for balance)
+  SELECT_OPTIMAL_SIZE: 25,
+  SELECT_MAX_COMPLEXITY: 500,
+  SELECT_SINGLE_BATCH_THRESHOLD: 20,
+  SELECT_CHARACTER_LIMIT: 3500,
 };
 
 const UNIFIED_AI_BATCHING_CONFIG = {
-  strategy: 'smart',
-  optimalSize: 20,
-  maxComplexity: 350,
-  singleBatchThreshold: 15,
+  strategy: 'json', // Default to JSON for all AI providers
+  optimalSize: AI_BATCHING_LIMITS.OPTIMAL_SIZE,
+  maxComplexity: AI_BATCHING_LIMITS.MAX_COMPLEXITY,
+  singleBatchThreshold: AI_BATCHING_LIMITS.SINGLE_BATCH_THRESHOLD,
+  characterLimit: AI_BATCHING_LIMITS.CHARACTER_LIMIT,
   modeOverrides: {
     select_element: {
-      optimalSize: 25,
-      maxComplexity: 500,
-      singleBatchThreshold: 20,
-      maxBatchSizeChars: 3500,
+      optimalSize: AI_BATCHING_LIMITS.SELECT_OPTIMAL_SIZE,
+      maxComplexity: AI_BATCHING_LIMITS.SELECT_MAX_COMPLEXITY,
+      singleBatchThreshold: AI_BATCHING_LIMITS.SELECT_SINGLE_BATCH_THRESHOLD,
+      characterLimit: AI_BATCHING_LIMITS.SELECT_CHARACTER_LIMIT,
       balancedBatching: true,
     },
   },
@@ -119,10 +141,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'adaptive', // Adapt chunk size based on complexity
@@ -146,10 +165,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: true,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -167,12 +188,17 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000, // 30 seconds max delay
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 600, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true,
       chunkSize: 'fixed', // Fixed chunk sizes work well
@@ -192,10 +218,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true,
       supportsBatchRequests: true,
       supportsThinking: false,
-      reliableJsonMode: true
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -223,10 +251,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -244,10 +269,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: true,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -275,10 +302,7 @@ export const PROVIDER_CONFIGURATIONS = {
         }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Most models support streaming
       chunkSize: 'adaptive',
@@ -298,10 +322,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: true, // Depends on model
       supportsBatchRequests: true,
       supportsThinking: false, // Varies by model
-      reliableJsonMode: true
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -319,12 +345,17 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 700, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -344,10 +375,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Depends on model
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
     }
   },
 
@@ -370,6 +403,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
+      optimalSize: 40,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE,
       delimiter: DEFAULT_TEXT_DELIMITER // Standard resilient delimiter
     },
@@ -392,6 +426,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -419,7 +454,8 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit',
       characterLimit: BASE_CHARACTER_LIMITS.GOOGLE,
-      maxChunksPerBatch: 15, // V2 has smaller segment limit per request
+      optimalSize: 40, // Base segment limit that scales with optimization level
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.GOOGLE, // Use standardized limit
       delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
@@ -441,6 +477,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
@@ -468,6 +505,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.YANDEX,
+      optimalSize: 40,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.YANDEX,
       delimiter: null // Yandex uses array format
     },
@@ -492,11 +530,12 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
       reliableJsonMode: true,
-      supportsDictionary: true // Yandex supports dictionary
+      supportsDictionary: false
     }
   },
 
@@ -519,6 +558,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.DEEPL,
+      optimalSize: 50,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.DEEPL,
       delimiter: null // DeepL uses array format
     },
@@ -543,6 +583,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // DeepL supports batch requests
       supportsThinking: false,
@@ -558,7 +599,7 @@ export const PROVIDER_CONFIGURATIONS = {
       maxConcurrent: 3, // Conservative due to HTML response issues
       delayBetweenRequests: 0, // No delay for first request
       initialDelay: 0,
-      subsequentDelay: 2000, // 2 seconds between subsequent requests
+      subsequentDelay: 500, // 1 second between subsequent requests
       burstLimit: 2,
       burstWindow: 3000,
       adaptiveBackoff: {
@@ -571,6 +612,7 @@ export const PROVIDER_CONFIGURATIONS = {
     batching: {
       strategy: 'character_limit', // Use character-based chunking
       characterLimit: BASE_CHARACTER_LIMITS.BING,
+      optimalSize: 20,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.BING,
       delimiter: DEFAULT_TEXT_DELIMITER, // Standard resilient delimiter
       adaptiveChunking: true, // Enable adaptive chunking for errors
@@ -601,6 +643,7 @@ export const PROVIDER_CONFIGURATIONS = {
       circuitBreakThreshold: 3 // Open circuit after 3 failures (reduced from default 5)
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -612,11 +655,11 @@ export const PROVIDER_CONFIGURATIONS = {
   // Microsoft Edge - Official Edge Browser translation service
   MicrosoftEdge: {
     rateLimit: {
-      maxConcurrent: 4,
+      maxConcurrent: 5, // Increased from 4
       delayBetweenRequests: 0,
       initialDelay: 0,
-      subsequentDelay: 200,
-      burstLimit: 10, // Increased burst limit
+      subsequentDelay: 100, // Reduced from 200 to match Google's speed
+      burstLimit: 12, // Increased from 10
       burstWindow: 1000,
       adaptiveBackoff: {
         enabled: true,
@@ -627,9 +670,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 5000,
+      characterLimit: BASE_CHARACTER_LIMITS.EDGE,
       optimalSize: 40, // Base segment limit for Edge
-      maxChunksPerBatch: 100, // Increased from 20 to 100 - Edge API supports large batches
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.EDGE, // Edge API supports large batches
       delimiter: null // Uses JSON array
     },
     streaming: {
@@ -651,6 +694,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Enable batch requests
       supportsThinking: false,
@@ -671,8 +715,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 10000,
-      maxChunksPerBatch: 50,
+      characterLimit: BASE_CHARACTER_LIMITS.BROWSER,
+      optimalSize: 50,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.BROWSER,
       delimiter: DEFAULT_TEXT_DELIMITER
     },
     streaming: {
@@ -689,10 +734,51 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true,
       supportsThinking: false,
       reliableJsonMode: true
+    }
+  },
+
+  // Vajehyab - Persian dictionary service
+  Vajehyab: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 1000,
+      initialDelay: 0,
+      subsequentDelay: 1000,
+      burstLimit: 5,
+      burstWindow: 60000
+    },
+    batching: {
+      strategy: 'character_limit',
+      characterLimit: 100, // Small limit for dictionary words
+      optimalSize: 1,
+      maxChunksPerBatch: 1,
+      delimiter: DEFAULT_TEXT_DELIMITER
+    },
+    streaming: {
+      enabled: false,
+      chunkSize: 'character_based',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: ['rate_limit', 'word_not_found'],
+      retryStrategies: {
+        'rate_limit': { delay: 60000, temporary: true },
+        'word_not_found': { delay: 0, temporary: false }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsTranslation: true,
+      supportsImageTranslation: false,
+      supportsBatchRequests: false,
+      supportsThinking: false,
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   },
 
@@ -714,9 +800,9 @@ export const PROVIDER_CONFIGURATIONS = {
     },
     batching: {
       strategy: 'character_limit',
-      characterLimit: 1500, // Safe for GET URL lengths
+      characterLimit: BASE_CHARACTER_LIMITS.LINGVA, // Safe for GET URL lengths
       optimalSize: 15,      // Base segment limit
-      maxChunksPerBatch: 30,
+      maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.LINGVA,
       delimiter: null // Uses JSON POST in config, but GET in provider (provider overrides)
     },
     streaming: {
@@ -736,6 +822,7 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false,
       supportsBatchRequests: true, // Supports batch via chunking
       supportsThinking: false,
@@ -758,12 +845,17 @@ export const PROVIDER_CONFIGURATIONS = {
         baseMultiplier: 1.5,
         maxDelay: 30000,
         resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          subsequentDelay: 800, // Faster for Select Element mode
+          burstLimit: 4, // Allow more burst for better UX
+          maxConcurrent: 2 // Maintain concurrency for Select Element
+        }
       }
     },
-    batching: {
-      ...UNIFIED_AI_BATCHING_CONFIG,
-      strategy: 'json'
-    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
     streaming: {
       enabled: true, // Enable streaming for real-time segment translation
       chunkSize: 'fixed',
@@ -783,10 +875,55 @@ export const PROVIDER_CONFIGURATIONS = {
       enableCircuitBreaker: true
     },
     features: {
+      supportsTranslation: true,
       supportsImageTranslation: false, // Conservative default
       supportsBatchRequests: true, // Enable batch requests for streaming
       supportsThinking: false,
-      reliableJsonMode: false
+      reliableJsonMode: false,
+      supportsDictionary: true
+    }
+  },
+
+  // Mock Provider - Used for development and testing
+  MockProvider: {
+    rateLimit: {
+      maxConcurrent: 5, // High for local mock testing
+      delayBetweenRequests: 0,
+      initialDelay: 0,
+      subsequentDelay: 100, // Minimal delay for mock
+      burstLimit: 10,
+      burstWindow: 1000,
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.5,
+        maxDelay: 5000,
+        resetAfterSuccess: 2
+      }
+    },
+    batching: {
+      ...UNIFIED_AI_BATCHING_CONFIG,
+      characterLimit: 2000,
+      optimalSize: 5
+    },
+    streaming: {
+      enabled: true,
+      chunkSize: 'fixed',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: ['rate_limit'],
+      retryStrategies: {
+        'rate_limit': { delay: 1000, temporary: true }
+      },
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsTranslation: true,
+      supportsImageTranslation: true,
+      supportsBatchRequests: true,
+      supportsThinking: true,
+      reliableJsonMode: true,
+      supportsDictionary: true
     }
   }
 };
@@ -823,10 +960,15 @@ function applyOptimizationLevel(config, level) {
 
   const result = { ...config, rateLimit: { ...config.rateLimit }, batching: { ...config.batching } };
 
+  // Multipliers for different optimization levels
+  const concurrentMultipliers = { 1: 0.4, 2: 0.7, 3: 1, 4: 1.5, 5: 2.0 };
+  const delayMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.7, 5: 0.4 };
+  const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
+  const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
+
   // 1. Scale Rate Limits
   // Concurrent requests multipliers: Level 1 (0.4), Level 2 (0.7), Level 3 (1.0), Level 4 (1.5), Level 5 (2.0)
   // We use floor for levels < 3 to be more conservative and ceil for levels > 3 to be more aggressive
-  const concurrentMultipliers = { 1: 0.4, 2: 0.7, 3: 1, 4: 1.5, 5: 2.0 };
   const baseConcurrent = config.rateLimit.maxConcurrent;
   
   if (safeLevel < 3) {
@@ -858,7 +1000,6 @@ function applyOptimizationLevel(config, level) {
   }
 
   // Subsequent Delay multipliers: Level 1 (2.5), Level 2 (1.5), Level 3 (1.0), Level 4 (0.7), Level 5 (0.4)
-  const delayMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.7, 5: 0.4 };
   result.rateLimit.subsequentDelay = Math.round(config.rateLimit.subsequentDelay * delayMultipliers[safeLevel]);
   
   // Scale Batching Delays if present
@@ -873,7 +1014,6 @@ function applyOptimizationLevel(config, level) {
     // AI Strategy: 
     // Level 1 (Economy): Large batches (multiplier 2.0x-2.5x) -> Minimizes Context/System Prompt overhead (Cost Efficient)
     // Level 5 (Turbo): Small batches (multiplier 0.3x-0.5x) -> Faster streaming/UI updates (Speed Efficient)
-    const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
     const multiplier = aiSizeMultipliers[safeLevel];
 
     result.batching.optimalSize = Math.max(5, Math.round(config.batching.optimalSize * multiplier));
@@ -885,7 +1025,6 @@ function applyOptimizationLevel(config, level) {
     }
   } else if (config.batching.strategy === 'character_limit') {
     // Traditional: Level 1 (Economy/Stability) -> Large chunks, Level 5 (Turbo) -> Small chunks
-    const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
     const multiplier = sizeMultipliers[safeLevel];
 
     result.batching.characterLimit = Math.max(500, Math.round(config.batching.characterLimit * multiplier));
@@ -903,6 +1042,65 @@ function applyOptimizationLevel(config, level) {
     
     if (config.batching.optimalSize) {
       result.batching.optimalSize = Math.max(15, Math.round(config.batching.optimalSize * multiplier));
+    }
+  }
+
+  // 3. Scale Mode Overrides (if present) - Ensures Select Element speed scales with optimization level
+  // Scale rateLimit.modeOverrides
+  if (config.rateLimit.modeOverrides) {
+    result.rateLimit.modeOverrides = {};
+    for (const mode in config.rateLimit.modeOverrides) {
+      const modeConfig = { ...config.rateLimit.modeOverrides[mode] };
+      
+      if (modeConfig.maxConcurrent) {
+        if (safeLevel < 3) {
+          modeConfig.maxConcurrent = Math.max(1, Math.floor(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
+        } else if (safeLevel > 3) {
+          modeConfig.maxConcurrent = Math.max(modeConfig.maxConcurrent, Math.ceil(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
+        }
+        modeConfig.maxConcurrent = Math.min(modeConfig.maxConcurrent, 12);
+      }
+      
+      if (modeConfig.burstLimit) {
+        if (safeLevel < 3) {
+          modeConfig.burstLimit = Math.max(1, Math.floor(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
+        } else if (safeLevel > 3) {
+          modeConfig.burstLimit = Math.max(modeConfig.burstLimit, Math.ceil(modeConfig.burstLimit * concurrentMultipliers[safeLevel]));
+        }
+      }
+      
+      if (modeConfig.subsequentDelay) {
+        modeConfig.subsequentDelay = Math.round(modeConfig.subsequentDelay * delayMultipliers[safeLevel]);
+      }
+      
+      result.rateLimit.modeOverrides[mode] = modeConfig;
+    }
+  }
+
+  // Scale batching.modeOverrides
+  if (config.batching.modeOverrides) {
+    result.batching.modeOverrides = {};
+    for (const mode in config.batching.modeOverrides) {
+      const modeConfig = { ...config.batching.modeOverrides[mode] };
+      
+      if (isAIStrategy) {
+        const multiplier = aiSizeMultipliers[safeLevel];
+        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(5, Math.round(modeConfig.optimalSize * multiplier));
+        if (modeConfig.maxComplexity) modeConfig.maxComplexity = Math.max(100, Math.round(modeConfig.maxComplexity * multiplier));
+        if (modeConfig.singleBatchThreshold) modeConfig.singleBatchThreshold = Math.max(5, Math.round(modeConfig.singleBatchThreshold * multiplier));
+        if (modeConfig.maxBatchSizeChars) modeConfig.maxBatchSizeChars = Math.max(500, Math.round(modeConfig.maxBatchSizeChars * multiplier));
+      } else if (config.batching.strategy === 'character_limit') {
+        const multiplier = sizeMultipliers[safeLevel];
+        if (modeConfig.characterLimit) modeConfig.characterLimit = Math.max(500, Math.round(modeConfig.characterLimit * multiplier));
+        if (modeConfig.optimalSize) modeConfig.optimalSize = Math.max(15, Math.round(modeConfig.optimalSize * multiplier));
+        
+        if (modeConfig.maxChunksPerBatch) {
+          const chunkMultiplier = safeLevel > 3 ? Math.max(0.8, multiplier) : multiplier;
+          modeConfig.maxChunksPerBatch = Math.max(25, Math.round(modeConfig.maxChunksPerBatch * chunkMultiplier));
+        }
+      }
+      
+      result.batching.modeOverrides[mode] = modeConfig;
     }
   }
 
@@ -955,6 +1153,9 @@ function normalizeProviderName(providerName) {
     'lingva-translate': ProviderNames.LINGVA,
     'browser': ProviderNames.BROWSER_API,
     'browserranslate': ProviderNames.BROWSER_API,
+    'vajehyab': ProviderNames.VAJEHYAB,
+    'mock': ProviderNames.MOCK,
+    'mockprovider': ProviderNames.MOCK,
     'custom': ProviderNames.CUSTOM,
     'custom-openai': ProviderNames.CUSTOM
   };

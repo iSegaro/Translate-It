@@ -12,10 +12,10 @@ export async function handleOpenOptionsPage(message) {
     
     if (anchor) {
       // Use tabs API to open with anchor
-      const optionsUrl = browser.runtime.getURL(`html/options.html#${anchor}`);
+      const optionsUrl = browser.runtime.getURL(`src/html/options.html#${anchor}`);
       
       // Try to find existing options tab and update it, or create new one
-      const tabs = await browser.tabs.query({ url: browser.runtime.getURL('html/options.html*') });
+      const tabs = await browser.tabs.query({ url: browser.runtime.getURL('src/html/options.html*') });
       
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[0].id, { url: optionsUrl, active: true });

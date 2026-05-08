@@ -45,7 +45,10 @@
     </BaseFieldset>
 
     <!-- Text Field Translation -->
-    <BaseFieldset :legend="t('activation_group_text_fields_title') || 'Text Field Translation'">
+    <BaseFieldset 
+      id="activation_group_text_fields"
+      :legend="t('activation_group_text_fields_title') || 'Text Field Translation'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -56,6 +59,8 @@
             v-model="fieldProvider"
             allow-default
             mode="button"
+            required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
           />
@@ -135,7 +140,10 @@
     </BaseFieldset>
 
     <!-- Select Element -->
-    <BaseFieldset :legend="t('activation_group_select_element_title') || 'Select Element'">
+    <BaseFieldset 
+      id="activation_group_select_element"
+      :legend="t('activation_group_select_element_title') || 'Select Element'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -146,30 +154,33 @@
             v-model="selectElementProvider"
             allow-default
             mode="button"
+            required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !translateWithSelectElement"
           />
         </div>
       </template>
       <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateWithSelectElement"
-          :disabled="!extensionEnabled"
-          :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
-        />
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="translateWithSelectElement"
+            :disabled="!extensionEnabled"
+            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+          />
+          <div 
+            id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
+            class="shortcut-picker-animated-wrapper"
+            :class="{ open: translateWithSelectElement }"
+          >
+            <ConfigureShortcutButton
+              command-name="SELECT-ELEMENT-COMMAND"
+              :disabled="!extensionEnabled"
+            />
+          </div>
+        </div>
         <span class="setting-description">
           {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
-        </span>
-      </div>
-
-      <div class="setting-group sub-setting-group">
-        <BaseCheckbox
-          v-model="selectElementShowOriginal"
-          :disabled="!extensionEnabled || !translateWithSelectElement"
-          :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
-        />
-        <span class="setting-description">
-          {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
         </span>
       </div>
 
@@ -178,11 +189,25 @@
         class="sub-options-group"
         :class="{ open: translateWithSelectElement }"
       >
-        <div
-          id="PAGE_CONTEXT_SELECT_ELEMENT"
-          class="sub-options-inner"
-        >
-          <div class="setting-group sub-setting-group">
+        <div class="sub-options-inner">
+          <div
+            id="SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="selectElementShowOriginal"
+              :disabled="!extensionEnabled"
+              :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
+            />
+            <span class="setting-description">
+              {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
+            </span>
+          </div>
+
+          <div
+            id="PAGE_CONTEXT_SELECT_ELEMENT"
+            class="setting-group sub-setting-group"
+          >
             <BaseCheckbox
               v-model="showSelectElementInContextMenu"
               :disabled="!extensionEnabled"
@@ -197,7 +222,10 @@
     </BaseFieldset>
 
     <!-- On-Page Selection -->
-    <BaseFieldset :legend="t('activation_group_page_selection_title') || 'On-Page Selection'">
+    <BaseFieldset 
+      id="activation_group_page_selection"
+      :legend="t('activation_group_page_selection_title') || 'On-Page Selection'"
+    >
       <template #header>
         <div class="legend-actions-wrapper">
           <span 
@@ -208,6 +236,7 @@
             v-model="selectionProvider"
             allow-default
             mode="button"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !translateOnTextSelection"
           />
@@ -303,6 +332,8 @@
             v-model="pageProvider"
             allow-default
             mode="button"
+            required-feature="bulk"
+            only-configured
             :is-global="false"
             :disabled="!extensionEnabled || !wholePageEnabled"
           />
@@ -410,6 +441,20 @@
               {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
             </span>
           </div>
+
+          <div 
+            id="WHOLE_PAGE_TOKEN_WARNING_HIDDEN"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="wholePageTokenWarningEnabled"
+              :disabled="!extensionEnabled"
+              :label="t('whole_page_token_warning_label') || 'Show token usage warning'"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_token_warning_description') || 'Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL).' }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -418,14 +463,15 @@
 
 <script setup>
 import './ActivationTab.scss'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -433,11 +479,15 @@ import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
+import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 const settingsStore = useSettingsStore()
+const { highlightElement } = useHighlightManager()
 const { t } = useUnifiedI18n()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
+
+// --- Actions ---
 
 // --- State ---
 // --- Settings Definitions ---
@@ -489,7 +539,7 @@ const showSelectElementInContextMenu = computed({
   }
 })
 
-const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', false)
+const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', CONFIG.TRANSLATE_ON_TEXT_SELECTION)
 const selectionTranslationMode = createSetting('selectionTranslationMode', SelectionTranslationMode.IMMEDIATE)
 const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', false)
 const activeSelectionIconOnTextfields = createSetting('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', true)
@@ -502,10 +552,43 @@ const wholePageAutoTranslate = createSetting('WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_C
 const wholePageShowOriginal = createSetting('WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER', false)
 const wholePageTranslateAfterScrollStop = createSetting('WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP', false)
 const wholePageScrollStopDelay = createSetting('WHOLE_PAGE_SCROLL_STOP_DELAY', 500)
+const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HIDDEN', false, {
+  transformGet: (v) => !v,
+  transformSet: (v) => !v
+})
 
 const fieldProvider = createProviderSetting(TranslationMode.Field)
 const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)
 const selectionProvider = createProviderSetting(TranslationMode.Selection)
 const pageProvider = createProviderSetting(TranslationMode.Page)
+
+// --- Validation Feedback ---
+
+const handleValidationFeedback = (e) => {
+  const { field, mode } = e.detail || {};
+  
+  if (field === 'provider' && mode) {
+    // Map mode to fieldset ID
+    const modeToId = {
+      [TranslationMode.Field]: 'activation_group_text_fields',
+      [TranslationMode.Select_Element]: 'activation_group_select_element',
+      [TranslationMode.Selection]: 'activation_group_page_selection',
+      [TranslationMode.Page]: 'FIELDSET_WHOLE_PAGE'
+    };
+    
+    const id = modeToId[mode];
+    if (id) highlightElement(id);
+  } else if (field === 'WHOLE_PAGE_SCROLL_STOP_DELAY') {
+    highlightElement('WHOLE_PAGE_TRIGGER_MODE');
+  }
+};
+
+onMounted(async () => {
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
 
 </script>

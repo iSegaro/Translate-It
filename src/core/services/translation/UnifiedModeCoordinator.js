@@ -68,7 +68,7 @@ export class UnifiedModeCoordinator {
     const providerInstance = await translationEngine.getProvider(provider);
     if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
-    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
+    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', 'page');
 
     try {
       const sessionId = request.sessionId || data.sessionId || messageId;
@@ -103,12 +103,16 @@ export class UnifiedModeCoordinator {
         error: null
       };
     } catch (error) {
-      const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+      const { isFatalError, matchErrorToType, isCancellationError } = await import('@/shared/error-management/ErrorMatcher.js');
       const errorType = matchErrorToType(error);
       const isFatal = isFatalError(error);
 
-      // Log the specific failure
-      logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
+      // Log the specific failure - Use debug for cancellations, warn for actual errors
+      if (isCancellationError(error)) {
+        logger.debug(`[UnifiedCoordinator] Page translation cancelled: ${error.message}`);
+      } else {
+        logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
+      }
       
       const fallbackResults = segments.map(s => ({ text: s }));
       
@@ -136,7 +140,7 @@ export class UnifiedModeCoordinator {
     const messageForEngine = {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
-      context: 'content', 
+      context: request.context || 'content', 
       data: { ...request.data, mode: TranslationMode.Field, enableDictionary: false }
     };
     return await translationEngine.handleTranslateMessage(messageForEngine, request.sender);
@@ -154,7 +158,7 @@ export class UnifiedModeCoordinator {
     return await translationEngine.handleTranslateMessage({
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
-      context: 'content', 
+      context: request.context || 'content', 
       data: enhancedData
     }, request.sender);
   }
@@ -166,7 +170,7 @@ export class UnifiedModeCoordinator {
     return await translationEngine.handleTranslateMessage({
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
-      context: 'content',
+      context: request.context || 'content',
       data: request.data
     }, request.sender);
   }

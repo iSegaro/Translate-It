@@ -1,4 +1,5 @@
 import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
+import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 
 /**
  * PageTranslationHelper - Utility methods for whole page translation
@@ -22,14 +23,18 @@ export class PageTranslationHelper {
     // Skip empty or purely whitespace strings
     if (!trimmed) return false;
 
-    // Filter rules
-    const isNumeric = /^\d+$/.test(trimmed);
-    const isTime = /^(\d+:)+\d+$/.test(trimmed);
+    // 1. Structural/Technical Filters (Regex)
+    // These items are universally non-translatable and often occur in technical content
+    if (DOM_FILTERS.isTechnicalPattern(trimmed)) return false;
+
+    // 2. Numeric and Metric Filters
+    const isNumeric = DOM_FILTERS.NUMERIC_REGEX.test(trimmed);
+    const isTime = DOM_FILTERS.TIME_REGEX.test(trimmed);
     
     // ALLOW 2+ character words for English (e.g., "In", "On", "Go")
     // For Farsi/Arabic, we already have special handling.
     const isTooShort = trimmed.length < 2 && !/[\u0600-\u06FF]/.test(trimmed);
-    const isMetric = /^\d+(\.\d+)?[kKM]$/.test(trimmed);
+    const isMetric = DOM_FILTERS.METRIC_REGEX.test(trimmed);
 
     const shouldSkip = isNumeric || isTime || isTooShort || isMetric;
 
@@ -112,8 +117,9 @@ export class PageTranslationHelper {
    * Check if a node is within the viewport plus a given margin.
    * This is used for prioritization and lazy loading.
    * 
-   * NOTE: Removed offsetParent check to support fixed/sticky elements.
-   * Relying on getBoundingClientRect which returns 0x0 for display:none.
+   * STRATEGY: For Text Nodes, we use Range.getBoundingClientRect() to get precise
+   * coordinates of the text itself. This prevents over-translation of off-screen 
+   * text that shares a large visible parent container.
    * 
    * @param {Node} node - The DOM node to check (Text, Attribute or Element)
    * @param {number} margin - Extra safety margin in pixels
@@ -123,18 +129,34 @@ export class PageTranslationHelper {
   static isInViewportWithMargin(node, margin, logger = null) {
     if (!node) return false;
     try {
-      const element = node.nodeType === Node.TEXT_NODE ? node.parentElement :
-                     (node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node);
+      let rect;
 
-      if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-      
-      // Basic connectivity check to ensure the element is still in the DOM
-      if (!element.isConnected) return false;
+      // 1. Precise Viewport Detection for Text Nodes
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (!node.parentElement || !node.isConnected) return false;
 
-      const rect = element.getBoundingClientRect();
+        // Use a shared Range to prevent GC pressure during high-frequency scrolling
+        if (!this._sharedRange) {
+          this._sharedRange = document.createRange();
+        }
+        
+        this._sharedRange.selectNodeContents(node);
+        rect = this._sharedRange.getBoundingClientRect();
+
+        // Fallback: If text node has no dimensions (0x0), it might be a quirk 
+        // or a zero-width element. Fallback to parent element for safety.
+        if (rect.width === 0 && rect.height === 0) {
+          rect = node.parentElement.getBoundingClientRect();
+        }
+      } else {
+        // 2. Detection for Elements and Attributes
+        const element = node.nodeType === Node.ATTRIBUTE_NODE ? node.ownerElement : node;
+        if (!element || element.nodeType !== Node.ELEMENT_NODE || !element.isConnected) return false;
+        rect = element.getBoundingClientRect();
+      }
       
-      // If the element has no dimensions, it's effectively invisible
-      if (rect.width === 0 || rect.height === 0) {
+      // If the bounding box has no dimensions, it's effectively invisible (e.g., display: none)
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
         return false;
       }
 

@@ -8,8 +8,17 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { getSourceLanguageAsync, getTargetLanguageAsync, TranslationMode } from "@/shared/config/config.js";
+import { 
+  getSourceLanguageAsync, 
+  getTargetLanguageAsync, 
+  TranslationMode,
+  getPopupMaxCharsAsync,
+  getSidepanelMaxCharsAsync,
+  getSelectionMaxCharsAsync,
+  getSelectElementMaxCharsAsync
+} from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
 import { TranslationHistoryManager } from "./managers/TranslationHistoryManager.js";
 import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
@@ -65,11 +74,11 @@ export class TranslationEngine {
     const messageId = request.messageId || data.messageId || `msg-${Date.now()}`;
     data.messageId = messageId;
 
-    // Register and detect duplicate
-    this.lifecycleRegistry.registerRequest(messageId, data.text);
+    // Register and detect duplicate with context awareness
+    this.lifecycleRegistry.registerRequest(messageId, data.text, context);
 
     try {
-      const result = await this.executeTranslation(data, sender);
+      const result = await this.executeTranslation(data, sender, context);
 
       if (!result || typeof result !== "object") {
         throw new Error(`Translation failed: invalid result format (${typeof result})`);
@@ -90,7 +99,7 @@ export class TranslationEngine {
   /**
    * Core translation execution logic with streaming and JSON optimization support
    */
-  async executeTranslation(data, sender) {
+  async executeTranslation(data, sender, uiContext = 'unknown') {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
@@ -111,7 +120,7 @@ export class TranslationEngine {
     data.mode = mode;
 
     // 2. Length Validation
-    const lengthError = this._validateTextLength(text, mode, provider);
+    const lengthError = await this._validateTextLength(text, mode, provider);
     if (lengthError) return lengthError;
 
     // 3. Resolve global languages for context (Coordinator will handle swapping)
@@ -124,12 +133,13 @@ export class TranslationEngine {
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
     if (isSelectJson) {
       logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender);
+      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
     }
 
     // 5. Standard execution via ProviderCoordinator
     const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
       mode: mode,
+      uiContext: uiContext, // Pass UI context (popup, sidepanel, etc.)
       originalSourceLang,
       originalTargetLang,
       messageId: data.messageId,
@@ -187,26 +197,45 @@ export class TranslationEngine {
    * Validate text length against mode-specific limits.
    * @private
    */
-  _validateTextLength(text, mode, provider) {
+  async _validateTextLength(text, mode, provider) {
     const isSelectElementMode = mode === TranslationMode.Select_Element;
-    const LIMITS = { WARNING: 10000, REGULAR_MAX: 50000, SELECT_MAX: 500000 };
+    const isSelectionMode = mode === TranslationMode.Selection;
+    const isPopupMode = mode === TranslationMode.Popup_Translate;
+    const isSidepanelMode = mode === TranslationMode.Sidepanel_Translate;
 
-    if (!isSelectElementMode && text.length > LIMITS.WARNING) {
-      if (text.length > LIMITS.REGULAR_MAX) {
-        return {
-          success: false,
-          error: `Text too long (${text.length} chars). Max: ${LIMITS.REGULAR_MAX}. Use "Select Element" for long texts.`,
-          translatedText: text, provider, mode
-        };
-      }
-      logger.warn(`[TranslationEngine] Large text detected (${text.length} chars).`);
-    } else if (isSelectElementMode && text.length > LIMITS.SELECT_MAX) {
+    let maxChars = 50000; // Default safety limit
+    
+    if (isSelectElementMode) {
+      maxChars = await getSelectElementMaxCharsAsync();
+    } else if (isSidepanelMode) {
+      maxChars = await getSidepanelMaxCharsAsync();
+    } else if (isPopupMode) {
+      maxChars = await getPopupMaxCharsAsync();
+    } else if (isSelectionMode) {
+      maxChars = await getSelectionMaxCharsAsync();
+    }
+
+    if (text.length > maxChars) {
+      logger.warn(`[TranslationEngine] Text too long for mode ${mode}: ${text.length} > ${maxChars}`);
       return {
         success: false,
-        error: `Text too long even for Select Element (${text.length} chars). Max: ${LIMITS.SELECT_MAX}.`,
-        translatedText: text, provider, mode
+        error: {
+          type: ErrorTypes.TEXT_TOO_LONG,
+          message: `Text too long (${text.length.toLocaleString()} chars). Max allowed for this mode is ${maxChars.toLocaleString()} chars.`,
+          context: mode,
+          timestamp: Date.now()
+        },
+        translatedText: text, 
+        provider, 
+        mode
       };
     }
+
+    // Still log a warning for large texts even if within limits
+    if (text.length > 10000 && !isSelectElementMode) {
+      logger.warn(`[TranslationEngine] Large text detected (${text.length.toLocaleString()} chars).`);
+    }
+
     return null;
   }
 
@@ -241,8 +270,9 @@ export class TranslationEngine {
   // --- Delegation Methods ---
   
   async cancelTranslation(messageId) { return await this.lifecycleRegistry.cancelTranslation(messageId); }
-  async cancelAllTranslations() { return await this.lifecycleRegistry.cancelAllTranslations(); }
+  async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
+  registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }
   isCancelled(messageId) { return this.lifecycleRegistry.isCancelled(messageId); }
   

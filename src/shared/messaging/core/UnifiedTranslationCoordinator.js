@@ -12,6 +12,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
+import { MessageActions } from './MessageActions.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
@@ -155,29 +156,37 @@ export class UnifiedTranslationCoordinator {
         const streamingResult = await streamingPromise;
 
         // Check if streaming failed (resolved with error instead of rejected to avoid uncaught promise)
-        if (streamingResult && !streamingResult.success) {
-          throw streamingResult.error;
+        if (streamingResult && streamingResult.success === false) {
+          if (streamingResult.cancelled) {
+            const cancelError = new Error(streamingResult.reason || 'Operation cancelled');
+            cancelError.type = ErrorTypes.USER_CANCELLED;
+            cancelError.isCancelled = true;
+            throw cancelError;
+          }
+          throw streamingResult.error || new Error('Streaming failed without explicit error');
         }
 
         return streamingResult;
       } else {
         // Not streaming, return regular response
-        if (messageId) streamingTimeoutManager.completeStreaming(messageId, initialResponse || {});
+        if (messageId) streamingTimeoutManager.completeStreaming(messageId, initialResponse || { success: true });
         return initialResponse;
       }
 
     } catch (error) {
       // Log cancellation as info instead of error using proper error management
-      const errorType = matchErrorToType(error);
+      const errorType = error ? matchErrorToType(error) : ErrorTypes.UNKNOWN;
+      const errorMessage = error?.message || (typeof error === 'string' ? error : 'Unknown error');
+      
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        logger.warn(`Streaming translation coordination failed for ${messageId}: ${error.message}`);
+        logger.debug(`Streaming translation coordination failed for ${messageId}: ${errorMessage}`);
       }
 
       // Cancel streaming if it was registered
       if (messageId && this.streamingOperations.has(messageId)) {
         const cancelReason = errorType === ErrorTypes.USER_CANCELLED
-          ? `User cancelled: ${error.message}`
-          : `Coordination error: ${error.message}`;
+          ? `User cancelled: ${errorMessage}`
+          : `Coordination error: ${errorMessage}`;
 
         try {
           streamingTimeoutManager.cancelStreaming(messageId, cancelReason);
@@ -246,6 +255,16 @@ export class UnifiedTranslationCoordinator {
     if (translation.type === 'streaming') {
       streamingTimeoutManager.cancelStreaming(messageId, reason);
     }
+
+    // Notify background to stop translation immediately
+    // We don't await this as we want the content-side cancellation to be immediate
+    sendRegularMessage({
+      action: MessageActions.CANCEL_TRANSLATION,
+      data: { messageId, reason }
+    }).catch(err => {
+      // Log at debug level as this is often due to extension context invalidation during cancellation
+      logger.debug(`Cancellation message to background failed for ${messageId}:`, err.message);
+    });
 
     this.activeTranslations.delete(messageId);
     this.streamingOperations.delete(messageId);
@@ -320,21 +339,31 @@ export class UnifiedTranslationCoordinator {
     // Enhanced timeouts for Select Element mode - allow longer processing times
     const isSelectElementMode = data?.mode === 'select_element' || data?.mode === 'select-element' || data?.options?.mode === 'select_element';
 
-    let baseTimeout, initialTimeout, progressTimeout, gracePeriod;
+    let initialTimeout, progressTimeout, gracePeriod;
 
     if (isSelectElementMode) {
-      // Select Element mode needs much longer timeouts due to batching and API delays
-      baseTimeout = Math.min(120000, Math.max(30000, segmentCount * 5000)); // 5s per segment, 30-120s range
-      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 4000)); // Up to 10 minutes
-      progressTimeout = Math.max(180000, segmentCount * 2000); // At least 3 minutes between progress
+      // Select Element mode needs much longer timeouts due to batching and API delays.
+      // We align this with the 90s system timeout but scale it with segments.
+      const baseTimeout = Math.max(90000, segmentCount * 6000); // 6s per segment, min 90s
+      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 5000)); // Up to 10 minutes
+      progressTimeout = Math.max(90000, segmentCount * 3000); // At least 90s between progress updates
       gracePeriod = Math.min(300000, segmentCount * 10000); // Up to 5 minutes grace period
     } else {
       // Standard timeouts for regular translation
-      baseTimeout = Math.min(30000, Math.max(15000, segmentCount * 3000)); // 3s per segment, 15-30s range
+      const baseTimeout = Math.max(60000, segmentCount * 5000); // 5s per segment, min 60s
       initialTimeout = customTimeout || Math.min(300000, baseTimeout + (segmentCount * 2000)); // Up to 5 minutes
-      progressTimeout = Math.max(60000, segmentCount * 1000); // At least 1 minute between progress
+      progressTimeout = Math.max(60000, segmentCount * 2000); // At least 1 minute between progress
       gracePeriod = Math.min(120000, segmentCount * 5000); // Up to 2 minutes grace period
     }
+
+    logger.debug(`Streaming timeouts calculated:`, {
+      mode: isSelectElementMode ? 'select-element' : 'regular',
+      segments: segmentCount,
+      textLength,
+      initialTimeout,
+      progressTimeout,
+      gracePeriod
+    });
 
     return {
       initialTimeout,

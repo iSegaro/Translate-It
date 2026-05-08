@@ -70,11 +70,12 @@ export class TranslationRequestTracker {
   /**
    * Create and track a new translation request
    */
-  createRequest({ messageId, data, sender, options = {} }) {
+  createRequest({ messageId, data, sender, context, sessionId, options = {} }) {
     const request = {
       messageId,
-      data,
+      data: { ...data, sessionId: sessionId || data?.sessionId },
       sender,
+      context: context || options.context || 'unknown',
       status: RequestStatus.PENDING,
       priority: options.priority || this.determinePriority(data),
       mode: this.detectMode(data),
@@ -87,6 +88,7 @@ export class TranslationRequestTracker {
         tabId: sender?.tab?.id,
         frameId: sender?.frameId,
         toastId: data?.toastId,
+        sessionId: sessionId || data?.sessionId,
         selectionRange: data?.selectionRange,
         originalText: data?.text,
         targetLanguage: data?.targetLanguage,

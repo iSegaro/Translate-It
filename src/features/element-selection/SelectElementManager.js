@@ -1,4 +1,4 @@
-// SelectElementManager - Simplified Manager using domtranslator
+// SelectElementManager - Specialized Manager for Select Element
 // Single responsibility: Manage Select Element mode lifecycle and interactions
 
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -8,11 +8,12 @@ import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { getSettingsAsync } from '@/shared/config/config.js';
-import { NOTIFICATION_TIME, TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
+import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { getTranslationString } from '@/utils/i18n/i18n.js';
+import { shouldShowProviderWarning } from '@/shared/utils/warning-manager.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 
@@ -32,7 +33,8 @@ import { extractTextFromElement, isValidTextElement } from './utils/elementHelpe
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
 
 /**
- * Simplified SelectElementManager using domtranslator library
+ * SelectElementManager - Coordinates the interactive Select Element mode.
+ * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
  */
 class SelectElementManager extends ResourceTracker {
   constructor() {
@@ -125,6 +127,15 @@ class SelectElementManager extends ResourceTracker {
         }
       });
 
+      // Listen for translation progress events
+      this.addEventListener(pageEventBus, 'select-element-translation-progress', (data) => {
+        if (data?.completed !== undefined && data?.total !== undefined) {
+          const progressType = data.isRequestProgress ? 'API requests' : 'items';
+          this.logger.debug(`[SelectElementManager] Progress update: ${data.completed}/${data.total} ${progressType}`);
+          this.updateNotificationForTranslationProgress(data.completed, data.total, data.isRequestProgress);
+        }
+      });
+
       this.isInitialized = true;
     } catch (error) {
       this.logger.warn('Error initializing SelectElementManager:', error);
@@ -181,10 +192,10 @@ class SelectElementManager extends ResourceTracker {
 
       if (this.isTopFrame) {
         this.showNotification();
-        const [settings, bingWarning, lingvaWarning] = await Promise.all([
-          getSettingsAsync(),
+        const [bingWarning, lingvaWarning, effectiveProvider] = await Promise.all([
           getTranslationString('BING_WPT_WARNING'),
-          getTranslationString('LINGVA_WPT_WARNING')
+          getTranslationString('LINGVA_WPT_WARNING'),
+          options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element)
         ]);
 
         // RE-CHECK again after another set of async calls
@@ -193,21 +204,25 @@ class SelectElementManager extends ResourceTracker {
           return { isActive: false };
         }
 
-        const activeProvider = activationOptions.provider || settings.TRANSLATION_API;
+        const activeProvider = effectiveProvider;
         if (activeProvider === ProviderRegistryIds.BING) {
-          this.baseNotificationManager.show(
-            bingWarning || 'Bing may have issues. Try another provider.',
-            'warning',
-            NOTIFICATION_TIME.WARNING_PROVIDER,
-            { id: 'bing-warning' }
-          );
+          if (await shouldShowProviderWarning('Bing')) {
+            this.baseNotificationManager.show(
+              bingWarning || 'Bing may have issues. Try another provider.',
+              'warning',
+              NOTIFICATION_TIME.WARNING_PROVIDER,
+              { id: 'bing-warning' }
+            );
+          }
         } else if (activeProvider === ProviderRegistryIds.LINGVA) {
-          this.baseNotificationManager.show(
-            lingvaWarning || 'Lingva may have issues. Try another provider.',
-            'warning',
-            NOTIFICATION_TIME.WARNING_PROVIDER,
-            { id: 'lingva-warning' }
-          );
+          if (await shouldShowProviderWarning('Lingva')) {
+            this.baseNotificationManager.show(
+              lingvaWarning || 'Lingva may have issues. Try another provider.',
+              'warning',
+              NOTIFICATION_TIME.WARNING_PROVIDER,
+              { id: 'lingva-warning' }
+            );
+          }
         }
       }
 
@@ -237,7 +252,7 @@ class SelectElementManager extends ResourceTracker {
         silent = false,
         preserveTranslations = options.preserveTranslations !== undefined
           ? options.preserveTranslations
-          : reason !== 'error' // Default: preserve for everything except error
+          : true // Default: preserve translations in Select Element mode even on error
       } = options;
 
       this.logger.debug(`Deactivating SelectElementManager (Reason: ${reason})`, { ...options, preserveTranslations });
@@ -298,9 +313,12 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
       window.addEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
 
-      const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart'];
+      // Robust interaction blocking: Include auxclick for middle-click and ensure capture phase
+      const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart', 'auxclick'];
       interactionEvents.forEach(eventType => {
         window.addEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
+        // Secondary safety: some sites use document-level capture listeners
+        document.addEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
       });
 
       window.addEventListener('keydown', this.handleKeyDown, true);
@@ -323,9 +341,10 @@ class SelectElementManager extends ResourceTracker {
     window.removeEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
     window.removeEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
     
-    const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart'];
+    const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart', 'auxclick'];
     interactionEvents.forEach(eventType => {
       window.removeEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
+      document.removeEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
@@ -335,7 +354,7 @@ class SelectElementManager extends ResourceTracker {
     }
   }
 
-  isCooldownActive() { return Date.now() - (this.activationTime || 0) < 500; }
+  isCooldownActive() { return Date.now() - (this.activationTime || 0) < 100; }
 
   handleMouseOver(event) {
     if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
@@ -381,12 +400,23 @@ class SelectElementManager extends ResourceTracker {
 
   handleInteraction(event) {
     if (!this.isActive || this.isCooldownActive()) return;
-    const path = event.composedPath ? event.composedPath() : [event.target];
-    if (path.some(el => this.elementSelector && this.elementSelector.isOurElement(el))) return;
+
+    const path = (event.composedPath && event.composedPath()) || [event.target];
+
+    // Check if the interaction is with our UI (Toasts, Popup, etc.)
+    // We must NOT block interactions with our own UI.
+    const isExtensionUI = path.some(el => {
+      if (!el) return false;
+      const isOur = this.elementSelector && this.elementSelector.isOurElement(el);
+      return isOur;
+    });
+
+    if (isExtensionUI) return;
 
     const isScrollRelatedTouch = event.type.startsWith('touch') || event.type.startsWith('pointer');
     if (this.isProcessingClick && isScrollRelatedTouch) return;
 
+    // Block the event for the page
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
@@ -452,7 +482,9 @@ class SelectElementManager extends ResourceTracker {
   async startTranslation(targetElement, options = {}) {
     try {
       if (!this.isActive) return;
-      if (this.isTopFrame) this.updateNotificationForTranslation();
+
+      // Mark as translating for Memory Garbage Collector protection
+      window.isTranslationInProgress = true;
 
       const result = await this.domTranslatorAdapter.translateElement(targetElement, {
         ...this.currentOptions,
@@ -484,30 +516,33 @@ class SelectElementManager extends ResourceTracker {
         this.performPostTranslationCleanup({ reason: 'success' }); // Fallback to success if result exists but structure is weird
       }
     } catch (error) {
-      this.logger.warn('Select Element translation failed:', error);
-      // CRITICAL: Log the actual error
-      
-      const errorType = matchErrorToType(error);
-      const isCancellation = errorType === ErrorTypes.USER_CANCELLED || 
-                             errorType === ErrorTypes.TRANSLATION_CANCELLED ||
-                             error.message === 'Handler cancelled';
+      const isCancellation = isCancellationError(error);
 
+      if (isCancellation) {
+        this.logger.debug('Select Element translation cancelled:', error.message);
+      } else {
+        this.logger.warn('Select Element translation failed:', error);
+      }
+      
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'element-selection');
       }
 
       if (isFatalError(error) && !isCancellation) {
-        this.deactivate({ preserveTranslations: false, reason: 'error' });
+        this.deactivate({ preserveTranslations: true, reason: 'error' });
       } else {
         this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
       }
+    } finally {
+      // Clear flag after translation is complete (success or error)
+      window.isTranslationInProgress = false;
     }
   }
 
   performPostTranslationCleanup(options = {}) {
     const reason = options.reason || 'success';
-    // For error case, we want to revert partial translations to avoid broken state
-    const preserveTranslations = reason !== 'error';
+    // In Select Element mode, we want to preserve partial translations even on error
+    const preserveTranslations = true;
 
     if (!this.isTopFrame) {
       try {
@@ -548,8 +583,11 @@ class SelectElementManager extends ResourceTracker {
     });
   }
 
-  updateNotificationForTranslation() {
-    pageEventBus.emit('update-select-element-notification', { status: TRANSLATION_STATUS.TRANSLATING });
+  updateNotificationForTranslationProgress(completed, total, isRequestProgress = true) {
+    pageEventBus.emit('update-select-element-notification', {
+      status: TRANSLATION_STATUS.TRANSLATING,
+      progress: { completed, total, isRequestProgress }
+    });
   }
 
   dismissNotification() {

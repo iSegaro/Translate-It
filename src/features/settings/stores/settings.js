@@ -2,12 +2,14 @@ import { defineStore } from 'pinia'
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
+import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -89,13 +91,18 @@ function getDefaultSettings() {
     ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
     TEXT_FIELD_SHORTCUT: CONFIG.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
     TRANSLATE_WITH_SELECT_ELEMENT: CONFIG.TRANSLATE_WITH_SELECT_ELEMENT ?? true,
-    SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: false ?? false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
-    TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION ?? true,
+    SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: CONFIG.SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER ?? false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
+    TRANSLATE_ON_TEXT_SELECTION: CONFIG.TRANSLATE_ON_TEXT_SELECTION,
     REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
     ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
+    // Character Limits
+    POPUP_MAX_CHARS: CONFIG.POPUP_MAX_CHARS || 5000,
+    SIDEPANEL_MAX_CHARS: CONFIG.SIDEPANEL_MAX_CHARS || 10000,
+    SELECTION_MAX_CHARS: CONFIG.SELECTION_MAX_CHARS || 5000,
+    SELECT_ELEMENT_MAX_CHARS: CONFIG.SELECT_ELEMENT_MAX_CHARS || 300000,
     MOBILE_UI_MODE: CONFIG.MOBILE_UI_MODE || MOBILE_CONSTANTS.UI_MODE.AUTO,
     MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: CONFIG.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE ?? false,
     DEBUG_MODE: CONFIG.DEBUG_MODE ?? false,
@@ -127,6 +134,7 @@ function getDefaultSettings() {
     WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER ?? false,
     WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: CONFIG.WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP ?? false,
     WHOLE_PAGE_SCROLL_STOP_DELAY: CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY || 500,
+    WHOLE_PAGE_TOKEN_WARNING_HIDDEN: CONFIG.WHOLE_PAGE_TOKEN_WARNING_HIDDEN ?? false,
     // AI Optimization Settings
     AI_CONTEXT_TRANSLATION_ENABLED: CONFIG.AI_CONTEXT_TRANSLATION_ENABLED ?? true,
     AI_CONVERSATION_HISTORY_ENABLED: CONFIG.AI_CONVERSATION_HISTORY_ENABLED ?? false,
@@ -180,6 +188,42 @@ export const useSettingsStore = defineStore('settings', () => {
   const targetLanguage = computed(() => settings.value.TARGET_LANGUAGE)
   const selectedProvider = computed(() => settings.value.TRANSLATION_API)
   
+  /**
+   * Helper to get the effective provider for a mode from reactive state.
+   * Follows the same logic as getEffectiveProviderAsync in config.js.
+   * Includes feature validation to ensure the provider is suitable for the mode.
+   */
+  const getEffectiveProvider = (mode) => {
+    const modeProviders = settings.value.MODE_PROVIDERS || {};
+    const globalApi = settings.value.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+    const systemDefault = ProviderRegistryIds.GOOGLE_V2;
+
+    let resolvedId = globalApi;
+
+    // 1. Direct mode-specific setting
+    if (mode && modeProviders[mode]) {
+      resolvedId = modeProviders[mode];
+    } 
+    // 2. Hierarchical Fallbacks
+    else if (mode === TranslationMode.Dictionary_Translation && modeProviders[TranslationMode.Selection]) {
+      resolvedId = modeProviders[TranslationMode.Selection];
+    }
+
+    // 3. Validation
+    const provider = findProviderById(resolvedId);
+    const needsBulk = [
+      TranslationMode.Page, 
+      TranslationMode.Select_Element, 
+      TranslationMode.Field
+    ].includes(mode);
+
+    if (needsBulk && provider && !provider.features?.includes('bulk')) {
+      return systemDefault;
+    }
+
+    return resolvedId;
+  };
+
   // Font settings getters
   const fontFamily = computed(() => settings.value.TRANSLATION_FONT_FAMILY)
   const fontSize = computed(() => settings.value.TRANSLATION_FONT_SIZE)
@@ -300,14 +344,30 @@ export const useSettingsStore = defineStore('settings', () => {
       // SMART CLEANUP: If Debug Mode is disabled while Mock provider is active, 
       // automatically switch to the system default provider.
       if (key === 'DEBUG_MODE' && value === false) {
-        const currentApi = settings.value['TRANSLATION_API'];
-        if (currentApi === 'mock') {
-          const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
-          
+        const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
+        let hasChanges = false;
+
+        // Cleanup Global Provider
+        if (settings.value['TRANSLATION_API'] === 'mock') {
           settings.value['TRANSLATION_API'] = defaultApi;
           updates['TRANSLATION_API'] = defaultApi;
+          hasChanges = true;
+          logger.info(`Debug mode disabled: Reverted global provider from Mock to default: ${defaultApi}`);
+        }
+
+        // Cleanup Mode-Specific Providers
+        if (settings.value.MODE_PROVIDERS) {
+          Object.keys(settings.value.MODE_PROVIDERS).forEach(mode => {
+            if (settings.value.MODE_PROVIDERS[mode] === 'mock') {
+              settings.value.MODE_PROVIDERS[mode] = null; // Revert to fallback (Global)
+              hasChanges = true;
+              logger.info(`Debug mode disabled: Reverted ${mode} provider from Mock to fallback`);
+            }
+          });
           
-          logger.info(`Debug mode disabled while Mock was active. Reverting provider to default: ${defaultApi}`);
+          if (hasChanges) {
+            updates['MODE_PROVIDERS'] = { ...settings.value.MODE_PROVIDERS };
+          }
         }
       }
 
@@ -466,35 +526,111 @@ export const useSettingsStore = defineStore('settings', () => {
   const validateSettings = () => {
     const errors = []
     
-    // Validate languages
-    if (!settings.value.SOURCE_LANGUAGE) {
-      errors.push('Source language is required')
+    // 1. Validate languages
+    const sLang = settings.value.SOURCE_LANGUAGE;
+    const tLang = settings.value.TARGET_LANGUAGE;
+
+    if (!sLang || sLang.toString().trim() === '') {
+      errors.push('validation_source_language_empty')
     }
     
-    if (!settings.value.TARGET_LANGUAGE) {
-      errors.push('Target language is required')
+    if (!tLang || tLang.toString().trim() === '') {
+      errors.push('validation_target_language_empty')
     }
     
-    if (settings.value.SOURCE_LANGUAGE === settings.value.TARGET_LANGUAGE) {
-      errors.push('Source and target languages cannot be the same')
+    if (sLang && tLang && sLang !== 'auto' && sLang === tLang) {
+      errors.push('validation_same_languages')
     }
     
-    // Validate API keys for selected provider
-  const provider = settings.value.TRANSLATION_API
-    if (['gemini', 'openai', 'openrouter', 'deepseek', 'custom'].includes(provider)) {
-      const keyField = provider === 'custom' ? 'CUSTOM_API_KEY' : 'API_KEY'
-      if (!settings.value[keyField]) {
-        errors.push(`API key is required for ${provider}`)
+    // 2. Validate Global Translation Provider
+    const apiProvider = settings.value.TRANSLATION_API;
+    if (apiProvider) {
+      const missingKey = getFirstMissingSetting(apiProvider, settings.value);
+      if (missingKey) {
+        errors.push('ERRORS_API_CONFIG_INVALID')
       }
     }
     
-    // Validate prompt templates
-    if (!settings.value.PROMPT_TEMPLATE || !settings.value.PROMPT_TEMPLATE.includes('$_{TEXT}')) {
-      errors.push('Prompt template must include $_{TEXT} placeholder')
+    // 3. Validate Mode-Specific Providers
+    if (settings.value.MODE_PROVIDERS) {
+      const isExtEnabled = settings.value.EXTENSION_ENABLED !== false;
+      
+      Object.entries(settings.value.MODE_PROVIDERS).forEach(([mode, providerId]) => {
+        if (providerId && providerId !== 'default' && providerId !== null) {
+          // Determine if the feature for this mode is enabled
+          let isFeatureEnabled = true;
+          
+          if (mode === TranslationMode.Field) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_ON_TEXT_FIELDS;
+          } else if (mode === TranslationMode.Select_Element) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_WITH_SELECT_ELEMENT;
+          } else if (mode === TranslationMode.Selection) {
+            isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_ON_TEXT_SELECTION;
+          } else if (mode === TranslationMode.Page) {
+            isFeatureEnabled = isExtEnabled && settings.value.WHOLE_PAGE_TRANSLATION_ENABLED;
+          } else if (mode === TranslationMode.ScreenCapture) {
+            isFeatureEnabled = isExtEnabled && (settings.value.ENABLE_SCREEN_CAPTURE !== false);
+          }
+          // Popup, Sidepanel, and Dictionary are always considered active features if extension is installed
+
+          if (isFeatureEnabled) {
+            const modeMissingKey = getFirstMissingSetting(providerId, settings.value);
+            if (modeMissingKey) {
+              errors.push('ERRORS_API_CONFIG_INVALID');
+            }
+          }
+        }
+      });
     }
     
-    if (settings.value.PROMPT_TEMPLATE_AUTO && !settings.value.PROMPT_TEMPLATE_AUTO.includes('$_{TEXT}')) {
-      errors.push('Auto prompt template must include $_{TEXT} placeholder if provided')
+    // 4. Validate Prompt Templates
+    const prompt = settings.value.PROMPT_TEMPLATE;
+    if (!prompt || prompt.toString().trim() === '') {
+      errors.push('validation_prompt_template_empty');
+    } else if (!prompt.toString().includes('$_{TEXT}')) {
+      errors.push('validation_prompt_template_missing_placeholders');
+    }
+
+    const autoPrompt = settings.value.PROMPT_TEMPLATE_AUTO;
+    if (autoPrompt && autoPrompt.toString().trim() !== '' && !autoPrompt.toString().includes('$_{TEXT}')) {
+      errors.push('validation_prompt_template_missing_placeholders');
+    }
+    
+    // 5. Validate Proxy
+    if (settings.value.PROXY_ENABLED && (!settings.value.PROXY_HOST || settings.value.PROXY_HOST.trim() === '')) {
+      errors.push('proxy_host_invalid')
+    }
+
+    // 6. Validate Whole Page Translation Settings
+    const scrollDelay = settings.value.WHOLE_PAGE_SCROLL_STOP_DELAY;
+    if (scrollDelay !== undefined && (scrollDelay < 100 || scrollDelay > 5000)) {
+      if (settings.value.WHOLE_PAGE_TRANSLATION_ENABLED && settings.value.EXTENSION_ENABLED !== false) {
+        errors.push('validation_scroll_delay_invalid');
+      } else {
+        // Reset to default if feature is disabled
+        const defaults = getDefaultSettings();
+        settings.value.WHOLE_PAGE_SCROLL_STOP_DELAY = defaults.WHOLE_PAGE_SCROLL_STOP_DELAY;
+      }
+    }
+
+    // 7. Validate Font Settings
+    const fontSize = settings.value.TRANSLATION_FONT_SIZE;
+    if (fontSize !== undefined) {
+      const sizeNum = parseInt(fontSize);
+      if (isNaN(sizeNum) || sizeNum < 10 || sizeNum > 30) {
+        const defaults = getDefaultSettings();
+        settings.value.TRANSLATION_FONT_SIZE = defaults.TRANSLATION_FONT_SIZE;
+      }
+    }
+
+    const fontFamily = settings.value.TRANSLATION_FONT_FAMILY;
+    if (!fontFamily || fontFamily.toString().trim() === '') {
+      const defaults = getDefaultSettings();
+      settings.value.TRANSLATION_FONT_FAMILY = defaults.TRANSLATION_FONT_FAMILY;
+    }
+
+    if (errors.length > 0) {
+      logger.debug('Settings validation failed:', errors);
     }
     
     return {
@@ -635,6 +771,7 @@ export const useSettingsStore = defineStore('settings', () => {
     sourceLanguage,
     targetLanguage,
     selectedProvider,
+    getEffectiveProvider,
     fontFamily,
     fontSize,
     

@@ -10,7 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { SimpleMarkdown } from "@/shared/utils/text/markdown.js";
+import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'useTTSSmart');
 
@@ -62,8 +62,11 @@ export function useTTSSmart() {
 
   /**
    * Starts a speech request
+   * @param {string} text - The text to speak
+   * @param {string} lang - The language code
+   * @param {Object} options - Additional options (e.g., { isDictionary: boolean })
    */
-  const speak = async (text, lang = "auto") => {
+  const speak = async (text, lang = "auto", options = {}) => {
     if (!text || !text.trim()) {
       logger.warn("[useTTSSmart] No text provided for TTS");
       return false;
@@ -94,7 +97,10 @@ export function useTTSSmart() {
         language = await getLanguageCodeForTTS(lang) || "en";
       }
       
-      const cleanText = SimpleMarkdown.getCleanTranslation(text);
+      // Determine extraction strategy based on options
+      const strategy = options.isDictionary ? ExtractionStrategy.PRIMARY_ONLY : ExtractionStrategy.FULL_TEXT;
+      const cleanText = SimpleMarkdown.getCleanTranslation(text, strategy);
+      
       lastText.value = text;
       lastLanguage.value = lang;
 
@@ -144,14 +150,18 @@ export function useTTSSmart() {
 
   /**
    * Stops the current instance's TTS request
+   * @param {Object} options - Stop options
    */
-  const stop = async () => {
+  const stop = async (options = {}) => {
     if (ttsState.value === 'idle') return true;
 
     try {
       const message = {
         action: MessageActions.TTS_STOP,
-        data: { ttsId: currentTTSId.value },
+        data: { 
+          ttsId: currentTTSId.value,
+          ...options
+        },
         context: 'tts-smart'
       };
       
@@ -167,12 +177,13 @@ export function useTTSSmart() {
 
   /**
    * Stops ALL TTS requests globally
+   * @param {Object} options - Stop options
    */
-  const stopAll = async () => {
+  const stopAll = async (options = {}) => {
     try {
       const message = {
         action: MessageActions.TTS_STOP,
-        data: {},
+        data: { ...options },
         context: 'tts-smart'
       };
       

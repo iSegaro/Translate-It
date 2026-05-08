@@ -42,6 +42,7 @@
       <button 
         class="ti-m-header-primary-btn notranslate"
         translate="no"
+        :class="{ 'is-disabled': primaryAction.disabled }"
         :data-status="pageTranslationData.status === 'error' ? 'error' : (pageTranslationData.isTranslating || pageTranslationData.isAutoTranslating ? 'translating' : (pageTranslationData.isTranslated ? 'translated' : 'ready'))"
         @click.stop="primaryAction.handler"
       >
@@ -58,7 +59,7 @@
         >
           <img
             src="@/icons/ui/close.png"
-            :alt="t('mobile_close_button_alt') || 'Close'"
+            :alt="t('mobile_close_button_alt', 'Close')"
             class="ti-m-icon-img-close"
           >
         </button>
@@ -74,10 +75,10 @@
       <div class="ti-m-progress-label-row">
         <div class="ti-m-progress-info">
           <span class="ti-m-progress-subtitle">
-            {{ pageTranslationData.status === 'error' ? (t('mobile_page_error_encountered') || 'Error Encountered') : (t('mobile_page_translation_progress') || 'Translation Progress') }}
+            {{ pageTranslationData.status === 'error' ? t('mobile_page_error_encountered', 'Error Encountered') : t('mobile_page_translation_progress', 'Translation Progress') }}
           </span>
           <span class="ti-m-progress-value">
-            {{ pageTranslationData.status === 'error' ? (t('mobile_page_failed_status') || 'Failed') : computedProgress + '%' }}
+            {{ pageTranslationData.status === 'error' ? t('mobile_page_failed_status', 'Failed') : computedProgress + '%' }}
           </span>
         </div>
         <div 
@@ -93,7 +94,7 @@
         v-if="pageTranslationData.status === 'error'"
         class="ti-m-error-message"
       >
-        {{ pageTranslationData.errorMessage || (t('mobile_page_unknown_error') || 'Unknown translation error') }}
+        {{ pageTranslationData.errorMessage || t('mobile_page_unknown_error', 'Unknown translation error') }}
       </div>
 
       <div class="ti-m-progress-bar-container">
@@ -107,8 +108,8 @@
       <!-- Settings Row (Auto Close) -->
       <div class="ti-m-progress-settings-row">
         <div class="ti-m-setting-info">
-          <span class="ti-m-setting-label">{{ t('mobile_page_auto_close_label') || 'Auto Close' }}</span>
-          <span class="ti-m-setting-desc">{{ t('mobile_page_auto_close_tooltip') || 'Close after starting' }}</span>
+          <span class="ti-m-setting-label">{{ t('mobile_page_auto_close_label', 'Auto Close') }}</span>
+          <span class="ti-m-setting-desc">{{ t('mobile_page_auto_close_tooltip', 'Close after starting') }}</span>
         </div>
         <button 
           class="ti-m-setting-toggle-btn"
@@ -129,9 +130,13 @@ import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { TranslationMode } from '@/shared/config/config.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue'
@@ -145,39 +150,69 @@ const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
+const { handleError } = useErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
 
+const pageProvider = computed(() => {
+  return settingsStore.getEffectiveProvider(TranslationMode.Page);
+});
+
+const isBulkSupported = computed(() => {
+  const provider = findProviderById(pageProvider.value);
+  return provider?.features?.includes('bulk') ?? false;
+});
+
+const handleBulkNotSupported = async () => {
+  mobileStore.closeSheet();
+  await handleError(t('provider_does_not_support_bulk', 'این سرویس از قابلیت‌های دسته‌ای پشتیبانی نمی‌کند'), 'mobile-page-translation:bulk-check', { 
+    showToast: true,
+    type: ErrorTypes.VALIDATION
+  });
+};
+
 const computedProgress = computed(() => {
+  if (pageTranslationData.value.status === 'error') return 0;
   if (pageTranslationData.value.status === 'completed') return 100;
   if (!pageTranslationData.value.totalCount || pageTranslationData.value.totalCount === 0) return 0;
-  return Math.round((pageTranslationData.value.translatedCount / pageTranslationData.value.totalCount) * 100);
+  const processed = (pageTranslationData.value.translatedCount || 0) + (pageTranslationData.value.failedCount || 0);
+  return Math.min(100, Math.round((processed / pageTranslationData.value.totalCount) * 100));
 })
 
 const primaryAction = computed(() => {
   const isError = pageTranslationData.value.status === 'error';
 
   if (isError) {
-    return { label: t('mobile_page_retry_btn') || 'Retry Translation', icon: wholePageIcon, bgColor: 'var(--ti-mobile-error)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: startTranslation }
+    return { label: t('mobile_page_retry_btn', 'Retry Translation'), icon: wholePageIcon, bgColor: 'var(--ti-mobile-error)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: startTranslation, disabled: !isBulkSupported.value }
   }
 
   if (pageTranslationData.value.isTranslating || pageTranslationData.value.isAutoTranslating) {
     const isInitialPass = pageTranslationData.value.isTranslating;
     return {
-      label: isInitialPass ? (t('mobile_page_stop_btn') || 'Stop Translation') : (t('mobile_page_stop_auto_btn') || 'Stop Auto-Translation'),
+      label: isInitialPass ? t('mobile_page_stop_btn', 'Stop Translation') : t('mobile_page_stop_auto_btn', 'Stop Auto-Translation'),
       icon: isInitialPass ? closeIcon : eyeHideIcon,
       bgColor: 'var(--ti-mobile-warning-bg)',
       textColor: 'var(--ti-mobile-warning)',
       border: '1px solid var(--ti-mobile-warning-bg)',
       iconFilter: isInitialPass ? 'invert(38%) sepia(88%) saturate(1212%) hue-rotate(335deg) brightness(98%) contrast(98%)' : 'invert(36%) sepia(84%) saturate(1212%) hue-rotate(351deg) brightness(91%) contrast(92%)',
-      handler: stopAutoTranslation
+      handler: stopAutoTranslation,
+      disabled: false
     }
   }
 
   if (pageTranslationData.value.isTranslated) {
-    return { label: t('mobile_page_restore_btn') || 'Restore Original Page', icon: restoreIcon, bgColor: 'var(--ti-mobile-card-bg)', textColor: 'var(--ti-mobile-text-secondary)', border: '1px solid var(--ti-mobile-border)', iconFilter: 'var(--ti-mobile-icon-filter)', handler: restorePage }
+    return { label: t('mobile_page_restore_btn', 'Restore Original Page'), icon: restoreIcon, bgColor: 'var(--ti-mobile-card-bg)', textColor: 'var(--ti-mobile-text-secondary)', border: '1px solid var(--ti-mobile-border)', iconFilter: 'var(--ti-mobile-icon-filter)', handler: restorePage, disabled: false }
   }
 
-  return { label: t('mobile_page_start_btn') || 'Start Translation', icon: wholePageIcon, bgColor: 'var(--ti-mobile-accent)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: startTranslation }
+  return { 
+    label: t('mobile_page_start_btn', 'Start Translation'), 
+    icon: wholePageIcon, 
+    bgColor: 'var(--ti-mobile-accent)', 
+    textColor: 'white', 
+    border: 'none', 
+    iconFilter: 'brightness(0) invert(1)', 
+    handler: startTranslation,
+    disabled: !isBulkSupported.value 
+  }
 })
 
 const goToDashboard = () => { 
@@ -204,8 +239,19 @@ const toggleAutoClose = async () => {
 }
 
 const startTranslation = () => { 
-  logger.info('Starting page translation from Mobile View');
-  pageEventBus.emit(MessageActions.PAGE_TRANSLATE); 
+  const provider = pageProvider.value;
+  if (!findProviderById(provider)?.features?.includes('bulk')) {
+    handleBulkNotSupported();
+    return;
+  }
+  logger.info('Starting page translation from Mobile View', { provider });
+  
+  // Reset error state before retrying
+  if (pageTranslationData.value.status === 'error') {
+    pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
+  }
+
+  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider }); 
   if (settingsStore.settings.MOBILE_PAGE_TRANSLATION_AUTO_CLOSE) {
     mobileStore.closeSheet() 
   }

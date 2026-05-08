@@ -1,11 +1,13 @@
 // src/config.js
 import { ProviderRegistryIds, nameToRegistryId } from '@/features/translation/providers/ProviderConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS, TTS_ENGINES } from './constants.js';
+import { isMobile } from '@/shared/utils/device.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
 logger.info('Config module initialized');
@@ -56,6 +58,7 @@ export const TRANSLATION_ERRORS = {
 
 // Detect environment
 const isFirefox = typeof __BROWSER__ !== 'undefined' ? __BROWSER__ === 'firefox' : false;
+export { isMobile } from '@/shared/utils/device.js';
 
 // Shared configuration (initial defaults)
 export const CONFIG = {
@@ -74,16 +77,25 @@ export const CONFIG = {
     "latin-script": "none" // پیش‌فرض: هیچکدام (اجازه به تشخیص خودکار پرووایدر)
   },
   THEME: "auto",
-  TIMEOUT: 30000,
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
   CHANGELOG_URL: "https://raw.githubusercontent.com/iSegaro/Translate-It/main/Changelog.md",
 
+  // --- Character Limits ---
+  /** Maximum characters allowed for popup translation */
+  POPUP_MAX_CHARS: 5000,
+  /** Maximum characters allowed for sidepanel translation */
+  SIDEPANEL_MAX_CHARS: 10000,
+  /** Maximum characters allowed for selection/floating window translation */
+  SELECTION_MAX_CHARS: 5000,
+  /** Maximum characters allowed for "Select Element" mode (usually higher for articles) */
+  SELECT_ELEMENT_MAX_CHARS: 300000,
+
 
   // --- API Settings ---
-  TRANSLATION_API: isFirefox ? ProviderRegistryIds.GOOGLE : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+  TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(
@@ -120,8 +132,8 @@ export const CONFIG = {
   MICROSOFT_EDGE_AUTH_URL: "https://edge.microsoft.com/translate/auth",
   MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
   LINGVA_API_URL: "https://lingva.ml",
-  WEBAI_API_URL: "http://localhost:6969/translate",
-  WEBAI_API_MODEL: "gemini-2.5-flash",
+  WEBAI_API_URL: "",
+  WEBAI_API_MODEL: "",
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   OPENAI_API_MODEL: "gpt-4o-mini",
@@ -232,7 +244,7 @@ export const CONFIG = {
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
-  TRANSLATE_ON_TEXT_SELECTION: true, // فعال کردن ترجمه با انتخاب متن در صفحه
+  TRANSLATE_ON_TEXT_SELECTION: !isMobile, // فعال کردن ترجمه با انتخاب متن در صفحه (غیرفعال در موبایل)
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
@@ -243,7 +255,7 @@ export const CONFIG = {
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
   // --- Versioning ---
-  PROMPTS_VERSION: 2, // Version of the prompt templates (updated for logical batching & key abbreviation)
+  PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
@@ -269,7 +281,9 @@ export const CONFIG = {
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
   WHOLE_PAGE_EXCLUDED_SELECTORS: [
     "script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
-    `.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}`, "[contenteditable='true']", `[translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`,
+    "var", "abbr", "address", "cite",
+    `.${TRANSLATION_HTML.IGNORE_CLASS}`, `.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}`,
+    "[contenteditable='true']", `[translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`,
     ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share",
     ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight",
     "hypothesis-highlight", ".hypothesis-highlight",
@@ -289,6 +303,7 @@ export const CONFIG = {
   SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
   WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
   WHOLE_PAGE_SCROLL_STOP_DELAY: 500, // تاخیر برای توقف اسکرول (ms)
+  WHOLE_PAGE_TOKEN_WARNING_HIDDEN: false, // پنهان کردن هشدار مصرف توکن در ترجمه صفحه
 
   // --- Proxy Settings ---
   PROXY_ENABLED: false, // فعال بودن proxy
@@ -331,12 +346,6 @@ export const CONFIG = {
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Translation quality requirements:
-- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
-- Prioritize clarity, tone, and readability over literal or word-for-word translation.
-- Maintain the original formatting, structure, and line breaks exactly.
-- Do **not** include any additional explanations, comments, markdown, or extra content.
-
 Output only the translated text:
 
 $_{TEXT}
@@ -348,12 +357,6 @@ $_{TEXT}
 
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
-
-Translation quality requirements:
-- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
-- Prioritize clarity, tone, and readability over literal or word-for-word translation.
-- Maintain the original formatting, structure, and line breaks exactly.
-- Do **not** include any additional explanations, comments, markdown, or extra content.
 
 Output only the translated text:
 
@@ -378,9 +381,11 @@ Example:
 Input: [{"t": "Hello", "i": "n1", "b": "b1", "r": "h1"}]
 Output: [{"t": "سلام", "i": "n1", "b": "b1", "r": "h1"}]
 
-CRITICAL - Placeholder Preservation:
-  1. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
-  2. DO NOT translate placeholders or renumber them.
+CRITICAL - Formatting & Structure:
+  1. Strictly preserve all line breaks (\n), indentation, and formatting.
+  2. If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  3. Preserve [[AIWC-0]], [[AIWC-1]] exactly.
+  4. DO NOT translate placeholders or renumber them.
 
 Return **only** the translated JSON array. No explanations or markdown.
 
@@ -446,8 +451,10 @@ $_{PROMPT_INSTRUCTIONS}
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-CRITICAL - Placeholder Preservation:
-  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -464,8 +471,10 @@ $_{PROMPT_INSTRUCTIONS}
 Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
 Each item MUST contain the "id" and the translated "text".
 
-CRITICAL - Placeholder Preservation:
-  If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -475,12 +484,19 @@ $_{TEXT}
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP ---*/
   PROMPT_BASE_AI_FOLLOWUP: `Continue translating the following JSON data from $_{SOURCE} to $_{TARGET}.
-  
+
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
-Return only the JSON object, no additional text.`,
+Return only the JSON object, no additional text.
+
+$_{TEXT}
+`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP ---*/
 
 /*--- Start PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
@@ -489,8 +505,15 @@ Return only the JSON object, no additional text.`,
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
+
 Maintain the exact same JSON structure (Object with "translations" array) as the previous batch.
-Return only the JSON object, no additional text.`,
+Return only the JSON object, no additional text.
+
+$_{TEXT}
+`,
 /*--- End PROMPT_BASE_AI_FOLLOWUP_AUTO ---*/
 
 
@@ -498,15 +521,14 @@ Return only the JSON object, no additional text.`,
   PROMPT_BASE_DICTIONARY: `You are a professional dictionary service. Your task is to accurately translate the word or phrase from $_{SOURCE} into $_{TARGET}.
 
 Format your response exactly as follows using Markdown:
-**$_{TEXT}**
-   
-- **Main Translation**: [Primary meaning in $_{TARGET}]
-- **Noun**: [Meanings if it's a noun, separated by comma]
-- **Verb**: [Meanings if it's a verb, separated by comma]
-- **Adjective**: [Meanings if it's an adjective, separated by comma]
+[Primary meaning in $_{TARGET} directly on the first line]
 
-Keep it very brief. Only include relevant parts of speech. No examples or explanations.
-All translations MUST be in $_{TARGET}.
+- **Noun**: Meanings, separated by comma
+- **Verb**: Meanings, separated by comma
+- **Adjective**: Meanings, separated by comma
+- **Synonyms**: 2-3 common synonyms
+
+Keep it very brief. All labels and content MUST be in $_{TARGET}. No examples or explanations.
 
 Now, please translate:
 $_{TEXT}
@@ -519,11 +541,9 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Translation quality requirements:
-  - Automatically detect the input language.
-  - Translate the content into $_{TARGET}.
-  - Ensure that the translation is fluent, natural, and idiomatic — not literal or mechanical.
-  - Prioritize clarity, smooth flow, and accurate meaning, without changing the original structure or layout.
+CRITICAL - Formatting & Structure:
+  - Strictly preserve all line breaks (\\n), indentation, and formatting.
+  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
 
 Return **only** the translated text. Do not include explanations, markdown, or any other content.
 
@@ -547,8 +567,7 @@ $_{TEXT}
    - Strictly follow these instructions: $_{PROMPT_INSTRUCTIONS}
    - Automatically detect the language of extracted text
    - Translate all extracted text into $_{TARGET}
-   - Maintain **natural, fluent, and idiomatic** translations
-   - Preserve the **original meaning and context**
+   - Maintain the **original meaning and context**
    - Use **appropriate terminology** for the content type (technical, casual, formal, etc.)
    - Keep **spatial relationships** when multiple text elements exist
 
@@ -564,21 +583,31 @@ $_{TEXT}
    - Maintain **consistency** in terminology throughout the translation
    - Handle **special characters, numbers, and symbols** appropriately
 
-**Important:** Output ONLY the translated text content. Do not include any analysis, descriptions, or additional commentary.`,
+**Important:** Output ONLY the translated text content. Do not include any analysis, descriptions, or additional commentary.
+
+$_{TEXT}`,
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
-- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
-- If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.`,
+- Maintain the original formatting, structure, and line breaks exactly.
+- If the input is already in $_{TARGET}, keep it unchanged or provide a natural refinement if necessary.
+- Do **not** include any additional explanations, comments, markdown, or extra content.
+
+$_{TEXT}`,
   /*--- End PROMPT_TEMPLATE ---*/
 
   /*--- Start PROMPT_TEMPLATE_AUTO ---*/
   PROMPT_TEMPLATE_AUTO: `- Translate the input text into $_{TARGET}.
-- Ensure the translation is fluent, natural, and idiomatic as if written by a native speaker.
+- Produce fluent, natural, and idiomatic translations as if written by a native speaker.
 - Prioritize clarity, tone, and readability while preserving the original intent and formatting.
-- If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.`,
+- Maintain the original formatting, structure, and line breaks exactly.
+- If the input is already in $_{TARGET}, translate it into $_{SOURCE} only if the entire context suggests a reverse translation is intended.
+- Do **not** include any additional explanations, comments, markdown, or extra content.
+
+$_{TEXT}`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/
 };
 
@@ -846,6 +875,60 @@ export const getTranslationApiAsync = async () => {
 
 export const getModeProvidersAsync = async () => {
   return getSettingValueAsync("MODE_PROVIDERS", CONFIG.MODE_PROVIDERS);
+};
+
+/**
+ * Resolves the effective provider for a specific translation mode.
+ * Returns the mode-specific provider if configured, otherwise falls back 
+ * to related modes (e.g., Dictionary -> Selection) or the global translation API.
+ * 
+ * Includes feature validation: If the resolved provider doesn't support 
+ * the mode's requirements (e.g. Bulk for Page Translation), it falls back 
+ * to the system default (googlev2).
+ * 
+ * @param {string} mode - The translation mode (from TranslationMode enum)
+ * @returns {Promise<string>} - The effective provider ID
+ */
+export const getEffectiveProviderAsync = async (mode) => {
+  try {
+    const [modeProviders, globalApi] = await Promise.all([
+      getModeProvidersAsync(),
+      getTranslationApiAsync()
+    ]);
+    
+    const systemDefault = ProviderRegistryIds.GOOGLE_V2;
+    let resolvedId = globalApi || systemDefault;
+    
+    // 1. Check direct mode-specific setting
+    if (mode && modeProviders && modeProviders[mode]) {
+      resolvedId = modeProviders[mode];
+    } 
+    // 2. Hierarchical Fallbacks
+    // Dictionary mode falls back to Selection provider if not explicitly set
+    else if (mode === TranslationMode.Dictionary_Translation && modeProviders?.[TranslationMode.Selection]) {
+      resolvedId = modeProviders[TranslationMode.Selection];
+    }
+    
+    // 3. Validation: Ensure the resolved provider supports the mode's requirements
+    const provider = findProviderById(resolvedId);
+    
+    // Mode-specific requirements
+    const needsBulk = [
+      TranslationMode.Page, 
+      TranslationMode.Select_Element, 
+      TranslationMode.Field
+    ].includes(mode);
+
+    if (needsBulk && provider && !provider.features?.includes('bulk')) {
+      logger.warn(`Resolved provider ${resolvedId} for mode ${mode} does not support bulk. Falling back to ${systemDefault}.`);
+      return systemDefault;
+    }
+    
+    return resolvedId;
+  } catch (error) {
+    logger.error(`Error resolving effective provider for mode ${mode}:`, error);
+    return ProviderRegistryIds.GOOGLE_V2;
+  }
 };
 
 // WebAI Specific
@@ -1285,4 +1368,37 @@ export const getWholePageScrollStopDelayAsync = async () => {
     "WHOLE_PAGE_SCROLL_STOP_DELAY",
     CONFIG.WHOLE_PAGE_SCROLL_STOP_DELAY
   );
+};
+
+export const getWholePageTokenWarningHiddenAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_TOKEN_WARNING_HIDDEN",
+    CONFIG.WHOLE_PAGE_TOKEN_WARNING_HIDDEN
+  );
+};
+
+// --- Character Limit Getters ---
+
+export const getPopupMaxCharsAsync = async () => {
+  return getSettingValueAsync("POPUP_MAX_CHARS", CONFIG.POPUP_MAX_CHARS);
+};
+
+export const getSidepanelMaxCharsAsync = async () => {
+  return getSettingValueAsync("SIDEPANEL_MAX_CHARS", CONFIG.SIDEPANEL_MAX_CHARS);
+};
+
+export const getSelectionMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECTION_MAX_CHARS", CONFIG.SELECTION_MAX_CHARS);
+};
+
+export const getSelectElementMaxCharsAsync = async () => {
+  return getSettingValueAsync("SELECT_ELEMENT_MAX_CHARS", CONFIG.SELECT_ELEMENT_MAX_CHARS);
+};
+
+export const getWholePageMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_MAX_CHARS", CONFIG.WHOLE_PAGE_MAX_CHARS);
+};
+
+export const getWholePageAiMaxCharsAsync = async () => {
+  return getSettingValueAsync("WHOLE_PAGE_AI_MAX_CHARS", CONFIG.WHOLE_PAGE_AI_MAX_CHARS);
 };

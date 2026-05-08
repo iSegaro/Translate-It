@@ -11,7 +11,7 @@ const { execSync } = require('child_process');
 
 // Set base directory to the project root (two levels up from /scripts/localization)
 const projectRoot = path.resolve(__dirname, '..', '..');
-const EN_LOCALE_PATH = path.join(projectRoot, '_locales/en/messages.json');
+const EN_LOCALE_PATH = path.join(projectRoot, 'src/_locales/en/messages.json');
 
 if (!fs.existsSync(EN_LOCALE_PATH)) {
   console.error(`❌ Error: Locale file not found at ${EN_LOCALE_PATH}`);
@@ -57,7 +57,7 @@ for (const key of allKeys) {
   // Search for the key in source files
   try {
     // Search for the key as a string literal
-    const searchDirs = ['src', 'html', 'public', 'config'];
+    const searchDirs = ['src', 'html', 'config'];
     const searchPaths = searchDirs
       .map(d => path.join(projectRoot, d))
       .filter(p => fs.existsSync(p))
@@ -66,7 +66,7 @@ for (const key of allKeys) {
     const manifestPath = path.join(projectRoot, 'manifest.json');
     const extraPaths = fs.existsSync(manifestPath) ? manifestPath : '';
     
-    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git || true`;
+    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude-dir=tests --exclude-dir=__tests__ --exclude="*.test.js" --exclude="*.spec.js" || true`;
     const result = execSync(command).toString();
     
     if (!result.trim()) {

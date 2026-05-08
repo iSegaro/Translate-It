@@ -4,8 +4,9 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { isValidTextElement } from '../utils/elementHelpers.js';
+import { ToastElementDetector } from '@/shared/toast/ToastElementDetector.js';
 
 /**
  * Element selection and highlighting functionality
@@ -69,40 +70,16 @@ export class ElementSelector extends ResourceTracker {
    * @returns {boolean} Whether element is our UI
    */
   isOurElement(element) {
-    if (!element || !element.classList) return false;
+    if (!element) return false;
+
+    // Use centralized ToastElementDetector for robust detection of toasts and extension UI
+    if (ToastElementDetector.shouldExcludeFromSelection(element)) {
+      return true;
+    }
     
-    // 1. Check for our UI Host (Shadow DOM root)
+    // Fallback for specific Shadow DOM root check if needed (though ToastElementDetector handles this)
     if (element.id && (element.id === UI_HOST_IDS.MAIN || element.id === UI_HOST_IDS.IFRAME)) {
       return true;
-    }
-
-    // 2. Check for our UI container classes
-    if (element.classList.contains('translate-it-toast') || 
-        element.classList.contains('translate-it-notification') ||
-        element.classList.contains('translate-it-ui-host')) {
-      return true;
-    }
-
-    // 3. Check for specific extension IDs
-    if (element.id && element.id.startsWith('translate-it-')) {
-      // EXCEPTION: Don't count the highlighted element as "our UI" 
-      if (element.classList.contains(this.HIGHLIGHT_CLASS)) {
-        return false;
-      }
-      return true;
-    }
-
-    // 4. Traverse up to see if it's inside our UI host or shadow root
-    let current = element;
-    while (current && current !== document.body) {
-      if (current.id === UI_HOST_IDS.MAIN || current.id === UI_HOST_IDS.IFRAME) {
-        return true;
-      }
-      if (current.classList && (current.classList.contains('translate-it-toast') || current.classList.contains('translate-it-notification'))) {
-        return true;
-      }
-      // Handle Shadow DOM boundaries
-      current = current.parentElement || (current.parentNode instanceof ShadowRoot ? current.parentNode.host : null);
     }
 
     return false;

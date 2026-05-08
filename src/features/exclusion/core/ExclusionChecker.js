@@ -6,7 +6,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js';
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'ExclusionChecker');

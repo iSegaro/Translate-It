@@ -50,6 +50,8 @@
     .prompt-template-input {
       width: 100%;
       position: relative;
+      direction: ltr !important;
+      text-align: left !important;
       
       :deep(textarea) {
         font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Ubuntu Mono', 'Consolas', monospace;
@@ -113,6 +115,18 @@
     max-width: 650px; // Compact width
     width: 100%;
     box-sizing: border-box;
+
+    .required-note {
+      font-size: 13px;
+      font-weight: $font-weight-semibold;
+      color: var(--color-warning);
+      background-color: var(--color-warning-alpha);
+      padding: $spacing-sm $spacing-md;
+      border-radius: $border-radius-sm;
+      margin-bottom: $spacing-md;
+      text-align: center;
+      border-inline-start: 4px solid var(--color-warning);
+    }
 
     p {
       font-size: 13px;
@@ -195,6 +209,138 @@
         }
       }
     }
+  }
+
+  .prompt-preview-section {
+    margin-top: $spacing-xl;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .prompt-preview-button-action {
+      margin-left: auto;
+      margin-right: auto;
+      width: fit-content;
+      min-width: 200px;
+      padding: $spacing-sm $spacing-md;
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-md;
+      color: var(--color-text);
+      font-size: 13px;
+      font-weight: $font-weight-medium;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      transition: all $transition-base;
+      box-shadow: $shadow-sm;
+
+      &:hover {
+        background-color: var(--color-primary-alpha);
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+        box-shadow: $shadow-md;
+      }
+
+      &:active {
+        transform: translateY(1px);
+      }
+
+      .button-icon {
+        font-size: 14px;
+      }
+    }
+
+    .prompt-preview-content {
+      margin-top: $spacing-md;
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-md;
+      width: 100%;
+      align-items: stretch;
+
+      .loading-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: $spacing-sm;
+        padding: $spacing-lg;
+        color: var(--color-text-secondary);
+        font-size: 13px;
+
+        .spinner {
+          width: 20px;
+          height: 20px;
+          border: 2px solid var(--color-border);
+          border-top-color: var(--color-primary);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+      }
+
+      .preview-note {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        text-align: center;
+        padding: $spacing-sm;
+        background-color: var(--color-background-secondary);
+        border-radius: $border-radius-sm;
+      }
+
+      .prompt-example-card {
+        background-color: var(--color-surface);
+        border: 1px solid var(--color-border-light);
+        border-radius: $border-radius-md;
+        overflow: hidden;
+
+        .example-header {
+          padding: $spacing-sm $spacing-md;
+          background-color: var(--color-background-secondary);
+          border-bottom: 1px solid var(--color-border-light);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: $spacing-xs;
+
+          .example-mode {
+            font-weight: $font-weight-semibold;
+            color: var(--color-primary);
+            font-size: 13px;
+          }
+
+          .example-desc {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+          }
+        }
+
+        .example-prompt {
+          margin: 0;
+          padding: $spacing-md;
+          font-size: 11px;
+          line-height: 1.6;
+          color: var(--color-text);
+          background-color: var(--color-background);
+          border: none;
+          white-space: pre-wrap;
+          word-break: break-word;
+          max-height: 300px;
+          overflow-y: auto;
+          font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+          direction: ltr !important;
+          text-align: left !important;
+        }
+      }
+    }
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

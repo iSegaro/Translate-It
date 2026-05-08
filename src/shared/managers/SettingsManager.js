@@ -12,8 +12,8 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
-import { SelectionTranslationMode } from '@/shared/config/config.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
@@ -46,7 +46,7 @@ class SettingsManager {
       APPLICATION_LOCALIZE: 'en',
       EXTENSION_ENABLED: true,
       TRANSLATE_ON_TEXT_FIELDS: false,
-      TRANSLATE_ON_TEXT_SELECTION: true,
+      TRANSLATE_ON_TEXT_SELECTION: !isMobile,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
@@ -58,6 +58,11 @@ class SettingsManager {
       ENABLE_DICTIONARY: true,
       EXCLUDED_SITES: [],
       ENHANCED_TRIPLE_CLICK_DRAG: false,
+      // Character Limits
+      POPUP_MAX_CHARS: 5000,
+      SIDEPANEL_MAX_CHARS: 10000,
+      SELECTION_MAX_CHARS: 5000,
+      SELECT_ELEMENT_MAX_CHARS: 300000,
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       SHOW_DESKTOP_FAB: true,
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },

@@ -18,8 +18,8 @@
 
 <div align="center">
   <strong>
-    • <a href="./README.md">English</a> | 
-    • <a href="./README_FARSI.md">فارسی</a>
+    • English | 
+    • <a href="./docs/README_FARSI.md">فارسی</a>
   </strong>
 </div>
 

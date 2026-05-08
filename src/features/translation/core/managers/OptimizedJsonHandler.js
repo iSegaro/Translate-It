@@ -10,6 +10,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 
@@ -17,11 +19,12 @@ export class OptimizedJsonHandler {
   /**
    * Orchestrates the optimized translation process.
    */
-  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender) {
+  async execute(engine, data, providerInstance, originalSourceLang, originalTargetLang, messageId, sender, uiContext = 'unknown') {
     const { text, sourceLanguage, targetLanguage, mode, options } = data;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
-    const abortController = engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '');
+    const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
+                             engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', uiContext);
 
     let hasErrors = false;
     let lastError = null;
@@ -51,11 +54,36 @@ export class OptimizedJsonHandler {
         // Execute one by one to minimize memory footprint and prevent queue flooding
         for (let i = 0; i < batches.length; i++) {
           await processBatch(batches[i], i);
+          if (hasErrors && lastError && isFatalError(lastError)) break;
         }
       } else {
         // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
-        // Run batches in parallel, but RateLimitManager will ultimately throttle them
-        const batchPromises = batches.map((batch, i) => processBatch(batch, i));
+        // Let RateLimitManager handle the actual concurrency and delays.
+        
+        let startIndex = 0;
+        // OPTIMIZATION: If source is auto, wait for the first batch to detect the language.
+        // This prevents redundant detection calls for all subsequent batches.
+        if (detectedSourceLanguage === 'auto' && batches.length > 0) {
+          logger.debug(`[JsonHandler] Auto-detection mode: Executing first batch sequentially to resolve source language...`);
+          await processBatch(batches[0], 0);
+          
+          // If first batch failed fatally, don't continue
+          if (hasErrors && lastError && isFatalError(lastError)) {
+            return { 
+              success: false, 
+              streaming: true, 
+              error: {
+                message: lastError.message || String(lastError),
+                type: lastError.type || matchErrorToType(lastError),
+                statusCode: lastError.statusCode
+              } 
+            };
+          }
+          startIndex = 1;
+        }
+
+        // Process remaining batches. They will be queued in RateLimitManager.
+        const batchPromises = batches.slice(startIndex).map((batch, i) => processBatch(batch, i + startIndex));
         await Promise.all(batchPromises);
       }
 
@@ -72,17 +100,6 @@ export class OptimizedJsonHandler {
         try {
           checkCancellation();
 
-          // Intelligent delay for non-sequential execution
-          if (i > 0 && providerConfig.rateLimit.maxConcurrent > 1) {
-            const delay = self._calculateDelay(batch, i, batches.length, providerConfig);
-            const concurrencyAwareDelay = Math.min(delay, 100);
-            if (concurrencyAwareDelay > 0) {
-              await new Promise(resolve => setTimeout(resolve, concurrencyAwareDelay));
-            }
-          }
-
-          checkCancellation();
-
           const statsBefore = statsManager.getSessionSummary(sessionId);
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
@@ -90,7 +107,7 @@ export class OptimizedJsonHandler {
           const translatedBatchResponse = await self._performBatchCall(
             providerInstance, 
             batch, 
-            sourceLanguage, 
+            detectedSourceLanguage, // Use potentially updated detectedSourceLanguage
             targetLanguage, 
             mode, 
             abortController, 
@@ -105,8 +122,8 @@ export class OptimizedJsonHandler {
           checkCancellation();
 
           // Capture detected language from the first successful batch if it's currently 'auto'
-          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.sourceLanguage) {
-            detectedSourceLanguage = translatedBatchResponse.sourceLanguage;
+          if (detectedSourceLanguage === 'auto' && translatedBatchResponse?.detectedLanguage) {
+            detectedSourceLanguage = translatedBatchResponse.detectedLanguage;
             logger.debug(`[JsonHandler] Captured detected source language: ${detectedSourceLanguage}`);
           }
 
@@ -127,19 +144,56 @@ export class OptimizedJsonHandler {
           }
           
         } catch (batchError) {
-          if (batchError.name === 'AbortError' || batchError.isCancelled) {
+          const errorType = matchErrorToType(batchError);
+          const isCancellation = batchError.name === 'AbortError' || 
+                               batchError.isCancelled || 
+                               errorType === ErrorTypes.USER_CANCELLED || 
+                               errorType === ErrorTypes.TRANSLATION_CANCELLED;
+
+          if (isCancellation) {
+            logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
+            
+            // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
+            // to prevent them from even attempting to start.
+            if (providerInstance.providerName) {
+              import('@/features/translation/core/ProviderCoordinator.js').then(({ providerCoordinator }) => {
+                if (providerCoordinator && providerCoordinator.queueManager) {
+                  // Actually, QueueManager is a singleton, we can use it directly
+                }
+              }).catch(() => { /* ignore */ });
+              
+              // More robust way: Use the QueueManager singleton directly
+              import('@/features/translation/core/QueueManager.js').then(({ queueManager }) => {
+                if (queueManager) {
+                  queueManager.cancelByMessageId(messageId);
+                }
+              }).catch(() => { /* ignore */ });
+            }
+            
             return; // Exit silently on cancellation
           }
           
-          logger.error(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
+          logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
           hasErrors = true;
           lastError = batchError;
+          
           // Stream empty/original results on failure to keep progress moving
           await self._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
+          
+          // Stop all other batches if error is fatal (429, etc.)
+          if (isFatalError(batchError)) {
+            abortController.abort();
+          }
         }
       }
 
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Final check for cancellation before sending end-of-stream markers
+      if (abortController.signal.aborted || engine.isCancelled(messageId)) {
+        logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
+      }
 
       if (hasErrors) {
         await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage);
@@ -148,7 +202,21 @@ export class OptimizedJsonHandler {
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
-      return { success: !hasErrors, streaming: true, error: lastError };
+
+      const formattedError = lastError ? {
+        message: lastError.message || String(lastError),
+        type: lastError.type || matchErrorToType(lastError),
+        statusCode: lastError.statusCode
+      } : null;
+
+      return {
+        success: !hasErrors,
+        streaming: true,
+        error: formattedError,
+        metadata: {
+          batchCount: batches.length
+        }
+      };
     } finally {
       engine.lifecycleRegistry.unregisterRequest(messageId);
     }
@@ -160,47 +228,19 @@ export class OptimizedJsonHandler {
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
       : (typeof batch === 'object' ? (batch.t || batch.text || '') : (batch || ''));
 
-    // Strategy 1: AI Providers with JSON support
-    if (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI) {
-      const response = await providerInstance.translate(
-        textsToTranslate,
-        source,
-        target,
-        {
-          mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
-          engine, sender, priority: 'high', rawJsonPayload: true,
-          expectedFormat: ResponseFormat.JSON_OBJECT
-        }
-      );
-      
-      // Extract the actual translated content from the unified response
-      return (response && typeof response === 'object' && response.translatedText !== undefined) 
-        ? response.translatedText 
-        : response;
-    } 
-    
-    // Strategy 2: Traditional Providers (Edge, Google, etc.)
-    const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
-    const delimiter = TranslationSegmentMapper.STANDARD_DELIMITER;
-    const joinedText = textsToTranslate.join(delimiter);
+    const expectedFormat = (providerInstance.constructor.batchStrategy === 'json' || providerInstance.constructor.isAI)
+      ? ResponseFormat.JSON_OBJECT
+      : ResponseFormat.STRING;
 
-    const response = await providerInstance.translate(
-      joinedText,
+    return await providerInstance.translate(
+      textsToTranslate,
       source,
       target,
-      { ...arguments[9], mode, abortController, messageId, sessionId, rawJsonPayload: true, expectedFormat: ResponseFormat.STRING }
-    );
-
-    // Extract text from unified response
-    const translatedJoined = (response && typeof response === 'object' && response.translatedText !== undefined) 
-      ? response.translatedText 
-      : response;
-
-    return TranslationSegmentMapper.mapTranslationToOriginalSegments(
-      translatedJoined,
-      textsToTranslate,
-      delimiter,
-      providerInstance.providerName
+      {
+        mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
+        engine, sender, priority: 'high', rawJsonPayload: true,
+        expectedFormat
+      }
     );
   }
 
@@ -256,20 +296,16 @@ export class OptimizedJsonHandler {
     }
 
     return originalBatch.map((item, idx) => {
-      const translatedContent = results[idx] !== undefined ? results[idx] : (typeof item === 'object' ? (item.t || item.text) : item);
+      // Use result if it exists and is not null (null means it was rejected by safety check)
+      const translatedContent = (results[idx] !== undefined && results[idx] !== null) 
+        ? results[idx] 
+        : (typeof item === 'object' ? (item.t || item.text) : item);
+        
       if (typeof item === 'object') {
         return { ...item, t: translatedContent, text: translatedContent };
       }
       return translatedContent;
     });
-  }
-
-  _calculateDelay(batch, index, total, config) {
-    if (!config?.batching?.delayBetweenRequests) return 0;
-    const baseDelay = config.batching.delayBetweenRequests;
-    const batchComplexity = batch.reduce((sum, item) => sum + (typeof item === 'object' ? (item.t || item.text || '').length : item?.length || 0), 0);
-    if (batchComplexity > 1000) return baseDelay * 1.5;
-    return baseDelay;
   }
 
   async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage) {
@@ -323,7 +359,11 @@ export class OptimizedJsonHandler {
       messageId,
       data: {
         success: false,
-        error: lastError ? { message: lastError.message || String(lastError), type: lastError.type || 'TRANSLATION_ERROR' } : null,
+        error: lastError ? { 
+          message: lastError.message || String(lastError), 
+          type: lastError.type || matchErrorToType(lastError),
+          statusCode: lastError.statusCode
+        } : null,
         sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,

@@ -73,7 +73,7 @@ const sanitizedChangelog = computed(() => {
 const fetchChangelog = async () => {
   try {
     // Use browser extension URL to access the changelog
-    const changelogUrl = browser.runtime.getURL('Changelog.md')
+    const changelogUrl = browser.runtime.getURL('docs/Changelog.md')
     const response = await fetch(changelogUrl)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)

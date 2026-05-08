@@ -1,18 +1,29 @@
 /**
- * DomTranslatorAdapter - Orchestrator for Select Element translation
- * Coordinates between background services and visual DOM management
+ * DomTranslatorAdapter - Specialized Orchestrator for "Select Element" Translation.
+ * 
+ * NOTE: This is NOT a wrapper for the 'DomTranslator' library used in Whole Page Translation.
+ * It is a custom, high-performance implementation specifically engineered for surgical 
+ * element selection.
+ * 
+ * Key Advantages over general library:
+ * 1. AI/DeepL Context Injection: Automatically gathers headings and metadata to improve LLM accuracy.
+ * 2. Structural Block Batching: Groups text nodes by semantic blocks (P, DIV) to prevent sentence fragmentation.
+ * 3. Token Optimization: Uses an abbreviated JSON protocol (t, i, b, r) saving ~75% overhead.
+ * 4. Resilient UID Mapping: Ensures 1:1 text node restoration even with asynchronous streaming updates.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { 
-  getTranslationApiAsync, 
-  getTargetLanguageAsync, 
+import { pageEventBus } from '@/core/PageEventBus.js';
+import {
+  getTargetLanguageAsync,
   getAIContextTranslationEnabledAsync,
-  getSourceLanguageAsync
+  getSourceLanguageAsync,
+  getEffectiveProviderAsync
 } from '@/config.js';
-import { AUTO_DETECT_VALUE, TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
@@ -33,6 +44,10 @@ import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTra
 // Export state and revert logic for external use
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
+/**
+ * Specialized adapter that coordinates between background services and visual DOM management.
+ * Designed for low-latency, high-precision translation of specific DOM branches.
+ */
 export class DomTranslatorAdapter extends ResourceTracker {
   constructor() {
     super('dom-translator-adapter');
@@ -42,9 +57,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.isTranslating = false;
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
-    
-    // Persistent session ID for the duration of this adapter's life
-    this.sessionMessageId = `s${Math.random().toString(36).substr(2, 6)}`;
+    this.currentSessionId = null;
 
     // Cache for original settings
     this.originalSettings = null;
@@ -74,6 +87,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     try {
       this.isTranslating = true;
+      
+      // Generate a fresh session ID for this specific translation request
+      this.currentSessionId = `s${Math.random().toString(36).substr(2, 6)}`;
+      
       if (onProgress) await onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' });
 
       const originalHTML = element.innerHTML;
@@ -82,6 +99,30 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // 1. Collect all valid text nodes
       const textNodesData = collectTextNodes(element);
       if (textNodesData.length === 0) throw new Error('No translatable text found');
+
+      // Validate segment count to prevent timeout issues
+      const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts
+      const WARNING_SEGMENTS = 500; // Increased from 200
+      if (textNodesData.length > MAX_SEGMENTS) {
+        this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, exceeding limit of ${MAX_SEGMENTS}`);
+        throw new Error(`Element is too large to translate (${textNodesData.length} text segments). Please select a smaller element.`);
+      } else if (textNodesData.length > WARNING_SEGMENTS) {
+        this.logger.debug(`[DomTranslatorAdapter] Element contains ${textNodesData.length} segments, translation may take longer`);
+      }
+
+      // Store batch count for progress tracking (will be updated after receiving response)
+      this.batchCount = null;
+      this.totalSegments = textNodesData.length;
+      this.progressEmitted = false; // Flag to prevent duplicate progress emissions
+
+      this.logger.debug(`[DomTranslatorAdapter] Initial progress: 0/? batches (${this.totalSegments} segments)`);
+
+      // Emit initial progress (0/total batches) - will be updated after receiving response
+      pageEventBus.emit('select-element-translation-progress', {
+        completed: 0,
+        total: 1, // Default, will be updated after receiving batch count from response
+        isRequestProgress: true // Flag to indicate this is API request count
+      });
 
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
@@ -101,7 +142,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const isAIContextEnabled = await getAIContextTranslationEnabledAsync();
 
       const [provider, targetLanguage] = await Promise.all([
-        options.provider || getTranslationApiAsync(),
+        options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
         options.targetLanguage || getTargetLanguageAsync()
       ]);
 
@@ -158,12 +199,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 data.data.forEach((translatedItem, index) => {
                   // Handle both abbreviated and full keys for backward compatibility
                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
-                  
+
                   let nodeData = null;
                   if (uid) {
                     nodeData = nodeMap.get(uid);
-                  } 
-                  
+                  }
+
                   // Fallback to sequential index ONLY if UID mapping fails or is missing
                   if (!nodeData) {
                     nodeData = textNodesData[lastProcessedIndex++];
@@ -172,7 +213,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     const currentIdx = textNodesData.findIndex(d => d.uid === uid);
                     if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
                   }
-                  
+
                   if (nodeData && !processedUids.has(nodeData.uid)) {
                     // Extract text from abbreviated key 't' or full key 'text'
                     const text = translatedItem?.t || translatedItem?.text || translatedItem;
@@ -180,6 +221,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     processedUids.add(nodeData.uid);
                   }
                 });
+
+                // Emit progress update based on batch index if available (OUTSIDE the loop)
+                if (data.batchIndex !== undefined && data.totalBatches !== undefined) {
+                  pageEventBus.emit('select-element-translation-progress', {
+                    completed: data.batchIndex + 1,
+                    total: data.totalBatches,
+                    isRequestProgress: true
+                  });
+                  this.progressEmitted = true; // Mark that progress has been emitted
+                }
               }
             } catch (err) {
               this.logger.error('Error during onStreamUpdate processing:', err);
@@ -194,10 +245,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
               Object.assign(error, errObj);
               return safeResolve({ success: false, error });
             }
-            safeResolve({ success: true, targetLanguage: effectiveTargetLanguage });
+
+            // Capture final language from stream end metadata if available
+            const finalLang = data.targetLanguage || effectiveTargetLanguage;
+            safeResolve({ success: true, targetLanguage: finalLang });
           },
           onError: (error) => {
-            if (isSettled || !this.currentMessageId || error.message === 'Handler cancelled') return;
+            if (isSettled || !this.currentMessageId) return;
+            
+            // Still resolve to allow cleanup, but pass the error
             safeResolve({ success: false, error });
           }
         });
@@ -208,7 +264,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       await contentScriptIntegration.initialize();
       
-      const response = await sendRegularMessage({
+      const response = await contentScriptIntegration.sendTranslationRequest({
         action: MessageActions.TRANSLATE,
         messageId, 
         data: {
@@ -222,27 +278,33 @@ export class DomTranslatorAdapter extends ResourceTracker {
           contextMetadata: isAIContextEnabled ? contextMetadata : null,
           contextSummary: contextSummary,
           options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
-          sessionId: this.sessionMessageId, 
+          sessionId: this.currentSessionId, 
         },
         context: MessageContexts.SELECT_ELEMENT,
       });
 
+      // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
-      if (response?.streaming) {
+      if (response?.success && response.streaming) {
         result = await streamEndPromise;
       } else if (response?.success) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
       } else {
-        throw new Error(response?.error?.message || response?.error || 'Translation failed');
+        result = response;
       }
 
-      // If the result contains an error (from resolve-only pattern), throw it now
+      // Update effective target language from result if it changed
+      if (result?.targetLanguage) {
+        effectiveTargetLanguage = result.targetLanguage;
+      }
+
+      // If the result contains an error, throw it now
       if (result && result.success === false && result.error) {
         throw result.error;
       }
 
       return await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.sessionMessageId
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId
       });
 
     } catch (error) {
@@ -288,6 +350,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const trailingMatch = originalText.match(/(\s*)$/);
     const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
     const trailingWhitespace = trailingMatch ? trailingMatch[1] : '';
+    const trimmedOriginal = originalText.trim();
+
+    // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
+    // returned a "cleaned" version of the same text.
+    // We ignore: ZWSP(\u200b), ZWNJ(\u200c), ZWJ(\u200d), LRM(\u200e), RLM(\u200f), BOM(\ufeff), Tatweel(\u0640), EnDash(\u2013), EmDash(\u2014)
+    const normalizeForComparison = (s) => s ? s.replace(/[\u200b-\u200f\uFEFF\u0640\u2013\u2014]/g, '').replace(/\s+/g, ' ').trim() : '';
+    const isFunctionallyIdentical = normalizeForComparison(finalTranslation) === normalizeForComparison(trimmedOriginal);
+    if (isFunctionallyIdentical) {
+      finalTranslation = trimmedOriginal;
+    } else {
+      finalTranslation = finalTranslation.trim();
+    }
     
     const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
     const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
@@ -306,10 +380,24 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element) {
+    this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
+
     try {
-      const parsed = JSON.parse(response.translatedText);
-      const results = Array.isArray(parsed) ? parsed : [parsed];
-      
+      // Robust result extraction - handle both unified response and direct results
+      let rawResults = response.translatedText;
+
+      // If it's already an object/array, don't re-parse
+      if (typeof rawResults === 'string' && (rawResults.trim().startsWith('[') || rawResults.trim().startsWith('{'))) {
+        try {
+          rawResults = JSON.parse(rawResults);
+        } catch (e) {
+          this.logger.warn('Failed to parse translatedText as JSON:', e.message);
+        }
+      }
+
+      const results = Array.isArray(rawResults) ? rawResults : [rawResults];
+      const finalTargetLanguage = response.targetLanguage || targetLanguage;
+
       results.forEach((item, i) => {
         // Handle abbreviated key 'i' for UID
         const uid = item?.i || item?.uid;
@@ -317,12 +405,35 @@ export class DomTranslatorAdapter extends ResourceTracker {
         if (nodeData) {
           // Handle abbreviated key 't' for text
           const text = item?.t || item?.text || item;
-          this._applyTranslationToNode(nodeData.node, text, targetLanguage, element);
+          this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
         }
       });
 
-      return { success: true, isNonStreaming: true, translatedResults: results };
-    } catch {
+      // Emit final progress for non-streaming mode
+      // Use batch count if available, otherwise use 1 (single request)
+      const total = this.batchCount || 1;
+
+      // Prevent duplicate progress emissions (e.g., when streaming mode also calls this)
+      if (!this.progressEmitted || this.batchCount !== null) {
+        this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse emitting final progress: ${total}/${total} (batchCount: ${this.batchCount})`);
+        pageEventBus.emit('select-element-translation-progress', {
+          completed: total,
+          total: total,
+          isRequestProgress: true // Always use request progress for consistency
+        });
+        this.progressEmitted = true;
+      } else {
+        this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse skipping duplicate progress emit`);
+      }
+
+      return {
+        success: true,
+        isNonStreaming: true,
+        translatedResults: results,
+        targetLanguage: finalTargetLanguage
+      };
+    } catch (err) {
+      this.logger.error('Invalid translation format during direct handling:', err);
       throw new Error('Invalid translation format');
     }
   }
@@ -409,8 +520,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
   async revertTranslation() { return await revertSelectElementTranslation(); }
 
   async cleanup() {
-    if (this.sessionMessageId) {
-      sendRegularMessage({ action: MessageActions.CANCEL_SESSION, data: { sessionId: this.sessionMessageId } }).catch(() => {});
+    if (this.currentSessionId) {
+      sendRegularMessage({ action: MessageActions.CANCEL_SESSION, data: { sessionId: this.currentSessionId } }).catch(() => {});
     }
     super.cleanup();
   }

@@ -17,7 +17,7 @@ export async function handleNotificationUpdateClick(notificationId) {
   try {
     if (notificationId === "update-notification") {
       // Open options page when update notification is clicked
-      const optionsUrl = browser.runtime.getURL("html/options.html#about");
+      const optionsUrl = browser.runtime.getURL("src/html/options.html#about");
       await browser.tabs.create({ url: optionsUrl });
 
       // Clear the notification

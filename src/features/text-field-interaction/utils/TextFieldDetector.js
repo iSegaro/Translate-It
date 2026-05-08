@@ -5,7 +5,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { FIELD_DETECTION } from '@/shared/config/constants.js';
+import { FIELD_DETECTION } from '@/shared/constants/detection.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TextFieldDetector');
 

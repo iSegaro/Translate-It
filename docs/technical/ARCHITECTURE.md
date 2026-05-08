@@ -45,6 +45,7 @@
 - **[Translation System](TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
 - **[Provider Implementation Guide](PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
+- **[Testing Strategy](TESTING_STRATEGY.md)** - Guidelines and roadmap for unit and integration testing
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
 - **[Logging System](LOGGING_SYSTEM.md)** - Structured logging with performance optimization
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system with Critical Protection for essential resources

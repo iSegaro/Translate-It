@@ -2,11 +2,12 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
   getEnableDictionaryAsync,
@@ -137,7 +138,6 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
     const body = new URLSearchParams();
     body.append("q", combinedText);
-    const originalCharCount = options.originalCharCount || chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const responseObj = await this._executeApiCall({
       url: url.toString(),
@@ -163,25 +163,72 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         // Capture detected source language if available (usually at index 2 or index 8)
         this._setDetectedLanguage(data[2] || (data[8] && data[8][0] && data[8][0][0]));
 
-        // Combine segments back
-        const translatedText = data[0].map(segment => segment[0] || "").join('');
-        
-        let candidateText = "";
-        if (shouldIncludeDictionary && data[1]) {
-          candidateText = data[1].map((dict) => {
-            const pos = dict[0] || "";
-            const terms = dict[1] || [];
-            return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
-          }).join("");
+        // For single segments, keep existing stable behavior
+        if (chunkTexts.length === 1) {
+          const translatedText = data[0].map(segment => segment[0] || "").join('');
+          
+          let candidateText = "";
+          if (shouldIncludeDictionary && data[1]) {
+            candidateText = data[1].map((dict) => {
+              const pos = dict[0] || "";
+              const terms = dict[1] || [];
+              return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
+            }).join("");
+          }
+
+          return { translatedText, candidateText: candidateText.trim() };
         }
 
-        return { translatedText, candidateText: candidateText.trim() };
+        // For multiple segments, reconstruct the array to prevent delimiter leakage.
+        // Google often splits our delimiters ([[---]]) and attaches brackets to adjacent text.
+        const segments = data[0];
+        const results = new Array(chunkTexts.length).fill("");
+        let currentIdx = 0;
+        let inDelimiterZone = false;
+
+        for (const segment of segments) {
+          const trans = segment[0] || "";
+          const orig = segment[1] || "";
+          
+          // Identify if this segment is part of the delimiter pattern
+          // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
+          const isDelimiterPart = /^[[\]\s\n\r.——–…ـ·・-]+$/.test(orig) && 
+                                  (orig.includes('-') || orig.includes('.') || orig.includes('[') || orig.includes(']') || 
+                                   orig.includes('—') || orig.includes('–') || orig.includes('…') || orig.includes('ـ') || 
+                                   orig.includes('·') || orig.includes('・'));
+          
+          if (isDelimiterPart) {
+            if (!inDelimiterZone) {
+              currentIdx++;
+              inDelimiterZone = true;
+            }
+            continue;
+          }
+
+          inDelimiterZone = false;
+          if (currentIdx < results.length) {
+            // Clean any delimiter remnants using centralized BIDI scrubbing
+            const cleanTrans = TraditionalTextProcessor.scrubBidiArtifacts(trans);
+            results[currentIdx] += cleanTrans;
+          }
+        }
+
+        // Fallback: If reconstruction resulted in empty segments for non-empty originals
+        // (which means Google merged segments unpredictably), fallback to joined string 
+        // and let the robust SegmentMapper handle it.
+        const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && chunkTexts[i].trim());
+        if (hasEmpty) {
+          const joinedResult = data[0].map(segment => segment[0] || "").join('');
+          return { translatedText: joinedResult, candidateText: "" };
+        }
+
+        return { translatedText: results, candidateText: "" };
       },
       context: 'googlev2-translate-chunk',
       abortController,
       sessionId: options.sessionId,
       charCount: this._calculateTraditionalCharCount(chunkTexts),
-      originalCharCount
+      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
     });
 
     // Handle dictionary formatting for single segment
@@ -217,7 +264,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         const partOfSpeech = line.substring(0, colonIndex).trim();
         const terms = line.substring(colonIndex + 1).trim();
         if (partOfSpeech && terms) {
-          markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
+          markdownOutput += `**${partOfSpeech}**: ${terms}\n\n`;
         }
       } else if (line.trim()) {
         markdownOutput += `**${line.trim()}**\n\n`;
@@ -226,4 +273,3 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     return markdownOutput.trim();
   }
 }
-

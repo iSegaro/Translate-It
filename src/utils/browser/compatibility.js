@@ -6,6 +6,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { isMobile, isTouchDevice } from '@/shared/utils/device.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.BROWSER, 'compatibility');
 
@@ -107,22 +108,11 @@ export function detectOS() {
  */
 export const deviceDetector = {
   isMobile() {
-    if (typeof navigator === 'undefined') return false;
-    const ua = navigator.userAgent || navigator.vendor || (window && window.opera) || "";
-    // Standard mobile UA detection
-    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    
-    // iPadOS detection (often reports as MacIntel but with touch)
-    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-
-    // In extension context (popups/sidepanels), innerWidth is always small.
-    // We should NOT rely on width + touch for mobile detection here as it hits touch-enabled desktops.
-    return isMobileUA || isIPadOS;
+    return isMobile;
   },
 
   isTouchDevice() {
-    if (typeof navigator === 'undefined') return false;
-    return (typeof window !== 'undefined' && 'ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    return isTouchDevice;
   },
 
   shouldEnableMobileUI() {

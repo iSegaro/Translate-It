@@ -79,25 +79,24 @@ body.sidepanel-context #app {
 // Used by useHighlightManager to spotlight specific settings
 @keyframes ti-highlight-pulse {
   0% { 
-    outline: 2px solid transparent; 
     box-shadow: 0 0 0 0 rgb(var(--primary-color-rgb, 64, 128, 255), 0);
     background-color: transparent;
   }
 
   15% { 
-    outline: 2px solid var(--primary-color, #4080ff);
-    box-shadow: 0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    // Use box-shadow for the "border" instead of outline for better reliability and radius-matching
+    box-shadow: 0 0 0 2px var(--primary-color, #4080ff),
+                0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
     background-color: rgb(var(--primary-color-rgb, 64, 128, 255), 0.05);
   }
 
   85% { 
-    outline: 2px solid var(--primary-color, #4080ff);
-    box-shadow: 0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
+    box-shadow: 0 0 0 2px var(--primary-color, #4080ff),
+                0 0 0 8px rgb(var(--primary-color-rgb, 64, 128, 255), 0.15);
     background-color: rgb(var(--primary-color-rgb, 64, 128, 255), 0.05);
   }
 
   100% { 
-    outline: 2px solid transparent; 
     box-shadow: 0 0 0 0 rgb(var(--primary-color-rgb, 64, 128, 255), 0);
     background-color: transparent;
   }

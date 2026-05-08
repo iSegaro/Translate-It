@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js';
+import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
 
@@ -114,7 +115,15 @@ export function collectTextNodes(element) {
       }
 
       // Filter out empty or whitespace-only nodes early
-      return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      const trimmed = node.textContent.trim();
+      if (!trimmed) return NodeFilter.FILTER_REJECT;
+
+      // Filter out technical patterns (Email, URL, etc.)
+      if (DOM_FILTERS.isTechnicalPattern(trimmed)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      return NodeFilter.FILTER_ACCEPT;
     }
   });
 

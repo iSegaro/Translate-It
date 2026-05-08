@@ -12,11 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
-const args = process.argv.slice(2)
-const isMobile = args.includes('--mobile') || args.includes('--m')
-
-const CHROME_BUILD_DIR = `dist/chrome/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}`
-const CHROME_ZIP_PATH = `dist/chrome/Translate-It-v${pkg.version}${isMobile ? '-mobile' : ''}.zip`
+const CHROME_BUILD_DIR = `dist/chrome/Translate-It-v${pkg.version}`
+const CHROME_ZIP_PATH = `dist/chrome/Translate-It-v${pkg.version}.zip`
 
 /**
  * Build Chrome extension with Vue
@@ -40,9 +37,7 @@ async function buildChromeExtension() {
     
     process.env.NODE_ENV = 'production'
     process.env.BROWSER = 'chrome'
-    if (isMobile) process.env.IS_MOBILE = 'true'
-    
-    // Build main extension files
+
     const buildCommand = `npx vite build --config config/vite/vite.config.chrome.js`
     execSync(buildCommand, { stdio: 'pipe' })
     

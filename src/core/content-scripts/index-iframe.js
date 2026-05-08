@@ -151,6 +151,7 @@ async function setupProgressForwarder(bus) {
         frameUrl: window.location.href,
         data: {
           translatedCount: data.translatedCount || 0,
+          failedCount: data.failedCount || data.failed || 0,
           totalCount: data.totalCount || 0,
           isTranslated: data.isTranslated,
           isAutoTranslating: data.isAutoTranslating,

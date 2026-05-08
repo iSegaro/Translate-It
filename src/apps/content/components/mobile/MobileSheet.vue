@@ -4,13 +4,15 @@
     class="ti-m-sheet-overlay notranslate"
     translate="no"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    @click.self="closeSheet"
+    @mousedown.self.prevent="closeSheet"
   >
     <div 
       class="ti-m-sheet notranslate"
       translate="no"
       :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
       :style="sheetStyle"
+      @mousedown="onSheetMouseDown"
+      @touchstart="onSheetMouseDown"
     >
       <!-- Drag Handle Header -->
       <div 
@@ -18,7 +20,7 @@
         @touchstart.stop.prevent="onDragStart"
         @touchmove.stop.prevent="onDragMove"
         @touchend.stop="onDragEnd"
-        @mousedown.stop="onDragStart"
+        @mousedown.stop.prevent="onDragStart"
       >
         <div class="ti-m-drag-handle" />
       </div>
@@ -47,10 +49,12 @@ import { computed, ref, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { MOBILE_CONSTANTS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
@@ -146,6 +150,17 @@ watch(isOpen, (newValue) => {
     document.body.style.overflow = ''
     document.body.style.touchAction = ''
     document.documentElement.style.overflow = ''
+
+    // Owner-aware TTS cleanup when sheet closes
+    if (newValue === false) {
+      sendMessage({
+        action: MessageActions.TTS_STOP,
+        data: { 
+          source: 'mobile-sheet-close',
+          stopOnlyIfOwner: true 
+        }
+      }).catch(err => logger.debug('Failed to stop TTS on mobile sheet close:', err));
+    }
   }
 }, { immediate: true })
 
@@ -194,6 +209,38 @@ const closeSheet = () => {
   document.documentElement.style.overflow = ''
   mobileStore.closeSheet()
 }
+
+const onSheetMouseDown = (e) => {
+  // CRITICAL: Prevent focus shift from page to sheet to preserve selection
+  const target = e.target;
+  
+  // 1. Identify interactive elements that MUST gain focus (text inputs)
+  const isFocusable = target.tagName === 'TEXTAREA' || 
+                      target.tagName === 'INPUT' || 
+                      target.isContentEditable;
+  
+  // 2. Identify elements that should trigger clicks (Buttons, Links, etc.)
+  // We don't want to preventDefault on touchstart for these to allow the sequence to complete.
+  const isClickable = target.closest('button') || target.closest('a');
+
+  if (e.type === 'mousedown') {
+    // For mouse, prevent focus shift for everything except focusable inputs
+    // This preserves selection while allowing buttons to be clicked
+    if (!isFocusable) {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if (e.type === 'touchstart') {
+    // For touch, only prevent on "dead zones" (not scrollable, not clickable)
+    // to avoid breaking mobile gestures or click sequences.
+    const isScrollable = target.closest('.ti-m-sheet-content');
+    if (!isFocusable && !isClickable && !isScrollable && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+};
 
 onUnmounted(() => {
   document.body.style.overflow = ''

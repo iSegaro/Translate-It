@@ -5,6 +5,7 @@ import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.j
 import { isChromium } from '@/core/browserHandlers.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'EdgeTTSHandler');
 
@@ -89,14 +90,24 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
 /**
  * Handle TTS Stop request for Edge TTS
  */
-export const handleEdgeTTSStopAll = async (message) => {
+export const handleEdgeTTSStopAll = async (message, sender) => {
   try {
-    const { ttsId } = message.data || {};
+    const { ttsId, stopOnlyIfOwner } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
     
+    // 1. Specific ID check
     if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
       return { success: true, skipped: true };
     }
+
+    // 2. Ownership check (for automatic cleanups)
+    if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
+      logger.debug('[EdgeTTS] Ignoring stop request: sender is not the owner');
+      return { success: true, skipped: true, reason: 'not_owner' };
+    }
+    
+    // Stop any active queue
+    ttsQueueManager.stop();
     
     // notifyTTSEnded will check sender internal state
     await ttsStateManager.notifyTTSEnded('stopped');

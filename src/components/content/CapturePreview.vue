@@ -295,6 +295,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { computed } from 'vue'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js'
 
 const { handleError } = useErrorHandler()
 
@@ -507,7 +508,8 @@ const copyResult = async () => {
   if (!translationResult.value) return
 
   try {
-    await navigator.clipboard.writeText(translationResult.value.text)
+    const cleanText = SimpleMarkdown.getCleanTranslation(translationResult.value.text, ExtractionStrategy.FULL_TEXT);
+    await navigator.clipboard.writeText(cleanText)
     showFeedback('Copied to clipboard!')
   } catch (err) {
     await handleError(err, 'capture-preview-copy')
@@ -527,7 +529,8 @@ const playTTS = async () => {
   try {
     isPlayingTTS.value = true
     
-    const utterance = new SpeechSynthesisUtterance(translationResult.value.text)
+    const cleanText = SimpleMarkdown.getCleanTranslation(translationResult.value.text, ExtractionStrategy.FULL_TEXT);
+    const utterance = new SpeechSynthesisUtterance(cleanText)
     utterance.lang = toLanguage.value
     utterance.rate = 0.9
     utterance.pitch = 1

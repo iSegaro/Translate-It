@@ -5,7 +5,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { shortcutManager } from '@/core/managers/content/shortcuts/ShortcutManager.js';
-import { INPUT_TYPES, NOTIFICATION_TIME } from '@/shared/config/constants.js';
+import { INPUT_TYPES } from '@/shared/constants/detection.js';
+import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 
 const Platform = {
@@ -36,7 +37,6 @@ export class ShortcutHandler extends ResourceTracker {
 
     this.isActive = false;
     this.keydownHandler = null;
-    this.translationHandler = null;
     this.featureManager = options.featureManager;
 
     // Platform will be detected asynchronously in activate()
@@ -390,7 +390,7 @@ export class ShortcutHandler extends ResourceTracker {
         }
 
         // Trigger translation for text field
-        this.triggerTextFieldTranslation(activeElement, text);
+        await this.triggerTextFieldTranslation(activeElement, text);
         
       } else {
         // Check for selected text
@@ -454,23 +454,16 @@ export class ShortcutHandler extends ResourceTracker {
     return '';
   }
 
-  triggerTextFieldTranslation(element, text) {
+  async triggerTextFieldTranslation(element, text) {
     try {
-      // Import translation handler dynamically to avoid circular dependencies
-      import('@/core/InstanceManager.js').then(({ getTranslationHandlerInstance }) => {
-        const translationHandler = getTranslationHandlerInstance();
-        if (translationHandler && typeof translationHandler.processTranslation_with_CtrlSlash === 'function') {
-          translationHandler.processTranslation_with_CtrlSlash({
-            text: text,
-            target: element
-          });
-        }
-      }).catch(() => {
-        // Silently fail if InstanceManager not available
-      });
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
       
-    } catch {
-      // Error triggering handled silently
+      await translateFieldViaSmartHandler({
+        text: text,
+        target: element
+      });
+    } catch (error) {
+      logger.error('Error triggering text field translation via shortcut:', error);
     }
   }
 
@@ -549,11 +542,6 @@ export class ShortcutHandler extends ResourceTracker {
 
   isShortcutSupported() {
     return this.platform !== Platform.UNKNOWN;
-  }
-
-  // Method to set translation handler after initialization
-  setTranslationHandler(handler) {
-    this.translationHandler = handler;
   }
 
   // Static method to deactivate ALL instances (used when feature should be globally disabled)

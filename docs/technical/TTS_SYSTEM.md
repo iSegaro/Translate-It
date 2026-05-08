@@ -25,9 +25,9 @@ The system uses a layered approach to separate UI interaction, logic routing, an
        │
 [ TTSDispatcher.js ] ◄─┐ (The Brain: Proactive Detection & Engine Selection)
        │               │
-       ├─► [ TTSLanguageService.js ] (Checks engine support via PROVIDER_CONFIGS)
-       │               │
-       │               └─► [ TTSVoiceService.js ] (Dynamic list & Dialect matching)
+       ▼               └─► [ TTSLanguageService.js ] (Checks engine support)
+       │
+[ TTSQueueManager.js ] ──► (The Conductor: Smart Chunking & Playback Queue)
        │
        ├─► [ handleEdgeTTS.js ] ──► [ EdgeTTSClient.js ] (Logic-only synthesize)
        │            │                      │
@@ -54,35 +54,49 @@ The central intelligence of the system. It intercepts all speech requests and pe
 - **Proactive Detection**: Identifies the language before the first attempt if "Smart Detection" is enabled.
 - **Engine Resolution**: Decides between Google or Edge based on user preference and native language support.
 - **Smart Recovery**: Handles Edge failures (e.g., 0-byte audio) by triggering re-detection and falling back to the alternative engine.
+- **Queue Handover**: Hands off the resolved request to the `TTSQueueManager` for playback orchestration.
 
-### 3. `TTSStateManager.js` (Unified State & Targeted Broadcast)
+### 3. `TTSQueueManager.js` (The Conductor)
+Manages long-form text by breaking it into smaller, manageable pieces:
+- **Smart Chunking**: Uses `Intl.Segmenter` to split text at logical sentence boundaries (max 200 chars).
+- **Sequential Playback**: Maintains a playback queue, feeding chunks to handlers one by one.
+- **Seamless Transitions**: Listens for internal completion signals to trigger the next chunk without resetting the UI state.
+- **Queue Control**: Ensures that "Stop" commands immediately clear all pending chunks.
+
+### 4. `TTSStateManager.js` (Unified State & Targeted Broadcast)
 Manages the shared state across all handlers:
 - **Targeted Broadcast**: Implements a `broadcastStatus` mechanism that notifies ONLY the initiating tab (all its frames/Shadow DOM) and internal extension contexts (Popup/Sidepanel). This improves performance by reducing unnecessary cross-tab traffic while ensuring UI synchronization in complex environments.
 - **Offscreen Persistence**: Controls the lifecycle of the Offscreen document. Uses `stopAudioOnly()` instead of closing the document to eliminate latency.
 - **Status Mapping**: Translates internal engine events into unified statuses: `completed`, `error`, `stopped`, and `idle`.
 
-### 4. `EdgeTTSClient.js` (Neural Worker)
+### 5. `EdgeTTSClient.js` (Neural Worker)
 A **logic-only** client for Microsoft Edge TTS:
 - **Mobile Emulation**: Uses fixed Mobile App IDs and modern User-Agents to ensure authenticity.
 - **Security**: Implements HMAC-SHA256 signatures and JWT token expiry management.
 - **Resilience**: Integrated with the Circuit Breaker to prevent IP blocking on server failures.
 
-### 5. `TTSLanguageService.js` (Capability Manager)
+### 6. `TTSLanguageService.js` (Capability Manager)
 Acts as a validator for engine capabilities:
 - **Logic Separation**: Decoupled from data; fetches support matrices from `ttsProviders.js`.
 - **Async Resolution**: Coordinates with `TTSVoiceService` to find the best available neural voice name.
 
-### 6. `TTSCircuitBreaker.js` (Protection Layer)
+### 7. `TTSCircuitBreaker.js` (Protection Layer)
 Prevents overwhelming failing services and protects user IP reputation:
 - **State Persistence**: Stores "Open/Closed" states in `storage.local` to survive worker suspensions.
 - **Thresholds**: Automatically blocks requests to an engine if it fails 5 times within a 10-minute window.
 - **Cooldown**: Enforces a 15-minute reset period before allowing new attempts.
 
-### 7. `TTSVoiceService.js` (Voice Management)
+### 8. `TTSVoiceService.js` (Voice Management)
 Handles the dynamic aspects of Microsoft Edge voices:
 - **Dynamic Fetching**: Downloads the live voice list from Microsoft using a trusted client token.
 - **Caching**: Implements a 24-hour cache in `storage.local` to avoid redundant network requests.
 - **Dialect Prioritization**: Implements a "Preferred Region" logic (e.g., prioritizing `en-US` over `en-AU` for English) to ensure natural sounding defaults.
+
+### 9. Owner-Aware Cleanup Logic
+To prevent cross-context interruptions (e.g., closing the Popup stopping a Desktop FAB playback), the system implements an **Ownership Verification** mechanism:
+- **`isCurrentOwner(sender)`**: The `TTSStateManager` identifies the initiator of the current audio using Tab IDs, Frame IDs, or internal URLs.
+- **`stopOnlyIfOwner` Flag**: Automatic cleanup triggers (like window closure or visibility changes) pass this flag. The background script only executes the stop command if the sender is the verified owner.
+- **Manual Overrides**: User-initiated actions (clicking a Stop button or starting new text) bypass this check to ensure the **Exclusive Playback** rule is maintained.
 
 ---
 

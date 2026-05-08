@@ -16,10 +16,11 @@ import {
   TranslationMode,
 } from "@/shared/config/config.js";
 
-import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { getLanguageNameFromCode, getCanonicalCode } from '@/shared/config/languageConstants.js';
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'promptBuilder');
 
 
@@ -84,8 +85,22 @@ export async function buildPrompt(
     actualSourceLang = 'en';
   }
   
-  const sourceName = capitalize(getLanguageNameFromCode(actualSourceLang) || actualSourceLang);
-  const targetName = capitalize(getLanguageNameFromCode(targetLang) || targetLang);
+  const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang);
+  const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang);
+
+  // Resolve instructions from template
+  const promptTemplate = sourceLang === 'auto'
+    ? await getPromptAutoAsync()
+    : await getPromptAsync();
+
+  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
+  const promptInstructionsWithoutText = promptTemplate
+    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
+    .replace(/\n\s*$/g, '');        // Remove trailing empty lines
+
+  const promptInstructions = promptInstructionsWithoutText
+    .replace(/\$_{SOURCE}/g, sourceName)
+    .replace(/\$_{TARGET}/g, targetName);
 
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
@@ -97,6 +112,7 @@ export async function buildPrompt(
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
+      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
       .replace(/\$_{TEXT}/g, text);
   }
 
@@ -107,7 +123,9 @@ export async function buildPrompt(
     logger.debug('AI provider in Select Element mode (batch). Using batch prompt.');
     const batchPromptTemplate = await getPromptBASEBatchAsync();
     return batchPromptTemplate
+      .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
+      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
       .replace(/\$_{TEXT}/g, text);
   }
 
@@ -135,30 +153,18 @@ export async function buildPrompt(
   }
 
   // Now, build the final prompt by injecting languages and instructions.
-  const promptTemplate = sourceLang === 'auto' 
-    ? await getPromptAutoAsync() 
-    : await getPromptAsync();
-  
-  // IMPORTANT: The placeholder format is $_{VAR}, not ${\\_\_VAR}.
-  const promptInstructions = promptTemplate
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName);
-
   let finalPromptWithInstructions = promptBase
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName)
     .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
 
   // Inject the actual text to be translated.
-  let finalPrompt;
-  if (finalPromptWithInstructions.includes("$_{TEXT}")) {
-    finalPrompt = finalPromptWithInstructions.replace(
-      /\$_{TEXT}/g,
-      text,
-    );
-  } else {
-    finalPrompt = `${finalPromptWithInstructions}\n\n${text}\n\n`;
-  }
+  // $_{TEXT} is now required in the prompt template, so we can safely replace it.
+  const protectedText = isAI ? NewlineManager.protect(text) : text;
+  const finalPrompt = finalPromptWithInstructions.replace(
+    /\$_{TEXT}/g,
+    protectedText,
+  );
 
   return finalPrompt;
 }

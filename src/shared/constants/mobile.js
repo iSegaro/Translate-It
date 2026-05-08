@@ -27,6 +27,6 @@ export const MOBILE_CONSTANTS = {
       LEFT: 'left',
       RIGHT: 'right'
     },
-    DEFAULT_Y: 120
+    DEFAULT_Y: -1
   }
 };

@@ -150,8 +150,11 @@ export class StreamingResponseHandler {
     // Complete streaming operation in coordinator
     if (data?.success) {
       this.coordinator.completeStreamingOperation(messageId, {
+        success: true,
         type: 'stream_end',
         updateCount: handler.updateCount,
+        targetLanguage: data.targetLanguage,
+        sourceLanguage: data.sourceLanguage,
         data
       });
     } else {
@@ -196,6 +199,7 @@ export class StreamingResponseHandler {
     // Complete operation in coordinator
     if (data?.success) {
       this.coordinator.completeStreamingOperation(messageId, {
+        success: true,
         type: 'translation_result',
         data
       });

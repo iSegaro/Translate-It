@@ -41,7 +41,7 @@ export async function handleOpenSidePanel(message, sender, sendResponse) {
     } else {
       // Fallback: open sidepanel page in new tab
       await browser.tabs.create({
-        url: browser.runtime.getURL('/html/sidepanel.html'),
+        url: browser.runtime.getURL('/src/html/sidepanel.html'),
         active: true
       });
     }

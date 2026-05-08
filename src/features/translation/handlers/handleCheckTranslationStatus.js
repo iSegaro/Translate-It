@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { streamingManager } from "../core/StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCheckTranslationStatus');
 
@@ -51,68 +52,66 @@ export async function handleCheckTranslationStatus(request, sender) {
       };
     }
 
-    // Check streaming manager first for active streaming translations
+    // Check streaming manager first for active or recently completed translations
     let streamingStatus = null;
     try {
-      const { streamingManager } = await import("../core/StreamingManager.js");
       streamingStatus = streamingManager.getStreamStatus(messageId);
       logger.debug('[CheckTranslationStatus] Streaming status checked', {
         messageId,
-        streamingStatus: streamingStatus?.status,
+        status: streamingStatus?.status,
         hasResults: streamingStatus?.hasResults
       });
     } catch (error) {
       logger.debug('[CheckTranslationStatus] StreamingManager check failed:', error);
     }
 
-    // Check translation engine for completed requests
-    let engineStatus = null;
+    // Check lifecycle registry for active (but not necessarily streaming) requests
+    let isActive = false;
     try {
-      if (translationEngine.getRequestStatus) {
-        engineStatus = translationEngine.getRequestStatus(messageId);
-        logger.debug('[CheckTranslationStatus] Engine status checked', {
-          messageId,
-          engineStatus: engineStatus?.status
-        });
+      if (translationEngine.getAbortController && translationEngine.getAbortController(messageId)) {
+        isActive = true;
+        logger.debug('[CheckTranslationStatus] Request found in LifecycleRegistry (Active)', { messageId });
       }
     } catch (error) {
-      logger.debug('[CheckTranslationStatus] Engine status check failed:', error);
+      logger.debug('[CheckTranslationStatus] LifecycleRegistry check failed:', error);
     }
 
-    // Determine completion status
+    // Determine completion and progress status
     let completed = false;
+    let inProgress = isActive || streamingStatus?.status === 'active';
     let reason = '';
     let hasResults = false;
+    let results = null;
 
-    // Check if streaming completed successfully
-    if (streamingStatus?.status === 'completed' && streamingStatus?.hasResults) {
+    // 1. Check if it's completed with results
+    if (streamingStatus?.isComplete && streamingStatus?.hasResults) {
       completed = true;
       hasResults = true;
-      reason = 'streaming_completed';
-      logger.info('[CheckTranslationStatus] Translation completed via streaming', { messageId });
-    }
-    // Check if engine completed successfully
-    else if (engineStatus?.status === 'completed' && engineStatus?.hasResults) {
+      results = streamingStatus.results;
+      reason = 'completed_with_results';
+      inProgress = false;
+    } 
+    // 2. Check if it's marked as error or cancelled
+    else if (streamingStatus?.status === 'error' || streamingStatus?.status === 'cancelled') {
       completed = true;
-      hasResults = true;
-      reason = 'engine_completed';
-      logger.info('[CheckTranslationStatus] Translation completed via engine', { messageId });
+      reason = `streaming_${streamingStatus.status}`;
+      inProgress = false;
     }
-    // Check if either system reports completion (even without results)
-    else if (streamingStatus?.status === 'completed' || engineStatus?.status === 'completed') {
-      completed = true;
-      reason = 'system_completed';
-      logger.info('[CheckTranslationStatus] Translation marked as completed by system', { messageId });
+    // 3. Just in progress
+    else if (inProgress) {
+      reason = 'still_in_progress';
+    } else {
+      reason = 'not_found';
     }
 
     const response = {
       success: true,
       completed,
+      inProgress,
       messageId,
       hasResults,
+      results,
       reason,
-      streamingStatus: streamingStatus?.status,
-      engineStatus: engineStatus?.status,
       timestamp: Date.now()
     };
 

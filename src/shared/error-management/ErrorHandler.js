@@ -1,4 +1,4 @@
-// File: src/error-management/ErrorHandler.js
+// File: src/shared/error-management/ErrorHandler.js
 
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { getErrorMessage } from "./ErrorMessages.js";
@@ -59,13 +59,31 @@ export class ErrorHandler {
     this.handling = true;
     
     try {
+      // Prioritize explicit type from meta for suppression and display logic
+      const type = meta.type || matchErrorToType(err);
+
       // Safely extract raw error message without triggering infinite recursion or stack depth
       let raw = 'Unknown Error';
       try {
         if (err instanceof Error) {
           raw = err.message || err.name || 'Error object';
         } else if (err && typeof err === 'object') {
-          raw = typeof err.message === 'string' ? err.message : (err.type || err.code || 'Object error');
+          raw = err.message || err.error || err.statusText || err.reason || err.type || err.code;
+          
+          if (!raw && err !== null) {
+             try {
+               const cleanErr = { ...err };
+               delete cleanErr.partialResults;
+               raw = JSON.stringify(cleanErr);
+               if (raw === '{}') raw = '';
+             } catch {
+               raw = '';
+             }
+          }
+          
+          if (!raw) {
+            raw = (typeof err.toString === 'function' && err.toString() !== '[object Object]') ? err.toString() : 'Unknown technical error';
+          }
         } else {
           raw = String(err || 'Unknown error');
         }
@@ -88,17 +106,58 @@ export class ErrorHandler {
         ExtensionContextManager.handleContextError(err, meta.context || 'ErrorHandler');
         return err;
       }
-
-      const type = matchErrorToType(err);
       
       // Determine message to display
       let msg;
       try {
-        const genericMsg = await getErrorMessage(type);
+        let genericMsg = await getErrorMessage(type);
+        let forceGeneric = false;
+
+        // ENHANCEMENT: For Circuit Breaker, combine the original error (e.g. Network Error) 
+        // with the Circuit Breaker message so the user knows WHY it was blocked.
+        if (type === ErrorTypes.CIRCUIT_BREAKER_OPEN && err) {
+          try {
+            let originalType = err.originalType;
+            const fullMessage = (typeof sanitizedRaw === 'string' ? sanitizedRaw : '') + (err.message || '');
+            const lowerMsg = fullMessage.toLowerCase();
+            
+            // Priority 1: Direct string scanning (most reliable for combined messages)
+            if (lowerMsg.includes('failed to fetch') || lowerMsg.includes('network') || lowerMsg.includes('connection')) {
+              originalType = ErrorTypes.NETWORK_ERROR;
+            } else if (lowerMsg.includes('429') || lowerMsg.includes('rate limit') || lowerMsg.includes('quota')) {
+              originalType = ErrorTypes.RATE_LIMIT_REACHED;
+            }
+            
+            // Priority 2: Fallback to technical reason extraction
+            if (!originalType && typeof sanitizedRaw === 'string' && sanitizedRaw.includes(': ')) {
+              const parts = sanitizedRaw.split(': ');
+              const reason = parts[parts.length - 1];
+              originalType = matchErrorToType(reason);
+            }
+
+            if (originalType && originalType !== ErrorTypes.CIRCUIT_BREAKER_OPEN) {
+              const originalMsg = await getErrorMessage(originalType);
+              if (originalMsg && originalMsg !== genericMsg) {
+                genericMsg = `${originalMsg}\n(${genericMsg})`;
+                forceGeneric = true; // Use our combined localized message
+              }
+            }
+          } catch (e) {
+            logger.debug('Failed to build enhanced circuit breaker message', e);
+          }
+        }
         
         // Decide whether to use raw message or localized generic message
-        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+        let shouldUseGeneric = forceGeneric || CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
         
+        // EXCEPTION: If the error is an API error, prefer the specific technical message 
+        // if it exists and is descriptive enough. 
+        // NOTE: We removed CIRCUIT_BREAKER_OPEN from here to force localized Persian messages.
+        const preferSpecific = [ErrorTypes.API_ERROR];
+        if (!forceGeneric && preferSpecific.includes(type) && typeof sanitizedRaw === 'string' && sanitizedRaw.length > 10) {
+          shouldUseGeneric = false;
+        }
+
         if (!shouldUseGeneric && typeof sanitizedRaw === 'string' && sanitizedRaw.length > 5 && 
             !sanitizedRaw.includes('[object Object]') && !sanitizedRaw.startsWith('Error:')) {
           msg = sanitizedRaw;
@@ -191,8 +250,50 @@ export class ErrorHandler {
       
       let msg;
       try {
-        const localizedMsg = await getErrorMessage(type);
-        const shouldUseGeneric = CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+        let localizedMsg = await getErrorMessage(type);
+        let forceGeneric = false;
+
+        // ENHANCEMENT: Match the logic in handle() for consistent Circuit Breaker messaging
+        if (type === ErrorTypes.CIRCUIT_BREAKER_OPEN && err) {
+          try {
+            let originalType = err.originalType;
+            const fullMessage = (typeof raw === 'string' ? raw : '') + (err.message || '');
+            const lowerMsg = fullMessage.toLowerCase();
+            
+            // Priority 1: Direct string scanning (most reliable for combined messages)
+            if (lowerMsg.includes('failed to fetch') || lowerMsg.includes('network') || lowerMsg.includes('connection')) {
+              originalType = ErrorTypes.NETWORK_ERROR;
+            } else if (lowerMsg.includes('429') || lowerMsg.includes('rate limit') || lowerMsg.includes('quota')) {
+              originalType = ErrorTypes.RATE_LIMIT_REACHED;
+            }
+            
+            // Priority 2: Fallback to technical reason extraction
+            if (!originalType && typeof raw === 'string' && raw.includes(': ')) {
+              const parts = raw.split(': ');
+              const reason = parts[parts.length - 1];
+              originalType = matchErrorToType(reason);
+            }
+
+            if (originalType && originalType !== ErrorTypes.CIRCUIT_BREAKER_OPEN) {
+              const originalMsg = await getErrorMessage(originalType);
+              if (originalMsg && originalMsg !== localizedMsg) {
+                localizedMsg = `${originalMsg}\n(${localizedMsg})`;
+                forceGeneric = true;
+              }
+            }
+          } catch (e) {
+            logger.debug('Failed to build enhanced circuit breaker message for UI', e);
+          }
+        }
+
+        let shouldUseGeneric = forceGeneric || CRITICAL_CONFIG_ERRORS.has(type) || FATAL_ERRORS.has(type);
+
+        // Exception for API errors to show descriptive technical details.
+        // NOTE: We removed CIRCUIT_BREAKER_OPEN from here to force localized Persian messages.
+        const preferSpecific = [ErrorTypes.API_ERROR];
+        if (!forceGeneric && preferSpecific.includes(type) && typeof raw === 'string' && raw.length > 10) {
+          shouldUseGeneric = false;
+        }
 
         if (!shouldUseGeneric && typeof raw === 'string' && raw.length > 5 && !raw.includes('[object Object]')) {
           msg = raw;

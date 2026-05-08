@@ -43,6 +43,24 @@
   flex: 1 1 0px !important;
   box-sizing: border-box !important;
   -webkit-tap-highlight-color: transparent !important;
+
+  &.is-disabled {
+    opacity: 0.4 !important;
+    filter: grayscale(1) !important;
+    cursor: default !important;
+    pointer-events: auto !important; /* CRITICAL: Must be auto to allow Toast click */
+    -webkit-tap-highlight-color: transparent !important;
+    
+    &:active {
+      transform: none !important;
+      background-color: transparent !important;
+    }
+
+    /* Ensure children don't block the click either */
+    * {
+      pointer-events: none !important;
+    }
+  }
 }
 
 .ti-m-icon-container {

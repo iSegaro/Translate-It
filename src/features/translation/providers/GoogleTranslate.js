@@ -10,6 +10,8 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
 
@@ -33,6 +35,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
   }
 
   _getLangCode(lang) {
+    if (!lang || lang === AUTO_DETECT_VALUE) return "auto";
     return getProviderLanguageCode(lang, 'GOOGLE');
   }
 
@@ -83,7 +86,6 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
     const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
-    const originalCharCount = chunkTexts.reduce((sum, t) => sum + (t?.length || 0), 0);
 
     const result = await this._executeRequest({
       url: `${apiUrl}?${queryParams.toString()}`,
@@ -122,7 +124,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       abortController,
       charCount: this._calculateTraditionalCharCount(chunkTexts),
       sessionId: options.sessionId,
-      originalCharCount: options.originalCharCount || originalCharCount
+      originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
     });
 
     // Handle dictionary formatting for single segment
@@ -161,7 +163,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
         const partOfSpeech = line.substring(0, colonIndex).trim();
         const terms = line.substring(colonIndex + 1).trim();
         if (partOfSpeech && terms) {
-          markdownOutput += `**${partOfSpeech}:** ${terms}\n\n`;
+          markdownOutput += `**${partOfSpeech}**: ${terms}\n\n`;
         }
       } else if (line.trim()) {
         markdownOutput += `**${line.trim()}**\n\n`;

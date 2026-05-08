@@ -7,8 +7,9 @@ import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { isChromium } from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
@@ -135,14 +136,24 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
 /**
  * Handle TTS Stop request
  */
-export const handleGoogleTTSStopAll = async (message) => {
+export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
-    const { ttsId } = message.data || {};
+    const { ttsId, stopOnlyIfOwner } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
     
+    // 1. Specific ID check
     if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
       return { success: true, skipped: true };
     }
+
+    // 2. Ownership check (for automatic cleanups)
+    if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
+      logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
+      return { success: true, skipped: true, reason: 'not_owner' };
+    }
+    
+    // Stop any active queue
+    ttsQueueManager.stop();
     
     await ttsStateManager.notifyTTSEnded('stopped');
     ttsStateManager.fullReset();

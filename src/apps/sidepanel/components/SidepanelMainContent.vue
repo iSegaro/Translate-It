@@ -12,6 +12,7 @@
           v-model:source-language="sourceLanguage"
           v-model:target-language="targetLanguage"
           :provider="currentProviderLocal"
+          :last-keyword="lastTranslation?.source"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
           :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
@@ -40,7 +41,8 @@
             v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"
@@ -69,7 +71,8 @@
             v-model="currentProviderLocal"
             mode="split"
             :is-global="false"
-            :show-sync="true"
+            show-sync
+            only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
             @cancel="cancelTranslation"
@@ -114,6 +117,7 @@
           :target-language="actualTargetLanguage"
           :last-translation="lastTranslation"
           :is-loading="isTranslating"
+          :is-streaming="isStreaming"
           :error="translationError"
           :error-type="errorType"
           :placeholder="t('SIDEPANEL_TARGET_TEXT_PLACEHOLDER', 'Translation result will appear here')"
@@ -162,6 +166,7 @@ const {
   sourceLanguage,
   targetLanguage,
   isTranslating,
+  isStreaming,
   translationError,
   errorType,
   canTranslate,
@@ -188,16 +193,12 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits(['can-translate-change', 'update:provider'])
+const emit = defineEmits(['can-translate-change', 'update:provider'])
 
 // State
-const currentProviderLocal = ref(props.provider)
-
-// Watch for prop changes to sync local state
-watch(() => props.provider, (newVal) => {
-  if (newVal && newVal !== currentProviderLocal.value) {
-    currentProviderLocal.value = newVal
-  }
+const currentProviderLocal = computed({
+  get: () => props.provider,
+  set: (value) => emit('update:provider', value)
 })
 
 // Language state management

@@ -17,6 +17,7 @@ export class HoverPreviewManager extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.UI, 'HoverPreviewManager');
     this.isActive = false;
     this.currentElement = null;
+    this.currentText = null;
     
     // Bind handlers
     this.handleMouseOver = this.handleMouseOver.bind(this);
@@ -46,6 +47,7 @@ export class HoverPreviewManager extends ResourceTracker {
     
     this.isActive = false;
     this.currentElement = null;
+    this.currentText = null;
     this.logger.debug('Hover preview manager destroyed');
   }
 
@@ -61,12 +63,18 @@ export class HoverPreviewManager extends ResourceTracker {
     if (this.currentElement === element) return;
     this.currentElement = element;
 
-    const originalText = this._getOriginalText(element);
+    // SMART DETECTION: Find the specific text node under the cursor
+    const x = event.clientX;
+    const y = event.clientY;
+    const specificNode = this._getSpecificNodeAt(x, y);
+
+    const originalText = this._getOriginalText(element, specificNode);
     if (originalText) {
+      this.currentText = originalText;
       this.logger.debug('Hover detected, emitting showTooltip event');
       PageTranslationEvents.showTooltip({
         text: originalText,
-        position: { x: event.clientX, y: event.clientY }
+        position: { x, y }
       });
       // Track mousemove only while hovering using ResourceTracker
       this.addEventListener(document, 'mousemove', this.handleMouseMove, true);
@@ -79,33 +87,80 @@ export class HoverPreviewManager extends ResourceTracker {
       PageTranslationEvents.hideTooltip();
       this.removeEventListener(document, 'mousemove', this.handleMouseMove, true);
       this.currentElement = null;
+      this.currentText = null;
     }
   }
 
   handleMouseMove(event) {
-    PageTranslationEvents.updateTooltipPosition({
-      x: event.clientX,
-      y: event.clientY
-    });
+    const x = event.clientX;
+    const y = event.clientY;
+
+    // 1. Update Position (Immediate feedback)
+    PageTranslationEvents.updateTooltipPosition({ x, y });
+
+    // 2. Detect Segment Change (Dynamic update)
+    // Even if we are in the same element, the text segment might have changed
+    if (this.currentElement) {
+      const specificNode = this._getSpecificNodeAt(x, y);
+      const newText = this._getOriginalText(this.currentElement, specificNode);
+      
+      if (newText && newText !== this.currentText) {
+        this.currentText = newText;
+        this.logger.debug('Segment change detected, updating tooltip content');
+        PageTranslationEvents.showTooltip({
+          text: newText,
+          position: { x, y }
+        });
+      }
+    }
   }
 
-  _getOriginalText(element) {
-    const textParts = [];
-    // Standard block-level elements that should trigger a line break in the tooltip
+  /**
+   * Identifies the specific text node at the given screen coordinates.
+   * @private
+   */
+  _getSpecificNodeAt(x, y) {
+    try {
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(x, y);
+        return range ? range.startContainer : null;
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(x, y);
+        return pos ? pos.offsetNode : null;
+      }
+    } catch {
+      // Silent fail
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves original text for an element, optionally focusing on a specific node.
+   * Implementation: Uses "Smart Segmentation" - it breaks the container's content 
+   * into logical segments (delimited by BR or block tags) and returns only the segment 
+   * containing the specificNode if provided.
+   * 
+   * @param {HTMLElement} element - The translated container element
+   * @param {Node|null} specificNode - The exact node under the cursor
+   * @returns {string|null}
+   */
+  _getOriginalText(element, specificNode = null) {
+    const segments = [[]]; // Array of text part arrays
+    let currentSegmentIndex = 0;
+
+    // Standard block-level elements that should trigger a line break or segment split
     const BLOCK_TAGS = new Set([
       'P', 'DIV', 'LI', 'TR', 'SECTION', 'ARTICLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 
       'HEADER', 'FOOTER', 'DT', 'DD', 'BLOCKQUOTE', 'FIGURE', 'TABLE', 'MAIN'
     ]);
 
-    // 1. Gather text nodes and handle BR tags for line breaks
-    // We use a custom filter to catch both Text nodes and BR elements.
+    // 1. Gather text nodes and handle BR/BLOCK tags for segmentation
     const walker = document.createTreeWalker(
       element,
       NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
       {
         acceptNode(node) {
           if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
-          // Accept BR and all block-level tags to handle layout breaks
           if (node.nodeName === 'BR' || BLOCK_TAGS.has(node.nodeName)) return NodeFilter.FILTER_ACCEPT;
           return NodeFilter.FILTER_SKIP;
         }
@@ -114,50 +169,55 @@ export class HoverPreviewManager extends ResourceTracker {
     );
 
     let node;
-    let hasText = false;
+    const nodeToSegmentMap = new Map();
 
     while ((node = walker.nextNode())) {
       if (node.nodeType === Node.TEXT_NODE) {
         const original = hoverPreviewLookup.get(node);
-        // Use original text if translated, otherwise use current text to keep continuity
         const content = original !== undefined ? original : node.textContent;
+        
         if (content) {
-          // Normalize internal whitespace to avoid HTML formatting noise
           const normalized = content.replace(/\s+/g, ' ');
           if (normalized.trim() || normalized === ' ') {
-            textParts.push(normalized);
-            hasText = true;
+            segments[currentSegmentIndex].push(normalized);
+            nodeToSegmentMap.set(node, currentSegmentIndex);
           }
         }
       } else {
-        // It's a BR or a BLOCK_TAG. Add a newline if we already have content to separate.
-        if (hasText && textParts[textParts.length - 1] !== '\n') {
-          textParts.push('\n');
+        // It's a BR or a BLOCK_TAG. Start a new segment if current one isn't empty.
+        if (segments[currentSegmentIndex].length > 0) {
+          currentSegmentIndex++;
+          segments[currentSegmentIndex] = [];
         }
       }
     }
 
-    // Join and perform final cleanup: trim lines and remove redundant empty lines
-    const mainText = textParts.join('')
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .join('\n');
+    // 2. Select the relevant segment(s)
+    let selectedText = '';
     
-    const finalLines = [];
-    if (mainText) {
-      finalLines.push(mainText);
+    if (specificNode && nodeToSegmentMap.has(specificNode)) {
+      // SMART MODE: Only return the segment containing the hovered node
+      const segmentIndex = nodeToSegmentMap.get(specificNode);
+      selectedText = segments[segmentIndex].join('').trim();
+    } else {
+      // FALLBACK MODE: Join all segments with newlines (standard behavior for small elements)
+      selectedText = segments
+        .map(seg => seg.join('').trim())
+        .filter(text => text.length > 0)
+        .join('\n');
     }
 
-    // 2. Check attributes (e.g., title, alt) - these always remain on separate lines
+    const finalLines = [];
+    if (selectedText) {
+      finalLines.push(selectedText);
+    }
+
+    // 3. Check attributes (e.g., title, alt) - these always remain on separate lines
     if (element.attributes) {
       for (let i = 0; i < element.attributes.length; i++) {
         const attr = element.attributes[i];
         const original = hoverPreviewLookup.get(attr);
         
-        // FIX: Only show original text for attributes if it was actually translated.
-        // We strip BiDi marks (RLM/LRM) from the current value before comparison to detect if
-        // the core content has changed.
         if (original && original !== stripBiDiMarks(attr.value)) {
           finalLines.push(`[${attr.name}]: ${original}`);
         }

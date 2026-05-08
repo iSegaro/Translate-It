@@ -1,6 +1,6 @@
 // ToastElementDetector - Centralized Vue Sonner element detection
 import { TOAST_SELECTORS, TOAST_ELEMENT_QUERIES, EXTENSION_SELECTORS } from './constants.js';
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 
 export class ToastElementDetector {
   /**
@@ -54,7 +54,7 @@ export class ToastElementDetector {
   }
   
   /**
-   * Check if element is within any toast using event path
+   * Check if element is part of a toast system using event path
    * @param {Event} event - Event object with composedPath
    * @returns {boolean} Whether click is within toast
    */
@@ -75,6 +75,21 @@ export class ToastElementDetector {
         ))
       );
     });
+  }
+
+  /**
+   * Check if element is currently highlighted by the extension
+   * @param {HTMLElement} element - Element to check
+   * @returns {boolean} Whether element is highlighted
+   */
+  static isHighlightedElement(element) {
+    if (!element || typeof element.hasAttribute !== 'function') return false;
+
+    return (
+      (element.classList && element.classList.contains(EXTENSION_SELECTORS.HIGHLIGHTED_CLASS)) ||
+      element.hasAttribute('data-translate-it-highlighted') ||
+      element.hasAttribute('data-translate-highlighted')
+    );
   }
   
   /**
@@ -116,11 +131,10 @@ export class ToastElementDetector {
     }
 
     // Check if element is currently highlighted by us
-    // IMPORTANT: We should NOT exclude highlighted elements from selection, 
+    // IMPORTANT: We should NOT exclude highlighted elements from selection or blocking, 
     // because that's exactly what the user wants to click on!
     // But we SHOULD exclude other extension elements like the popup container.
-    if (element.classList && element.classList.contains(EXTENSION_SELECTORS.HIGHLIGHTED_CLASS)) {
-      // Don't exclude the highlighted element itself, as it's the target
+    if (this.isHighlightedElement(element)) {
       return false;
     }
 
@@ -129,10 +143,8 @@ export class ToastElementDetector {
       return true;
     }
     
-    // Check if element has our data attributes
-    if (element.hasAttribute('data-translate-it-highlighted') ||
-        element.hasAttribute('data-translate-id') ||
-        element.hasAttribute('data-translate-highlighted')) {
+    // Check if element has our data attributes (excluding highlighting)
+    if (element.hasAttribute('data-translate-id')) {
       return true;
     }
     

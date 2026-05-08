@@ -4,16 +4,20 @@
  */
 
 import { TRANSLATION_CONSTANTS, ResponseFormat } from "@/shared/config/translationConstants.js";
-import { ProviderTypes } from "@/features/translation/providers/ProviderConstants.js";
+import { ProviderTypes, nameToRegistryId } from "@/features/translation/providers/ProviderConstants.js";
+import { findProviderById } from "@/features/translation/providers/ProviderManifest.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import { isFatalError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
+import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { AUTO_DETECT_VALUE } from "@/shared/config/constants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
+import { queueManager } from "./QueueManager.js";
+import { TranslationPriority } from "./RateLimitManager.js";
+import { streamingManager } from "./StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ProviderCoordinator');
 
@@ -34,24 +38,28 @@ export class ProviderCoordinator {
     // We only swap if we have original languages (usually from TranslationEngine)
     // If not provided, we assume current source/target are the "original" ones
     const originalSource = options.originalSourceLang || sourceLang;
-    const originalTarget = options.originalTargetLang || targetLang;
 
     try {
       const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
 
-      // 1a. Apply Language Swapping (Bilingual Logic)
-      // This will only perform detection if bilingual is enabled
-      const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
-        sampleText,
-        sourceLang,
-        targetLang,
-        originalSource,
-        originalTarget,
-        { providerName, mode: translateMode }
-      );
+      // Check if provider supports bilingual swapping (e.g. specialized dictionaries like Vajehyab may not)
+      const providerId = nameToRegistryId(providerName) || providerName;
+      const manifest = findProviderById(providerId);
+      const supportsBilingual = manifest?.features?.includes('bilingual') ?? true;
 
-      processedSourceLang = swappedSource;
-      processedTargetLang = swappedTarget;
+      // 1a. Apply Language Swapping (Bilingual Logic)
+      if (supportsBilingual) {
+        const [swappedSource, swappedTarget] = await LanguageSwappingService.applyLanguageSwapping(
+          sampleText,
+          sourceLang,
+          targetLang,
+          originalSource,
+          { providerName, mode: translateMode }
+        );
+
+        processedSourceLang = swappedSource;
+        processedTargetLang = swappedTarget;
+      }
 
       // 1b. Auto-Detection Fallback
       // If we are still at 'auto' (meaning bilingual was disabled or didn't swap),
@@ -89,7 +97,17 @@ export class ProviderCoordinator {
 
     // 3. Metadata Awareness
     const inputCount = Array.isArray(text) ? text.length : (jsonInfo.isJson ? jsonInfo.parsed.length : 1);
-    options.textLength = typeof text === 'string' ? text.length : (jsonInfo.isJson ? JSON.stringify(jsonInfo.parsed).length : 0);
+    
+    // FIX: Correctly calculate total character length for arrays, strings, and JSON structures
+    if (typeof text === 'string') {
+      options.textLength = text.length;
+    } else if (Array.isArray(text)) {
+      options.textLength = text.reduce((sum, s) => sum + (typeof s === 'string' ? s.length : (s?.t?.length || s?.text?.length || 0)), 0);
+    } else if (jsonInfo.isJson) {
+      options.textLength = JSON.stringify(jsonInfo.parsed).length;
+    } else {
+      options.textLength = 0;
+    }
 
     // 4. Resolve strategy and expected format
     const strategy = this._resolveExecutionStrategy(provider, jsonInfo.isJson, options);
@@ -101,23 +119,42 @@ export class ProviderCoordinator {
     // 5. Initialize Streaming if needed
     // Only enable coordinator-level streaming if not already handled by an orchestrator (rawJsonPayload)
     if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+      // FIX: Ensure both StreamingManager AND LifecycleRegistry (for AIStreamManager) have sender info
+      if (engine && typeof engine.registerStreamingSender === 'function') {
+        engine.registerStreamingSender(messageId, options.sender);
+      }
       await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
     }
 
-    // 6. Execute based on strategy
+    // 6. Execute based on strategy via QueueManager for retry and priority support
     try {
-      let result;
-      if (jsonInfo.isJson && !options.rawJsonPayload) {
-        logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
-        result = await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
-      } else {
-        result = await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+      // Map string priorities to numeric values recognized by QueueManager
+      let numericPriority = options.priority;
+      if (typeof numericPriority === 'string') {
+        const pMap = { 
+          'high': TranslationPriority.HIGH, 
+          'normal': TranslationPriority.NORMAL, 
+          'low': TranslationPriority.LOW 
+        };
+        numericPriority = pMap[numericPriority.toLowerCase()] || TranslationPriority.NORMAL;
+      } else if (numericPriority === undefined || numericPriority === null) {
+        numericPriority = TranslationPriority.NORMAL;
       }
 
-      // If we are in coordinator-level streaming mode, we return a status object
-      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
-        return { success: true, streaming: true, messageId };
-      }
+      const executeTask = async () => {
+        if (jsonInfo.isJson && !options.rawJsonPayload) {
+          logger.debug(`[Coordinator] Strategy: JSON Wrapped`);
+          return await this._executeJsonWrapped(provider, jsonInfo.parsed, providerSourceLang, providerTargetLang, translateMode, options);
+        } else {
+          return await this._executeStandard(provider, text, providerSourceLang, providerTargetLang, translateMode, options);
+        }
+      };
+
+      // Enqueue the task - QueueManager handles retries and prioritization
+      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode, {
+        messageId: options.messageId,
+        uiContext: options.uiContext
+      });
 
       // 7. Post-processing & Normalization
       // Use the strict Response Contract to determine cleaning strategy
@@ -143,6 +180,20 @@ export class ProviderCoordinator {
             );
           }
         }
+      }
+
+      // If we are in coordinator-level streaming mode, we return a status object
+      // FIX: Also include the translatedText as a final fallback so the UI can resolve immediately
+      if (strategy.useStreaming && expectedFormat !== ResponseFormat.JSON_OBJECT && !options.rawJsonPayload) {
+        return { 
+          success: true, 
+          streaming: true, 
+          messageId, 
+          translatedText: finalResult,
+          provider: providerName,
+          sourceLanguage: processedSourceLang,
+          targetLanguage: processedTargetLang
+        };
       }
 
       // 8. Capture Detected Language & Register Feedback
@@ -173,14 +224,15 @@ export class ProviderCoordinator {
       };
     } catch (error) {
       const errorType = matchErrorToType(error);
+      const isTransient = isTransientError(error) || isTransientError(errorType);
       
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
       } else {
-        logger.error(`[Coordinator] Execution failed for ${providerName}:`, error.message);
+        logger.debug(`[Coordinator] Execution failed for ${providerName}:`, error.message);
       }
 
-      if (isFatalError(error)) throw error;
+      if (isFatalError(error) || isTransient) throw error;
       return Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
     }
   }
@@ -258,7 +310,6 @@ export class ProviderCoordinator {
     if (!messageId || !engine) return;
 
     try {
-      const { streamingManager } = await import("./StreamingManager.js");
       const segments = Array.isArray(text) ? text : [text];
       
       streamingManager.initializeStream(messageId, sender, provider, segments, sessionId);
@@ -296,8 +347,17 @@ export class ProviderCoordinator {
       return JSON.stringify(translatedJson, null, 2);
     }
     
-    logger.error(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}`);
-    return Array.isArray(results) ? results.join('\n') : String(results);
+    if (results?.length !== jsonArray.length) {
+      logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
+    }
+
+    // Fallback: If results don't match, map what we can or return joined string
+    // But CRITICAL: ensure every part is processed via _ensureString to prevent JSON artifacts
+    if (Array.isArray(results)) {
+      return JSON.stringify(results.map(r => this._ensureString(r)));
+    }
+    
+    return this._ensureString(results);
   }
 
   /**
@@ -336,10 +396,18 @@ export class ProviderCoordinator {
 
     // If result is already an array, clean each element and ENSURE they are strings
     if (Array.isArray(result)) {
-      return result.map(item => {
+      const cleanedArray = result.map(item => {
         const cleaned = AIResponseParser.cleanAIResponse(item, ResponseFormat.STRING);
         return this._ensureString(cleaned);
       });
+
+      // CRITICAL: If we expected a single STRING but got an array (due to internal batching),
+      // we must join or unwrap it to satisfy the contract.
+      if (expectedFormat === ResponseFormat.STRING) {
+        return cleanedArray.length === 1 ? cleanedArray[0] : cleanedArray.join('\n');
+      }
+
+      return cleanedArray;
     }
 
     // Use the contract-aware cleaner
@@ -347,7 +415,14 @@ export class ProviderCoordinator {
     
     // If cleaning produced an array (e.g. from JSON_ARRAY), ensure its elements are strings
     if (Array.isArray(cleaned)) {
-      return cleaned.map(item => this._ensureString(item));
+      const strings = cleaned.map(item => this._ensureString(item));
+      
+      // Respect the STRING contract even if parser returned an array
+      if (expectedFormat === ResponseFormat.STRING) {
+        return strings.length === 1 ? strings[0] : strings.join('\n');
+      }
+      
+      return strings;
     }
 
     return this._ensureString(cleaned);
@@ -364,7 +439,10 @@ export class ProviderCoordinator {
     
     // If it's an object from a specialized orchestrator, try to find text
     if (typeof result === 'object') {
-      return result.t || result.text || result.translatedText || JSON.stringify(result);
+      const text = result.t || result.text || result.translatedText;
+      // CRITICAL: If no text property found, do NOT JSON.stringify it as it leads to artifacts in the UI.
+      // Returning empty string is safer than showing technical JSON data to the user.
+      return typeof text === 'string' ? text : "";
     }
     
     return String(result);

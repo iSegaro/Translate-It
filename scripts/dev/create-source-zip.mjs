@@ -27,20 +27,13 @@ const outputFilePath = path.resolve(
 // لیست فایل‌ها و پوشه‌هایی که باید در سورس کد نهایی گنجانده شوند
 const sourceFilesAndDirs = [
   ".gitignore",
-  "_locales",
   "config",
-  "html",
-  "public",
   "scripts",
   "src",
-  "Changelog.md",
-  "eslint.config.js",
   "package.json",
   "pnpm-lock.yaml",
-  "Privacy.md",
   "AGENT.md",
   "README.md",
-  "README_FARSI.md",
 ];
 
 // اطمینان از وجود پوشه خروجی
@@ -86,7 +79,17 @@ sourceFilesAndDirs.forEach((item) => {
   }
   
   if (fs.statSync(itemPath).isDirectory()) {
-    archive.directory(itemPath, item);
+    // افزودن دایرکتوری با فیلتر برای حذف فایل‌های تست
+    archive.directory(itemPath, item, (entry) => {
+      const isTestFile = /\.(test|spec)\.js$/.test(entry.name);
+      const isTestFolder = entry.name.includes('/tests/') || entry.name.startsWith('tests/');
+      
+      if (isTestFile || isTestFolder) {
+        // console.log(chalk.gray(`  - Excluding test asset: ${entry.name}`));
+        return false;
+      }
+      return entry;
+    });
   } else {
     archive.file(itemPath, { name: item });
   }

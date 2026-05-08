@@ -221,7 +221,7 @@
 
 <script setup>
 import './AdvanceTab.scss'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -229,6 +229,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS, LOG_CATEGORIES } from '@/shared/logging/logConstants.js'
 import proxyIcon from '@/icons/ui/proxy.png?url'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -243,6 +244,7 @@ const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
 const { handleError } = useErrorHandler()
 const { createSetting } = useTabSettings(settingsStore, logger)
+const { highlightElement } = useHighlightManager()
 
 // Accordion state
 const activeAccordion = ref(null)
@@ -250,11 +252,32 @@ const toggleAccordion = (name) => {
   activeAccordion.value = activeAccordion.value === name ? null : name
 }
 
+// Validation feedback listener
+const handleValidationFeedback = (e) => {
+  const { field } = e.detail || {};
+  
+  if (field === 'proxy' || field === 'PROXY_HOST') {
+    activeAccordion.value = 'proxy';
+    
+    // Delay to allow accordion animation
+    setTimeout(() => {
+      highlightElement('PROXY_HOST');
+    }, 400);
+  } else if (field === 'debug') {
+    activeAccordion.value = 'debug';
+  }
+};
+
 // Global reveal listener for highlighting
 onMounted(() => {
   window.addEventListener('options-reveal-accordion', (e) => {
     activeAccordion.value = e.detail;
   });
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
 })
 
 // --- Settings ---

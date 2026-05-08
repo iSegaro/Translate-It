@@ -114,14 +114,27 @@ export class GeminiProvider extends BaseAIProvider {
         fetchOptions,
         charCount: fetchOptions.body.length,
         originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
-        extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
+        extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
+        }
+        
+        const candidate = data?.candidates?.[0];
+        if (candidate?.finishReason === 'SAFETY') {
+          throw new Error('API_ERROR: Content blocked by Gemini safety filters');
+        }
+        
+        return candidate?.content?.parts?.[0]?.text;
+      },
         context: `${this.providerName.toLowerCase()}-translation`,
         abortController,
         sessionId,
         updateApiKey: (newKey, options) => {
-          const urlObj = new URL(options.url);
-          urlObj.searchParams.set('key', newKey);
-          options.url = urlObj.toString();
+          if (options.url) {
+            const urlObj = new URL(options.url);
+            urlObj.searchParams.set('key', newKey);
+            options.url = urlObj.toString();
+          }
         }
       });
 
@@ -140,16 +153,28 @@ export class GeminiProvider extends BaseAIProvider {
           url,
           fetchOptions: { ...fetchOptions, body: retryBodyJson },
           charCount: retryBodyJson.length,
-          extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
+          extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
+        }
+        
+        const candidate = data?.candidates?.[0];
+        if (candidate?.finishReason === 'SAFETY') {
+          throw new Error('API_ERROR: Content blocked by Gemini safety filters');
+        }
+        
+        return candidate?.content?.parts?.[0]?.text;
+      },
           context: `${this.providerName.toLowerCase()}-translation-fallback`,
           abortController,
           sessionId,
           updateApiKey: (newKey, options) => {
-            const urlObj = new URL(options.url);
-            urlObj.searchParams.set('key', newKey);
-            options.url = urlObj.toString();
-          }
-        });
+            if (options.url) {
+              const urlObj = new URL(options.url);
+              urlObj.searchParams.set('key', newKey);
+              options.url = urlObj.toString();
+            }
+          }        });
       }
       throw error;
     }
@@ -193,16 +218,28 @@ export class GeminiProvider extends BaseAIProvider {
       url,
       fetchOptions,
       charCount: AITextProcessor.calculatePayloadChars(requestBody.contents),
-      extractResponse: (data) => data?.candidates?.[0]?.content?.parts?.[0]?.text,
+      extractResponse: (data) => {
+        if (data?.error) {
+          throw new Error(`API_ERROR: ${data.error.message || 'Unknown Gemini Error'}`);
+        }
+        
+        const candidate = data?.candidates?.[0];
+        if (candidate?.finishReason === 'SAFETY') {
+          throw new Error('API_ERROR: Content blocked by Gemini safety filters');
+        }
+        
+        return candidate?.content?.parts?.[0]?.text;
+      },
       context: `${this.providerName.toLowerCase()}-image-translation`,
       abortController,
       sessionId,
       updateApiKey: (newKey, options) => {
-        const urlObj = new URL(options.url);
-        urlObj.searchParams.set('key', newKey);
-        options.url = urlObj.toString();
-      }
-    });
+        if (options.url) {
+          const urlObj = new URL(options.url);
+          urlObj.searchParams.set('key', newKey);
+          options.url = urlObj.toString();
+        }
+      }    });
   }
 }
 

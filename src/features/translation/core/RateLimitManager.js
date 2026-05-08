@@ -1,12 +1,15 @@
 /**
  * Rate Limit Manager - Intelligent request throttling with priority-based scheduling
- * Combines advanced stability (Circuit Breaker, Adaptive Backoff) with 
+ * Combines advanced stability (Circuit Breaker, Adaptive Backoff) with
  * priority-based queuing (HIGH, NORMAL, LOW).
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
+import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
+import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
 
@@ -45,9 +48,7 @@ export class RateLimitManager {
    */
   async reloadConfigurations() {
     this.providerStates.clear();
-    const { PROVIDER_CONFIGURATIONS, getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-    
+
     for (const name of Object.keys(PROVIDER_CONFIGURATIONS)) {
       const level = await getProviderOptimizationLevelAsync(name);
       const optimizedConfig = getProviderConfiguration(name, level);
@@ -57,19 +58,16 @@ export class RateLimitManager {
 
   /**
    * Initialize or get provider state
-   * Optimized to fetch configuration dynamically if not present
+   * Optimized to fetch configuration if not present
    */
   async _initializeProviderWithLevel(providerName) {
     if (this.providerStates.has(providerName)) {
       return this.providerStates.get(providerName);
     }
 
-    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-
     const level = await getProviderOptimizationLevelAsync(providerName);
     const optimizedConfig = getProviderConfiguration(providerName, level);
-    
+
     return this._initializeProvider(providerName, optimizedConfig.rateLimit);
   }
 
@@ -86,6 +84,7 @@ export class RateLimitManager {
     
     const state = {
       config: { ...safeDefault, ...config },
+      isManualConfig: Object.keys(config).length > 0, // Mark as manual if config provided
       activeRequests: 0,
       lastRequestTime: 0,
       queues: {
@@ -128,22 +127,30 @@ export class RateLimitManager {
     // Resolve registry ID to name if necessary
     const name = registryIdToName(providerName) || providerName;
 
-    // Refresh state and configuration to ensure we're using the latest optimization level
+    // Refresh state and configuration only if it doesn't exist
     const state = await this._initializeProviderWithLevel(name);
     
-    // CRITICAL: Always re-fetch level to handle real-time setting changes between levels (e.g. 5 to 1)
-    const { getProviderConfiguration } = await import('@/features/translation/core/ProviderConfigurations.js');
-    const { getProviderOptimizationLevelAsync } = await import('@/shared/config/config.js');
-    const currentLevel = await getProviderOptimizationLevelAsync(name);
-    
-    // Update config if it's different from what's in state (or always for safety during debug)
-    const latestConfig = getProviderConfiguration(name, currentLevel);
-    state.config = { ...state.config, ...latestConfig.rateLimit };
+    // Only update config if we're not in a manual/test state (or merge intelligently)
+    // For now, let's ensure we don't overwrite if we're already initialized with specific values
+    if (!state.isManualConfig) {
+      const currentLevel = await getProviderOptimizationLevelAsync(name);
+      const latestConfig = getProviderConfiguration(name, currentLevel);
+      state.config = { ...state.config, ...latestConfig.rateLimit };
+    }
 
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const error = new Error(`Circuit breaker open for ${name}. Too many failures.`);
+      const lastError = state.lastCircuitError;
+      const reason = lastError ? `: ${lastError.message || lastError}` : '';
+      const error = new Error(`Circuit breaker open for ${name}. Too many failures${reason}`);
       error.type = 'CIRCUIT_BREAKER_OPEN';
+      
+      // If the underlying error was fatal/retryable, preserve its characteristics safely
+      if (lastError) {
+        error.originalType = lastError.type || matchErrorToType(lastError);
+        if (lastError.statusCode) error.statusCode = lastError.statusCode;
+      }
+      
       throw error;
     }
 
@@ -174,14 +181,20 @@ export class RateLimitManager {
           const index = queue.indexOf(request);
           if (index !== -1) {
             queue.splice(index, 1);
-            reject(new Error('Request aborted while in queue'));
+            const abortError = new Error('Request aborted while in queue');
+            abortError.name = 'AbortError';
+            abortError.isCancelled = true;
+            reject(abortError);
           }
         };
         abortSignal.addEventListener('abort', onAbort, { once: true });
         
         // If already aborted
         if (abortSignal.aborted) {
-          reject(new Error('Request aborted before enqueuing'));
+          const abortError = new Error('Request aborted before enqueuing');
+          abortError.name = 'AbortError';
+          abortError.isCancelled = true;
+          reject(abortError);
           return;
         }
       }
@@ -194,46 +207,45 @@ export class RateLimitManager {
   /**
    * Main queue processing logic - respects priorities (HIGH > NORMAL > LOW)
    */
-  async _processQueue(providerName) {
+  _processQueue(providerName) {
     const state = this.providerStates.get(providerName);
-    if (!state || state.isProcessingQueue) return;
+    if (!state) return;
 
-    state.isProcessingQueue = true;
+    // Stop processing if circuit is open
+    if (this._isCircuitOpen(state)) {
+      this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
+      return;
+    }
 
-    try {
-      while (this._hasPendingRequests(state)) {
-        // Check concurrency
-        if (state.activeRequests >= state.config.maxConcurrent) break;
+    // While we have capacity and pending requests, start them
+    while (state.activeRequests < state.config.maxConcurrent) {
+      // Check delay between requests
+      const now = Date.now();
+      const baseDelay = state.config.delayBetweenRequests || 0;
+      const adjustedDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const timeSinceLast = now - state.lastRequestTime;
 
-        // Check delay between requests
-        const now = Date.now();
-        const baseDelay = state.config.delayBetweenRequests || 100;
-        const adjustedDelay = baseDelay * state.currentBackoffMultiplier;
-        const timeSinceLast = now - state.lastRequestTime;
-
-        if (timeSinceLast < adjustedDelay) {
-          const waitTime = Math.max(0, adjustedDelay - timeSinceLast);
-          await new Promise(r => setTimeout(r, waitTime));
-          continue; // Re-check conditions after wait
-        }
-
-        // Get next request by priority
-        const nextRequest = this._getNextRequest(state);
-        if (!nextRequest) break;
-
-        // Update stats and execute
-        state.activeRequests++;
-        state.lastRequestTime = Date.now();
-        
-        // Track wait time
-        const waitTime = Date.now() - nextRequest.enqueuedAt;
-        state.performanceStats.totalWaitTime += waitTime;
-        state.performanceStats.totalRequests++;
-
-        this._executeRequest(state, nextRequest, providerName, nextRequest.options);
+      if (timeSinceLast < adjustedDelay) {
+        const waitTime = Math.max(0, adjustedDelay - timeSinceLast);
+        if (state.nextProcessTimer) clearTimeout(state.nextProcessTimer);
+        state.nextProcessTimer = setTimeout(() => this._processQueue(providerName), waitTime);
+        break; 
       }
-    } finally {
-      state.isProcessingQueue = false;
+
+      // Get next request by priority
+      const nextRequest = this._getNextRequest(state);
+      if (!nextRequest) break;
+
+      // Update state and execute
+      state.activeRequests++;
+      state.lastRequestTime = Date.now();
+      
+      const waitTime = Date.now() - nextRequest.enqueuedAt;
+      state.performanceStats.totalWaitTime += waitTime;
+      state.performanceStats.totalRequests++;
+
+      // Execute without blocking the loop
+      this._executeRequest(state, nextRequest, providerName, nextRequest.options);
     }
   }
 
@@ -250,8 +262,41 @@ export class RateLimitManager {
     return null;
   }
 
+  _rejectQueue(state, error) {
+    const isCircuitBreaker = error.message?.includes('Circuit breaker open');
+    
+    [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
+      while (state.queues[p].length > 0) {
+        const req = state.queues[p].shift();
+        
+        // If it's a circuit breaker reject, we want it to be fatal enough to stop but 
+        // also recognizable as a cancellation if the user/handler decides so.
+        // For now, let's keep the error as provided but add Abort properties if it's a clear stop.
+        if (isCircuitBreaker) {
+          error.name = 'AbortError';
+          error.isCancelled = true;
+        }
+        
+        req.reject(error);
+      }
+    });
+  }
+
   async _executeRequest(state, request, providerName, options = {}) {
     const requestStartTime = Date.now();
+    
+    // Check if aborted before starting
+    if (request.options?.abortController?.signal?.aborted) {
+      state.activeRequests--; // Decrease because it was increased before calling _executeRequest
+      const abortError = new Error('Request aborted before execution');
+      abortError.name = 'AbortError';
+      abortError.isCancelled = true;
+      request.reject(abortError);
+      // Immediately process next to keep concurrency high
+      this._processQueue(providerName);
+      return;
+    }
+
     try {
       const result = await request.task(options);
       const duration = Date.now() - requestStartTime;
@@ -263,14 +308,23 @@ export class RateLimitManager {
       
       request.resolve(result);
     } catch (error) {
-      this._recordFailure(state, error, providerName);
+      // Don't count cancellations as failures
+      const isCancellation = error.name === 'AbortError' || 
+                           error.isCancelled || 
+                           error.message?.includes('cancelled') ||
+                           error.message?.includes('aborted');
+      
+      if (!isCancellation) {
+        this._recordFailure(state, error, providerName);
+      }
+      
       request.reject(error);
     } finally {
       state.activeRequests--;
       this._updateDerivedStats(state);
       
-      // Process next in queue
-      setTimeout(() => this._processQueue(providerName), 10);
+      // Process next in queue IMMEDIATELY to preserve strict priority and concurrency
+      this._processQueue(providerName);
     }
   }
 
@@ -315,7 +369,13 @@ export class RateLimitManager {
 
   _recordFailure(state, error, providerName) {
     state.performanceStats.failedRequests++;
-    state.consecutiveFailures++;
+    
+    // Config errors (API key missing, etc.) should NOT count towards circuit breaking
+    // because they are client-side issues, not provider health issues.
+    const isConfig = isConfigError(error);
+    if (!isConfig) {
+      state.consecutiveFailures++;
+    }
     
     // Adaptive Backoff: Increase delay on 429 or quota errors
     const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
@@ -324,10 +384,16 @@ export class RateLimitManager {
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 
-    if (state.consecutiveFailures >= state.circuitBreakThreshold) {
-      state.isCircuitOpen = true;
-      state.circuitOpenTime = Date.now();
-      logger.error(`Circuit breaker OPENED for ${providerName} after ${state.consecutiveFailures} failures`);
+    // CRITICAL: Open circuit breaker immediately on fatal errors (excluding config errors)
+    const isFatal = isFatalError(error);
+
+    if ((isFatal && !isConfig) || state.consecutiveFailures >= state.circuitBreakThreshold) {
+      if (!state.isCircuitOpen) {
+        state.isCircuitOpen = true;
+        state.circuitOpenTime = Date.now();
+        state.lastCircuitError = error; // Store the error that caused the break
+        logger.error(`Circuit breaker OPENED for ${providerName} ${isFatal ? '(FATAL ERROR) ' : ''}after ${state.consecutiveFailures} failures. Error: ${error.message || error}`);
+      }
     }
   }
 
@@ -365,6 +431,36 @@ export class RateLimitManager {
         state.queues[p] = [];
       });
       state.activeRequests = 0;
+    }
+  }
+
+  /**
+   * Clear pending requests for a specific messageId across all providers
+   * @param {string} messageId - Optional message ID to filter by
+   */
+  clearPendingRequests(messageId = null) {
+    logger.debug(`Clearing pending requests${messageId ? ` for messageId: ${messageId}` : ''}`);
+    
+    for (const state of this.providerStates.values()) {
+      [TranslationPriority.HIGH, TranslationPriority.NORMAL, TranslationPriority.LOW].forEach(p => {
+        const queue = state.queues[p];
+        const remaining = [];
+        
+        for (const request of queue) {
+          const reqMessageId = request.options?.messageId || request.options?.abortController?.messageId;
+          
+          if (!messageId || reqMessageId === messageId) {
+            const error = new Error(messageId ? 'Request cancelled' : 'All requests cleared');
+            error.name = 'AbortError';
+            error.isCancelled = true;
+            request.reject(error);
+          } else {
+            remaining.push(request);
+          }
+        }
+        
+        state.queues[p] = remaining;
+      });
     }
   }
 }

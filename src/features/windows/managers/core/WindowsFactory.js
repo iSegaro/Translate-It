@@ -20,6 +20,9 @@ export class WindowsFactory {
     const host = document.createElement("div");
     host.classList.add(WindowsConfig.CSS_CLASSES.POPUP_HOST);
     host.id = `translate-window-${frameId || 'main'}-${Date.now()}`;
+    host.setAttribute('role', 'dialog');
+    host.setAttribute('aria-modal', 'false');
+    host.setAttribute('aria-label', 'Translation Window');
     return host;
   }
 
@@ -33,6 +36,7 @@ export class WindowsFactory {
 
     const container = document.createElement("div");
     container.classList.add(WindowsConfig.CSS_CLASSES.POPUP_CONTAINER);
+    container.setAttribute('role', 'document');
     shadowRoot.appendChild(container);
 
     return { shadowRoot, container };
@@ -88,6 +92,9 @@ export class WindowsFactory {
   createLoadingDots() {
     const container = document.createElement("div");
     container.classList.add(WindowsConfig.CSS_CLASSES.LOADING_CONTAINER);
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-label', 'Translating...');
     
     [0, 1, 2].forEach(() => {
       const dot = document.createElement("span");
@@ -105,6 +112,9 @@ export class WindowsFactory {
   createTranslateIcon(targetDocument = document) {
     const icon = targetDocument.createElement("div");
     icon.id = WindowsConfig.IDS.ICON;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('aria-label', 'Translate selected text');
     
     let iconUrl;
     try {
@@ -170,6 +180,9 @@ export class WindowsFactory {
     }
     icon.alt = title;
     icon.title = title;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('aria-label', title);
     icon.classList.add(WindowsConfig.CSS_CLASSES.TTS_ICON);
     return icon;
   }
@@ -188,6 +201,9 @@ export class WindowsFactory {
     }
     icon.alt = title;
     icon.title = title;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('aria-label', title);
     icon.classList.add(WindowsConfig.CSS_CLASSES.TTS_ICON);
     icon.style.marginLeft = "4px";
     return icon;
@@ -219,6 +235,9 @@ export class WindowsFactory {
   createCloseButton() {
     const closeButton = document.createElement("span");
     closeButton.textContent = "✕";
+    closeButton.setAttribute('role', 'button');
+    closeButton.setAttribute('tabindex', '0');
+    closeButton.setAttribute('aria-label', 'Close translation');
     closeButton.style.opacity = "0.7";
     closeButton.style.fontSize = "14px";
     closeButton.style.cursor = "pointer";

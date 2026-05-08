@@ -1,0 +1,137 @@
+{
+  "extends": [
+    "stylelint-config-standard-scss",
+    "stylelint-config-recommended-vue"
+  ],
+  "rules": {
+    "at-rule-no-unknown": null,
+    "scss/at-rule-no-unknown": true,
+    "selector-class-pattern": [
+      "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+      {
+        "message": "Class names must use ti- prefix (ti-component or ti-u-utility)"
+      }
+    ],
+    "selector-id-pattern": null,
+    "no-duplicate-selectors": true,
+    "no-empty-source": null,
+    "rule-empty-line-before": [
+      "always",
+      {
+        "except": ["first-nested"],
+        "ignore": ["after-comment"]
+      }
+    ],
+    "unit-no-unknown": [
+      true,
+      {
+        "ignoreUnits": ["rpx"]
+      }
+    ],
+    "color-hex-length": "short",
+    "color-named": "never",
+    "selector-max-compound-selectors": 4,
+    "selector-max-attribute": 2,
+    "selector-max-class": 3,
+    "selector-max-id": 0,
+    "selector-max-pseudo-class": 3,
+    "selector-max-specificity": "0,4,1",
+    "selector-max-universal": 1,
+    "selector-no-qualifying-type": [
+      true,
+      {
+        "ignore": ["attribute", "class"]
+      }
+    ],
+    "declaration-no-important": true,
+    "declaration-block-no-duplicate-properties": true,
+    "declaration-block-no-redundant-longhand-properties": true,
+    "property-no-vendor-prefix": true,
+    "value-no-vendor-prefix": true,
+    "media-feature-name-no-vendor-prefix": true,
+    "comment-empty-line-before": [
+      "always",
+      {
+        "ignore": ["stylelint-commands"]
+      }
+    ],
+    "scss/dollar-variable-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "SCSS variables should use kebab-case"
+      }
+    ],
+    "scss/at-mixin-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "Mixins should use kebab-case"
+      }
+    ],
+    "scss/percent-placeholder-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "Placeholders should use kebab-case"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["../**/*.vue"],
+      "customSyntax": "postcss-html",
+      "rules": {
+        "selector-class-pattern": [
+          "^(ti-[a-z][a-z0-9]*([_-][a-z0-9]+)*|ti-u-[a-z-]+)$",
+          {
+            "message": "Vue component classes must use ti- prefix"
+          }
+        ],
+        "vue-scoped-css/no-parsing-error": true,
+        "vue-scoped-css/require-v-deep-usage": null,
+        "vue-scoped-css/no-deep-combinator": null
+      }
+    },
+    {
+      "files": ["../src/assets/styles/critical/**/*.scss"],
+      "rules": {
+        "declaration-no-important": null,
+        "selector-max-specificity": null
+      }
+    },
+    {
+      "files": ["../src/assets/styles/utilities/**/*.scss"],
+      "rules": {
+        "declaration-no-important": null
+      }
+    },
+    {
+      "files": [
+        "../src/assets/styles/layout/_options.scss",
+        "../src/assets/styles/layout/_sidepanel.scss",
+        "../src/assets/styles/main.scss",
+        "../src/assets/styles/content-app-global.scss",
+        "../src/assets/styles/content-main-dom.scss",
+        "../src/assets/styles/content-main-dom.css",
+        "../src/assets/styles/components/_ti-field-icon.scss",
+        "../src/assets/styles/components/_ti-window.scss",
+        "../src/assets/styles/components/_toast-integration.scss"
+      ],
+      "rules": {
+        "declaration-no-important": null,
+        "selector-max-specificity": null,
+        "selector-max-attribute": null,
+        "selector-class-pattern": null,
+        "selector-max-id": null,
+        "selector-max-class": null,
+        "declaration-block-no-duplicate-properties": null
+      }
+    }
+  ],
+  "ignoreFiles": [
+    "../dist/**/*",
+    "../node_modules/**/*",
+    "../src/public/**/*",
+    "../**/*.min.css",
+    "../**/vendor/**/*",
+    "../src/**/*.vue"
+  ]
+}

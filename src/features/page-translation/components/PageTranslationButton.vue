@@ -39,7 +39,7 @@
         :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canTranslate"
         :title="translateButtonTitle"
-        :class="{ 'is-compact-icon': compact }"
+        :class="{ 'is-compact-icon': compact, 'is-translate-btn': true }"
         @click="handleTranslate"
       >
         <div class="ti-btn-status-container">
@@ -66,54 +66,45 @@
 
     <!-- State: Translating or Auto-Translating -->
     <template v-if="isTranslating || isAutoTranslating">
-      <div
+      <a
         v-if="textOnly"
-        class="ti-text-status-wrapper"
+        href="#"
+        class="toolbar-link loading"
+        :class="{ 'ti-active': isAutoTranslating }"
+        @click.prevent="handleCancelOrStop"
       >
-        <a
-          href="#"
-          class="toolbar-link loading"
-          :class="{ 'is-active': isAutoTranslating }"
-          @click.prevent="handleCancelOrStop"
-        >
-          <PageTranslationStatus 
-            :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
-            mode="compact"
-            class="ti-text-status-badge"
-          />
-          {{ t('page_translation_btn_stop') || 'Stop Translating' }}
-        </a>
-      </div>
+        <PageTranslationStatus 
+          :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
+          mode="compact"
+          class="ti-text-status-badge"
+        />
+        {{ t('page_translation_btn_stop') || 'Stop Translating' }}
+      </a>
       <BaseButton
         v-else
         :variant="compact ? 'ghost' : 'primary'"
         :title="cancelButtonTitle"
-        :class="{ 'is-compact-icon': compact, 'is-active': isAutoTranslating }"
+        :class="{ 'is-compact-icon': compact, 'ti-active': isAutoTranslating }"
         @click="handleCancelOrStop"
       >
-        <!-- Shared Status Indicator for Popup/Sidepanel -->
         <div class="ti-btn-status-container">
+          <!-- Loading Spinner centered via CSS -->
           <LoadingSpinner
             v-if="isTranslating || isAutoTranslating"
             size="sm"
           />
+          
+          <!-- Status Badge absolute via CSS -->
           <PageTranslationStatus 
             :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
             mode="compact"
             class="ti-btn-status-badge"
           />
+          
+          <!-- Icon removed during translation states as requested. 
+               Container size is maintained via SCSS .compact-wrapper fix -->
         </div>
 
-        <img
-          v-if="compact && !isTranslating && !isAutoTranslating"
-          :src="ExtensionContextManager.safeGetURL('icons/ui/whole-page.png')"
-          class="toolbar-icon"
-          alt="Stop"
-        >
-        <Icon
-          v-else-if="!compact && !isTranslating && !isAutoTranslating"
-          icon="fa6-solid:language"
-        />
         <span v-if="!compact">{{ isTranslating ? translatingText : stopTranslatingText }}</span>
       </BaseButton>
     </template>
@@ -143,7 +134,7 @@
         :variant="compact ? 'ghost' : 'secondary'"
         :disabled="!canRestore"
         :title="restoreButtonTitle"
-        :class="{ 'is-compact-icon': compact }"
+        :class="{ 'is-compact-icon': compact, 'is-restore-btn': true }"
         @click="handleRestore"
       >
         <div class="ti-btn-status-container">
@@ -194,6 +185,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -205,7 +200,7 @@ const {
   isAutoTranslating,
   progress,
   message,
-  canTranslate,
+  canTranslate: baseCanTranslate,
   canRestore,
   hasError,
   translatePage,
@@ -215,7 +210,8 @@ const {
 } = usePageTranslation();
 
 // Computed properties
-const showProgress = computed(() => isTranslating.value && progress.value > 0);
+const canTranslate = computed(() => baseCanTranslate.value && !props.disabled);
+const showProgress = computed(() => isTranslating.value && progress.value > 0 && !props.compact);
 
 const progressText = computed(() => {
   if (message.value) return message.value;
@@ -243,6 +239,9 @@ const restoreButtonText = computed(() => {
 });
 
 const translateButtonTitle = computed(() => {
+  if (props.disabled) {
+    return t('provider_does_not_support_bulk') || 'This provider does not support page/element translation';
+  }
   if (!canTranslate.value) {
     return isTranslating.value || isAutoTranslating.value ? 'Translation in progress...' : 'Translate entire page';
   }

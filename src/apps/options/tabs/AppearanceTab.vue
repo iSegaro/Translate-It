@@ -4,7 +4,10 @@
       <h2>{{ t('appearance_section_title') || 'Appearance' }}</h2>
       
       <!-- Font Settings -->
-      <BaseFieldset :legend="t('font_settings_title') || 'Font Settings'">
+      <BaseFieldset 
+        id="FIELDSET_FONT_SETTINGS"
+        :legend="t('font_settings_title') || 'Font Settings'"
+      >
         <p class="setting-description">
           {{ t('font_settings_description') || 'Customize the font and size for translation display' }}
         </p>
@@ -39,6 +42,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { onMounted, onUnmounted } from 'vue'
 
 // Components
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
@@ -46,6 +51,7 @@ import FontSelector from '@/components/feature/FontSelector.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AppearanceTab')
 const settingsStore = useSettingsStore()
+const { highlightElement } = useHighlightManager()
 const { t } = useUnifiedI18n()
 const { createSetting } = useTabSettings(settingsStore, logger)
 
@@ -73,4 +79,22 @@ const validateFonts = () => {
     validationError.value = isValid ? '' : (t('font_validation_failed') || 'Font settings validation failed')
   }
 }
+
+// --- Validation Feedback ---
+
+const handleValidationFeedback = (e) => {
+  const { field } = e.detail || {};
+  if (field === 'font_settings') {
+    highlightElement('FIELDSET_FONT_SETTINGS');
+    validateFonts(); // Explicitly trigger error message display
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
+
+onUnmounted(() => {
+  window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+})
 </script>

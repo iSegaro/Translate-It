@@ -2,8 +2,9 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { initializebrowserAPI } from '@/features/tts/core/useBrowserAPI.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
+import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSStateManager');
 
@@ -93,7 +94,28 @@ class TTSStateManager {
   resetSpeakState() {
     this.currentTTSRequest = null;
     this.lastTTSText = null;
-    this.lastTTSLanguage = null;
+    // lastTTSLanguage is preserved for the final completion notification
+  }
+
+  /**
+   * Check if a sender is the current owner of the active TTS session.
+   * This is used for owner-aware cleanup.
+   * 
+   * @param {Object} sender - The message sender to check
+   * @returns {boolean} True if the sender is the current owner
+   */
+  isCurrentOwner(sender) {
+    if (!this.currentTTSSender || !sender) return false;
+
+    // 1. Internal Context Match (Popup/Sidepanel/Options)
+    // Internal contexts often don't have a tab ID, so we check the URL
+    if (!sender.tab?.id && !this.currentTTSSender.tab?.id) {
+      return sender.url === this.currentTTSSender.url;
+    }
+
+    // 2. Tab/Frame Match (Content Scripts / FAB)
+    return sender.tab?.id === this.currentTTSSender.tab?.id && 
+           sender.frameId === this.currentTTSSender.frameId;
   }
 
   /**
@@ -103,6 +125,7 @@ class TTSStateManager {
     this.resetSpeakState();
     this.currentTTSSender = null;
     this.currentTTSId = null;
+    this.lastTTSLanguage = null;
   }
 
   /**
@@ -153,14 +176,20 @@ class TTSStateManager {
    * Notify the requester that TTS has ended
    */
   async notifyTTSEnded(reason = 'completed', errorData = null) {
-    const status = reason === 'error' ? 'error' : 'idle';
-    
-    // Always broadcast status for independent UI updates
-    await this.broadcastStatus(status, { 
-      reason, 
-      ...(errorData || {}) 
-    });
+    // CRITICAL: Check with QueueManager first. If there are more chunks, 
+    // it will handle the next playback and we DON'T notify the UI yet.
+    if (reason === 'completed' && ttsQueueManager.chunks.length > 0 && ttsQueueManager.currentIndex < ttsQueueManager.chunks.length - 1) {
+      await ttsQueueManager.onChunkEnded('completed');
+      return;
+    }
 
+    const status = reason === 'error' ? 'error' : 'idle';
+
+    // Always broadcast status for independent UI updates
+    await this.broadcastStatus(status, {
+      reason,
+      ...(errorData || {})
+    });
     if (!this.currentTTSSender) return;
 
     try {

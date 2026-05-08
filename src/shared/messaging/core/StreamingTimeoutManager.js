@@ -253,7 +253,7 @@ export class StreamingTimeoutManager {
    */
   isStreaming(messageId) {
     const streamState = this.activeStreams.get(messageId);
-    return streamState && !streamState.isCompleted && !streamState.isCancelled;
+    return !!(streamState && !streamState.isCompleted && !streamState.isCancelled);
   }
 
   /**
@@ -263,7 +263,13 @@ export class StreamingTimeoutManager {
    */
   shouldContinue(messageId) {
     const streamState = this.activeStreams.get(messageId);
-    return streamState && !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut;
+    if (!streamState) {
+      // If we're not tracking this message, it's either not a streaming operation
+      // or it has already been cleaned up. In either case, we should allow
+      // the regular messaging flow to continue.
+      return true;
+    }
+    return !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut;
   }
 
   /**

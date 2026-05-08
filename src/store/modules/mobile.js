@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { MOBILE_CONSTANTS, TRANSLATION_STATUS } from '@/shared/config/constants.js'
+import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -21,7 +22,8 @@ export const useMobileStore = defineStore('mobile', () => {
     sourceLang: 'auto',
     targetLang: 'en',
     isLoading: false,
-    error: null
+    error: null,
+    mode: null
   })
 
   // Page Translation State
@@ -30,6 +32,7 @@ export const useMobileStore = defineStore('mobile', () => {
     isTranslated: false,
     isAutoTranslating: false,
     translatedCount: 0,
+    failedCount: 0,
     totalCount: 0,
     status: TRANSLATION_STATUS.IDLE, // 'idle' | 'translating' | 'completed' | 'error'
     errorMessage: null
@@ -117,7 +120,8 @@ export const useMobileStore = defineStore('mobile', () => {
       sourceLang: 'auto',
       targetLang: 'en',
       isLoading: false,
-      error: null
+      error: null,
+      mode: null
     }
   }
 

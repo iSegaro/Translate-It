@@ -6,6 +6,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
+import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIResponseParser');
 
@@ -18,45 +19,29 @@ const Healers = {
    * Pre-processing Pipeline: Fixes the raw string before any parsing attempt.
    */
   PreProcessors: [
-    // 1. Basic Cleanup
-    (text) => text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
+    // 1. Basic Cleanup - Keep ZWNJ (\u200C) and ZWJ (\u200D) for Persian support and Emojis
+    (text) => text.replace(/\u200B|\uFEFF/g, '').trim(),
 
-    // 2. SMART UNESCAPE: Handle multiple levels of escaping (\u0648, \\u0648, \\u000648, etc.)
+    // 2. SMART UNESCAPE: Handle multiple levels of escaping
+    // ONLY intended for raw string responses, not JSON strings before parsing
     (text) => {
-      if (!text.includes('\\u')) return text;
-      try {
-        let processed = text;
-        // Fix non-standard 6-digit/double-escaped escapes like \\u000648 -> \u0648
-        processed = processed.replace(/(?:\\\\|\\)u000([0-9a-fA-F]{3,4})/g, '\\u$1');
-        
-        // Unescape standard Unicode sequences (both \u0648 and \\u0648)
-        processed = processed.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
-          try {
-            return String.fromCharCode(parseInt(grp, 16));
-          } catch { return match; }
-        });
-        
-        // Strip remaining dangerous control characters (00-1F) except common ones
-        const lowRange = '\\x00-\\x08';
-        const midRange = '\\x0B-\\x0C';
-        const highRange = '\\x0E-\\x1F';
-        const controlPattern = new RegExp(`[${lowRange}${midRange}${highRange}]`, 'g');
-        return processed.replace(controlPattern, '');
-      } catch { return text; }
+      // Logic moved to be format-sensitive in cleanAIResponse
+      return text;
     },
 
     // 3. QUOTE HEALER: Fix AI using single quotes for JSON keys or values
     // This is common in weak models: {'id': '0'} -> {"id": "0"}
     (text) => {
-      if (!text.includes("'") && !text.includes('translations')) return text;
+      if (!text.includes("'")) return text;
       let processed = text;
       // Fix keys: 'id': -> "id":
       processed = processed.replace(/'(\w+)'\s*:/g, '"$1":');
       // Fix specific common key: translations':[ -> "translations":[
       processed = processed.replace(/translations'\s*:\s*\[/g, '"translations":[');
-      // Fix values: : 'value' -> : "value" (careful with Persian text containing apostrophes)
-      // We only target single quotes that are preceded by : and followed by , or } or ]
+      // Fix values: : 'value' -> : "value"
       processed = processed.replace(/:\s*'([^']*)'\s*([,}\]])/g, ': "$1"$2');
+      // Fix array items: ['item', 'item'] -> ["item", "item"]
+      processed = processed.replace(/([[,])\s*'([^']*)'\s*([,\]])/g, '$1"$2"$3');
       return processed;
     },
 
@@ -128,11 +113,13 @@ export const AIResponseParser = {
   cleanAIResponse(result, expectedFormat = ResponseFormat.STRING) {
     if (!result || typeof result !== 'string') return result;
 
-    // Execute Pre-processing Pipeline
-    let processedResult = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
-
+    // Strategy 1: RAW STRING (Popup, Sidepanel, Field)
     if (expectedFormat === ResponseFormat.STRING) {
-      const stripped = this._stripMarkdown(processedResult);
+      // For raw strings, we apply the full pipeline including unescaping
+      let processed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
+      processed = this._unescapeRawString(processed);
+      
+      const stripped = this._stripMarkdown(processed);
       // Fallback: If AI returned JSON even though we asked for STRING
       if (stripped.startsWith('{') || stripped.startsWith('[')) {
         try {
@@ -149,13 +136,59 @@ export const AIResponseParser = {
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
-    let parsed = this._extractAndParseJson(processedResult, expectedFormat);
+    // CRITICAL: We skip PreProcessors like unescape/cleanup for JSON initially to prevent structure corruption.
+    // If parsing fails, we then try the healers as a fallback.
+    let parsed = null;
+    try {
+      parsed = this._extractAndParseJson(result, expectedFormat);
+    } catch {
+      // Ignore initial error and try healing
+    }
+
+    if (!parsed) {
+      const healed = Healers.PreProcessors.reduce((text, healer) => healer(text), result);
+      if (healed !== result) {
+        parsed = this._extractAndParseJson(healed, expectedFormat);
+      } else if (!parsed) {
+        // If no healing was possible and we still don't have a result, re-run to throw original error
+        parsed = this._extractAndParseJson(result, expectedFormat);
+      }
+    }
 
     // Execute Post-processing Pipeline
-    parsed = Healers.PostProcessors.deepUnescape(parsed, expectedFormat, this._extractAndParseJson.bind(this));
-    parsed = Healers.PostProcessors.formatBridge(parsed, expectedFormat);
+    if (parsed) {
+      parsed = Healers.PostProcessors.deepUnescape(parsed, expectedFormat, this._extractAndParseJson.bind(this));
+      parsed = Healers.PostProcessors.formatBridge(parsed, expectedFormat);
+    }
 
     return parsed;
+  },
+
+  /**
+   * Manual unescape for raw strings (Internal)
+   * @private
+   */
+  _unescapeRawString(text) {
+    if (!text || !text.includes('\\u')) return text;
+    try {
+      let processed = text;
+      // Fix non-standard 6-digit/double-escaped escapes like \\u000648 -> \u0648
+      processed = processed.replace(/(?:\\\\|\\)u000([0-9a-fA-F]{3,4})/g, '\\u$1');
+      
+      // Unescape standard Unicode sequences (both \u0648 and \\u0648)
+      processed = processed.replace(/(?:\\\\|\\)u([0-9a-fA-F]{4})/g, (match, grp) => {
+        try {
+          return String.fromCharCode(parseInt(grp, 16));
+        } catch { return match; }
+      });
+      
+      // Strip remaining dangerous control characters (00-1F) except common ones
+      const lowRange = '\\x00-\\x08';
+      const midRange = '\\x0B-\\x0C';
+      const highRange = '\\x0E-\\x1F';
+      const controlPattern = new RegExp(`[${lowRange}${midRange}${highRange}]`, 'g');
+      return processed.replace(controlPattern, '');
+    } catch { return text; }
   },
 
   /**
@@ -265,7 +298,12 @@ export const AIResponseParser = {
       text = text.t || text.text || text.translation || Object.values(text)[0] || JSON.stringify(text);
     }
 
-    return { text: String(text || ''), id };
+    // Restore newlines from markers if present
+    if (typeof text === 'string' && NewlineManager.hasMarkers(text)) {
+      text = NewlineManager.restore(text);
+    }
+
+    return { text: String(text || '').trim(), id };
   },
 
   /**
@@ -366,8 +404,7 @@ export const AIResponseParser = {
     
     // SAFETY CHECK: Re-evaluate if this looks like JSON garbage (single or double quotes)
     const isJsonGarbage = (cleanText.startsWith('{') || cleanText.startsWith('[')) && 
-                          (cleanText.includes('":') || cleanText.includes('":') || 
-                           cleanText.includes("':") || cleanText.includes("' :"));
+                          (cleanText.includes('":') || cleanText.includes("':") || cleanText.includes("' :"));
 
     if (isJsonGarbage) {
       throw new Error(`AI returned malformed JSON that couldn't be parsed as ${expectedFormat}`);

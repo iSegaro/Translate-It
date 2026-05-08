@@ -59,16 +59,39 @@
 
 .ti-btn-status-container {
   position: relative !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  width: auto !important;
+  height: auto !important;
+
+  /* Match standard icon size in sidepanel/popup to keep layout stable when icon is hidden */
+  .compact-wrapper & {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .ti-base-loading-spinner {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 5 !important;
+    pointer-events: none !important;
+  }
 }
 
 .ti-btn-status-badge {
   position: absolute !important;
-  bottom: -4px !important;
-  right: -4px !important;
+  bottom: -2px !important;
+  right: -2px !important;
   z-index: 10 !important;
+
+  /* Adjust for compact sidepanel buttons (34px button with 22px icon) */
+  .compact-wrapper & {
+    bottom: -1px !important;
+    right: -1px !important;
+  }
 }
 
 .ti-text-status-wrapper {

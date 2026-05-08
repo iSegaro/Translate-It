@@ -1,7 +1,7 @@
 /**
  * TTS Providers Configuration - Centralized data for all TTS engines
  */
-import { TTS_ENGINES } from '@/shared/config/constants.js';
+import { TTS_ENGINES } from '@/shared/constants/tts.js';
 
 export const PROVIDER_CONFIGS = {
   // --- Microsoft Edge Neural TTS Data ---
@@ -49,7 +49,7 @@ export const PROVIDER_CONFIGS = {
       baseUrl: 'https://translate.google.com/translate_tts',
       clientParam: 'tw-ob',
       encoding: 'UTF-8',
-      offscreenPath: 'html/offscreen.html',
+      offscreenPath: 'src/html/offscreen.html',
       maxTextLength: 200,
       defaultLanguage: 'en',
       cleaningRegex: /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u3000-\u303F\uFF00-\uFFEF\u00C0-\u024Fa-zA-Z0-9\s.,!?-]/g,

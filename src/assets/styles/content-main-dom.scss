@@ -34,7 +34,7 @@ html[data-translate-it-select-mode="true"] {
   input[type="submit"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
   input[type="button"]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]),
   [href]:not([data-sonner-toast], [data-sonner-toaster], [data-translate-ui]) {
-    pointer-events: none;
+    cursor: crosshair;
     color: inherit;
     text-decoration: none;
   }

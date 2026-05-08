@@ -6,12 +6,13 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { streamingManager } from "../StreamingManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
 
 export class TranslationLifecycleRegistry {
   constructor() {
-    this.activeTranslations = new Map(); // Track active translations: messageId -> AbortController
+    this.activeTranslations = new Map(); // Track active translations: messageId -> { controller: AbortController, context: string }
     this.cancelledRequests = new Set(); // Track cancelled request messageIds
     this.recentRequests = new Map();     // Track recent requests to prevent duplicates
     this.streamingSenders = new Map();    // Track tab info for streaming: messageId -> sender
@@ -23,9 +24,10 @@ export class TranslationLifecycleRegistry {
    * 
    * @param {string} messageId - Unique ID for the message
    * @param {string} text - Content being translated (for duplicate detection)
+   * @param {string} context - UI context (popup, sidepanel, etc.)
    * @returns {AbortController} The controller for this request
    */
-  registerRequest(messageId, text) {
+  registerRequest(messageId, text, context = 'unknown') {
     // Detect duplicates (brief window of 1 second)
     const requestId = `${messageId}:${text?.substring(0, 50)}`;
     if (this.recentRequests.has(requestId)) {
@@ -37,7 +39,10 @@ export class TranslationLifecycleRegistry {
     }
 
     const abortController = new AbortController();
-    this.activeTranslations.set(messageId, abortController);
+    this.activeTranslations.set(messageId, { 
+      controller: abortController, 
+      context 
+    });
     this.cancelledRequests.delete(messageId);
     
     // Store in recent for duplicate prevention
@@ -86,12 +91,11 @@ export class TranslationLifecycleRegistry {
     
     if (this.activeTranslations.has(messageId)) {
       logger.info(`[LifecycleRegistry] Aborting active translation: ${messageId}`);
-      this.activeTranslations.get(messageId).abort();
+      this.activeTranslations.get(messageId).controller.abort();
     }
 
     try {
       // Notify streaming manager to clean up resources
-      const { streamingManager } = await import("../StreamingManager.js");
       await streamingManager.cancelStream(messageId, ErrorTypes.USER_CANCELLED);
     } catch { /* ignore */ }
 
@@ -99,24 +103,37 @@ export class TranslationLifecycleRegistry {
   }
 
   /**
-   * Cancel all currently active translations.
+   * Cancel currently active translations, optionally filtered by context.
    * 
+   * @param {string} [context] - Optional context to filter by (e.g., 'popup')
    * @returns {Promise<number>} Number of cancelled translations
    */
-  async cancelAllTranslations() {
+  async cancelAllTranslations(context = null) {
     let cancelledCount = 0;
     
-    for (const [messageId, abortController] of this.activeTranslations) {
+    for (const [messageId, entry] of this.activeTranslations) {
+      // Apply context filter if provided
+      if (context && entry.context !== context) {
+        continue;
+      }
+
       try {
         this.cancelledRequests.add(messageId);
-        abortController.abort();
+        entry.controller.abort();
         cancelledCount++;
       } catch { /* ignore */ }
     }
 
     try {
-      const { streamingManager } = await import("../StreamingManager.js");
-      await streamingManager.cancelAllStreams('All translations cancelled by user');
+      // If no context or specifically popup/sidepanel, we might want to be more surgical with streamingManager
+      // for now, cancelAllStreams is safe as it handles all active streams
+      if (!context) {
+        await streamingManager.cancelAllStreams('All translations cancelled by user');
+      } else {
+        // Find streams belonging to this context and cancel them
+        // This is a bit more complex as streamingManager doesn't track context yet
+        // but it will be cleaned up eventually or when the next stream update fails
+      }
     } catch { /* ignore */ }
 
     return cancelledCount;
@@ -129,7 +146,8 @@ export class TranslationLifecycleRegistry {
    * @returns {AbortController|null}
    */
   getAbortController(messageId) {
-    return this.activeTranslations.get(messageId) || null;
+    const entry = this.activeTranslations.get(messageId);
+    return entry ? entry.controller : null;
   }
 
   /**

@@ -7,7 +7,7 @@ import { TranslationMode, CONFIG } from "@/shared/config/config.js";
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { isRTLLanguage } from '@/features/element-selection/utils/textDirection.js';
 import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js';
-import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
+import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 
 let logger = null;
 const getLogger = () => {
@@ -66,7 +66,7 @@ export class TranslationRenderer {
     firstLine.appendChild(ttsIconOriginal);
 
     // Create copy icon
-    const copyIcon = this._createCopyIcon(translatedText);
+    const copyIcon = this._createCopyIcon(translatedText, "Copy", translationMode);
     firstLine.appendChild(copyIcon);
 
     // Create drag handle
@@ -125,14 +125,18 @@ export class TranslationRenderer {
   /**
    * Create copy icon with functionality
    */
-  _createCopyIcon(textToCopy, title = "Copy") {
+  _createCopyIcon(textToCopy, title = "Copy", translationMode) {
     const icon = this.factory.createCopyIcon(title);
     
     icon.addEventListener("click", async (e) => {
       e.stopPropagation();
       
+      // Determine strategy based on mode
+      const isDictionary = translationMode === TranslationMode.Dictionary_Translation;
+      const strategy = isDictionary ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
+      
       // Clean translation for a clean copy
-      const cleanText = SimpleMarkdown.getCleanTranslation(textToCopy);
+      const cleanText = SimpleMarkdown.getCleanTranslation(textToCopy, strategy);
       
       // Log click event
       this.logger.debug('📋 Copy icon clicked!', { 

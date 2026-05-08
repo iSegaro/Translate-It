@@ -214,8 +214,8 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  height: 100%;
   flex: 1;
+  min-height: 0; // Ensure flex child can shrink to enable inner scrolling
 }
 
 /* Sidepanel-specific adjustments (similar to popup) */
@@ -235,7 +235,6 @@
   padding: 42px 8px 8px 8px;
 }
 
-
 .output-container {
   margin: 6px 12px;
   flex: 1;
@@ -244,37 +243,8 @@
   min-height: 0;
 }
 
-
-.translation-form :deep(.result-content) {
+.translation-form :deep(.ti-translation-content) {
   flex: 1;
   min-height: 0;
-  max-height: none;
   font-size: 13px;
-  height: 100%;
-  margin: 6px 12px;
-}
-
-.translation-form :deep(.translation-textarea) {
-  min-height: 120px;
-  max-height: 200px;
-  font-size: 13px;
-  padding: 42px 8px 8px 8px;
-}
-
-
-.output-container {
-  margin: 6px 12px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-
-.translation-form :deep(.result-content) {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  font-size: 13px;
-  height: 100%;
 }

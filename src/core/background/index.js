@@ -1,6 +1,7 @@
 // Background script entry point for Vue build
 // Cross-browser service worker for Manifest V3
 
+import browser from 'webextension-polyfill'
 import { LifecycleManager } from "@/core/managers/core/LifecycleManager.js";
 import { registerAllProviders } from "@/features/translation/providers/register-providers.js";
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
@@ -9,6 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -23,15 +25,119 @@ import "./listeners/onSubframeDOMContentLoaded.js";
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
 import { startMemoryMonitoring } from '@/core/memory/MemoryMonitor.js';
 
+// --- Diagnostic Logging ---
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'index');
 const errorHandler = ErrorHandler.getInstance();
 
+// --- Port Lifecycle Management ---
+
+/**
+ * Shared cleanup logic for UI ports (popup, sidepanel)
+ */
+async function performUiCleanup(context, sender) {
+  // Exit early if extension context is invalidated to avoid "Extension context invalidated" errors
+  if (!ExtensionContextManager.isValidSync()) {
+    return;
+  }
+
+  logger.info(`[Background] Starting cleanup for context: ${context}`);
+  
+  try {
+    if (globalThis.backgroundService?.initialized) {
+      const service = globalThis.backgroundService;
+      
+      // 1. Stop all TTS when UI closes
+      const ttsHandler = service.messageHandler.getHandlerForMessage('TTS_STOP');
+      if (ttsHandler) {
+        logger.debug(`[Background] Stopping TTS for ${context} closure`);
+        await ttsHandler({ 
+          action: 'TTS_STOP', 
+          data: { 
+            source: `${context}-port-disconnect`,
+            stopOnlyIfOwner: true
+          } 
+        }, sender);
+      }
+
+      // 2. Cancel all active translations from UI
+      const cancelHandler = service.messageHandler.getHandlerForMessage('CANCEL_TRANSLATION');
+      if (cancelHandler) {
+        logger.info(`[Background] Triggering CANCEL_TRANSLATION for context: ${context}`);
+        await cancelHandler({
+          action: 'CANCEL_TRANSLATION',
+          data: { 
+            cancelAll: true, 
+            context: context,
+            reason: `${context}_closed` 
+          }
+        }, sender);
+      } else {
+        // Fallback: directly call engine and queue manager
+        if (service.translationEngine) {
+          logger.info(`[Background] Fallback: Directly cancelling translations for context: ${context}`);
+          await service.translationEngine.cancelAllTranslations(context);
+          
+          try {
+            const { queueManager } = await import("@/features/translation/core/QueueManager.js");
+            queueManager.cancelByUiContext(context);
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  } catch (error) {
+    errorHandler.handle(error, {
+      context: `background-cleanup-${context}`,
+      showToast: false
+    });
+  }
+}
+
+// Register onConnect at the very top level for maximum reliability in Service Workers
+const runtime = (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime : browser.runtime;
+
+runtime.onConnect.addListener((port) => {
+  try {
+    const isUiPort = port.name === 'popup-lifecycle' || port.name === 'sidepanel-lifecycle';
+    
+    if (isUiPort) {
+      logger.info(`[Background] UI Port connected: ${port.name}`);
+      const context = port.name === 'popup-lifecycle' ? 'popup' : 'sidepanel';
+      
+      port.onMessage.addListener((msg) => {
+        if (msg.action === 'POPUP_OPENED' || msg.action === 'SIDEPANEL_OPENED') {
+          logger.debug(`[Background] UI established connection: ${port.name}`);
+        }
+      });
+      
+      port.onDisconnect.addListener(() => {
+        logger.info(`[Background] Port DISCONNECTED: ${port.name}`);
+        performUiCleanup(context, port.sender).catch(err => {
+          errorHandler.handle(err, {
+            context: `background-port-disconnect-${context}`,
+            showToast: false
+          });
+        });
+      });
+    }
+  } catch (err) {
+    errorHandler.handle(err, {
+      context: 'background-onConnect',
+      showToast: false
+    });
+  }
+});
+
+// --- Initialization ---
+
+// Register all translation providers
 registerAllProviders();
+
+const backgroundService = new LifecycleManager();
+globalThis.backgroundService = backgroundService;
+
 
 // Handle extension installation
 browser.runtime.onInstalled.addListener(async (details) => {
-  const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'onInstalled');
-
   try {
     await handleInstallationEvent(details);
   } catch (error) {
@@ -39,9 +145,7 @@ browser.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
-const backgroundService = new LifecycleManager();
-globalThis.backgroundService = backgroundService;
-
+// Initialize Background Service
 backgroundService.initialize().then(async () => {
   logger.info("[Background] Background service initialization completed!");
 
@@ -81,134 +185,30 @@ backgroundService.initialize().then(async () => {
             try {
               await handleCommandEvent(command, tab);
             } catch (error) {
-              logger.error(`Error handling command ${command}:`, error);
+              errorHandler.handle(error, {
+                context: `background-command-${command}`,
+                showToast: false
+              });
             }
           });
 
           logger.info("Keyboard shortcuts listener registered successfully");
         }
       } catch (error) {
-        logger.error("Failed to register keyboard shortcuts listener:", error);
+        errorHandler.handle(error, {
+          context: 'background-shortcuts-init',
+          showToast: false
+        });
       }
     })();
   }
 
 }).catch((error) => {
-  logger.error("[Background] Background service initialization failed:", error);
+  errorHandler.handle(error, {
+    context: 'background-init',
+    showToast: false
+  });
 });
 
 export { backgroundService };
 
-// Setup port-based reliable messaging endpoint
-import browser from 'webextension-polyfill'
-import ExtensionContextManager from '@/core/extensionContext.js'
-browser.runtime.onConnect.addListener((port) => {
-  try {
-    logger.info('[Background] Port connected:', port.name);
-
-    // Handle popup lifecycle port separately
-    if (port.name === 'popup-lifecycle') {
-      // Popup lifecycle port connected - logged at TRACE level for detailed debugging
-      // logger.trace('[Background] Popup lifecycle port connected');
-      
-      port.onMessage.addListener((msg) => {
-        if (msg.action === 'POPUP_OPENED') {
-          // Popup opened - logged at TRACE level for detailed debugging
-          // logger.trace('[Background] Popup opened at:', new Date(msg.data.timestamp));
-        }
-      });
-      
-      port.onDisconnect.addListener(async () => {
-        // Popup port disconnected - logged at TRACE level for detailed debugging
-        // logger.trace('[Background] Popup port disconnected - popup closed, stopping TTS');
-        // Stop all TTS when popup closes
-        try {
-          if (!ExtensionContextManager.isValidSync()) {
-            return; // Context invalid, skip silently - handled by ExtensionContextManager
-          }
-
-          if (backgroundService.initialized) {
-            const handler = backgroundService.messageHandler.getHandlerForMessage('TTS_STOP');
-            if (handler) {
-              await handler({ 
-                action: 'TTS_STOP', 
-                data: { source: 'popup-port-disconnect' } 
-              });
-              // TTS stopped successfully - logged at TRACE level for detailed debugging
-              // logger.trace('[Background] TTS stopped successfully on popup close');
-            } else {
-              // No handler found - logged at TRACE level for detailed debugging
-              // logger.trace('[Background] No handler found for TTS_STOP');
-            }
-          } else {
-            // Background service not initialized - logged at TRACE level for detailed debugging
-            // logger.trace('[Background] Background service not initialized, skipping TTS stop on popup close');
-          }
-        } catch (error) {
-          await errorHandler.handle(error, {
-            context: 'background-popup-port-disconnect',
-            showToast: false
-          });
-        }
-      });
-      
-      return;
-    }
-
-    // Handle sidepanel lifecycle port separately
-    if (port.name === 'sidepanel-lifecycle') {
-      // Sidepanel lifecycle port connected - logged at TRACE level for detailed debugging
-      // logger.trace('[Background] Sidepanel lifecycle port connected');
-      
-      port.onMessage.addListener((msg) => {
-        if (msg.action === 'SIDEPANEL_OPENED') {
-          // Sidepanel opened - logged at TRACE level for detailed debugging
-          // logger.trace('[Background] Sidepanel opened at:', new Date(msg.data.timestamp));
-        }
-      });
-      
-      port.onDisconnect.addListener(async () => {
-        // Sidepanel port disconnected - logged at TRACE level for detailed debugging
-        // logger.trace('[Background] Sidepanel port disconnected - sidepanel closed, stopping TTS');
-        // Stop all TTS when sidepanel closes
-        try {
-          if (!ExtensionContextManager.isValidSync()) {
-            return; // Context invalid, skip silently - handled by ExtensionContextManager
-          }
-
-          if (backgroundService.initialized) {
-            const handler = backgroundService.messageHandler.getHandlerForMessage('TTS_STOP');
-            if (handler) {
-              await handler({ 
-                action: 'TTS_STOP', 
-                data: { source: 'sidepanel-port-disconnect' } 
-              });
-              // TTS stopped successfully - logged at TRACE level for detailed debugging
-              // logger.trace('[Background] TTS stopped successfully on sidepanel close');
-            } else {
-              // No handler found - logged at TRACE level for detailed debugging
-              // logger.trace('[Background] No handler found for TTS_STOP');
-            }
-          } else {
-            // Background service not initialized - logged at TRACE level for detailed debugging
-            // logger.trace('[Background] Background service not initialized, skipping TTS stop on sidepanel close');
-          }
-        } catch (error) {
-          await errorHandler.handle(error, {
-            context: 'background-sidepanel-port-disconnect',
-            showToast: false
-          });
-        }
-      });
-      
-      return;
-    }
-    
-    // Only handle lifecycle ports now (popup, sidepanel)
-    // All messaging is now handled via direct runtime.sendMessage through UnifiedMessaging
-    // Unrecognized port - logged at TRACE level for detailed debugging
-    // logger.trace('[Background] Unrecognized port connection:', port.name, '- ignoring as UnifiedMessaging handles all messaging');
-    } catch (err) {
-      logger.error('[Background] Error in onConnect handler:', err);
-    }
-  });

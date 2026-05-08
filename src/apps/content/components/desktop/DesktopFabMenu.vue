@@ -240,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -249,10 +249,10 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import useSettingsStore from '@/features/settings/stores/settings.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { TRANSLATION_STATUS } from '@/shared/config/constants.js';
+import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getDesktopFabPositionAsync, SelectionTranslationMode } from '@/shared/config/config.js';
+import { getDesktopFabPositionAsync, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
@@ -262,6 +262,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
@@ -433,6 +434,18 @@ const handleMouseLeave = () => {
   }, ANIMATION_CONFIG.LEAVE_DELAY);
 };
 
+/**
+ * Checks if the provider for a specific mode supports bulk operations
+ */
+const supportsBulk = (mode) => {
+  const providerId = settingsStore.getEffectiveProvider(mode);
+  const provider = findProviderById(providerId);
+  return provider?.features?.includes('bulk') ?? true;
+};
+
+const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element));
+const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page));
+
 const menuItems = computed(() => {
   const items = [];
   if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
@@ -440,20 +453,26 @@ const menuItems = computed(() => {
       id: 'translate_selection',
       label: t('desktop_fab_translate_selection_label'),
       icon: IconTranslateSelection,
-      closeMenu: true,
+      closeMenu: false,
       action: () => triggerTranslation()
     });
   }
 
   if (allowedFeatures.value.selectElement) {
+    const provider = settingsStore.getEffectiveProvider(TranslationMode.Select_Element);
     items.push({
       id: 'select_element',
       label: t('desktop_fab_select_element_label'),
+      tooltip: !isSelectElementSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب المان پشتیبانی نمی‌کند') : '',
       icon: IconSelectElement,
+      disabled: !isSelectElementSupported.value,
       closeMenu: true,
       action: async () => {
         try {
-          await sendMessage({ action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE });
+          await sendMessage({ 
+            action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+            data: { provider }
+          });
         } catch (err) {
           if (ExtensionContextManager.isContextError(err)) {
             ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
@@ -471,15 +490,18 @@ const menuItems = computed(() => {
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
-  if (status.isTranslating || status.isAuto) {
+  if (status.isAuto || status.isTranslating) {
     items.push({
-      id: 'page_translating',
-      label: status.isTranslating ? t('desktop_fab_translating_label') : t('desktop_fab_stop_auto_translating_label'),
+      id: 'page_translating_stop',
+      label: t('desktop_fab_stop_auto_translating_label'),
       icon: IconHourglass,
-      showProgress: true,
+      showProgress: status.isTranslating,
       percent: status.percent,
       closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO)
+      action: () => {
+        logger.info('Stopping page translation from FAB');
+        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
+      }
     });
   } else if (status.isCompleted) {
     items.push({
@@ -490,12 +512,15 @@ const menuItems = computed(() => {
       action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
     });
   } else if (isPageTranslationAllowed) {
+    const provider = settingsStore.getEffectiveProvider(TranslationMode.Page);
     items.push({
       id: 'translate_page',
       label: t('desktop_fab_translate_page_label'),
+      tooltip: !isPageTranslationSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از ترجمه صفحه پشتیبانی نمی‌کند') : '',
       icon: IconTranslatePage,
+      disabled: !isPageTranslationSupported.value,
       closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE)
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider })
     });
   }
 
@@ -521,7 +546,8 @@ const pageTranslationStatus = computed(() => {
   const isError = data.status === TRANSLATION_STATUS.ERROR;
   
   const isActive = isTranslating || isAuto || isCompleted || isError;
-  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
+  const processedCount = (data.translatedCount || 0) + (data.failedCount || 0);
+  const percent = data.totalCount > 0 ? Math.round((processedCount / data.totalCount) * 100) : 0;
   
   return {
     isActive,
@@ -720,12 +746,17 @@ const onDrag = (e) => {
   const point = isMouseEvent ? e : e.touches[0];
 
   if (!isDragging.value) {
-    const dy = point.clientY - startY - verticalPos.value;
+    const dy = point.clientY - (startY + verticalPos.value);
     const dx = point.clientX - startX;
-    if (Math.abs(dy) > 5 || Math.abs(dx) > 10) {
+    
+    // Only start dragging if moved beyond threshold
+    if (Math.abs(dy) > 5 || Math.abs(dx) > 5) {
       isDragging.value = true;
       wasDragged.value = true;
       isFaded.value = false;
+      
+      // Re-sync startY to current point to ensure smooth transition from threshold
+      startY = point.clientY - verticalPos.value;
     }
   }
 
@@ -818,9 +849,22 @@ onMounted(async () => {
   // Settle position before showing to prevent jumps
   setTimeout(() => {
     isReady.value = true;
-    setTimeout(() => {
-      isPositioning.value = false;
-    }, 150);
+    
+    // Settling pixel position on first mount if not already set
+    // We do this in a double requestAnimationFrame or nextTick to ensure the DOM is ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (verticalPos.value === -1 && fabContainerRef.value) {
+          const rect = fabContainerRef.value.getBoundingClientRect();
+          verticalPos.value = rect.top;
+          userPreferredY.value = rect.top;
+        }
+        
+        setTimeout(() => {
+          isPositioning.value = false;
+        }, 150);
+      });
+    });
   }, 100);
 
   startFadeTimer(false);
@@ -832,5 +876,10 @@ onMounted(async () => {
   };
 
   tracker.addEventListener(window, 'click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  logger.debug('[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup');
+  tts.stop({ stopOnlyIfOwner: true }).catch(() => {});
 });
 </script>

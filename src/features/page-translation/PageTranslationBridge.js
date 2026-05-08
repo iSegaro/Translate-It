@@ -57,13 +57,6 @@ export class PageTranslationBridge extends ResourceTracker {
 
       if (!text || !text.trim()) return text;
 
-      // Diagnostic Log: See what's being discovered
-      this.logger.debugLazy(() => [`Discovered node: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`, {
-        score,
-        tagName: node?.parentElement?.tagName || node?.ownerElement?.tagName || 'UNKNOWN',
-        nodePresent: !!node
-      }]);
-
       // 1. Capture original whitespace to preserve formatting
       const leadingMatch = text.match(/^(\s*)/);
       const trailingMatch = text.match(/(\s*)$/);
@@ -75,15 +68,24 @@ export class PageTranslationBridge extends ResourceTracker {
       // We pass the node as the 4th argument
       const translated = await onTranslateCallback(trimmedText, sessionContext, score, node);
       
+      // OPTIMIZATION: Preserve ZWNJ, Tatweel, Dashes and BiDi marks if the provider 
+      // returned a "cleaned" version of the same text.
+      // We ignore: ZWSP(\u200b), ZWNJ(\u200c), ZWJ(\u200d), LRM(\u200e), RLM(\u200f), BOM(\ufeff), Tatweel(\u0640), EnDash(\u2013), EmDash(\u2014)
+      const normalizeForComparison = (s) => s ? s.replace(/[\u200b-\u200f\uFEFF\u0640\u2013\u2014]/g, '').replace(/\s+/g, ' ').trim() : '';
+      const isFunctionallyIdentical = translated && 
+        normalizeForComparison(translated) === normalizeForComparison(trimmedText);
+
       // FIX: Only apply marks if the text was actually translated (different from original)
-      if (translated && translated !== trimmedText) {
+      // and not just a ZWNJ-stripped version of the original.
+      if (translated && translated !== trimmedText && !isFunctionallyIdentical) {
         // 3. Inject BiDi Isolation Mark (RLM/LRM) directly into the string.
         const mark = isTargetRTL ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         
-        return leadingWhitespace + mark + translated + trailingWhitespace;
+        return leadingWhitespace + mark + translated.trim() + trailingWhitespace;
       }
       
-      return leadingWhitespace + (translated || trimmedText) + trailingWhitespace;
+      // Use trimmedText if functionally identical to preserve ZWNJ
+      return leadingWhitespace + (isFunctionallyIdentical ? trimmedText : (translated ? translated.trim() : trimmedText)) + trailingWhitespace;
     };
 
     const nodesTranslator = new NodesTranslator(translateWithContext);

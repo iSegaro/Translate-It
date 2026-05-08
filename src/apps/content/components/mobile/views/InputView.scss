@@ -150,6 +150,33 @@
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     box-shadow: 0 4px 10px rgba(51, 154, 240, 0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    .ti-m-btn-content-stack {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      align-items: center !important;
+      justify-items: center !important;
+    }
+
+    .ti-m-btn-label-hidden, .ti-m-btn-label-visible {
+      grid-area: 1 / 1 / 2 / 2 !important;
+      white-space: nowrap !important;
+      transition: opacity 0.2s ease !important;
+    }
+
+    .ti-m-btn-label-hidden {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    .ti-m-btn-label-visible {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
 
     &:disabled {
       opacity: 0.5 !important;

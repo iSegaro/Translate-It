@@ -1,0 +1,2198 @@
+{
+  "options_loading": {
+    "message": "در حال بارگذاری تنظیمات..."
+  },
+  "app_welcome": {
+    "message": "به افزونه Translate It خوش آمدید!"
+  },
+  "IsRTL": {
+    "message": "true"
+  },
+  "name": {
+    "message": "Translate It"
+  },
+  "nameChrome": {
+    "message": "Translate It"
+  },
+  "nameFirefox": {
+    "message": "Translate It"
+  },
+  "description": {
+    "message": "همه چیز رو ترجمه کنید، به سادگی."
+  },
+  "theme_section_title": {
+    "message": "پوسته"
+  },
+  "localization_section_title": {
+    "message": "زبان افزونه"
+  },
+  "context_menu_options": {
+    "message": "تنظیمات"
+  },
+  "context_menu_shortcuts": {
+    "message": "تنظیمات میانبرها"
+  },
+  "context_menu_help": {
+    "message": "کمک مفید"
+  },
+  "context_menu_translate_screen": {
+    "message": "ترجمه صفحه (عکس‌برداری)"
+  },
+  "context_menu_reload_extension": {
+    "message": "بارگذاری مجدد افزونه (دیباگ)"
+  },
+  "context_menu_translate_with_selection": {
+    "message": "ترجمه انتخابی"
+  },
+  "context_menu_api_provider": {
+    "message": "سرور API"
+  },
+  "api_provider_google": {
+    "message": "مترجم گوگل (کلاسیک)"
+  },
+  "api_provider_gemini": {
+    "message": "Gemini"
+  },
+  "api_provider_webai": {
+    "message": "WebAI"
+  },
+  "api_provider_openai": {
+    "message": "OpenAI"
+  },
+  "api_provider_openrouter": {
+    "message": "OpenRouter"
+  },
+  "api_provider_deepseek": {
+    "message": "DeepSeek"
+  },
+  "api_provider_bing": {
+    "message": "مترجم بینگ"
+  },
+  "api_provider_browser": {
+    "message": "مترجم مرورگر"
+  },
+  "api_provider_yandex": {
+    "message": "مترجم یاندکس"
+  },
+  "api_provider_browserapi": {
+    "message": "Browser Translator"
+  },
+  "api_provider_custom": {
+    "message": "(OpenAI) سفارشی"
+  },
+  "api_provider_deepl": {
+    "message": "DeepL"
+  },
+  "api_provider_mock": {
+    "message": "شبیه‌ساز توسعه"
+  },
+  "provider_default": {
+    "message": "پیش‌فرض"
+  },
+  "incompatible_label": {
+    "message": "ناسازگار"
+  },
+  "provider_google_title": {
+    "message": "مترجم گوگل (کلاسیک)"
+  },
+  "provider_google_description": {
+    "message": "از سرویس رایگان و عمومی Google Translate استفاده می کند. کلید API لازم نیست."
+  },
+  "provider_googlev2_title": {
+    "message": "مترجم گوگل"
+  },
+  "provider_googlev2_description": {
+    "message": "نسخه پایدار گوگل ترنسلیت با استفاده از توکن‌های امنیتی و شبیه‌سازی دقیق مرورگر. مناسب برای متن‌های طولانی. بدون نیاز به کلید API."
+  },
+  "provider_yandex_title": {
+    "message": "مترجم یاندکس"
+  },
+  "provider_yandex_description": {
+    "message": "از سرویس رایگان و عمومی Yandex Translate استفاده می کند. کلید API لازم نیست."
+  },
+  "provider_deepl_title": {
+    "message": "مترجم DeepL"
+  },
+  "provider_deepl_description": {
+    "message": "سرویس ترجمه هوشمند توسط DeepL. نیاز به کلید API دارد."
+  },
+  "provider_bing_title": {
+    "message": "مترجم بینگ"
+  },
+  "provider_bing_description": {
+    "message": "از سرویس رایگان و عمومی Microsoft Bing Translator استفاده می کند. کلید API لازم نیست."
+  },
+  "provider_edge_title": {
+    "message": "مترجم مایکروسافت اج"
+  },
+  "provider_edge_description": {
+    "message": "سرویس رسمی ترجمه مرورگر مایکروسافت اج. سریع‌تر و پایدارتر. بدون نیاز به کلید API."
+  },
+  "provider_lingva_title": {
+    "message": "مترجم لینگوا"
+  },
+  "provider_lingva_description": {
+    "message": "رابط متن‌باز و رایگان گوگل ترنسلیت. متمرکز بر حریم خصوصی و غیرمتمرکز. بدون نیاز به کلید API."
+  },
+  "provider_gemini_title": {
+    "message": "گوگل جمینای (Gemini)"
+  },
+  "provider_gemini_description": {
+    "message": "ترجمه هوشمند با درک متن توسط هوش مصنوعی گوگل. نیاز به کلید API دارد."
+  },
+  "provider_openai_title": {
+    "message": "OpenAI GPT"
+  },
+  "provider_openai_description": {
+    "message": "ترجمه با استفاده از مدل‌های پیشرفته GPT. نیاز به کلید API دارد."
+  },
+  "provider_openrouter_title": {
+    "message": "OpenRouter"
+  },
+  "provider_openrouter_description": {
+    "message": "دسترسی به مجموعه‌ای از مدل‌های هوش مصنوعی از طریق OpenRouter. نیاز به کلید API دارد."
+  },
+  "provider_deepseek_title": {
+    "message": "DeepSeek"
+  },
+  "provider_deepseek_description": {
+    "message": "مدل‌های هوش مصنوعی DeepSeek برای ترجمه سریع و با کیفیت. نیاز به کلید API دارد."
+  },
+  "provider_webai_title": {
+    "message": "سرور محلی WebAI"
+  },
+  "provider_webai_description": {
+    "message": "استفاده از مدل‌های هوش مصنوعی به صورت محلی. بدون نیاز به کلید API."
+  },
+  "provider_browser_title": {
+    "message": "مترجم داخلی مرورگر"
+  },
+  "provider_browser_description": {
+    "message": "استفاده از قابلیت ترجمه داخلی مرورگر (کروم ۱۳۸+). قابلیت ترجمه آفلاین."
+  },
+  "provider_custom_title": {
+    "message": "سرویس سفارشی"
+  },
+  "provider_custom_description": {
+    "message": "استفاده از APIهای سازگار با OpenAI. آدرس سرور و کلید اختصاصی خود را وارد کنید."
+  },
+  "provider_mock_title": {
+    "message": "شبیه‌ساز توسعه"
+  },
+  "provider_mock_description": {
+    "message": "یک پرووایدر شبیه‌سازی شده برای اهداف توسعه و تست."
+  },
+  "provider_vajehyab_title": {
+    "message": "واژه‌یاب (Vajehyab)"
+  },
+  "provider_vajehyab_description": {
+    "message": "لغت‌نامه چندزبانه فارسی. مناسب برای کلمات تکی. بدون نیاز به کلید API."
+  },
+  "vajehyab_word_not_found": {
+    "message": "کلمه در لغت‌نامه واژه‌یاب یافت نشد"
+  },
+  "provider_does_not_support_bulk": {
+    "message": "این سرویس از ترجمه صفحه و حالت انتخاب المان پشتیبانی نمی‌کند."
+  },
+  "options_page_title": {
+    "message": "تنظیمات"
+  },
+  "page_translation_token_warning": {
+    "message": "پرووایدر انتخاب شده ({provider}) از توکن/اعتبار استفاده می‌کند. ترجمه کامل صفحه ممکن است بخش زیادی از سهمیه شما را مصرف کند. آیا مایل به ادامه هستید؟"
+  },
+  "page_translation_token_confirm": {
+    "message": "به هر حال ترجمه کن"
+  },
+  "page_translation_token_cancel": {
+    "message": "انصراف"
+  },
+  "dont_show_again": {
+    "message": "دیگر نشان نده"
+  },
+  "options_description": {
+    "message": "همه چیز رو ترجمه کنید، به سادگی."
+  },
+  "options_changelog_loading": {
+    "message": "در حال بارگذاری تغییرات..."
+  },
+  "github_link_title": {
+    "message": "مشاهده در گیت‌هاب"
+  },
+  "options_error_same_languages": {
+    "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند."
+  },
+  "options_error_empty_language": {
+    "message": "زبان را انتخاب نکرده‌اید."
+  },
+  "popup_loading": {
+    "message": "در حال بارگذاری پنجره..."
+  },
+  "popup_translate_button_text": {
+    "message": "ترجمه"
+  },
+  "export_settings_description": {
+    "message": "تنظیمات فعلی خود را به یک فایل JSON برای پشتیبان‌گیری یا اشتراک‌گذاری صادر کنید."
+  },
+  "import_settings_description": {
+    "message": "وارد کردن تنظیمات فعلی شما را بازنویسی خواهد کرد. پس از وارد کردن موفقیت‌آمیز، صفحه دوباره بارگذاری خواهد شد."
+  },
+  "languages_tab_title": {
+    "message": "زبان‌ها"
+  },
+  "appearance_tab_title": {
+    "message": "ظاهر"
+  },
+  "activation_tab_title": {
+    "message": "روش‌های ترجمه"
+  },
+  "prompt_tab_title": {
+    "message": "تنظیمات پرامپت"
+  },
+  "api_tab_title": {
+    "message": "تنظیمات API"
+  },
+  "import_export_tab_title": {
+    "message": "پشتیبان‌گیری"
+  },
+  "advance_tab_title": {
+    "message": "پیش‌رفته"
+  },
+  "tts_tab_title": {
+    "message": "تبدیل متن به گفتار"
+  },
+  "tts_tab_desc": {
+    "message": "تنظیمات مربوط به صدا و موتورهای تلفظ متن را در اینجا مدیریت کنید."
+  },
+  "tts_engine_label": {
+    "message": "موتور تلفظ (TTS)"
+  },
+  "tts_engine_google": {
+    "message": "مترجم گوگل (استاندارد)"
+  },
+  "tts_engine_edge": {
+    "message": "مایکروسافت اج (طبیعی - Neural)"
+  },
+  "tts_engine_desc": {
+    "message": "موتور پیش‌فرض برای تلفظ متن را انتخاب کنید. موتور Edge صداهای بسیار باکیفیت و طبیعی ارائه می‌دهد."
+  },
+  "tts_fallback_label": {
+    "message": "فعال‌سازی موتور جایگزین"
+  },
+  "tts_fallback_desc": {
+    "message": "در صورتی که موتور انتخابی از زبان متن پشتیبانی نکند، به طور خودکار از موتور جایگزین استفاده می‌شود."
+  },
+  "tts_autodetect_label": {
+    "message": "تشخیص هوشمند زبان"
+  },
+  "tts_autodetect_desc": {
+    "message": "قبل از پخش صدا، زبان متن را به طور هوشمند شناسایی می‌کند تا از صدای صحیح برای آن زبان استفاده شود."
+  },
+  "import_success": {
+    "message": "تنظیمات با موفقیت وارد شد."
+  },
+  "prompt_reset_button": {
+    "message": "دوباره"
+  },
+  "activation_group_general_title": {
+    "message": "کلید اصلی"
+  },
+  "activation_group_fab_title": {
+    "message": "دکمه دسترسی سریع (FAB)"
+  },
+  "activation_group_select_element_title": {
+    "message": "انتخاب المان"
+  },
+  "activation_group_text_fields_title": {
+    "message": "ترجمه فیلدهای متنی"
+  },
+  "activation_group_page_selection_title": {
+    "message": "انتخاب در صفحه"
+  },
+  "activation_group_dictionary_title": {
+    "message": "حالت دیکشنری"
+  },
+  "import_export_export_title": {
+    "message": "پشتیبان‌گیری تنظیمات"
+  },
+  "import_export_import_title": {
+    "message": "بازیابی تنظیمات"
+  },
+  "notification_update_title": {
+    "message": "افزونه به‌روز شد"
+  },
+  "notification_update_message": {
+    "message": "افزونه {appName} به نسخه {version} به‌روزرسانی شد. تغییرات جدید را ببینید."
+  },
+  "ERRORS_TRANSLATION_TIMEOUT": {
+    "message": "ترجمه با زمان‌انتظار مواجه شد. لطفا دوباره تلاش کنید."
+  },
+  "ERRORS_SETTINGS_LOADING_TIMEOUT": {
+    "message": "زمان بارگذاری تنظیمات به پایان رسید. لطفا دوباره تلاش کنید."
+  },
+  "sidepanel_load_error_title": {
+    "message": "خطا در بارگذاری پنل کناری"
+  },
+  "popup_load_error_title": {
+    "message": "خطا در بارگذاری پنجره کوچک"
+  },
+  "options_load_error_title": {
+    "message": "خطا در بارگذاری تنظیمات"
+  },
+  "languages_section_title": {
+    "message": "زبان‌ها"
+  },
+  "source_language_label": {
+    "message": "زبان مبدا"
+  },
+  "target_language_label": {
+    "message": "زبان مقصد"
+  },
+  "help_tab_title": {
+    "message": "راهنما"
+  },
+  "about_tab_title": {
+    "message": "تغییرات جدید"
+  },
+  "help_section_title": {
+    "message": "راهنما و مستندات"
+  },
+  "about_section_title": {
+    "message": "آخرین تغییرات"
+  },
+  "options_changelog_error": {
+    "message": "خطا در بارگذاری تغییرات."
+  },
+  "help_shortcut_title": {
+    "message": "چگونه میانبرهای کیبورد را تغییر دهیم؟"
+  },
+  "help_shortcut_content_p1": {
+    "message": "در **Firefox**، میانبرها از طریق صفحه افزونه‌ها مدیریت می‌شوند:"
+  },
+  "help_shortcut_content_li1": {
+    "message": "آدرس <strong>about:addons</strong> را در نوار آدرس خود وارد کنید."
+  },
+  "help_shortcut_content_li2": {
+    "message": "روی آیکون **چرخ‌دنده (⚙️)** در گوشه بالا-راست کلیک کنید."
+  },
+  "help_shortcut_content_li3": {
+    "message": "گزینه **Manage Extension Shortcuts** را از منو انتخاب کنید."
+  },
+  "help_shortcut_content_li4": {
+    "message": "افزونه **Translate It** را پیدا کرده و میانبر دلخواه خود را تنظیم کنید."
+  },
+  "help_api_keys_title": {
+    "message": "کلیدهای API را از کجا دریافت کنم؟"
+  },
+  "help_api_keys_content": {
+    "message": "شما می‌توانید لینک وب‌سایت هر ارائه‌دهنده API را در تب **تنظیمات API** پیدا کنید. برای تولید کلید، باید در پلتفرم‌های مربوطه یک حساب کاربری ایجاد کنید."
+  },
+  "help_free_providers_title": {
+    "message": "ارائه‌دهندگان رایگان (بدون نیاز به کلید API)"
+  },
+  "help_free_providers_google": {
+    "message": "Google Translate - از سرور عمومی گوگل ترنسلیت استفاده می‌کند"
+  },
+  "help_free_providers_bing": {
+    "message": "Microsoft Bing - از سرور عمومی بینگ ترنسلیت استفاده می‌کند"
+  },
+  "help_free_providers_yandex": {
+    "message": "Yandex Translate - از سرور عمومی یاندکس ترنسلیت استفاده می‌کند"
+  },
+  "help_api_providers_title": {
+    "message": "ارائه‌دهندگان API (نیاز به کلید API دارند)"
+  },
+  "help_api_providers_gemini": {
+    "message": "Google Gemini - کلید API رایگان خود را از [Google AI Studio]({url}) دریافت کنید"
+  },
+  "help_api_providers_openai": {
+    "message": "OpenAI - در [OpenAI Platform]({url}) ثبت‌نام کنید"
+  },
+  "help_api_providers_openrouter": {
+    "message": "OpenRouter - دسترسی به چندین مدل از طریق [OpenRouter]({url})"
+  },
+  "help_api_providers_deepseek": {
+    "message": "DeepSeek - دریافت دسترسی API از [DeepSeek Platform]({url})"
+  },
+  "help_security_notice_title": {
+    "message": "🔒 نکات امنیتی"
+  },
+  "help_security_notice_content": {
+    "message": "کلیدهای API شما به‌صورت محلی در مرورگر شما ذخیره می‌شوند و هرگز با اشخاص ثالث به اشتراک گذاشته نمی‌شوند. برای امنیت بیشتر، می‌توانید هنگام خروجی گرفتن از تنظیمات با استفاده از ویژگی پشتیبان گیری، آن‌ها را رمزگذاری کنید."
+  },
+  "help_shortcut_content_p2": {
+    "message": "در **Chrome**، روند متفاوت است:"
+  },
+  "help_shortcut_content_chrome_li1": {
+    "message": "روی ایکون افزونه کلیک راست کنید."
+  },
+  "help_shortcut_content_chrome_li2": {
+    "message": "گزینه **تنظیمات میانبرها** را انتخاب کنید."
+  },
+  "help_shortcut_content_chrome_li3": {
+    "message": "روی آیکون مداد (✏️) کنار **Translate It** کلیک کنید و میانبر جدید خود را تایپ کنید."
+  },
+  "translation_activation_section_title": {
+    "message": "روش‌های فعال‌سازی ترجمه"
+  },
+  "extension_enabled_label": {
+    "message": "فعال بودن افزونه"
+  },
+  "extension_enabled_description": {
+    "message": "فعال‌سازی یا غیرفعال‌سازی تمام عملکردهای افزونه به جز پاپ‌آپ و سایدپنل."
+  },
+  "show_desktop_fab_label": {
+    "message": "نمایش دکمه دسترسی سریع در دسکتاپ (FAB)"
+  },
+  "show_desktop_fab_description": {
+    "message": "نمایش یک دکمه شناور در دسکتاپ برای دسترسی سریع به ابزارهایی مانند انتخاب المان و ترجمه صفحه."
+  },
+  "restore_original_label": {
+    "message": "مشاهده متن اصلی"
+  },
+  "stop_auto_translating_label": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "select_element_label": {
+    "message": "انتخاب المان"
+  },
+  "translate_page_label": {
+    "message": "ترجمه صفحه"
+  },
+  "translate_on_text_fields_label": {
+    "message": "نمایش آیکون در فیلدهای متنی"
+  },
+  "translate_on_text_fields_description": {
+    "message": "نمایش آیکونِ ترجمه در هر جایی که تایپ می‌کنید."
+  },
+  "enable_shortcut_for_text_fields_label": {
+    "message": "فعال‌سازی کلید میانبر برای فیلدهای متنی"
+  },
+  "enable_shortcut_for_text_fields_description": {
+    "message": "امکان استفاده از کلید میانبر Ctrl+/ برای فعال‌سازی ترجمه در داخل فیلد متنی را فراهم می‌کند."
+  },
+  "translate_with_select_element_label": {
+    "message": "فعال‌سازی ترجمه از طریق انتخاب المان"
+  },
+  "translate_with_select_element_description": {
+    "message": "اجازه می‌دهد تا ترجمه با استفاده از یک روش انتخاب خاص (مانند انتخاب کل یک پاراگراف) فعال شود."
+  },
+  "show_select_element_in_context_menu_label": {
+    "message": "نمایش در منوی کلیک‌راست"
+  },
+  "show_select_element_in_context_menu_description": {
+    "message": "گزینه «انتخاب المان» را در منوی کلیک‌راست مرورگر نمایش می‌دهد."
+  },
+  "translate_on_text_selection_label": {
+    "message": "فعال‌سازی ترجمه روی انتخاب متن"
+  },
+  "translate_on_text_selection_description": {
+    "message": "امکان فعال‌سازی ترجمه به صورت خودکار یا از طریق آیکون پس از انتخاب متن در صفحه."
+  },
+  "mobile_dashboard_page_label": {
+    "message": "صفحه"
+  },
+  "mobile_dashboard_select_label": {
+    "message": "انتخاب"
+  },
+  "mobile_dashboard_input_label": {
+    "message": "ورودی"
+  },
+  "mobile_dashboard_settings_label": {
+    "message": "تنظیمات"
+  },
+  "mobile_dashboard_revert_label": {
+    "message": "بازگشت"
+  },
+  "mobile_dashboard_history_label": {
+    "message": "تاریخچه"
+  },
+  "mobile_selection_auto_label": {
+    "message": "خودکار"
+  },
+  "mobile_selection_translating_label": {
+    "message": "در حال ترجمه..."
+  },
+  "mobile_selection_source_text_title": {
+    "message": "متن اصلی"
+  },
+  "mobile_selection_speak_tooltip": {
+    "message": "پخش صدا"
+  },
+  "mobile_selection_copy_tooltip": {
+    "message": "کپی"
+  },
+  "mobile_selection_history_tooltip": {
+    "message": "تاریخچه"
+  },
+  "mobile_selection_stop_label": {
+    "message": "توقف"
+  },
+  "mobile_selection_stop_tooltip": {
+    "message": "توقف پخش"
+  },
+  "mobile_selection_copied_message": {
+    "message": "ترجمه در حافظه کپی شد"
+  },
+  "mobile_page_error_encountered": {
+    "message": "خطایی رخ داد"
+  },
+  "mobile_page_translation_progress": {
+    "message": "پیشرفت ترجمه"
+  },
+  "mobile_page_failed_status": {
+    "message": "ناموفق"
+  },
+  "mobile_page_unknown_error": {
+    "message": "خطای ناشناخته در ترجمه"
+  },
+  "mobile_page_retry_btn": {
+    "message": "تلاش مجدد"
+  },
+  "mobile_page_stop_btn": {
+    "message": "توقف ترجمه"
+  },
+  "mobile_page_stop_auto_btn": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "mobile_page_restore_btn": {
+    "message": "بازگرداندن صفحه اصلی"
+  },
+  "mobile_page_start_btn": {
+    "message": "شروع ترجمه"
+  },
+  "mobile_page_auto_close_label": {
+    "message": "بستن خودکار"
+  },
+  "mobile_page_auto_close_tooltip": {
+    "message": "بستن خودکار دشبورد پس از شروع ترجمه"
+  },
+  "mobile_fab_alt": {
+    "message": "ترجمه"
+  },
+  "mobile_close_button_alt": {
+    "message": "بستن"
+  },
+  "mobile_swap_languages_alt": {
+    "message": "به"
+  },
+  "mobile_history_button_alt": {
+    "message": "تاریخچه"
+  },
+  "desktop_fab_tooltip": {
+    "message": "ترجمه"
+  },
+  "desktop_fab_alt": {
+    "message": "عملیات ترجمه"
+  },
+  "desktop_fab_revert_tooltip": {
+    "message": "بازگرداندن ترجمه‌های المان"
+  },
+  "desktop_fab_settings_tooltip": {
+    "message": "باز کردن تنظیمات"
+  },
+  "desktop_fab_select_element_label": {
+    "message": "انتخاب المان"
+  },
+  "desktop_fab_translate_selection_label": {
+    "message": "ترجمه متن انتخاب شده"
+  },
+  "desktop_fab_stop_auto_translating_label": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "desktop_fab_restore_original_label": {
+    "message": "مشاهده متن اصلی"
+  },
+  "desktop_fab_translate_page_label": {
+    "message": "ترجمه صفحه"
+  },
+  "desktop_fab_tts_tooltip": {
+    "message": "تبدیل متن به گفتار"
+  },
+  "desktop_fab_tts_play_tooltip": {
+    "message": "پخش"
+  },
+  "desktop_fab_tts_stop_tooltip": {
+    "message": "توقف"
+  },
+  "mobile_ui_mode_auto": {
+    "message": "پیروی از سیستم"
+  },
+  "mobile_ui_mode_mobile": {
+    "message": "همیشه موبایل"
+  },
+  "mobile_ui_mode_desktop": {
+    "message": "همیشه دسکتاپ"
+  },
+  "mobile_input_header_title": {
+    "message": "ورودی دستی"
+  },
+  "mobile_input_source_text_label": {
+    "message": "متن مبدا"
+  },
+  "mobile_input_placeholder": {
+    "message": "اینجا تایپ کنید..."
+  },
+  "mobile_input_clear_btn": {
+    "message": "پاک کردن"
+  },
+  "mobile_input_translate_btn": {
+    "message": "ترجمه"
+  },
+  "mobile_input_no_result_error": {
+    "message": "ترجمه‌ای یافت نشد. دوباره تلاش کنید."
+  },
+  "mobile_input_copied_message": {
+    "message": "کپی شد"
+  },
+  "mobile_input_pasted_message": {
+    "message": "از حافظه جایگذاری شد"
+  },
+  "mobile_input_paste_failed": {
+    "message": "خطا در جایگذاری. لطفاً دسترسی به حافظه را اجازه دهید."
+  },
+  "options_textField_mode_copy": {
+    "message": "کپی در حافظه"
+  },
+  "options_textField_mode_replace": {
+    "message": "جایگذاری در فیلد متنی"
+  },
+  "enable_replace_on_special_sites": {
+    "message": "جایگذاری فقط در سایت‌های خاص (WhatsApp, Telegram, Instagram و غیره)"
+  },
+  "options_selection_mode_label": {
+    "message": "حالت ترجمه متن انتخابی"
+  },
+  "options_selection_mode_immediate": {
+    "message": "بلافاصله"
+  },
+  "options_selection_mode_onclick": {
+    "message": "نمایش آیکون"
+  },
+  "options_selection_mode_onfabclick": {
+    "message": "FAB"
+  },
+  "require_ctrl_for_text_selection_label": {
+    "message": "الزام استفاده از کلید Ctrl برای ترجمه متن"
+  },
+  "active_selection_icon_on_textfields_label": {
+    "message": "فعال‌سازی دوبار کلیک در فیلدهای متنی"
+  },
+  "active_selection_icon_on_textfields_description": {
+    "message": "نمایش آیکون ترجمه هنگام دوبار کلیک روی متن‌های داخل فیلدهای متنی (textarea)."
+  },
+  "enhanced_triple_click_drag_label": {
+    "message": "پشتیبانی پیشرفته از سه‌بار کلیک + کشیدن"
+  },
+  "enhanced_triple_click_drag_description": {
+    "message": "هنگام فعال‌سازی، با سه‌بار کلیک برای انتخاب یک پاراگراف و سپس کشیدن ماوس برای گسترش انتخاب، سیستم تا زمان رها کردن ماوس صبر می‌کند و سپس ترجمه را نمایش می‌دهد. این از ترجمه زودهنگام موقع انتخاب چندین پاراگراف جلوگیری می‌کند."
+  },
+  "enable_dictionary_translation_description": {
+    "message": "کلمات یا عبارات کوتاه به عنوان جستجو در دیکشنری در نظر گرفته شده و تعاریف دقیق به جای ترجمه استاندارد ارائه می‌شوند."
+  },
+  "prompt_section_title": {
+    "message": "الگوی درخواست (Prompt)"
+  },
+  "prompt_template_label": {
+    "message": "الگوی درخواست"
+  },
+  "prompt_template_info": {
+    "message": "از کلیدواژه‌ها برای شخصی‌سازی درخواست خود استفاده کنید."
+  },
+  "prompt_template_placeholder": {
+    "message": "الگوی درخواست خود را در اینجا وارد کنید. از کلیدواژه‌هایی مانند $_{SOURCE}, $_{TARGET} و $_{TEXT} استفاده کنید."
+  },
+  "prompt_template_help": {
+    "message": "شما باید از کلیدواژه‌های زیر در الگوی درخواست خود استفاده کنید:"
+  },
+  "api_section_title": {
+    "message": "رابط ترجمه (API)"
+  },
+  "translation_api_label": {
+    "message": "سرویس دهنده"
+  },
+  "provider_label": {
+    "message": "سرویس‌دهنده"
+  },
+  "gemini_api_settings_title": {
+    "message": "تنظیمات Gemini"
+  },
+  "gemini_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از Google AI Studio دریافت کنید."
+  },
+  "openai_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از وبسایت OpenAI دریافت کنید."
+  },
+  "deepseek_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از وبسایت DeepSeek دریافت کنید."
+  },
+  "openrouter_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از وبسایت OpenRouter دریافت کنید."
+  },
+  "webai_api_key_info": {
+    "message": "شما می‌توانید یک API Server شخصی در کامپیوتر خود اجرا کنید."
+  },
+  "gemini_api_key_link": {
+    "message": "دریافت کلید API رایگان"
+  },
+  "openai_api_key_link": {
+    "message": "دریافت کلید API"
+  },
+  "deepseek_api_key_link": {
+    "message": "دریافت کلید API"
+  },
+  "openrouter_api_key_link": {
+    "message": "دریافت کلید API"
+  },
+  "webai_api_key_link": {
+    "message": "راه‌اندازی API Server شخصی."
+  },
+  "gemini_api_settings_api_key_label": {
+    "message": "کلید API"
+  },
+  "gemini_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "gemini_api_settings_api_url_label": {
+    "message": "آدرس API"
+  },
+  "gemini_api_url_placeholder": {
+    "message": "آدرس پیش‌فرض Gemini API"
+  },
+  "gemini_api_url_info": {
+    "message": "برای استفاده از نقطه پایانی پیش‌فرض Gemini، این قسمت را خالی بگذارید"
+  },
+  "gemini_custom_model_label": {
+    "message": "نام مدل"
+  },
+  "gemini_custom_model_placeholder": {
+    "message": "نام مدل را وارد کنید"
+  },
+  "gemini_custom_model_info": {
+    "message": "نام دقیق مدل را که توسط Google ارائه شده است وارد کنید"
+  },
+  "gemini_custom_api_url_info": {
+    "message": "آدرس کامل API به همراه نام مدل را وارد کنید"
+  },
+  "webai_api_settings_title": {
+    "message": "تنظیمات WebAI"
+  },
+  "webai_api_url_label": {
+    "message": "آدرس"
+  },
+  "webai_api_url_placeholder": {
+    "message": "آدرس API را وارد کنید"
+  },
+  "webai_api_model_label": {
+    "message": "مدل"
+  },
+  "webai_api_model_placeholder": {
+    "message": "مدل"
+  },
+  "lingva_api_settings_title": {
+    "message": "تنظیمات API لینگوا"
+  },
+  "lingva_api_url_label": {
+    "message": "آدرس API"
+  },
+  "lingva_api_url_placeholder": {
+    "message": "آدرس API لینگوا را وارد کنید (مانند https://lingva.ml)"
+  },
+  "lingva_api_url_info": {
+    "message": "شما می‌توانید از نمونه‌های عمومی لینگوا استفاده کنید یا خودتان آن را میزبانی کنید."
+  },
+  "lingva_instances_link": {
+    "message": "مشاهده نمونه‌های عمومی لینگوا."
+  },
+  "openai_api_settings_title": {
+    "message": "تنظیمات OpenAI"
+  },
+  "openai_api_settings_api_key_label": {
+    "message": "کلید API"
+  },
+  "openai_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "openai_api_settings_model_label": {
+    "message": "مدل"
+  },
+  "openai_api_model_placeholder": {
+    "message": "مدل OpenAI را وارد کنید"
+  },
+  "openrouter_api_settings_title": {
+    "message": "تنظیمات OpenRouter"
+  },
+  "openrouter_api_settings_api_key_label": {
+    "message": "کلید API"
+  },
+  "openrouter_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "openrouter_api_settings_model_label": {
+    "message": "مدل"
+  },
+  "openrouter_api_model_placeholder": {
+    "message": "مدل OpenRouter (مثلاً: openai/gpt-4o) را وارد کنید"
+  },
+  "deepseek_api_settings_title": {
+    "message": "تنظیمات DeepSeek"
+  },
+  "deepseek_api_settings_api_key_label": {
+    "message": "کلید API"
+  },
+  "deepseek_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "deepseek_api_settings_model_label": {
+    "message": "مدل"
+  },
+  "deepseek_api_model_placeholder": {
+    "message": "مدل DeepSeek را وارد کنید (مثلا: deepseek-chat)"
+  },
+  "deepl_api_settings_title": {
+    "message": "تنظیمات API DeepL"
+  },
+  "deepl_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از"
+  },
+  "deepl_api_key_link": {
+    "message": "وبسایت DeepL API"
+  },
+  "deepl_free_api_info": {
+    "message": "نسخه رایگان با ۵۰۰,۰۰۰ کاراکتر در ماه موجود است."
+  },
+  "deepl_api_key_label": {
+    "message": "کلید API"
+  },
+  "deepl_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "deepl_api_tier_label": {
+    "message": "نسخه API"
+  },
+  "deepl_api_tier_free": {
+    "message": "رایگان (api-free.deepl.com)"
+  },
+  "deepl_api_tier_pro": {
+    "message": "پولی (api.deepl.com)"
+  },
+  "deepl_free_tier_description": {
+    "message": "رایگان با محدودیت ۵۰۰,۰۰۰ کاراکتر در ماه. از api-free.deepl.com استفاده می‌کند"
+  },
+  "deepl_pro_tier_description": {
+    "message": "حرفه‌ای با محدودیت بیشتر بر اساس اشتراک شما. از api.deepl.com استفاده می‌کند"
+  },
+  "deepl_formality_label": {
+    "message": "رسمی بودن ترجمه"
+  },
+  "deepl_formality_description": {
+    "message": "سطح رسمی بودن ترجمه را کنترل کنید. برخی زبان‌ها ممکن است همه گزینه‌ها را پشتیبانی نکنند."
+  },
+  "deepl_formality_default": {
+    "message": "پیش‌فرض (خودکار)"
+  },
+  "deepl_formality_more": {
+    "message": "رسمی‌تر"
+  },
+  "deepl_formality_less": {
+    "message": "غیررسمی‌تر"
+  },
+  "deepl_formality_prefer_more": {
+    "message": "ترجیح رسمی"
+  },
+  "deepl_formality_prefer_less": {
+    "message": "ترجیح غیررسمی"
+  },
+  "deepl_beta_languages_label": {
+    "message": "فعال‌سازی زبان‌های بتا"
+  },
+  "deepl_beta_languages_description": {
+    "message": "پشتیبانی از زبان‌های بتا را فعال کنید. زبان‌های بتا از تنظیمات رسمی بودن پشتیبانی نمی‌کنند."
+  },
+  "custom_api_settings_title": {
+    "message": "تنظیمات API سازگار با OpenAI"
+  },
+  "custom_api_settings_description": {
+    "message": "برای اتصال به هر سرویس دیگری که با فرمت OpenAI سازگار است، استفاده کنید."
+  },
+  "custom_api_settings_api_url_label": {
+    "message": "آدرس"
+  },
+  "custom_api_url_placeholder": {
+    "message": "(مثل: v1/chat/completions)"
+  },
+  "custom_api_url_example": {
+    "message": "مثال:"
+  },
+  "custom_api_settings_api_key_label": {
+    "message": "کلید API"
+  },
+  "custom_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "custom_api_settings_model_label": {
+    "message": "مدل"
+  },
+  "custom_api_model_placeholder": {
+    "message": "نام مدل را وارد کنید"
+  },
+  "import_export_section_title": {
+    "message": "پشتیبان‌گیری و بازیابی تنظیمات"
+  },
+  "export_settings_button": {
+    "message": "پشتیبان‌گیری از تنظیمات"
+  },
+  "export_password_label": {
+    "message": "🔐 رمز عبور صادرات (پیشنهاد امنیتی)"
+  },
+  "export_password_placeholder": {
+    "message": "رمز قوی برای محافظت از کلیدهای API ایجاد کنید"
+  },
+  "import_settings_label": {
+    "message": "بازیابی تنظیمات از فایل"
+  },
+  "import_settings_button": {
+    "message": "بازیابی تنظیمات"
+  },
+  "import_password_label": {
+    "message": "🔑 رمز عبور وارد کردن مورد نیاز است"
+  },
+  "import_password_placeholder": {
+    "message": "رمز عبور مورد استفاده در صادرات را وارد کنید"
+  },
+  "security_warning_title": {
+    "message": "⚠️ هشدار امنیتی ⚠️"
+  },
+  "security_warning_message": {
+    "message": "شما در حال صادر کردن تنظیمات خود بدون محافظت رمز عبور هستید.\nکلیدهای API شما به صورت متن ساده ذخیره شده و برای هرکسی قابل خواندن خواهند بود.\n\n🔒 برای امنیت، به‌شدت پیشنهاد می‌شود از رمز عبور استفاده کنید."
+  },
+  "security_warning_question": {
+    "message": "آیا می‌خواهید بدون محافظت رمز عبور ادامه دهید؟"
+  },
+  "save_settings_button": {
+    "message": "ذخیره تنظیمات"
+  },
+  "excluded_sites_label": {
+    "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"
+  },
+  "advance_debug_mode_label": {
+    "message": "حالت اشکال‌زدایی (Debug Mode)"
+  },
+  "debug_section_description": {
+    "message": "فعال‌سازی لاگ‌های جزئی برای بخش‌های مختلف. این تنظیم بر سطح کلی لاگ غلبه می‌کند."
+  },
+  "proxy_section_title": {
+    "message": "تنظیمات پروکسی"
+  },
+  "proxy_section_description": {
+    "message": "تنظیم پروکسی برای پرووایدرهایی با محدودیت جغرافیایی (مثلاً Gemini از ایران)"
+  },
+  "proxy_enabled_label": {
+    "message": "فعال‌سازی پروکسی"
+  },
+  "proxy_type_label": {
+    "message": "نوع پروکسی"
+  },
+  "proxy_host_label": {
+    "message": "آدرس سرور"
+  },
+  "proxy_port_label": {
+    "message": "پورت"
+  },
+  "proxy_username_label": {
+    "message": "نام کاربری (اختیاری)"
+  },
+  "proxy_password_label": {
+    "message": "رمز عبور (اختیاری)"
+  },
+  "proxy_testing": {
+    "message": "در حال تست..."
+  },
+  "proxy_test_direct": {
+    "message": "تست اتصال مستقیم"
+  },
+  "proxy_test_proxy": {
+    "message": "تست اتصال پروکسی"
+  },
+  "proxy_test_success": {
+    "message": "اتصال پروکسی با موفقیت برقرار شد!"
+  },
+  "direct_test_success": {
+    "message": "اتصال مستقیم با موفقیت برقرار شد!"
+  },
+  "proxy_test_failed": {
+    "message": "اتصال پروکسی ناموفق. تنظیمات را بررسی کنید."
+  },
+  "direct_test_failed": {
+    "message": "اتصال مستقیم ناموفق. لطفا اینترنت خود را بررسی کنید."
+  },
+  "proxy_test_error": {
+    "message": "تست با خطا مواجه شد."
+  },
+  "proxy_not_enabled": {
+    "message": "لطفاً ابتدا پروکسی را فعال کنید تا بتوانید اتصال را تست کنید."
+  },
+  "proxy_warning_title": {
+    "message": "محدودیت افزونه مرورگر"
+  },
+  "proxy_warning_message": {
+    "message": "افزونه‌های مرورگر به دلیل محدودیت‌های امنیتی نمی‌توانند مستقیماً از سرور پروکسی استفاده کنند. این تنظیم قصد شما را پیکربندی می‌کند، اما استفاده واقعی از پروکسی ممکن است نیاز به تنظیمات اضافی داشته باشد یا متفاوت از انتظار عمل کند."
+  },
+  "proxy_config_invalid": {
+    "message": "تنظیمات پروکسی نامعتبر. لطفا تنظیمات خود را بررسی کنید."
+  },
+  "proxy_host_invalid": {
+    "message": "نام میزبان نامعتبر. لطفا یک نام دامنه یا آدرس IP معتبر وارد کنید."
+  },
+  "theme_auto": {
+    "message": "خودکار با سیستم"
+  },
+  "theme_light": {
+    "message": "روشن"
+  },
+  "theme_dark": {
+    "message": "تاریک"
+  },
+  "theme_toggle_title": {
+    "message": "تغییر پوسته"
+  },
+  "popup_page_title": {
+    "message": "Translate It!"
+  },
+  "popup_translate_page_link": {
+    "message": "ترجمه صفحه"
+  },
+  "popup_translate_page_link_title": {
+    "message": "ترجمه صفحه در تب جدید"
+  },
+  "popup_select_element_alt_icon": {
+    "message": "انتخاب عنصر"
+  },
+  "popup_select_element_title_icon": {
+    "message": "حالت انتخاب با ماوس"
+  },
+  "popup_revert_alt_icon": {
+    "message": "بازگرداندن"
+  },
+  "popup_revert_title_icon": {
+    "message": "بازگرداندن (کلید Esc)"
+  },
+  "popup_clear_storage_alt_icon": {
+    "message": "پاک کردن"
+  },
+  "popup_clear_storage_title_icon": {
+    "message": "پاک کردن فیلدها"
+  },
+  "popup_settings_alt_icon": {
+    "message": "تنظیمات"
+  },
+  "popup_settings_title_icon": {
+    "message": "تنظیمات"
+  },
+  "popup_target_language_title": {
+    "message": "زبان مقصد"
+  },
+  "popup_target_language_placeholder": {
+    "message": "زبان مقصد"
+  },
+  "popup_clear_target_language_title": {
+    "message": "پاک کردن مقصد"
+  },
+  "popup_swap_languages_title": {
+    "message": "جابجایی زبان‌ها"
+  },
+  "popup_swap_languages_alt_icon": {
+    "message": "جابجایی"
+  },
+  "popup_source_language_placeholder": {
+    "message": "زبان مبدا"
+  },
+  "popup_source_language_title": {
+    "message": "زبان مبدا"
+  },
+  "popup_clear_source_language_title": {
+    "message": "پاک کردن مبدا"
+  },
+  "popup_translate_button_title": {
+    "message": "ترجمه"
+  },
+  "popup_stop_button_title": {
+    "message": "توقف ترجمه"
+  },
+  "popup_exclude_toggle_title": {
+    "message": "فعال/غیرفعال کردن در این سایت"
+  },
+  "popup_copy_source_alt_icon": {
+    "message": "کپی مبدا"
+  },
+  "popup_copy_source_title_icon": {
+    "message": "کپی"
+  },
+  "popup_voice_source_alt_icon": {
+    "message": "تلفظ مبدا"
+  },
+  "popup_voice_source_title_icon": {
+    "message": "تلفظ"
+  },
+  "popup_paste_source_alt_icon": {
+    "message": "چسباندن"
+  },
+  "popup_paste_source_title_icon": {
+    "message": "چسباندن"
+  },
+  "popup_target_text_placeholder": {
+    "message": "ترجمه اینجا نمایش داده می‌شود"
+  },
+  "popup_source_text_placeholder": {
+    "message": "اینجا بنویسید"
+  },
+  "popup_copy_target_alt_icon": {
+    "message": "کپی مقصد"
+  },
+  "popup_copy_target_title_icon": {
+    "message": "کپی"
+  },
+  "popup_voice_target_alt_icon": {
+    "message": "تلفظ مقصد"
+  },
+  "popup_voice_target_title_icon": {
+    "message": "تلفظ"
+  },
+  "popup_string_during_translate": {
+    "message": "در حال ترجمه..."
+  },
+  "popup_string_error_sending": {
+    "message": "خطا در ارسال درخواست."
+  },
+  "popup_string_error_response_empty": {
+    "message": "(ترجمه یافت نشد)"
+  },
+  "popup_string_translate_error_trigger": {
+    "message": "خطا در هنگام ترجمه."
+  },
+  "popup_string_translate_error_response": {
+    "message": "خطا در دریافت پاسخ ترجمه."
+  },
+  "popup_open_side_panel_title": {
+    "message": "پنل کناری"
+  },
+  "page_translation_btn_translate": {
+    "message": "ترجمه صفحه"
+  },
+  "page_translation_btn_stop": {
+    "message": "توقف ترجمه"
+  },
+  "page_translation_btn_restore": {
+    "message": "بازگشت به اصلی"
+  },
+  "sync_page_label": {
+    "message": "همگام صفحه"
+  },
+  "sync_element_label": {
+    "message": "همگام المان"
+  },
+  "api_key_show": {
+    "message": "نمایش"
+  },
+  "api_key_hide": {
+    "message": "مخفی"
+  },
+  "SIDEPANEL_SOURCE_TEXT_LABEL": {
+    "message": "متن اصلی"
+  },
+  "SIDEPANEL_TARGET_TEXT_LABEL": {
+    "message": "ترجمه"
+  },
+  "SIDEPANEL_SOURCE_TEXT_PLACEHOLDER": {
+    "message": "اینجا بنویسید"
+  },
+  "SIDEPANEL_TARGET_TEXT_PLACEHOLDER": {
+    "message": "ترجمه اینجا نمایش داده می‌شود"
+  },
+  "SIDEPANEL_SELECT_ELEMENT_MESSAGE": {
+    "message": "روی المان‌ها در صفحه وب کلیک کنید تا ترجمه شوند..."
+  },
+  "SIDEPANEL_TRANSLATE_BUTTON_TEXT": {
+    "message": "ترجمه"
+  },
+  "SIDEPANEL_SETTINGS_TITLE_ICON": {
+    "message": "تنظیمات"
+  },
+  "SIDEPANEL_CLEAR_STORAGE_TITLE_ICON": {
+    "message": "خالی کردن"
+  },
+  "SIDEPANEL_REVERT_TOOLTIP": {
+    "message": "بازگردانی (Esc کلید)"
+  },
+  "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
+    "message": "انتخاب المان با موس"
+  },
+  "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
+    "message": "ورودی (خودکار)"
+  },
+  "SIDEPANEL_SWAP_LANGUAGES_TITLE": {
+    "message": "جابجایی زبان‌ها"
+  },
+  "SIDEPANEL_SWAP_LANGUAGES_ALT": {
+    "message": "جابجایی"
+  },
+  "SIDEPANEL_SOURCE_LANGUAGE_TITLE": {
+    "message": "زبان مبدا"
+  },
+  "SIDEPANEL_TARGET_LANGUAGE_TITLE": {
+    "message": "زبان مقصد"
+  },
+  "SIDEPANEL_COPY_SOURCE_ALT_ICON": {
+    "message": "کپی"
+  },
+  "SIDEPANEL_VOICE_SOURCE_ALT_ICON": {
+    "message": "صدا مبدا"
+  },
+  "SIDEPANEL_PASTE_SOURCE_ALT_ICON": {
+    "message": "چسباندن"
+  },
+  "SIDEPANEL_COPY_TARGET_ALT_ICON": {
+    "message": "کپی نتیجه"
+  },
+  "SIDEPANEL_VOICE_TARGET_ALT_ICON": {
+    "message": "صدا مقصد"
+  },
+  "SIDEPANEL_TARGET_LANGUAGE_PLACEHOLDER": {
+    "message": "زبان مقصد"
+  },
+  "SIDEPANEL_VOICE_TARGET_TITLE_ICON": {
+    "message": "تلفظ"
+  },
+  "SIDEPANEL_VOICE_SOURCE_TITLE_ICON": {
+    "message": "تلفظ"
+  },
+  "SIDEPANEL_COPY_SOURCE_TITLE_ICON": {
+    "message": "کپی"
+  },
+  "SIDEPANEL_COPY_TARGET_TITLE_ICON": {
+    "message": "کپی"
+  },
+  "SIDEPANEL_PASTE_SOURCE_TITLE_ICON": {
+    "message": "چسباندن"
+  },
+  "history_delete": {
+    "message": "حذف"
+  },
+  "history_delete_item": {
+    "message": "حذف این مورد"
+  },
+  "STATUS_TRANSLATING_CTRLSLASH": {
+    "message": "درحال ترجمه..."
+  },
+  "STATUS_TRANSLATING_SELECT_ELEMENT": {
+    "message": "درحال ترجمه..."
+  },
+  "STATUS_TRANSLATING_ICON": {
+    "message": "درحال ترجمه..."
+  },
+  "STATUS_Revert_Number": {
+    "message": "بازگردانی شد"
+  },
+  "STATUS_REVERT_NOT_FOUND": {
+    "message": "ترجمه‌ای برای بازگردانی وجود ندارد."
+  },
+  "STATUS_FROM_MEMORY": {
+    "message": "از حافظه"
+  },
+  "STATUS_REMOVE_MEMORY": {
+    "message": "حافظه پاک شد"
+  },
+  "STATUS_SMARTTRANSLATE_COPIED": {
+    "message": "ترجمه در کلیپ‌بورد کپی شد (Ctrl+V)."
+  },
+  "SIDEPANEL_API_PROVIDER_TOOLTIP": {
+    "message": "ارایه دهنده سرویس"
+  },
+  "SIDEPANEL_HISTORY_TOOLTIP": {
+    "message": "تاریخچه ترجمه"
+  },
+  "SIDEPANEL_HISTORY_TITLE": {
+    "message": "تاریخچه ترجمه‌ها"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY": {
+    "message": "پاک کردن تاریخچه"
+  },
+  "SIDEPANEL_CLEAR_ALL_HISTORY_TOOLTIP": {
+    "message": "پاک کردن تمام تاریخچه"
+  },
+  "SIDEPANEL_EXPORT_HISTORY": {
+    "message": "خروجی گرفتن"
+  },
+  "SIDEPANEL_EXPORT_HISTORY_TOOLTIP": {
+    "message": "گرفتن خروجی از تاریخچه"
+  },
+  "SIDEPANEL_EXPORT_JSON_CLEAN": {
+    "message": "خروجی JSON (تمیز)"
+  },
+  "SIDEPANEL_EXPORT_JSON_RAW": {
+    "message": "خروجی JSON (خام)"
+  },
+  "SIDEPANEL_EXPORT_CSV": {
+    "message": "خروجی CSV"
+  },
+  "SIDEPANEL_EXPORT_ANKI": {
+    "message": "خروجی انکی (Anki)"
+  },
+  "CONFIRM_CLEAR_ALL_HISTORY": {
+    "message": "تاریخچه پاک شود؟"
+  },
+  "OPTIONS_STATUS_SAVED_SUCCESS": {
+    "message": "با موفقیت ذخیره شد :)"
+  },
+  "OPTIONS_STATUS_SAVED_FAILED": {
+    "message": "ذخیره نشد :("
+  },
+  "OPTIONS_STATUS_VALIDATION_FAILED": {
+    "message": "لطفاً پیش از ذخیره، خطاها را برطرف کنید"
+  },
+  "browser_api_settings_title": {
+    "message": "تنظیمات مرورگر"
+  },
+  "browser_api_description": {
+    "message": "موتور داخلی مرورگر ترجمه‌های سریع و خصوصی را ارائه می‌دهد. بدون نیاز به ارسال اطلاعات به سرورهای خارجی."
+  },
+  "browser_api_requirements": {
+    "message": "نیازمندی‌ها:"
+  },
+  "browser_api_requirements_chrome": {
+    "message": "+Chrome 138 (دسکتاپ)"
+  },
+  "browser_api_requirements_gpu": {
+    "message": "GPU with 4GB+ VRAM"
+  },
+  "browser_api_requirements_storage": {
+    "message": "فضای ذخیره سازی (حداقل ۲۲ گیگابایت)"
+  },
+  "browser_api_requirements_internet": {
+    "message": "یک اتصال نامحدود اینترنت، برای دانلودهای اولیه"
+  },
+  "PROVIDER_MODEL_LABEL": {
+    "message": "مدل"
+  },
+  "gemini_model_title": {
+    "message": "انتخاب مدل Gemini یا آدرس سفارشی"
+  },
+  "openai_custom_model_placeholder": {
+    "message": "نام مدل را وارد کنید"
+  },
+  "openai_custom_model_label": {
+    "message": "نام مدل"
+  },
+  "openrouter_custom_model_placeholder": {
+    "message": "نام مدل را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
+  },
+  "openrouter_custom_model_label": {
+    "message": "نام مدل"
+  },
+  "deepseek_custom_model_placeholder": {
+    "message": "نام مدل را وارد کنید"
+  },
+  "deepseek_custom_model_label": {
+    "message": "نام مدل"
+  },
+  "ERRORS_CIRCUIT_BREAKER_OPEN": {
+    "message": "سرویس موقتاً مسدود شده است. به دلیل خطاهای مکرر، این سرویس برای دقایقی غیرفعال است. لطفا از سرویس دهنده دیگری استفاده کنید یا کمی بعد دوباره تلاش کنید."
+  },
+  "ERRORS_UNKNOWN": {
+    "message": "خطای ناشناخته رخ داد."
+  },
+  "ERRORS_INVALID_CONTEXT": {
+    "message": "زمینهٔ افزونه نامعتبر است. لطفا صفحه را تازه‌سازی کنید."
+  },
+  "ERRORS_CONTEXT_LOST": {
+    "message": "زمینهٔ افزونه از بین رفته است."
+  },
+  "ERRORS_TAB_AVAILABILITY": {
+    "message": "تب در دسترس نیست."
+  },
+  "ERRORS_EMPTY_PROMPT": {
+    "message": "متن پرامپت خالی یا نامعتبر است."
+  },
+  "ERRORS_TEXT_TOO_LONG": {
+    "message": "متن انتخاب شده بیش از حد طولانی است. لطفا بخش کوتاه‌تری را انتخاب کنید."
+  },
+  "ERRORS_NETWORK_ERROR": {
+    "message": "خطای شبکه. لطفا اتصال اینترنت خود را بررسی کنید."
+  },
+  "ERRORS_HTTP_ERROR": {
+    "message": "خطای HTTP در ارتباط با سرور."
+  },
+  "ERRORS_BROWSER_API_UNAVAILABLE": {
+    "message": "سرویس ترجمه کروم (Built-in) در دسترس نیست. این قابلیت به کروم ۱۳۸ یا بالاتر نیاز دارد."
+  },
+  "ERRORS_API_KEY_MISSING": {
+    "message": "کلید API وارد نشده است."
+  },
+  "ERRORS_API_KEY_INVALID": {
+    "message": "کلید API نامعتبر یا غیرمجاز است."
+  },
+  "ERRORS_API_URL_MISSING": {
+    "message": "آدرس API وارد نشده است."
+  },
+  "ERRORS_API_ENDPOINT_INVALID": {
+    "message": "آدرس API اشتباه است (خطای ۴۰۴)."
+  },
+  "ERRORS_API_CONFIG_INVALID": {
+    "message": "پیکربندی API نامعتبر است. لطفا تنظیمات خود را بررسی کنید."
+  },
+  "ERRORS_API_ERROR": {
+    "message": "خطای API سرویس ترجمه."
+  },
+  "ERRORS_MODEL_MISSING": {
+    "message": "مدل هوش مصنوعی انتخاب شده نامعتبر یا پیدا نشده است."
+  },
+  "ERRORS_INVALID_REQUEST": {
+    "message": "فرمت درخواست یا پارامترهای ارسالی نامعتبر است."
+  },
+  "ERRORS_INSUFFICIENT_BALANCE": {
+    "message": "اعتبار یا موجودی برای API انتخاب شده کافی نیست."
+  },
+  "ERRORS_FORBIDDEN_ERROR": {
+    "message": "دسترسی ممنوع است. مجوزها یا فیلتر محتوای سرویس‌دهنده را بررسی کنید."
+  },
+  "ERRORS_RATE_LIMIT_REACHED": {
+    "message": "محدودیت تعداد درخواست‌ها به پایان رسیده است. لطفا کمی بعد دوباره تلاش کنید."
+  },
+  "ERRORS_SERVER_ERROR": {
+    "message": "سرور ارائه‌دهنده سرویس با خطای داخلی مواجه شد. لطفا بعداً تلاش کنید."
+  },
+  "ERRORS_MODEL_OVERLOADED": {
+    "message": "سرور مدل مورد نظر در حال حاضر شلوغ است. لطفا کمی بعد تلاش کنید."
+  },
+  "ERRORS_QUOTA_EXCEEDED": {
+    "message": "اعتبار مورد استفاده شما از این API به پایان رسیده است."
+  },
+  "ERRORS_DEEPL_QUOTA_EXCEEDED": {
+    "message": "محدودیت کاراکتر DeepL به پایان رسیده. نسخه رایگان: ۵۰۰,۰۰۰ کاراکتر در ماه. تنظیمات حساب DeepL خود را بررسی کنید یا طرح اشتراک خود را ارتقا دهید."
+  },
+  "ERRORS_GEMINI_QUOTA_REGION": {
+    "message": "سهمیه Gemini به پایان رسیده است (احتمالاً به دلیل محدودیت منطقه‌ای)."
+  },
+  "ERRORS_IMPORT_PASSWORD_REQUIRED": {
+    "message": "برای وارد کردن تنظیمات رمزگذاری‌شده، رمز عبور ضروری است."
+  },
+  "ERRORS_IMPORT_PASSWORD_INCORRECT": {
+    "message": "رمز عبور اشتباه یا داده‌های خراب."
+  },
+  "ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED": {
+    "message": "زبان‌های انتخابی توسط Chrome Translation API پشتیبانی نمی‌شود. لطفا سرویس ترجمه یا ترکیب زبانی دیگری انتخاب کنید."
+  },
+  "ERRORS_PAGE_TRANSLATION_STOPPED": {
+    "message": "{error}"
+  },
+  "ERRORS_USER_CANCELLED": {
+    "message": "ترجمه توسط کاربر لغو شد."
+  },
+  "gemini_thinking_label": {
+    "message": "فعال‌سازی حالت تفکر"
+  },
+  "gemini_thinking_description": {
+    "message": "اجازه دهید مدل قبل از پاسخ، گام به گام فکر کند."
+  },
+  "advance_section_title": {
+    "message": "بخش پیشرفته"
+  },
+  "prompt_source_help": {
+    "message": "زبان مبدا را برای پرامپت انتخاب کنید."
+  },
+  "prompt_target_help": {
+    "message": "زبان مقصد را برای پرامپت انتخاب کنید."
+  },
+  "prompt_text_help": {
+    "message": "متنی که می‌خواهید ترجمه یا پردازش شود را وارد کنید."
+  },
+  "prompt_preview_button": {
+    "message": "پیش‌نمایش پرامپت‌های تولید شده"
+  },
+  "prompt_preview_loading": {
+    "message": "در حال تولید پرامپت‌ها..."
+  },
+  "prompt_preview_note": {
+    "message": "این مثال‌ها نشان می‌دهند که الگوی شما در حالت‌های مختلف ترجمه چگونه استفاده می‌شود"
+  },
+  "import_error_generic": {
+    "message": "خطا در وارد کردن تنظیمات."
+  },
+  "import_error_password": {
+    "message": "وارد کردن تنظیمات با شکست مواجه شد: رمز عبور اشتباه است."
+  },
+  "appearance_section_title": {
+    "message": "ظاهر"
+  },
+  "font_settings_title": {
+    "message": "تنظیمات فونت"
+  },
+  "font_settings_description": {
+    "message": "فونت و اندازه نمایش ترجمه را سفارشی کنید"
+  },
+  "font_family_label": {
+    "message": "نوع فونت"
+  },
+  "font_size_label": {
+    "message": "اندازه فونت"
+  },
+  "font_preview_label": {
+    "message": "پیش‌نمایش"
+  },
+  "font_family_required": {
+    "message": "انتخاب نوع فونت الزامی است"
+  },
+  "font_size_invalid": {
+    "message": "اندازه فونت باید یک عدد معتبر باشد"
+  },
+  "font_size_range_error": {
+    "message": "اندازه فونت باید بین ۱۰ تا ۳۰ پیکسل باشد"
+  },
+  "font_family_update_error": {
+    "message": "خطا در به‌روزرسانی نوع فونت"
+  },
+  "font_size_update_error": {
+    "message": "خطا در به‌روزرسانی اندازه فونت"
+  },
+  "font_validation_failed": {
+    "message": "تایید اعتبار تنظیمات فونت با شکست مواجه شد"
+  },
+  "search_fonts_placeholder": {
+    "message": "جستجوی فونت..."
+  },
+  "loading_fonts": {
+    "message": "در حال بارگذاری فونت‌ها..."
+  },
+  "no_fonts_found": {
+    "message": "هیچ فونتی یافت نشد"
+  },
+  "system_font": {
+    "message": "سیستمی"
+  },
+  "font_loading_error": {
+    "message": "خطا در بارگذاری فونت‌ها"
+  },
+  "SELECT_ELEMENT_MODE_ACTIVATED": {
+    "message": "روی متنی که می‌خواهید ترجمه شود کلیک کنید."
+  },
+  "SELECT_ELEMENT_MODE_ACTIVATED_MOBILE": {
+    "message": "انگشت خود را روی متن بکشید تا ترجمه شود."
+  },
+  "SELECT_ELEMENT_TRANSLATING": {
+    "message": "در حال ترجمه..."
+  },
+  "SELECT_ELEMENT_CANCEL": {
+    "message": "کنسل"
+  },
+  "LINGVA_WPT_WARNING": {
+    "message": "سرویس Lingva ممکن است در متن‌های طولانی دچار خطا شود."
+  },
+  "BING_WPT_WARNING": {
+    "message": "سرویس Bing ممکن است در متن‌های طولانی دچار خطا شود."
+  },
+  "click_to_set_shortcut": {
+    "message": "برای تنظیم میانبر کلیک کنید"
+  },
+  "shortcut_waiting": {
+    "message": "منتظر فشردن کلیدها..."
+  },
+  "cancel": {
+    "message": "انصراف"
+  },
+  "clear": {
+    "message": "پاک کردن"
+  },
+  "confirm": {
+    "message": "تایید"
+  },
+  "api_test_button": {
+    "message": "تست کلیدها"
+  },
+  "api_test_testing": {
+    "message": "در حال تست..."
+  },
+  "api_test_no_keys": {
+    "message": "هیچ کلیدی برای تست وجود ندارد"
+  },
+  "api_test_result_partial": {
+    "message": "{valid} کلید معتبر و {invalid} کلید نامعتبر یافت شد"
+  },
+  "api_test_result_all_invalid": {
+    "message": "همه {count} کلید نامعتبر هستند"
+  },
+  "api_test_unknown_provider": {
+    "message": "ارائه‌دهنده ناشناخته: {provider}"
+  },
+  "api_test_failed": {
+    "message": "تست کلیدها با شکست مواجه شد: {error}"
+  },
+  "api_key_tips": {
+    "message": "💡 هر کلید API را در یک خط جداگانه وارد کنید"
+  },
+  "validation_source_language_empty": {
+    "message": "زبان مبدا نمی‌تواند خالی باشد."
+  },
+  "validation_target_language_empty": {
+    "message": "زبان مقصد نمی‌تواند خالی باشد."
+  },
+  "validation_same_languages": {
+    "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند."
+  },
+  "validation_api_key_empty": {
+    "message": "کلید API برای {provider} نمی‌تواند خالی باشد."
+  },
+  "validation_api_key_too_short": {
+    "message": "کلید API به نظر خیلی کوتاه می‌آید."
+  },
+  "validation_api_key_invalid": {
+    "message": "کلید API باید حداقل ۱۰ کاراکتر باشد و بدون فاصله"
+  },
+  "validation_prompt_template_empty": {
+    "message": "الگوی پرامپت نمی‌تواند خالی باشد."
+  },
+  "validation_prompt_template_missing_placeholders": {
+    "message": "الگوی پرامپت باید شامل موارد زیر باشد: {placeholders}"
+  },
+  "validation_invalid_domains": {
+    "message": "دامینه‌های نامعتبر: {domains}"
+  },
+  "validation_import_file_required": {
+    "message": "لطفا یک فایل برای وارد کردن انتخاب کنید."
+  },
+  "validation_import_file_json_only": {
+    "message": "فقط فایل‌های JSON پشتیبانی می‌شوند."
+  },
+  "validation_import_file_too_large": {
+    "message": "حجم فایل باید کمتر از ۵ مگابایت باشد."
+  },
+  "validation_field_required": {
+    "message": "این فیلد الزامی است"
+  },
+  "validation_min_length": {
+    "message": "باید حداقل {min} کاراکتر باشد"
+  },
+  "validation_max_length": {
+    "message": "باید حداکثر {max} کاراکتر باشد"
+  },
+  "validation_invalid_email": {
+    "message": "یک آدرس ایمیل معتبر وارد کنید"
+  },
+  "validation_invalid_url": {
+    "message": "یک URL معتبر وارد کنید"
+  },
+  "history_title": {
+    "message": "تاریخچه ترجمه"
+  },
+  "history_items_count": {
+    "message": "{count} مورد"
+  },
+  "history_search_placeholder": {
+    "message": "جستجو در تاریخچه..."
+  },
+  "history_filter": {
+    "message": "فیلتر"
+  },
+  "history_filter_tooltip": {
+    "message": "گزینه‌های فیلتر"
+  },
+  "history_filter_by_provider": {
+    "message": "فیلتر بر اساس ارائه‌دهنده"
+  },
+  "history_all_providers": {
+    "message": "همه ارائه‌دهندگان"
+  },
+  "history_filter_by_type": {
+    "message": "فیلتر بر اساس نوع"
+  },
+  "history_text_translations": {
+    "message": "ترجمه‌های متنی"
+  },
+  "history_image_translations": {
+    "message": "ترجمه‌های تصویری"
+  },
+  "history_time_period": {
+    "message": "بازه زمانی"
+  },
+  "history_time_all": {
+    "message": "همه زمان"
+  },
+  "history_time_today": {
+    "message": "امروز"
+  },
+  "history_time_week": {
+    "message": "این هفته"
+  },
+  "history_time_month": {
+    "message": "این ماه"
+  },
+  "history_sort": {
+    "message": "مرتب‌سازی"
+  },
+  "history_sort_tooltip": {
+    "message": "گزینه‌های مرتب‌سازی"
+  },
+  "history_sort_by_date": {
+    "message": "بر اساس تاریخ"
+  },
+  "history_sort_by_provider": {
+    "message": "بر اساس ارائه‌دهنده"
+  },
+  "history_sort_by_length": {
+    "message": "بر اساس طول متن"
+  },
+  "history_sort_newest": {
+    "message": "جدیدترین اول"
+  },
+  "history_sort_oldest": {
+    "message": "قدیمی‌ترین اول"
+  },
+  "history_clear_all": {
+    "message": "پاک کردن همه"
+  },
+  "history_clear_all_tooltip": {
+    "message": "پاک کردن کل تاریخچه"
+  },
+  "history_loading": {
+    "message": "در حال بارگذاری تاریخچه..."
+  },
+  "history_no_results": {
+    "message": "نتیجه‌ای یافت نشد"
+  },
+  "history_no_history": {
+    "message": "هنوز تاریچه‌ای وجود ندارد"
+  },
+  "history_no_results_hint": {
+    "message": "جستجو یا فیلترها را تغییر دهید"
+  },
+  "history_no_history_hint": {
+    "message": "ترجمه‌های شما اینجا نمایش داده می‌شوند"
+  },
+  "history_type_image": {
+    "message": "تصویر"
+  },
+  "history_type_text": {
+    "message": "متن"
+  },
+  "history_label_source": {
+    "message": "مبدا:"
+  },
+  "history_label_translation": {
+    "message": "ترجمه:"
+  },
+  "history_label_confidence": {
+    "message": "اعتماد:"
+  },
+  "history_retranslate_tooltip": {
+    "message": "ترجمه مجدد"
+  },
+  "history_more_actions_tooltip": {
+    "message": "اقدامات بیشتر"
+  },
+  "history_action_edit": {
+    "message": "ویرایش"
+  },
+  "history_action_favorite": {
+    "message": "علاقه‌مندی"
+  },
+  "history_action_unfavorite": {
+    "message": "حذف از علاقه‌مندی"
+  },
+  "history_action_export": {
+    "message": "صادر کردن"
+  },
+  "history_action_delete": {
+    "message": "حذف"
+  },
+  "history_page_first": {
+    "message": "صفحه اول"
+  },
+  "history_page_previous": {
+    "message": "صفحه قبل"
+  },
+  "history_page_next": {
+    "message": "صفحه بعد"
+  },
+  "history_page_last": {
+    "message": "صفحه آخر"
+  },
+  "history_page_info": {
+    "message": "صفحه {current} از {total}"
+  },
+  "history_items_selected": {
+    "message": "{count} مورد انتخاب شده"
+  },
+  "history_items_selected_plural": {
+    "message": "{count} مورد انتخاب شده"
+  },
+  "history_bulk_export": {
+    "message": "صادر کردن"
+  },
+  "history_bulk_delete": {
+    "message": "حذف"
+  },
+  "history_bulk_cancel": {
+    "message": "انصراف"
+  },
+  "history_copy_all_selected_tooltip": {
+    "message": "کپی همه موارد انتخاب شده"
+  },
+  "history_clear_confirm_title": {
+    "message": "پاک کردن تاریخچه"
+  },
+  "history_clear_confirm_message": {
+    "message": "آیا مطمئن هستید که می‌خواهید کل تاریخچه ترجمه را پاک کنید؟"
+  },
+  "history_clear_confirm_warning": {
+    "message": "این عمل قابل بازگشت نیست."
+  },
+  "history_clear_confirm_button": {
+    "message": "پاک کردن همه"
+  },
+  "history_copied_feedback": {
+    "message": "{count} مورد در کلیپ‌بورد کپی شد!"
+  },
+  "history_cleared_feedback": {
+    "message": "تاریخچه پاک شد"
+  },
+  "history_deleted_feedback": {
+    "message": "{count} ترجمه حذف شد"
+  },
+  "history_delete_confirm_message": {
+    "message": "آیا مطمئن هستید که می‌خواهید این ترجمه را حذف کنید؟"
+  },
+  "history_bulk_delete_confirm_message": {
+    "message": "آیا مطمئن هستید که می‌خواهید {count} ترجمه را حذف کنید؟"
+  },
+  "window_copy_translation": {
+    "message": "کپی ترجمه"
+  },
+  "window_close": {
+    "message": "بستن"
+  },
+  "window_tts_no_text": {
+    "message": "متنی برای خواندن موجود نیست"
+  },
+  "window_tts_stop": {
+    "message": "توقف خواندن (برای توقف کلیک کنید)"
+  },
+  "window_tts_speak_original": {
+    "message": "🔊 خواندن متن اصلی (حالت فعلی: متن اصلی)"
+  },
+  "window_tts_speak_translation": {
+    "message": "🔊 خواندن ترجمه (حالت فعلی: ترجمه)"
+  },
+  "window_show_original": {
+    "message": "نمایش متن اصلی (سپس از دکمه بلندگو برای گوش دادن به متن اصلی استفاده کنید)"
+  },
+  "window_hide_original": {
+    "message": "مخفی کردن متن اصلی (دکمه TTS متن اصلی را می‌خواند)"
+  },
+  "window_loading_alt": {
+    "message": "در حال بارگذاری..."
+  },
+  "window_translation_placeholder": {
+    "message": "ترجمه اینجا نمایش داده می‌شود"
+  },
+  "action_copy_text": {
+    "message": "کپی متن"
+  },
+  "action_copy_to_clipboard": {
+    "message": "کپی متن به کلیپ‌بورد"
+  },
+  "action_paste_from_clipboard": {
+    "message": "چسباندن از کلیپ‌بورد"
+  },
+  "action_speak_text": {
+    "message": "خواندن متن"
+  },
+  "action_stop_speaking": {
+    "message": "توقف خواندن"
+  },
+  "action_retry": {
+    "message": "تلاش مجدد"
+  },
+  "action_settings": {
+    "message": "تنظیمات"
+  },
+  "retry_button": {
+    "message": "تلاش مجدد"
+  },
+  "translateSelectedText": {
+    "message": "ترجمه متن انتخاب شده"
+  },
+  "translateWithTranslateIt": {
+    "message": "ترجمه با Translate-It"
+  },
+  "click_to_translate": {
+    "message": "برای ترجمه کلیک کنید"
+  },
+  "whole_page_translation_section_title": {
+    "message": "ترجمه کل صفحه"
+  },
+  "whole_page_translation_enabled_label": {
+    "message": "فعال‌سازی ترجمه کل صفحه"
+  },
+  "whole_page_translation_enabled_description": {
+    "message": "اجازه ترجمه تمام محتوای صفحه وب با حفظ چیدمان و ساختار آن."
+  },
+  "whole_page_lazy_loading_label": {
+    "message": "بارگذاری تنبل (بهینه‌سازی)"
+  },
+  "whole_page_lazy_loading_description": {
+    "message": "فقط بخش‌هایی از صفحه را ترجمه می‌کند که قابل مشاهده هستند یا به محدوده دید نزدیک‌اند. برای سرعت بیشتر توصیه می‌شود."
+  },
+  "whole_page_auto_translate_on_dom_changes_label": {
+    "message": "ترجمه خودکار محتوای جدید (اسکرول نامحدود)"
+  },
+  "whole_page_auto_translate_on_dom_changes_description": {
+    "message": "تشخیص و ترجمه خودکار محتوای جدید به محض ظاهر شدن (مثلاً هنگام اسکرول در توییتر یا ساب‌استک)."
+  },
+  "whole_page_show_original_on_hover_label": {
+    "message": "نمایش متن اصلی هنگام نگه داشتن موس"
+  },
+  "whole_page_show_original_on_hover_description": {
+    "message": "هنگام نگه داشتن موس روی متن ترجمه شده، متن اصلی را در یک کادر کوچک نمایش می‌دهد."
+  },
+  "select_element_show_original_on_hover_label": {
+    "message": "نمایش متن اصلی هنگام نگه داشتن موس"
+  },
+  "select_element_show_original_on_hover_description": {
+    "message": "هنگام نگه داشتن موس روی المان‌های ترجمه شده در حالت انتخاب المان، متن اصلی را در یک کادر کوچک نمایش می‌دهد."
+  },
+  "whole_page_translate_after_scroll_stop_label": {
+    "message": "ترجمه با توقف اسکرول"
+  },
+  "whole_page_translate_after_scroll_stop_description": {
+    "message": "فقط زمانی که اسکرول متوقف شود، ترجمه انجام می‌شود. مناسب برای کارایی بیشتر و صرفه‌جویی در مصرف API."
+  },
+  "whole_page_translate_fluid_description": {
+    "message": "ترجمه به صورت مداوم با تاخیری اندک در حین اسکرول. پاسخگویی سریع‌تر اما ممکن است مصرف API را افزایش دهد."
+  },
+  "whole_page_trigger_mode_label": {
+    "message": "حالت شروع ترجمه"
+  },
+  "whole_page_trigger_on_stop": {
+    "message": "هنگام توقف اسکرول"
+  },
+  "whole_page_trigger_fluid": {
+    "message": "هنگام اسکرول"
+  },
+  "whole_page_delay_label": {
+    "message": "تاخیر در ترجمه"
+  },
+  "whole_page_scroll_stop_delay_unit": {
+    "message": "ms"
+  },
+  "whole_page_token_warning_label": {
+    "message": "نمایش هشدار برای سرویس‌های مصرف‌کننده توکن"
+  },
+  "whole_page_token_warning_description": {
+    "message": "نمایش یک کادر تایید قبل از ترجمه کل صفحه، زمانی که سرویس انتخابی از اعتبار یا توکن شما استفاده می‌کند (مانند Gemini، OpenAI، DeepL)."
+  },
+  "ai_optimization_section_title": {
+    "message": "بهینه‌سازی هوش مصنوعی"
+  },
+  "ai_context_translation_label": {
+    "message": "درک هوشمند محیط (Context)"
+  },
+  "ai_context_translation_description": {
+    "message": "ارسال اطلاعات صفحه (عنوان و بخش‌ها) به مدل‌های AI برای افزایش دقت ترجمه در متن‌های کوتاه یا مبهم. (در DeepL همیشه فعال است)"
+  },
+  "ai_conversation_history_label": {
+    "message": "حافظه گفتگو"
+  },
+  "ai_conversation_history_description": {
+    "message": "در حالت Select Element بخشی از ترجمه‌های قبلی را به‌صورت موقت نگه می‌دارد تا یکپارچگی و درک متن بهتر شود. این کار می‌تواند کیفیت ترجمه را افزایش دهد، اما ممکن است مصرف توکن را کمی بیشتر کند."
+  },
+  "bilingual_translation_label": {
+    "message": "ترجمه دوطرفه (جابجایی زبان)"
+  },
+  "bilingual_translation_description": {
+    "message": "اگر زبان متن شناسایی شده با زبان مقصد یکی باشد، به طور خودکار به زبان مبدا (یا انگلیسی در صورت خودکار بودن مبدا) ترجمه می‌شود."
+  },
+  "bilingual_mode_selection_label": {
+    "message": "انتخاب متن"
+  },
+  "bilingual_mode_select_element_label": {
+    "message": "انتخاب المان"
+  },
+  "bilingual_mode_field_label": {
+    "message": "فیلدهای متنی"
+  },
+  "bilingual_mode_popup_label": {
+    "message": "پاپ‌آپ و سایدپنل"
+  },
+  "bilingual_mode_page_label": {
+    "message": "ترجمه کل صفحه"
+  },
+  "optimization_level_label": {
+    "message": "استراتژی ترجمه (سرعت در مقابل هزینه)"
+  },
+  "optimization_level_1": {
+    "message": "سطح ۱"
+  },
+  "optimization_level_2": {
+    "message": "سطح ۲"
+  },
+  "optimization_level_3": {
+    "message": "سطح ۳"
+  },
+  "optimization_level_4": {
+    "message": "سطح ۴"
+  },
+  "optimization_level_5": {
+    "message": "سطح ۵"
+  },
+  "opt_economy": {
+    "message": "اقتصادی"
+  },
+  "opt_stable": {
+    "message": "پایدار"
+  },
+  "opt_balanced": {
+    "message": "متعادل"
+  },
+  "opt_turbo": {
+    "message": "توربو"
+  },
+  "opt_fast": {
+    "message": "سریع"
+  },
+  "optimization_description_ai": {
+    "message": "انتخاب بین حالت 'اقتصادی' برای حداکثر بهره‌وری توکن‌ها، یا حالت 'توربو' برای سریع‌ترین زمان نمایش ترجمه."
+  },
+  "optimization_description_traditional": {
+    "message": "ایجاد توازن بین مصرف API و پایداری IP در مقابل سرعت ترجمه. کارایی بالاتر باعث کاهش تعداد درخواست‌ها و جلوگیری از مسدود شدن می‌شود."
+  },
+  "enable_translation_history_label": {
+    "message": "فعال‌سازی تاریخچه ترجمه"
+  },
+  "enable_translation_history_description": {
+    "message": "ثبت ترجمه‌ها در تاریخچه."
+  },
+  "language_detection_label": {
+    "message": "تشخیص زبان"
+  },
+  "language_detection_preferences_description": {
+    "message": "زبان اولویت را برای رسم‌الخط‌های مشترک تعیین کنید. این تنظیم مشخص می‌کند که در حالت «تشخیص خودکار»، متن شما با اولویت کدام زبان شناسایی شود (مثلا برای تشخیص صحیح زبان فارسی در میان زبان‌های مشابه)."
+  },
+  "arabic_script_priority_label": {
+    "message": "اولویت خط عربی"
+  },
+  "persian_language_name": {
+    "message": "فارسی"
+  },
+  "default_label": {
+    "message": "پیش‌فرض"
+  },
+  "arabic_language_name": {
+    "message": "عربی"
+  },
+  "urdu_language_name": {
+    "message": "اردو"
+  },
+  "pashto_language_name": {
+    "message": "پشتو"
+  },
+  "chinese_simplified_name": {
+    "message": "چینی (ساده‌شده)"
+  },
+  "chinese_traditional_name": {
+    "message": "چینی (سنتی)"
+  },
+  "chinese_classical_name": {
+    "message": "چینی (ادبی)"
+  },
+  "chinese_cantonese_name": {
+    "message": "کانتونی"
+  },
+  "chinese_script_priority_label": {
+    "message": "اولویت خط چینی"
+  },
+  "devanagari_script_priority_label": {
+    "message": "اولویت خط دواناگری"
+  },
+  "hindi_language_name": {
+    "message": "هندی"
+  },
+  "marathi_language_name": {
+    "message": "ماراتی"
+  },
+  "nepali_language_name": {
+    "message": "نپالی"
+  },
+  "latin_script_priority_label": {
+    "message": "اولویت خط لاتین"
+  },
+  "latin_priority_none_label": {
+    "message": "خودکار"
+  },
+  "english_language_name": {
+    "message": "انگلیسی"
+  },
+  "french_language_name": {
+    "message": "فرانسوی"
+  },
+  "spanish_language_name": {
+    "message": "اسپانیایی"
+  },
+  "german_language_name": {
+    "message": "آلمانی"
+  },
+  "italian_language_name": {
+    "message": "ایتالیایی"
+  },
+  "portuguese_language_name": {
+    "message": "پرتغالی"
+  },
+  "turkish_language_name": {
+    "message": "ترکی"
+  },
+  "dutch_language_name": {
+    "message": "هلندی"
+  },
+  "smart_language_title": {
+    "message": "واژه‌یاب"
+  },
+  "smart_language_description": {
+    "message": "این پرووایدر مخصوص زبان فارسی است و نتایج لغت‌نامه را برای زبان‌های انگلیسی، عربی و ترکی در رابطه با زبان فارسی ارائه می‌دهد."
+  },
+  "smart_language_fallback_note": {
+    "message": "نکته: این تنظیمات برای ویژگی‌هایی مانند ترجمه در فیلد متنی (که ممکن است توسط پرووایدر فعلی پشتیبانی نشوند) استفاده می‌شود."
+  },
+  "prompt_preview_mode_field": {
+    "message": "ترجمه فیلد متنی"
+  },
+  "prompt_preview_desc_field": {
+    "message": "ترجمه در فیلدهای ورودی (مثل جعبه متن، فیلد ایمیل)"
+  },
+  "prompt_preview_mode_popup": {
+    "message": "ترجمه پاپ‌آپ / سایدپنل"
+  },
+  "prompt_preview_desc_popup": {
+    "message": "پاپ‌آپ و پنل کناری"
+  },
+  "prompt_preview_mode_selection": {
+    "message": "انتخاب متن"
+  },
+  "prompt_preview_desc_selection": {
+    "message": "ترجمه متن انتخاب شده در صفحات وب"
+  },
+  "prompt_preview_mode_batch": {
+    "message": "انتخاب المان / ترجمه صفحه"
+  },
+  "prompt_preview_desc_batch": {
+    "message": "ترجمه دسته‌ای چندین المان یا کل صفحه وب در قالب JSON"
+  },
+  "prompt_preview_mode_screen_capture": {
+    "message": "ترجمه از روی تصویر"
+  },
+  "prompt_preview_desc_screen_capture": {
+    "message": "استخراج متن و ترجمه از تصاویر اسکرین‌شات"
+  },
+  "prompt_preview_mode_dictionary": {
+    "message": "ترجمه دیکشنری"
+  },
+  "prompt_preview_desc_dictionary": {
+    "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+  }
+}

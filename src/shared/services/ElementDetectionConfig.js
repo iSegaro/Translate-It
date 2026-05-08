@@ -14,6 +14,9 @@ export const TRANSLATION_SELECTORS = [
   '[data-translation-icon]',
   '.translation-window',
   '.translation-icon',
+  '.mobile-fab',
+  '.ti-m-sheet',
+  '.ti-m-selection-view',
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
@@ -29,7 +32,7 @@ export const ICON_SELECTORS = [
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
-import { UI_HOST_IDS } from '@/shared/config/constants.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 
 /**
  * Host/container selectors

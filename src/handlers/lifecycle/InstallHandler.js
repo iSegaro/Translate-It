@@ -183,14 +183,14 @@ async function handleFreshInstallation() {
     await storageManager.set(CONFIG);
 
     // Open options page to languages page for initial setup
-    const optionsUrl = browser.runtime.getURL("html/options.html#languages");
+    const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   } else {
     // Truly fresh installation - initialize with default settings
     await storageManager.set(CONFIG);
     logger.init('Fresh installation completed with default settings');
 
-    const optionsUrl = browser.runtime.getURL("html/options.html#languages");
+    const optionsUrl = browser.runtime.getURL("src/html/options.html#languages");
     await browser.tabs.create({ url: optionsUrl });
   }
 }

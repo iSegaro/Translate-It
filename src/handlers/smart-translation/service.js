@@ -3,10 +3,11 @@
  */
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
+import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
-import { TranslationMode, getTranslationApiAsync, getSourceLanguageAsync, getTargetLanguageAsync } from "@/shared/config/config.js";
+import { TranslationMode, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from "@/shared/config/config.js";
 import { detectOS as detectPlatform } from "@/utils/browser/compatibility.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
@@ -18,6 +19,7 @@ import { storePendingTranslationData, getPendingTranslationData, clearPendingTra
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
+import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationService');
 const notificationManager = new NotificationManager();
@@ -44,7 +46,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   let currentToastId = toastId;
 
   try {
-    const currentProvider = await getTranslationApiAsync();
+    const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
     const currentSourceLang = await getSourceLanguageAsync();
     const currentTargetLang = await getTargetLanguageAsync();
 
@@ -108,8 +110,13 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       }
     }
   } catch (err) {
-    logger.error('Text field translation request failed:', err);
-    await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
+    if (isCancellationError(err)) {
+      logger.debug('Text field translation request cancelled:', err.message);
+    } else {
+      logger.error('Text field translation request failed:', err);
+      await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
+    }
+    
     if (currentToastId) notificationManager.dismiss(currentToastId);
     clearPendingTranslationData(currentToastId);
     clearPendingNotificationData('error');
@@ -177,6 +184,10 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     clearPendingNotificationData('failed');
     throw new Error(errorMessage);
   }
+
+  // Clean the translated text before application or copy
+  // Since this is for text-fields, we always want FULL_TEXT cleaning (no markdown, keep paragraphs)
+  const cleanTranslatedText = SimpleMarkdown.getCleanTranslation(translatedText, ExtractionStrategy.FULL_TEXT);
   
   try {
     const currentTime = Date.now();
@@ -212,8 +223,8 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const isReplaceMode = await determineReplaceMode(mode, platform);
     
     if (isReplaceMode && target && isEditableElement(target)) {
-      const wasApplied = await applyTranslation(translatedText, selectionRange, platform, tabId, target, toastId);
-      
+      const wasApplied = await applyTranslation(cleanTranslatedText, selectionRange, platform, tabId, target, toastId);
+
       if (wasApplied && toastId && pendingTranslationByToastId.has(toastId)) {
         const data = pendingTranslationByToastId.get(toastId);
         data.processed = true;
@@ -224,7 +235,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
       }
       return { applied: wasApplied, mode: 'replace' };
     } else {
-      await copyToClipboard(translatedText, toastId);
+      await copyToClipboard(cleanTranslatedText, toastId);
       clearPendingTranslationData(toastId);
       return { applied: true, mode: 'copy' };
     }

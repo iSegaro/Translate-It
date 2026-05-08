@@ -5,8 +5,8 @@
         v-if="isSelectElementEnabled"
         id="selectElementBtn"
         class="toolbar-button"
-        :title="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
-        :disabled="isActivating"
+        :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
+        :disabled="isActivating || !isSelectElementSupported"
         :class="{ 'ti-active': isSelectModeActive }"
         @click="handleSelectElement"
         @keydown.enter.prevent="handleSelectElement"
@@ -42,15 +42,17 @@
         <PageTranslationButton 
           compact 
           :target-language="translationStore.uiTargetLanguage"
+          :disabled="!isPageTranslationSupported"
         />
       </div>
 
       <div class="toolbar-separator" />
 
-      <ProviderSelector 
+      <ProviderSelector
         v-model="currentProviderLocal"
         mode="icon-only"
         :is-global="true"
+        only-configured
         @provider-change="handleProviderChange"
       />
       <button
@@ -98,6 +100,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -154,6 +157,34 @@ const isExtensionEnabledGlobal = computed(() => {
   return settingsStore.settings?.EXTENSION_ENABLED ?? true
 })
 
+/**
+ * Gets the effective provider for a specific mode, accounting for synchronization
+ */
+const getEffectiveProvider = (mode) => {
+  const syncKey = mode === TranslationMode.Page ? 'page' : 'element'
+  if (translationStore.ephemeralSync[syncKey] && translationStore.selectedProvider) {
+    return translationStore.selectedProvider
+  }
+  
+  // Fallback to mode-specific settings or global provider
+  return settingsStore.settings?.MODE_PROVIDERS?.[mode] || 
+         props.currentProvider || 
+         settingsStore.settings.TRANSLATION_API || 
+         'googlev2'
+}
+
+/**
+ * Checks if the provider for a specific mode supports bulk operations
+ */
+const supportsBulk = (mode) => {
+  const providerId = getEffectiveProvider(mode)
+  const provider = findProviderById(providerId)
+  return provider?.features?.includes('bulk') ?? true
+}
+
+const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element))
+const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page))
+
 const isSelectElementEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true)
 })
@@ -168,6 +199,8 @@ const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 
 const handleSelectElement = async () => {
+  if (!isSelectElementSupported.value) return
+
   getLogger().debug('Select Element button clicked! Mode:', isSelectModeActive.value ? 'Deactivating' : 'Activating')
 
   try {

@@ -36,27 +36,25 @@ export function useUnifiedI18n() {
   /**
    * Unified translation function that tries vue-i18n first, then falls back to legacy
    * @param {string} key - Translation key
-   * @param {string|Object} fallback - Fallback text or vue-i18n options
+   * @param {string|Object} options - Fallback text or vue-i18n options
    * @returns {string} Translated text
    */
-  const t = (key, fallback = key) => {
+  const t = (key, options = {}) => {
     try {
-      // Try vue-i18n first
-      const vueTranslation = vueT(key)
-      if (vueTranslation && vueTranslation !== key) {
-        return vueTranslation
+      // If options is a string, it's treated as a fallback
+      if (typeof options === 'string') {
+        const vueTranslation = vueT(key)
+        if (vueTranslation && vueTranslation !== key) {
+          return vueTranslation
+        }
+        return options || key
       }
 
-      // If it's an object with options, handle it
-      if (typeof fallback === 'object') {
-        return vueT(key, fallback)
-      }
-
-      // Return fallback if vue-i18n didn't find the key
-      return fallback || key
+      // If it's an object, it's vue-i18n options
+      return vueT(key, options)
     } catch (error) {
       logger.debug('Translation failed for key:', key, error)
-      return fallback || key
+      return typeof options === 'string' ? options : key
     }
   }
 

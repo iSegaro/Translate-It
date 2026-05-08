@@ -47,6 +47,7 @@
               mode="split"
               :is-global="false"
               :show-sync="true"
+              only-configured
               :loading="translationFormRef?.isTranslating"
               @translate="handleTranslate"
               @cancel="handleCancel"
@@ -57,6 +58,7 @@
               v-model:source-language="sourceLanguage"
               v-model:target-language="targetLanguage"
               :provider="currentProvider"
+              :last-keyword="lastTranslation?.source"
               :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
               :source-title="t('popup_source_language_title') || 'زبان مبدا'"
               :target-title="t('popup_target_language_title') || 'زبان مقصد'"
@@ -129,7 +131,8 @@ const { t } = useUnifiedI18n()
 const { 
   sourceLanguage,
   targetLanguage,
-  clearTranslation
+  clearTranslation,
+  lastTranslation
 } = useUnifiedTranslation('popup');
 
 // TTS Global Manager for cross-context lifecycle management
@@ -249,7 +252,13 @@ onMounted(() => {
    */
   ttsGlobal.register(async () => {
     try {
-      await sendMessage({ action: MessageActions.TTS_STOP, data: { source: 'popup-cleanup' } })
+      await sendMessage({ 
+        action: MessageActions.TTS_STOP, 
+        data: { 
+          source: 'popup-cleanup',
+          stopOnlyIfOwner: true
+        } 
+      })
     } catch (error) {
       logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
     }
@@ -259,10 +268,15 @@ onMounted(() => {
    * Establish a port connection to the background script.
    * Disconnection of this port is the most reliable way to detect popup closure.
    */
-  const port = browser.runtime.connect({ name: 'popup-lifecycle' })
-  port.postMessage({ action: 'POPUP_OPENED', data: { timestamp: Date.now() } })
-  
-  window.__popupPort = port
+  try {
+    const port = browser.runtime.connect({ name: 'popup-lifecycle' })
+    
+    port.postMessage({ action: 'POPUP_OPENED', data: { timestamp: Date.now() } })
+    
+    window.__popupPort = port
+  } catch (error) {
+    logger.error('[PopupApp] Failed to establish lifecycle port:', error)
+  }
   
   // Start the initialization sequence
   initialize()
