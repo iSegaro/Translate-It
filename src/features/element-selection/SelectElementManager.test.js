@@ -276,6 +276,17 @@ describe('SelectElementManager', () => {
       manager.handleTouchMove(moveEvent);
       expect(manager.elementSelector.handleMouseOver).toHaveBeenCalledWith(mockElement);
     });
+
+    it('should block auxclick (middle-click) interaction', () => {
+      const event = new MouseEvent('auxclick', { bubbles: true, cancelable: true });
+      vi.spyOn(event, 'preventDefault');
+      vi.spyOn(event, 'stopImmediatePropagation');
+      
+      manager.handleInteraction(event);
+      
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopImmediatePropagation).toHaveBeenCalled();
+    });
   });
 
   describe('cross-frame and notifications', () => {

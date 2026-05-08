@@ -313,9 +313,12 @@ class SelectElementManager extends ResourceTracker {
       window.addEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
       window.addEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
 
-      const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart'];
+      // Robust interaction blocking: Include auxclick for middle-click and ensure capture phase
+      const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart', 'auxclick'];
       interactionEvents.forEach(eventType => {
         window.addEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
+        // Secondary safety: some sites use document-level capture listeners
+        document.addEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
       });
 
       window.addEventListener('keydown', this.handleKeyDown, true);
@@ -338,9 +341,10 @@ class SelectElementManager extends ResourceTracker {
     window.removeEventListener('touchmove', this.handleTouchMove, { capture: true, passive: false });
     window.removeEventListener('touchend', this.handleTouchEnd, { capture: true, passive: false });
     
-    const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart'];
+    const interactionEvents = ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'contextmenu', 'dragstart', 'auxclick'];
     interactionEvents.forEach(eventType => {
       window.removeEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
+      document.removeEventListener(eventType, this.handleInteraction, { capture: true, passive: false });
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
@@ -350,7 +354,7 @@ class SelectElementManager extends ResourceTracker {
     }
   }
 
-  isCooldownActive() { return Date.now() - (this.activationTime || 0) < 500; }
+  isCooldownActive() { return Date.now() - (this.activationTime || 0) < 100; }
 
   handleMouseOver(event) {
     if (!this.isActive || this.isProcessingClick || this.isCooldownActive()) return;
