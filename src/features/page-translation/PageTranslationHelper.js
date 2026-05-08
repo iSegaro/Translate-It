@@ -4,6 +4,15 @@ import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
  * PageTranslationHelper - Utility methods for whole page translation
  */
 export class PageTranslationHelper {
+  // Static regex patterns for common non-translatable technical patterns
+  // Defined as static to avoid re-compilation during high-frequency calls
+  static EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  static URL_REGEX = /^(https?:\/\/|www\.)[^\s/$.?#].[^\s]*$/i;
+  static HEX_COLOR_REGEX = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  static VERSION_REGEX = /^(v\d+\.\d+(\.\d+)?|\d+\.\d+\.\d+)(-[a-zA-Z0-9.]+)?$/;
+  static FILE_PATH_REGEX = /^(\/|[a-zA-Z]:\\)[^\s:*?"<>|]+$/;
+  static HASHTAG_MENTION_REGEX = /^([#@]\S+\s*)+$/;
+
   /**
    * Normalize text for consistent tracking and comparison
    */
@@ -22,7 +31,16 @@ export class PageTranslationHelper {
     // Skip empty or purely whitespace strings
     if (!trimmed) return false;
 
-    // Filter rules
+    // 1. Structural/Technical Filters (Regex)
+    // These items are universally non-translatable and often occur in technical content
+    if (this.EMAIL_REGEX.test(trimmed)) return false;
+    if (this.URL_REGEX.test(trimmed)) return false;
+    if (this.HEX_COLOR_REGEX.test(trimmed)) return false;
+    if (this.VERSION_REGEX.test(trimmed)) return false;
+    if (this.FILE_PATH_REGEX.test(trimmed)) return false;
+    if (this.HASHTAG_MENTION_REGEX.test(trimmed)) return false;
+
+    // 2. Numeric and Metric Filters
     const isNumeric = /^\d+$/.test(trimmed);
     const isTime = /^(\d+:)+\d+$/.test(trimmed);
     

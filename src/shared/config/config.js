@@ -281,7 +281,9 @@ export const CONFIG = {
   WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true, // ترجمه خودکار وقتی صفحه تغییر می‌کند
   WHOLE_PAGE_EXCLUDED_SELECTORS: [
     "script", "style", "code", "pre", "noscript", "meta", "textarea", "link", "time", "kbd", "svg", "ruby", "rt", "rp", "math", "d-math", "samp",
-    `.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}`, "[contenteditable='true']", `[translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`,
+    "var", "abbr", "address", "cite",
+    `.${TRANSLATION_HTML.IGNORE_CLASS}`, `.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}`,
+    "[contenteditable='true']", `[translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`,
     ".social-share", ".share-nav", "[data-toolbar=share]", ".o-share",
     ".prism-code", ".enlighter-code", ".rc-CodeBlock", "[role=code]", "table.highlight",
     "hypothesis-highlight", ".hypothesis-highlight",
