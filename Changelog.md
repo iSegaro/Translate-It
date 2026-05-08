@@ -3,6 +3,7 @@
 ##### Fixed
 
 - **[#113](https://github.com/iSegaro/Translate-It/issues/113)**: Fixed an issue where the translation window could close unexpectedly when dragging it quickly
+- **[#114](https://github.com/iSegaro/Translate-It/issues/114)**: Fixed issues with `Page Translation` and `Hover Original Previews` on large pages, while reducing unnecessary translations and token usage
 
 ---
 
