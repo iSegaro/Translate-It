@@ -48,7 +48,7 @@ export const DEFAULT_PAGE_TRANSLATION_SETTINGS = {
   chunkSize: 250,
   maxConcurrentFlushes: 1,
   lazyLoading: true,
-  rootMargin: '150px',
+  rootMargin: '75px',
   priorityThreshold: 1
 };
 
@@ -71,5 +71,5 @@ export const PAGE_TRANSLATION_TIMING = {
   DOM_STABILIZATION_DELAY: 50,
   
   // Scroll stop detection
-  VIEWPORT_BUFFER_PX: 100
+  VIEWPORT_BUFFER_PX: 50
 };

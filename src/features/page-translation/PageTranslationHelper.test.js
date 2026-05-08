@@ -101,5 +101,35 @@ describe('PageTranslationHelper', () => {
       });
       expect(PageTranslationHelper.isInViewportWithMargin(element, 100)).toBe(false);
     });
+
+    it('should handle text nodes correctly using Range', () => {
+      const parent = document.createElement('div');
+      const textNode = document.createTextNode('sample text');
+      parent.appendChild(textNode);
+      document.body.appendChild(parent);
+
+      // Mock Range
+      const mockRect = {
+        top: 100,
+        bottom: 200,
+        left: 100,
+        right: 200,
+        width: 100,
+        height: 100
+      };
+      
+      const mockRange = {
+        selectNodeContents: vi.fn(),
+        getBoundingClientRect: vi.fn().mockReturnValue(mockRect)
+      };
+      
+      // Mock createRange to return our mock object
+      vi.spyOn(document, 'createRange').mockReturnValue(mockRange);
+      
+      const result = PageTranslationHelper.isInViewportWithMargin(textNode, 100);
+      
+      expect(result).toBe(true);
+      expect(mockRange.selectNodeContents).toHaveBeenCalledWith(textNode);
+    });
   });
 });
