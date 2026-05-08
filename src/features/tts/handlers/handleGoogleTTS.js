@@ -136,13 +136,20 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
 /**
  * Handle TTS Stop request
  */
-export const handleGoogleTTSStopAll = async (message) => {
+export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
-    const { ttsId } = message.data || {};
+    const { ttsId, stopOnlyIfOwner } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
     
+    // 1. Specific ID check
     if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
       return { success: true, skipped: true };
+    }
+
+    // 2. Ownership check (for automatic cleanups)
+    if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
+      logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
+      return { success: true, skipped: true, reason: 'not_owner' };
     }
     
     // Stop any active queue

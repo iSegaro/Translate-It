@@ -150,14 +150,18 @@ export function useTTSSmart() {
 
   /**
    * Stops the current instance's TTS request
+   * @param {Object} options - Stop options
    */
-  const stop = async () => {
+  const stop = async (options = {}) => {
     if (ttsState.value === 'idle') return true;
 
     try {
       const message = {
         action: MessageActions.TTS_STOP,
-        data: { ttsId: currentTTSId.value },
+        data: { 
+          ttsId: currentTTSId.value,
+          ...options
+        },
         context: 'tts-smart'
       };
       
@@ -173,12 +177,13 @@ export function useTTSSmart() {
 
   /**
    * Stops ALL TTS requests globally
+   * @param {Object} options - Stop options
    */
-  const stopAll = async () => {
+  const stopAll = async (options = {}) => {
     try {
       const message = {
         action: MessageActions.TTS_STOP,
-        data: {},
+        data: { ...options },
         context: 'tts-smart'
       };
       

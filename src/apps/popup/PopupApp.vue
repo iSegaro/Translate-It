@@ -252,7 +252,13 @@ onMounted(() => {
    */
   ttsGlobal.register(async () => {
     try {
-      await sendMessage({ action: MessageActions.TTS_STOP, data: { source: 'popup-cleanup' } })
+      await sendMessage({ 
+        action: MessageActions.TTS_STOP, 
+        data: { 
+          source: 'popup-cleanup',
+          stopOnlyIfOwner: true
+        } 
+      })
     } catch (error) {
       logger.error('[PopupApp] Failed to stop TTS during cleanup:', error)
     }

@@ -92,6 +92,12 @@ Handles the dynamic aspects of Microsoft Edge voices:
 - **Caching**: Implements a 24-hour cache in `storage.local` to avoid redundant network requests.
 - **Dialect Prioritization**: Implements a "Preferred Region" logic (e.g., prioritizing `en-US` over `en-AU` for English) to ensure natural sounding defaults.
 
+### 9. Owner-Aware Cleanup Logic
+To prevent cross-context interruptions (e.g., closing the Popup stopping a Desktop FAB playback), the system implements an **Ownership Verification** mechanism:
+- **`isCurrentOwner(sender)`**: The `TTSStateManager` identifies the initiator of the current audio using Tab IDs, Frame IDs, or internal URLs.
+- **`stopOnlyIfOwner` Flag**: Automatic cleanup triggers (like window closure or visibility changes) pass this flag. The background script only executes the stop command if the sender is the verified owner.
+- **Manual Overrides**: User-initiated actions (clicking a Stop button or starting new text) bypass this check to ensure the **Exclusive Playback** rule is maintained.
+
 ---
 
 ## Smart Language Detection & Voice Selection

@@ -168,7 +168,10 @@ const initialize = async () => {
         // Send direct TTS stop message to background to stop any playing TTS
         browser.runtime.sendMessage({
           action: MessageActions.TTS_STOP,
-          data: {}
+          data: { 
+            source: 'sidepanel-hidden',
+            stopOnlyIfOwner: true
+          }
         }).catch(error => {
           logger.debug('[SidepanelApp] Failed to send TTS stop message in visibility change:', error)
         })
@@ -185,7 +188,10 @@ const initialize = async () => {
       // Send direct TTS stop message to background to stop any playing TTS
       browser.runtime.sendMessage({
         action: MessageActions.TTS_STOP,
-        data: {}
+        data: {
+          source: 'sidepanel-pagehide',
+          stopOnlyIfOwner: true
+        }
       }).catch(error => {
         logger.debug('[SidepanelApp] Failed to send TTS stop message in pagehide:', error)
       })
@@ -230,7 +236,10 @@ onBeforeUnmount(() => {
     // Send direct TTS stop message to background to stop any playing TTS
     browser.runtime.sendMessage({
       action: MessageActions.TTS_STOP,
-      data: {}
+      data: {
+        source: 'sidepanel-unmount',
+        stopOnlyIfOwner: true
+      }
     }).catch(error => {
       logger.debug('[SidepanelApp] Failed to send TTS stop message:', error)
     })

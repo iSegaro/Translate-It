@@ -430,6 +430,7 @@ export function useSidepanelActions() {
       logger.debug('Stopping TTS');
       await sendMessage({
         action: MessageActions.TTS_STOP,
+        data: { stopOnlyIfOwner: true },
         context: MessageContexts.SIDEPANEL,
         timestamp: Date.now()
       });

@@ -51,6 +51,8 @@ import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
@@ -146,6 +148,17 @@ watch(isOpen, (newValue) => {
     document.body.style.overflow = ''
     document.body.style.touchAction = ''
     document.documentElement.style.overflow = ''
+
+    // Owner-aware TTS cleanup when sheet closes
+    if (newValue === false) {
+      sendMessage({
+        action: MessageActions.TTS_STOP,
+        data: { 
+          source: 'mobile-sheet-close',
+          stopOnlyIfOwner: true 
+        }
+      }).catch(err => logger.debug('Failed to stop TTS on mobile sheet close:', err));
+    }
   }
 }, { immediate: true })
 

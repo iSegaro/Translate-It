@@ -334,7 +334,7 @@ onMounted(async () => {
   // Track all resources for automatic cleanup
   tracker.trackResource('positioning', () => cleanupPositioning());
   tracker.trackResource('tts-stop', () => {
-    tts.stopAll().catch(() => {});
+    tts.stopAll({ stopOnlyIfOwner: true }).catch(() => {});
   });
 });
 

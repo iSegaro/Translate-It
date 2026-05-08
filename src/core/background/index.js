@@ -52,8 +52,11 @@ async function performUiCleanup(context, sender) {
         logger.debug(`[Background] Stopping TTS for ${context} closure`);
         await ttsHandler({ 
           action: 'TTS_STOP', 
-          data: { source: `${context}-port-disconnect` } 
-        });
+          data: { 
+            source: `${context}-port-disconnect`,
+            stopOnlyIfOwner: true
+          } 
+        }, sender);
       }
 
       // 2. Cancel all active translations from UI
