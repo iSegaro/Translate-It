@@ -15,6 +15,8 @@ export const TRANSLATION_SELECTORS = [
   '.translation-window',
   '.translation-icon',
   '.mobile-fab',
+  '.ti-m-sheet',
+  '.ti-m-selection-view',
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
