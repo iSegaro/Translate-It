@@ -128,7 +128,7 @@ export class HoverPreviewManager extends ResourceTracker {
         const pos = document.caretPositionFromPoint(x, y);
         return pos ? pos.offsetNode : null;
       }
-    } catch (e) {
+    } catch {
       // Silent fail
     }
     return null;
