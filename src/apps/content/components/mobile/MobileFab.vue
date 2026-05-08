@@ -274,6 +274,11 @@ const onFabDragStart = (e) => {
   const isMouseEvent = e.type === 'mousedown';
   if (isMouseEvent && e.button !== 0) return;
   
+  // CRITICAL: Prevent focus shift and selection loss
+  if (e.cancelable) {
+    e.preventDefault();
+  }
+  
   const point = isMouseEvent ? e : e.touches[0];
   
   dragStartX = point.clientX;
@@ -290,6 +295,7 @@ const onFabDragStart = (e) => {
     // For touch, we must use window listeners with passive: false to allow preventDefault
     tracker.addEventListener(window, 'touchmove', onFabDragMove, { passive: false });
     tracker.addEventListener(window, 'touchend', onFabDragEnd);
+    tracker.addEventListener(window, 'touchcancel', onFabDragEnd);
   }
   
   isFabIdle.value = false;
@@ -351,9 +357,16 @@ const onFabDragEnd = async (e) => {
   } else {
     tracker.removeEventListener(window, 'touchmove', onFabDragMove);
     tracker.removeEventListener(window, 'touchend', onFabDragEnd);
+    tracker.removeEventListener(window, 'touchcancel', onFabDragEnd);
   }
 
-  if (!isFabDragging.value) return;
+  if (!isFabDragging.value) {
+    // If it was a touch event, manually trigger click because touchstart was prevented
+    if (e && (e.type === 'touchend')) {
+      onMobileFabClick();
+    }
+    return;
+  }
   isFabDragging.value = false;
 
   try {

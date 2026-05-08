@@ -14,6 +14,7 @@ export const TRANSLATION_SELECTORS = [
   '[data-translation-icon]',
   '.translation-window',
   '.translation-icon',
+  '.mobile-fab',
   '.AIWritingCompanion-translation-icon-extension'
 ];
 
