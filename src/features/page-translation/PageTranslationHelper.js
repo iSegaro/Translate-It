@@ -1,4 +1,5 @@
 import { PAGE_TRANSLATION_ATTRIBUTES } from './PageTranslationConstants.js';
+import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 
 /**
  * PageTranslationHelper - Utility methods for whole page translation
@@ -22,14 +23,18 @@ export class PageTranslationHelper {
     // Skip empty or purely whitespace strings
     if (!trimmed) return false;
 
-    // Filter rules
-    const isNumeric = /^\d+$/.test(trimmed);
-    const isTime = /^(\d+:)+\d+$/.test(trimmed);
+    // 1. Structural/Technical Filters (Regex)
+    // These items are universally non-translatable and often occur in technical content
+    if (DOM_FILTERS.isTechnicalPattern(trimmed)) return false;
+
+    // 2. Numeric and Metric Filters
+    const isNumeric = DOM_FILTERS.NUMERIC_REGEX.test(trimmed);
+    const isTime = DOM_FILTERS.TIME_REGEX.test(trimmed);
     
     // ALLOW 2+ character words for English (e.g., "In", "On", "Go")
     // For Farsi/Arabic, we already have special handling.
     const isTooShort = trimmed.length < 2 && !/[\u0600-\u06FF]/.test(trimmed);
-    const isMetric = /^\d+(\.\d+)?[kKM]$/.test(trimmed);
+    const isMetric = DOM_FILTERS.METRIC_REGEX.test(trimmed);
 
     const shouldSkip = isNumeric || isTime || isTooShort || isMetric;
 
