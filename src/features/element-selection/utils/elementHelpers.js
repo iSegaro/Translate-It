@@ -1,6 +1,9 @@
 // elementHelpers - Text extraction and element validation utilities
 // Simplified helper functions for the new Select Element architecture
 
+import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+
 /**
  * Extract meaningful text from an element
  * @param {HTMLElement} element - Element to extract text from
@@ -40,15 +43,12 @@ export function hasValidTextContent(element, options = {}) {
   if (words.length < minWordCount) return false;
 
   // Skip pure numbers, symbols, or whitespace
-  const onlyNumbersSymbols = /^[\d\s\p{P}\p{S}]+$/u;
-  if (onlyNumbersSymbols.test(text)) return false;
+  if (DOM_FILTERS.NUMERIC_REGEX.test(text) || /^[\d\s\p{P}\p{S}]+$/u.test(text)) {
+    return false;
+  }
 
-  // Skip if the entire text is a URL or email address
-  // Improved pattern to only match if it looks like a standalone URL or email
-  const standaloneUrlPattern = /^(https?:\/\/|www\.)\S+$/i;
-  const standaloneEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  if (standaloneUrlPattern.test(text) || standaloneEmailPattern.test(text)) {
+  // Skip if the entire text is a technical pattern (URL, Email, etc.)
+  if (DOM_FILTERS.isTechnicalPattern(text)) {
     return false;
   }
 
@@ -63,13 +63,20 @@ export function hasValidTextContent(element, options = {}) {
 export function isValidTextElement(element) {
   if (!element) return false;
 
-  // Skip invalid tags
+  // 1. Skip invalid tags
   const invalidTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
   if (invalidTags.includes(element.tagName)) {
     return false;
   }
 
-  // Skip invisible elements
+  // 2. Respect standard 'notranslate' class and 'translate=no' attribute
+  // Check the element and its ancestors
+  const isExcluded = element.closest(`.${TRANSLATION_HTML.NO_TRANSLATE_CLASS}, [translate='${TRANSLATION_HTML.NO_TRANSLATE_VALUE}']`);
+  if (isExcluded) {
+    return false;
+  }
+
+  // 3. Skip invisible elements
   try {
     const style = window.getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
@@ -80,7 +87,7 @@ export function isValidTextElement(element) {
     return false;
   }
 
-  // Check for text content
+  // 4. Check for text content
   return hasValidTextContent(element);
 }
 
@@ -122,25 +129,6 @@ export function findBestContainer(startElement, options = {}) {
   }
 
   return bestCandidate || startElement;
-}
-
-/**
- * Check if text is a common UI word that should be skipped
- * @param {string} text - Text to check
- * @returns {boolean} Whether text is a UI word
- */
-export function isCommonUIWord(text) {
-  if (!text || typeof text !== 'string') return false;
-
-  const words = text.trim().toLowerCase();
-  const commonUIWords = [
-    'ok', 'cancel', 'yes', 'no', 'submit', 'reset', 'login', 'logout',
-    'menu', 'home', 'back', 'next', 'prev', 'previous', 'continue',
-    'skip', 'done', 'finish', 'close', 'open', 'save', 'edit', 'delete',
-    'search', 'filter', 'sort', 'view', 'hide', 'show', 'toggle',
-  ];
-
-  return commonUIWords.includes(words);
 }
 
 /**
@@ -287,7 +275,6 @@ export default {
   hasValidTextContent,
   isValidTextElement,
   findBestContainer,
-  isCommonUIWord,
   getImmediateTextContent,
   isRTLText,
   getDirectionFromLanguage,

@@ -53,6 +53,22 @@ describe('PageTranslationHelper', () => {
       expect(PageTranslationHelper.shouldTranslate('Hello World')).toBe(true);
       expect(PageTranslationHelper.shouldTranslate('This is a test.')).toBe(true);
     });
+
+    it('should return false for technical patterns (Email, URL, etc.)', () => {
+      expect(PageTranslationHelper.shouldTranslate('test@example.com')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('https://google.com')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('www.site.co')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('#ffffff')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('v1.2.3')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('1.2.3-beta')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('/usr/bin/local')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('C:\\Windows\\System32')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('#Programming')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('@username')).toBe(false);
+      expect(PageTranslationHelper.shouldTranslate('#KingRezaPahlavi‌ForIran')).toBe(false); // With ZWNJ
+      expect(PageTranslationHelper.shouldTranslate('#Tag1 #Tag2')).toBe(false); // Multiple tags
+      expect(PageTranslationHelper.shouldTranslate('@user1 @user2 #tag')).toBe(false); // Mixed multiple
+    });
   });
 
   describe('isInViewportWithMargin', () => {
