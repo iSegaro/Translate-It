@@ -33,10 +33,10 @@
     "i18n:purge": "node scripts/localization/purge-notes.cjs",
     "analyze": "node scripts/dev/analyze-bundles.js",
     "perf:monitor": "node scripts/dev/performance-monitor.js",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test": "vitest --config tests/vitest.config.js",
+    "test:run": "vitest run --config tests/vitest.config.js",
+    "test:ui": "vitest --ui --config tests/vitest.config.js",
+    "test:coverage": "vitest run --coverage --config tests/vitest.config.js"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
