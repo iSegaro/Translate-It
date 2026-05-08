@@ -287,6 +287,38 @@ describe('SelectElementManager', () => {
       expect(event.preventDefault).toHaveBeenCalled();
       expect(event.stopImmediatePropagation).toHaveBeenCalled();
     });
+
+    it('should block interactions on highlighted elements', () => {
+      const mockElement = document.createElement('div');
+      mockElement.setAttribute('data-translate-highlighted', 'true');
+      
+      // Mock isOurElement to return false for highlighted elements (the fix)
+      manager.elementSelector.isOurElement.mockReturnValue(false);
+      
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      vi.spyOn(event, 'preventDefault');
+      vi.spyOn(event, 'stopImmediatePropagation');
+      
+      manager.handleInteraction(event);
+      
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopImmediatePropagation).toHaveBeenCalled();
+    });
+
+    it('should NOT block interactions on extension UI elements', () => {
+      const mockElement = document.createElement('div');
+      manager.elementSelector.isOurElement.mockImplementation((el) => el === mockElement);
+      
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: mockElement, writable: false });
+      event.composedPath = vi.fn(() => [mockElement]);
+      
+      vi.spyOn(event, 'preventDefault');
+      
+      manager.handleInteraction(event);
+      
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
   });
 
   describe('cross-frame and notifications', () => {

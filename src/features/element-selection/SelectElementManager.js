@@ -400,12 +400,23 @@ class SelectElementManager extends ResourceTracker {
 
   handleInteraction(event) {
     if (!this.isActive || this.isCooldownActive()) return;
-    const path = event.composedPath ? event.composedPath() : [event.target];
-    if (path.some(el => this.elementSelector && this.elementSelector.isOurElement(el))) return;
+
+    const path = (event.composedPath && event.composedPath()) || [event.target];
+
+    // Check if the interaction is with our UI (Toasts, Popup, etc.)
+    // We must NOT block interactions with our own UI.
+    const isExtensionUI = path.some(el => {
+      if (!el) return false;
+      const isOur = this.elementSelector && this.elementSelector.isOurElement(el);
+      return isOur;
+    });
+
+    if (isExtensionUI) return;
 
     const isScrollRelatedTouch = event.type.startsWith('touch') || event.type.startsWith('pointer');
     if (this.isProcessingClick && isScrollRelatedTouch) return;
 
+    // Block the event for the page
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
