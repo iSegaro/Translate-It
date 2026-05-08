@@ -10,7 +10,7 @@ export async function handleOpenURL(message) {
   try {
     const anchor = message.data?.anchor;
     const optionsUrl = browser.runtime.getURL(
-      `html/options.html${anchor ? `#${anchor}` : ""}`
+      `src/html/options.html${anchor ? `#${anchor}` : ""}`
     );
     browser.tabs.create({ url: optionsUrl });
     return { success: true };

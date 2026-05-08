@@ -19,19 +19,19 @@ function fixExtensionPaths() {
   const copyStaticFiles = async (outDir) => {
     // Ensure output directory exists
     await fs.ensureDir(outDir);
-    await fs.ensureDir(resolve(outDir, 'html'));
+    await fs.ensureDir(resolve(outDir, 'src/html'));
     
     // Copy offscreen files
-    const publicOffscreenJs = resolve(process.cwd(), 'public/offscreen.js');
-    const htmlOffscreenHtml = resolve(process.cwd(), 'html/offscreen.html');
+    const srcOffscreenJs = resolve(process.cwd(), 'src/html/offscreen.js');
+    const htmlOffscreenHtml = resolve(process.cwd(), 'src/html/offscreen.html');
     
-    if (await fs.pathExists(publicOffscreenJs)) {
-      await fs.copy(publicOffscreenJs, resolve(outDir, 'offscreen.js'));
+    if (await fs.pathExists(srcOffscreenJs)) {
+      await fs.copy(srcOffscreenJs, resolve(outDir, 'src/html/offscreen.js'));
       console.log('📄 Copied offscreen.js');
     }
     
     if (await fs.pathExists(htmlOffscreenHtml)) {
-      await fs.copy(htmlOffscreenHtml, resolve(outDir, 'html/offscreen.html'));
+      await fs.copy(htmlOffscreenHtml, resolve(outDir, 'src/html/offscreen.html'));
       console.log('📄 Copied offscreen.html');
     } else {
       console.log('⚠️ offscreen.html not found at:', htmlOffscreenHtml);
@@ -41,7 +41,7 @@ function fixExtensionPaths() {
   };
 
   const fixHtmlPaths = async (outDir) => {
-    const htmlDir = resolve(outDir, 'html');
+    const htmlDir = resolve(outDir, 'src/html');
     
     // Ensure html directory exists
     await fs.ensureDir(htmlDir);
@@ -57,12 +57,18 @@ function fixExtensionPaths() {
         let content = await fs.readFile(srcPath, 'utf-8');
         
         // Fix all absolute paths to relative paths
-        content = content.replace(/src="\/([^"]+)"/g, 'src="../$1"');
-        content = content.replace(/href="\/([^"]+)"/g, 'href="../$1"');
-        content = content.replace(/src='\/([^']+)'/g, "src='../$1'");
-        content = content.replace(/href='\/([^']+)'/g, "href='../$1'");
+        if (htmlFile === 'offscreen.html') {
+          // offscreen.js is now in the same directory
+          content = content.replace(/src="\/offscreen\.js"/g, 'src="./offscreen.js"');
+          content = content.replace(/src='\/offscreen\.js'/g, "src='./offscreen.js'");
+        }
         
-        // Write to html/ directory
+        content = content.replace(/src="\/([^"]+)"/g, 'src="../../$1"');
+        content = content.replace(/href="\/([^"]+)"/g, 'href="../../$1"');
+        content = content.replace(/src='\/([^']+)'/g, "src='../../$1'");
+        content = content.replace(/href='\/([^']+)'/g, "href='../../$1'");
+        
+        // Write to src/html/ directory
         await fs.writeFile(destPath, content);
         
         // Remove original
@@ -84,17 +90,17 @@ function fixExtensionPaths() {
     },
     // Development server mode  
     configureServer(server) {
-      // Serve HTML files from /html/ path with correct structure
-      server.middlewares.use('/html', (req, res, next) => {
+      // Serve HTML files from /src/html/ path with correct structure
+      server.middlewares.use('/src/html', (req, res, next) => {
         if (req.url.endsWith('.html')) {
-          const filename = req.url.substring(1); // Remove leading slash
+          const filename = 'src/html' + req.url; // req.url starts with /
           const rootPath = resolve(process.cwd(), filename);
           
           if (fs.existsSync(rootPath)) {
             let content = fs.readFileSync(rootPath, 'utf-8');
             
-            // For development server, keep original paths but ensure they work from /html/ context
-            // The development server will serve assets from root, so relative paths from html/ should go up one level
+            // For development server, keep original paths but ensure they work from /src/html/ context
+            // The development server will serve assets from root, so relative paths from src/html/ should go up two levels
             content = content.replace(/src="\/src\/app\/main\/([^"]+)"/g, 'src="/src/app/main/$1"');
             
             res.setHeader('Content-Type', 'text/html');
@@ -105,10 +111,10 @@ function fixExtensionPaths() {
         next();
       });
       
-      // Also handle direct HTML file access from root
+      // Also handle direct HTML file access from root (deprecated, but kept for compatibility)
       server.middlewares.use((req, res, next) => {
         if (req.url.match(/\/(popup|sidepanel|options)\.html$/)) {
-          const filename = req.url.substring(1);
+          const filename = 'src/html' + req.url;
           const rootPath = resolve(process.cwd(), filename);
           
           if (fs.existsSync(rootPath)) {
@@ -124,8 +130,8 @@ function fixExtensionPaths() {
       });
       
       // Handle offscreen files specifically for serve mode
-      server.middlewares.use('/html/offscreen.html', (req, res, next) => {
-        const offscreenPath = resolve(process.cwd(), 'html/offscreen.html');
+      server.middlewares.use('/src/html/offscreen.html', (req, res, next) => {
+        const offscreenPath = resolve(process.cwd(), 'src/html/offscreen.html');
         
         if (fs.existsSync(offscreenPath)) {
           let content = fs.readFileSync(offscreenPath, 'utf-8');
@@ -138,17 +144,18 @@ function fixExtensionPaths() {
       });
       
       // Handle offscreen.js for serve mode
-      server.middlewares.use('/offscreen.js', (req, res, next) => {
-        const offscreenJsPath = resolve(process.cwd(), 'public/offscreen.js');
-        
-        if (fs.existsSync(offscreenJsPath)) {
-          let content = fs.readFileSync(offscreenJsPath, 'utf-8');
-          res.setHeader('Content-Type', 'application/javascript');
-          res.end(content);
-          return;
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/offscreen.js' || req.url === '/src/html/offscreen.js') {
+          const offscreenJsPath = resolve(process.cwd(), 'src/html/offscreen.js');
+          
+          if (fs.existsSync(offscreenJsPath)) {
+            let content = fs.readFileSync(offscreenJsPath, 'utf-8');
+            res.setHeader('Content-Type', 'application/javascript');
+            res.end(content);
+            return;
+          }
         }
-        
-        res.status(404).send('offscreen.js not found');
+        next();
       });
     },
     // Handle hot updates in watch mode
@@ -279,11 +286,11 @@ export default defineConfig({
       transformManifest: async (manifest) => {
         const outDir = baseOutDir;
         await fs.ensureDir(outDir);
-        await fs.ensureDir(resolve(outDir, 'html'));
+        await fs.ensureDir(resolve(outDir, 'src/html'));
         
         // Copy required assets
         const srcDir = process.cwd();
-        await fs.copy(resolve(srcDir, '_locales'), resolve(outDir, '_locales'));
+        await fs.copy(resolve(srcDir, 'src/_locales'), resolve(outDir, '_locales'));
         await fs.copy(resolve(srcDir, 'src/icons'), resolve(outDir, 'icons'));
         
         // Copy CSS files for content scripts (CRITICAL FIX)
@@ -296,9 +303,10 @@ export default defineConfig({
         }
         
         // Copy Changelog.md for About page
-        const changelogSrc = resolve(srcDir, 'Changelog.md');
-        const changelogDest = resolve(outDir, 'Changelog.md');
+        const changelogSrc = resolve(srcDir, 'docs/Changelog.md');
+        const changelogDest = resolve(outDir, 'docs/Changelog.md');
         if (await fs.pathExists(changelogSrc)) {
+          await fs.ensureDir(resolve(outDir, 'docs'));
           await fs.copy(changelogSrc, changelogDest);
         }
         

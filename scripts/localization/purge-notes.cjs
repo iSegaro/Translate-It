@@ -14,7 +14,7 @@ const path = require('path');
 const readline = require('readline');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
-const LOCALES_DIR = path.join(projectRoot, '_locales');
+const LOCALES_DIR = path.join(projectRoot, 'src/_locales');
 
 const targetLocale = process.argv[2];
 

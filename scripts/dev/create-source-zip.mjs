@@ -27,19 +27,13 @@ const outputFilePath = path.resolve(
 // لیست فایل‌ها و پوشه‌هایی که باید در سورس کد نهایی گنجانده شوند
 const sourceFilesAndDirs = [
   ".gitignore",
-  "_locales",
   "config",
-  "html",
-  "public",
   "scripts",
   "src",
-  "Changelog.md",
   "package.json",
   "pnpm-lock.yaml",
-  "Privacy.md",
   "AGENT.md",
   "README.md",
-  "README_FARSI.md",
 ];
 
 // اطمینان از وجود پوشه خروجی

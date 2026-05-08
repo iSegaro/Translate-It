@@ -13,6 +13,7 @@ export const createBaseConfig = (browser, options = {}) => {
   console.log(`🔧 Creating base config for ${browser} (${isProduction ? 'production' : 'development'} mode)${isWatchMode ? ' [WATCH MODE]' : ''}`);
 
   return defineConfig({
+    publicDir: resolve(process.cwd(), 'src/public'),
     plugins: [
       vue({
         template: {

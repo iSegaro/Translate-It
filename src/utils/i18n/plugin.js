@@ -5,8 +5,8 @@ import { LOG_COMPONENTS } from '../../shared/logging/logConstants.js';
 import { UI_LOCALE_TO_CODE_MAP } from '../../shared/config/languageConstants.js';
 import { CONFIG } from '../../shared/config/config.js';
 
-import rawEn from '../../../_locales/en/messages.json';
-import rawFa from '../../../_locales/fa/messages.json';
+import rawEn from '../../_locales/en/messages.json';
+import rawFa from '../../_locales/fa/messages.json';
 
 const logger = getScopedLogger(LOG_COMPONENTS.I18N, 'i18n-plugin');
 

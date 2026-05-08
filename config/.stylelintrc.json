@@ -129,7 +129,7 @@
   "ignoreFiles": [
     "../dist/**/*",
     "../node_modules/**/*",
-    "../public/**/*",
+    "../src/public/**/*",
     "../**/*.min.css",
     "../**/vendor/**/*",
     "../src/**/*.vue"

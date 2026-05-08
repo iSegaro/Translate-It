@@ -91,7 +91,7 @@ const openShortcutSettings = async () => {
       try {
         const browserInfo = await browserAPI.value.runtime.getBrowserInfo();
         if (browserInfo.name === "Firefox") {
-          url = browserAPI.value.runtime.getURL("html/options.html?tab=shortcuts");
+          url = browserAPI.value.runtime.getURL("src/html/options.html?tab=shortcuts");
         }
       } catch (e) {
         logger.debug("Failed to get browser info, using default shortcuts URL", e);
@@ -106,8 +106,8 @@ const openShortcutSettings = async () => {
   } catch (err) {
     logger.error("Failed to open shortcuts page:", err);
     const fallbackUrl = browserAPI.value?.runtime?.getURL 
-      ? browserAPI.value.runtime.getURL("html/options.html?tab=shortcuts") 
-      : "html/options.html?tab=shortcuts";
+      ? browserAPI.value.runtime.getURL("src/html/options.html?tab=shortcuts") 
+      : "src/html/options.html?tab=shortcuts";
     window.open(fallbackUrl, '_blank');
   }
 }

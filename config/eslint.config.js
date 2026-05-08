@@ -12,7 +12,7 @@ export default [
       "**/dist/",
       "**/OLD/",
       "**/node_modules/",
-      "**/public/",
+      "**/src/public/",
       "**/*.mjs",
       "**/scripts/",
       "**/config/",

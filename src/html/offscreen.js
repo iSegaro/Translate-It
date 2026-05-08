@@ -1,4 +1,4 @@
-// public/offscreen.js
+// src/public/offscreen.js
 // Chrome-specific offscreen script
 
 // Enhanced logging for offscreen document

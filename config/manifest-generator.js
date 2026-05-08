@@ -47,8 +47,6 @@ export function generateManifest(browser = 'chrome') {
       {
         resources: [
           'browser-polyfill.js',
-          'html/offscreen.html',
-          'offscreen.js',
           'icons/flags/*.svg',
           'icons/ui/*.gif',
           'icons/ui/*.png',
@@ -61,8 +59,8 @@ export function generateManifest(browser = 'chrome') {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          '_locales/*',
-          'Changelog.md'
+          'src/_locales/*',
+          'docs/Changelog.md'
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
@@ -124,7 +122,7 @@ function generateChromeManifest(baseManifest) {
     
     // Chrome action (popup)
     action: {
-      default_popup: 'html/popup.html',
+      default_popup: 'src/html/popup.html',
       default_title: 'Translate It',
       default_icon: {
         16: 'icons/extension/extension_icon_16.png',
@@ -135,17 +133,30 @@ function generateChromeManifest(baseManifest) {
     },
     
     // Options page
-    options_page: 'html/options.html',
+    options_page: 'src/html/options.html',
     
     // Side panel configuration
     side_panel: {
-      default_path: 'html/sidepanel.html'
+      default_path: 'src/html/sidepanel.html'
     },
     
     // Content Security Policy for Chrome MV3 (with Vue 3 compatibility)
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
-    }
+    },
+
+    // Chrome-specific web accessible resources
+    web_accessible_resources: [
+      ...baseManifest.web_accessible_resources,
+      {
+        resources: [
+          'src/html/offscreen.html',
+          'src/html/offscreen.js'
+        ],
+        matches: ['<all_urls>', 'file://*/*'],
+        use_dynamic_url: true
+      }
+    ]
   };
 
   return manifest;
@@ -185,7 +196,7 @@ function generateFirefoxManifest(baseManifest) {
     
     // Action (popup) - similar to Chrome but with Firefox naming
     action: {
-      default_popup: 'html/popup.html',
+      default_popup: 'src/html/popup.html',
       default_title: '__MSG_name__',
       default_icon: {
         16: 'icons/extension/extension_icon_16.png',
@@ -200,7 +211,7 @@ function generateFirefoxManifest(baseManifest) {
     
     // Options UI
     options_ui: {
-      page: 'html/options.html',
+      page: 'src/html/options.html',
       open_in_tab: true
     },
     
@@ -220,7 +231,7 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox sidebar action
     sidebar_action: {
-      default_panel: 'html/sidepanel.html',
+      default_panel: 'src/html/sidepanel.html',
       default_title: '__MSG_name__'
     },
     
@@ -241,8 +252,8 @@ function generateFirefoxManifest(baseManifest) {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          '_locales/*',
-          'Changelog.md'
+          'src/_locales/*',
+          'docs/Changelog.md'
         ],
         matches: ['<all_urls>', 'file://*/*']
         // Note: use_dynamic_url not supported in Firefox yet

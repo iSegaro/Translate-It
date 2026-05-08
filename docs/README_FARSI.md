@@ -3,10 +3,10 @@
 
 <p align="center">
   <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="./docs/Store/Chrome-Store.png" alt="فروشگاه کروم" height="60" />
+    <img src="./Store/Chrome-Store.png" alt="فروشگاه کروم" height="60" />
   </a>
   <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./docs/Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="60" />
+    <img src="./Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="60" />
   </a>
 </p>
 
@@ -18,15 +18,15 @@
 
 <div align="center">
   <strong>
-    • <a href="./README.md">English</a> | 
-    • <a href="./README_FARSI.md">فارسی</a>
+    • <a href="../README.md">English</a> | 
+    • فارسی
   </strong>
 </div>
 
 <br>
 
 <p align="center">
-  <img src="./docs/Images/Options_Farsi.jpg" alt="افزونه Translate It" height="400" />
+  <img src="./Images/Options_Farsi.jpg" alt="افزونه Translate It" height="400" />
 </p>
 
 افزونه **Translate It** یک ابزار شخصی، سبک و کارآمد برای ترجمه متن در صفحات وب و فیلدهای متنی است. این افزونه با استفاده از چندین سرویس هوش مصنوعی، تجربه‌ای سریع و بدون درز را برای شما فراهم می‌کند.
@@ -54,31 +54,31 @@
 
 <p align="center">
   <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="./docs/Store/Chrome-Store.png" alt="فروشگاه کروم" height="60" />
+    <img src="./Store/Chrome-Store.png" alt="فروشگاه کروم" height="60" />
   </a>
   <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./docs/Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="60" />
+    <img src="./Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="60" />
   </a>
 </p>
 
-*برای نصب دستی، [راهنمای نصب](./docs/guides/INSTALLATION_FA.md) را مطالعه کنید.*
+*برای نصب دستی، [راهنمای نصب](./guides/INSTALLATION_FA.md) را مطالعه کنید.*
 
 ### ۲. تنظیمات ارائه‌دهندگان (Providers)
 اکثر سرویس‌ها (مثل Gemini، OpenAI، DeepSeek) نیاز به کلید API دارند.
-- نحوه‌ی دریافت و تنظیم کلیدها را در [**راهنمای تنظیمات API**](./docs/guides/API_GUIDE_FA.md) بیاموزید.
+- نحوه‌ی دریافت و تنظیم کلیدها را در [**راهنمای تنظیمات API**](./guides/API_GUIDE_FA.md) بیاموزید.
 - *سرویس‌های رایگان مانند گوگل و بینگ بدون نیاز به تنظیمات در دسترس هستند.*
 
 ### ۳. نحوه استفاده و میان‌برها
-- برای جزئیات بیشتر و مشاهده کلیدهای میان‌بر، به [**راهنمای کاربر**](./docs/guides/USAGE_FA.md) مراجعه کنید.
+- برای جزئیات بیشتر و مشاهده کلیدهای میان‌بر، به [**راهنمای کاربر**](./guides/USAGE_FA.md) مراجعه کنید.
 
 ---
 
 ## 🛠 توسعه و مشارکت
 
 ما از مشارکت‌های شما استقبال می‌کنیم! برای راه‌اندازی پروژه و شروع توسعه:
-- [**راهنمای مشارکت**](./docs/guides/CONTRIBUTING_FA.md) را برای نصب و ساخت پروژه مطالعه کنید.
-- برای افزودن یا بروزرسانی ترجمه‌ها، [**راهنمای بومی‌سازی**](./docs/guides/LOCALIZATION_GUIDE_FA.md) را دنبال کنید.
-- برای درک ساختار پروژه، [**نمای کلی معماری**](./docs/technical/ARCHITECTURE.md) را بررسی کنید.
+- [**راهنمای مشارکت**](./guides/CONTRIBUTING_FA.md) را برای نصب و ساخت پروژه مطالعه کنید.
+- برای افزودن یا بروزرسانی ترجمه‌ها، [**راهنمای بومی‌سازی**](./guides/LOCALIZATION_GUIDE_FA.md) را دنبال کنید.
+- برای درک ساختار پروژه، [**نمای کلی معماری**](./technical/ARCHITECTURE.md) را بررسی کنید.
 
 ---
 
