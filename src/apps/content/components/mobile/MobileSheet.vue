@@ -1,29 +1,29 @@
 <template>
+  <div 
+    v-if="isOpen && !isFullscreen"
+    class="ti-m-sheet-overlay notranslate"
+    translate="no"
+    :class="{ 'is-dark': settingsStore.isDarkTheme }"
+    @mousedown.self.prevent="closeSheet"
+  >
     <div 
-      v-if="isOpen && !isFullscreen"
-      class="ti-m-sheet-overlay notranslate"
+      class="ti-m-sheet notranslate"
       translate="no"
-      :class="{ 'is-dark': settingsStore.isDarkTheme }"
-      @mousedown.self.prevent="closeSheet"
+      :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
+      :style="sheetStyle"
+      @mousedown="onSheetMouseDown"
+      @touchstart="onSheetMouseDown"
     >
+      <!-- Drag Handle Header -->
       <div 
-        class="ti-m-sheet notranslate"
-        translate="no"
-        :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
-        :style="sheetStyle"
-        @mousedown="onSheetMouseDown"
-        @touchstart="onSheetMouseDown"
+        class="ti-m-sheet-header" 
+        @touchstart.stop.prevent="onDragStart"
+        @touchmove.stop.prevent="onDragMove"
+        @touchend.stop="onDragEnd"
+        @mousedown.stop.prevent="onDragStart"
       >
-        <!-- Drag Handle Header -->
-        <div 
-          class="ti-m-sheet-header" 
-          @touchstart.stop.prevent="onDragStart"
-          @touchmove.stop.prevent="onDragMove"
-          @touchend.stop="onDragEnd"
-          @mousedown.stop.prevent="onDragStart"
-        >
-          <div class="ti-m-drag-handle" />
-        </div>
+        <div class="ti-m-drag-handle" />
+      </div>
 
       <!-- Main Content Container -->
       <div 

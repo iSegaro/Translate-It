@@ -111,7 +111,13 @@
                 viewBox="0 0 24 24"
                 class="ti-m-source-speak-icon"
               >
-                <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                <rect
+                  x="6"
+                  y="6"
+                  width="12"
+                  height="12"
+                  rx="1.5"
+                />
               </svg>
               <img
                 v-else
