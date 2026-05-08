@@ -76,7 +76,7 @@
             :content="selectionData.translation"
             :target-language="selectionData.targetLang"
             :is-loading="selectionData.isLoading"
-            :tts-status="tts.ttsState.value"
+            :tts-status="targetTTSStatus"
             :error="selectionData.error"
             :is-dictionary="isDictionary"
             :copy-title="t('mobile_selection_copy_tooltip', 'Copy')"
@@ -95,9 +95,33 @@
           class="ti-m-original-card" 
           @click="handleSourceTextClick"
         >
-          <div class="ti-m-original-title">
-            {{ t('mobile_selection_source_text_title', 'Source Text') }}
+          <div class="ti-m-original-header-row">
+            <div class="ti-m-original-title">
+              {{ t('mobile_selection_source_text_title', 'Source Text') }}
+            </div>
+            
+            <button 
+              class="ti-m-source-speak-btn"
+              :class="{ 'is-playing': isSourcePlaying }"
+              :title="t('mobile_selection_speak_tooltip', 'Speak')"
+              @click.stop="handleSourceSpeak"
+            >
+              <svg
+                v-if="isSourcePlaying"
+                viewBox="0 0 24 24"
+                class="ti-m-source-speak-icon"
+              >
+                <rect x="6" y="6" width="12" height="12" rx="1.5" />
+              </svg>
+              <img
+                v-else
+                src="@/icons/ui/speaker.png"
+                class="ti-m-source-speak-icon ti-m-icon-img"
+                :alt="t('mobile_selection_speak_tooltip', 'Speak')"
+              >
+            </button>
           </div>
+          
           <div 
             class="ti-m-original-text" 
             :dir="originalDir"
@@ -112,7 +136,7 @@
 
 <script setup>
 import './SelectionView.scss'
-import { computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
@@ -131,6 +155,23 @@ const settingsStore = useSettingsStore()
 const { selectionData, sheetState } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
 const tts = useTTSSmart()
+
+const sourceTTSId = ref(null)
+const targetTTSId = ref(null)
+
+const isSourcePlaying = computed(() => {
+  if (tts.currentTTSId.value === sourceTTSId.value) {
+    return tts.ttsState.value === 'playing' || tts.ttsState.value === 'loading';
+  }
+  return false;
+})
+
+const targetTTSStatus = computed(() => {
+  if (tts.currentTTSId.value === targetTTSId.value) {
+    return tts.ttsState.value;
+  }
+  return 'idle';
+});
 
 const isDictionary = computed(() => {
   return selectionData.value.mode === 'dictionary' || 
@@ -169,12 +210,34 @@ const expandSheet = () => { if (sheetState.value === MOBILE_CONSTANTS.SHEET_STAT
 const handleSourceTextClick = () => { if (sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL) mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT); else expandSheet() }
 const goBack = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD) }
 const closeView = () => { mobileStore.closeSheet() }
+
 const onSpeak = async (data) => { 
   const text = data?.text || selectionData.value.translation; 
   const lang = data?.language || selectionData.value.targetLang; 
   const isDict = data?.isDictionary ?? isDictionary.value;
-  if (text) await tts.speak(text, lang, { isDictionary: isDict }); 
+  if (text) {
+    const result = await tts.speak(text, lang, { isDictionary: isDict });
+    if (result) {
+      targetTTSId.value = tts.currentTTSId.value;
+    }
+  }
 }
+
+const handleSourceSpeak = async () => {
+  if (isSourcePlaying.value) {
+    await tts.stop();
+  } else {
+    const text = selectionData.value.text;
+    const lang = selectionData.value.sourceLang;
+    if (text) {
+      const result = await tts.speak(text, lang);
+      if (result) {
+        sourceTTSId.value = tts.currentTTSId.value;
+      }
+    }
+  }
+}
+
 const onTextCopied = () => { pageEventBus.emit(MessageActions.SHOW_NOTIFICATION_SIMPLE, { message: t('mobile_selection_copied_message', 'Copied'), type: 'success' }) }
 const onHistory = () => { mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY) }
 </script>
