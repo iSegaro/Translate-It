@@ -220,7 +220,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         overlayImg.src = cleanMessage.data.overlayBlob;
       }
       
-    } catch (error) {
+    } catch {
       sendResponse({ success: false, error: 'Composite icon generation failed' });
     }
     return true;
@@ -274,7 +274,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           data: Array.from(imageData.data)
         }
       });
-    } catch (error) {
+    } catch {
       sendResponse({ success: false, error: 'Simple overlay icon generation failed' });
     }
     return true;
@@ -445,7 +445,7 @@ function handleTTSStop(sendResponse) {
       try {
         currentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
         currentAudio.load(); // Reset to empty state
-      } catch(e) {
+      } catch {
         // Ignore errors during cleanup
       }
       currentAudio = null;
@@ -457,6 +457,62 @@ function handleTTSStop(sendResponse) {
   } catch (error) {
     console.error("[Offscreen] TTS stop failed:", error);
     safeResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle TTS pause
+ * Note: Currently unused in the project, added for future extensibility.
+ */
+function handleTTSPause(sendResponse) {
+  try {
+    let paused = false;
+
+    if (currentUtterance && speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+      paused = true;
+      console.log("[Offscreen] TTS speech paused");
+    }
+
+    if (currentAudio && !currentAudio.paused) {
+      currentAudio.pause();
+      paused = true;
+      console.log("[Offscreen] TTS audio paused");
+    }
+
+    sendResponse({ success: true, paused });
+  } catch (error) {
+    console.error("[Offscreen] TTS pause failed:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Handle TTS resume
+ * Note: Currently unused in the project, added for future extensibility.
+ */
+function handleTTSResume(sendResponse) {
+  try {
+    let resumed = false;
+
+    if (currentUtterance && speechSynthesis.paused) {
+      speechSynthesis.resume();
+      resumed = true;
+      console.log("[Offscreen] TTS speech resumed");
+    }
+
+    if (currentAudio && currentAudio.paused) {
+      currentAudio.play().catch(error => {
+        console.error("[Offscreen] TTS audio resume failed:", error);
+      });
+      resumed = true;
+      console.log("[Offscreen] TTS audio resumed");
+    }
+
+    sendResponse({ success: true, resumed });
+  } catch (error) {
+    console.error("[Offscreen] TTS resume failed:", error);
+    sendResponse({ success: false, error: error.message });
   }
 }
 
@@ -580,7 +636,7 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         });
       });
 
-      resourceTracker.addEventListener(currentAudio, "error", (e) => {
+      resourceTracker.addEventListener(currentAudio, "error", () => {
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         isPlaying = false; // Reset playing state
@@ -774,189 +830,6 @@ function handleWebSpeechFallback(data, sendResponse) {
     console.error("[Offscreen] Web Speech API fallback failed:", error);
     isPlaying = false; // Reset playing state
     sendResponse({ success: false, error: `All TTS methods failed: ${error.message}` });
-  }
-}
-
-/**
- * Handle audio playback (legacy support)
- */
-function handleAudioPlayback(url, sendResponse) {
-  logger.debug("Starting audio playback for URL:", url.substring(0, 100) + '...');
-  
-  // Create a safe response wrapper to prevent multiple calls
-  let responseSent = false;
-  const safeResponse = (response) => {
-    if (!responseSent) {
-      responseSent = true;
-      logger.debug("Sending response to background:", response);
-      
-      try {
-        sendResponse(response);
-        logger.debug("Response sent successfully");
-      } catch (error) {
-        logger.error("Response send failed:", error);
-        // Try alternative approach
-        resourceTracker.trackTimeout(() => {
-          try {
-            sendResponse(response);
-            logger.debug("Response sent via retry");
-          } catch (retryError) {
-            logger.error("Response retry failed:", retryError);
-          }
-        }, 50);
-      }
-    } else {
-      logger.warn("Duplicate response attempt blocked");
-    }
-  };
-  
-  try {
-    // Cancel any ongoing fetch
-    if (currentFetchController) {
-      currentFetchController.abort();
-    }
-    currentFetchController = new AbortController();
-    
-    // Stop any current audio
-    if (currentAudio) {
-      logger.debug("Stopping current audio");
-      currentAudio.pause();
-      currentAudio.src = "";
-    }
-    
-    isPlaying = true;
-
-    currentAudio = new Audio();
-    
-    // Set proper headers and user agent for Google TTS
-    currentAudio.crossOrigin = "anonymous";
-    
-    // Add proper user agent and referer for Google TTS
-    if (url.includes('translate.google.com')) {
-      // Create a request with proper headers and abort controller
-      fetch(url, {
-        method: 'GET',
-        signal: currentFetchController.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Referer': 'https://translate.google.com/',
-          'Accept': 'audio/*,*/*;q=0.9',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.blob();
-      })
-      .then(audioBlob => {
-        const audioUrl = URL.createObjectURL(audioBlob);
-        if (currentAudio && isPlaying) {
-          currentAudio.src = audioUrl;
-        } else {
-          logger.warn("Audio was stopped during fetch, cleaning up");
-          URL.revokeObjectURL(audioUrl);
-          isPlaying = false;
-          return Promise.reject(new Error('Audio was stopped during fetch'));
-        }
-        
-        resourceTracker.addEventListener(currentAudio, "ended", () => {
-          logger.info("Audio playback ended");
-          URL.revokeObjectURL(audioUrl);
-          currentAudio = null;
-
-          // Notify background that this chunk ended (internal only)
-          chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(err => {
-            logger.error("Failed to send internal chunk ended notification:", err);
-          });
-        });
-        resourceTracker.addEventListener(currentAudio, "error", (e) => {
-          logger.error("Audio playback error:", e);
-          URL.revokeObjectURL(audioUrl);
-          currentAudio = null;
-          safeResponse({
-            success: false,
-            error: e.message || "Audio playback error",
-          });
-        });
-
-        resourceTracker.addEventListener(currentAudio, "loadstart", () => {
-          logger.debug("Audio loading started");
-        });
-
-        return currentAudio.play();
-      })
-      .then(() => {
-        logger.info("Audio playback started successfully");
-        // Send success response immediately after playback starts, don't wait for end
-        logger.debug("Sending success response to background...");
-        
-        // Send response immediately while the runtime channel is still open
-        const responseData = { success: true, message: "Audio playback started" };
-        logger.debug("About to call safeResponse with:", responseData);
-        safeResponse(responseData);
-        logger.debug("safeResponse called successfully");
-        
-        // ALSO send success via separate message (backup method)
-        chrome.runtime.sendMessage({ 
-          action: 'GOOGLE_TTS_STARTED',
-          success: true 
-        }).catch(err => {
-          logger.debug("Backup success message send failed:", err);
-        });
-      })
-      .catch((err) => {
-        // Check if error is due to abort
-        if (err.name === 'AbortError') {
-          logger.debug("Audio fetch aborted (expected)");
-          return;
-        }
-        
-        logger.error("Audio fetch/play failed:", err);
-        currentAudio = null;
-        isPlaying = false;
-        safeResponse({ success: false, error: err.message });
-      });
-    } else {
-      // Fallback for non-Google TTS URLs
-      currentAudio.src = url;
-      
-      resourceTracker.addEventListener(currentAudio, "ended", () => {
-        console.log("[Offscreen] Audio playback ended");
-        currentAudio = null;
-        // Don't send response here anymore, already sent after play() starts
-      });
-
-      resourceTracker.addEventListener(currentAudio, "error", (e) => {
-        console.error("[Offscreen] Audio playback error:", e);
-        currentAudio = null;
-        safeResponse({
-          success: false,
-          error: e.message || "Audio playback error",
-        });
-      });
-
-      resourceTracker.addEventListener(currentAudio, "loadstart", () => {
-        console.log("[Offscreen] Audio loading started");
-      });
-
-      currentAudio
-        .play()
-        .then(() => {
-          console.log("[Offscreen] Audio playback started");
-          // Send success response immediately after playback starts
-          safeResponse({ success: true });
-        })
-        .catch((err) => {
-          console.error("[Offscreen] Audio play failed:", err);
-          currentAudio = null;
-          safeResponse({ success: false, error: err.message });
-        });
-    }
-  } catch (error) {
-    console.error("[Offscreen] Audio playback setup failed:", error);
-    safeResponse({ success: false, error: error.message });
   }
 }
 
