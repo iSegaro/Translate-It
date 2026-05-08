@@ -9,15 +9,16 @@ export default [
   // Global ignores
   {
     ignores: [
-      "dist/",
-      "OLD/",
-      "node_modules/",
-      "public/",
-      "*.mjs",
-      "scripts/",
-      "config/",
-      "tests/e2e/",
-      "*.config.js",
+      "**/dist/",
+      "**/OLD/",
+      "**/node_modules/",
+      "**/public/",
+      "**/*.mjs",
+      "**/scripts/",
+      "**/config/",
+      "**/tests/e2e/",
+      "**/*.config.js",
+      "**/tests/coverage/",
     ],
   },
 

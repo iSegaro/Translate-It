@@ -34,7 +34,6 @@ const sourceFilesAndDirs = [
   "scripts",
   "src",
   "Changelog.md",
-  "eslint.config.js",
   "package.json",
   "pnpm-lock.yaml",
   "Privacy.md",
