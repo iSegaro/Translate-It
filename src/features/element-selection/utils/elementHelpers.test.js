@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import helpers from './elementHelpers.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 
 const {
   extractTextFromElement,
   hasValidTextContent,
   isValidTextElement,
   findBestContainer,
-  isCommonUIWord,
   getImmediateTextContent,
   isRTLText,
   getDirectionFromLanguage,
@@ -72,16 +72,32 @@ describe('elementHelpers', () => {
       expect(hasValidTextContent(el)).toBe(false);
     });
 
-    it('should return false for standalone URLs', () => {
+    it('should return false for technical patterns', () => {
       const el = document.createElement('div');
+      
       el.textContent = 'https://google.com';
+      expect(hasValidTextContent(el)).toBe(false);
+      
+      el.textContent = 'test@example.com';
+      expect(hasValidTextContent(el)).toBe(false);
+      
+      el.textContent = '#ffffff';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = 'v1.0.1';
+      expect(hasValidTextContent(el)).toBe(false);
+
+      el.textContent = '#Tag #AnotherTag';
       expect(hasValidTextContent(el)).toBe(false);
     });
 
-    it('should return false for email addresses', () => {
+    it('should return true for UI words (now allowed)', () => {
       const el = document.createElement('div');
-      el.textContent = 'test@example.com';
-      expect(hasValidTextContent(el)).toBe(false);
+      el.textContent = 'OK';
+      expect(hasValidTextContent(el)).toBe(true);
+      
+      el.textContent = 'Cancel';
+      expect(hasValidTextContent(el)).toBe(true);
     });
   });
 
@@ -94,6 +110,28 @@ describe('elementHelpers', () => {
       const style = document.createElement('style');
       style.textContent = 'body { color: red; }';
       expect(isValidTextElement(style)).toBe(false);
+    });
+
+    it('should return false for elements with notranslate class', () => {
+      const parent = document.createElement('div');
+      parent.className = TRANSLATION_HTML.NO_TRANSLATE_CLASS;
+      const child = document.createElement('div');
+      child.textContent = 'Some text';
+      parent.appendChild(child);
+      document.body.appendChild(parent);
+
+      expect(isValidTextElement(child)).toBe(false);
+      document.body.removeChild(parent);
+    });
+
+    it('should return false for elements with translate="no"', () => {
+      const el = document.createElement('div');
+      el.setAttribute('translate', TRANSLATION_HTML.NO_TRANSLATE_VALUE);
+      el.textContent = 'Some text';
+      document.body.appendChild(el);
+
+      expect(isValidTextElement(el)).toBe(false);
+      document.body.removeChild(el);
     });
 
     it('should return false for invisible elements', () => {
@@ -109,19 +147,6 @@ describe('elementHelpers', () => {
       
       expect(isValidTextElement(el)).toBe(false);
       vi.restoreAllMocks();
-    });
-  });
-
-  describe('isCommonUIWord', () => {
-    it('should return true for common UI words', () => {
-      expect(isCommonUIWord('OK')).toBe(true);
-      expect(isCommonUIWord('Cancel')).toBe(true);
-      expect(isCommonUIWord('submit')).toBe(true);
-    });
-
-    it('should return false for non-UI words', () => {
-      expect(isCommonUIWord('Hello')).toBe(false);
-      expect(isCommonUIWord('Translate It')).toBe(false);
     });
   });
 
