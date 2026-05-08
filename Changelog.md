@@ -2,14 +2,18 @@
 
 ##### Added
 
-- **[#116](https://github.com/iSegaro/Translate-It/issues/116)**: Added Text-to-Speech support for original text and improved the mobile experience with better text selection and floating button interactions
+- Added Text-to-Speech support for original text and improved the mobile experience with better text selection and floating button interactions ([#116](https://github.com/iSegaro/Translate-It/issues/116))
 
 ##### Fixed
 
-- **[#113](https://github.com/iSegaro/Translate-It/issues/113)**: Fixed an issue where the translation window could close unexpectedly when dragging it quickly
-- **[#114](https://github.com/iSegaro/Translate-It/issues/114)**: Fixed issues with `Page Translation` and `Hover Original Previews` on large pages, while reducing unnecessary translations and token usage
-- **[#115](https://github.com/iSegaro/Translate-It/issues/115)**: Improved the mobile experience by preventing accidental text deselection, improving floating button interactions, and adding Text-to-Speech support for original text
-- **[#117](https://github.com/iSegaro/Translate-It/issues/117)**: Fixed issues where `Select Element` mode could accidentally open links instead of translating content on some websites (e.g. Twitter/X)
+- Fixed an issue where the translation window could close unexpectedly when dragging it quickly ([#113](https://github.com/iSegaro/Translate-It/issues/113))
+- Fixed issues with `Page Translation` and `Hover Original Previews` on large pages, while reducing unnecessary translations and token usage ([#114](https://github.com/iSegaro/Translate-It/issues/114))
+- Improved the mobile experience by preventing accidental text deselection, improving floating button interactions, and adding Text-to-Speech support for original text ([#115](https://github.com/iSegaro/Translate-It/issues/115))
+- Fixed issues where `Select Element` mode could accidentally open links instead of translating content on some websites (e.g. Twitter/X) ([#117](https://github.com/iSegaro/Translate-It/issues/117), [#119](https://github.com/iSegaro/Translate-It/issues/119))
+
+##### Changed
+
+- Improved translation filtering to reduce unnecessary token usage and better protect technical content such as links, emails, addresses, and code-related text ([#118](https://github.com/iSegaro/Translate-It/issues/118))
 
 ---
 
