@@ -98,6 +98,27 @@ class TTSStateManager {
   }
 
   /**
+   * Check if a sender is the current owner of the active TTS session.
+   * This is used for owner-aware cleanup.
+   * 
+   * @param {Object} sender - The message sender to check
+   * @returns {boolean} True if the sender is the current owner
+   */
+  isCurrentOwner(sender) {
+    if (!this.currentTTSSender || !sender) return false;
+
+    // 1. Internal Context Match (Popup/Sidepanel/Options)
+    // Internal contexts often don't have a tab ID, so we check the URL
+    if (!sender.tab?.id && !this.currentTTSSender.tab?.id) {
+      return sender.url === this.currentTTSSender.url;
+    }
+
+    // 2. Tab/Frame Match (Content Scripts / FAB)
+    return sender.tab?.id === this.currentTTSSender.tab?.id && 
+           sender.frameId === this.currentTTSSender.frameId;
+  }
+
+  /**
    * Complete reset of all state
    */
   fullReset() {

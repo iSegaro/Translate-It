@@ -54,6 +54,7 @@ The central state manager for the touch-optimized UI. It manages:
 - **Visibility**: `isOpen`, `isFullscreen`.
 - **Navigation**: `activeView` (Dashboard, Selection, Input, etc.).
 - **Visual State**: `sheetState` (Closed, Peek, Full).
+- **Owner-Aware TTS Cleanup**: Closing the bottom sheet triggers a localized cleanup that only stops audio initiated by the sheet itself, preventing interference with other contexts.
 - **Selection Data**: Synchronized with global selection events. It specifically tracks `actualSourceLanguage` and `actualTargetLanguage` from translation results to ensure the UI labels (e.g., in the header) reflect the real language pair used by the engine, regardless of the initial "Auto" setting.
 
 ### 2. Gesture Engine (`useMobileGestures.js`)

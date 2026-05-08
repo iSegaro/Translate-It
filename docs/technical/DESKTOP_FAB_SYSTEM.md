@@ -64,6 +64,7 @@ This composable decouples FAB logic from the visual component:
 
 ### 3. Integrated Smart TTS Controller
 The FAB includes an advanced TTS badge that leverages the global `useTTSSmart` system.
+- **Owner-Aware Cleanup**: The FAB's audio is protected by the "Owner-Aware Cleanup" logic. Closing the extension popup or sidepanel will NOT interrupt FAB playback unless they were the initiators.
 - **Actual Language Metadata**: Integrates with the `TranslationEngine` to identify the *actual* language used for translation. After a successful translation, it prioritizes the returned `actualSourceLanguage` for accurate TTS accents and labels, especially during Bilingual swaps.
 - **Auto Language Detection**: For initial (pre-translation) state, it uses `LanguageDetectionService` to identify the language of the selected text in real-time.
 - **Visual State Management**:

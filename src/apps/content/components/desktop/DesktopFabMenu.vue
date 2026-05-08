@@ -240,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -876,5 +876,10 @@ onMounted(async () => {
   };
 
   tracker.addEventListener(window, 'click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  logger.debug('[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup');
+  tts.stop({ stopOnlyIfOwner: true }).catch(() => {});
 });
 </script>
