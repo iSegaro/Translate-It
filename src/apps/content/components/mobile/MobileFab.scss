@@ -48,6 +48,8 @@
   cursor: pointer !important;
   transition: var(--fab-transition) !important;
   -webkit-tap-highlight-color: transparent !important;
+  user-select: none !important;
+  touch-action: none !important;
 
   /* State Overrides */
   &.is-hidden {

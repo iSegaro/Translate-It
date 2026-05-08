@@ -1,27 +1,29 @@
 <template>
-  <div 
-    v-if="isOpen && !isFullscreen"
-    class="ti-m-sheet-overlay notranslate"
-    translate="no"
-    :class="{ 'is-dark': settingsStore.isDarkTheme }"
-    @click.self="closeSheet"
-  >
     <div 
-      class="ti-m-sheet notranslate"
+      v-if="isOpen && !isFullscreen"
+      class="ti-m-sheet-overlay notranslate"
       translate="no"
-      :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
-      :style="sheetStyle"
+      :class="{ 'is-dark': settingsStore.isDarkTheme }"
+      @mousedown.self.prevent="closeSheet"
     >
-      <!-- Drag Handle Header -->
       <div 
-        class="ti-m-sheet-header" 
-        @touchstart.stop.prevent="onDragStart"
-        @touchmove.stop.prevent="onDragMove"
-        @touchend.stop="onDragEnd"
-        @mousedown.stop="onDragStart"
+        class="ti-m-sheet notranslate"
+        translate="no"
+        :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
+        :style="sheetStyle"
+        @mousedown="onSheetMouseDown"
+        @touchstart="onSheetMouseDown"
       >
-        <div class="ti-m-drag-handle" />
-      </div>
+        <!-- Drag Handle Header -->
+        <div 
+          class="ti-m-sheet-header" 
+          @touchstart.stop.prevent="onDragStart"
+          @touchmove.stop.prevent="onDragMove"
+          @touchend.stop="onDragEnd"
+          @mousedown.stop.prevent="onDragStart"
+        >
+          <div class="ti-m-drag-handle" />
+        </div>
 
       <!-- Main Content Container -->
       <div 
@@ -207,6 +209,38 @@ const closeSheet = () => {
   document.documentElement.style.overflow = ''
   mobileStore.closeSheet()
 }
+
+const onSheetMouseDown = (e) => {
+  // CRITICAL: Prevent focus shift from page to sheet to preserve selection
+  const target = e.target;
+  
+  // 1. Identify interactive elements that MUST gain focus (text inputs)
+  const isFocusable = target.tagName === 'TEXTAREA' || 
+                      target.tagName === 'INPUT' || 
+                      target.isContentEditable;
+  
+  // 2. Identify elements that should trigger clicks (Buttons, Links, etc.)
+  // We don't want to preventDefault on touchstart for these to allow the sequence to complete.
+  const isClickable = target.closest('button') || target.closest('a');
+
+  if (e.type === 'mousedown') {
+    // For mouse, prevent focus shift for everything except focusable inputs
+    // This preserves selection while allowing buttons to be clicked
+    if (!isFocusable) {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if (e.type === 'touchstart') {
+    // For touch, only prevent on "dead zones" (not scrollable, not clickable)
+    // to avoid breaking mobile gestures or click sequences.
+    const isScrollable = target.closest('.ti-m-sheet-content');
+    if (!isFocusable && !isClickable && !isScrollable && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+};
 
 onUnmounted(() => {
   document.body.style.overflow = ''

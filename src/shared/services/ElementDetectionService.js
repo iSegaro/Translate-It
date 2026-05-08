@@ -145,10 +145,24 @@ export class ElementDetectionService {
     let depth = 0;
 
     while (current && depth <= maxDepth && current !== document.body) {
-      if (current.matches(selectors)) {
+      if (current instanceof Element && current.matches(selectors)) {
         return current;
       }
-      current = current.parentElement;
+      
+      // Try parent element
+      const parent = current.parentElement;
+      if (parent) {
+        current = parent;
+      } else {
+        // Cross Shadow DOM boundary if parent is null
+        const root = current.getRootNode();
+        if (root instanceof ShadowRoot) {
+          current = root.host;
+        } else {
+          current = null;
+        }
+      }
+      
       depth++;
     }
 
@@ -169,6 +183,14 @@ export class ElementDetectionService {
 
     if (element.matches('.translation-icon') || element.matches('[data-translation-icon]')) {
       return ELEMENT_TYPES.TRANSLATION_ICON;
+    }
+
+    if (element.matches('.mobile-fab')) {
+      return ELEMENT_TYPES.TRANSLATION_ICON;
+    }
+
+    if (element.matches('.ti-m-sheet') || element.matches('.ti-m-selection-view')) {
+      return ELEMENT_TYPES.TRANSLATION_WINDOW;
     }
 
     if (element.id?.startsWith('text-field-icon-')) {

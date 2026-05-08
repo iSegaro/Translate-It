@@ -132,8 +132,42 @@
     font-weight: 800 !important;
     text-transform: uppercase !important;
     color: var(--ti-mobile-text-muted) !important;
-    margin-bottom: 6px !important;
     letter-spacing: 0.5px !important;
+  }
+
+  .ti-m-original-header-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 6px !important;
+    width: 100% !important;
+  }
+
+  .ti-m-source-speak-btn {
+    background: none !important;
+    border: none !important;
+    padding: 4px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    transition: background-color 0.2s ease !important;
+
+    &:active {
+      background-color: var(--ti-mobile-header-border) !important;
+    }
+
+    &.is-playing {
+      color: var(--ti-mobile-accent) !important;
+    }
+  }
+
+  .ti-m-source-speak-icon {
+    width: 16px !important;
+    height: 16px !important;
+    object-fit: contain !important;
+    fill: currentColor !important;
   }
 
   .ti-m-original-text {
