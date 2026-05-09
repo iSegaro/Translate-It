@@ -13,6 +13,7 @@
   z-index: 1000;
   padding: 16px;
   backdrop-filter: blur(2px);
+  pointer-events: auto !important;
 }
 
 .modal-container {

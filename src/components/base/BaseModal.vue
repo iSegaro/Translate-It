@@ -1,11 +1,15 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div
-        v-if="modelValue"
-        class="modal-overlay"
-        @click="handleOverlayClick"
-      >
+  <!-- 
+    CRITICAL: Teleport to body is disabled in extension content scripts 
+    to keep the modal within the Shadow DOM isolation. 
+    Otherwise, it loses all its scoped styles.
+  -->
+  <Transition name="modal">
+    <div
+      v-if="modelValue"
+      class="modal-overlay"
+      @click="handleOverlayClick"
+    >
         <div
           class="modal-container"
           :class="[`size-${size}`, { fullscreen }]"
@@ -42,8 +46,7 @@
           </footer>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+  </Transition>
 </template>
 
 <script setup>

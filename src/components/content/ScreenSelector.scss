@@ -9,6 +9,7 @@
   z-index: 2147483647;
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  pointer-events: auto !important;
   
   &.selecting {
     cursor: crosshair;

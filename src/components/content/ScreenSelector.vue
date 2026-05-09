@@ -24,32 +24,9 @@
         {{ Math.round(selectionRect.width) }} × {{ Math.round(selectionRect.height) }}
       </div>
     </div>
-    
-    <!-- Instructions -->
-    <div
-      class="instruction-panel"
-      :class="{ visible: !hasSelection && !isCapturing }"
-    >
-      <div class="instruction-content">
-        <div class="instruction-icon">
-          📸
-        </div>
-        <div class="instruction-text">
-          <h3>Select Area to Translate</h3>
-          <p>Click and drag to select text or image area</p>
-          <div class="instruction-shortcuts">
-            <span><kbd>Esc</kbd> Cancel</span>
-            <span><kbd>Enter</kbd> Capture</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    
+
     <!-- Toolbar -->
-    <div
-      class="capture-toolbar"
-      :class="{ visible: hasSelection || isCapturing }"
-    >
+    <div class="capture-toolbar visible">
       <div class="toolbar-content">
         <!-- Capture options -->
         <div class="capture-options">
@@ -158,10 +135,6 @@ const props = defineProps({
   onError: {
     type: Function,
     default: () => {}
-  },
-  showInstructions: {
-    type: Boolean,
-    default: true
   },
   allowFullScreen: {
     type: Boolean,

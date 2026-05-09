@@ -3,7 +3,8 @@
     :class="[
       'content-app-container', 
       TRANSLATION_HTML.NO_TRANSLATE_CLASS,
-      settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light'
+      settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light',
+      { 'capture-mode': isScreenCaptureActive || activeCapture }
     ]"
     :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE"
   >
