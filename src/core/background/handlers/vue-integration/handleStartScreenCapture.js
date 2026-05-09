@@ -4,10 +4,11 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { captureManager } from '@/core/managers/browser-specific/capture/CaptureManager.js';
 
 const errorHandler = new ErrorHandler();
 
-export async function handleStartScreenCapture(message) {
+export async function handleStartScreenCapture(message, sender, sendResponse) {
   try {
     // Get active tab
     const [tab] = await browser.tabs.query({
@@ -18,28 +19,25 @@ export async function handleStartScreenCapture(message) {
       throw new Error("No active tab found");
     }
 
-    // Send message to content script to start capture UI
-    try {
-      await browser.tabs.sendMessage(tab.id, {
-        action: MessageActions.START_SCREEN_CAPTURE,
-        source: "background",
-      });
-    } catch (sendError) {
-      // Use centralized context error detection
-      if (ExtensionContextManager.isContextError(sendError)) {
-        ExtensionContextManager.handleContextError(sendError, 'screen-capture-start');
-        throw new Error('Content script not available on this tab');
-      }
-      throw sendError;
-    }
+    // Use CaptureManager for orchestration
+    await captureManager.startAreaCapture({
+      tabId: tab.id,
+      ...message.data
+    });
 
-    return {
+    const response = {
       success: true,
       data: {
         success: true,
         message: "Screen capture started",
       },
     };
+
+    if (sendResponse && typeof sendResponse === 'function') {
+      sendResponse(response);
+    }
+
+    return response;
   } catch (error) {
     errorHandler.handle(error, {
       type: ErrorTypes.SCREEN_CAPTURE,

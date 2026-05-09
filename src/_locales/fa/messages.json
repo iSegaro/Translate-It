@@ -2183,6 +2183,12 @@
   "prompt_preview_desc_batch": {
     "message": "ترجمه دسته‌ای چندین المان یا کل صفحه وب در قالب JSON"
   },
+  "popup_screen_capture_title_icon": {
+    "message": "تصویربرداری از صفحه"
+  },
+  "popup_screen_capture_alt_icon": {
+    "message": "تصویربرداری"
+  },
   "prompt_preview_mode_screen_capture": {
     "message": "ترجمه از روی تصویر"
   },

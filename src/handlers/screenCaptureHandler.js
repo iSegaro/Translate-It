@@ -60,7 +60,7 @@ export async function handleStartAreaCapture(
     ]);
 
     // 3. Validate provider supports image translation
-    const providerInfo = ProviderRegistry.getProvider(provider);
+    const providerInfo = ProviderRegistry.getById(provider);
     if (!providerInfo || providerInfo.category !== "ai") {
       throw createScreenCaptureError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,
@@ -185,7 +185,7 @@ export async function handleStartFullScreenCapture(
     ]);
 
     // 3. Validate provider supports image translation
-    const providerInfo = ProviderRegistry.getProvider(provider);
+    const providerInfo = ProviderRegistry.getById(provider);
     if (!providerInfo || providerInfo.category !== "ai") {
       throw createScreenCaptureError(
         ErrorTypes.PROVIDER_IMAGE_NOT_SUPPORTED,

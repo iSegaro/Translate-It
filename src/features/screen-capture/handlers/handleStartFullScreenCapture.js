@@ -3,6 +3,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { captureManager } from '@/core/managers/browser-specific/capture/CaptureManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'handleStartFullScreenCapture');
 
@@ -20,12 +21,6 @@ export async function handleStartFullScreenCapture(message, sender, sendResponse
   logger.debug('[Handler:startFullScreenCapture] Processing full screen capture:', message.data);
   
   try {
-    const backgroundService = globalThis.backgroundService;
-    
-    if (!backgroundService) {
-      throw new Error("Background service not initialized.");
-    }
-    
     const { tabId, autoTranslate = false } = message.data || {};
     const targetTabId = tabId || sender.tab?.id;
     
@@ -33,8 +28,8 @@ export async function handleStartFullScreenCapture(message, sender, sendResponse
       throw new Error('Tab ID is required for full screen capture');
     }
     
-    // Start full screen capture via background service
-    const captureResult = await backgroundService.startFullScreenCapture({
+    // Start full screen capture via capture manager singleton
+    const captureResult = await captureManager.startFullScreenCapture({
       tabId: targetTabId,
       autoTranslate,
       sender

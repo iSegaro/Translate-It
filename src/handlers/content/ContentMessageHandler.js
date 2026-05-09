@@ -50,6 +50,10 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = manager;
   }
 
+  setScreenCaptureManager(manager) {
+    this.screenCaptureManager = manager;
+  }
+
   setIFrameManager(manager) {
     this.iFrameManager = manager;
   }
@@ -183,6 +187,13 @@ export class ContentMessageHandler extends ResourceTracker {
   registerHandlers() {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
+    
+    // Screen capture handlers
+    this.registerHandler(MessageActions.START_SCREEN_CAPTURE, this.handleStartScreenCapture.bind(this));
+    this.registerHandler(MessageActions.CAPTURE_SCREEN_AREA, this.handleCaptureScreenArea.bind(this));
+    this.registerHandler(MessageActions.SHOW_CAPTURE_PREVIEW, this.handleShowCapturePreview.bind(this));
+    this.registerHandler(MessageActions.SHOW_CAPTURE_RESULT, this.handleShowCaptureResult.bind(this));
+    
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
 
@@ -350,6 +361,50 @@ export class ContentMessageHandler extends ResourceTracker {
     } else {
       return { success: true, activated: false };
     }
+  }
+
+  async handleStartScreenCapture(message) {
+    console.log('[ContentMessageHandler] START_SCREEN_CAPTURE received!', message.data);
+    this.logger.info("ContentMessageHandler: START_SCREEN_CAPTURE received!");
+
+    try {
+      if (!this.screenCaptureManager) {
+        const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        const screenCaptureHandler = await loadFeature('screenCapture', true);
+        if (screenCaptureHandler) {
+          this.setScreenCaptureManager(screenCaptureHandler);
+        } else {
+          return { success: false, error: 'Screen capture feature blocked or failed to load' };
+        }
+      }
+
+      return await this.screenCaptureManager.handleStartScreenCapture(message);
+    } catch (error) {
+      this.logger.error("Screen capture start failed:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleCaptureScreenArea(message) {
+    this.logger.info("ContentMessageHandler: CAPTURE_SCREEN_AREA received!");
+    
+    if (this.screenCaptureManager) {
+      return await this.screenCaptureManager.handleCaptureScreenArea(message);
+    }
+    
+    return { success: false, error: 'ScreenCaptureManager not available' };
+  }
+
+  async handleShowCapturePreview(message) {
+    this.logger.info("ContentMessageHandler: SHOW_CAPTURE_PREVIEW received!");
+    pageEventBus.emit('show-capture-preview', message.data);
+    return { success: true };
+  }
+
+  async handleShowCaptureResult(message) {
+    this.logger.info("ContentMessageHandler: SHOW_CAPTURE_RESULT received!");
+    pageEventBus.emit('show-capture-result', message.data);
+    return { success: true };
   }
 
   async handleStreamUpdate(message) {

@@ -42,6 +42,25 @@ export function useScreenCapture() {
   });
 
   // Methods
+  // Methods
+  const toggleScroll = (lock) => {
+    if (lock) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      window.addEventListener("wheel", preventScroll, { passive: false });
+      window.addEventListener("touchmove", preventScroll, { passive: false });
+    } else {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      window.removeEventListener("wheel", preventScroll);
+      window.removeEventListener("touchmove", preventScroll);
+    }
+  };
+
+  const preventScroll = (e) => {
+    e.preventDefault();
+  };
+
   const startSelection = (event) => {
     if (isCapturing.value) return;
 
@@ -59,8 +78,9 @@ export function useScreenCapture() {
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
 
-    // Prevent text selection during capture
+    // Prevent text selection and lock scroll during capture
     document.body.style.userSelect = "none";
+    toggleScroll(true);
     event.preventDefault();
   };
 
@@ -81,7 +101,7 @@ export function useScreenCapture() {
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
 
-    // Restore text selection
+    // Restore text selection (but keep scroll locked until capture finished or cancelled)
     document.body.style.userSelect = "";
 
     isSelecting.value = false;
@@ -109,11 +129,13 @@ export function useScreenCapture() {
       error.value = null;
 
       // Get viewport coordinates for the selection
+      // Multiply by devicePixelRatio for accurate mapping to captureVisibleTab output
+      const dpr = window.devicePixelRatio || 1;
       const coordinates = {
-        x: normalizedRect.value.x,
-        y: normalizedRect.value.y,
-        width: normalizedRect.value.width,
-        height: normalizedRect.value.height,
+        x: Math.round(normalizedRect.value.x * dpr),
+        y: Math.round(normalizedRect.value.y * dpr),
+        width: Math.round(normalizedRect.value.width * dpr),
+        height: Math.round(normalizedRect.value.height * dpr),
       };
 
       // Capture the screen area
@@ -121,9 +143,11 @@ export function useScreenCapture() {
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
+        toggleScroll(false); // Unlock scroll after successful capture
         return {
           imageData: response.data.imageData,
           coordinates: coordinates,
+          text: response.data.text,
         };
       } else {
         throw new Error(response.error || "Failed to capture screen area");
@@ -131,6 +155,7 @@ export function useScreenCapture() {
     } catch (err) {
       logger.error("Screen capture error:", err);
       error.value = err.message || "Failed to capture screen area";
+      toggleScroll(false); // Unlock scroll on error
       throw err;
     } finally {
       isCapturing.value = false;
@@ -144,6 +169,7 @@ export function useScreenCapture() {
     isSelecting.value = false;
     capturedImage.value = null;
     error.value = null;
+    toggleScroll(false);
   };
 
   const cancelSelection = () => {
@@ -151,8 +177,9 @@ export function useScreenCapture() {
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
 
-    // Restore text selection
+    // Restore text selection and unlock scroll
     document.body.style.userSelect = "";
+    toggleScroll(false);
 
     resetSelection();
   };

@@ -186,7 +186,7 @@
             v-else
             class="btn-icon"
           >🌐</span>
-          <span class="btn-text">{{ isTranslating ? translatingText : translateText }}</span>
+          <span class="btn-text">{{ isTranslating ? translatingText : translateBtnLabel }}</span>
         </button>
       </div>
       
@@ -304,6 +304,10 @@ const props = defineProps({
     type: String,
     required: true
   },
+  text: {
+    type: String,
+    default: null
+  },
   coordinates: {
     type: Object,
     default: null
@@ -322,7 +326,7 @@ const emit = defineEmits(['close', 'retake', 'translate', 'save'])
 
 // Stores and APIs
 const translationStore = useTranslationStore()
-const { translateImage } = useExtensionAPI()
+const { translateImage, translateText } = useExtensionAPI()
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('capture-preview')
@@ -340,7 +344,7 @@ const selectedRegion = ref(null)
 
 // Localized messages
 const translatingText = ref('Translating...')
-const translateText = ref('Translate')
+const translateBtnLabel = ref('Translate')
 
 // Initialize localized messages
 onMounted(async () => {
@@ -358,7 +362,7 @@ onMounted(async () => {
 
   const { getTranslationString } = await utilsFactory.getI18nUtils()
   translatingText.value = await getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...'
-  translateText.value = await getTranslationString('TRANSLATE') || 'Translate'
+  translateBtnLabel.value = await getTranslationString('TRANSLATE') || 'Translate'
 })
 
 // Form data
@@ -420,12 +424,31 @@ const callTranslateImage = async () => {
       mode: 'image'
     }
 
-    const result = await translateImage(props.imageData, options)
-    
-    translationResult.value = {
-      ...result,
-      detectedText: null, // Will be populated if OCR is performed separately
-      confidence: result.confidence || 0.85
+    let result;
+    if (props.text) {
+      // If we already have OCR text, use translateText for better compatibility
+      result = await translateText(props.text, {
+        sourceLanguage: fromLanguage.value,
+        targetLanguage: toLanguage.value,
+        provider: selectedProvider.value,
+        mode: 'screen-capture'
+      });
+      
+      translationResult.value = {
+        text: result.translatedText,
+        detectedText: props.text,
+        provider: result.provider,
+        confidence: 1.0
+      }
+    } else {
+      // Fallback to image translation (AI-based OCR)
+      result = await translateImage(props.imageData, options)
+      
+      translationResult.value = {
+        ...result,
+        detectedText: null,
+        confidence: result.confidence || 0.85
+      }
     }
 
     emit('translate', result)

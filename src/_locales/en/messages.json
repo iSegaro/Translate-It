@@ -257,6 +257,48 @@
   "advance_tab_title": {
     "message": "Advance"
   },
+  "ocr_tab_title": {
+    "message": "Screen OCR"
+  },
+  "ocr_tab_desc": {
+    "message": "Manage languages and settings for on-screen text recognition (OCR)."
+  },
+  "ocr_languages_label": {
+    "message": "OCR Languages"
+  },
+  "ocr_download_button": {
+    "message": "Download"
+  },
+  "ocr_delete_button": {
+    "message": "Delete"
+  },
+  "ocr_status_installed": {
+    "message": "Installed"
+  },
+  "ocr_status_not_installed": {
+    "message": "Not Installed"
+  },
+  "ocr_auto_download_label": {
+    "message": "Auto-download needed languages"
+  },
+  "ocr_auto_download_desc": {
+    "message": "Automatically download the language model if it's missing when you start a screen capture."
+  },
+  "ocr_cache_clear_button": {
+    "message": "Clear OCR Cache"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "Remove all downloaded language models from local storage to free up space."
+  },
+  "ocr_download_progress": {
+    "message": "Downloading {lang}: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "{lang} model downloaded successfully."
+  },
+  "ocr_download_error": {
+    "message": "Failed to download {lang} model."
+  },
   "tts_tab_title": {
     "message": "Text-to-Speech"
   },
@@ -2182,6 +2224,15 @@
   },
   "prompt_preview_desc_batch": {
     "message": "Multiple elements or whole page translation in JSON format"
+  },
+  "popup_screen_capture_title_icon": {
+    "message": "Capture Screen Area"
+  },
+  "popup_screen_capture_alt_icon": {
+    "message": "Screen Capture"
+  },
+  "context_menu_screen_capture": {
+    "message": "Capture Screen"
   },
   "prompt_preview_mode_screen_capture": {
     "message": "Screen Capture"

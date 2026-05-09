@@ -164,10 +164,13 @@ class LifecycleManager {
       'getElementSelectionHandlerStats': Handlers.getElementSelectionHandlerStats,
       
       // Screen capture handlers - Lazy loaded for better performance
-      'startAreaCapture': Handlers.handleStartAreaCaptureLazy,
-      'startFullScreenCapture': Handlers.handleStartFullScreenCaptureLazy,
+      [MessageActions.START_AREA_CAPTURE]: Handlers.handleStartAreaCaptureLazy,
+      [MessageActions.START_SCREEN_CAPTURE]: Handlers.handleStartScreenCaptureLazy,
+      [MessageActions.CAPTURE_FULL_SCREEN]: Handlers.handleStartFullScreenCaptureLazy,
       'requestFullScreenCapture': Handlers.handleRequestFullScreenCaptureLazy,
-      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImageLazy,
+      [MessageActions.PROCESS_SCREEN_CAPTURE]: Handlers.handleProcessAreaCaptureImageLazy,
+      [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
+      [MessageActions.OCR_PROCESS]: Handlers.handleCaptureScreenAreaLazy,
       'previewConfirmed': Handlers.handlePreviewConfirmedLazy,
       'previewCancelled': Handlers.handlePreviewCancelledLazy,
       'previewRetry': Handlers.handlePreviewRetryLazy,

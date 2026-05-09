@@ -1,0 +1,169 @@
+.ocr-tab {
+  padding: 1rem;
+
+  .tab-header {
+    margin-bottom: 2rem;
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .tab-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  .settings-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: var(--text-primary);
+    }
+
+    p {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+  }
+
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+
+    .setting-info {
+      flex: 1;
+
+      label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        color: var(--text-primary);
+      }
+
+      p {
+        margin-bottom: 0;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+    }
+  }
+
+  .language-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .language-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+
+    &.installed {
+      border-color: var(--accent-color);
+      background: var(--bg-accent-subtle, rgba(var(--accent-color-rgb), 0.05));
+    }
+
+    .lang-info {
+      margin-bottom: 1rem;
+
+      .lang-name {
+        display: block;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .lang-status {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+    }
+
+    .lang-actions {
+      button {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .btn-download {
+        background: var(--accent-color);
+        color: white;
+        border: none;
+
+        &:hover:not(:disabled) {
+          filter: brightness(1.1);
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+
+      .btn-delete {
+        background: transparent;
+        color: var(--text-danger, #ff4d4f);
+        border: 1px solid var(--text-danger, #ff4d4f);
+
+        &:hover {
+          background: var(--text-danger, #ff4d4f);
+          color: white;
+        }
+      }
+    }
+  }
+
+  .danger-zone {
+    border-color: var(--text-danger, #ff4d4f);
+    
+    h3 {
+      color: var(--text-danger, #ff4d4f);
+    }
+  }
+
+  .btn-danger {
+    background: var(--text-danger, #ff4d4f);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+  }
+}
+
+/* RTL Support */
+.rtl .ocr-tab {
+  .setting-item {
+    flex-direction: row;
+  }
+}

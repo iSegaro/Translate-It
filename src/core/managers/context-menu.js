@@ -30,6 +30,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
+const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
@@ -370,6 +371,7 @@ export class ContextMenuManager extends ResourceTracker {
       const isSelectElementEnabled = isExtensionEnabled && 
                                    (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
                                    isBulkSupported;
+      const isScreenCaptureEnabled = isExtensionEnabled && (settings.SCREEN_CAPTURE_ENABLED !== false);
       const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // Get commands for keyboard shortcuts
@@ -393,6 +395,23 @@ export class ContextMenuManager extends ResourceTracker {
           logger.debug(`Created page context menu: "${pageMenuTitle}"`);
         } catch (e) {
           logger.error("Error creating page context menu:", e);
+        }
+      }
+
+      // --- 1.5. Create Screen Capture Menu ---
+      if (isScreenCaptureEnabled) {
+        try {
+          let captureMenuTitle =
+            (await getTranslationString("context_menu_translate_screen", locale)) ||
+            "Capture Screen";
+          await this.createMenu({
+            id: SCREEN_CAPTURE_MENU_ID,
+            title: captureMenuTitle,
+            contexts: ["page", "action"],
+          });
+          logger.debug(`Created screen capture menu: "${captureMenuTitle}"`);
+        } catch (e) {
+          logger.error("Error creating screen capture menu:", e);
         }
       }
 
@@ -717,6 +736,34 @@ export class ContextMenuManager extends ResourceTracker {
         case PAGE_CONTEXT_MENU_ID:
           await this._activateSelectElement(tab);
           break;
+
+        case SCREEN_CAPTURE_MENU_ID: {
+          const targetTab = tab || (await browser.tabs.query({ active: true, currentWindow: true }))[0];
+          if (targetTab?.id) {
+            const backgroundService = globalThis.backgroundService;
+            if (backgroundService && backgroundService.messageHandler) {
+              // Try both possible action names for compatibility
+              const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.START_AREA_CAPTURE) 
+                           || backgroundService.messageHandler.getHandlerForMessage('startAreaCapture');
+              
+              if (handler) {
+                logger.debug("Directly calling startAreaCapture handler from context menu");
+                // Handlers expect (message, sender, sendResponse)
+                await handler({
+                  action: MessageActions.START_AREA_CAPTURE,
+                  data: { tabId: targetTab.id, source: "context-menu" }
+                }, { tab: targetTab }, (response) => {
+                  logger.debug("Direct handler response:", response);
+                });
+              } else {
+                logger.error("Start area capture handler not found in background service");
+              }
+            } else {
+              logger.error("Background service or message handler not available");
+            }
+          }
+          break;
+        }
 
         case ACTION_TRANSLATE_ELEMENT_ID: {
           const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });

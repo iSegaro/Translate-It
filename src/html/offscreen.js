@@ -158,6 +158,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCachedAudioPlayback(cleanMessage.audioData, sendResponse);
     return true;
   }
+  else if (action === "OCR_PROCESS" && cleanMessage.data) {
+    handleOCRProcess(cleanMessage.data, sendResponse);
+    return true; // keep async channel open
+  }
   else if (action === "GENERATE_COMPOSITE_ICON" && cleanMessage.data) {
     // Handle composite icon generation inline
     try {
@@ -915,6 +919,31 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
       
   } catch (error) {
     console.error("[Offscreen] Cached audio setup failed:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+let ocrEngine = null;
+
+/**
+ * Handle OCR processing with lazy loading
+ */
+async function handleOCRProcess(data, sendResponse) {
+  try {
+    if (!ocrEngine) {
+      logger.info("Loading OCR engine...");
+      // Dynamically import the OCR engine
+      // The path is relative to src/html/offscreen.js
+      const module = await import('../features/screen-capture/services/ocrEngine.js');
+      ocrEngine = module;
+      logger.info("OCR engine loaded successfully");
+    }
+    
+    const { image, lang, coordinates } = data;
+    const text = await ocrEngine.recognize(image, lang, coordinates);
+    sendResponse({ success: true, text });
+  } catch (error) {
+    logger.error("OCR process failed:", error);
     sendResponse({ success: false, error: error.message });
   }
 }

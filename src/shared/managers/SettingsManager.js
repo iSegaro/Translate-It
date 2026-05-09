@@ -48,6 +48,7 @@ class SettingsManager {
       TRANSLATE_ON_TEXT_FIELDS: false,
       TRANSLATE_ON_TEXT_SELECTION: !isMobile,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
+      SCREEN_CAPTURE_ENABLED: true,
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,

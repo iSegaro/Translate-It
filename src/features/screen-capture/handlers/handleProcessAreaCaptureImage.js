@@ -3,6 +3,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { captureManager } from '@/core/managers/browser-specific/capture/CaptureManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'handleProcessAreaCaptureImage');
 
@@ -20,12 +21,6 @@ export async function handleProcessAreaCaptureImage(message, sender, sendRespons
   logger.debug('[Handler:processAreaCaptureImage] Processing captured image:', message.data);
   
   try {
-    const backgroundService = globalThis.backgroundService;
-    
-    if (!backgroundService) {
-      throw new Error("Background service not initialized.");
-    }
-    
     const { imageData, coordinates, autoTranslate = false, tabId } = message.data || {};
     const targetTabId = tabId || sender.tab?.id;
     
@@ -33,8 +28,8 @@ export async function handleProcessAreaCaptureImage(message, sender, sendRespons
       throw new Error('Image data is required for processing');
     }
     
-    // Process the captured image via background service
-    const processResult = await backgroundService.processAreaCaptureImage({
+    // Process the captured image via capture manager
+    const processResult = await captureManager.processAreaCaptureImage({
       imageData,
       coordinates,
       autoTranslate,

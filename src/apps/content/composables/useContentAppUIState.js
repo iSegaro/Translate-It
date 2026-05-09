@@ -35,6 +35,7 @@ export function useContentAppUIState(settingsStore, mobileStore, tracker) {
 
   // Status for various UI components
   const isSelectModeActive = ref(false);
+  const isScreenCaptureActive = ref(false);
   const isFullscreen = computed(() => mobileStore.isFullscreen); 
   const isExtensionEnabled = computed(() => settingsStore.settings?.EXTENSION_ENABLED !== false);
   const showDesktopFab = computed(() => settingsStore.settings?.SHOW_DESKTOP_FAB !== false);
@@ -83,6 +84,16 @@ export function useContentAppUIState(settingsStore, mobileStore, tracker) {
         logger.info('Event: select-mode-deactivated');
         isSelectModeActive.value = false;
       });
+
+      tracker.addEventListener(pageEventBus, 'screen-capture-activated', () => {
+        logger.info('Event: screen-capture-activated');
+        isScreenCaptureActive.value = true;
+      });
+
+      tracker.addEventListener(pageEventBus, 'screen-capture-deactivated', () => {
+        logger.info('Event: screen-capture-deactivated');
+        isScreenCaptureActive.value = false;
+      });
     }
   });
 
@@ -91,6 +102,7 @@ export function useContentAppUIState(settingsStore, mobileStore, tracker) {
     canAccessTop,
     shouldShowGlobalUI,
     isSelectModeActive,
+    isScreenCaptureActive,
     isFullscreen,
     isExtensionEnabled,
     showDesktopFab,

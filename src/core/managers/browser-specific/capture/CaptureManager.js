@@ -1,15 +1,14 @@
 // src/capture/CaptureManager.js
 
-import { getbrowser } from "@/utils/browser-polyfill.js";
+import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'CaptureManager');
 
 import { handleUIError } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { ProviderRegistry } from "../core/provider-registry.js";
+import { ProviderRegistry } from "@/core/provider-registry.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import { ScreenSelector } from "./ScreenSelector.js";
 import { textExtractor } from "./TextExtractor.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
@@ -57,20 +56,22 @@ export class CaptureManager extends ResourceTracker {
 
       this.isActive = true;
 
-      // Initialize screen selector for area selection
-      this.screenSelector = new ScreenSelector({
-        mode: "area",
-        onSelectionComplete: this._handleAreaSelection.bind(this),
-        onCancel: this._handleCaptureCancel.bind(this),
-      });
-
       // Store options for later use
       this.captureOptions = options;
 
-      // Start area selection
-      await this.screenSelector.start();
+      // Start area selection in content script via messaging
+      const tabId = options.tabId;
+      if (tabId) {
+        await browser.tabs.sendMessage(tabId, {
+          action: MessageActions.START_SCREEN_CAPTURE,
+          source: "background",
+          data: options
+        });
+      } else {
+        throw new Error("No active tab for area capture");
+      }
 
-  logger.init('Area capture initialized successfully');
+      logger.init('Area capture request sent to content script');
     } catch (error) {
   logger.error('Error starting area capture:', error);
       this.cleanup();
@@ -177,7 +178,7 @@ export class CaptureManager extends ResourceTracker {
   logger.debug('Requesting preview display in content script');
 
       // Get active tab to send preview message
-      const [activeTab] = await getbrowser().tabs.query({
+      const [activeTab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
@@ -191,7 +192,7 @@ export class CaptureManager extends ResourceTracker {
 
       // Send preview data to content script
       try {
-        await getbrowser().tabs.sendMessage(activeTab.id, {
+        await browser.tabs.sendMessage(activeTab.id, {
           action: MessageActions.SHOW_CAPTURE_PREVIEW,
           data: {
             captureData,
@@ -261,7 +262,7 @@ export class CaptureManager extends ResourceTracker {
   logger.debug('Restarting area capture selection');
 
         // Get active tab to send area selection restart message
-        const [activeTab] = await getbrowser().tabs.query({
+        const [activeTab] = await browser.tabs.query({
           active: true,
           currentWindow: true,
         });
@@ -275,7 +276,7 @@ export class CaptureManager extends ResourceTracker {
 
         // Send area selection start message to content script
         try {
-          await getbrowser().tabs.sendMessage(activeTab.id, {
+          await browser.tabs.sendMessage(activeTab.id, {
             action: MessageActions.START_SCREEN_AREA_SELECTION,
             data: this.captureOptions,
           });
@@ -382,7 +383,7 @@ export class CaptureManager extends ResourceTracker {
       if (!targetTabId) {
   logger.debug('No tab ID found in capture data, trying active tab fallback');
         // Fallback to active tab query
-        const [activeTab] = await getbrowser().tabs.query({
+        const [activeTab] = await browser.tabs.query({
           active: true,
           currentWindow: true,
         });
@@ -399,7 +400,7 @@ export class CaptureManager extends ResourceTracker {
 
       // Send result data to content script
       try {
-        await getbrowser().tabs.sendMessage(targetTabId, {
+        await browser.tabs.sendMessage(targetTabId, {
           action: MessageActions.SHOW_CAPTURE_RESULT,
           data: {
             originalCapture: captureData,
@@ -445,7 +446,7 @@ export class CaptureManager extends ResourceTracker {
   logger.debug('Capturing screen');
 
       // Get active tab
-      const [activeTab] = await getbrowser().tabs.query({
+      const [activeTab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
@@ -458,7 +459,7 @@ export class CaptureManager extends ResourceTracker {
       }
 
       // Capture visible tab
-      const dataUrl = await getbrowser().tabs.captureVisibleTab(
+      const dataUrl = await browser.tabs.captureVisibleTab(
         activeTab.windowId,
         {
           format: "png",
@@ -499,13 +500,16 @@ export class CaptureManager extends ResourceTracker {
    * @private
    */
   _validateProviderSupport(providerId) {
-    const provider = ProviderRegistry.getProvider(providerId);
+    if (!providerId) return true; // Allow starting without a provider (uses default/local OCR)
+
+    const provider = ProviderRegistry.getById(providerId);
     if (!provider) {
-      return false;
+      return true; // Assume local OCR fallback is possible
     }
 
-    // Only AI providers support image translation
-    return provider.category === "ai";
+    // AI providers support direct image translation, 
+    // but others can still work with local OCR fallback
+    return true; 
   }
 
   /**
