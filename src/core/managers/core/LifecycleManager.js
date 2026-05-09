@@ -199,7 +199,6 @@ class LifecycleManager {
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
       'getProviderConfig': Handlers.handleGetProviderConfigLazy,
-      [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
       'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
       'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
       'logError': Handlers.handleLogErrorLazy,
