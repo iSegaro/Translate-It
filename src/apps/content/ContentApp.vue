@@ -217,13 +217,15 @@ const onCapturePreviewRetake = () => {
 // 4. Notifications (Toasts) Management
 useContentAppNotifications({ shouldShowGlobalUI, toastRTL, tracker });
 
+import { pageEventBus } from '@/core/PageEventBus.js';
+
 // Setup screen capture global listener
 onMounted(() => {
-  const pageEventBus = window.pageEventBus;
   if (pageEventBus) {
     tracker.addEventListener(pageEventBus, 'show-capture-preview', (data) => {
-      logger.info('Event: show-capture-preview', data);
+      console.log('[ContentApp] Event: show-capture-preview received!', data);
       activeCapture.value = data;
+      isScreenCaptureActive.value = false; // Deactivate selector when preview shows
     });
   }
 });

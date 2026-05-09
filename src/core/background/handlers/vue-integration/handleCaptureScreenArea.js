@@ -4,6 +4,7 @@ import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 import { getSourceLanguageAsync } from "@/shared/config/config.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 const errorHandler = new ErrorHandler();
 
@@ -64,15 +65,29 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       }
     }
 
-    // 5. Return the extracted text
+    // 5. Send message to content script to show preview
+    const resultData = {
+      text: extractedText,
+      imageData,
+      coordinates,
+      timestamp: Date.now(),
+    };
+
+    // Send the preview message to the tab that requested it
+    try {
+      await browser.tabs.sendMessage(sender.tab.id, {
+        action: MessageActions.SHOW_CAPTURE_PREVIEW,
+        data: resultData
+      });
+      console.log("[handleCaptureScreenArea] SHOW_CAPTURE_PREVIEW message sent to tab:", sender.tab.id);
+    } catch (msgError) {
+      console.error("[handleCaptureScreenArea] Failed to send SHOW_CAPTURE_PREVIEW:", msgError);
+    }
+
+    // 6. Return the extracted text
     const response = {
       success: true,
-      data: {
-        text: extractedText,
-        imageData,
-        coordinates,
-        timestamp: Date.now(),
-      },
+      data: resultData,
     };
 
     if (sendResponse && typeof sendResponse === 'function') {
