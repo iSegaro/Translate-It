@@ -1,0 +1,145 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ocrCache } from '../ocrCache.js';
+
+describe('ocrCache', () => {
+  let mockDB;
+  let mockTransaction;
+  let mockStore;
+  let mockRequest;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    
+    // Setup complex IndexedDB mocks
+    mockRequest = {
+      onsuccess: null,
+      onerror: null,
+      result: null,
+      error: null
+    };
+
+    mockStore = {
+      get: vi.fn(() => mockRequest),
+      put: vi.fn(() => mockRequest),
+      delete: vi.fn(() => mockRequest),
+      clear: vi.fn(() => mockRequest),
+      getAllKeys: vi.fn(() => mockRequest)
+    };
+
+    mockTransaction = {
+      objectStore: vi.fn(() => mockStore)
+    };
+
+    mockDB = {
+      transaction: vi.fn(() => mockTransaction),
+      close: vi.fn()
+    };
+
+    const mockOpenRequest = {
+      onupgradeneeded: null,
+      onsuccess: null,
+      onerror: null,
+      result: mockDB
+    };
+
+    vi.stubGlobal('indexedDB', {
+      open: vi.fn(() => mockOpenRequest)
+    });
+
+    // Reset internal state of ocrCache singleton
+    ocrCache.db = null;
+
+    // Helper to trigger success on next tick
+    const triggerSuccess = (req, result) => {
+      req.result = result;
+      setTimeout(() => req.onsuccess({ target: req }), 0);
+    };
+
+    vi.spyOn(ocrCache, 'init').mockImplementation(async () => {
+      if (ocrCache.db) return ocrCache.db;
+      ocrCache.db = mockDB;
+      return mockDB;
+    });
+  });
+
+  describe('getModel', () => {
+    it('should return model data from store', async () => {
+      const mockData = new ArrayBuffer(8);
+      
+      // We need to wait for the method to call the mock
+      const promise = ocrCache.getModel('eng');
+      
+      // Wait for async init and transaction setup
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const request = mockStore.get.mock.results[0].value;
+      request.result = mockData;
+      request.onsuccess();
+
+      const result = await promise;
+      expect(result).toBe(mockData);
+      expect(mockStore.get).toHaveBeenCalledWith('eng');
+    });
+
+    it('should return null if not found', async () => {
+      const promise = ocrCache.getModel('fra');
+      
+      // Wait for async init and transaction setup
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const request = mockStore.get.mock.results[0].value;
+      request.result = null;
+      request.onsuccess();
+
+      const result = await promise;
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('saveModel', () => {
+    it('should put data into store', async () => {
+      const mockData = new ArrayBuffer(8);
+      const promise = ocrCache.saveModel('deu', mockData);
+      
+      // Wait for async init and transaction setup
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const request = mockStore.put.mock.results[0].value;
+      request.onsuccess();
+
+      await promise;
+      expect(mockStore.put).toHaveBeenCalledWith(mockData, 'deu');
+    });
+  });
+
+  describe('hasModel', () => {
+    it('should return true if model exists', async () => {
+      vi.spyOn(ocrCache, 'getModel').mockResolvedValue(new ArrayBuffer(4));
+      const result = await ocrCache.hasModel('eng');
+      expect(result).toBe(true);
+    });
+
+    it('should return false if model does not exist', async () => {
+      vi.spyOn(ocrCache, 'getModel').mockResolvedValue(null);
+      const result = await ocrCache.hasModel('spa');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('listCachedLanguages', () => {
+    it('should return all keys', async () => {
+      const mockKeys = ['eng', 'fas', 'fra'];
+      const promise = ocrCache.listCachedLanguages();
+      
+      // Wait for async init and transaction setup
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const request = mockStore.getAllKeys.mock.results[0].value;
+      request.result = mockKeys;
+      request.onsuccess();
+
+      const result = await promise;
+      expect(result).toEqual(mockKeys);
+    });
+  });
+});
