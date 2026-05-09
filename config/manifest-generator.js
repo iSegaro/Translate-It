@@ -59,7 +59,7 @@ export function generateManifest(browser = 'chrome') {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          'src/_locales/*',
+          '_locales/*',
           'docs/Changelog.md'
         ],
         matches: ['<all_urls>', 'file://*/*'],
@@ -259,7 +259,7 @@ function generateFirefoxManifest(baseManifest) {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          'src/_locales/*',
+          '_locales/*',
           'docs/Changelog.md',
           'assets/ocr/*'
         ],
