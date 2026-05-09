@@ -241,7 +241,7 @@ export class ExclusionChecker {
       await this.initialize();
     }
 
-    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation'];
+    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation', 'screenCapture'];
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,
