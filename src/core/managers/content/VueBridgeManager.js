@@ -24,7 +24,6 @@ class ContentScriptVueBridge extends ResourceTracker {
       CREATE_VUE_MICRO_APP: this.handleCreateMicroApp,
       DESTROY_VUE_MICRO_APP: this.handleDestroyMicroApp,
       START_SCREEN_CAPTURE: this.handleStartScreenCapture,
-      SHOW_CAPTURE_PREVIEW: this.handleShowCapturePreview,
     };
   }
 
@@ -41,7 +40,6 @@ class ContentScriptVueBridge extends ResourceTracker {
   async registerComponents() {
     const components = {
       ScreenSelector: () => import("@/components/content/ScreenSelector.vue"),
-      CapturePreview: () => import("@/components/content/CapturePreview.vue"),
     };
     for (const [name, loader] of Object.entries(components)) {
       this.componentRegistry.set(name, async () => (await loader()).default);
@@ -126,9 +124,7 @@ class ContentScriptVueBridge extends ResourceTracker {
       onSelect: async (result) => {
         try {
           const response = await this.messenger.sendMessage({ action: MessageActions.PROCESS_SCREEN_CAPTURE, data: result });
-          if (response.success && data.showPreview !== false) {
-            await this.handleShowCapturePreview(result, instanceId);
-          } else if (!response.success) {
+          if (!response.success) {
             throw new Error(response.error || "Failed to process capture");
           }
         } catch (error) {
@@ -143,17 +139,6 @@ class ContentScriptVueBridge extends ResourceTracker {
       ...data,
     });
     sendResponse({ success: true, instanceId });
-  }
-
-  handleShowCapturePreview = async (captureResult, selectorInstanceId) => {
-    this.destroyMicroApp(selectorInstanceId);
-    await this.createMicroApp("CapturePreview", {
-      ...captureResult,
-      onClose: (id) => this.destroyMicroApp(id),
-      onRetake: (id) => { this.destroyMicroApp(id); this.handleStartScreenCapture({ showPreview: true }, () => {}); },
-      onTranslate: (result) => this.messenger.sendMessage({ action: MessageActions.CAPTURE_TRANSLATION_COMPLETED, data: result }),
-      onSave: (result) => this.messenger.sendMessage({ action: MessageActions.CAPTURE_SAVE_TRANSLATION, data: result }),
-    });
   }
 
   showCaptureError = (message, instanceId = null) => {
@@ -206,102 +191,9 @@ class ContentScriptVueBridge extends ResourceTracker {
     setTimeout(() => errorContainer.remove(), NOTIFICATION_TIME.WARNING);
   }
 
-  handleAdvancedScreenCapture = async (data, sendResponse) => {
-    try {
-      const { mode = "manual", detectText = false, autoTranslate = false } = data;
-      if (mode === "auto") {
-        await this.performAutoCapture(detectText, autoTranslate, sendResponse);
-      } else {
-        await this.handleStartScreenCapture(data, sendResponse);
-      }
-    } catch (error) {
-      sendResponse({ success: false, error: error.message });
-    }
-  }
-
-  performAutoCapture = async (detectText, autoTranslate, sendResponse) => {
-    try {
-      const captureResponse = await this.messenger.sendMessage({ action: MessageActions.CAPTURE_FULL_SCREEN });
-      if (!captureResponse.success) throw new Error(captureResponse.error || "Failed to capture screen");
-
-      if (detectText) {
-        const analysisResponse = await this.messenger.sendMessage({ action: MessageActions.PROCESS_IMAGE_OCR, data: { imageData: captureResponse.data.imageData } });
-        if (analysisResponse.success && analysisResponse.data.textRegions?.length > 0) {
-          await this.showTextRegionSelector(captureResponse.data.imageData, analysisResponse.data.textRegions, autoTranslate);
-          sendResponse({ success: true, mode: "text-regions" });
-        } else {
-          await this.handleStartScreenCapture({ showPreview: true }, sendResponse);
-        }
-      } else {
-        if (autoTranslate) {
-          await this.performDirectTranslation(captureResponse.data.imageData, sendResponse);
-        } else {
-          await this.handleShowCapturePreview(captureResponse.data, null);
-          sendResponse({ success: true, mode: "preview" });
-        }
-      }
-    } catch (error) {
-      sendResponse({ success: false, error: error.message });
-    }
-  }
-
-  showTextRegionSelector = async (imageData, textRegions, autoTranslate) => {
-    const instanceId = await this.createMicroApp("TextRegionSelector", {
-      imageData,
-      textRegions,
-      onRegionSelect: async (region) => {
-        if (autoTranslate) {
-          const croppedImageData = await this.cropImage(imageData, region);
-          await this.performDirectTranslation(croppedImageData);
-        } else {
-          const croppedImageData = await this.cropImage(imageData, region);
-          await this.handleShowCapturePreview({ imageData: croppedImageData, coordinates: region }, instanceId);
-        }
-      },
-      onCancel: () => this.destroyMicroApp(instanceId),
-    });
-    return instanceId;
-  }
-
-  performDirectTranslation = async (imageData, sendResponse = null) => {
-    try {
-      const translationResponse = await this.messenger.sendMessage({ action: MessageActions.CAPTURE_TRANSLATE_IMAGE_DIRECT, data: { imageData } });
-      if (translationResponse.success) {
-        await this.showTranslationResult(translationResponse.data);
-        sendResponse?.({ success: true, translation: translationResponse.data });
-      } else {
-        throw new Error(translationResponse.error || "Translation failed");
-      }
-    } catch (error) {
-      sendResponse?.({ success: false, error: error.message });
-      throw error;
-    }
-  }
-
-  showTranslationResult = async (/*translationData*/) => {
-    // TranslationTooltip removed - translation results now handled elsewhere
-    // logger.trace("[Vue Bridge] Translation result received:", translationData);
-    return null;
-  }
-
-  handleShowTextRegions = async (data, sendResponse) => {
-    try {
-      const { imageData, textRegions, autoTranslate = false } = data;
-      const instanceId = await this.showTextRegionSelector(imageData, textRegions, autoTranslate);
-      sendResponse({ success: true, instanceId });
-    } catch (error) {
-      sendResponse({ success: false, error: error.message });
-    }
-  }
-
-  cropImage = async (imageData) => {
-    return imageData;
-  }
-
-
   hideAllOverlays = () => {
     for (const [id, instance] of this.vueInstances) {
-      if (["ScreenSelector", "CapturePreview"].includes(instance.componentName)) this.destroyMicroApp(id);
+      if (instance.componentName === "ScreenSelector") this.destroyMicroApp(id);
     }
   }
 

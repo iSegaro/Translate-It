@@ -404,8 +404,6 @@ export class ContentMessageHandler extends ResourceTracker {
       await screenCaptureCoordinator.handleResult(message.data);
     } catch (error) {
       this.logger.error("Failed to handle capture result via coordinator:", error);
-      // Fallback for safety
-      pageEventBus.emit('show-capture-preview', message.data);
     }
     
     return { success: true };

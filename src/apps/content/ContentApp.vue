@@ -90,15 +90,6 @@
         @select="onScreenAreaSelected"
         @cancel="onScreenCaptureCancel"
       />
-      
-      <CapturePreview 
-        v-if="activeCapture"
-        :image-data="activeCapture.imageData"
-        :text="activeCapture.text"
-        :coordinates="activeCapture.coordinates"
-        @close="onCapturePreviewClose"
-        @retake="onCapturePreviewRetake"
-      />
 
       <!-- Mobile Bottom Sheet -->
       <MobileSheet v-if="isMobileUI && isTopFrame" />
@@ -136,7 +127,6 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 const ElementHighlightOverlay = defineAsyncComponent(() => import('./components/ElementHighlightOverlay.vue'));
 const ScreenSelector = defineAsyncComponent(() => import('@/components/content/ScreenSelector.vue'));
-const CapturePreview = defineAsyncComponent(() => import('@/components/content/CapturePreview.vue'));
 
 // Lazy Loaded Components (Optimized Resource Usage)
 // These components are loaded on-demand or based on device type to reduce the initial JS footprint.
@@ -192,12 +182,8 @@ watch(isScreenCaptureActive, (newVal) => {
   logger.info(`[ContentApp] isScreenCaptureActive changed: ${newVal}`);
 });
 
-// Screen Capture State
-const activeCapture = ref(null);
-
 const onScreenAreaSelected = (result) => {
   logger.info('Screen area selected', result);
-  activeCapture.value = result;
   isScreenCaptureActive.value = false;
 };
 
@@ -206,32 +192,7 @@ const onScreenCaptureCancel = () => {
   isScreenCaptureActive.value = false;
 };
 
-const onCapturePreviewClose = () => {
-  activeCapture.value = null;
-};
-
-const onCapturePreviewRetake = () => {
-  activeCapture.value = null;
-  isScreenCaptureActive.value = true;
-};
-
 // 4. Notifications (Toasts) Management
-useContentAppNotifications({ shouldShowGlobalUI, toastRTL, tracker });
-
-import { pageEventBus } from '@/core/PageEventBus.js';
-
-// Setup screen capture global listener
-onMounted(() => {
-  if (pageEventBus) {
-    tracker.addEventListener(pageEventBus, 'show-capture-preview', (data) => {
-      console.log('[ContentApp] Event: show-capture-preview received!', data);
-      activeCapture.value = data;
-      isScreenCaptureActive.value = false; // Deactivate selector when preview shows
-    });
-  }
-});
-
-// 5. TextField Interaction Icons Management
 const {
   activeIcons,
   setIconRef,

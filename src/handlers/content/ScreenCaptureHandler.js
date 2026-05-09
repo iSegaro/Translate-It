@@ -57,10 +57,7 @@ export class ScreenCaptureHandler {
   async handleCaptureScreenArea(message) {
     logger.info('CAPTURE_SCREEN_AREA received', message.data);
     
-    // This is usually sent from ContentApp to Background
-    // If it's sent to Content, we might want to show the preview
-    pageEventBus.emit('show-capture-preview', message.data);
-    
+    // Results are now handled via SHOW_CAPTURE_PREVIEW message and Coordinator
     return { success: true };
   }
 }

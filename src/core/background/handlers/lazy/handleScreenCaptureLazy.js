@@ -23,10 +23,6 @@ async function loadScreenCaptureHandlers() {
     startFullScreenModule,
     requestFullScreenModule,
     processAreaModule,
-    previewConfirmedModule,
-    previewCancelledModule,
-    previewRetryModule,
-    resultClosedModule,
     captureErrorModule,
     areaSelectionCancelModule
   ] = await Promise.all([
@@ -34,10 +30,6 @@ async function loadScreenCaptureHandlers() {
     import('@/features/screen-capture/handlers/handleStartFullScreenCapture.js'),
     import('@/features/screen-capture/handlers/handleRequestFullScreenCapture.js'),
     import('@/features/screen-capture/handlers/handleProcessAreaCaptureImage.js'),
-    import('@/features/screen-capture/handlers/handlePreviewConfirmed.js'),
-    import('@/features/screen-capture/handlers/handlePreviewCancelled.js'),
-    import('@/features/screen-capture/handlers/handlePreviewRetry.js'),
-    import('@/features/screen-capture/handlers/handleResultClosed.js'),
     import('@/features/screen-capture/handlers/handleCaptureError.js'),
     import('@/features/screen-capture/handlers/handleAreaSelectionCancel.js')
   ]);
@@ -47,10 +39,6 @@ async function loadScreenCaptureHandlers() {
     handleStartFullScreenCapture: startFullScreenModule.handleStartFullScreenCapture,
     handleRequestFullScreenCapture: requestFullScreenModule.handleRequestFullScreenCapture,
     handleProcessAreaCaptureImage: processAreaModule.handleProcessAreaCaptureImage,
-    handlePreviewConfirmed: previewConfirmedModule.handlePreviewConfirmed,
-    handlePreviewCancelled: previewCancelledModule.handlePreviewCancelled,
-    handlePreviewRetry: previewRetryModule.handlePreviewRetry,
-    handleResultClosed: resultClosedModule.handleResultClosed,
     handleCaptureError: captureErrorModule.handleCaptureError,
     handleAreaSelectionCancel: areaSelectionCancelModule.handleAreaSelectionCancel
   };
@@ -89,38 +77,6 @@ export const handleRequestFullScreenCaptureLazy = async (message, sender, sendRe
 export const handleProcessAreaCaptureImageLazy = async (message, sender, sendResponse) => {
   const { handleProcessAreaCaptureImage } = await loadScreenCaptureHandlers();
   return await handleProcessAreaCaptureImage(message, sender, sendResponse);
-};
-
-/**
- * Lazy handler for PREVIEW_CONFIRMED
- */
-export const handlePreviewConfirmedLazy = async (message, sender, sendResponse) => {
-  const { handlePreviewConfirmed } = await loadScreenCaptureHandlers();
-  return await handlePreviewConfirmed(message, sender, sendResponse);
-};
-
-/**
- * Lazy handler for PREVIEW_CANCELLED
- */
-export const handlePreviewCancelledLazy = async (message, sender, sendResponse) => {
-  const { handlePreviewCancelled } = await loadScreenCaptureHandlers();
-  return await handlePreviewCancelled(message, sender, sendResponse);
-};
-
-/**
- * Lazy handler for PREVIEW_RETRY
- */
-export const handlePreviewRetryLazy = async (message, sender, sendResponse) => {
-  const { handlePreviewRetry } = await loadScreenCaptureHandlers();
-  return await handlePreviewRetry(message, sender, sendResponse);
-};
-
-/**
- * Lazy handler for RESULT_CLOSED
- */
-export const handleResultClosedLazy = async (message, sender, sendResponse) => {
-  const { handleResultClosed } = await loadScreenCaptureHandlers();
-  return await handleResultClosed(message, sender, sendResponse);
 };
 
 /**

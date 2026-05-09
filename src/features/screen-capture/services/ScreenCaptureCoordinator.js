@@ -8,14 +8,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'ScreenCaptureCoor
 
 /**
  * Coordinator for handling screen capture (OCR) results.
- * Responsible for routing the extracted text to various UI components
- * like WindowsManager, Sidepanel, or the Preview UI.
+ * Responsible for routing the extracted text to WindowsManager.
  */
 export class ScreenCaptureCoordinator {
   constructor() {
-    // Current target for OCR results. 
-    // Possible values: 'window' (WindowsManager), 'preview' (CapturePreview UI)
-    // Future values: 'sidepanel', 'mobilesheet'
+    // Current target for OCR results.
+    // Future values could include 'sidepanel' or 'mobilesheet'
     this.target = 'window'; 
   }
 
@@ -40,17 +38,12 @@ export class ScreenCaptureCoordinator {
         case 'window':
           await this.dispatchToWindowsManager(text, coordinates);
           break;
-        case 'preview':
-          pageEventBus.emit('show-capture-preview', data);
-          break;
         default:
-          logger.warn(`Unknown routing target: ${this.target}, falling back to preview`);
-          pageEventBus.emit('show-capture-preview', data);
+          logger.warn(`Unknown routing target: ${this.target}, falling back to window`);
+          await this.dispatchToWindowsManager(text, coordinates);
       }
     } catch (error) {
       logger.error(`Failed to route OCR result to ${this.target}:`, error);
-      // Fallback to preview on error to ensure user sees something
-      pageEventBus.emit('show-capture-preview', data);
     }
   }
 
@@ -70,10 +63,10 @@ export class ScreenCaptureCoordinator {
     // 2. Calculate anchor position (bottom-center of captured area)
     const dpr = window.devicePixelRatio || 1;
     const cssCoords = {
-      x: coordinates.x / dpr,
-      y: coordinates.y / dpr,
-      width: coordinates.width / dpr,
-      height: coordinates.height / dpr
+      x: coordinates ? coordinates.x / dpr : window.innerWidth / 2,
+      y: coordinates ? coordinates.y / dpr : window.innerHeight / 2,
+      width: coordinates ? coordinates.width / dpr : 0,
+      height: coordinates ? coordinates.height / dpr : 0
     };
 
     const position = {
@@ -85,7 +78,6 @@ export class ScreenCaptureCoordinator {
     logger.debug('Dispatching GLOBAL_SELECTION_TRIGGER with options', { position });
 
     // 3. Trigger via Event Bus (Decoupled Architecture)
-    // We pass options to force immediate display and use correct OCR mode
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, {
       text,
       position,

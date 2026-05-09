@@ -171,10 +171,6 @@ class LifecycleManager {
       [MessageActions.PROCESS_SCREEN_CAPTURE]: Handlers.handleProcessAreaCaptureImageLazy,
       [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
       [MessageActions.OCR_PROCESS]: Handlers.handleCaptureScreenAreaLazy,
-      'previewConfirmed': Handlers.handlePreviewConfirmedLazy,
-      'previewCancelled': Handlers.handlePreviewCancelledLazy,
-      'previewRetry': Handlers.handlePreviewRetryLazy,
-      'resultClosed': Handlers.handleResultClosedLazy,
       'captureError': Handlers.handleCaptureErrorLazy,
       'areaSelectionCancel': Handlers.handleAreaSelectionCancelLazy,
       
@@ -219,8 +215,7 @@ class LifecycleManager {
       // Vue Bridge handlers - Lazy loaded for better performance
       'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
       'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy,
-      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridgeLazy
+      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy
     };
     
     // Add browser-specific handlers
