@@ -158,6 +158,8 @@
 .action-buttons {
   display: flex;
   gap: 8px;
+}
+
 .toolbar-btn {
   display: flex;
   align-items: center;
@@ -253,6 +255,7 @@
   to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
+.capture-btn {
   background: #e3f2fd;
   border-color: #2196f3;
   color: #2196f3;
@@ -274,10 +277,6 @@
   background: #ffebee;
   border-color: #f44336;
   color: #f44336;
-}
-
-.btn-icon {
-  font-size: 14px;
 }
 
 .btn-text {
@@ -331,7 +330,10 @@
 }
 
 .error-icon {
-  font-size: 16px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
 .error-close {
@@ -339,12 +341,22 @@
   border: none;
   color: white;
   cursor: pointer;
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
   margin-left: 8px;
   opacity: 0.8;
   
   &:hover {
     opacity: 1;
+  }
+
+  .close-icon-img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
   }
 }
 

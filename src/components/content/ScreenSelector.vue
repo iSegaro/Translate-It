@@ -60,7 +60,7 @@
             :title="$t('screen_capture_cancel')"
             @click="cancel"
           >
-            <span class="btn-icon">✕</span>
+            <img :src="CloseIcon" class="btn-icon" alt="Cancel" />
             <span class="btn-text">{{ $t('screen_capture_cancel') }}</span>
           </button>
         </div>
@@ -95,13 +95,13 @@
       class="error-panel"
     >
       <div class="error-content">
-        <span class="error-icon">⚠️</span>
+        <img :src="WarningIcon" class="error-icon" alt="Warning" />
         <span class="error-text">{{ $t('screen_capture_error') }}: {{ error }}</span>
         <button
           class="error-close"
           @click="clearError"
         >
-          ✕
+          <img :src="CloseIcon" class="close-icon-img" alt="Close" />
         </button>
       </div>
     </div>
@@ -125,6 +125,8 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 // Icons
 import CaptureIcon from '@/icons/ui/capture.svg'
 import FullscreenIcon from '@/icons/ui/whole-page.png'
+import CloseIcon from '@/icons/ui/close.svg'
+import WarningIcon from '@/icons/ui/warning.svg'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
 
