@@ -6,54 +6,25 @@
     :closable="!isTranslating"
   >
     <div class="capture-preview">
-      <!-- Image preview section -->
+      <!-- Extracted text section -->
       <div class="preview-section">
         <div class="preview-header">
-          <h4>Captured Image</h4>
+          <h4>Extracted Text</h4>
           <div class="preview-info">
             <span class="info-item">
-              <span class="info-label">Size:</span>
-              <span class="info-value">{{ imageInfo.width }}×{{ imageInfo.height }}</span>
-            </span>
-            <span class="info-item">
-              <span class="info-label">Format:</span>
-              <span class="info-value">{{ imageInfo.format }}</span>
+              <span class="info-label">Characters:</span>
+              <span class="info-value">{{ editableText.length }}</span>
             </span>
           </div>
         </div>
         
-        <div class="preview-image-container">
-          <img 
-            ref="previewImage"
-            :src="imageData" 
-            alt="Captured screen area" 
-            class="preview-image"
-            @load="handleImageLoad"
-          >
-          
-          <!-- Image overlay for text detection -->
-          <div
-            v-if="detectedTextRegions.length > 0"
-            class="text-overlay"
-          >
-            <div 
-              v-for="(region, index) in detectedTextRegions"
-              :key="index"
-              class="text-region"
-              :style="getRegionStyle(region)"
-              :class="{ 'ti-active': selectedRegion === region }"
-              @click="selectTextRegion(region)"
-            />
-          </div>
-          
-          <!-- Loading overlay -->
-          <div
-            v-if="isAnalyzing"
-            class="analysis-overlay"
-          >
-            <div class="analysis-spinner" />
-            <p>Analyzing image...</p>
-          </div>
+        <div class="preview-text-container">
+          <textarea
+            v-model="editableText"
+            class="extracted-text-area"
+            placeholder="No text detected or still processing..."
+            rows="6"
+          ></textarea>
         </div>
       </div>
       
@@ -126,29 +97,6 @@
               </option>
             </select>
           </div>
-          
-          <!-- OCR Options -->
-          <div class="ocr-options">
-            <label class="checkbox-label">
-              <input 
-                v-model="ocrOptions.preprocessImage" 
-                type="checkbox"
-                class="checkbox"
-              >
-              <span class="checkmark" />
-              Enhance image quality
-            </label>
-            
-            <label class="checkbox-label">
-              <input 
-                v-model="ocrOptions.detectRegions" 
-                type="checkbox"
-                class="checkbox"
-              >
-              <span class="checkmark" />
-              Detect text regions
-            </label>
-          </div>
         </div>
       </div>
       
@@ -164,18 +112,8 @@
         </button>
         
         <button 
-          v-if="ocrOptions.detectRegions" 
-          class="action-btn analyze-btn"
-          :disabled="isAnalyzing || isTranslating"
-          @click="analyzeImage"
-        >
-          <span class="btn-icon">🔍</span>
-          <span class="btn-text">Analyze</span>
-        </button>
-        
-        <button 
           class="action-btn primary-btn" 
-          :disabled="isTranslating || isAnalyzing"
+          :disabled="isTranslating || !editableText.trim()"
           @click="callTranslateImage"
         >
           <span
@@ -334,13 +272,18 @@ const tracker = useResourceTracker('capture-preview')
 // Reactive state
 const isVisible = ref(true)
 const isTranslating = ref(false)
-const isAnalyzing = ref(false)
 const isPlayingTTS = ref(false)
 const previewImage = ref(null)
 const translationResult = ref(null)
 const error = ref(null)
-const detectedTextRegions = ref([])
-const selectedRegion = ref(null)
+const editableText = ref(props.text || '')
+
+// Sync editableText with props.text when it changes
+watch(() => props.text, (newText) => {
+  if (newText) {
+    editableText.value = newText
+  }
+})
 
 // Localized messages
 const translatingText = ref('Translating...')
@@ -369,17 +312,6 @@ onMounted(async () => {
 const fromLanguage = ref('auto')
 const toLanguage = ref('en')
 const selectedProvider = ref('gemini')
-const ocrOptions = ref({
-  preprocessImage: true,
-  detectRegions: false
-})
-
-// Image info
-const imageInfo = ref({
-  width: 0,
-  height: 0,
-  format: 'PNG'
-})
 
 // Available languages (simplified list)
 const availableLanguages = [
@@ -403,52 +335,26 @@ const imageCapableProviders = computed(() => {
 })
 
 // Methods
-const handleImageLoad = () => {
-  if (previewImage.value) {
-    imageInfo.value.width = previewImage.value.naturalWidth
-    imageInfo.value.height = previewImage.value.naturalHeight
-  }
-}
-
 const callTranslateImage = async () => {
-  if (!props.imageData || isTranslating.value) return
+  if (!editableText.value.trim() || isTranslating.value) return
 
   isTranslating.value = true
   error.value = null
 
   try {
-    const options = {
-      from: fromLanguage.value,
-      to: toLanguage.value,
+    // If we have text (extracted from OCR), use translateText for better compatibility
+    const result = await translateText(editableText.value, {
+      sourceLanguage: fromLanguage.value,
+      targetLanguage: toLanguage.value,
       provider: selectedProvider.value,
-      mode: 'image'
-    }
-
-    let result;
-    if (props.text) {
-      // If we already have OCR text, use translateText for better compatibility
-      result = await translateText(props.text, {
-        sourceLanguage: fromLanguage.value,
-        targetLanguage: toLanguage.value,
-        provider: selectedProvider.value,
-        mode: 'screen-capture'
-      });
-      
-      translationResult.value = {
-        text: result.translatedText,
-        detectedText: props.text,
-        provider: result.provider,
-        confidence: 1.0
-      }
-    } else {
-      // Fallback to image translation (AI-based OCR)
-      result = await translateImage(props.imageData, options)
-      
-      translationResult.value = {
-        ...result,
-        detectedText: null,
-        confidence: result.confidence || 0.85
-      }
+      mode: 'screen-capture'
+    });
+    
+    translationResult.value = {
+      text: result.translatedText,
+      detectedText: editableText.value,
+      provider: result.provider,
+      confidence: 1.0
     }
 
     emit('translate', result)
@@ -461,52 +367,6 @@ const callTranslateImage = async () => {
   } finally {
     isTranslating.value = false
   }
-}
-
-const analyzeImage = async () => {
-  if (!props.imageData || isAnalyzing.value) return
-
-  isAnalyzing.value = true
-  error.value = null
-
-  try {
-    // This would call an OCR service to detect text regions
-    // For now, we'll simulate this functionality
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    // Mock detected regions
-    detectedTextRegions.value = [
-      { x: 10, y: 20, width: 200, height: 30, confidence: 0.95 },
-      { x: 50, y: 80, width: 150, height: 25, confidence: 0.88 }
-    ]
-  } catch (err) {
-    await handleError(err, 'capture-preview-image-analysis')
-    error.value = {
-      message: 'Failed to analyze image',
-      details: err.message
-    }
-  } finally {
-    isAnalyzing.value = false
-  }
-}
-
-const getRegionStyle = (region) => {
-  const imgElement = previewImage.value
-  if (!imgElement) return {}
-
-  const scaleX = imgElement.clientWidth / imgElement.naturalWidth
-  const scaleY = imgElement.clientHeight / imgElement.naturalHeight
-
-  return {
-    left: `${region.x * scaleX}px`,
-    top: `${region.y * scaleY}px`,
-    width: `${region.width * scaleX}px`,
-    height: `${region.height * scaleY}px`
-  }
-}
-
-const selectTextRegion = (region) => {
-  selectedRegion.value = region
 }
 
 const swapLanguages = () => {
