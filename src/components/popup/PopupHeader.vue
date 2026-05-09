@@ -227,7 +227,7 @@ const handleScreenCapture = async () => {
     const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (activeTab?.id) {
       await sendMessage({
-        action: MessageActions.START_AREA_CAPTURE,
+        action: MessageActions.START_SCREEN_CAPTURE,
         data: { tabId: activeTab.id }
       })
       window.close()

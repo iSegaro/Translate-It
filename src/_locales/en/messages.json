@@ -2245,5 +2245,35 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "Brief word definitions and synonyms (Note: This mode uses a fixed format)"
+  },
+  "screen_capture_label": {
+    "message": "Capture"
+  },
+  "screen_capture_full_screen": {
+    "message": "Full Screen"
+  },
+  "screen_capture_cancel": {
+    "message": "Cancel"
+  },
+  "screen_capture_capturing": {
+    "message": "Capturing..."
+  },
+  "screen_capture_select_area": {
+    "message": "Select an area to capture"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "Click and drag to select area"
+  },
+  "screen_capture_press_escape": {
+    "message": "Press ESC to cancel"
+  },
+  "screen_capture_press_enter": {
+    "message": "Press ENTER to confirm"
+  },
+  "screen_capture_error": {
+    "message": "Capture failed"
+  },
+  "screen_capture_retry": {
+    "message": "Retry"
   }
 }

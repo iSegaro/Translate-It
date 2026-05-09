@@ -3,8 +3,6 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import ExtensionContextManager from '@/core/extensionContext.js';
-import { captureManager } from '@/core/managers/browser-specific/capture/CaptureManager.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -22,10 +20,11 @@ export async function handleStartScreenCapture(message, sender, sendResponse) {
       throw new Error("No active tab found");
     }
 
-    // Use CaptureManager for orchestration
-    await captureManager.startAreaCapture({
-      tabId: tab.id,
-      ...message.data
+    // Directly send start command to content script
+    await browser.tabs.sendMessage(tab.id, {
+      action: MessageActions.START_SCREEN_CAPTURE,
+      source: "background",
+      data: message.data || {}
     });
 
     const response = {

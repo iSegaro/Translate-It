@@ -33,21 +33,22 @@
           <button 
             class="toolbar-btn capture-btn"
             :disabled="!hasSelection || isCapturing" 
-            title="Capture selected area"
+            :title="$t('screen_capture_label')"
             @click="confirmSelection"
           >
-            <span class="btn-icon">📸</span>
-            <span class="btn-text">Capture</span>
+            <img :src="CaptureIcon" class="btn-icon" alt="Capture" />
+            <span class="btn-text">{{ $t('screen_capture_label') }}</span>
           </button>
           
           <button 
+            v-if="allowFullScreen"
             class="toolbar-btn fullscreen-btn"
             :disabled="isCapturing"
-            title="Capture entire screen"
+            :title="$t('screen_capture_full_screen')"
             @click="captureFullScreen"
           >
-            <span class="btn-icon">🖼️</span>
-            <span class="btn-text">Full Screen</span>
+            <img :src="FullscreenIcon" class="btn-icon" alt="Full Screen" />
+            <span class="btn-text">{{ $t('screen_capture_full_screen') }}</span>
           </button>
         </div>
         
@@ -56,11 +57,11 @@
           <button 
             class="toolbar-btn cancel-btn"
             :disabled="isCapturing"
-            title="Cancel capture"
+            :title="$t('screen_capture_cancel')"
             @click="cancel"
           >
             <span class="btn-icon">✕</span>
-            <span class="btn-text">Cancel</span>
+            <span class="btn-text">{{ $t('screen_capture_cancel') }}</span>
           </button>
         </div>
       </div>
@@ -71,7 +72,20 @@
         class="capture-loading"
       >
         <div class="loading-spinner" />
-        <span>Capturing...</span>
+        <span>{{ $t('screen_capture_capturing') }}</span>
+      </div>
+    </div>
+
+    <!-- Instructions when no selection -->
+    <div v-if="!hasSelection && !isCapturing" class="instruction-overlay">
+      <div class="instruction-content">
+        <div class="instruction-title">{{ $t('screen_capture_select_area') }}</div>
+        <div class="instruction-subtitle">{{ $t('screen_capture_drag_to_select') }}</div>
+        <div class="instruction-shortcuts">
+          <div class="shortcut-item">
+            <kbd>ESC</kbd> {{ $t('screen_capture_press_escape') }}
+          </div>
+        </div>
       </div>
     </div>
     
@@ -82,7 +96,7 @@
     >
       <div class="error-content">
         <span class="error-icon">⚠️</span>
-        <span class="error-text">{{ error }}</span>
+        <span class="error-text">{{ $t('screen_capture_error') }}: {{ error }}</span>
         <button
           class="error-close"
           @click="clearError"
@@ -107,6 +121,10 @@ import { useScreenCapture } from '@/features/screen-capture/composables/useScree
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+
+// Icons
+import CaptureIcon from '@/icons/ui/capture.svg'
+import FullscreenIcon from '@/icons/ui/whole-page.png'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
 

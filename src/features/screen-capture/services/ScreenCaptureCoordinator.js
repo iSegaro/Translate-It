@@ -19,28 +19,35 @@ export class ScreenCaptureCoordinator {
 
   /**
    * Handle the OCR result by routing it to the configured target.
-   * @param {Object} data - The OCR result data.
-   * @param {string} data.text - Extracted text.
-   * @param {Object} data.coordinates - Viewport coordinates of captured area.
+   * @param {Object} data - The OCR result data
+   * @param {string} data.text - Extracted text
+   * @param {string} data.imageData - Base64 image data (optional)
+   * @param {Object} data.coordinates - Captured area coordinates (device pixels)
+   * @param {string} data.captureType - 'area' | 'fullscreen'
+   * @param {number} data.timestamp - Unix timestamp
    */
   async handleResult(data) {
-    const { text, coordinates } = data;
+    const { text, coordinates, captureType = 'area' } = data;
     
-    if (!text) {
+    if (!text || text.trim().length === 0) {
       logger.warn('No text extracted, skipping dispatch');
       return;
     }
 
-    logger.info(`Routing OCR result to: ${this.target}`, { textLength: text.length });
+    logger.info(`Routing OCR result to: ${this.target}`, { 
+      textLength: text.length,
+      captureType,
+      hasCoordinates: !!coordinates
+    });
 
     try {
       switch (this.target) {
         case 'window':
-          await this.dispatchToWindowsManager(text, coordinates);
+          await this.dispatchToWindowsManager(text, coordinates, captureType);
           break;
         default:
           logger.warn(`Unknown routing target: ${this.target}, falling back to window`);
-          await this.dispatchToWindowsManager(text, coordinates);
+          await this.dispatchToWindowsManager(text, coordinates, captureType);
       }
     } catch (error) {
       logger.error(`Failed to route OCR result to ${this.target}:`, error);
@@ -50,41 +57,54 @@ export class ScreenCaptureCoordinator {
   /**
    * Dispatch text to WindowsManager for translation display.
    * Uses decoupled event-based communication via PageEventBus.
+   * @param {string} text - Extracted text
+   * @param {Object} coordinates - Captured area coordinates (device pixels)
+   * @param {string} captureType - Type of capture ('area' | 'fullscreen')
    */
-  async dispatchToWindowsManager(text, coordinates) {
+  async dispatchToWindowsManager(text, coordinates, captureType) {
     // 1. Ensure WindowsManager feature is loaded
     try {
       const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
       await loadFeature('windowsManager', true);
     } catch (e) {
       logger.error('Failed to load windowsManager feature', e);
+      return;
     }
 
-    // 2. Calculate anchor position (bottom-center of captured area)
+    // 2. Convert device pixels to CSS pixels for position calculation
     const dpr = window.devicePixelRatio || 1;
+    
+    // Default to center if no coordinates
     const cssCoords = {
-      x: coordinates ? coordinates.x / dpr : window.innerWidth / 2,
-      y: coordinates ? coordinates.y / dpr : window.innerHeight / 2,
-      width: coordinates ? coordinates.width / dpr : 0,
-      height: coordinates ? coordinates.height / dpr : 0
+      x: coordinates ? coordinates.x / dpr : (window.innerWidth / 2) - 100,
+      y: coordinates ? coordinates.y / dpr : (window.innerHeight / 2) - 50,
+      width: coordinates ? coordinates.width / dpr : 200,
+      height: coordinates ? coordinates.height / dpr : 100
     };
 
+    // 3. Calculate anchor position (bottom-center of captured area)
     const position = {
       x: cssCoords.x + (cssCoords.width / 2),
-      y: cssCoords.y + cssCoords.height + 10,
-      _isViewportRelative: true // CRITICAL: Position is relative to viewport
+      y: cssCoords.y + cssCoords.height + 10, // 10px padding below
+      _isViewportRelative: true, // CRITICAL: Position is relative to viewport
+      _sourceCoordinates: coordinates, // Keep original coordinates for reference
+      _coordinateSpace: 'device-pixel',
+      _captureType: captureType
     };
 
     logger.debug('Dispatching GLOBAL_SELECTION_TRIGGER with options', { position });
 
-    // 3. Trigger via Event Bus (Decoupled Architecture)
+    // 4. Trigger via Event Bus (Decoupled Architecture)
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, {
       text,
       position,
       options: {
         immediate: true,               // Bypass icon/ctrl settings
         mode: TranslationMode.ScreenCapture, // Use specialized OCR prompts
-        _isViewportRelative: true      // Fix positioning
+        _isViewportRelative: true,      // Fix positioning
+        _sourceCaptureType: captureType,
+        _sourceCoordinates: coordinates,
+        _coordinateSpace: 'device-pixel'
       }
     });
   }

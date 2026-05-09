@@ -2200,5 +2200,35 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+  },
+  "screen_capture_label": {
+    "message": "ضبط"
+  },
+  "screen_capture_full_screen": {
+    "message": "صفحه کامل"
+  },
+  "screen_capture_cancel": {
+    "message": "لغو"
+  },
+  "screen_capture_capturing": {
+    "message": "در حال ضبط..."
+  },
+  "screen_capture_select_area": {
+    "message": "ناحیه‌ای را برای ضبط انتخاب کنید"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "کلیک و درگ کنید تا ناحیه را انتخاب کنید"
+  },
+  "screen_capture_press_escape": {
+    "message": "برای لغو ESC را بزنید"
+  },
+  "screen_capture_press_enter": {
+    "message": "برای تأیید ENTER را بزنید"
+  },
+  "screen_capture_error": {
+    "message": "ضبط ناموفق بود"
+  },
+  "screen_capture_retry": {
+    "message": "تلاش مجدد"
   }
 }

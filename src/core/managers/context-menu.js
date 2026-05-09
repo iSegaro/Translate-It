@@ -743,20 +743,20 @@ export class ContextMenuManager extends ResourceTracker {
             const backgroundService = globalThis.backgroundService;
             if (backgroundService && backgroundService.messageHandler) {
               // Try both possible action names for compatibility
-              const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.START_AREA_CAPTURE) 
-                           || backgroundService.messageHandler.getHandlerForMessage('startAreaCapture');
+              const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.START_SCREEN_CAPTURE) 
+                           || backgroundService.messageHandler.getHandlerForMessage('startScreenCapture');
               
               if (handler) {
-                logger.debug("Directly calling startAreaCapture handler from context menu");
+                logger.debug("Directly calling startScreenCapture handler from context menu");
                 // Handlers expect (message, sender, sendResponse)
                 await handler({
-                  action: MessageActions.START_AREA_CAPTURE,
+                  action: MessageActions.START_SCREEN_CAPTURE,
                   data: { tabId: targetTab.id, source: "context-menu" }
                 }, { tab: targetTab }, (response) => {
                   logger.debug("Direct handler response:", response);
                 });
               } else {
-                logger.error("Start area capture handler not found in background service");
+                logger.error("Start screen capture handler not found in background service");
               }
             } else {
               logger.error("Background service or message handler not available");

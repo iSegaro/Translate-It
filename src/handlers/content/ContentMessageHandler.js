@@ -190,8 +190,7 @@ export class ContentMessageHandler extends ResourceTracker {
     
     // Screen capture handlers
     this.registerHandler(MessageActions.START_SCREEN_CAPTURE, this.handleStartScreenCapture.bind(this));
-    this.registerHandler(MessageActions.CAPTURE_SCREEN_AREA, this.handleCaptureScreenArea.bind(this));
-    this.registerHandler(MessageActions.SCREEN_CAPTURE_OCR_RESULT, this.handleShowCapturePreview.bind(this));
+    this.registerHandler(MessageActions.SCREEN_CAPTURE_OCR_RESULT, this.handleScreenCaptureResult.bind(this));
     
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
@@ -384,21 +383,11 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
-  async handleCaptureScreenArea(message) {
-    this.logger.info("ContentMessageHandler: CAPTURE_SCREEN_AREA received!");
-    
-    if (this.screenCaptureManager) {
-      return await this.screenCaptureManager.handleCaptureScreenArea(message);
-    }
-    
-    return { success: false, error: 'ScreenCaptureManager not available' };
-  }
-
-  async handleShowCapturePreview(message) {
+  async handleScreenCaptureResult(message) {
     this.logger.info("ContentMessageHandler: SCREEN_CAPTURE_OCR_RESULT received!");
 
     try {
-      // Lazy load the coordinator to keep ContentMessageHandler light
+      // Lazy load the coordinator
       const { screenCaptureCoordinator } = await import('@/features/screen-capture/services/ScreenCaptureCoordinator.js');
       await screenCaptureCoordinator.handleResult(message.data);
     } catch (error) {

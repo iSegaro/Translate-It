@@ -67,6 +67,7 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       imageData,
       coordinates,
       timestamp: Date.now(),
+      captureType: coordinates ? 'area' : 'fullscreen'
     };
 
     // Send the OCR result message to the tab that requested it (non-blocking)

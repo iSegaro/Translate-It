@@ -122,6 +122,20 @@ class OCRCache {
       request.onerror = () => reject(request.error);
     });
   }
+
+  /**
+   * Check if a language model is in cache
+   * @param {string} lang Language code
+   * @returns {Promise<boolean>}
+   */
+  async hasModel(lang) {
+    try {
+      const model = await this.getModel(lang);
+      return model !== null;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export const ocrCache = new OCRCache();

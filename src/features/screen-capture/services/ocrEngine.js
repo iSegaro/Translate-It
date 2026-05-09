@@ -30,7 +30,8 @@ async function initWorker(lang) {
   // Use absolute URLs for all assets
   const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
   const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
-  const langPath = 'https://tessdata.projectnaptha.com/4.0.0';
+  // Use the fast models which are smaller and better for extensions
+  const langPath = 'https://tessdata.projectnaptha.com/4.0.0_fast';
 
   logger.debug(`Initializing worker for ${lang}`, {
     workerPath,
@@ -39,10 +40,18 @@ async function initWorker(lang) {
   });
 
   try {
+    // Check if model is in our manual cache
+    const isCached = await ocrCache.getModel(lang);
+    if (!isCached) {
+      logger.debug(`Model for ${lang} not found in ocrCache, Tesseract will download it.`);
+    } else {
+      logger.debug(`Model for ${lang} found in ocrCache.`);
+    }
+
     // Import Tesseract module
     const { createWorker } = await import('tesseract.js');
     
-    // Following EdgeTranslate pattern: (lang, oem, options)
+    // Following project standards: (lang, oem, options)
     // workerBlobURL: false is critical for extensions to avoid blob: CSP issues
     worker = await createWorker(lang, 1, {
       workerPath: workerPath,
@@ -78,10 +87,10 @@ export async function recognize(image, lang = 'eng', coordinates = null) {
     const options = {};
     if (coordinates) {
       options.rectangle = {
-        top: coordinates.y,
-        left: coordinates.x,
-        width: coordinates.width,
-        height: coordinates.height
+        top: Math.round(coordinates.y),
+        left: Math.round(coordinates.x),
+        width: Math.round(coordinates.width),
+        height: Math.round(coordinates.height)
       };
     }
 
@@ -107,7 +116,9 @@ export async function terminateIfIdle() {
 }
 
 // Set up periodic idle check
-idleInterval = setInterval(terminateIfIdle, 60000); // Check every minute
+if (!idleInterval) {
+  idleInterval = setInterval(terminateIfIdle, 60000); // Check every minute
+}
 
 /**
  * Cleanup OCR engine resources
@@ -140,3 +151,4 @@ export async function cleanupOCREngine() {
 
   logger.debug('OCR engine cleanup completed');
 }
+
