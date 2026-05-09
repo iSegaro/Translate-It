@@ -92,8 +92,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'close', 'open'])
 
-// Resource tracker for automatic cleanup
-const tracker = useResourceTracker('base-modal')
+// Resource tracker for automatic cleanup - Use a unique ID per instance to avoid cleanup collisions
+const tracker = useResourceTracker(`base-modal-${Math.random().toString(36).substr(2, 9)}`)
 
 const handleClose = () => {
   emit('update:modelValue', false)
