@@ -26,7 +26,7 @@
     </div>
 
     <!-- Toolbar -->
-    <div class="capture-toolbar visible">
+    <div class="capture-toolbar visible" @mousedown.stop>
       <div class="toolbar-content">
         <!-- Capture options -->
         <div class="capture-options">
@@ -87,6 +87,7 @@
     <div
       v-if="error"
       class="error-panel"
+      @mousedown.stop
     >
       <div class="error-content">
         <img :src="WarningIcon" class="error-icon" alt="Warning" />
