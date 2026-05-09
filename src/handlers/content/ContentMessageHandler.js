@@ -367,7 +367,7 @@ export class ContentMessageHandler extends ResourceTracker {
     try {
       if (!this.screenCaptureManager) {
         const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
-        const screenCaptureHandler = await loadFeature('screenCapture', true);
+        const screenCaptureHandler = await loadFeature('screenCapture');
         if (screenCaptureHandler) {
           this.setScreenCaptureManager(screenCaptureHandler);
         } else {

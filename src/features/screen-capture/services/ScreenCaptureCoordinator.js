@@ -65,7 +65,7 @@ export class ScreenCaptureCoordinator {
     // 1. Ensure WindowsManager feature is loaded
     try {
       const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
-      await loadFeature('windowsManager', true);
+      await loadFeature('windowsManager');
     } catch (e) {
       logger.error('Failed to load windowsManager feature', e);
       return;
