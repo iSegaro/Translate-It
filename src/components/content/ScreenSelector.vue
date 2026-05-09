@@ -1,7 +1,7 @@
 <template>
   <div 
     class="screen-selector-overlay" 
-    :class="{ selecting: isSelecting, capturing: isCapturing }"
+    :class="{ selecting: isSelecting, capturing: isCapturing, hidden: isHidingForCapture }"
     @mousedown="startSelection"
     @touchstart="handleTouchStart"
   >
@@ -26,7 +26,11 @@
     </div>
 
     <!-- Toolbar -->
-    <div class="capture-toolbar visible" @mousedown.stop>
+    <div 
+      class="capture-toolbar" 
+      :class="{ visible: (isCapturing || !isSelecting) && !isHidingForCapture }"
+      @mousedown.stop
+    >
       <div class="toolbar-content">
         <!-- Capture options -->
         <div class="capture-options">
@@ -166,9 +170,36 @@ const {
 } = useScreenCapture()
 
 // Additional state
+const isHidingForCapture = ref(false)
 const showCrosshair = ref(false)
 const cursorX = ref(0)
 const cursorY = ref(0)
+
+/**
+ * Execute a capture action while temporarily hiding the UI
+ * @param {Function} captureFn The capture function to execute
+ */
+const runCaptureAction = async (captureFn) => {
+  isHidingForCapture.value = true
+  
+  // Wait for two frames to ensure the UI is fully hidden by the browser before capturing
+  await new Promise(resolve => requestAnimationFrame(() => {
+    requestAnimationFrame(resolve)
+  }))
+
+  try {
+    const result = await captureFn()
+    logger.debug('Action captured successfully')
+    emit('select', result)
+    props.onSelect(result)
+  } catch (err) {
+    logger.error('Capture action failed:', err)
+    emit('error', err)
+    props.onError(err)
+  } finally {
+    isHidingForCapture.value = false
+  }
+}
 
 // Methods
 const confirmSelection = async () => {
@@ -178,16 +209,7 @@ const confirmSelection = async () => {
     return
   }
 
-  try {
-    const result = await captureSelection()
-    logger.debug('Selection captured successfully')
-    emit('select', result)
-    props.onSelect(result)
-  } catch (err) {
-    logger.error('Selection capture failed:', err)
-    emit('error', err)
-    props.onError(err)
-  }
+  await runCaptureAction(captureSelection)
 }
 
 // Watch for selection completion to auto-capture or cancel on click
@@ -211,16 +233,7 @@ const captureFullScreen = async () => {
     return
   }
 
-  try {
-    const result = await captureFullScreenArea()
-    logger.debug('Full screen captured successfully')
-    emit('select', result)
-    props.onSelect(result)
-  } catch (err) {
-    logger.error('Full screen capture failed:', err)
-    emit('error', err)
-    props.onError(err)
-  }
+  await runCaptureAction(captureFullScreenArea)
 }
 
 const resetSelection = () => {
