@@ -193,7 +193,7 @@ export class CaptureManager extends ResourceTracker {
       // Send preview data to content script
       try {
         await browser.tabs.sendMessage(activeTab.id, {
-          action: MessageActions.SHOW_CAPTURE_PREVIEW,
+          action: MessageActions.SCREEN_CAPTURE_OCR_RESULT,
           data: {
             captureData,
             captureType,
@@ -341,20 +341,8 @@ export class CaptureManager extends ResourceTracker {
         textLength: extractionResult.translatedText?.length || 0,
       });
 
-      // Display translation result
-  logger.info('About to display result:', {
-        translatedText: extractionResult.translatedText,
-        translatedTextType: typeof extractionResult.translatedText,
-        translatedTextStringified: JSON.stringify(
-          extractionResult.translatedText,
-        ),
-      });
-
-      await this._displayTranslationResult(
-        extractionResult.translatedText,
-        captureData,
-        extractionResult,
-      );
+      // Note: Result display is now handled via SCREEN_CAPTURE_OCR_RESULT message
+      // This method completes translation, result is routed by the caller
     } catch (error) {
   logger.error('Error translating image:', error);
       throw this._normalizeError(error, "translateCapturedImage");
@@ -362,74 +350,7 @@ export class CaptureManager extends ResourceTracker {
   }
 
   /**
-   * Display translation result in content script
-   * @param {string} translationResult - Translated text
-   * @param {Object} captureData - Original capture data
-   * @param {Object} _extractionMetadata - Text extraction metadata
-   * @private
-   */
-  async _displayTranslationResult(
-    translationResult,
-    captureData
-  ) {
-    try {
-  logger.info('Requesting result display in content script');
-
-      // Use the tab ID from capture data instead of querying for active tab
-      // This ensures we send result to the correct tab even if focus has changed
-      let targetTabId =
-        captureData.tabId || (this.currentCapture && this.currentCapture.tabId);
-
-      if (!targetTabId) {
-  logger.debug('No tab ID found in capture data, trying active tab fallback');
-        // Fallback to active tab query
-        const [activeTab] = await browser.tabs.query({
-          active: true,
-          currentWindow: true,
-        });
-        if (!activeTab) {
-          throw this._createError(
-            ErrorTypes.TAB_AVAILABILITY,
-            "No active tab found for result display",
-          );
-        }
-        targetTabId = activeTab.id;
-      }
-
-  logger.info('Using tab ID for result display:', targetTabId);
-
-      // Send result data to content script
-      try {
-        await browser.tabs.sendMessage(targetTabId, {
-          action: MessageActions.SHOW_CAPTURE_RESULT,
-          data: {
-            originalCapture: captureData,
-            translationText: translationResult,
-            position: captureData.position || { x: 100, y: 100 },
-          },
-        });
-      } catch (sendError) {
-        // Use centralized context error detection
-        if (ExtensionContextManager.isContextError(sendError)) {
-          ExtensionContextManager.handleContextError(sendError, 'capture-manager');
-        } else {
-          logger.warn(`Could not send result to tab ${targetTabId}:`, sendError);
-        }
-        throw this._createError(
-          ErrorTypes.TAB_AVAILABILITY,
-          "Content script not available on this tab",
-        );
-      }
-
-  logger.info('Result display request sent to content script');
-    } catch (error) {
-  logger.error('Error requesting result display:', error);
-      throw this._normalizeError(error, "displayTranslationResult");
-    }
-  }
-
-  /**
-   * Handle translation result close from content script
+   * Handle translation result close from content script (legacy - no longer used)
    */
   handleResultClose() {
   logger.info('Translation result closed');

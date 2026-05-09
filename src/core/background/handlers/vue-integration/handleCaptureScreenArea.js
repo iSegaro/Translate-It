@@ -69,12 +69,12 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       timestamp: Date.now(),
     };
 
-    // Send the preview message to the tab that requested it (non-blocking)
+    // Send the OCR result message to the tab that requested it (non-blocking)
     browser.tabs.sendMessage(sender.tab.id, {
-      action: MessageActions.SHOW_CAPTURE_PREVIEW,
+      action: MessageActions.SCREEN_CAPTURE_OCR_RESULT,
       data: resultData
     }).catch(msgError => {
-      logger.error("Failed to send SHOW_CAPTURE_PREVIEW:", msgError);
+      logger.error("Failed to send SCREEN_CAPTURE_OCR_RESULT:", msgError);
     });
 
     // 6. Return the extracted text (immediate response to sender)

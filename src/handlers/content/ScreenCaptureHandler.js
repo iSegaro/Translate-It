@@ -64,8 +64,8 @@ export class ScreenCaptureHandler {
    */
   async handleCaptureScreenArea(message) {
     logger.info('CAPTURE_SCREEN_AREA received', message.data);
-    
-    // Results are now handled via SHOW_CAPTURE_PREVIEW message and Coordinator
+
+    // Results are now handled via SCREEN_CAPTURE_OCR_RESULT message and Coordinator
     return { success: true };
   }
 }
