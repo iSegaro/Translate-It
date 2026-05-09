@@ -74,21 +74,15 @@
         <div class="loading-spinner" />
         <span>{{ $t('screen_capture_capturing') }}</span>
       </div>
-    </div>
 
-    <!-- Instructions when no selection -->
-    <div v-if="!hasSelection && !isCapturing" class="instruction-overlay">
-      <div class="instruction-content">
-        <div class="instruction-title">{{ $t('screen_capture_select_area') }}</div>
-        <div class="instruction-subtitle">{{ $t('screen_capture_drag_to_select') }}</div>
-        <div class="instruction-shortcuts">
-          <div class="shortcut-item">
-            <kbd>ESC</kbd> {{ $t('screen_capture_press_escape') }}
-          </div>
-        </div>
+      <!-- Minimal Toolbar Hint -->
+      <div v-if="!isCapturing" class="toolbar-hint">
+        <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
+        <span v-if="!hasSelection" class="hint-separator">•</span>
+        <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
       </div>
     </div>
-    
+
     <!-- Error message -->
     <div
       v-if="error"
@@ -263,11 +257,6 @@ const handleKeyDown = (event) => {
   switch (event.key) {
     case 'Escape':
       cancel()
-      break
-    case 'Enter':
-      if (hasSelection.value) {
-        confirmSelection()
-      }
       break
     case 'r':
     case 'R':

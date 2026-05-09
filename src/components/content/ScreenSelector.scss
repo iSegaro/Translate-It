@@ -195,64 +195,45 @@
   object-fit: contain;
 }
 
-/* Instruction Overlay */
-.instruction-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(4px);
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  text-align: center;
-  max-width: 320px;
-  pointer-events: none;
-  animation: fadeIn 0.4s ease;
-}
-
-.instruction-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.instruction-subtitle {
-  font-size: 14px;
+/* Toolbar Hint */
+.toolbar-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
   color: #666;
-  margin-bottom: 16px;
+  animation: fadeIn 0.3s ease;
 }
 
-.instruction-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
+.hint-separator {
+  color: #ddd;
 }
 
-.shortcut-item {
-  font-size: 12px;
-  color: #888;
+.hint-shortcut {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 
   kbd {
-    background: #f5f5f5;
+    background: #f0f0f0;
     border: 1px solid #ddd;
     border-radius: 3px;
-    padding: 2px 6px;
+    padding: 1px 4px;
     font-family: monospace;
-    font-size: 11px;
-    color: #333;
+    font-weight: 600;
+    color: #444;
+    font-size: 10px;
+    line-height: 1;
   }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translate(-50%, -40%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .capture-btn {
@@ -477,4 +458,15 @@
     background: #4a4a4a;
     border-color: #666;
   }
-}
+
+  .toolbar-hint {
+    border-top-color: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+  }
+
+  .hint-shortcut kbd {
+    background: #444;
+    border-color: #555;
+    color: #eee;
+  }
+  }
