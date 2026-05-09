@@ -54,16 +54,6 @@
         <!-- Action buttons -->
         <div class="action-buttons">
           <button 
-            class="toolbar-btn reset-btn"
-            :disabled="isCapturing"
-            title="Reset selection"
-            @click="resetSelection"
-          >
-            <span class="btn-icon">🔄</span>
-            <span class="btn-text">Reset</span>
-          </button>
-          
-          <button 
             class="toolbar-btn cancel-btn"
             :disabled="isCapturing"
             title="Cancel capture"
@@ -112,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useScreenCapture } from '@/features/screen-capture/composables/useScreenCapture.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -184,6 +174,20 @@ const confirmSelection = async () => {
     props.onError(err)
   }
 }
+
+// Watch for selection completion to auto-capture or cancel on click
+watch(isSelecting, (newValue, oldValue) => {
+  // When mouse is released (isSelecting goes from true to false)
+  if (oldValue === true && newValue === false) {
+    if (hasSelection.value) {
+      logger.info('Auto-capturing after selection completion');
+      confirmSelection();
+    } else {
+      logger.info('No selection made (simple click), cancelling capture');
+      cancel();
+    }
+  }
+});
 
 const captureFullScreen = async () => {
   logger.debug('Capture Full Screen clicked!')
