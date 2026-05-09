@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia';
 import { ocrCache } from '../utils/ocrCache.js';
+import { toTesseractLanguageCode, OCR_LANGUAGE_MAP } from '../utils/ocrLanguageMap.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCRStore');
 
 export const useOCRStore = defineStore('ocr', {
   state: () => ({
@@ -7,30 +12,6 @@ export const useOCRStore = defineStore('ocr', {
     isDownloading: false,
     downloadProgress: 0,
     currentDownloadingLang: null,
-    // Mapping of extension language codes to Tesseract language codes
-    // Key: extension code, Value: Tesseract code
-    langMapping: {
-      'en': 'eng',
-      'fa': 'fas',
-      'fr': 'fra',
-      'de': 'deu',
-      'es': 'spa',
-      'it': 'ita',
-      'pt': 'por',
-      'ru': 'rus',
-      'zh-cn': 'chi_sim',
-      'zh-tw': 'chi_tra',
-      'ja': 'jpn',
-      'ko': 'kor',
-      'ar': 'ara',
-      'hi': 'hin',
-      'tr': 'tur',
-      'nl': 'nld',
-      'pl': 'pol',
-      'vi': 'vie',
-      'id': 'ind',
-      'th': 'tha',
-    },
     // Settings
     autoDownload: true,
     defaultOCRLang: 'eng',
@@ -38,11 +19,11 @@ export const useOCRStore = defineStore('ocr', {
 
   getters: {
     isDownloaded: (state) => (lang) => {
-      const tesseractCode = state.langMapping[lang] || lang;
+      const tesseractCode = toTesseractLanguageCode(lang);
       return state.downloadedLanguages.includes(tesseractCode);
     },
-    supportedLanguages: (state) => {
-      return Object.keys(state.langMapping);
+    supportedLanguages: () => {
+      return Object.keys(OCR_LANGUAGE_MAP);
     }
   },
 
@@ -56,8 +37,8 @@ export const useOCRStore = defineStore('ocr', {
     },
 
     async downloadLanguage(langCode) {
-      const tesseractCode = this.langMapping[langCode] || langCode;
-      
+      const tesseractCode = toTesseractLanguageCode(langCode);
+
       if (this.downloadedLanguages.includes(tesseractCode)) {
         return;
       }
@@ -70,7 +51,7 @@ export const useOCRStore = defineStore('ocr', {
         // Tesseract.js language data URL (using the fast/lightweight models)
         // We use the same URL format as Tesseract.js uses internally
         const url = `https://tessdata.projectnaptha.com/4.0.0_fast/${tesseractCode}.traineddata.gz`;
-        
+
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to download ${tesseractCode}`);
 
@@ -84,10 +65,10 @@ export const useOCRStore = defineStore('ocr', {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           chunks.push(value);
           loaded += value.length;
-          
+
           if (total > 0) {
             this.downloadProgress = Math.round((loaded / total) * 100);
           }
@@ -99,7 +80,7 @@ export const useOCRStore = defineStore('ocr', {
         await ocrCache.saveModel(tesseractCode, arrayBuffer);
         await this.refreshDownloadedLanguages();
       } catch (error) {
-        console.error(`OCRStore: Error downloading ${tesseractCode}`, error);
+        logger.error(`Error downloading ${tesseractCode}`, error);
         throw error;
       } finally {
         this.isDownloading = false;
@@ -109,7 +90,7 @@ export const useOCRStore = defineStore('ocr', {
     },
 
     async deleteLanguage(langCode) {
-      const tesseractCode = this.langMapping[langCode] || langCode;
+      const tesseractCode = toTesseractLanguageCode(langCode);
       await ocrCache.deleteModel(tesseractCode);
       await this.refreshDownloadedLanguages();
     },

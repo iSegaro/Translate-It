@@ -193,7 +193,7 @@ const isSelectElementEnabled = computed(() => {
 })
 
 const isScreenCaptureEnabled = computed(() => {
-  return isExtensionEnabledGlobal.value && (settingsStore.settings?.SCREEN_CAPTURE_ENABLED ?? true)
+  return isExtensionEnabledGlobal.value && (settingsStore.settings?.ENABLE_SCREEN_CAPTURE ?? true)
 })
 
 const isWholePageEnabled = computed(() => {

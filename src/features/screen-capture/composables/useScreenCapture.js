@@ -17,6 +17,16 @@ export function useScreenCapture() {
   const capturedImage = ref(null);
   const error = ref(null);
 
+  // Store original style values for restoration
+  const originalStyles = ref({
+    bodyOverflow: '',
+    bodyUserSelect: '',
+    htmlOverflow: ''
+  });
+
+  // Track event listeners for cleanup
+  const activeListeners = ref(new Map());
+
   // Computed
   const hasSelection = computed(() => {
     return selectionRect.value.width > 10 && selectionRect.value.height > 10;
@@ -42,18 +52,30 @@ export function useScreenCapture() {
   });
 
   // Methods
-  // Methods
   const toggleScroll = (lock) => {
     if (lock) {
+      // Save original values
+      originalStyles.value.bodyOverflow = document.body.style.overflow || '';
+      originalStyles.value.htmlOverflow = document.documentElement.style.overflow || '';
+
       document.body.style.overflow = "hidden";
       document.documentElement.style.overflow = "hidden";
+
+      // Track listeners for cleanup
       window.addEventListener("wheel", preventScroll, { passive: false });
       window.addEventListener("touchmove", preventScroll, { passive: false });
+      activeListeners.value.set('wheel-preventScroll', { target: window, event: 'wheel', handler: preventScroll });
+      activeListeners.value.set('touchmove-preventScroll', { target: window, event: 'touchmove', handler: preventScroll });
     } else {
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
+      // Restore original values
+      document.body.style.overflow = originalStyles.value.bodyOverflow;
+      document.documentElement.style.overflow = originalStyles.value.htmlOverflow;
+
+      // Clean up tracked listeners
       window.removeEventListener("wheel", preventScroll);
       window.removeEventListener("touchmove", preventScroll);
+      activeListeners.value.delete('wheel-preventScroll');
+      activeListeners.value.delete('touchmove-preventScroll');
     }
   };
 
@@ -74,9 +96,14 @@ export function useScreenCapture() {
 
     error.value = null;
 
-    // Add event listeners for mouse move and up
+    // Save original userSelect value
+    originalStyles.value.bodyUserSelect = document.body.style.userSelect || '';
+
+    // Add event listeners for mouse move and up (track them for cleanup)
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
+    activeListeners.value.set('mousemove', { target: document, event: 'mousemove', handler: handleMouseMove });
+    activeListeners.value.set('mouseup', { target: document, event: 'mouseup', handler: handleMouseUp });
 
     // Prevent text selection and lock scroll during capture
     document.body.style.userSelect = "none";
@@ -97,12 +124,21 @@ export function useScreenCapture() {
   const handleMouseUp = () => {
     if (!isSelecting.value) return;
 
-    // Remove event listeners
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    // Remove event listeners using tracked references
+    const mouseMoveListener = activeListeners.value.get('mousemove');
+    const mouseUpListener = activeListeners.value.get('mouseup');
+
+    if (mouseMoveListener) {
+      document.removeEventListener(mouseMoveListener.event, mouseMoveListener.handler);
+      activeListeners.value.delete('mousemove');
+    }
+    if (mouseUpListener) {
+      document.removeEventListener(mouseUpListener.event, mouseUpListener.handler);
+      activeListeners.value.delete('mouseup');
+    }
 
     // Restore text selection (but keep scroll locked until capture finished or cancelled)
-    document.body.style.userSelect = "";
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
 
     isSelecting.value = false;
   };
@@ -173,12 +209,14 @@ export function useScreenCapture() {
   };
 
   const cancelSelection = () => {
-    // Remove event listeners if active
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    // Remove all tracked event listeners
+    activeListeners.value.forEach((listener, key) => {
+      listener.target.removeEventListener(listener.event, listener.handler);
+    });
+    activeListeners.value.clear();
 
     // Restore text selection and unlock scroll
-    document.body.style.userSelect = "";
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
     toggleScroll(false);
 
     resetSelection();
@@ -208,9 +246,11 @@ export function useScreenCapture() {
 
     error.value = null;
 
-    // Add touch event listeners
+    // Add touch event listeners (track them for cleanup)
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd);
+    activeListeners.value.set('touchmove', { target: document, event: 'touchmove', handler: handleTouchMove });
+    activeListeners.value.set('touchend', { target: document, event: 'touchend', handler: handleTouchEnd });
 
     event.preventDefault();
   };
@@ -228,9 +268,18 @@ export function useScreenCapture() {
   const handleTouchEnd = () => {
     if (!isSelecting.value) return;
 
-    // Remove touch event listeners
-    document.removeEventListener("touchmove", handleTouchMove);
-    document.removeEventListener("touchend", handleTouchEnd);
+    // Remove touch event listeners using tracked references
+    const touchMoveListener = activeListeners.value.get('touchmove');
+    const touchEndListener = activeListeners.value.get('touchend');
+
+    if (touchMoveListener) {
+      document.removeEventListener(touchMoveListener.event, touchMoveListener.handler);
+      activeListeners.value.delete('touchmove');
+    }
+    if (touchEndListener) {
+      document.removeEventListener(touchEndListener.event, touchEndListener.handler);
+      activeListeners.value.delete('touchend');
+    }
 
     isSelecting.value = false;
   };
@@ -300,11 +349,29 @@ export function useScreenCapture() {
   // Lifecycle management
   onMounted(() => {
     document.addEventListener("keydown", handleKeyDown);
+    activeListeners.value.set('keydown', { target: document, event: 'keydown', handler: handleKeyDown });
   });
 
   onUnmounted(() => {
     cancelSelection();
-    document.removeEventListener("keydown", handleKeyDown);
+
+    // Clean up keydown listener
+    const keydownListener = activeListeners.value.get('keydown');
+    if (keydownListener) {
+      document.removeEventListener(keydownListener.event, keydownListener.handler);
+      activeListeners.value.delete('keydown');
+    }
+
+    // Ensure all remaining listeners are cleaned up
+    activeListeners.value.forEach((listener, key) => {
+      listener.target.removeEventListener(listener.event, listener.handler);
+    });
+    activeListeners.value.clear();
+
+    // Ensure all styles are restored
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
+    document.body.style.overflow = originalStyles.value.bodyOverflow;
+    document.documentElement.style.overflow = originalStyles.value.htmlOverflow;
   });
 
   return {

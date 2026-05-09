@@ -5,8 +5,11 @@ import browser from "webextension-polyfill";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { captureManager } from '@/core/managers/browser-specific/capture/CaptureManager.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const errorHandler = new ErrorHandler();
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleStartScreenCapture');
 
 export async function handleStartScreenCapture(message, sender, sendResponse) {
   try {
@@ -44,6 +47,10 @@ export async function handleStartScreenCapture(message, sender, sendResponse) {
       context: "handleStartScreenCapture",
       messageData: message.data,
     });
-    throw error;
+    const errorResponse = { success: false, error: error.message };
+    if (sendResponse && typeof sendResponse === 'function') {
+      sendResponse(errorResponse);
+    }
+    return errorResponse;
   }
 }

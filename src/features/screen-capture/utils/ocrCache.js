@@ -2,6 +2,10 @@
  * IndexedDB wrapper for caching OCR language models (.traineddata)
  */
 
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCRCache');
 const DB_NAME = 'translate_it_ocr_cache';
 const STORE_NAME = 'language_models';
 const DB_VERSION = 1;
@@ -33,7 +37,7 @@ class OCRCache {
       };
 
       request.onerror = (event) => {
-        console.error('OCRCache: Error opening IndexedDB', event.target.error);
+        logger.error('Error opening IndexedDB', event.target.error);
         reject(event.target.error);
       };
     });

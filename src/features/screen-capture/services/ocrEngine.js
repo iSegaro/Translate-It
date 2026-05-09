@@ -1,10 +1,15 @@
 import browser from 'webextension-polyfill';
 import { ocrCache } from '../utils/ocrCache.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCREngine');
 
 let worker = null;
 let currentLang = null;
 let lastUsedTime = Date.now();
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+let idleInterval = null;
 
 /**
  * Initialize Tesseract Worker
@@ -17,7 +22,7 @@ async function initWorker(lang) {
   }
 
   if (worker) {
-    console.log("OCREngine: Terminating existing worker...");
+    logger.debug("Terminating existing worker");
     await worker.terminate();
     worker = null;
   }
@@ -25,9 +30,9 @@ async function initWorker(lang) {
   // Use absolute URLs for all assets
   const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
   const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
-  const langPath = 'https://tessdata.projectnaptha.com/4.0.0'; 
+  const langPath = 'https://tessdata.projectnaptha.com/4.0.0';
 
-  console.log(`OCREngine: Initializing worker for ${lang}...`, {
+  logger.debug(`Initializing worker for ${lang}`, {
     workerPath,
     corePath,
     langPath
@@ -43,14 +48,14 @@ async function initWorker(lang) {
       workerPath: workerPath,
       corePath: corePath,
       langPath: langPath,
-      workerBlobURL: false, 
-      logger: m => console.debug('Tesseract:', m),
+      workerBlobURL: false,
+      logger: m => logger.debug('Tesseract:', m),
     });
-    
-    console.log(`OCREngine: Worker initialized successfully for ${lang}`);
+
+    logger.debug(`Worker initialized successfully for ${lang}`);
     currentLang = lang;
   } catch (error) {
-    console.error(`OCREngine: Failed to initialize worker for ${lang}:`, error);
+    logger.error(`Failed to initialize worker for ${lang}:`, error);
     worker = null;
     throw error;
   }
@@ -84,7 +89,7 @@ export async function recognize(image, lang = 'eng', coordinates = null) {
     lastUsedTime = Date.now();
     return text;
   } catch (error) {
-    console.error('OCREngine: Recognition failed', error);
+    logger.error('Recognition failed', error);
     throw error;
   }
 }
@@ -94,7 +99,7 @@ export async function recognize(image, lang = 'eng', coordinates = null) {
  */
 export async function terminateIfIdle() {
   if (worker && (Date.now() - lastUsedTime > IDLE_TIMEOUT)) {
-    console.log('OCREngine: Terminating idle worker');
+    logger.debug('Terminating idle worker');
     await worker.terminate();
     worker = null;
     currentLang = null;
@@ -102,4 +107,36 @@ export async function terminateIfIdle() {
 }
 
 // Set up periodic idle check
-setInterval(terminateIfIdle, 60000); // Check every minute
+idleInterval = setInterval(terminateIfIdle, 60000); // Check every minute
+
+/**
+ * Cleanup OCR engine resources
+ * Call this when the feature is deactivated or extension is shutting down
+ */
+export async function cleanupOCREngine() {
+  logger.debug('Cleaning up OCR engine resources');
+
+  // Clear idle check interval
+  if (idleInterval) {
+    clearInterval(idleInterval);
+    idleInterval = null;
+    logger.debug('Cleared idle check interval');
+  }
+
+  // Terminate worker if active
+  if (worker) {
+    try {
+      await worker.terminate();
+      logger.debug('OCR worker terminated');
+    } catch (error) {
+      logger.warn('Error terminating OCR worker:', error);
+    }
+    worker = null;
+  }
+
+  // Reset state
+  currentLang = null;
+  lastUsedTime = Date.now();
+
+  logger.debug('OCR engine cleanup completed');
+}

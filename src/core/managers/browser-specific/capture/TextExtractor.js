@@ -7,6 +7,7 @@ import { unifiedTranslationService } from '@/core/services/translation/UnifiedTr
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'TextExtractor');
 
@@ -79,13 +80,8 @@ class TextExtractor {
    */
   async performOCR(imageData, sourceLang, coordinates = null) {
     try {
-      // Tesseract mapping
-      const langMapping = {
-        'en': 'eng', 'fa': 'fas', 'fr': 'fra', 'de': 'deu', 'es': 'spa',
-        'it': 'ita', 'pt': 'por', 'ru': 'rus', 'zh-cn': 'chi_sim',
-        'zh-tw': 'chi_tra', 'ja': 'jpn', 'ko': 'kor', 'ar': 'ara'
-      };
-      const tesseractLang = langMapping[sourceLang] || 'eng';
+      // Convert extension language code to Tesseract language code
+      const tesseractLang = toTesseractLanguageCode(sourceLang);
 
       // Send to offscreen for OCR
       const response = await browser.runtime.sendMessage({

@@ -938,14 +938,19 @@ async function handleOCRProcess(data, sendResponse) {
       console.log("[Offscreen] OCR engine module loaded");
     }
 
+    // Import language mapping utility
+    const { toTesseractLanguageCode } = await import('../features/screen-capture/utils/ocrLanguageMap.js');
+
     const { image, lang, coordinates } = data;
-    console.log("[Offscreen] Starting recognition...");
-    const text = await ocrEngine.recognize(image, lang, coordinates);
+    const tesseractLang = toTesseractLanguageCode(lang); // Convert to valid Tesseract language code
+
+    console.log("[Offscreen] Starting recognition with language:", tesseractLang);
+    const text = await ocrEngine.recognize(image, tesseractLang, coordinates);
     console.log("[Offscreen] Recognition successful, extracted text length:", text?.length);
     sendResponse({ success: true, text });
   } catch (error) {
     console.error("[Offscreen] OCR process failed. Full error object:", error);
-    
+
     // Extract as much info as possible
     let errorMessage = "Unknown OCR error";
     if (typeof error === 'string') {
@@ -953,9 +958,9 @@ async function handleOCRProcess(data, sendResponse) {
     } else if (error && typeof error === 'object') {
       errorMessage = error.message || error.statusText || JSON.stringify(error);
     }
-    
-    sendResponse({ 
-      success: false, 
+
+    sendResponse({
+      success: false,
       error: errorMessage,
       stack: error?.stack || new Error().stack
     });

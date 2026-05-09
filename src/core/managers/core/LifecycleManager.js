@@ -169,8 +169,6 @@ class LifecycleManager {
       [MessageActions.CAPTURE_FULL_SCREEN]: Handlers.handleStartFullScreenCaptureLazy,
       'requestFullScreenCapture': Handlers.handleRequestFullScreenCaptureLazy,
       [MessageActions.PROCESS_SCREEN_CAPTURE]: Handlers.handleProcessAreaCaptureImageLazy,
-      [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
-      [MessageActions.OCR_PROCESS]: Handlers.handleCaptureScreenAreaLazy,
       'captureError': Handlers.handleCaptureErrorLazy,
       'areaSelectionCancel': Handlers.handleAreaSelectionCancelLazy,
       
@@ -206,16 +204,14 @@ class LifecycleManager {
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
       'getProviderConfig': Handlers.handleGetProviderConfigLazy,
-      'startScreenCapture': Handlers.handleStartScreenCaptureLazy,
-      'captureScreenArea': Handlers.handleCaptureScreenAreaLazy,
+      [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
       'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
       'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
       'logError': Handlers.handleLogErrorLazy,
 
       // Vue Bridge handlers - Lazy loaded for better performance
       'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy
     };
     
     // Add browser-specific handlers

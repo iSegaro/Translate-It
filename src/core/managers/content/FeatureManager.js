@@ -103,7 +103,7 @@ export class FeatureManager extends ResourceTracker {
   async evaluateAndRegisterFeatures() {
     // Order matters: contentMessageHandler should be activated first
     // selectElement is managed directly by FeatureManager with its own Critical Protection
-    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation'];
+    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
 
     logger.debug('Evaluating features for registration:', features);
 
@@ -376,7 +376,8 @@ export class FeatureManager extends ResourceTracker {
         'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
         'SHOW_DESKTOP_FAB',
         'MOBILE_UI_MODE',
-        'EXCLUDED_SITES'
+        'EXCLUDED_SITES',
+        'ENABLE_SCREEN_CAPTURE'
       ];
       
       this.settingsListener = async (data) => {
@@ -449,7 +450,7 @@ export class FeatureManager extends ResourceTracker {
     try {
       // Order matters: contentMessageHandler should be evaluated first
       // selectElement is managed directly by FeatureManager with its own Critical Protection
-      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation'];
+      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
 
       logger.debug('Re-evaluating all features');
 

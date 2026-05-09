@@ -5,8 +5,12 @@ import browser from "webextension-polyfill";
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 import { getSourceLanguageAsync } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const errorHandler = new ErrorHandler();
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCaptureScreenArea');
 
 export async function handleCaptureScreenArea(message, sender, sendResponse) {
   const { coordinates } = message.data;
@@ -23,15 +27,7 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
     // 3. Get OCR language mapping
     // We'll use the current source language from settings
     const sourceLang = await getSourceLanguageAsync();
-    
-    // Tesseract mapping (from our store logic, simplified here)
-    // In a real app, we might want to get this from the ocrStore
-    const langMapping = {
-      'en': 'eng', 'fa': 'fas', 'fr': 'fra', 'de': 'deu', 'es': 'spa',
-      'it': 'ita', 'pt': 'por', 'ru': 'rus', 'zh-cn': 'chi_sim',
-      'zh-tw': 'chi_tra', 'ja': 'jpn', 'ko': 'kor', 'ar': 'ara'
-    };
-    const tesseractLang = langMapping[sourceLang] || 'eng';
+    const tesseractLang = toTesseractLanguageCode(sourceLang);
 
     // 4. Perform OCR
     let extractedText = '';
@@ -50,7 +46,7 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
 
       if (!ocrResponse || !ocrResponse.success) {
         const errorMsg = ocrResponse?.error || "OCR processing failed";
-        console.error("[handleCaptureScreenArea] OCR failed in offscreen:", errorMsg, ocrResponse?.stack);
+        logger.error("OCR failed in offscreen:", { error: errorMsg, stack: ocrResponse?.stack });
         throw new Error(errorMsg);
       }
       extractedText = ocrResponse.text;
@@ -60,7 +56,7 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
         const { recognize } = await import('@/features/screen-capture/services/ocrEngine.js');
         extractedText = await recognize(imageData, tesseractLang, coordinates);
       } catch (importError) {
-        console.error("Firefox OCR import failed:", importError);
+        logger.error("Firefox OCR import failed:", importError);
         throw new Error("OCR engine failed to load in Firefox background");
       }
     }
@@ -73,18 +69,15 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       timestamp: Date.now(),
     };
 
-    // Send the preview message to the tab that requested it
-    try {
-      await browser.tabs.sendMessage(sender.tab.id, {
-        action: MessageActions.SHOW_CAPTURE_PREVIEW,
-        data: resultData
-      });
-      console.log("[handleCaptureScreenArea] SHOW_CAPTURE_PREVIEW message sent to tab:", sender.tab.id);
-    } catch (msgError) {
-      console.error("[handleCaptureScreenArea] Failed to send SHOW_CAPTURE_PREVIEW:", msgError);
-    }
+    // Send the preview message to the tab that requested it (non-blocking)
+    browser.tabs.sendMessage(sender.tab.id, {
+      action: MessageActions.SHOW_CAPTURE_PREVIEW,
+      data: resultData
+    }).catch(msgError => {
+      logger.error("Failed to send SHOW_CAPTURE_PREVIEW:", msgError);
+    });
 
-    // 6. Return the extracted text
+    // 6. Return the extracted text (immediate response to sender)
     const response = {
       success: true,
       data: resultData,
@@ -101,6 +94,10 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       context: "handleCaptureScreenArea",
       messageData: message.data,
     });
-    return { success: false, error: error.message };
+    const errorResponse = { success: false, error: error.message };
+    if (sendResponse && typeof sendResponse === 'function') {
+      sendResponse(errorResponse);
+    }
+    return errorResponse;
   }
 }

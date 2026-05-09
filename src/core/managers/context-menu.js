@@ -368,10 +368,10 @@ export class ContextMenuManager extends ResourceTracker {
       const provider = findProviderById(selectElementApi);
       const isBulkSupported = provider?.features?.includes('bulk') ?? false;
 
-      const isSelectElementEnabled = isExtensionEnabled && 
+      const isSelectElementEnabled = isExtensionEnabled &&
                                    (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
                                    isBulkSupported;
-      const isScreenCaptureEnabled = isExtensionEnabled && (settings.SCREEN_CAPTURE_ENABLED !== false);
+      const isScreenCaptureEnabled = isExtensionEnabled && (settings.ENABLE_SCREEN_CAPTURE !== false);
       const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // Get commands for keyboard shortcuts

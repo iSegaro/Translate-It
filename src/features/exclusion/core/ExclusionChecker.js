@@ -101,7 +101,7 @@ export class ExclusionChecker {
         'SHOW_DESKTOP_FAB',
         'EXTENSION_ENABLED',
         'WHOLE_PAGE_TRANSLATION_ENABLED',
-        'SCREEN_CAPTURE_ENABLED'
+        'ENABLE_SCREEN_CAPTURE'
       ];
 
       featureSettings.forEach(setting => {
@@ -210,7 +210,7 @@ export class ExclusionChecker {
         return settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
 
       case 'screenCapture':
-        const screenCaptureVal = settingsManager.get('SCREEN_CAPTURE_ENABLED', true);
+        const screenCaptureVal = settingsManager.get('ENABLE_SCREEN_CAPTURE', true);
         logger.debug(`Checking screenCapture enablement: ${screenCaptureVal}`);
         return screenCaptureVal;
 

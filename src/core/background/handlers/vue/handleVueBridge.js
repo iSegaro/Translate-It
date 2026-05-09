@@ -14,8 +14,7 @@ export async function handleVueBridge(message, sender) {
     
     const vueBridgeActions = [
       'CREATE_VUE_MICRO_APP',
-      'DESTROY_VUE_MICRO_APP', 
-      'START_SCREEN_CAPTURE'
+      'DESTROY_VUE_MICRO_APP'
     ];
     
     if (!vueBridgeActions.includes(message.action)) {
