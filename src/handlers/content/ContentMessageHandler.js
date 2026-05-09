@@ -362,7 +362,6 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleStartScreenCapture(message) {
-    console.log('[ContentMessageHandler] START_SCREEN_CAPTURE received!', message.data);
     this.logger.info("ContentMessageHandler: START_SCREEN_CAPTURE received!");
 
     try {
