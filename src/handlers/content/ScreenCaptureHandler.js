@@ -26,14 +26,21 @@ export class ScreenCaptureHandler {
    * Handle START_SCREEN_CAPTURE message
    */
   async handleStartScreenCapture(message) {
+    console.log('[ScreenCaptureHandler] START_SCREEN_CAPTURE received', message.data);
     logger.info('START_SCREEN_CAPTURE received', message.data);
 
     try {
+      this.isActive = true;
+
       // Ensure Vue is loaded
       if (window.translateItContentCore && !window.translateItContentCore.vueLoaded) {
+        console.log('[ScreenCaptureHandler] Loading Vue App...');
         await window.translateItContentCore.loadVueApp();
+        // Give Vue/Pinia/Components a moment to mount and setup event listeners
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
 
+      console.log('[ScreenCaptureHandler] Emitting screen-capture-activated event');
       // Emit event to ContentApp via pageEventBus
       pageEventBus.emit('screen-capture-activated', message.data || {});
 

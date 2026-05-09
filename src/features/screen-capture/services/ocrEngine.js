@@ -1,4 +1,3 @@
-import { createWorker } from 'tesseract.js';
 import browser from 'webextension-polyfill';
 import { ocrCache } from '../utils/ocrCache.js';
 
@@ -18,53 +17,44 @@ async function initWorker(lang) {
   }
 
   if (worker) {
+    console.log("OCREngine: Terminating existing worker...");
     await worker.terminate();
     worker = null;
   }
 
-  console.log(`OCREngine: Initializing worker for ${lang}...`);
-  
-  // Custom fetch to use IndexedDB cache
-  const customFetch = async (url) => {
-    const filename = url.split('/').pop();
-    if (filename.endsWith('.traineddata.gz')) {
-      const langCode = filename.replace('.traineddata.gz', '');
-      const cachedData = await ocrCache.getModel(langCode);
-      if (cachedData) {
-        console.log(`OCREngine: Using cached model for ${langCode}`);
-        return {
-          ok: true,
-          arrayBuffer: () => Promise.resolve(cachedData),
-          status: 200
-        };
-      }
-    }
-    
-    // Fallback to normal fetch
-    const response = await fetch(url);
-    
-    // Save to cache if it's a language model
-    if (response.ok && filename.endsWith('.traineddata.gz')) {
-      const langCode = filename.replace('.traineddata.gz', '');
-      const clone = response.clone();
-      const data = await clone.arrayBuffer();
-      await ocrCache.saveModel(langCode, data);
-      console.log(`OCREngine: Cached model for ${langCode}`);
-    }
-    
-    return response;
-  };
+  // Use absolute URLs for all assets
+  const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
+  const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
+  const langPath = 'https://tessdata.projectnaptha.com/4.0.0'; 
 
-  worker = await createWorker(lang, 1, {
-    workerPath: browser.runtime.getURL('assets/ocr/worker.min.js'),
-    corePath: browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.js'), // Point to the loader script
-    logger: m => console.debug('Tesseract:', m),
-    // We can't easily override fetch in createWorker options in V5 in all environments,
-    // but Tesseract.js V5 has better built-in caching.
-    // If we need strict local-only, we might need a different approach.
+  console.log(`OCREngine: Initializing worker for ${lang}...`, {
+    workerPath,
+    corePath,
+    langPath
   });
 
-  currentLang = lang;
+  try {
+    // Import Tesseract module
+    const { createWorker } = await import('tesseract.js');
+    
+    // Following EdgeTranslate pattern: (lang, oem, options)
+    // workerBlobURL: false is critical for extensions to avoid blob: CSP issues
+    worker = await createWorker(lang, 1, {
+      workerPath: workerPath,
+      corePath: corePath,
+      langPath: langPath,
+      workerBlobURL: false, 
+      logger: m => console.debug('Tesseract:', m),
+    });
+    
+    console.log(`OCREngine: Worker initialized successfully for ${lang}`);
+    currentLang = lang;
+  } catch (error) {
+    console.error(`OCREngine: Failed to initialize worker for ${lang}:`, error);
+    worker = null;
+    throw error;
+  }
+
   lastUsedTime = Date.now();
   return worker;
 }

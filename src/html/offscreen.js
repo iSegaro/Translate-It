@@ -929,25 +929,38 @@ let ocrEngine = null;
  * Handle OCR processing with lazy loading
  */
 async function handleOCRProcess(data, sendResponse) {
+  console.log("[Offscreen] handleOCRProcess started", { lang: data.lang });
   try {
     if (!ocrEngine) {
-      logger.info("Loading OCR engine...");
-      // Dynamically import the OCR engine
-      // The path is relative to src/html/offscreen.js
+      console.log("[Offscreen] Loading OCR engine module...");
       const module = await import('../features/screen-capture/services/ocrEngine.js');
       ocrEngine = module;
-      logger.info("OCR engine loaded successfully");
+      console.log("[Offscreen] OCR engine module loaded");
     }
-    
+
     const { image, lang, coordinates } = data;
+    console.log("[Offscreen] Starting recognition...");
     const text = await ocrEngine.recognize(image, lang, coordinates);
+    console.log("[Offscreen] Recognition successful, extracted text length:", text?.length);
     sendResponse({ success: true, text });
   } catch (error) {
-    logger.error("OCR process failed:", error);
-    sendResponse({ success: false, error: error.message });
+    console.error("[Offscreen] OCR process failed. Full error object:", error);
+    
+    // Extract as much info as possible
+    let errorMessage = "Unknown OCR error";
+    if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object') {
+      errorMessage = error.message || error.statusText || JSON.stringify(error);
+    }
+    
+    sendResponse({ 
+      success: false, 
+      error: errorMessage,
+      stack: error?.stack || new Error().stack
+    });
   }
 }
-
 // Cleanup resources when page unloads
 resourceTracker.addEventListener(window, 'beforeunload', () => {
   logger.debug('Offscreen document unloading, cleaning up resources...');

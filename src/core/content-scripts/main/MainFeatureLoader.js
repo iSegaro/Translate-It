@@ -102,12 +102,14 @@ export class MainFeatureLoader {
         }
 
         if (this.contentScriptCore && this.contentScriptCore.loadFeature) {
+          console.log(`[MainFeatureLoader] Loading feature: ${featureName} (${category})`);
           await this.contentScriptCore.loadFeature(featureName);
 
           if (process.env.NODE_ENV === 'development') {
             const featureLogger = await this.initializeLogger();
             featureLogger.debug(`[MainFeatureLoader] Loaded feature: ${featureName} (${category})`);
           }
+          console.log(`[MainFeatureLoader] Successfully loaded feature: ${featureName}`);
         }
       } catch (error) {
         await this.handleLoadingError(featureName, category, error);

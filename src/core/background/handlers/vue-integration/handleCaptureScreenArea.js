@@ -48,7 +48,9 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       });
 
       if (!ocrResponse || !ocrResponse.success) {
-        throw new Error(ocrResponse?.error || "OCR processing failed");
+        const errorMsg = ocrResponse?.error || "OCR processing failed";
+        console.error("[handleCaptureScreenArea] OCR failed in offscreen:", errorMsg, ocrResponse?.stack);
+        throw new Error(errorMsg);
       }
       extractedText = ocrResponse.text;
     } else {

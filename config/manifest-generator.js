@@ -60,11 +60,17 @@ export function generateManifest(browser = 'chrome') {
           'src/styles/*.css',
           'js/*.js',
           'src/_locales/*',
-          'docs/Changelog.md',
-          'assets/ocr/*'
+          'docs/Changelog.md'
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
+      },
+      {
+        resources: [
+          'assets/ocr/*'
+        ],
+        matches: ['<all_urls>', 'file://*/*'],
+        use_dynamic_url: false
       }
     ],
     

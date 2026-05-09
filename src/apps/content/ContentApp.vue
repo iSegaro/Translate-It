@@ -186,6 +186,11 @@ const {
   isMobileUI
 } = useContentAppUIState(settingsStore, mobileStore, tracker);
 
+import { watch } from 'vue';
+watch(isScreenCaptureActive, (newVal) => {
+  logger.info(`[ContentApp] isScreenCaptureActive changed: ${newVal}`);
+});
+
 // Screen Capture State
 const activeCapture = ref(null);
 
