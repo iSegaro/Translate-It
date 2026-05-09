@@ -8,28 +8,6 @@
     ]"
     :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE"
   >
-    <!-- This will host all in-page UI components -->
-    <Toaster
-      v-if="shouldShowGlobalUI"
-      rich-colors
-      position="bottom-right"
-      expand
-      :toast-options="{
-        style: {
-          pointerEvents: 'auto',
-          cursor: 'auto',
-          zIndex: 2147483647,
-          unicodeBidi: 'plaintext',
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word',
-          maxWidth: '320px',
-          minWidth: '280px',
-          whiteSpace: 'pre-wrap',
-          overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-        }
-      }"
-    />
     <template v-if="isExtensionEnabled && settingsStore.isInitialized">
       <!-- TextField Interaction Icons -->
       <TextFieldIcon
@@ -107,6 +85,33 @@
       <!-- Page Translation Original Text Tooltip -->
       <PageTranslationTooltip />
     </template>
+
+    <!-- 
+      Toaster (Notification System)
+      CRITICAL: Placed at the end of the template to ensure it stays on top of 
+      all other siblings in the Shadow DOM stacking context (Z-index rule for siblings).
+    -->
+    <Toaster
+      v-if="shouldShowGlobalUI"
+      rich-colors
+      position="bottom-right"
+      expand
+      :toast-options="{
+        style: {
+          pointerEvents: 'auto',
+          cursor: 'auto',
+          zIndex: 2147483647,
+          unicodeBidi: 'plaintext',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          maxWidth: '320px',
+          minWidth: '280px',
+          whiteSpace: 'pre-wrap',
+          overflow: 'hidden',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        }
+      }"
+    />
   </div>
 </template>
 
@@ -193,6 +198,9 @@ const onScreenCaptureCancel = () => {
 };
 
 // 4. Notifications (Toasts) Management
+useContentAppNotifications({ shouldShowGlobalUI, toastRTL, tracker });
+
+// 5. TextField Interaction Icons
 const {
   activeIcons,
   setIconRef,
