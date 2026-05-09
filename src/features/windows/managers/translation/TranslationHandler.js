@@ -77,9 +77,9 @@ export class TranslationHandler {
       };
 
       // Determine translation mode
-      let translationMode = TranslationMode.Selection;
+      let translationMode = options.mode || TranslationMode.Selection;
       const isDictionaryCandidate = isSingleWordOrShortPhrase(selectedText);
-      if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
+      if (!options.mode && settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
         translationMode = TranslationMode.Dictionary_Translation;
       }
 

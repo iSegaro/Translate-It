@@ -250,11 +250,11 @@ export class WindowsManager extends ResourceTracker {
    * Handle translation trigger for pending selections (Coordinator Pattern)
    */
   async _handleSelectionTrigger(payload) {
-    const { text, position } = payload;
-    this.logger.info('Selection trigger received (Global)', { textLength: text?.length });
+    const { text, position, options = {} } = payload;
+    this.logger.info('Selection trigger received (Global)', { textLength: text?.length, options });
     
     if (text && position) {
-      await this._showWindow(text, position);
+      await this._showWindow(text, position, options);
     }
   }
 
@@ -323,11 +323,13 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    // Get current mode from settings
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+    // Get current mode from settings (allow override via options.immediate)
+    const selectionTranslationMode = options.immediate 
+      ? SelectionTranslationMode.IMMEDIATE 
+      : settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
     // 2. Check for interaction conditions (e.g., Ctrl requirement)
-    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE && !options.immediate) {
       const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
       if (requireCtrl && options.ctrlPressed !== true) {
         this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
@@ -403,7 +405,7 @@ export class WindowsManager extends ResourceTracker {
       } else if (selectionTranslationMode === SelectionTranslationMode.ON_CLICK) {
         await this._showIcon(selectedText, position);
       } else {
-        await this._showWindow(selectedText, position);
+        await this._showWindow(selectedText, position, options);
       }
     } finally {
       this.state.setProcessing(false);
@@ -886,7 +888,7 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Show translation window with two-phase loading
    */
-  async _showWindow(selectedText, position) {
+  async _showWindow(selectedText, position, options = {}) {
     if (!ExtensionContextManager.isValidSync() || !selectedText) {
       this.logger.debug('Cannot show window: invalid context or empty text', { selectedText });
       return;
@@ -898,7 +900,8 @@ export class WindowsManager extends ResourceTracker {
         x: Math.round(position.x || 0),
         y: Math.round(position.y || 0)
       },
-      context: this.isTopFrame ? 'main-frame' : 'iframe'
+      context: this.isTopFrame ? 'main-frame' : 'iframe',
+      options
     });
 
       
@@ -956,7 +959,7 @@ export class WindowsManager extends ResourceTracker {
 
     // PHASE 2: Perform translation and update window
     try {
-      const translationResult = await this._startTranslationProcess(selectedText, windowId);
+      const translationResult = await this._startTranslationProcess(selectedText, windowId, options);
 
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
@@ -1005,14 +1008,14 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Start translation process for a window
    */
-  async _startTranslationProcess(selectedText, windowId = null) {
+  async _startTranslationProcess(selectedText, windowId = null, options = {}) {
     try {
-      const options = { windowId };
-      if (this.state.provider) {
-        options.provider = this.state.provider;
+      const translationOptions = { ...options, windowId };
+      if (this.state.provider && !options.provider) {
+        translationOptions.provider = this.state.provider;
       }
       // Perform translation
-      const result = await this.translationHandler.performTranslation(selectedText, options);
+      const result = await this.translationHandler.performTranslation(selectedText, translationOptions);
       
       if (this.state.isTranslationCancelled) return null;
       

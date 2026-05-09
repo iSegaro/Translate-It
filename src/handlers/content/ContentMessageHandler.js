@@ -397,7 +397,17 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async handleShowCapturePreview(message) {
     this.logger.info("ContentMessageHandler: SHOW_CAPTURE_PREVIEW received!");
-    pageEventBus.emit('show-capture-preview', message.data);
+    
+    try {
+      // Lazy load the coordinator to keep ContentMessageHandler light
+      const { screenCaptureCoordinator } = await import('@/features/screen-capture/services/ScreenCaptureCoordinator.js');
+      await screenCaptureCoordinator.handleResult(message.data);
+    } catch (error) {
+      this.logger.error("Failed to handle capture result via coordinator:", error);
+      // Fallback for safety
+      pageEventBus.emit('show-capture-preview', message.data);
+    }
+    
     return { success: true };
   }
 
@@ -514,6 +524,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
+      case TranslationMode.ScreenCapture:
         this.logger.info(`Forwarding result for ${translationMode} mode to WindowsManager`);
         if (window.windowsManagerInstance && window.windowsManagerInstance.translationHandler) {
           return window.windowsManagerInstance.translationHandler.handleTranslationResult(message);
