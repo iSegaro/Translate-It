@@ -41,26 +41,40 @@
             :title="$t('screen_capture_ocr_language')"
           >
             <span class="ocr-language-label">{{ $t('screen_capture_ocr_language') }}</span>
-            <select
-              v-model="selectedOCRLanguage"
-              class="ocr-language-dropdown"
-              :disabled="isCapturing || downloadedLanguageOptions.length === 0"
-              @change="persistSelectedOCRLanguage"
-            >
-              <option
-                v-if="downloadedLanguageOptions.length === 0"
-                value=""
+            <div class="ocr-select-container">
+              <select
+                v-model="selectedOCRLanguage"
+                class="ocr-language-dropdown"
+                :disabled="isCapturing || downloadedLanguageOptions.length === 0"
+                @change="persistSelectedOCRLanguage"
               >
-                {{ $t('ocr_status_not_installed') }}
-              </option>
-              <option
-                v-for="lang in downloadedLanguageOptions"
-                :key="lang.code"
-                :value="lang.code"
+                <option
+                  v-if="downloadedLanguageOptions.length === 0"
+                  value=""
+                >
+                  {{ $t('ocr_status_not_installed') }}
+                </option>
+                <option
+                  v-for="lang in downloadedLanguageOptions"
+                  :key="lang.code"
+                  :value="lang.code"
+                >
+                  {{ lang.name }}
+                </option>
+              </select>
+              <button 
+                class="manage-langs-btn" 
+                :disabled="isCapturing"
+                :title="$t('options_page_title')"
+                @click="openOCRSettings"
               >
-                {{ lang.name }}
-              </option>
-            </select>
+                <img 
+                  :src="SettingsIcon" 
+                  class="btn-icon" 
+                  alt="Settings" 
+                />
+              </button>
+            </div>
           </label>
 
           <button 
@@ -128,10 +142,12 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import NotificationManager from '@/core/managers/core/NotificationManager.js'
+import { openOptionsPage } from '@/core/helpers.js'
 
 // Icons
 import FullscreenIcon from '@/icons/ui/whole-page.png'
 import CloseIcon from '@/icons/ui/close.svg'
+import SettingsIcon from '@/icons/ui/settings.png'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
 
@@ -363,6 +379,11 @@ const captureFullScreen = async () => {
 const resetSelection = () => {
   logger.debug('Reset Selection clicked!')
   resetCaptureSelection()
+}
+
+const openOCRSettings = () => {
+  logger.debug('Opening OCR settings page')
+  openOptionsPage('ocr')
 }
 
 const cancel = () => {
