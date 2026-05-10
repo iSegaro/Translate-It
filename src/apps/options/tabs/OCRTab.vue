@@ -27,11 +27,11 @@
     <div class="settings-section">
       <h3>{{ t('ocr_languages_label') }}</h3>
       
-      <div class="language-grid">
+      <div class="language-list">
         <div 
           v-for="lang in supportedLanguages" 
           :key="lang.code"
-          class="language-card"
+          class="language-item"
           :class="{ 'installed': ocrStore.isDownloaded(lang.code) }"
         >
           <div class="lang-info">
