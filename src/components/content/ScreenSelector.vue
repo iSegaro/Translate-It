@@ -6,8 +6,10 @@
       capturing: isCapturing, 
       hidden: isHidingForCapture,
       'theme-dark': settingsStore.isDarkTheme,
-      'theme-light': !settingsStore.isDarkTheme
+      'theme-light': !settingsStore.isDarkTheme,
+      'is-ready': isStylesLoaded
     }"
+    :style="!isStylesLoaded ? { display: 'none' } : {}"
     @mousedown="startSelection"
     @touchstart="handleTouchStart"
   >
@@ -78,6 +80,8 @@
                   :src="SettingsIcon" 
                   class="btn-icon" 
                   alt="Settings" 
+                  width="14"
+                  height="14"
                 />
               </button>
             </div>
@@ -90,7 +94,13 @@
             :title="$t('screen_capture_full_screen')"
             @click="captureFullScreen"
           >
-            <img :src="FullscreenIcon" class="btn-icon" alt="Full Screen" />
+            <img 
+              :src="FullscreenIcon" 
+              class="btn-icon" 
+              alt="Full Screen" 
+              width="16"
+              height="16"
+            />
             <span class="btn-text">{{ $t('screen_capture_full_screen') }}</span>
           </button>
         </div>
@@ -103,7 +113,13 @@
             :title="$t('screen_capture_cancel')"
             @click="cancel"
           >
-            <img :src="CloseIcon" class="btn-icon" alt="Cancel" />
+            <img 
+              :src="CloseIcon" 
+              class="btn-icon" 
+              alt="Cancel" 
+              width="16"
+              height="16"
+            />
             <span class="btn-text">{{ $t('screen_capture_cancel') }}</span>
           </button>
         </div>
@@ -272,6 +288,7 @@ const showCrosshair = ref(false)
 const cursorX = ref(0)
 const cursorY = ref(0)
 const selectedOCRLanguage = ref('')
+const isStylesLoaded = ref(false)
 
 const downloadedLanguageOptions = computed(() => {
   return downloadedLanguageCodes.value
@@ -457,10 +474,12 @@ onMounted(async () => {
     const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
     
     if (screenCaptureUiStyles && injectStylesToShadowRoot) {
-      injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
+      await injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
     }
   } catch (error) {
     logger.warn('Failed to load lazy styles:', error);
+  } finally {
+    isStylesLoaded.value = true;
   }
 
   tracker.addEventListener(document, 'mousemove', handleMouseMove)
