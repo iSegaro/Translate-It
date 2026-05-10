@@ -30,7 +30,7 @@ export class ScreenCaptureCoordinator {
     const { text, coordinates, captureType = 'area' } = data;
     
     if (!text || text.trim().length === 0) {
-      logger.warn('No text extracted, skipping dispatch. Text was empty or null.');
+      logger.debug('No text extracted, skipping dispatch. Text was empty or null.');
       return;
     }
 
