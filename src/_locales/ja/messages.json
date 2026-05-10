@@ -2220,7 +2220,16 @@
     "message": "ENTERで確定"
   },
   "screen_capture_error": {
-    "message": "キャプチャ失敗"
+    "message": "キャプチャエラー"
+  },
+  "screen_capture_error_failed": {
+    "message": "キャプチャに失敗しました。もう一度お試しください。"
+  },
+  "screen_capture_error_no_text": {
+    "message": "選択された範囲内にテキストが見つかりませんでした。"
+  },
+  "screen_capture_error_model": {
+    "message": "OCRモデルの読み込みに失敗しました。接続を確認してください。"
   },
   "screen_capture_retry": {
     "message": "再試行"

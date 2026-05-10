@@ -2271,7 +2271,16 @@
     "message": "Press ENTER to confirm"
   },
   "screen_capture_error": {
-    "message": "Capture failed"
+    "message": "Capture Error"
+  },
+  "screen_capture_error_failed": {
+    "message": "Screen capture failed. Please try again."
+  },
+  "screen_capture_error_no_text": {
+    "message": "No text detected in the selected area."
+  },
+  "screen_capture_error_model": {
+    "message": "Failed to load OCR model. Check your connection."
   },
   "screen_capture_retry": {
     "message": "Retry"

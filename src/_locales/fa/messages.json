@@ -2226,7 +2226,16 @@
     "message": "برای تأیید ENTER را بزنید"
   },
   "screen_capture_error": {
-    "message": "ضبط ناموفق بود"
+    "message": "خطا در تصویربرداری"
+  },
+  "screen_capture_error_failed": {
+    "message": "تصویربرداری با شکست مواجه شد. لطفاً دوباره تلاش کنید."
+  },
+  "screen_capture_error_no_text": {
+    "message": "هیچ متنی در ناحیه انتخاب شده یافت نشد."
+  },
+  "screen_capture_error_model": {
+    "message": "خطا در بارگذاری مدل OCR. اتصال اینترنت را بررسی کنید."
   },
   "screen_capture_retry": {
     "message": "تلاش مجدد"

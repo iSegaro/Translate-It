@@ -294,69 +294,6 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Error panel */
-.error-panel {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(244, 67, 54, 0.95);
-  color: white;
-  border-radius: 8px;
-  padding: 12px 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  animation: slideInUp 0.3s ease;
-}
-
-.error-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.error-icon {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
-}
-
-.error-close {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  margin-left: 8px;
-  opacity: 0.8;
-  
-  &:hover {
-    opacity: 1;
-  }
-
-  .close-icon-img {
-    width: 14px;
-    height: 14px;
-    object-fit: contain;
-    filter: brightness(0) invert(1);
-  }
-}
-
-@keyframes slideInUp {
-  from {
-    transform: translateX(-50%) translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(-50%) translateY(0);
-    opacity: 1;
-  }
-}
-
 /* Crosshair */
 .crosshair {
   position: absolute;

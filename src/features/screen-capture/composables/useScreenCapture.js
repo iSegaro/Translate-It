@@ -167,19 +167,31 @@ export function useScreenCapture() {
       if (response.success) {
         capturedImage.value = response.data.imageData;
         toggleScroll(false); // Unlock scroll after successful capture
+
+        // Handle empty text as a specific "no-text" error condition
+        if (!response.data.text || response.data.text.trim().length === 0) {
+          throw new Error("no-text");
+        }
+
         return {
           imageData: response.data.imageData,
           coordinates: coordinates,
           text: response.data.text,
         };
       } else {
-        throw new Error(response.error || "Failed to capture screen area");
+        // Map background error strings to internal error keys
+        const errorMsg = response.error || "";
+        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
+          throw new Error("model-error");
+        }
+        throw new Error(errorMsg || "capture-failed");
       }
-    } catch (err) {
-      logger.error("Screen capture error:", err);
-      error.value = err.message || "Failed to capture screen area";
+      } catch (err) {
+      logger.error("Capture area error:", err);
+      error.value = err.message;
       toggleScroll(false); // Unlock scroll on error
       throw err;
+
     } finally {
       isCapturing.value = false;
     }
@@ -283,17 +295,28 @@ export function useScreenCapture() {
       if (response.success) {
         capturedImage.value = response.data.imageData;
         toggleScroll(false); // Unlock scroll if it was locked
+        
+        // Handle empty text as a specific "no-text" error condition
+        if (!response.data.text || response.data.text.trim().length === 0) {
+          throw new Error("no-text");
+        }
+        
         return {
           imageData: response.data.imageData,
           coordinates: null, // Full screen
           text: response.data.text,
         };
       } else {
-        throw new Error(response.error || "Failed to capture full screen");
+        // Map background error strings to internal error keys
+        const errorMsg = response.error || "";
+        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
+          throw new Error("model-error");
+        }
+        throw new Error(errorMsg || "capture-failed");
       }
     } catch (err) {
       logger.error("Full screen capture error:", err);
-      error.value = err.message || "Failed to capture full screen";
+      error.value = err.message;
       toggleScroll(false); // Unlock scroll on error
       throw err;
     } finally {

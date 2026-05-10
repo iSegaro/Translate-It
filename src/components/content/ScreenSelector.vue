@@ -68,32 +68,15 @@
         <div class="loading-spinner" />
         <span>{{ $t('screen_capture_capturing') }}</span>
       </div>
+<!-- Minimal Toolbar Hint -->
+<div v-if="!isCapturing" class="toolbar-hint">
+  <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
+  <span v-if="!hasSelection" class="hint-separator">•</span>
+  <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
+</div>
+</div>
+</div>
 
-      <!-- Minimal Toolbar Hint -->
-      <div v-if="!isCapturing" class="toolbar-hint">
-        <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
-        <span v-if="!hasSelection" class="hint-separator">•</span>
-        <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
-      </div>
-    </div>
-
-    <!-- Error message -->
-    <div
-      v-if="error"
-      class="error-panel"
-      @mousedown.stop
-    >
-      <div class="error-content">
-        <img :src="WarningIcon" class="error-icon" alt="Warning" />
-        <span class="error-text">{{ $t('screen_capture_error') }}: {{ error }}</span>
-        <button
-          class="error-close"
-          @click="clearError"
-        >
-          <img :src="CloseIcon" class="close-icon-img" alt="Close" />
-        </button>
-      </div>
-    </div>
     
     <!-- Crosshair cursor -->
     <div 
@@ -101,7 +84,6 @@
       class="crosshair"
       :style="{ left: cursorX + 'px', top: cursorY + 'px' }"
     />
-  </div>
 </template>
 
 <script setup>
@@ -110,6 +92,8 @@ import { useScreenCapture } from '@/features/screen-capture/composables/useScree
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import NotificationManager from '@/core/managers/core/NotificationManager.js'
 
 // Icons
 import FullscreenIcon from '@/icons/ui/whole-page.png'
@@ -117,6 +101,9 @@ import CloseIcon from '@/icons/ui/close.svg'
 import WarningIcon from '@/icons/ui/warning.svg'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
+
+// Localization helper
+const { t } = useUnifiedI18n()
 
 // Resource tracker for memory management
 const tracker = useResourceTracker('screen-selector')
@@ -157,6 +144,39 @@ const {
   captureFullScreen: captureFullScreenArea,
   handleTouchStart
 } = useScreenCapture()
+
+// Notification Manager
+const notificationManager = new NotificationManager()
+
+/**
+ * Shows a localized toast error message
+ * @param {string} errorKey - Internal error key (no-text, model-error, etc.)
+ */
+const showToastError = (errorKey) => {
+  let message = t('screen_capture_error_failed')
+  
+  if (errorKey === 'no-text') {
+    message = t('screen_capture_error_no_text')
+  } else if (errorKey === 'model-error') {
+    message = t('screen_capture_error_model')
+  } else if (errorKey && errorKey.length > 5) {
+    // If it's a direct message from elsewhere, use it
+    message = errorKey
+  }
+
+  notificationManager.show(message, 'error', 4000, {
+    id: 'screen-capture-error'
+  })
+}
+
+// Watch for errors from composable
+watch(error, (newError) => {
+  if (newError) {
+    showToastError(newError)
+    props.onError(newError)
+    emit('error', newError)
+  }
+})
 
 // Additional state
 const isHidingForCapture = ref(false)
@@ -235,10 +255,6 @@ const cancel = () => {
   cancelSelection()
   emit('cancel')
   props.onCancel()
-}
-
-const clearError = () => {
-  error.value = null
 }
 
 // Mouse tracking for crosshair
