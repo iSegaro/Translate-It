@@ -163,23 +163,57 @@ class OCRCache {
   /**
    * Save a language model to cache
    * @param {string} lang Language code
-   * @param {ArrayBuffer} data The model data
+   * @param {ArrayBuffer|Uint8Array} data The model data
    */
   async saveModel(lang, data) {
+    // CRITICAL: Tesseract.js v5+ (and tesseract-core) requires Uint8Array (ArrayBufferView)
+    // to write to its virtual filesystem. ArrayBuffer will cause "Unsupported data type" error.
+    const uint8Data = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+
     const db = await this.init();
     await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(data, lang);
+      const request = store.put(uint8Data, lang);
 
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
 
     try {
-      await this.saveTesseractCachedModel(lang, data);
+      await this.saveTesseractCachedModel(lang, uint8Data);
     } catch (error) {
       logger.warn(`Failed to mirror ${lang} to Tesseract cache`, error);
+    }
+  }
+
+  /**
+   * Migrate existing cached models from ArrayBuffer to Uint8Array
+   * Fixes the "Unsupported data type" error in Tesseract.js v5+
+   */
+  async migrateTesseractCache() {
+    try {
+      logger.debug('Starting Tesseract cache migration...');
+      const languages = await this.listTesseractCachedLanguages();
+      let migratedCount = 0;
+
+      for (const lang of languages) {
+        const data = await this.getTesseractCachedModel(lang);
+        // If it's an ArrayBuffer but not a View (like Uint8Array), it will crash Tesseract.js v5+
+        if (data && data instanceof ArrayBuffer && !ArrayBuffer.isView(data)) {
+          logger.debug(`Migrating ${lang} from ArrayBuffer to Uint8Array`);
+          await this.saveTesseractCachedModel(lang, new Uint8Array(data));
+          migratedCount++;
+        }
+      }
+
+      if (migratedCount > 0) {
+        logger.info(`Successfully migrated ${migratedCount} OCR models to Uint8Array format`);
+      } else {
+        logger.debug('No OCR models needed migration');
+      }
+    } catch (error) {
+      logger.error('Failed to migrate Tesseract cache', error);
     }
   }
 

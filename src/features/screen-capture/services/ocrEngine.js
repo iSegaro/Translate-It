@@ -54,6 +54,9 @@ async function initWorker(lang) {
   });
 
   try {
+    // Migration: Ensure models are in Uint8Array format (required for Tesseract.js v5+)
+    await ocrCache.migrateTesseractCache();
+
     // Check if model is in our manual cache
     const isCached = await ocrCache.getModel(lang);
     if (!isCached) {

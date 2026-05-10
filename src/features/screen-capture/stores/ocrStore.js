@@ -76,8 +76,9 @@ export const useOCRStore = defineStore('ocr', {
 
         const blob = new Blob(chunks);
         const arrayBuffer = await blob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
 
-        await ocrCache.saveModel(tesseractCode, arrayBuffer);
+        await ocrCache.saveModel(tesseractCode, uint8Array);
         await this.refreshDownloadedLanguages();
       } catch (error) {
         logger.error(`Error downloading ${tesseractCode}`, error);
