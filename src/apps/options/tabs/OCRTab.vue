@@ -92,14 +92,37 @@ const { t } = useUnifiedI18n()
 const ocrStore = useOCRStore()
 const settingsStore = useSettingsStore()
 
-// Get language names for supported OCR languages
+// Priority languages to show at the top
+const PRIORITY_LANGS = ['fas', 'eng', 'ara', 'deu', 'fra', 'spa', 'rus', 'chi_sim', 'chi_tra', 'jpn', 'kor', 'tur']
+
+// Get language names and sort them: Installed > Priority > Alphabetical
 const supportedLanguages = computed(() => {
-  return ocrStore.supportedLanguages.map(code => {
+  const languages = ocrStore.supportedLanguages.map(code => {
     const lang = SUPPORTED_OCR_LANGUAGES.find(l => l.code === code)
     return {
       code,
       name: lang ? lang.name : code
     }
+  })
+
+  return languages.sort((a, b) => {
+    const isAInstalled = ocrStore.isDownloaded(a.code)
+    const isBInstalled = ocrStore.isDownloaded(b.code)
+
+    // 1. Installed status
+    if (isAInstalled && !isBInstalled) return -1
+    if (!isAInstalled && isBInstalled) return 1
+
+    // 2. Priority list
+    const aPriority = PRIORITY_LANGS.indexOf(a.code)
+    const bPriority = PRIORITY_LANGS.indexOf(b.code)
+
+    if (aPriority !== -1 && bPriority !== -1) return aPriority - bPriority
+    if (aPriority !== -1) return -1
+    if (bPriority !== -1) return 1
+
+    // 3. Alphabetical
+    return a.name.localeCompare(b.name)
   })
 })
 
