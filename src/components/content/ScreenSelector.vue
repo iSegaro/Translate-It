@@ -13,8 +13,8 @@
     }"
     :dir="isRTL ? 'rtl' : 'ltr'"
     :style="!isStylesLoaded ? { display: 'none' } : {}"
-    @mousedown="canCapture ? startSelection($event) : null"
-    @touchstart="canCapture ? handleTouchStart($event) : null"
+    @mousedown="canCapture ? startSelection($event) : cancel()"
+    @touchstart="canCapture ? handleTouchStart($event) : cancel()"
   >
     <!-- Selection box -->
     <div 
