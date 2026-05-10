@@ -35,16 +35,6 @@
         <!-- Capture options -->
         <div class="capture-options">
           <button 
-            class="toolbar-btn capture-btn"
-            :disabled="!hasSelection || isCapturing" 
-            :title="$t('screen_capture_label')"
-            @click="confirmSelection"
-          >
-            <img :src="CaptureIcon" class="btn-icon" alt="Capture" />
-            <span class="btn-text">{{ $t('screen_capture_label') }}</span>
-          </button>
-          
-          <button 
             v-if="allowFullScreen"
             class="toolbar-btn fullscreen-btn"
             :disabled="isCapturing"
@@ -122,7 +112,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 
 // Icons
-import CaptureIcon from '@/icons/ui/capture.svg'
 import FullscreenIcon from '@/icons/ui/whole-page.png'
 import CloseIcon from '@/icons/ui/close.svg'
 import WarningIcon from '@/icons/ui/warning.svg'
