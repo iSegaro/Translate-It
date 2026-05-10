@@ -2288,6 +2288,9 @@
   "screen_capture_error_model": {
     "message": "Failed to load OCR model. Check your connection."
   },
+  "screen_capture_error_model_missing": {
+    "message": "Language model not installed. Please download it from OCR settings."
+  },
   "screen_capture_retry": {
     "message": "Retry"
   }
