@@ -13,7 +13,7 @@ const errorHandler = new ErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCaptureScreenArea');
 
 export async function handleCaptureScreenArea(message, sender, sendResponse) {
-  const { coordinates } = message.data;
+  const { coordinates, ocrLang: requestedOcrLang } = message.data;
 
   try {
     // 1. Capture visible tab
@@ -25,11 +25,13 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
     await ttsStateManager.ensureOffscreenDocument();
 
     // 3. Get OCR language mapping
-    // We'll prioritize OCR_DEFAULT_LANG from settings, then fallback to current source language
+    // Priority: 1. Manually requested via UI, 2. OCR_DEFAULT_LANG from settings, 3. fallback to current source language
     const settings = await getSettingsAsync();
 
-    const ocrLang = settings.OCR_DEFAULT_LANG || settings.SOURCE_LANGUAGE || 'eng';
+    const ocrLang = requestedOcrLang || settings.OCR_DEFAULT_LANG || settings.SOURCE_LANGUAGE || 'eng';
     const tesseractLang = toTesseractLanguageCode(ocrLang === 'auto' ? 'eng' : ocrLang);
+
+    logger.debug(`Starting OCR with language: ${tesseractLang}`, { requestedOcrLang });
 
     // 4. Perform OCR
     let extractedText = '';
