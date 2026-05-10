@@ -140,7 +140,7 @@
         class="toolbar-hint"
       >
         <span v-if="!hasSelection" class="hint-text">
-          {{ canCapture ? $t('screen_capture_drag_to_select') : $t('ocr_status_not_installed') }}
+          {{ canCapture ? $t('screen_capture_drag_to_select') : $t('screen_capture_error_model_missing') }}
         </span>
         <span v-if="!hasSelection" class="hint-separator">•</span>
         <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
