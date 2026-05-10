@@ -13,7 +13,6 @@ export const useOCRStore = defineStore('ocr', {
     downloadProgress: 0,
     currentDownloadingLang: null,
     // Settings
-    autoDownload: true,
     defaultOCRLang: 'eng',
   }),
 

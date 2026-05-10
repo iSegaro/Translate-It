@@ -6,26 +6,7 @@
     </div>
 
     <div class="settings-section">
-      <div class="setting-item">
-        <div class="setting-info">
-          <label>{{ t('ocr_auto_download_label') }}</label>
-          <p>{{ t('ocr_auto_download_desc') }}</p>
-        </div>
-        <div class="setting-control">
-          <label class="switch">
-            <input 
-              type="checkbox" 
-              v-model="ocrStore.autoDownload"
-              @change="saveOCRSettings"
-            >
-            <span class="slider round"></span>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="section-header">
+      <div class="languages-header">
         <h3>{{ t('ocr_languages_label') }}</h3>
         <div class="search-box">
           <input 
@@ -150,16 +131,7 @@ const supportedLanguages = computed(() => {
 
 onMounted(async () => {
   await ocrStore.init()
-  
-  // Load settings from settingsStore if they exist
-  if (settingsStore.settings.OCR_AUTO_DOWNLOAD !== undefined) {
-    ocrStore.autoDownload = settingsStore.settings.OCR_AUTO_DOWNLOAD
-  }
 })
-
-const saveOCRSettings = async () => {
-  settingsStore.updateSettingLocally('OCR_AUTO_DOWNLOAD', ocrStore.autoDownload)
-}
 
 const confirmClearCache = async () => {
   if (confirm(t('history_clear_confirm_message'))) {

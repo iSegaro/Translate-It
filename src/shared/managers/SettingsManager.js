@@ -49,7 +49,6 @@ class SettingsManager {
       TRANSLATE_ON_TEXT_SELECTION: !isMobile,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
       ENABLE_SCREEN_CAPTURE: true,
-      OCR_AUTO_DOWNLOAD: CONFIG.OCR_AUTO_DOWNLOAD ?? true,
       OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,

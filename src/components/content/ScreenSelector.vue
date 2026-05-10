@@ -263,6 +263,8 @@ const showToastError = (errorKey) => {
     message = t('screen_capture_error_no_text')
   } else if (errorKey === 'model-error') {
     message = t('screen_capture_error_model')
+  } else if (errorKey === 'model-not-installed') {
+    message = t('screen_capture_error_model_missing')
   } else if (errorKey && errorKey.length > 5) {
     // If it's a direct message from elsewhere, use it
     message = errorKey

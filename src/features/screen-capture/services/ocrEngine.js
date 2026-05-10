@@ -13,16 +13,6 @@ let lastUsedTime = Date.now();
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 let idleInterval = null;
 
-async function getOCRAutoDownloadEnabled() {
-  try {
-    const result = await browser.storage?.local?.get?.('OCR_AUTO_DOWNLOAD');
-    return result?.OCR_AUTO_DOWNLOAD !== false;
-  } catch (error) {
-    logger.debug('Falling back to enabled OCR auto-download setting', error);
-    return true;
-  }
-}
-
 /**
  * Initialize Tesseract Worker
  * @param {string} lang Tesseract language code
@@ -42,8 +32,10 @@ async function initWorker(lang) {
   // Use absolute URLs for all assets
   const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
   const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
-  const autoDownload = await getOCRAutoDownloadEnabled();
-  const cacheMethod = autoDownload ? 'write' : 'readOnly';
+  
+  // Strictly use read-only mode to prevent unexpected background downloads.
+  // Models must be pre-downloaded from the OCR settings tab.
+  const cacheMethod = 'readOnly';
 
   logger.debug(`Initializing worker for ${lang}`, {
     workerPath,
@@ -58,11 +50,10 @@ async function initWorker(lang) {
     await ocrCache.migrateTesseractCache();
 
     // Check if model is in our manual cache
-    const isCached = await ocrCache.getModel(lang);
+    const isCached = await ocrCache.hasModel(lang);
     if (!isCached) {
-      logger.debug(`Model for ${lang} not found in ocrCache, Tesseract will download it.`);
-    } else {
-      logger.debug(`Model for ${lang} found in ocrCache.`);
+      logger.warn(`Model for ${lang} not found in ocrCache. Refusing to download automatically.`);
+      throw new Error("model-not-installed");
     }
 
     // Import Tesseract module
