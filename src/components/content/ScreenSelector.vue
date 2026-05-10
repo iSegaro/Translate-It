@@ -301,6 +301,13 @@ onMounted(async () => {
   tracker.addEventListener(document, 'mouseleave', handleMouseLeave)
   tracker.addEventListener(document, 'keydown', handleKeyDown)
   tracker.addEventListener(document, 'contextmenu', handleContextMenu)
+
+  // Listen for cancel event from global shortcut manager
+  const { pageEventBus } = await import('@/core/PageEventBus.js');
+  tracker.addEventListener(pageEventBus, 'cancel-screen-capture', () => {
+    logger.info('Received cancel-screen-capture event');
+    cancel();
+  });
 })
 
 onUnmounted(() => {

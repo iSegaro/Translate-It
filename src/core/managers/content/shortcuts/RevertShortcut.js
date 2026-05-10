@@ -58,6 +58,19 @@ export class RevertShortcut {
       return { success: true, action: 'skipped_select_element_handling_esc' };
     }
 
+    // Priority 0.5: If Screen Capture is active, cancel it
+    if (window.isScreenCaptureActive) {
+      logger.debug('[RevertShortcut] Screen Capture is active. Executing CANCEL action.');
+      try {
+        const { pageEventBus } = await import('@/core/PageEventBus.js');
+        pageEventBus.emit('cancel-screen-capture');
+        window.isScreenCaptureActive = false; // Optimistic clear
+        return { success: true, action: 'cancelled_screen_capture' };
+      } catch (error) {
+        logger.error('[RevertShortcut] Error cancelling screen capture:', error);
+      }
+    }
+
     // Priority 1: If SelectElementManager is active, let it handle ESC key
     const selectElementManager = await getActiveSelectElementManager();
     if (selectElementManager && selectElementManager.isActive) {

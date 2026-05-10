@@ -190,11 +190,13 @@ watch(isScreenCaptureActive, (newVal) => {
 const onScreenAreaSelected = (result) => {
   logger.info('Screen area selected', result);
   isScreenCaptureActive.value = false;
+  window.isScreenCaptureActive = false;
 };
 
 const onScreenCaptureCancel = () => {
   logger.info('Screen capture cancelled');
   isScreenCaptureActive.value = false;
+  window.isScreenCaptureActive = false;
 };
 
 // 4. Notifications (Toasts) Management

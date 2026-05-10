@@ -18,6 +18,7 @@ export class ScreenCaptureHandler {
 
   async deactivate() {
     this.isActive = false;
+    window.isScreenCaptureActive = false;
 
     // Cleanup OCR engine resources
     try {
@@ -39,6 +40,7 @@ export class ScreenCaptureHandler {
 
     try {
       this.isActive = true;
+      window.isScreenCaptureActive = true;
 
       // Ensure Vue is loaded
       if (window.translateItContentCore && !window.translateItContentCore.vueLoaded) {
