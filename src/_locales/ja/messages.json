@@ -2213,6 +2213,12 @@
   "ocr_tab_desc": {
     "message": "画面上のテキスト認識 (OCR) の言語と設定を管理します。"
   },
+  "ocr_enabled_label": {
+    "message": "スクリーンOCRを有効にする"
+  },
+  "ocr_enabled_desc": {
+    "message": "画像からテキストを抽出し、翻訳することを許可します。"
+  },
   "ocr_languages_label": {
     "message": "OCR言語"
   },

@@ -263,6 +263,12 @@
   "ocr_tab_desc": {
     "message": "Manage languages and settings for on-screen text recognition (OCR)."
   },
+  "ocr_enabled_label": {
+    "message": "Enable Screen OCR"
+  },
+  "ocr_enabled_desc": {
+    "message": "Allow extracting text from images and translating it."
+  },
   "ocr_languages_label": {
     "message": "OCR Languages"
   },

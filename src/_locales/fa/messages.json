@@ -2219,6 +2219,12 @@
   "ocr_tab_desc": {
     "message": "مدیریت زبان‌ها و تنظیمات تشخیص متن از روی تصویر (OCR)."
   },
+  "ocr_enabled_label": {
+    "message": "فعال‌سازی استخراج متن (OCR)"
+  },
+  "ocr_enabled_desc": {
+    "message": "قابلیت استخراج متن از تصاویر و ترجمه آن را فعال می‌کند."
+  },
   "ocr_languages_label": {
     "message": "زبان‌های OCR"
   },

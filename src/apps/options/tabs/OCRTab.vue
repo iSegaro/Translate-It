@@ -5,7 +5,19 @@
       <p class="tab-description">{{ t('ocr_tab_desc') }}</p>
     </div>
 
-    <div class="settings-section">
+    <!-- OCR Toggle Section -->
+    <div class="settings-section ocr-toggle-section">
+      <div class="setting-group">
+        <BaseCheckbox
+          id="ENABLE_SCREEN_CAPTURE"
+          v-model="enableScreenCapture"
+          :label="t('ocr_enabled_label')"
+        />
+        <p class="setting-description">{{ t('ocr_enabled_desc') }}</p>
+      </div>
+    </div>
+
+    <div class="settings-section" :class="{ 'is-disabled': !enableScreenCapture }">
       <div class="languages-header">
         <h3>{{ t('ocr_languages_label') }}</h3>
         <div class="search-box">
@@ -78,12 +90,23 @@ import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n'
 import { useSettingsStore } from '@/features/settings/stores/settings'
 import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLanguageMap.js'
+import { useTabSettings } from '../composables/useTabSettings.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
+// Components
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OCRTab')
 const { t } = useUnifiedI18n()
 const ocrStore = useOCRStore()
 const settingsStore = useSettingsStore()
+const { createSetting } = useTabSettings(settingsStore, logger)
 
 const searchQuery = ref('')
+
+// Settings
+const enableScreenCapture = createSetting('ENABLE_SCREEN_CAPTURE', true)
 
 // Priority languages to show at the top
 const PRIORITY_LANGS = ['fas', 'eng', 'ara', 'deu', 'fra', 'spa', 'rus', 'chi_sim', 'chi_tra', 'jpn', 'kor', 'tur']
