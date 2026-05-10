@@ -290,13 +290,16 @@ export function useScreenCapture() {
       isCapturing.value = true;
       error.value = null;
 
-      const response = await captureScreenArea();
+      // Pass null explicitly for full screen to avoid undefined issues in messaging
+      const response = await captureScreenArea(null);
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
+        toggleScroll(false); // Unlock scroll if it was locked
         return {
           imageData: response.data.imageData,
           coordinates: null, // Full screen
+          text: response.data.text,
         };
       } else {
         throw new Error(response.error || "Failed to capture full screen");
@@ -304,6 +307,7 @@ export function useScreenCapture() {
     } catch (err) {
       logger.error("Full screen capture error:", err);
       error.value = err.message || "Failed to capture full screen";
+      toggleScroll(false); // Unlock scroll on error
       throw err;
     } finally {
       isCapturing.value = false;

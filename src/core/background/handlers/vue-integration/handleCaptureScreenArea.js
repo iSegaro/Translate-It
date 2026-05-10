@@ -51,16 +51,30 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
         logger.error("OCR failed in offscreen:", { error: errorMsg, stack: ocrResponse?.stack });
         throw new Error(errorMsg);
       }
-      extractedText = ocrResponse.text;
+      
+      // Robustly handle different response formats from offscreen context
+      extractedText = ocrResponse.text || ocrResponse.data?.text || '';
+      logger.info("OCR completed in offscreen context", { 
+        textLength: extractedText.length,
+        hasCoordinates: !!coordinates 
+      });
     } else {
       // Firefox: Run OCR directly in background script (as it has DOM access)
       try {
         const { recognize } = await import('@/features/screen-capture/services/ocrEngine.js');
         extractedText = await recognize(imageData, tesseractLang, coordinates);
+        logger.info("OCR completed in background context (Firefox)", { 
+          textLength: extractedText.length,
+          hasCoordinates: !!coordinates 
+        });
       } catch (importError) {
         logger.error("Firefox OCR import failed:", importError);
         throw new Error("OCR engine failed to load in Firefox background");
       }
+    }
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      logger.debug("OCR extracted empty text. Capture may have failed to find characters.");
     }
 
     // 5. Send message to content script to show preview

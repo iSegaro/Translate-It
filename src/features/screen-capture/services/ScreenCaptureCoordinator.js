@@ -30,7 +30,7 @@ export class ScreenCaptureCoordinator {
     const { text, coordinates, captureType = 'area' } = data;
     
     if (!text || text.trim().length === 0) {
-      logger.warn('No text extracted, skipping dispatch');
+      logger.warn('No text extracted, skipping dispatch. Text was empty or null.');
       return;
     }
 
@@ -74,18 +74,23 @@ export class ScreenCaptureCoordinator {
     // 2. Convert device pixels to CSS pixels for position calculation
     const dpr = window.devicePixelRatio || 1;
     
+    // Normalized check for coordinates
+    const hasCoords = coordinates && typeof coordinates === 'object' && 'x' in coordinates;
+    
     // Default to center if no coordinates
     const cssCoords = {
-      x: coordinates ? coordinates.x / dpr : (window.innerWidth / 2) - 100,
-      y: coordinates ? coordinates.y / dpr : (window.innerHeight / 2) - 50,
-      width: coordinates ? coordinates.width / dpr : 200,
-      height: coordinates ? coordinates.height / dpr : 100
+      x: hasCoords ? coordinates.x / dpr : (window.innerWidth / 2) - 100,
+      y: hasCoords ? coordinates.y / dpr : (window.innerHeight / 2) - 50,
+      width: hasCoords ? coordinates.width / dpr : 200,
+      height: hasCoords ? coordinates.height / dpr : 100
     };
 
-    // 3. Calculate anchor position (bottom-center of captured area)
+    // 3. Calculate anchor position
+    // For fullscreen: Use the center of the viewport
+    // For area: Use the bottom-center of the area
     const position = {
       x: cssCoords.x + (cssCoords.width / 2),
-      y: cssCoords.y + cssCoords.height + 10, // 10px padding below
+      y: hasCoords ? cssCoords.y + cssCoords.height + 10 : cssCoords.y + (cssCoords.height / 2),
       _isViewportRelative: true, // CRITICAL: Position is relative to viewport
       _sourceCoordinates: coordinates, // Keep original coordinates for reference
       _coordinateSpace: 'device-pixel',
