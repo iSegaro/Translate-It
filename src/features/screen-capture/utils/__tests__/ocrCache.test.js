@@ -50,12 +50,6 @@ describe('ocrCache', () => {
     ocrCache.db = null;
     ocrCache.tesseractDb = null;
 
-    // Helper to trigger success on next tick
-    const triggerSuccess = (req, result) => {
-      req.result = result;
-      setTimeout(() => req.onsuccess({ target: req }), 0);
-    };
-
     vi.spyOn(ocrCache, 'init').mockImplementation(async () => {
       if (ocrCache.db) return ocrCache.db;
       ocrCache.db = mockDB;

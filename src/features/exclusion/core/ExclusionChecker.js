@@ -209,10 +209,11 @@ export class ExclusionChecker {
       case 'pageTranslation':
         return settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
 
-      case 'screenCapture':
+      case 'screenCapture': {
         const screenCaptureVal = settingsManager.get('ENABLE_SCREEN_CAPTURE', true);
         logger.debug(`Checking screenCapture enablement: ${screenCaptureVal}`);
         return screenCaptureVal;
+      }
 
       default:
         logger.debug(`Feature ${featureName} hit default case in isFeatureEnabled (false)`);

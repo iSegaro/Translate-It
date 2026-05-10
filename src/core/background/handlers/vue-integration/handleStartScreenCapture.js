@@ -3,11 +3,8 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const errorHandler = new ErrorHandler();
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleStartScreenCapture');
 
 export async function handleStartScreenCapture(message, sender, sendResponse) {
   try {

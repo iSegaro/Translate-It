@@ -12,7 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SyncOCRLanguages');
  * Returns the list of downloaded OCR languages from IndexedDB
  * This allows content scripts to access the list without direct IndexedDB access
  */
-export const handleSyncOCRLanguages = async (message, sender, sendResponse) => {
+export const handleSyncOCRLanguages = async (_message, _sender, _sendResponse) => {
   logger.debug('SYNC_OCR_DOWNLOADABLE_LANGUAGES received');
 
   try {

@@ -117,7 +117,7 @@
 
 <script setup>
 import './ContentApp.scss'
-import { ref, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
+import { onUnmounted, defineAsyncComponent } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';

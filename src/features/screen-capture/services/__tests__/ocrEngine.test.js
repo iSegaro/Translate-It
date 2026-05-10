@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { recognize, terminateIfIdle, cleanupOCREngine } from '../ocrEngine.js';
+import { recognize, cleanupOCREngine } from '../ocrEngine.js';
 
 // Mock Tesseract.js
 vi.mock('tesseract.js', () => ({

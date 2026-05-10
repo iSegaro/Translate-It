@@ -1,4 +1,3 @@
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus } from '@/core/PageEventBus.js';

@@ -209,7 +209,7 @@ export function useScreenCapture() {
 
   const cancelSelection = () => {
     // Remove all tracked event listeners
-    activeListeners.value.forEach((listener, key) => {
+    activeListeners.value.forEach((listener) => {
       listener.target.removeEventListener(listener.event, listener.handler);
     });
     activeListeners.value.clear();
@@ -377,7 +377,7 @@ export function useScreenCapture() {
     }
 
     // Ensure all remaining listeners are cleaned up
-    activeListeners.value.forEach((listener, key) => {
+    activeListeners.value.forEach((listener) => {
       listener.target.removeEventListener(listener.event, listener.handler);
     });
     activeListeners.value.clear();

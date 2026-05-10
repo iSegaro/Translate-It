@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ocrCache } from '../utils/ocrCache.js';
-import { toTesseractLanguageCode, OCR_LANGUAGE_MAP, getSupportedOCRCanvasCodes } from '../utils/ocrLanguageMap.js';
+import { toTesseractLanguageCode, getSupportedOCRCanvasCodes } from '../utils/ocrLanguageMap.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 

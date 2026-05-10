@@ -469,7 +469,7 @@ const cancel = () => {
 }
 
 // Mouse tracking
-const handleMouseMove = (event) => {
+const handleMouseMove = (_event) => {
   // Logic for custom cursor was removed to fix double-cursor issue
 }
 
