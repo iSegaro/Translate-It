@@ -431,38 +431,6 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Crosshair */
-.crosshair {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  pointer-events: none;
-  z-index: 2147483648;
-}
-
-.crosshair::before,
-.crosshair::after {
-  content: '';
-  position: absolute;
-  background: var(--ss-accent);
-}
-
-.crosshair::before {
-  left: 50%;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  transform: translateX(-50%);
-}
-
-.crosshair::after {
-  top: 50%;
-  left: 0;
-  height: 1px;
-  width: 100%;
-  transform: translateY(-50%);
-}
-
 /* Responsive design */
 @media (max-width: 768px) {
   .instruction-panel {

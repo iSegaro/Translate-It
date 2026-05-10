@@ -158,13 +158,6 @@
         <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
       </div>
     </div>
-
-    <!-- Crosshair cursor -->
-    <div 
-      v-if="showCrosshair" 
-      class="crosshair"
-      :style="{ left: cursorX + 'px', top: cursorY + 'px' }"
-    />
   </div>
 </template>
 
@@ -302,9 +295,6 @@ watch(error, (newError) => {
 
 // Additional state
 const isHidingForCapture = ref(false)
-const showCrosshair = ref(false)
-const cursorX = ref(0)
-const cursorY = ref(0)
 const selectedOCRLanguage = ref('')
 const isStylesLoaded = ref(false)
 const isCancelled = ref(false)
@@ -472,20 +462,13 @@ const cancel = () => {
   props.onCancel()
 }
 
-// Mouse tracking for crosshair
+// Mouse tracking
 const handleMouseMove = (event) => {
-  cursorX.value = event.clientX
-  cursorY.value = event.clientY
-  
-  if (!isSelecting.value && canCapture.value) {
-    showCrosshair.value = true
-  } else {
-    showCrosshair.value = false
-  }
+  // Logic for custom cursor was removed to fix double-cursor issue
 }
 
 const handleMouseLeave = () => {
-  showCrosshair.value = false
+  // Logic for custom cursor was removed
 }
 
 // Keyboard shortcuts
