@@ -1,7 +1,13 @@
 <template>
   <div 
     class="screen-selector-overlay" 
-    :class="{ selecting: isSelecting, capturing: isCapturing, hidden: isHidingForCapture }"
+    :class="{ 
+      selecting: isSelecting, 
+      capturing: isCapturing, 
+      hidden: isHidingForCapture,
+      'theme-dark': settingsStore.isDarkTheme,
+      'theme-light': !settingsStore.isDarkTheme
+    }"
     @mousedown="startSelection"
     @touchstart="handleTouchStart"
   >
