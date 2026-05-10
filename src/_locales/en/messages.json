@@ -2270,6 +2270,9 @@
   "screen_capture_capturing": {
     "message": "Capturing..."
   },
+  "screen_capture_status_extracting": {
+    "message": "Extracting text..."
+  },
   "screen_capture_select_area": {
     "message": "Select an area to capture"
   },

@@ -365,6 +365,9 @@ watch(downloadedLanguageOptions, selectAvailableOCRLanguage)
 const runCaptureAction = async (captureFn) => {
   isHidingForCapture.value = true
   
+  // Show status notification
+  const statusToastId = notificationManager.showStatus(t('screen_capture_status_extracting'))
+
   // Wait for two frames to ensure the UI is fully hidden by the browser before capturing
   await new Promise(resolve => requestAnimationFrame(() => {
     requestAnimationFrame(resolve)
@@ -381,6 +384,7 @@ const runCaptureAction = async (captureFn) => {
     props.onError(err)
   } finally {
     isHidingForCapture.value = false
+    notificationManager.dismiss(statusToastId)
   }
 }
 

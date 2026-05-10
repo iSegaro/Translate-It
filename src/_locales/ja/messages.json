@@ -2259,7 +2259,10 @@
     "message": "キャンセル"
   },
   "screen_capture_capturing": {
-    "message": "キャプチャ中..."
+    "message": "キャプチャしています..."
+  },
+  "screen_capture_status_extracting": {
+    "message": "テキストを抽出しています..."
   },
   "screen_capture_select_area": {
     "message": "キャプチャする領域を選択"

@@ -2267,6 +2267,9 @@
   "screen_capture_capturing": {
     "message": "در حال ضبط..."
   },
+  "screen_capture_status_extracting": {
+    "message": "در حال استخراج متن..."
+  },
   "screen_capture_select_area": {
     "message": "ناحیه‌ای را برای ضبط انتخاب کنید"
   },
