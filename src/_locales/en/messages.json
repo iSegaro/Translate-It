@@ -1728,7 +1728,10 @@
     "message": "{count} items"
   },
   "history_search_placeholder": {
-    "message": "Search history..."
+    "message": "Search in history..."
+  },
+  "search_placeholder": {
+    "message": "Search..."
   },
   "history_filter": {
     "message": "Filter"

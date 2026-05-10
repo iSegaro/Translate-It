@@ -1688,6 +1688,9 @@
   "history_search_placeholder": {
     "message": "履歴を検索..."
   },
+  "search_placeholder": {
+    "message": "検索..."
+  },
   "history_filter": {
     "message": "フィルター"
   },

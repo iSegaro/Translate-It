@@ -1688,6 +1688,9 @@
   "history_search_placeholder": {
     "message": "جستجو در تاریخچه..."
   },
+  "search_placeholder": {
+    "message": "جستجو..."
+  },
   "history_filter": {
     "message": "فیلتر"
   },

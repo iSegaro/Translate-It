@@ -25,7 +25,17 @@
     </div>
 
     <div class="settings-section">
-      <h3>{{ t('ocr_languages_label') }}</h3>
+      <div class="section-header">
+        <h3>{{ t('ocr_languages_label') }}</h3>
+        <div class="search-box">
+          <input 
+            type="text" 
+            v-model="searchQuery" 
+            :placeholder="t('search_placeholder')"
+            class="search-input"
+          >
+        </div>
+      </div>
       
       <div class="language-list">
         <div 
@@ -82,7 +92,7 @@
 
 <script setup>
 import './OCRTab.scss'
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n'
 import { useSettingsStore } from '@/features/settings/stores/settings'
@@ -92,18 +102,29 @@ const { t } = useUnifiedI18n()
 const ocrStore = useOCRStore()
 const settingsStore = useSettingsStore()
 
+const searchQuery = ref('')
+
 // Priority languages to show at the top
 const PRIORITY_LANGS = ['fas', 'eng', 'ara', 'deu', 'fra', 'spa', 'rus', 'chi_sim', 'chi_tra', 'jpn', 'kor', 'tur']
 
 // Get language names and sort them: Installed > Priority > Alphabetical
 const supportedLanguages = computed(() => {
-  const languages = ocrStore.supportedLanguages.map(code => {
+  let languages = ocrStore.supportedLanguages.map(code => {
     const lang = SUPPORTED_OCR_LANGUAGES.find(l => l.code === code)
     return {
       code,
       name: lang ? lang.name : code
     }
   })
+
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    languages = languages.filter(lang => 
+      lang.name.toLowerCase().includes(query) || 
+      lang.code.toLowerCase().includes(query)
+    )
+  }
 
   return languages.sort((a, b) => {
     const isAInstalled = ocrStore.isDownloaded(a.code)

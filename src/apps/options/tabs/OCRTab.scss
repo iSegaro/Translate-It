@@ -36,6 +36,41 @@
       font-size: 0.85rem;
       margin-bottom: 1rem;
     }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+
+      h3 {
+        margin-bottom: 0;
+      }
+
+      .search-box {
+        flex: 1;
+        max-width: 300px;
+        min-width: 200px;
+
+        .search-input {
+          width: 100%;
+          padding: 0.5rem 0.75rem;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          font-size: 0.85rem;
+          transition: border-color 0.2s;
+
+          &:focus {
+            outline: none;
+            border-color: var(--accent-color);
+          }
+        }
+      }
+    }
   }
 
   .setting-item {
