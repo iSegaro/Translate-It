@@ -554,6 +554,9 @@
   "mobile_dashboard_history_label": {
     "message": "History"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "Capture"
+  },
   "mobile_selection_auto_label": {
     "message": "Auto"
   },

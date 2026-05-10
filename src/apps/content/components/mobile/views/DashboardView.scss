@@ -99,6 +99,7 @@
 /* Specific Icon Colors */
 .ti-m-icon-translate-page { background: #e7f5ff !important; }
 .ti-m-icon-select-element { background: #f3f0ff !important; }
+.ti-m-icon-screen-capture { background: #e3fafb !important; }
 .ti-m-icon-manual-input { background: #ebfbee !important; }
 .ti-m-icon-history { background: #fff9db !important; }
 .ti-m-icon-settings { background: #fff4e6 !important; }
@@ -118,6 +119,7 @@
 .ti-m-dashboard-view.is-dark {
   .ti-m-icon-translate-page { background: rgba(51, 154, 240, 0.15) !important; }
   .ti-m-icon-select-element { background: rgba(132, 94, 247, 0.15) !important; }
+  .ti-m-icon-screen-capture { background: rgba(16, 152, 173, 0.15) !important; }
   .ti-m-icon-manual-input { background: rgba(64, 192, 87, 0.15) !important; }
   .ti-m-icon-history { background: rgba(250, 176, 5, 0.15) !important; }
   .ti-m-icon-settings { background: rgba(253, 126, 20, 0.15) !important; }
@@ -131,7 +133,8 @@
   .ti-m-icon-history,
   .ti-m-icon-settings,
   .ti-m-icon-revert,
-  .ti-m-icon-tts {
+  .ti-m-icon-tts,
+  .ti-m-icon-screen-capture {
     .ti-toolbar-icon {
       filter: invert(1) !important;
     }

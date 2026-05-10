@@ -506,6 +506,9 @@
   "mobile_dashboard_history_label": {
     "message": "履歴"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "キャプチャ"
+  },
   "mobile_selection_auto_label": {
     "message": "自動"
   },
