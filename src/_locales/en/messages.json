@@ -2252,6 +2252,9 @@
   "screen_capture_full_screen": {
     "message": "Full Screen"
   },
+  "screen_capture_ocr_language": {
+    "message": "OCR Language"
+  },
   "screen_capture_cancel": {
     "message": "Cancel"
   },

@@ -211,8 +211,8 @@ export function useExtensionAPI() {
     return await sendMessage(MessageActions.START_SCREEN_CAPTURE);
   };
 
-  const captureScreenArea = async (coordinates) => {
-    return await sendMessage(MessageActions.CAPTURE_SCREEN_AREA, { coordinates });
+  const captureScreenArea = async (coordinates, options = {}) => {
+    return await sendMessage(MessageActions.CAPTURE_SCREEN_AREA, { coordinates, ...options });
   };
 
   // Content script integration

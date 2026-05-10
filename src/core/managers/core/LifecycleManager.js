@@ -202,6 +202,7 @@ class LifecycleManager {
       'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
       'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
       'logError': Handlers.handleLogErrorLazy,
+      [MessageActions.SYNC_OCR_DOWNLOADABLE_LANGUAGES]: Handlers.handleSyncOCRLanguagesLazy,
 
       // Vue Bridge handlers - Lazy loaded for better performance
       'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,

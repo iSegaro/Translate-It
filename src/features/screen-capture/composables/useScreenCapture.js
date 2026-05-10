@@ -144,7 +144,7 @@ export function useScreenCapture() {
     };
   };
 
-  const confirmSelection = async () => {
+  const confirmSelection = async (options = {}) => {
     if (!hasSelection.value || isCapturing.value) return;
 
     try {
@@ -162,7 +162,7 @@ export function useScreenCapture() {
       };
 
       // Capture the screen area
-      const response = await captureScreenArea(coordinates);
+      const response = await captureScreenArea(coordinates, options);
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
@@ -284,13 +284,13 @@ export function useScreenCapture() {
   };
 
   // Full screen capture (no selection needed)
-  const captureFullScreen = async () => {
+  const captureFullScreen = async (options = {}) => {
     try {
       isCapturing.value = true;
       error.value = null;
 
       // Pass null explicitly for full screen to avoid undefined issues in messaging
-      const response = await captureScreenArea(null);
+      const response = await captureScreenArea(null, options);
 
       if (response.success) {
         capturedImage.value = response.data.imageData;

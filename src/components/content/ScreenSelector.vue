@@ -30,10 +30,39 @@
       class="capture-toolbar" 
       :class="{ visible: (isCapturing || !isSelecting) && !isHidingForCapture }"
       @mousedown.stop
+      @touchstart.stop
+      @click.stop
     >
       <div class="toolbar-content">
         <!-- Capture options -->
         <div class="capture-options">
+          <label
+            class="ocr-language-select"
+            :title="$t('screen_capture_ocr_language')"
+          >
+            <span class="ocr-language-label">{{ $t('screen_capture_ocr_language') }}</span>
+            <select
+              v-model="selectedOCRLanguage"
+              class="ocr-language-dropdown"
+              :disabled="isCapturing || downloadedLanguageOptions.length === 0"
+              @change="persistSelectedOCRLanguage"
+            >
+              <option
+                v-if="downloadedLanguageOptions.length === 0"
+                value=""
+              >
+                {{ $t('ocr_status_not_installed') }}
+              </option>
+              <option
+                v-for="lang in downloadedLanguageOptions"
+                :key="lang.code"
+                :value="lang.code"
+              >
+                {{ lang.name }}
+              </option>
+            </select>
+          </label>
+
           <button 
             v-if="allowFullScreen"
             class="toolbar-btn fullscreen-btn"
@@ -69,28 +98,33 @@
         <span>{{ $t('screen_capture_capturing') }}</span>
       </div>
 <!-- Minimal Toolbar Hint -->
-<div v-if="!isCapturing" class="toolbar-hint">
-  <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
-  <span v-if="!hasSelection" class="hint-separator">•</span>
-  <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
-</div>
-</div>
-</div>
+      <div
+        v-if="!isCapturing"
+        class="toolbar-hint"
+      >
+        <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
+        <span v-if="!hasSelection" class="hint-separator">•</span>
+        <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
+      </div>
+    </div>
 
-    
     <!-- Crosshair cursor -->
     <div 
       v-if="showCrosshair" 
       class="crosshair"
       :style="{ left: cursorX + 'px', top: cursorY + 'px' }"
     />
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useScreenCapture } from '@/features/screen-capture/composables/useScreenCapture.js'
+import { useSettingsStore } from '@/features/settings/stores/settings'
+import { SUPPORTED_OCR_LANGUAGES, toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import NotificationManager from '@/core/managers/core/NotificationManager.js'
@@ -98,7 +132,6 @@ import NotificationManager from '@/core/managers/core/NotificationManager.js'
 // Icons
 import FullscreenIcon from '@/icons/ui/whole-page.png'
 import CloseIcon from '@/icons/ui/close.svg'
-import WarningIcon from '@/icons/ui/warning.svg'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ScreenSelector')
 
@@ -107,6 +140,39 @@ const { t } = useUnifiedI18n()
 
 // Resource tracker for memory management
 const tracker = useResourceTracker('screen-selector')
+const settingsStore = useSettingsStore()
+
+/**
+ * Get browser API (cross-platform compatible)
+ */
+const getBrowserAPI = () => {
+  if (typeof browser !== 'undefined') return browser;
+  if (typeof chrome !== 'undefined') return chrome;
+  throw new Error('Extension API not available');
+};
+
+/**
+ * Load downloaded languages from background via messaging
+ */
+const downloadedLanguageCodes = ref([]);
+
+async function loadDownloadedLanguages() {
+  try {
+    const api = getBrowserAPI();
+    const response = await api.runtime.sendMessage({
+      action: MessageActions.SYNC_OCR_DOWNLOADABLE_LANGUAGES
+    });
+
+    if (response?.success && Array.isArray(response.languages)) {
+      downloadedLanguageCodes.value = response.languages;
+      logger.debug('Downloaded languages loaded from background:', response.languages);
+    } else {
+      logger.debug('No downloaded languages found');
+    }
+  } catch (error) {
+    logger.warn('Failed to load downloaded languages from background:', error);
+  }
+}
 
 const props = defineProps({
   onSelect: {
@@ -183,6 +249,55 @@ const isHidingForCapture = ref(false)
 const showCrosshair = ref(false)
 const cursorX = ref(0)
 const cursorY = ref(0)
+const selectedOCRLanguage = ref('')
+
+const downloadedLanguageOptions = computed(() => {
+  return downloadedLanguageCodes.value
+    .map(code => {
+      const language = SUPPORTED_OCR_LANGUAGES.find(item => item.code === code)
+      return {
+        code,
+        name: language?.name || code
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const getCaptureOptions = () => {
+  return selectedOCRLanguage.value
+    ? { ocrLang: selectedOCRLanguage.value }
+    : {}
+}
+
+const selectAvailableOCRLanguage = () => {
+  const downloadedCodes = downloadedLanguageOptions.value.map(lang => lang.code)
+  const configuredCode = toTesseractLanguageCode(settingsStore.settings.OCR_DEFAULT_LANG)
+
+  if (downloadedCodes.includes(selectedOCRLanguage.value)) {
+    return
+  }
+
+  if (downloadedCodes.includes(configuredCode)) {
+    selectedOCRLanguage.value = configuredCode
+    return
+  }
+
+  selectedOCRLanguage.value = downloadedCodes[0] || ''
+}
+
+const persistSelectedOCRLanguage = async () => {
+  if (!selectedOCRLanguage.value) {
+    return
+  }
+
+  try {
+    await settingsStore.updateSettingAndPersist('OCR_DEFAULT_LANG', selectedOCRLanguage.value)
+  } catch (err) {
+    logger.warn('Failed to persist OCR language selection:', err)
+  }
+}
+
+watch(downloadedLanguageOptions, selectAvailableOCRLanguage)
 
 /**
  * Execute a capture action while temporarily hiding the UI
@@ -197,7 +312,7 @@ const runCaptureAction = async (captureFn) => {
   }))
 
   try {
-    const result = await captureFn()
+    const result = await captureFn(getCaptureOptions())
     logger.debug('Action captured successfully')
     emit('select', result)
     props.onSelect(result)
@@ -286,7 +401,7 @@ const handleKeyDown = (event) => {
       break
     case 'f':
     case 'F':
-      if (event.ctrlKey || event.metaKey && props.allowFullScreen) {
+      if ((event.ctrlKey || event.metaKey) && props.allowFullScreen) {
         event.preventDefault()
         captureFullScreen()
       }
@@ -301,6 +416,14 @@ const handleContextMenu = (event) => {
 
 // Lifecycle
 onMounted(async () => {
+  try {
+    await settingsStore.loadSettings();
+    await loadDownloadedLanguages();
+    selectAvailableOCRLanguage();
+  } catch (err) {
+    logger.warn('Failed to load OCR language options:', err)
+  }
+
   // Inject Screen Capture specific styles lazily
   try {
     const { screenCaptureUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
@@ -310,7 +433,7 @@ onMounted(async () => {
       injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
     }
   } catch (error) {
-    console.warn('[ScreenSelector] Failed to load lazy styles:', error);
+    logger.warn('Failed to load lazy styles:', error);
   }
 
   tracker.addEventListener(document, 'mousemove', handleMouseMove)

@@ -162,7 +162,43 @@
 .capture-options,
 .action-buttons {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.ocr-language-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #333;
+  cursor: default;
+}
+
+.ocr-language-label {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ocr-language-dropdown {
+  min-width: 128px;
+  max-width: 180px;
+  height: 28px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fff;
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .toolbar-btn {
@@ -351,6 +387,16 @@
     padding: 6px 8px;
     font-size: 12px;
   }
+
+  .ocr-language-select {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  .ocr-language-dropdown {
+    min-width: 0;
+    flex: 1;
+  }
   
   .btn-text {
     display: none;
@@ -391,6 +437,13 @@
   }
   
   .toolbar-btn {
+    background: #404040;
+    border-color: #555;
+    color: #e0e0e0;
+  }
+
+  .ocr-language-select,
+  .ocr-language-dropdown {
     background: #404040;
     border-color: #555;
     color: #e0e0e0;

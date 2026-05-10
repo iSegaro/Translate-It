@@ -2201,6 +2201,9 @@
   "screen_capture_full_screen": {
     "message": "フルスクリーン"
   },
+  "screen_capture_ocr_language": {
+    "message": "OCR言語"
+  },
   "screen_capture_cancel": {
     "message": "キャンセル"
   },

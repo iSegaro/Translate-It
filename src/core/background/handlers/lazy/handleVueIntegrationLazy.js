@@ -29,6 +29,7 @@ async function loadVueIntegrationHandlers() {
     updateContextMenuModule,
     getExtensionInfoModule,
     logErrorModule,
+    syncOCRLanguagesModule,
     vueBridgeModule
   ] = await Promise.all([
     import('../vue-integration/handleTranslateImage.js'),
@@ -41,6 +42,7 @@ async function loadVueIntegrationHandlers() {
     import('../vue-integration/handleUpdateContextMenu.js'),
     import('../vue-integration/handleGetExtensionInfo.js'),
     import('../vue-integration/handleLogError.js'),
+    import('../vue-integration/handleSyncOCRLanguages.js'),
     import('../vue/handleVueBridge.js')
   ]);
 
@@ -55,6 +57,7 @@ async function loadVueIntegrationHandlers() {
     handleUpdateContextMenu: updateContextMenuModule.handleUpdateContextMenu,
     handleGetExtensionInfo: getExtensionInfoModule.handleGetExtensionInfo,
     handleLogError: logErrorModule.handleLogError,
+    handleSyncOCRLanguages: syncOCRLanguagesModule.handleSyncOCRLanguages,
     handleVueBridge: vueBridgeModule.handleVueBridge
   };
 
@@ -140,6 +143,14 @@ export const handleGetExtensionInfoLazy = async (message, sender, sendResponse) 
 export const handleLogErrorLazy = async (message, sender, sendResponse) => {
   const { handleLogError } = await loadVueIntegrationHandlers();
   return await handleLogError(message, sender, sendResponse);
+};
+
+/**
+ * Lazy handler for SYNC_OCR_DOWNLOADABLE_LANGUAGES
+ */
+export const handleSyncOCRLanguagesLazy = async (message, sender, sendResponse) => {
+  const { handleSyncOCRLanguages } = await loadVueIntegrationHandlers();
+  return await handleSyncOCRLanguages(message, sender, sendResponse);
 };
 
 /**

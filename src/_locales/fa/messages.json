@@ -2207,6 +2207,9 @@
   "screen_capture_full_screen": {
     "message": "صفحه کامل"
   },
+  "screen_capture_ocr_language": {
+    "message": "زبان OCR"
+  },
   "screen_capture_cancel": {
     "message": "لغو"
   },
