@@ -10,42 +10,42 @@
       class="modal-overlay"
       @click="handleOverlayClick"
     >
-        <div
-          class="modal-container"
-          :class="[`size-${size}`, { fullscreen }]"
-          @click.stop
+      <div
+        class="modal-container"
+        :class="[`size-${size}`, { fullscreen }]"
+        @click.stop
+      >
+        <header
+          v-if="title || $slots.header"
+          class="modal-header"
         >
-          <header
-            v-if="title || $slots.header"
-            class="modal-header"
-          >
-            <slot name="header">
-              <h3 class="modal-title">
-                {{ title }}
-              </h3>
-            </slot>
-            <BaseButton
-              v-if="closable"
-              variant="ghost"
-              size="sm"
-              icon="close"
-              class="close-button"
-              @click="handleClose"
-            />
-          </header>
+          <slot name="header">
+            <h3 class="modal-title">
+              {{ title }}
+            </h3>
+          </slot>
+          <BaseButton
+            v-if="closable"
+            variant="ghost"
+            size="sm"
+            icon="close"
+            class="close-button"
+            @click="handleClose"
+          />
+        </header>
           
-          <div class="modal-body">
-            <slot />
-          </div>
-          
-          <footer
-            v-if="$slots.footer"
-            class="modal-footer"
-          >
-            <slot name="footer" />
-          </footer>
+        <div class="modal-body">
+          <slot />
         </div>
+          
+        <footer
+          v-if="$slots.footer"
+          class="modal-footer"
+        >
+          <slot name="footer" />
+        </footer>
       </div>
+    </div>
   </Transition>
 </template>
 

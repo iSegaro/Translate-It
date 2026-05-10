@@ -85,7 +85,7 @@
                   alt="Settings" 
                   width="14"
                   height="14"
-                />
+                >
               </button>
             </div>
           </label>
@@ -103,7 +103,7 @@
               alt="Full Screen" 
               width="16"
               height="16"
-            />
+            >
             <span class="btn-text">{{ $t('screen_capture_full_screen') }}</span>
           </button>
         </div>
@@ -122,7 +122,7 @@
               alt="Cancel" 
               width="16"
               height="16"
-            />
+            >
             <span class="btn-text">{{ $t('screen_capture_cancel') }}</span>
           </button>
         </div>
@@ -136,12 +136,15 @@
         <div class="loading-spinner" />
         <span>{{ $t('screen_capture_capturing') }}</span>
       </div>
-<!-- Minimal Toolbar Hint -->
+      <!-- Minimal Toolbar Hint -->
       <div
         v-if="!isCapturing"
         class="toolbar-hint"
       >
-        <span v-if="!hasSelection" class="hint-text">
+        <span
+          v-if="!hasSelection"
+          class="hint-text"
+        >
           <template v-if="canCapture">
             {{ $t('screen_capture_drag_to_select') }}
           </template>
@@ -154,7 +157,10 @@
             >{{ $t('screen_capture_missing_model_action') }}</a>
           </template>
         </span>
-        <span v-if="!hasSelection" class="hint-separator">•</span>
+        <span
+          v-if="!hasSelection"
+          class="hint-separator"
+        >•</span>
         <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
       </div>
     </div>

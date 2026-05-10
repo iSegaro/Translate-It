@@ -2,7 +2,9 @@
   <div class="ocr-tab">
     <div class="tab-header">
       <h2>{{ t('ocr_tab_title') }}</h2>
-      <p class="tab-description">{{ t('ocr_tab_desc') }}</p>
+      <p class="tab-description">
+        {{ t('ocr_tab_desc') }}
+      </p>
     </div>
 
     <!-- OCR Toggle Section -->
@@ -13,27 +15,37 @@
           v-model="enableScreenCapture"
           :label="t('ocr_enabled_label')"
         />
-        <p class="setting-description">{{ t('ocr_enabled_desc') }}</p>
+        <p class="setting-description">
+          {{ t('ocr_enabled_desc') }}
+        </p>
       </div>
 
-      <div class="setting-group" :class="{ 'is-disabled': !enableScreenCapture }">
+      <div
+        class="setting-group"
+        :class="{ 'is-disabled': !enableScreenCapture }"
+      >
         <BaseCheckbox
           id="PAGE_CONTEXT_SCREEN_CAPTURE"
           v-model="showInContextMenu"
           :label="t('ocr_context_menu_label')"
           :disabled="!enableScreenCapture"
         />
-        <p class="setting-description">{{ t('ocr_context_menu_desc') }}</p>
+        <p class="setting-description">
+          {{ t('ocr_context_menu_desc') }}
+        </p>
       </div>
     </div>
 
-    <div class="settings-section" :class="{ 'is-disabled': !enableScreenCapture }">
+    <div
+      class="settings-section"
+      :class="{ 'is-disabled': !enableScreenCapture }"
+    >
       <div class="languages-header">
         <h3>{{ t('ocr_languages_label') }}</h3>
         <div class="search-box">
           <input 
-            type="text" 
             v-model="searchQuery" 
+            type="text" 
             :placeholder="t('search_placeholder')"
             class="search-input"
           >
