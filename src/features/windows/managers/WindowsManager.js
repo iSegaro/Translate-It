@@ -254,7 +254,9 @@ export class WindowsManager extends ResourceTracker {
     this.logger.info('Selection trigger received (Global)', { textLength: text?.length, options });
     
     if (text && position) {
-      await this._showWindow(text, position, options);
+      // Use public show() method instead of _showWindow to benefit from 
+      // mobile redirection and permission checks.
+      await this.show(text, position, options);
     }
   }
 
@@ -347,7 +349,7 @@ export class WindowsManager extends ResourceTracker {
     if (this.shouldUseMobileUI()) {
       if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
         this.logger.info('Mobile + Immediate mode: showing mobile sheet immediately');
-        await this._showMobileSheet(selectedText);
+        await this._showMobileSheet(selectedText, options);
         return;
       } 
       
@@ -415,11 +417,12 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Show mobile-specific bottom sheet
    * @param {string} selectedText - Selected text to translate
+   * @param {Object} options - Translation options
    */
-  async _showMobileSheet(selectedText) {
+  async _showMobileSheet(selectedText, options = {}) {
     if (!selectedText) return;
 
-    this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length });
+    this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length, options });
 
     this.state.setOriginalText(selectedText);
     this.state.setTranslationCancelled(false);
@@ -430,12 +433,13 @@ export class WindowsManager extends ResourceTracker {
       text: selectedText,
       view: MOBILE_CONSTANTS.VIEWS.SELECTION,
       state: MOBILE_CONSTANTS.SHEET_STATE.PEEK,
-      isLoading: true
+      isLoading: true,
+      mode: options.mode || null
     });
 
     try {
       // Start translation process
-      const translationResult = await this._startTranslationProcess(selectedText);
+      const translationResult = await this._startTranslationProcess(selectedText, null, options);
 
       if (!translationResult) {
         this.logger.info('Mobile translation cancelled');
@@ -448,7 +452,8 @@ export class WindowsManager extends ResourceTracker {
         translation: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         targetLanguage: translationResult.targetLanguage,
-        isLoading: false
+        isLoading: false,
+        mode: options.mode || null
       });
       
     } catch (error) {
@@ -461,7 +466,8 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         isStreaming: false,
         isError: true,
-        error: errorInfo.message
+        error: errorInfo.message,
+        mode: options.mode || null
       });
     }
   }
