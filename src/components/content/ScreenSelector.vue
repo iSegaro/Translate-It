@@ -183,7 +183,7 @@ import { openOptionsPage } from '@/core/helpers.js'
 import { screenCaptureCoordinator } from '@/features/screen-capture/services/ScreenCaptureCoordinator.js'
 
 // Icons
-import FullscreenIcon from '@/icons/ui/whole-page.png'
+import FullscreenIcon from '@/icons/ui/full-screen-capture.svg'
 import CloseIcon from '@/icons/ui/close.svg'
 import SettingsIcon from '@/icons/ui/settings.png'
 
