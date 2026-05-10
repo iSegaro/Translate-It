@@ -65,7 +65,10 @@ export default function useFabSelection(options = {}) {
     // Emit global trigger event - Coordinator will handle the rest
     pageEventBus.emit(SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, {
       text: pendingSelection.value.text,
-      position: pendingSelection.value.position
+      position: pendingSelection.value.position,
+      options: {
+        immediate: true // Ensure window shows immediately regardless of selection mode
+      }
     });
 
     // Reset local state for responsiveness

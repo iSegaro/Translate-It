@@ -13,7 +13,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
 import settingsManager from '@/shared/managers/SettingsManager.js';
-import { state, SelectionTranslationMode } from "@/shared/config/config.js";
+import { state, SelectionTranslationMode, TranslationMode } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
@@ -325,13 +325,18 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    // Get current mode from settings (allow override via options.immediate)
-    const selectionTranslationMode = options.immediate 
+    // Explicit actions (OCR, Manual triggers) should bypass the selection mode settings
+    // and always trigger immediate UI display.
+    const isExplicitAction = options.immediate === true || 
+                             options.mode === TranslationMode.ScreenCapture;
+
+    // Get current mode from settings (allow override via options.immediate or explicit actions)
+    const selectionTranslationMode = (options.immediate || isExplicitAction)
       ? SelectionTranslationMode.IMMEDIATE 
       : settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
     // 2. Check for interaction conditions (e.g., Ctrl requirement)
-    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE && !options.immediate) {
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE && !options.immediate && !isExplicitAction) {
       const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
       if (requireCtrl && options.ctrlPressed !== true) {
         this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
@@ -373,8 +378,8 @@ export class WindowsManager extends ResourceTracker {
     const isOnFabClickMode = selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK;
     
     // If the main feature is disabled, we MUST preserve selection for external modules (like FAB)
-    // and skip our own internal UI display.
-    if (!isTextSelectionEnabled) {
+    // and skip our own internal UI display, UNLESS it's an explicit action.
+    if (!isTextSelectionEnabled && !isExplicitAction) {
       this.logger.debug('TRANSLATE_ON_TEXT_SELECTION is disabled, preserving for external modules and skipping internal UI');
       this.state.setOriginalText(selectedText);
       await this.dismiss(false, true); // Force preserveSelection = true
@@ -398,7 +403,7 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
+      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK && !isExplicitAction) {
         this.logger.info('onFabClick mode: selection handled by external UI (like FAB)', { textLength: selectedText?.length });
         this.state.setOriginalText(selectedText);
         
