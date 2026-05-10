@@ -2225,6 +2225,12 @@
   "ocr_enabled_desc": {
     "message": "画像からテキストを抽出し、翻訳することを許可します。"
   },
+  "ocr_context_menu_label": {
+    "message": "コンテキストメニューに表示"
+  },
+  "ocr_context_menu_desc": {
+    "message": "画面上のテキストを右クリックした際に、翻訳オプションを表示します。"
+  },
   "ocr_languages_label": {
     "message": "OCR言語"
   },

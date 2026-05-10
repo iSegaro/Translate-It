@@ -317,6 +317,7 @@ export const CONFIG = {
   // --- UI & Styling ---
   CONTEXT_MENU_VISIBILITY: {
     PAGE_CONTEXT_SELECT_ELEMENT: true,    // نمایش در کلیک‌راست صفحات
+    PAGE_CONTEXT_SCREEN_CAPTURE: true,    // نمایش تصویربرداری در کلیک‌راست صفحات
     ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
     ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
     ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون

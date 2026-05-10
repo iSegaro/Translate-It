@@ -2231,6 +2231,12 @@
   "ocr_enabled_desc": {
     "message": "قابلیت استخراج متن از تصاویر و ترجمه آن را فعال می‌کند."
   },
+  "ocr_context_menu_label": {
+    "message": "نمایش در منوی راست‌کلیک"
+  },
+  "ocr_context_menu_desc": {
+    "message": "اضافه کردن به منوی راست‌کلیک صفحات."
+  },
   "ocr_languages_label": {
     "message": "زبان‌های OCR"
   },

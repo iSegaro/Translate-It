@@ -15,6 +15,16 @@
         />
         <p class="setting-description">{{ t('ocr_enabled_desc') }}</p>
       </div>
+
+      <div class="setting-group" :class="{ 'is-disabled': !enableScreenCapture }">
+        <BaseCheckbox
+          id="PAGE_CONTEXT_SCREEN_CAPTURE"
+          v-model="showInContextMenu"
+          :label="t('ocr_context_menu_label')"
+          :disabled="!enableScreenCapture"
+        />
+        <p class="setting-description">{{ t('ocr_context_menu_desc') }}</p>
+      </div>
     </div>
 
     <div class="settings-section" :class="{ 'is-disabled': !enableScreenCapture }">
@@ -107,6 +117,13 @@ const searchQuery = ref('')
 
 // Settings
 const enableScreenCapture = createSetting('ENABLE_SCREEN_CAPTURE', true)
+const showInContextMenu = createSetting('CONTEXT_MENU_VISIBILITY', {}, {
+  transformGet: (visibility) => visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false,
+  transformSet: (value) => {
+    const current = settingsStore.settings?.CONTEXT_MENU_VISIBILITY || {}
+    return { ...current, PAGE_CONTEXT_SCREEN_CAPTURE: value }
+  }
+})
 
 // Priority languages to show at the top
 const PRIORITY_LANGS = ['fas', 'eng', 'ara', 'deu', 'fra', 'spa', 'rus', 'chi_sim', 'chi_tra', 'jpn', 'kor', 'tur']

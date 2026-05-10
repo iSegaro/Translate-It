@@ -269,6 +269,12 @@
   "ocr_enabled_desc": {
     "message": "Allow extracting text from images and translating it."
   },
+  "ocr_context_menu_label": {
+    "message": "Show in Context Menu"
+  },
+  "ocr_context_menu_desc": {
+    "message": "Add it to the page's right-click menu"
+  },
   "ocr_languages_label": {
     "message": "OCR Languages"
   },

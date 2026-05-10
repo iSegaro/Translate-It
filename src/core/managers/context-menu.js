@@ -399,7 +399,7 @@ export class ContextMenuManager extends ResourceTracker {
       }
 
       // --- 1.5. Create Screen Capture Menu ---
-      if (isScreenCaptureEnabled) {
+      if (isScreenCaptureEnabled && visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false) {
         try {
           let captureMenuTitle =
             (await getTranslationString("context_menu_translate_screen", locale)) ||

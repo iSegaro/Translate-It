@@ -32,6 +32,13 @@
     }
 
     .setting-group {
+      transition: all 0.3s ease;
+
+      &.is-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
       .setting-description {
         display: block;
         margin-top: 0.5rem;
