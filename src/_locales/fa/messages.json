@@ -2210,6 +2210,48 @@
   "screen_capture_ocr_language": {
     "message": "زبان OCR"
   },
+  "ocr_tab_title": {
+    "message": "تشخیص متن (OCR)"
+  },
+  "ocr_tab_desc": {
+    "message": "مدیریت زبان‌ها و تنظیمات تشخیص متن از روی تصویر (OCR)."
+  },
+  "ocr_languages_label": {
+    "message": "زبان‌های OCR"
+  },
+  "ocr_download_button": {
+    "message": "دانلود"
+  },
+  "ocr_delete_button": {
+    "message": "حذف"
+  },
+  "ocr_status_installed": {
+    "message": "نصب شده"
+  },
+  "ocr_status_not_installed": {
+    "message": "نصب نشده"
+  },
+  "ocr_auto_download_label": {
+    "message": "دانلود خودکار زبان‌های مورد نیاز"
+  },
+  "ocr_auto_download_desc": {
+    "message": "در صورت فعال بودن، هنگام شروع تصویربرداری اگر مدل زبان موجود نباشد، به طور خودکار دانلود می‌شود."
+  },
+  "ocr_cache_clear_button": {
+    "message": "پاکسازی حافظه OCR"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "تمام مدل‌های زبان دانلود شده را برای آزادسازی فضا از حافظه داخلی حذف می‌کند."
+  },
+  "ocr_download_progress": {
+    "message": "در حال دانلود {lang}: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "مدل {lang} با موفقیت دانلود شد."
+  },
+  "ocr_download_error": {
+    "message": "خطا در دانلود مدل {lang}."
+  },
   "screen_capture_cancel": {
     "message": "لغو"
   },

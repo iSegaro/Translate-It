@@ -2204,6 +2204,48 @@
   "screen_capture_ocr_language": {
     "message": "OCR言語"
   },
+  "ocr_tab_title": {
+    "message": "スクリーンOCR"
+  },
+  "ocr_tab_desc": {
+    "message": "画面上のテキスト認識 (OCR) の言語と設定を管理します。"
+  },
+  "ocr_languages_label": {
+    "message": "OCR言語"
+  },
+  "ocr_download_button": {
+    "message": "ダウンロード"
+  },
+  "ocr_delete_button": {
+    "message": "削除"
+  },
+  "ocr_status_installed": {
+    "message": "インストール済み"
+  },
+  "ocr_status_not_installed": {
+    "message": "未インストール"
+  },
+  "ocr_auto_download_label": {
+    "message": "必要な言語を自動ダウンロード"
+  },
+  "ocr_auto_download_desc": {
+    "message": "スクリーンキャプチャ開始時に言語モデルがない場合、自動的にダウンロードします。"
+  },
+  "ocr_cache_clear_button": {
+    "message": "OCRキャッシュをクリア"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "ダウンロード済みのすべての言語モデルをローカルストレージから削除して空き容量を増やします。"
+  },
+  "ocr_download_progress": {
+    "message": "{lang} をダウンロード中: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "{lang} モデルのダウンロードが完了しました。"
+  },
+  "ocr_download_error": {
+    "message": "{lang} モデルのダウンロードに失敗しました。"
+  },
   "screen_capture_cancel": {
     "message": "キャンセル"
   },
