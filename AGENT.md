@@ -123,6 +123,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - **`docs/technical/CSS_ARCHITECTURE.md`**: Modern CSS Architecture.
 - **`docs/technical/UI_HOST_SYSTEM.md`**: UI Host architecture.
 - **`docs/technical/SELECT_ELEMENT_SYSTEM.md`**: Redesigned Element Selection System.
+- **`docs/technical/SCREEN_CAPTURE_SYSTEM.md`**: **Screen Capture System** – Interactive area capture and Tesseract.js OCR engine.
 
 ## Additional Resources
 - **`docs/Images/`**: Architectural images and diagrams.
