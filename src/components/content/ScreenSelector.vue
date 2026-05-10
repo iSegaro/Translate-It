@@ -180,6 +180,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import NotificationManager from '@/core/managers/core/NotificationManager.js'
 import { openOptionsPage } from '@/core/helpers.js'
+import { screenCaptureCoordinator } from '@/features/screen-capture/services/ScreenCaptureCoordinator.js'
 
 // Icons
 import FullscreenIcon from '@/icons/ui/whole-page.png'
@@ -306,6 +307,8 @@ const cursorX = ref(0)
 const cursorY = ref(0)
 const selectedOCRLanguage = ref('')
 const isStylesLoaded = ref(false)
+const isCancelled = ref(false)
+const activeStatusToastId = ref(null)
 
 const canCapture = computed(() => downloadedLanguageOptions.value.length > 0)
 const isRTL = computed(() => t('IsRTL') === 'true')
@@ -363,10 +366,15 @@ watch(downloadedLanguageOptions, selectAvailableOCRLanguage)
  * @param {Function} captureFn The capture function to execute
  */
 const runCaptureAction = async (captureFn) => {
+  const captureId = Date.now()
+  isCancelled.value = false
   isHidingForCapture.value = true
   
+  // Start session in coordinator to track result
+  screenCaptureCoordinator.startSession(captureId)
+
   // Show status notification
-  const statusToastId = notificationManager.showStatus(t('screen_capture_status_extracting'))
+  activeStatusToastId.value = notificationManager.showStatus(t('screen_capture_status_extracting'))
 
   // Wait for two frames to ensure the UI is fully hidden by the browser before capturing
   await new Promise(resolve => requestAnimationFrame(() => {
@@ -374,17 +382,30 @@ const runCaptureAction = async (captureFn) => {
   }))
 
   try {
-    const result = await captureFn(getCaptureOptions())
+    const result = await captureFn({ ...getCaptureOptions(), captureId })
+    
+    // If user cancelled during the async process, ignore the result
+    if (isCancelled.value) {
+      logger.debug('Capture action completed but user had already cancelled')
+      return
+    }
+
     logger.debug('Action captured successfully')
     emit('select', result)
     props.onSelect(result)
   } catch (err) {
-    logger.error('Capture action failed:', err)
-    emit('error', err)
-    props.onError(err)
+    // Only show/emit error if not cancelled
+    if (!isCancelled.value) {
+      logger.error('Capture action failed:', err)
+      emit('error', err)
+      props.onError(err)
+    }
   } finally {
     isHidingForCapture.value = false
-    notificationManager.dismiss(statusToastId)
+    if (activeStatusToastId.value) {
+      notificationManager.dismiss(activeStatusToastId.value)
+      activeStatusToastId.value = null
+    }
   }
 }
 
@@ -435,6 +456,17 @@ const openOCRSettings = () => {
 
 const cancel = () => {
   logger.debug('Cancel clicked!')
+  isCancelled.value = true
+  
+  // Cancel session in coordinator
+  screenCaptureCoordinator.cancelSession()
+
+  // Immediately dismiss the processing toast if it exists
+  if (activeStatusToastId.value) {
+    notificationManager.dismiss(activeStatusToastId.value)
+    activeStatusToastId.value = null
+  }
+
   cancelSelection()
   emit('cancel')
   props.onCancel()

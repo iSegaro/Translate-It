@@ -15,6 +15,24 @@ export class ScreenCaptureCoordinator {
     // Current target for OCR results.
     // Future values could include 'sidepanel' or 'mobilesheet'
     this.target = 'window'; 
+    this.activeSessionId = null;
+  }
+
+  /**
+   * Start a new capture session to track results.
+   * @param {number} sessionId - Unique session ID (e.g. Date.now())
+   */
+  startSession(sessionId) {
+    this.activeSessionId = sessionId;
+    logger.debug(`Started new OCR session: ${sessionId}`);
+  }
+
+  /**
+   * Cancel the current session. Results with this ID will be ignored.
+   */
+  cancelSession() {
+    logger.debug(`Cancelled OCR session: ${this.activeSessionId}`);
+    this.activeSessionId = null;
   }
 
   /**
@@ -25,10 +43,22 @@ export class ScreenCaptureCoordinator {
    * @param {Object} data.coordinates - Captured area coordinates (device pixels)
    * @param {string} data.captureType - 'area' | 'fullscreen'
    * @param {number} data.timestamp - Unix timestamp
+   * @param {number} data.captureId - The session ID this result belongs to
    */
   async handleResult(data) {
-    const { text, coordinates, captureType = 'area' } = data;
+    const { text, coordinates, captureType = 'area', captureId } = data;
     
+    // Validate session
+    if (captureId && this.activeSessionId && captureId !== this.activeSessionId) {
+      logger.debug(`Ignoring OCR result from stale session: ${captureId} (Current: ${this.activeSessionId})`);
+      return;
+    }
+
+    if (!this.activeSessionId && captureId) {
+      logger.debug(`Ignoring OCR result as session was cancelled: ${captureId}`);
+      return;
+    }
+
     if (!text || text.trim().length === 0) {
       logger.debug('No text extracted, skipping dispatch. Text was empty or null.');
       return;
@@ -37,7 +67,8 @@ export class ScreenCaptureCoordinator {
     logger.info(`Routing OCR result to: ${this.target}`, { 
       textLength: text.length,
       captureType,
-      hasCoordinates: !!coordinates
+      hasCoordinates: !!coordinates,
+      captureId
     });
 
     try {
@@ -51,6 +82,11 @@ export class ScreenCaptureCoordinator {
       }
     } catch (error) {
       logger.error(`Failed to route OCR result to ${this.target}:`, error);
+    } finally {
+      // Clear session after processing (or if it was a one-off result)
+      if (captureId === this.activeSessionId) {
+        this.activeSessionId = null;
+      }
     }
   }
 

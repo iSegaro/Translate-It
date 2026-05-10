@@ -13,7 +13,7 @@ const errorHandler = new ErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCaptureScreenArea');
 
 export async function handleCaptureScreenArea(message, sender, sendResponse) {
-  const { coordinates, ocrLang: requestedOcrLang } = message.data;
+  const { coordinates, ocrLang: requestedOcrLang, captureId } = message.data;
 
   try {
     // 1. Capture visible tab
@@ -85,7 +85,8 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       imageData,
       coordinates,
       timestamp: Date.now(),
-      captureType: coordinates ? 'area' : 'fullscreen'
+      captureType: coordinates ? 'area' : 'fullscreen',
+      captureId
     };
 
     // Send the OCR result message to the tab that requested it (non-blocking)
