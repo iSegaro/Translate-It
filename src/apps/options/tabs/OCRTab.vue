@@ -86,7 +86,7 @@ import { onMounted, computed } from 'vue'
 import { useOCRStore } from '@/features/screen-capture/stores/ocrStore.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n'
 import { useSettingsStore } from '@/features/settings/stores/settings'
-import { basicLanguageList } from '@/utils/i18n/languages'
+import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 
 const { t } = useUnifiedI18n()
 const ocrStore = useOCRStore()
@@ -95,13 +95,14 @@ const settingsStore = useSettingsStore()
 // Get language names for supported OCR languages
 const supportedLanguages = computed(() => {
   return ocrStore.supportedLanguages.map(code => {
-    const lang = basicLanguageList.find(l => l.code === code)
+    const lang = SUPPORTED_OCR_LANGUAGES.find(l => l.code === code)
     return {
       code,
-      name: lang ? lang.name : code.toUpperCase()
+      name: lang ? lang.name : code
     }
   })
 })
+
 
 onMounted(async () => {
   await ocrStore.init()
