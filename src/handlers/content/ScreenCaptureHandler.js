@@ -39,6 +39,13 @@ export class ScreenCaptureHandler {
     logger.info('START_SCREEN_CAPTURE received', message.data);
 
     try {
+      // 1. FAST FAIL: Only handle screen capture UI in the top frame
+      // Browser viewport capture always captures the whole visible tab area.
+      if (window !== window.top) {
+        logger.debug('Ignoring screen capture request in iframe');
+        return { success: true, ignored: true };
+      }
+
       this.isActive = true;
       window.isScreenCaptureActive = true;
 
