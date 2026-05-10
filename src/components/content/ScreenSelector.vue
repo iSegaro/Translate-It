@@ -7,11 +7,12 @@
       hidden: isHidingForCapture,
       'theme-dark': settingsStore.isDarkTheme,
       'theme-light': !settingsStore.isDarkTheme,
-      'is-ready': isStylesLoaded
+      'is-ready': isStylesLoaded,
+      'no-languages': !canCapture
     }"
     :style="!isStylesLoaded ? { display: 'none' } : {}"
-    @mousedown="startSelection"
-    @touchstart="handleTouchStart"
+    @mousedown="canCapture ? startSelection($event) : null"
+    @touchstart="canCapture ? handleTouchStart($event) : null"
   >
     <!-- Selection box -->
     <div 
@@ -90,7 +91,7 @@
           <button 
             v-if="allowFullScreen"
             class="toolbar-btn fullscreen-btn"
-            :disabled="isCapturing"
+            :disabled="isCapturing || !canCapture"
             :title="$t('screen_capture_full_screen')"
             @click="captureFullScreen"
           >
@@ -138,7 +139,9 @@
         v-if="!isCapturing"
         class="toolbar-hint"
       >
-        <span v-if="!hasSelection" class="hint-text">{{ $t('screen_capture_drag_to_select') }}</span>
+        <span v-if="!hasSelection" class="hint-text">
+          {{ canCapture ? $t('screen_capture_drag_to_select') : $t('ocr_status_not_installed') }}
+        </span>
         <span v-if="!hasSelection" class="hint-separator">•</span>
         <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
       </div>
@@ -292,6 +295,8 @@ const cursorY = ref(0)
 const selectedOCRLanguage = ref('')
 const isStylesLoaded = ref(false)
 
+const canCapture = computed(() => downloadedLanguageOptions.value.length > 0)
+
 const downloadedLanguageOptions = computed(() => {
   return downloadedLanguageCodes.value
     .map(code => {
@@ -423,8 +428,10 @@ const handleMouseMove = (event) => {
   cursorX.value = event.clientX
   cursorY.value = event.clientY
   
-  if (!isSelecting.value) {
+  if (!isSelecting.value && canCapture.value) {
     showCrosshair.value = true
+  } else {
+    showCrosshair.value = false
   }
 }
 
@@ -447,7 +454,7 @@ const handleKeyDown = (event) => {
       break
     case 'f':
     case 'F':
-      if ((event.ctrlKey || event.metaKey) && props.allowFullScreen) {
+      if ((event.ctrlKey || event.metaKey) && props.allowFullScreen && canCapture.value) {
         event.preventDefault()
         captureFullScreen()
       }
