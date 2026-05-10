@@ -1230,7 +1230,10 @@
     "message": "بازگردانی (Esc کلید)"
   },
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
-    "message": "انتخاب المان با موس"
+    "message": "انتخاب المان"
+  },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "استخراج متن از تصویر (OCR)"
   },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "ورودی (خودکار)"

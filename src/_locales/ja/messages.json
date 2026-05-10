@@ -1232,6 +1232,9 @@
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
     "message": "要素を選択"
   },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "スクリーンキャプチャ (OCR)"
+  },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "入力（自動）"
   },

@@ -1286,6 +1286,9 @@
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
     "message": "Select Element"
   },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "Screen Capture (OCR)"
+  },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "Input (Auto)"
   },

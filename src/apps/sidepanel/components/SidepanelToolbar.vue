@@ -46,6 +46,23 @@
         />
       </div>
 
+      <!-- Screen Capture Button -->
+      <button
+        v-if="isScreenCaptureEnabled"
+        id="screenCaptureBtn"
+        class="toolbar-button"
+        :title="t('SIDEPANEL_SCREEN_CAPTURE_TOOLTIP')"
+        @click="handleScreenCapture"
+        @keydown.enter.prevent="handleScreenCapture"
+        @keydown.space.prevent="handleScreenCapture"
+      >
+        <img
+          :src="captureIcon"
+          alt="Screen Capture"
+          class="toolbar-icon"
+        >
+      </button>
+
       <div class="toolbar-separator" />
 
       <ProviderSelector
@@ -101,6 +118,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -193,10 +212,15 @@ const isWholePageEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true)
 })
 
+const isScreenCaptureEnabled = computed(() => {
+  return isExtensionEnabledGlobal.value && (settingsStore.settings?.ENABLE_SCREEN_CAPTURE ?? true)
+})
+
 // Icon URLs using runtime.getURL
 const selectIcon = browser.runtime.getURL('icons/ui/select.png')
 const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
+const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
 
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
@@ -272,6 +296,18 @@ const handleRevertAction = async () => {
   } catch (error) {
     getLogger().error('[SidepanelToolbar] Unexpected error in handleRevertAction:', error)
     showVisualFeedback(document.getElementById('revertActionBtn'), 'error')
+  }
+}
+
+const handleScreenCapture = async () => {
+  getLogger().debug('Screen Capture button clicked!')
+  try {
+    await sendMessage({ action: MessageActions.START_SCREEN_CAPTURE })
+    showVisualFeedback(document.getElementById('screenCaptureBtn'), 'success')
+  } catch (error) {
+    getLogger().error('Screen Capture error:', error)
+    showVisualFeedback(document.getElementById('screenCaptureBtn'), 'error')
+    await handleError(error, 'SidepanelToolbar-screenCapture')
   }
 }
 
