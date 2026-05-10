@@ -2288,6 +2288,12 @@
   "screen_capture_error_model_missing": {
     "message": "言語モデルがインストールされていません。OCR設定からダウンロードしてください。"
   },
+  "screen_capture_missing_model_status": {
+    "message": "言語モデルがインストールされていません。"
+  },
+  "screen_capture_missing_model_action": {
+    "message": "OCR設定からダウンロードしてください。"
+  },
   "screen_capture_retry": {
     "message": "再試行"
   }

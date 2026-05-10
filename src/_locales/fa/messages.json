@@ -2294,6 +2294,12 @@
   "screen_capture_error_model_missing": {
     "message": "مدل زبان نصب نشده است. لطفاً آن را از تنظیمات OCR دانلود کنید."
   },
+  "screen_capture_missing_model_status": {
+    "message": "مدل زبان نصب نشده است. "
+  },
+  "screen_capture_missing_model_action": {
+    "message": "لطفا آن را از تنظیمات OCR دانلود کنید."
+  },
   "screen_capture_retry": {
     "message": "تلاش مجدد"
   }

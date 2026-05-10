@@ -8,8 +8,10 @@
       'theme-dark': settingsStore.isDarkTheme,
       'theme-light': !settingsStore.isDarkTheme,
       'is-ready': isStylesLoaded,
-      'no-languages': !canCapture
+      'no-languages': !canCapture,
+      'rtl': isRTL
     }"
+    :dir="isRTL ? 'rtl' : 'ltr'"
     :style="!isStylesLoaded ? { display: 'none' } : {}"
     @mousedown="canCapture ? startSelection($event) : null"
     @touchstart="canCapture ? handleTouchStart($event) : null"
@@ -140,7 +142,17 @@
         class="toolbar-hint"
       >
         <span v-if="!hasSelection" class="hint-text">
-          {{ canCapture ? $t('screen_capture_drag_to_select') : $t('screen_capture_error_model_missing') }}
+          <template v-if="canCapture">
+            {{ $t('screen_capture_drag_to_select') }}
+          </template>
+          <template v-else>
+            {{ $t('screen_capture_missing_model_status') }}
+            <a 
+              href="#" 
+              class="hint-link" 
+              @click.prevent="openOCRSettings"
+            >{{ $t('screen_capture_missing_model_action') }}</a>
+          </template>
         </span>
         <span v-if="!hasSelection" class="hint-separator">•</span>
         <span class="hint-shortcut"><kbd>ESC</kbd> {{ $t('screen_capture_cancel') }}</span>
@@ -296,6 +308,7 @@ const selectedOCRLanguage = ref('')
 const isStylesLoaded = ref(false)
 
 const canCapture = computed(() => downloadedLanguageOptions.value.length > 0)
+const isRTL = computed(() => t('IsRTL') === 'true')
 
 const downloadedLanguageOptions = computed(() => {
   return downloadedLanguageCodes.value

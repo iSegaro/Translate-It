@@ -2297,6 +2297,12 @@
   "screen_capture_error_model_missing": {
     "message": "Language model not installed. Please download it from OCR settings."
   },
+  "screen_capture_missing_model_status": {
+    "message": "Language model not installed. "
+  },
+  "screen_capture_missing_model_action": {
+    "message": "Please download it from OCR settings."
+  },
   "screen_capture_retry": {
     "message": "Retry"
   }
