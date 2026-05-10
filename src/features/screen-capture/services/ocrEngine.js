@@ -4,12 +4,24 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCREngine');
+const REMOTE_LANG_PATH = 'https://tessdata.projectnaptha.com/4.0.0_fast';
+const TESSERACT_CACHE_PATH = '.';
 
 let worker = null;
 let currentLang = null;
 let lastUsedTime = Date.now();
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 let idleInterval = null;
+
+async function getOCRAutoDownloadEnabled() {
+  try {
+    const result = await browser.storage?.local?.get?.('OCR_AUTO_DOWNLOAD');
+    return result?.OCR_AUTO_DOWNLOAD !== false;
+  } catch (error) {
+    logger.debug('Falling back to enabled OCR auto-download setting', error);
+    return true;
+  }
+}
 
 /**
  * Initialize Tesseract Worker
@@ -30,13 +42,15 @@ async function initWorker(lang) {
   // Use absolute URLs for all assets
   const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
   const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
-  // Use the fast models which are smaller and better for extensions
-  const langPath = 'https://tessdata.projectnaptha.com/4.0.0_fast';
+  const autoDownload = await getOCRAutoDownloadEnabled();
+  const cacheMethod = autoDownload ? 'write' : 'readOnly';
 
   logger.debug(`Initializing worker for ${lang}`, {
     workerPath,
     corePath,
-    langPath
+    langPath: REMOTE_LANG_PATH,
+    cachePath: TESSERACT_CACHE_PATH,
+    cacheMethod
   });
 
   try {
@@ -56,7 +70,9 @@ async function initWorker(lang) {
     worker = await createWorker(lang, 1, {
       workerPath: workerPath,
       corePath: corePath,
-      langPath: langPath,
+      langPath: REMOTE_LANG_PATH,
+      cachePath: TESSERACT_CACHE_PATH,
+      cacheMethod,
       workerBlobURL: false,
       logger: m => logger.debug('Tesseract:', m),
     });
@@ -151,4 +167,3 @@ export async function cleanupOCREngine() {
 
   logger.debug('OCR engine cleanup completed');
 }
-

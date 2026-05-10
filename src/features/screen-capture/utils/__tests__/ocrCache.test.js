@@ -48,6 +48,7 @@ describe('ocrCache', () => {
 
     // Reset internal state of ocrCache singleton
     ocrCache.db = null;
+    ocrCache.tesseractDb = null;
 
     // Helper to trigger success on next tick
     const triggerSuccess = (req, result) => {
@@ -60,6 +61,10 @@ describe('ocrCache', () => {
       ocrCache.db = mockDB;
       return mockDB;
     });
+    vi.spyOn(ocrCache, 'getTesseractCachedModel').mockResolvedValue(null);
+    vi.spyOn(ocrCache, 'saveTesseractCachedModel').mockResolvedValue();
+    vi.spyOn(ocrCache, 'deleteTesseractCachedModel').mockResolvedValue();
+    vi.spyOn(ocrCache, 'listTesseractCachedLanguages').mockResolvedValue([]);
   });
 
   describe('getModel', () => {
@@ -93,6 +98,7 @@ describe('ocrCache', () => {
 
       const result = await promise;
       expect(result).toBeNull();
+      expect(ocrCache.getTesseractCachedModel).toHaveBeenCalledWith('fra');
     });
   });
 
@@ -109,6 +115,7 @@ describe('ocrCache', () => {
 
       await promise;
       expect(mockStore.put).toHaveBeenCalledWith(mockData, 'deu');
+      expect(ocrCache.saveTesseractCachedModel).toHaveBeenCalledWith('deu', mockData);
     });
   });
 
@@ -140,6 +147,20 @@ describe('ocrCache', () => {
 
       const result = await promise;
       expect(result).toEqual(mockKeys);
+    });
+
+    it('should include languages mirrored in Tesseract cache', async () => {
+      ocrCache.listTesseractCachedLanguages.mockResolvedValue(['fas', 'jpn']);
+      const promise = ocrCache.listCachedLanguages();
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const request = mockStore.getAllKeys.mock.results[0].value;
+      request.result = ['eng', 'fas'];
+      request.onsuccess();
+
+      const result = await promise;
+      expect(result).toEqual(['eng', 'fas', 'jpn']);
     });
   });
 });

@@ -3,7 +3,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
-import { getSourceLanguageAsync } from "@/shared/config/config.js";
+import { getSettingsAsync } from "@/shared/config/config.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -25,9 +25,11 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
     await ttsStateManager.ensureOffscreenDocument();
 
     // 3. Get OCR language mapping
-    // We'll use the current source language from settings
-    const sourceLang = await getSourceLanguageAsync();
-    const tesseractLang = toTesseractLanguageCode(sourceLang);
+    // We'll prioritize OCR_DEFAULT_LANG from settings, then fallback to current source language
+    const settings = await getSettingsAsync();
+
+    const ocrLang = settings.OCR_DEFAULT_LANG || settings.SOURCE_LANGUAGE || 'eng';
+    const tesseractLang = toTesseractLanguageCode(ocrLang === 'auto' ? 'eng' : ocrLang);
 
     // 4. Perform OCR
     let extractedText = '';

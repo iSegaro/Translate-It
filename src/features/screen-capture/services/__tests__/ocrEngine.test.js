@@ -21,13 +21,19 @@ vi.mock('../../utils/ocrCache.js', () => ({
 
 // Mock browser API using vi.hoisted to ensure it's available for vi.mock
 const mocks = vi.hoisted(() => ({
-  getURL: vi.fn((path) => `chrome-extension://test/${path}`)
+  getURL: vi.fn((path) => `chrome-extension://test/${path}`),
+  storageGet: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('webextension-polyfill', () => ({
   default: {
     runtime: {
       getURL: mocks.getURL
+    },
+    storage: {
+      local: {
+        get: mocks.storageGet
+      }
     }
   }
 }));
@@ -61,9 +67,29 @@ describe('ocrEngine', () => {
 
       expect(result).toBe('Test recognition');
       expect(createWorker).toHaveBeenCalledWith('eng', 1, expect.objectContaining({
+        cacheMethod: 'write',
         workerBlobURL: false
       }));
       expect(mockWorker.recognize).toHaveBeenCalledWith('mock-image-data', expect.any(Object));
+    });
+
+    it('should avoid writing new Tesseract cache entries when OCR auto-download is disabled', async () => {
+      mocks.storageGet.mockResolvedValueOnce({ OCR_AUTO_DOWNLOAD: false });
+      const mockWorker = {
+        recognize: vi.fn().mockResolvedValue({
+          data: { text: 'No cache write' }
+        }),
+        terminate: vi.fn().mockResolvedValue()
+      };
+
+      const { createWorker } = await import('tesseract.js');
+      createWorker.mockResolvedValue(mockWorker);
+
+      await recognize('mock-image-data', 'eng');
+
+      expect(createWorker).toHaveBeenCalledWith('eng', 1, expect.objectContaining({
+        cacheMethod: 'readOnly'
+      }));
     });
 
     it('should reuse worker for same language', async () => {

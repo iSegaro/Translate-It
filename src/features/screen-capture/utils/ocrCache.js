@@ -9,10 +9,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCRCache');
 const DB_NAME = 'translate_it_ocr_cache';
 const STORE_NAME = 'language_models';
 const DB_VERSION = 1;
+const TESSERACT_DB_NAME = 'keyval-store';
+const TESSERACT_STORE_NAME = 'keyval';
+const TESSERACT_CACHE_PREFIX = '.';
+
+const getTesseractCacheKey = (lang) => `${TESSERACT_CACHE_PREFIX}/${lang}.traineddata`;
 
 class OCRCache {
   constructor() {
     this.db = null;
+    this.tesseractDb = null;
   }
 
   /**
@@ -44,13 +50,98 @@ class OCRCache {
   }
 
   /**
+   * Initialize Tesseract.js' built-in browser cache database.
+   *
+   * Tesseract.js reads language models through idb-keyval using the default
+   * database/store pair. Mirroring our manually downloaded models there makes
+   * OCR runtime use the same files managed from the OCR settings tab.
+   */
+  async initTesseractCache() {
+    if (this.tesseractDb) return this.tesseractDb;
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(TESSERACT_DB_NAME, 1);
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(TESSERACT_STORE_NAME)) {
+          db.createObjectStore(TESSERACT_STORE_NAME);
+        }
+      };
+
+      request.onsuccess = (event) => {
+        this.tesseractDb = event.target.result;
+        resolve(this.tesseractDb);
+      };
+
+      request.onerror = (event) => {
+        logger.error('Error opening Tesseract IndexedDB cache', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  }
+
+  async getTesseractCachedModel(lang) {
+    const db = await this.initTesseractCache();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TESSERACT_STORE_NAME], 'readonly');
+      const store = transaction.objectStore(TESSERACT_STORE_NAME);
+      const request = store.get(getTesseractCacheKey(lang));
+
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async saveTesseractCachedModel(lang, data) {
+    const db = await this.initTesseractCache();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TESSERACT_STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(TESSERACT_STORE_NAME);
+      const request = store.put(data, getTesseractCacheKey(lang));
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteTesseractCachedModel(lang) {
+    const db = await this.initTesseractCache();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TESSERACT_STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(TESSERACT_STORE_NAME);
+      const request = store.delete(getTesseractCacheKey(lang));
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async listTesseractCachedLanguages() {
+    const db = await this.initTesseractCache();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([TESSERACT_STORE_NAME], 'readonly');
+      const store = transaction.objectStore(TESSERACT_STORE_NAME);
+      const request = store.getAllKeys();
+
+      request.onsuccess = () => {
+        const languages = request.result
+          .map((key) => String(key).match(/^\.\/(.+)\.traineddata$/)?.[1])
+          .filter(Boolean);
+        resolve(languages);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
    * Get a language model from cache
    * @param {string} lang Language code (e.g., 'eng')
    * @returns {Promise<ArrayBuffer|null>}
    */
   async getModel(lang) {
     const db = await this.init();
-    return new Promise((resolve, reject) => {
+    const model = await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(lang);
@@ -58,6 +149,15 @@ class OCRCache {
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
+
+    if (model) return model;
+
+    try {
+      return await this.getTesseractCachedModel(lang);
+    } catch (error) {
+      logger.warn(`Failed to read ${lang} from Tesseract cache`, error);
+      return null;
+    }
   }
 
   /**
@@ -67,7 +167,7 @@ class OCRCache {
    */
   async saveModel(lang, data) {
     const db = await this.init();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.put(data, lang);
@@ -75,6 +175,12 @@ class OCRCache {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    try {
+      await this.saveTesseractCachedModel(lang, data);
+    } catch (error) {
+      logger.warn(`Failed to mirror ${lang} to Tesseract cache`, error);
+    }
   }
 
   /**
@@ -83,7 +189,7 @@ class OCRCache {
    */
   async deleteModel(lang) {
     const db = await this.init();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.delete(lang);
@@ -91,14 +197,21 @@ class OCRCache {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    try {
+      await this.deleteTesseractCachedModel(lang);
+    } catch (error) {
+      logger.warn(`Failed to delete ${lang} from Tesseract cache`, error);
+    }
   }
 
   /**
    * Clear all cached models
    */
   async clear() {
+    const languages = await this.listCachedLanguages();
     const db = await this.init();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.clear();
@@ -106,6 +219,14 @@ class OCRCache {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+
+    await Promise.all(languages.map(async (lang) => {
+      try {
+        await this.deleteTesseractCachedModel(lang);
+      } catch (error) {
+        logger.warn(`Failed to delete ${lang} from Tesseract cache during clear`, error);
+      }
+    }));
   }
 
   /**
@@ -113,7 +234,7 @@ class OCRCache {
    */
   async listCachedLanguages() {
     const db = await this.init();
-    return new Promise((resolve, reject) => {
+    const localLanguages = await new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.getAllKeys();
@@ -121,6 +242,14 @@ class OCRCache {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
+
+    try {
+      const tesseractLanguages = await this.listTesseractCachedLanguages();
+      return Array.from(new Set([...localLanguages, ...tesseractLanguages]));
+    } catch (error) {
+      logger.warn('Failed to list Tesseract cached OCR languages', error);
+      return localLanguages;
+    }
   }
 
   /**

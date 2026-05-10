@@ -113,7 +113,7 @@ onMounted(async () => {
 })
 
 const saveOCRSettings = async () => {
-  settingsStore.updateSetting('OCR_AUTO_DOWNLOAD', ocrStore.autoDownload)
+  settingsStore.updateSettingLocally('OCR_AUTO_DOWNLOAD', ocrStore.autoDownload)
 }
 
 const confirmClearCache = async () => {
