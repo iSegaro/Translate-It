@@ -593,6 +593,9 @@
   "desktop_fab_select_element_label": {
     "message": "انتخاب المان"
   },
+  "desktop_fab_screen_capture_label": {
+    "message": "تصویربرداری از صفحه"
+  },
   "desktop_fab_translate_selection_label": {
     "message": "ترجمه متن انتخاب شده"
   },

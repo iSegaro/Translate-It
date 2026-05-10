@@ -268,6 +268,7 @@ import './DesktopFabMenu.scss';
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
+import IconScreenCapture from '@/icons/ui/capture.svg';
 import IconRevert from '@/icons/ui/revert.png';
 import IconRestore from '@/icons/ui/restore.png';
 import IconHourglass from '@/icons/ui/hourglass.png';
@@ -286,7 +287,8 @@ const exclusionChecker = ExclusionChecker.getInstance();
 
 const allowedFeatures = ref({
   selectElement: true,
-  pageTranslation: true
+  pageTranslation: true,
+  screenCapture: true
 });
 
 const updateAllowedFeatures = async () => {
@@ -294,6 +296,7 @@ const updateAllowedFeatures = async () => {
   if (status.initialized) {
     allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
     allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+    allowedFeatures.value.screenCapture = status.features.screenCapture?.allowed ?? true;
     logger.debug('FAB allowed features updated', allowedFeatures.value);
   }
 };
@@ -479,6 +482,31 @@ const menuItems = computed(() => {
           } else {
             await handleError(err, { 
               context: 'desktop-fab:select-element',
+              showToast: true 
+            });
+          }
+        }
+      }
+    });
+  }
+
+  if (allowedFeatures.value.screenCapture) {
+    items.push({
+      id: 'screen_capture',
+      label: t('desktop_fab_screen_capture_label'),
+      icon: IconScreenCapture,
+      closeMenu: true,
+      action: async () => {
+        try {
+          await sendMessage({ 
+            action: MessageActions.START_SCREEN_CAPTURE 
+          });
+        } catch (err) {
+          if (ExtensionContextManager.isContextError(err)) {
+            ExtensionContextManager.handleContextError(err, 'desktop-fab:screen-capture');
+          } else {
+            await handleError(err, { 
+              context: 'desktop-fab:screen-capture',
               showToast: true 
             });
           }

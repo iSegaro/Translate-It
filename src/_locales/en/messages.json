@@ -641,6 +641,9 @@
   "desktop_fab_select_element_label": {
     "message": "Select Element"
   },
+  "desktop_fab_screen_capture_label": {
+    "message": "Screen Capture"
+  },
   "desktop_fab_translate_selection_label": {
     "message": "Translate Selection"
   },

@@ -591,7 +591,10 @@
     "message": "設定を開く"
   },
   "desktop_fab_select_element_label": {
-    "message": "要素を選択"
+    "message": "要素選択"
+  },
+  "desktop_fab_screen_capture_label": {
+    "message": "スクリーンキャプチャ"
   },
   "desktop_fab_translate_selection_label": {
     "message": "選択範囲を翻訳"
