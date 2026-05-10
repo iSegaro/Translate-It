@@ -301,9 +301,6 @@ onMounted(async () => {
   tracker.addEventListener(document, 'mouseleave', handleMouseLeave)
   tracker.addEventListener(document, 'keydown', handleKeyDown)
   tracker.addEventListener(document, 'contextmenu', handleContextMenu)
-  
-  // Focus the overlay to receive keyboard events
-  document.body.style.overflow = 'hidden'
 })
 
 onUnmounted(() => {
@@ -311,8 +308,5 @@ onUnmounted(() => {
   document.removeEventListener('mouseleave', handleMouseLeave)
   document.removeEventListener('keydown', handleKeyDown)
   document.removeEventListener('contextmenu', handleContextMenu)
-  
-  // Restore body overflow
-  document.body.style.overflow = ''
 })
 </script>

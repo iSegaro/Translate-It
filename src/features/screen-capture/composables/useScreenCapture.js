@@ -19,9 +19,7 @@ export function useScreenCapture() {
 
   // Store original style values for restoration
   const originalStyles = ref({
-    bodyOverflow: '',
     bodyUserSelect: '',
-    htmlOverflow: ''
   });
 
   // Track event listeners for cleanup
@@ -54,23 +52,12 @@ export function useScreenCapture() {
   // Methods
   const toggleScroll = (lock) => {
     if (lock) {
-      // Save original values
-      originalStyles.value.bodyOverflow = document.body.style.overflow || '';
-      originalStyles.value.htmlOverflow = document.documentElement.style.overflow || '';
-
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-
       // Track listeners for cleanup
       window.addEventListener("wheel", preventScroll, { passive: false });
       window.addEventListener("touchmove", preventScroll, { passive: false });
       activeListeners.value.set('wheel-preventScroll', { target: window, event: 'wheel', handler: preventScroll });
       activeListeners.value.set('touchmove-preventScroll', { target: window, event: 'touchmove', handler: preventScroll });
     } else {
-      // Restore original values
-      document.body.style.overflow = originalStyles.value.bodyOverflow;
-      document.documentElement.style.overflow = originalStyles.value.htmlOverflow;
-
       // Clean up tracked listeners
       window.removeEventListener("wheel", preventScroll);
       window.removeEventListener("touchmove", preventScroll);
@@ -374,8 +361,6 @@ export function useScreenCapture() {
 
     // Ensure all styles are restored
     document.body.style.userSelect = originalStyles.value.bodyUserSelect;
-    document.body.style.overflow = originalStyles.value.bodyOverflow;
-    document.documentElement.style.overflow = originalStyles.value.htmlOverflow;
   });
 
   return {
