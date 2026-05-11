@@ -170,10 +170,49 @@ export function usePositioning(initialPosition, options = {}) {
     }
     
     const coords = getCoordinates(event);
-    const newX = coords.x - dragStartOffset.value.x;
-    const newY = coords.y - dragStartOffset.value.y;
+    const rawX = coords.x - dragStartOffset.value.x;
+    const rawY = coords.y - dragStartOffset.value.y;
     
-    currentPosition.value = clampToViewport({ x: newX, y: newY });
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const snapThreshold = 30; // Distance of POINTER to edge to trigger dock
+    const breakThreshold = 100; // Distance of POINTER from edge to trigger undock
+    
+    // Snapping Logic (Based on Pointer position)
+    if (currentDockMode.value === 'none') {
+      if (coords.x < snapThreshold) {
+        updateDockMode('left');
+        return;
+      } else if (coords.x > vw - snapThreshold) {
+        updateDockMode('right');
+        return;
+      }
+    } else {
+      // Breakaway Logic (Undocking - Based on Pointer position)
+      let shouldUndock = false;
+      if (currentDockMode.value === 'left' && coords.x > breakThreshold) {
+        shouldUndock = true;
+      } else if (currentDockMode.value === 'right' && coords.x < vw - breakThreshold) {
+        shouldUndock = true;
+      }
+      
+      if (shouldUndock) {
+        const previousMode = currentDockMode.value;
+        updateDockMode('none');
+        
+        // Adjust drag offset so the window center stays under the cursor when undocking
+        // This makes the transition feel smooth
+        if (previousMode === 'left') {
+          dragStartOffset.value.x = (currentDockedWidth.value || defaultWidth) / 2;
+        } else {
+          dragStartOffset.value.x = (currentDockedWidth.value || defaultWidth) / 2;
+        }
+      } else {
+        // If still docked, don't update position freely (docked state handles it)
+        return;
+      }
+    }
+    
+    currentPosition.value = clampToViewport({ x: rawX, y: rawY });
   };
 
   const stopDrag = () => {
@@ -188,13 +227,6 @@ export function usePositioning(initialPosition, options = {}) {
   };
 
   const startDrag = (event) => {
-    // Undock if dragging
-    if (currentDockMode.value !== 'none') {
-      currentDockMode.value = 'none';
-      // Recalculate drag start offset based on normal dimensions
-      // This is a bit tricky since width/height might change immediately
-    }
-
     isDragging.value = true;
     
     // Prevent default on touchstart to avoid scrolling/gestures
