@@ -31,13 +31,15 @@ async function initWorker(lang) {
 
   // Use absolute URLs for all assets
   const workerPath = browser.runtime.getURL('assets/ocr/worker.min.js');
-  const corePath = browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js');
+  // In v7, corePath should ideally point to the directory containing the WASM files.
+  // The library will automatically select the best core (e.g. simd-lstm) from the folder.
+  const corePath = browser.runtime.getURL('assets/ocr/');
   
   // Strictly use read-only mode to prevent unexpected background downloads.
   // Models must be pre-downloaded from the OCR settings tab.
   const cacheMethod = 'readOnly';
 
-  logger.debug(`Initializing worker for ${lang}`, {
+  logger.debug(`Initializing Tesseract.js v7 worker for ${lang}`, {
     workerPath,
     corePath,
     langPath: REMOTE_LANG_PATH,
@@ -59,11 +61,11 @@ async function initWorker(lang) {
     // Import Tesseract module
     const { createWorker } = await import('tesseract.js');
     
-    // Following project standards: (lang, oem, options)
+    // Tesseract.js v7: (langs, oem, options)
     // workerBlobURL: false is critical for extensions to avoid blob: CSP issues
     worker = await createWorker(lang, 1, {
-      workerPath: workerPath,
-      corePath: corePath,
+      workerPath,
+      corePath,
       langPath: REMOTE_LANG_PATH,
       cachePath: TESSERACT_CACHE_PATH,
       cacheMethod,
