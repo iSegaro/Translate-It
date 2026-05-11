@@ -206,6 +206,12 @@ export class WindowsManager extends ResourceTracker {
       // Listen for global selection clear events
       this._selectionClearHandler = () => {
         if (this.state.isVisible || this.state.isIconMode) {
+          // Prevent dismissal if the window is pinned
+          if (this.state.isPinned) {
+            this.logger.debug('Global selection clear ignored: Window is pinned');
+            return;
+          }
+
           this.logger.debug('Global selection clear received, dismissing UI');
           this.dismiss(false);
         }
@@ -589,6 +595,12 @@ export class WindowsManager extends ResourceTracker {
     this._dismissHandler = (event) => {
       // Handle icon mode or visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
+
+      // Prevent dismissal if the window is pinned
+      if (this.state.isPinned) {
+        this.logger.debug('Dismiss ignored: Window is pinned');
+        return;
+      }
 
       // Skip if currently dragging or just finished dragging a translation window
       // This prevents accidental dismissal after fast drag operations

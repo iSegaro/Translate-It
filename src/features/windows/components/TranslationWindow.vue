@@ -24,12 +24,20 @@
     v-show="!isFullscreen"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host normal-window"
-    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
+    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
     :style="windowStyle"
     data-translate-ui="true"
     @mousedown.stop
     @click.stop
   >
+    <!-- Resize handle for docked mode -->
+    <div
+      v-if="dockMode !== 'none'"
+      class="ti-dock-resize-handle"
+      @mousedown.stop="startResize"
+      @touchstart.stop="startResize"
+    ></div>
+
     <div
       class="ti-window-header"
       @mousedown="handleStartDrag"
@@ -47,6 +55,67 @@
           @mousedown.stop
           @touchstart.stop
         />
+        <button
+          class="ti-action-btn"
+          :class="{ 'ti-active': isPinned }"
+          :title="isPinned ? t('window_unpin') : t('window_pin')"
+          @click.stop="togglePin"
+          @mousedown.stop
+          @touchstart.stop
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
+            />
+          </svg>
+        </button>
+        <button
+          class="ti-action-btn"
+          :class="{ 'ti-active': dockMode !== 'none' }"
+          :title="t('window_cycle_dock')"
+          @click.stop="cycleDockMode"
+          @mousedown.stop
+          @touchstart.stop
+        >
+          <svg
+            v-if="dockMode === 'none'"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M18 15v3H6v-3H4v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2zM7 9l1.41 1.41L11 7.83V16h2V7.83l2.59 2.58L17 9l-5-5-5 5z"
+            />
+          </svg>
+          <svg
+            v-else-if="dockMode === 'left'"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h5v12H4zm16 0h-9V6h9v12z"
+            />
+          </svg>
+          <svg
+            v-else
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill="currentColor"
+              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM13 18V6h7v12h-7zM4 18V6h7v12H4z"
+            />
+          </svg>
+        </button>
         <button
           class="ti-action-btn"
           :title="t('window_copy_translation')"
@@ -174,6 +243,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
@@ -207,8 +277,66 @@ useMessaging('content');
 
 const tts = useTTSSmart();
 const mobileStore = useMobileStore();
+const settings = useSettingsStore();
 const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
 const tracker = useResourceTracker(`translation-window-${props.id}`);
+
+// Pinned and Docked states
+const isPinned = ref(settings.getSetting('WINDOW_IS_PINNED', false));
+const dockMode = ref(settings.getSetting('WINDOW_DOCK_MODE', 'none'));
+const dockedWidth = ref(settings.getSetting('WINDOW_DOCKED_WIDTH', 350));
+
+// Watch for external setting changes (e.g. from Options page)
+watch(() => settings.settings.WINDOW_IS_PINNED, (newVal) => {
+  if (newVal !== undefined) isPinned.value = newVal;
+});
+watch(() => settings.settings.WINDOW_DOCK_MODE, (newVal) => {
+  if (newVal !== undefined) {
+    dockMode.value = newVal;
+    updateDockMode(newVal);
+  }
+});
+watch(() => settings.settings.WINDOW_DOCKED_WIDTH, (newVal) => {
+  if (newVal !== undefined) {
+    dockedWidth.value = newVal;
+    updateDockedWidth(newVal);
+  }
+});
+
+// Update WindowsState with initial values
+onMounted(() => {
+  const windowsManager = window.windowsManagerInstance;
+  if (windowsManager && windowsManager.state) {
+    windowsManager.state.setPinned(isPinned.value);
+    windowsManager.state.setDockMode(dockMode.value);
+  }
+});
+
+const togglePin = () => {
+  isPinned.value = !isPinned.value;
+  settings.updateSettingAndPersist('WINDOW_IS_PINNED', isPinned.value);
+  
+  const windowsManager = window.windowsManagerInstance;
+  if (windowsManager && windowsManager.state) {
+    windowsManager.state.setPinned(isPinned.value);
+  }
+};
+
+const cycleDockMode = () => {
+  const modes = ['none', 'left', 'right'];
+  const currentIndex = modes.indexOf(dockMode.value);
+  const nextIndex = (currentIndex + 1) % modes.length;
+  const newMode = modes[nextIndex];
+  dockMode.value = newMode;
+  
+  settings.updateSettingAndPersist('WINDOW_DOCK_MODE', newMode);
+  updateDockMode(newMode);
+  
+  const windowsManager = window.windowsManagerInstance;
+  if (windowsManager && windowsManager.state) {
+    windowsManager.state.setDockMode(newMode);
+  }
+};
 
 // Fullscreen state from store
 const isFullscreen = computed(() => mobileStore.isFullscreen);
@@ -281,14 +409,32 @@ const currentHeight = computed(() => currentSize.value === 'small' ? 28 : null);
 const {
   currentPosition,
   isDragging: isPositionDragging,
+  currentDockMode,
+  currentDockedWidth,
   positionStyle,
   startDrag,
   updatePosition,
+  updateDockMode,
+  updateDockedWidth,
   cleanup: cleanupPositioning
 } = usePositioning(props.position, {
   defaultWidth: currentWidth.value || WindowsConfig.POSITIONING.POPUP_WIDTH,
   defaultHeight: currentHeight.value || WindowsConfig.POSITIONING.POPUP_HEIGHT,
-  enableDragging: true
+  enableDragging: true,
+  dockMode: dockMode.value,
+  dockedWidth: dockedWidth.value
+});
+
+// Sync dockMode back to local ref if it changes (e.g. via dragging)
+watch(currentDockMode, (newVal) => {
+  if (newVal !== dockMode.value) {
+    dockMode.value = newVal;
+    settings.updateSettingAndPersist('WINDOW_DOCK_MODE', newVal);
+    const windowsManager = window.windowsManagerInstance;
+    if (windowsManager && windowsManager.state) {
+      windowsManager.state.setDockMode(newVal);
+    }
+  }
 });
 
 watch(() => props.position, (newPos) => {
@@ -340,6 +486,47 @@ onMounted(async () => {
 
 const handleClose = () => emit('close', props.id);
 const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
+
+// Resize logic for docked mode
+const isResizing = ref(false);
+const startResize = (event) => {
+  isResizing.value = true;
+  const startX = event.type === 'touchstart' ? event.touches[0].clientX : event.clientX;
+  const startWidth = dockedWidth.value;
+
+  const handleResizeMove = (e) => {
+    if (!isResizing.value) return;
+    const currentX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    let newWidth;
+    
+    if (dockMode.value === 'left') {
+      newWidth = startWidth + (currentX - startX);
+    } else {
+      newWidth = startWidth - (currentX - startX);
+    }
+    
+    // Bounds
+    newWidth = Math.max(200, Math.min(newWidth, window.innerWidth * 0.8));
+    dockedWidth.value = newWidth;
+    updateDockedWidth(newWidth);
+  };
+
+  const stopResize = () => {
+    isResizing.value = false;
+    settings.updateSettingAndPersist('WINDOW_DOCKED_WIDTH', dockedWidth.value);
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', stopResize);
+    document.removeEventListener('touchmove', handleResizeMove);
+    document.removeEventListener('touchend', stopResize);
+    document.body.style.userSelect = '';
+  };
+
+  document.addEventListener('mousemove', handleResizeMove);
+  document.addEventListener('mouseup', stopResize);
+  document.addEventListener('touchmove', handleResizeMove, { passive: false });
+  document.addEventListener('touchend', stopResize);
+  document.body.style.userSelect = 'none';
+};
 
 const handleCopy = async () => {
   if (!translatedText.value) return;

@@ -93,6 +93,12 @@ export class ClickManager extends ResourceTracker {
    * Handle outside click events
    */
   _handleOutsideClick(e) {
+    // Prevent dismissal if the window is pinned
+    if (this.state.isPinned) {
+      this.logger.debug('Outside click ignored: Window is pinned');
+      return;
+    }
+
     // Prevent dismissal if transitioning from icon to window
     if (this.state.shouldPreventDismissal) {
       this.logger.debug('Outside click ignored due to pending transition');
