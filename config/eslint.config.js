@@ -10,9 +10,9 @@ export default [
   {
     ignores: [
       "**/dist/",
-      "**/OLD/",
       "**/node_modules/",
       "**/src/public/",
+      "**/src/features/screen-capture/assets/",
       "**/*.mjs",
       "**/scripts/",
       "**/config/",
