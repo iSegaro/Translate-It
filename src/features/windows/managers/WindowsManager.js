@@ -394,11 +394,12 @@ export class WindowsManager extends ResourceTracker {
 
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode || isOnFabClickMode;
     
-    // Support for updating existing window if pinned or docked in IMMEDIATE mode
+    // Support for updating existing window if pinned or docked
+    // We do this regardless of selectionTranslationMode because if a window is kept open, 
+    // the user likely wants the new translation to appear there immediately.
     if (this.state.isVisible && !this.state.isIconMode && 
-        selectionTranslationMode === SelectionTranslationMode.IMMEDIATE && 
         (this.state.isPinned || this.state.dockMode !== 'none')) {
-      this.logger.info('Updating existing pinned/docked window in IMMEDIATE mode');
+      this.logger.info('Updating existing pinned/docked window');
       
       // Cancel previous translation if any
       if (this.translationHandler && typeof this.translationHandler.cancelAllTranslations === 'function') {
@@ -406,7 +407,7 @@ export class WindowsManager extends ResourceTracker {
       }
       this.state.setTranslationCancelled(false);
 
-      // Clear manual provider override for completely new selections (if requested)
+      // Clear manual provider override for completely new selections
       if (!this._isIconToWindowTransition) {
         this.state.setProvider(null);
       }
