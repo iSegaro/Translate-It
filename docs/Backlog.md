@@ -11,6 +11,9 @@ List of features, enhancements, and ideas planned for future development.
 
 - Integration Module: Gmail, Twitter, Goolge Docs
 
+- در ترجمه صفحه و ترجمه المان، در سایت زیر باعث میشه جهت که راست چین میشود، زیر عکس ها قرار بگیره. باید جلوی جابه جا شدن متن ها رو گرفت در موقع چپ چین و راست چین شدن
+https://appcenter.browser.qq.com/
+
 - مقدار shared/config/constanst ها تفکیک شده. توی پروژه کدهای قدیمی هنوز فایل کامل constants.js رو ایمپورت میکنند. باید ریفکتور اتفاق بیافته تا از فایل های صحیح استفاده کنند.
 
 - بهبود حالت نوشتن
@@ -45,6 +48,9 @@ Error during translation: Error: This request requires more credits, or fewer ma
 - [LibreTranslator (Linguist JS)](https://github.com/translate-tools/linguist-translators/blob/master/translators/LibreTranslator.js): Open-source translator implementation.
 - [Baidu Translator](https://github.com/ttop32/MouseTooltipTranslator/blob/main/src/translator/baidu.js): Investigation of Baidu translator implementation.
 - [DeepSeek Model Interface](https://asmodeus.free.nf/?i=1): Custom interface/resource for DeepSeek model.
+
+- دیکشنری
+https://github.com/crimx/ext-saladict/tree/dev/src/components/dictionaries
 
 ### Other
 - [Lumetrium Prompt Catalog](https://lumetrium.com/definer/wiki/sources/ai/prompts/catalog): Catalog of specialized prompts for translation and dictionary services.
