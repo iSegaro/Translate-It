@@ -20,7 +20,7 @@
   <strong>
     • <a href="../README.md">English</a> | 
     • فارسی | 
-    • <a href="./docs/README_JAPANESE.md">Japanese</a>
+    • <a href="./docs/README_JAPANESE.md">日本語</a>
   </strong>
 </div>
 
