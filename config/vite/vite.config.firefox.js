@@ -157,6 +157,15 @@ export default defineConfig({
           await fs.ensureDir(resolve(outDir, 'docs'));
           await fs.copy(changelogSrc, changelogDest);
         }
+
+        // Copy Tesseract assets
+        const tesseractSrc = resolve(srcDir, 'src/features/screen-capture/assets');
+        const tesseractDest = resolve(outDir, 'assets/ocr');
+        if (await fs.pathExists(tesseractSrc)) {
+          await fs.ensureDir(tesseractDest);
+          await fs.copy(tesseractSrc, tesseractDest);
+          console.log('✅ Copied Tesseract assets to assets/ocr/');
+        }
         
         // Move HTML files to src/html/ directory and fix their paths
         const htmlFiles = [

@@ -57,7 +57,18 @@
       @click="handleClearStorage"
     />
 
-    <!-- 6. Select Element -->
+    <!-- 6. Screen Capture -->
+    <IconButton
+      v-if="isScreenCaptureEnabled"
+      icon="capture.svg"
+      :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
+      :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
+      type="toolbar"
+      class="ti-btn-capture"
+      @click="handleScreenCapture"
+    />
+
+    <!-- 7. Select Element -->
     <IconButton
       v-if="isSelectElementEnabled"
       icon="select.png"
@@ -181,6 +192,10 @@ const isSelectElementEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true)
 })
 
+const isScreenCaptureEnabled = computed(() => {
+  return isExtensionEnabledGlobal.value && (settingsStore.settings?.ENABLE_SCREEN_CAPTURE ?? true)
+})
+
 const isWholePageEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true)
 })
@@ -203,6 +218,22 @@ const handleSelectElement = async () => {
     }
   } catch (error) {
     await handleError(error, 'PopupHeader-selectElement')
+  }
+}
+
+const handleScreenCapture = async () => {
+  logger.debug('Screen Capture button clicked!')
+  try {
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (activeTab?.id) {
+      await sendMessage({
+        action: MessageActions.START_SCREEN_CAPTURE,
+        data: { tabId: activeTab.id }
+      })
+      window.close()
+    }
+  } catch (error) {
+    await handleError(error, 'PopupHeader-screenCapture')
   }
 }
 

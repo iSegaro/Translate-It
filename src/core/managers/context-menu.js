@@ -30,6 +30,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'context-menu');
 // --- Constants for Menu Item IDs ---
 const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
+const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
@@ -367,15 +368,16 @@ export class ContextMenuManager extends ResourceTracker {
       const provider = findProviderById(selectElementApi);
       const isBulkSupported = provider?.features?.includes('bulk') ?? false;
 
-      const isSelectElementEnabled = isExtensionEnabled && 
+      const isSelectElementEnabled = isExtensionEnabled &&
                                    (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
                                    isBulkSupported;
+      const isScreenCaptureEnabled = isExtensionEnabled && (settings.ENABLE_SCREEN_CAPTURE !== false);
       const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
 
       // Get commands for keyboard shortcuts
       const commands = await browser.commands.getAll();
 
-      // --- 1. Create Page Context Menu ---
+      // --- 1. Create Page Context Menu (Select Element) ---
       if (isSelectElementEnabled && visibility.PAGE_CONTEXT_SELECT_ELEMENT) {
         try {
           let pageMenuTitle =
@@ -400,27 +402,7 @@ export class ContextMenuManager extends ResourceTracker {
       try {
         logger.debug("[ContextMenuManager] Creating Action (Browser Action) menus...");
 
-        // --- Translate Element Menu (First option) ---
-        if (isSelectElementEnabled && visibility.ACTION_CONTEXT_SELECT_ELEMENT) {
-          let actionPageMenuTitle =
-            (await getTranslationString("context_menu_translate_with_selection", locale)) ||
-            "Translate Element";
-          const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
-          if (command && command.shortcut) {
-            actionPageMenuTitle = `${actionPageMenuTitle} (${command.shortcut})`;
-          }
-          await this.createMenu({
-            id: ACTION_TRANSLATE_ELEMENT_ID,
-            title: actionPageMenuTitle,
-            contexts: ["action"],
-          });
-          logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
-        }
-        
-        // Always show API Provider unless we decide to make it toggleable too
-        // For now, keeping it consistent with the plan (only toggle requested items)
-
-        // --- API Provider Parent Menu ---
+        // --- 2.1. API Provider Parent Menu (First option in Action menu) ---
         await this.createMenu({
           id: API_PROVIDER_PARENT_ID,
           title:
@@ -464,7 +446,41 @@ export class ContextMenuManager extends ResourceTracker {
           `Created ${apiProviders.length} API Provider sub-menus. Current API: ${settings.TRANSLATION_API}`
         );
 
-        // --- Options Menu ---
+        // --- 2.2. Translate Element Menu (Second option in Action menu) ---
+        if (isSelectElementEnabled && visibility.ACTION_CONTEXT_SELECT_ELEMENT) {
+          let actionPageMenuTitle =
+            (await getTranslationString("context_menu_translate_with_selection", locale)) ||
+            "Translate Element";
+          const command = commands.find((c) => c.name === "SELECT-ELEMENT-COMMAND");
+          if (command && command.shortcut) {
+            actionPageMenuTitle = `${actionPageMenuTitle} (${command.shortcut})`;
+          }
+          await this.createMenu({
+            id: ACTION_TRANSLATE_ELEMENT_ID,
+            title: actionPageMenuTitle,
+            contexts: ["action"],
+          });
+          logger.debug(`Created Translate Element action menu: "${actionPageMenuTitle}"`);
+        }
+
+        // --- 2.3. Screen Capture Menu (Third option in Action menu, also in Page menu) ---
+        if (isScreenCaptureEnabled && visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false) {
+          try {
+            let captureMenuTitle =
+              (await getTranslationString("context_menu_translate_screen", locale)) ||
+              "Capture Screen";
+            await this.createMenu({
+              id: SCREEN_CAPTURE_MENU_ID,
+              title: captureMenuTitle,
+              contexts: ["page", "action"],
+            });
+            logger.debug(`Created screen capture menu: "${captureMenuTitle}"`);
+          } catch (e) {
+            logger.error("Error creating screen capture menu:", e);
+          }
+        }
+
+        // --- 2.4. Options Menu (Fourth option in Action menu) ---
         if (visibility.ACTION_CONTEXT_OPTIONS) {
           await this.createMenu({
             id: ACTION_CONTEXT_MENU_OPTIONS_ID,
@@ -717,6 +733,34 @@ export class ContextMenuManager extends ResourceTracker {
         case PAGE_CONTEXT_MENU_ID:
           await this._activateSelectElement(tab);
           break;
+
+        case SCREEN_CAPTURE_MENU_ID: {
+          const targetTab = tab || (await browser.tabs.query({ active: true, currentWindow: true }))[0];
+          if (targetTab?.id) {
+            const backgroundService = globalThis.backgroundService;
+            if (backgroundService && backgroundService.messageHandler) {
+              // Try both possible action names for compatibility
+              const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.START_SCREEN_CAPTURE) 
+                           || backgroundService.messageHandler.getHandlerForMessage('startScreenCapture');
+              
+              if (handler) {
+                logger.debug("Directly calling startScreenCapture handler from context menu");
+                // Handlers expect (message, sender, sendResponse)
+                await handler({
+                  action: MessageActions.START_SCREEN_CAPTURE,
+                  data: { tabId: targetTab.id, source: "context-menu" }
+                }, { tab: targetTab }, (response) => {
+                  logger.debug("Direct handler response:", response);
+                });
+              } else {
+                logger.error("Start screen capture handler not found in background service");
+              }
+            } else {
+              logger.error("Background service or message handler not available");
+            }
+          }
+          break;
+        }
 
         case ACTION_TRANSLATE_ELEMENT_ID: {
           const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });

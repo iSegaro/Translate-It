@@ -100,7 +100,8 @@ export class ExclusionChecker {
         'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
         'SHOW_DESKTOP_FAB',
         'EXTENSION_ENABLED',
-        'WHOLE_PAGE_TRANSLATION_ENABLED'
+        'WHOLE_PAGE_TRANSLATION_ENABLED',
+        'ENABLE_SCREEN_CAPTURE'
       ];
 
       featureSettings.forEach(setting => {
@@ -149,7 +150,7 @@ export class ExclusionChecker {
       // Feature-specific setting check
       const featureEnabled = this.isFeatureEnabled(featureName);
       if (!featureEnabled) {
-        logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
+        logger.debug(`Feature ${featureName} blocked: feature setting disabled (check isFeatureEnabled)`);
         return false;
       }
 
@@ -208,7 +209,14 @@ export class ExclusionChecker {
       case 'pageTranslation':
         return settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
 
+      case 'screenCapture': {
+        const screenCaptureVal = settingsManager.get('ENABLE_SCREEN_CAPTURE', true);
+        logger.debug(`Checking screenCapture enablement: ${screenCaptureVal}`);
+        return screenCaptureVal;
+      }
+
       default:
+        logger.debug(`Feature ${featureName} hit default case in isFeatureEnabled (false)`);
         return false;
     }
   }
@@ -234,7 +242,7 @@ export class ExclusionChecker {
       await this.initialize();
     }
 
-    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation'];
+    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation', 'screenCapture'];
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,

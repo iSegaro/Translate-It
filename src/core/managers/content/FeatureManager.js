@@ -103,7 +103,7 @@ export class FeatureManager extends ResourceTracker {
   async evaluateAndRegisterFeatures() {
     // Order matters: contentMessageHandler should be activated first
     // selectElement is managed directly by FeatureManager with its own Critical Protection
-    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation'];
+    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
 
     logger.debug('Evaluating features for registration:', features);
 
@@ -202,15 +202,31 @@ export class FeatureManager extends ResourceTracker {
               logger.warn('Failed to integrate SelectElementManager with ContentMessageHandler:', integrationError);
             }
           } else if (featureName === 'contentMessageHandler') {
-            // If ContentMessageHandler is activated after SelectElementManager, connect them
+            // If ContentMessageHandler is activated after SelectElementManager or ScreenCaptureHandler, connect them
             try {
               const selectElementManager = this.featureHandlers.get('selectElement');
               if (selectElementManager && typeof handler.setSelectElementManager === 'function') {
                 handler.setSelectElementManager(selectElementManager);
                 logger.debug('ContentMessageHandler integrated with existing SelectElementManager');
               }
+              
+              const screenCaptureManager = this.featureHandlers.get('screenCapture');
+              if (screenCaptureManager && typeof handler.setScreenCaptureManager === 'function') {
+                handler.setScreenCaptureManager(screenCaptureManager);
+                logger.debug('ContentMessageHandler integrated with existing ScreenCaptureHandler');
+              }
             } catch (integrationError) {
-              logger.warn('Failed to integrate ContentMessageHandler with SelectElementManager:', integrationError);
+              logger.warn('Failed to integrate ContentMessageHandler with managers:', integrationError);
+            }
+          } else if (featureName === 'screenCapture') {
+            try {
+              const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+              if (contentMessageHandler && typeof contentMessageHandler.setScreenCaptureManager === 'function') {
+                contentMessageHandler.setScreenCaptureManager(handler);
+                logger.debug('ScreenCaptureHandler integrated with ContentMessageHandler');
+              }
+            } catch (integrationError) {
+              logger.warn('Failed to integrate ScreenCaptureHandler with ContentMessageHandler:', integrationError);
             }
           }
 
@@ -330,6 +346,12 @@ export class FeatureManager extends ResourceTracker {
           HandlerClass = PageTranslationManager;
           break;
         }
+
+        case 'screenCapture': {
+          const { ScreenCaptureHandler } = await import('@/handlers/content/ScreenCaptureHandler.js');
+          HandlerClass = ScreenCaptureHandler;
+          break;
+        }
         default:
           logger.error(`Unknown feature: ${featureName}`);
           return null;
@@ -354,7 +376,8 @@ export class FeatureManager extends ResourceTracker {
         'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
         'SHOW_DESKTOP_FAB',
         'MOBILE_UI_MODE',
-        'EXCLUDED_SITES'
+        'EXCLUDED_SITES',
+        'ENABLE_SCREEN_CAPTURE'
       ];
       
       this.settingsListener = async (data) => {
@@ -427,7 +450,7 @@ export class FeatureManager extends ResourceTracker {
     try {
       // Order matters: contentMessageHandler should be evaluated first
       // selectElement is managed directly by FeatureManager with its own Critical Protection
-      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation'];
+      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
 
       logger.debug('Re-evaluating all features');
 

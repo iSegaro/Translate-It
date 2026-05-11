@@ -78,6 +78,7 @@ export async function loadFeature(featureName, force = false) {
       case 'selectElement': loadingPromise = loadSelectElementFeature(force); break;
       case 'shortcut': loadingPromise = loadShortcutFeature(force); break;
       case 'pageTranslation': loadingPromise = loadPageTranslationFeature(); break;
+      case 'screenCapture': loadingPromise = loadScreenCaptureFeature(force); break;
       default: throw new Error(`Unknown feature: ${featureName}`);
     }
 
@@ -211,6 +212,24 @@ async function loadPageTranslationFeature() {
   return pageTranslationManager;
 }
 
+async function loadScreenCaptureFeature(force = false) {
+  if (!featureManager) {
+    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+    featureManager = FeatureManager.getInstance();
+  }
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  const isAllowed = force || await exclusionChecker.isFeatureAllowed('screenCapture');
+
+  if (isAllowed) {
+    await featureManager.activateFeature('screenCapture');
+  } else {
+    logger.debug('ScreenCapture is blocked by exclusion, skipping activation');
+    return null;
+  }
+  return featureManager.getFeatureHandler('screenCapture');
+}
+
 export async function loadCoreFeatures() {
   try {
     const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
@@ -251,6 +270,7 @@ export async function loadFeatureOnDemand(featureName) {
     windowsManager: async () => await loadFeature('windowsManager'),
     selectElement: async () => await loadFeature('selectElement'),
     pageTranslation: async () => await loadFeature('pageTranslation'),
+    screenCapture: async () => await loadFeature('screenCapture'),
     shortcut: async () => await loadFeature('shortcut'),
     textFieldIcon: async () => await loadFeature('textFieldIcon'),
     vue: async () => {

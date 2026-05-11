@@ -164,16 +164,8 @@ class LifecycleManager {
       'getElementSelectionHandlerStats': Handlers.getElementSelectionHandlerStats,
       
       // Screen capture handlers - Lazy loaded for better performance
-      'startAreaCapture': Handlers.handleStartAreaCaptureLazy,
-      'startFullScreenCapture': Handlers.handleStartFullScreenCaptureLazy,
-      'requestFullScreenCapture': Handlers.handleRequestFullScreenCaptureLazy,
-      'processAreaCaptureImage': Handlers.handleProcessAreaCaptureImageLazy,
-      'previewConfirmed': Handlers.handlePreviewConfirmedLazy,
-      'previewCancelled': Handlers.handlePreviewCancelledLazy,
-      'previewRetry': Handlers.handlePreviewRetryLazy,
-      'resultClosed': Handlers.handleResultClosedLazy,
-      'captureError': Handlers.handleCaptureErrorLazy,
-      'areaSelectionCancel': Handlers.handleAreaSelectionCancelLazy,
+      [MessageActions.START_SCREEN_CAPTURE]: Handlers.handleStartScreenCaptureLazy,
+      [MessageActions.CAPTURE_SCREEN_AREA]: Handlers.handleCaptureScreenAreaLazy,
       
       // Text selection handlers
       'getSelectedText': Handlers.handleGetSelectedText,
@@ -207,17 +199,14 @@ class LifecycleManager {
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
       'getProviderConfig': Handlers.handleGetProviderConfigLazy,
-      'startScreenCapture': Handlers.handleStartScreenCaptureLazy,
-      'captureScreenArea': Handlers.handleCaptureScreenAreaLazy,
       'updateContextMenu': Handlers.handleUpdateContextMenuLazy,
       'getExtensionInfo': Handlers.handleGetExtensionInfoLazy,
       'logError': Handlers.handleLogErrorLazy,
+      [MessageActions.SYNC_OCR_DOWNLOADABLE_LANGUAGES]: Handlers.handleSyncOCRLanguagesLazy,
 
       // Vue Bridge handlers - Lazy loaded for better performance
       'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'START_SCREEN_CAPTURE': Handlers.handleVueBridgeLazy,
-      'SHOW_CAPTURE_PREVIEW': Handlers.handleVueBridgeLazy
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy
     };
     
     // Add browser-specific handlers

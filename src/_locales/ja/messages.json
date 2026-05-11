@@ -506,6 +506,9 @@
   "mobile_dashboard_history_label": {
     "message": "履歴"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "キャプチャ"
+  },
   "mobile_selection_auto_label": {
     "message": "自動"
   },
@@ -591,7 +594,10 @@
     "message": "設定を開く"
   },
   "desktop_fab_select_element_label": {
-    "message": "要素を選択"
+    "message": "要素選択"
+  },
+  "desktop_fab_screen_capture_label": {
+    "message": "スクリーンキャプチャ"
   },
   "desktop_fab_translate_selection_label": {
     "message": "選択範囲を翻訳"
@@ -1226,6 +1232,9 @@
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
     "message": "要素を選択"
   },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "スクリーンキャプチャ (OCR)"
+  },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "入力（自動）"
   },
@@ -1687,6 +1696,9 @@
   },
   "history_search_placeholder": {
     "message": "履歴を検索..."
+  },
+  "search_placeholder": {
+    "message": "検索..."
   },
   "history_filter": {
     "message": "フィルター"
@@ -2194,5 +2206,113 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "単語の定義と類義語（注：このモードは固定形式を使用します）"
+  },
+  "screen_capture_label": {
+    "message": "キャプチャ"
+  },
+  "screen_capture_full_screen": {
+    "message": "フルスクリーン"
+  },
+  "screen_capture_ocr_language": {
+    "message": "OCR言語"
+  },
+  "ocr_tab_title": {
+    "message": "スクリーンOCR"
+  },
+  "ocr_tab_desc": {
+    "message": "画面上のテキスト認識 (OCR) の言語と設定を管理します。"
+  },
+  "ocr_enabled_label": {
+    "message": "スクリーンOCRを有効にする"
+  },
+  "ocr_enabled_desc": {
+    "message": "画像からテキストを抽出し、翻訳することを許可します。"
+  },
+  "ocr_context_menu_label": {
+    "message": "コンテキストメニューに表示"
+  },
+  "ocr_context_menu_desc": {
+    "message": "画面上のテキストを右クリックした際に、翻訳オプションを表示します。"
+  },
+  "ocr_languages_label": {
+    "message": "OCR言語"
+  },
+  "ocr_download_button": {
+    "message": "ダウンロード"
+  },
+  "ocr_delete_button": {
+    "message": "削除"
+  },
+  "ocr_status_installed": {
+    "message": "インストール済み"
+  },
+  "ocr_status_not_installed": {
+    "message": "未インストール"
+  },
+  "ocr_auto_download_label": {
+    "message": "必要な言語を自動ダウンロード"
+  },
+  "ocr_auto_download_desc": {
+    "message": "スクリーンキャプチャ開始時に言語モデルがない場合、自動的にダウンロードします。"
+  },
+  "ocr_cache_clear_button": {
+    "message": "OCRキャッシュをクリア"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "ダウンロード済みのすべての言語モデルをローカルストレージから削除して空き容量を増やします。"
+  },
+  "ocr_download_progress": {
+    "message": "{lang} をダウンロード中: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "{lang} モデルのダウンロードが完了しました。"
+  },
+  "ocr_download_error": {
+    "message": "{lang} モデルのダウンロードに失敗しました。"
+  },
+  "screen_capture_cancel": {
+    "message": "キャンセル"
+  },
+  "screen_capture_capturing": {
+    "message": "キャプチャしています..."
+  },
+  "screen_capture_status_extracting": {
+    "message": "テキストを抽出しています..."
+  },
+  "screen_capture_select_area": {
+    "message": "キャプチャする領域を選択"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "クリック＆ドラッグで選択"
+  },
+  "screen_capture_press_escape": {
+    "message": "ESCでキャンセル"
+  },
+  "screen_capture_press_enter": {
+    "message": "ENTERで確定"
+  },
+  "screen_capture_error": {
+    "message": "キャプチャエラー"
+  },
+  "screen_capture_error_failed": {
+    "message": "キャプチャに失敗しました。もう一度お試しください。"
+  },
+  "screen_capture_error_no_text": {
+    "message": "選択された範囲内にテキストが見つかりませんでした。"
+  },
+  "screen_capture_error_model": {
+    "message": "OCRモデルの読み込みに失敗しました。接続を確認してください。"
+  },
+  "screen_capture_error_model_missing": {
+    "message": "言語モデルがインストールされていません。OCR設定からダウンロードしてください。"
+  },
+  "screen_capture_missing_model_status": {
+    "message": "言語モデルがインストールされていません。"
+  },
+  "screen_capture_missing_model_action": {
+    "message": "OCR設定からダウンロードしてください。"
+  },
+  "screen_capture_retry": {
+    "message": "再試行"
   }
 }

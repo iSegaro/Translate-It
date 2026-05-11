@@ -13,7 +13,7 @@ import { ThemeManager } from "./theme/ThemeManager.js";
 // - WindowsFactory, PositionCalculator, SmartPositioner
 // - AnimationManager, TranslationRenderer, DragHandler
 import settingsManager from '@/shared/managers/SettingsManager.js';
-import { state, SelectionTranslationMode } from "@/shared/config/config.js";
+import { state, SelectionTranslationMode, TranslationMode } from "@/shared/config/config.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
@@ -250,11 +250,13 @@ export class WindowsManager extends ResourceTracker {
    * Handle translation trigger for pending selections (Coordinator Pattern)
    */
   async _handleSelectionTrigger(payload) {
-    const { text, position } = payload;
-    this.logger.info('Selection trigger received (Global)', { textLength: text?.length });
+    const { text, position, options = {} } = payload;
+    this.logger.info('Selection trigger received (Global)', { textLength: text?.length, options });
     
     if (text && position) {
-      await this._showWindow(text, position);
+      // Use public show() method instead of _showWindow to benefit from 
+      // mobile redirection and permission checks.
+      await this.show(text, position, options);
     }
   }
 
@@ -323,11 +325,18 @@ export class WindowsManager extends ResourceTracker {
       return;
     }
 
-    // Get current mode from settings
-    const selectionTranslationMode = settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
+    // Explicit actions (OCR, Manual triggers) should bypass the selection mode settings
+    // and always trigger immediate UI display.
+    const isExplicitAction = options.immediate === true || 
+                             options.mode === TranslationMode.ScreenCapture;
+
+    // Get current mode from settings (allow override via options.immediate or explicit actions)
+    const selectionTranslationMode = (options.immediate || isExplicitAction)
+      ? SelectionTranslationMode.IMMEDIATE 
+      : settingsManager.get('selectionTranslationMode', SelectionTranslationMode.ON_CLICK);
 
     // 2. Check for interaction conditions (e.g., Ctrl requirement)
-    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
+    if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE && !options.immediate && !isExplicitAction) {
       const requireCtrl = settingsManager.get('REQUIRE_CTRL_FOR_TEXT_SELECTION', false);
       if (requireCtrl && options.ctrlPressed !== true) {
         this.logger.debug('Ctrl requirement not met for immediate translation, skipping UI display');
@@ -345,7 +354,7 @@ export class WindowsManager extends ResourceTracker {
     if (this.shouldUseMobileUI()) {
       if (selectionTranslationMode === SelectionTranslationMode.IMMEDIATE) {
         this.logger.info('Mobile + Immediate mode: showing mobile sheet immediately');
-        await this._showMobileSheet(selectedText);
+        await this._showMobileSheet(selectedText, options);
         return;
       } 
       
@@ -369,8 +378,8 @@ export class WindowsManager extends ResourceTracker {
     const isOnFabClickMode = selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK;
     
     // If the main feature is disabled, we MUST preserve selection for external modules (like FAB)
-    // and skip our own internal UI display.
-    if (!isTextSelectionEnabled) {
+    // and skip our own internal UI display, UNLESS it's an explicit action.
+    if (!isTextSelectionEnabled && !isExplicitAction) {
       this.logger.debug('TRANSLATE_ON_TEXT_SELECTION is disabled, preserving for external modules and skipping internal UI');
       this.state.setOriginalText(selectedText);
       await this.dismiss(false, true); // Force preserveSelection = true
@@ -394,7 +403,7 @@ export class WindowsManager extends ResourceTracker {
     this.state.setProcessing(true);
 
     try {
-      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK) {
+      if (selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK && !isExplicitAction) {
         this.logger.info('onFabClick mode: selection handled by external UI (like FAB)', { textLength: selectedText?.length });
         this.state.setOriginalText(selectedText);
         
@@ -403,7 +412,7 @@ export class WindowsManager extends ResourceTracker {
       } else if (selectionTranslationMode === SelectionTranslationMode.ON_CLICK) {
         await this._showIcon(selectedText, position);
       } else {
-        await this._showWindow(selectedText, position);
+        await this._showWindow(selectedText, position, options);
       }
     } finally {
       this.state.setProcessing(false);
@@ -413,11 +422,12 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Show mobile-specific bottom sheet
    * @param {string} selectedText - Selected text to translate
+   * @param {Object} options - Translation options
    */
-  async _showMobileSheet(selectedText) {
+  async _showMobileSheet(selectedText, options = {}) {
     if (!selectedText) return;
 
-    this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length });
+    this.logger.info('Creating mobile translation sheet', { textLength: selectedText.length, options });
 
     this.state.setOriginalText(selectedText);
     this.state.setTranslationCancelled(false);
@@ -428,12 +438,13 @@ export class WindowsManager extends ResourceTracker {
       text: selectedText,
       view: MOBILE_CONSTANTS.VIEWS.SELECTION,
       state: MOBILE_CONSTANTS.SHEET_STATE.PEEK,
-      isLoading: true
+      isLoading: true,
+      mode: options.mode || null
     });
 
     try {
       // Start translation process
-      const translationResult = await this._startTranslationProcess(selectedText);
+      const translationResult = await this._startTranslationProcess(selectedText, null, options);
 
       if (!translationResult) {
         this.logger.info('Mobile translation cancelled');
@@ -446,7 +457,8 @@ export class WindowsManager extends ResourceTracker {
         translation: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         targetLanguage: translationResult.targetLanguage,
-        isLoading: false
+        isLoading: false,
+        mode: options.mode || null
       });
       
     } catch (error) {
@@ -459,7 +471,8 @@ export class WindowsManager extends ResourceTracker {
         isLoading: false,
         isStreaming: false,
         isError: true,
-        error: errorInfo.message
+        error: errorInfo.message,
+        mode: options.mode || null
       });
     }
   }
@@ -886,7 +899,7 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Show translation window with two-phase loading
    */
-  async _showWindow(selectedText, position) {
+  async _showWindow(selectedText, position, options = {}) {
     if (!ExtensionContextManager.isValidSync() || !selectedText) {
       this.logger.debug('Cannot show window: invalid context or empty text', { selectedText });
       return;
@@ -898,7 +911,8 @@ export class WindowsManager extends ResourceTracker {
         x: Math.round(position.x || 0),
         y: Math.round(position.y || 0)
       },
-      context: this.isTopFrame ? 'main-frame' : 'iframe'
+      context: this.isTopFrame ? 'main-frame' : 'iframe',
+      options
     });
 
       
@@ -956,7 +970,7 @@ export class WindowsManager extends ResourceTracker {
 
     // PHASE 2: Perform translation and update window
     try {
-      const translationResult = await this._startTranslationProcess(selectedText, windowId);
+      const translationResult = await this._startTranslationProcess(selectedText, windowId, options);
 
       // If translation was cancelled (returns null for cancellation only)
       if (!translationResult) {
@@ -1005,14 +1019,14 @@ export class WindowsManager extends ResourceTracker {
   /**
    * Start translation process for a window
    */
-  async _startTranslationProcess(selectedText, windowId = null) {
+  async _startTranslationProcess(selectedText, windowId = null, options = {}) {
     try {
-      const options = { windowId };
-      if (this.state.provider) {
-        options.provider = this.state.provider;
+      const translationOptions = { ...options, windowId };
+      if (this.state.provider && !options.provider) {
+        translationOptions.provider = this.state.provider;
       }
       // Perform translation
-      const result = await this.translationHandler.performTranslation(selectedText, options);
+      const result = await this.translationHandler.performTranslation(selectedText, translationOptions);
       
       if (this.state.isTranslationCancelled) return null;
       

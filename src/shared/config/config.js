@@ -249,6 +249,7 @@ export const CONFIG = {
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
+  OCR_DEFAULT_LANG: 'eng', // زبان پیش‌فرض OCR
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
@@ -316,6 +317,7 @@ export const CONFIG = {
   // --- UI & Styling ---
   CONTEXT_MENU_VISIBILITY: {
     PAGE_CONTEXT_SELECT_ELEMENT: true,    // نمایش در کلیک‌راست صفحات
+    PAGE_CONTEXT_SCREEN_CAPTURE: true,    // نمایش تصویربرداری در کلیک‌راست صفحات
     ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
     ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
     ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون

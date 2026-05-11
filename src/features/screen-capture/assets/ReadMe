@@ -1,0 +1,18 @@
+Tesseract.js v7.0.0 Assets
+==========================
+
+These files are used for offline OCR processing in the browser extension.
+They are kept locally to comply with Content Security Policy (CSP) and ensure 100% privacy/offline capability.
+
+Source URLs (v7.0.0):
+- worker.min.js: https://unpkg.com/tesseract.js@7.0.0/dist/worker.min.js
+- tesseract-core-simd-lstm.wasm.js: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-simd-lstm.wasm.js
+- tesseract-core-simd-lstm.wasm: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-simd-lstm.wasm
+- tesseract-core-relaxedsimd-lstm.wasm.js: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-relaxedsimd-lstm.wasm.js
+- tesseract-core-relaxedsimd-lstm.wasm: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-relaxedsimd-lstm.wasm
+- tesseract-core-lstm.wasm.js: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-lstm.wasm.js
+- tesseract-core-lstm.wasm: https://unpkg.com/tesseract.js-core@7.0.0/tesseract-core-lstm.wasm
+
+Note:
+`tesseract.min.js` is NOT included here as it is bundled directly from `node_modules` in the build process.
+Only the worker and WASM cores are loaded at runtime from this directory.

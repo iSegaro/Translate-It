@@ -257,6 +257,60 @@
   "advance_tab_title": {
     "message": "Advance"
   },
+  "ocr_tab_title": {
+    "message": "Screen OCR"
+  },
+  "ocr_tab_desc": {
+    "message": "Manage languages and settings for on-screen text recognition (OCR)."
+  },
+  "ocr_enabled_label": {
+    "message": "Enable Screen OCR"
+  },
+  "ocr_enabled_desc": {
+    "message": "Allow extracting text from images and translating it."
+  },
+  "ocr_context_menu_label": {
+    "message": "Show in Context Menu"
+  },
+  "ocr_context_menu_desc": {
+    "message": "Add it to the page's right-click menu"
+  },
+  "ocr_languages_label": {
+    "message": "OCR Languages"
+  },
+  "ocr_download_button": {
+    "message": "Download"
+  },
+  "ocr_delete_button": {
+    "message": "Delete"
+  },
+  "ocr_status_installed": {
+    "message": "Installed"
+  },
+  "ocr_status_not_installed": {
+    "message": "Not Installed"
+  },
+  "ocr_auto_download_label": {
+    "message": "Auto-download needed languages"
+  },
+  "ocr_auto_download_desc": {
+    "message": "Automatically download the language model if it's missing when you start a screen capture."
+  },
+  "ocr_cache_clear_button": {
+    "message": "Clear OCR Cache"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "Remove all downloaded language models from local storage to free up space."
+  },
+  "ocr_download_progress": {
+    "message": "Downloading {lang}: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "{lang} model downloaded successfully."
+  },
+  "ocr_download_error": {
+    "message": "Failed to download {lang} model."
+  },
   "tts_tab_title": {
     "message": "Text-to-Speech"
   },
@@ -506,6 +560,9 @@
   "mobile_dashboard_history_label": {
     "message": "History"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "Capture"
+  },
   "mobile_selection_auto_label": {
     "message": "Auto"
   },
@@ -592,6 +649,9 @@
   },
   "desktop_fab_select_element_label": {
     "message": "Select Element"
+  },
+  "desktop_fab_screen_capture_label": {
+    "message": "Screen Capture"
   },
   "desktop_fab_translate_selection_label": {
     "message": "Translate Selection"
@@ -1226,6 +1286,9 @@
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
     "message": "Select Element"
   },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "Screen Capture (OCR)"
+  },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "Input (Auto)"
   },
@@ -1686,7 +1749,10 @@
     "message": "{count} items"
   },
   "history_search_placeholder": {
-    "message": "Search history..."
+    "message": "Search in history..."
+  },
+  "search_placeholder": {
+    "message": "Search..."
   },
   "history_filter": {
     "message": "Filter"
@@ -2183,6 +2249,15 @@
   "prompt_preview_desc_batch": {
     "message": "Multiple elements or whole page translation in JSON format"
   },
+  "popup_screen_capture_title_icon": {
+    "message": "Capture Screen Area"
+  },
+  "popup_screen_capture_alt_icon": {
+    "message": "Screen Capture"
+  },
+  "context_menu_screen_capture": {
+    "message": "Capture Screen"
+  },
   "prompt_preview_mode_screen_capture": {
     "message": "Screen Capture"
   },
@@ -2194,5 +2269,59 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "Brief word definitions and synonyms (Note: This mode uses a fixed format)"
+  },
+  "screen_capture_label": {
+    "message": "Capture"
+  },
+  "screen_capture_full_screen": {
+    "message": "Full Screen"
+  },
+  "screen_capture_ocr_language": {
+    "message": "OCR Language"
+  },
+  "screen_capture_cancel": {
+    "message": "Cancel"
+  },
+  "screen_capture_capturing": {
+    "message": "Capturing..."
+  },
+  "screen_capture_status_extracting": {
+    "message": "Extracting text..."
+  },
+  "screen_capture_select_area": {
+    "message": "Select an area to capture"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "Click and drag to select area"
+  },
+  "screen_capture_press_escape": {
+    "message": "Press ESC to cancel"
+  },
+  "screen_capture_press_enter": {
+    "message": "Press ENTER to confirm"
+  },
+  "screen_capture_error": {
+    "message": "Capture Error"
+  },
+  "screen_capture_error_failed": {
+    "message": "Screen capture failed. Please try again."
+  },
+  "screen_capture_error_no_text": {
+    "message": "No text detected in the selected area."
+  },
+  "screen_capture_error_model": {
+    "message": "Failed to load OCR model. Check your connection."
+  },
+  "screen_capture_error_model_missing": {
+    "message": "Language model not installed. Please download it from OCR settings."
+  },
+  "screen_capture_missing_model_status": {
+    "message": "Language model not installed. "
+  },
+  "screen_capture_missing_model_action": {
+    "message": "Please download it from OCR settings."
+  },
+  "screen_capture_retry": {
+    "message": "Retry"
   }
 }

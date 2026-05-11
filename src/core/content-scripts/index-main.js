@@ -102,6 +102,7 @@ async function initializeLogger() {
     if (process.env.NODE_ENV === 'development') {
       scriptLogger.debug('Initializing main frame content script (Modular mode)');
     }
+    console.log('[ContentScript] Main frame initialized');
 
     // 6. INITIALIZE CORE
     try {

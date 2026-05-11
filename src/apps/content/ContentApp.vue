@@ -3,32 +3,11 @@
     :class="[
       'content-app-container', 
       TRANSLATION_HTML.NO_TRANSLATE_CLASS,
-      settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light'
+      settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light',
+      { 'capture-mode': isScreenCaptureActive || activeCapture }
     ]"
     :translate="TRANSLATION_HTML.NO_TRANSLATE_VALUE"
   >
-    <!-- This will host all in-page UI components -->
-    <Toaster
-      v-if="shouldShowGlobalUI"
-      rich-colors
-      position="bottom-right"
-      expand
-      :toast-options="{
-        style: {
-          pointerEvents: 'auto',
-          cursor: 'auto',
-          zIndex: 2147483647,
-          unicodeBidi: 'plaintext',
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word',
-          maxWidth: '320px',
-          minWidth: '280px',
-          whiteSpace: 'pre-wrap',
-          overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-        }
-      }"
-    />
     <template v-if="isExtensionEnabled && settingsStore.isInitialized">
       <!-- TextField Interaction Icons -->
       <TextFieldIcon
@@ -83,6 +62,13 @@
       <!-- Select Element Overlays -->
       <ElementHighlightOverlay />
 
+      <!-- Screen Capture Components -->
+      <ScreenSelector 
+        v-if="isScreenCaptureActive"
+        @select="onScreenAreaSelected"
+        @cancel="onScreenCaptureCancel"
+      />
+
       <!-- Mobile Bottom Sheet -->
       <MobileSheet v-if="isMobileUI && isTopFrame" />
 
@@ -99,6 +85,33 @@
       <!-- Page Translation Original Text Tooltip -->
       <PageTranslationTooltip />
     </template>
+
+    <!-- 
+      Toaster (Notification System)
+      CRITICAL: Placed at the end of the template to ensure it stays on top of 
+      all other siblings in the Shadow DOM stacking context (Z-index rule for siblings).
+    -->
+    <Toaster
+      v-if="shouldShowGlobalUI"
+      rich-colors
+      position="bottom-right"
+      expand
+      :toast-options="{
+        style: {
+          pointerEvents: 'auto',
+          cursor: 'auto',
+          zIndex: 2147483647,
+          unicodeBidi: 'plaintext',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
+          maxWidth: '320px',
+          minWidth: '280px',
+          whiteSpace: 'pre-wrap',
+          overflow: 'hidden',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        }
+      }"
+    />
   </div>
 </template>
 
@@ -117,7 +130,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 // Static Imports (Critical & Immediate UI)
 // These are loaded immediately to ensure responsiveness and core system integrity.
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
-import ElementHighlightOverlay from './components/ElementHighlightOverlay.vue';
+const ElementHighlightOverlay = defineAsyncComponent(() => import('./components/ElementHighlightOverlay.vue'));
+const ScreenSelector = defineAsyncComponent(() => import('@/components/content/ScreenSelector.vue'));
 
 // Lazy Loaded Components (Optimized Resource Usage)
 // These components are loaded on-demand or based on device type to reduce the initial JS footprint.
@@ -160,6 +174,7 @@ const {
   isTopFrame,
   shouldShowGlobalUI,
   isSelectModeActive,
+  isScreenCaptureActive,
   isFullscreen,
   isExtensionEnabled,
   showDesktopFab,
@@ -167,10 +182,27 @@ const {
   isMobileUI
 } = useContentAppUIState(settingsStore, mobileStore, tracker);
 
+import { watch } from 'vue';
+watch(isScreenCaptureActive, (newVal) => {
+  logger.info(`[ContentApp] isScreenCaptureActive changed: ${newVal}`);
+});
+
+const onScreenAreaSelected = (result) => {
+  logger.info('Screen area selected', result);
+  isScreenCaptureActive.value = false;
+  window.isScreenCaptureActive = false;
+};
+
+const onScreenCaptureCancel = () => {
+  logger.info('Screen capture cancelled');
+  isScreenCaptureActive.value = false;
+  window.isScreenCaptureActive = false;
+};
+
 // 4. Notifications (Toasts) Management
 useContentAppNotifications({ shouldShowGlobalUI, toastRTL, tracker });
 
-// 5. TextField Interaction Icons Management
+// 5. TextField Interaction Icons
 const {
   activeIcons,
   setIconRef,

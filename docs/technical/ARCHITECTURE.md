@@ -63,6 +63,7 @@
 - **[Selection Coordinator](SELECTION_COORDINATOR.md)** - **Decoupled Architecture (2026)** - Pub/Sub model for selection events between managers (Windows, FAB, TTS)
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
+- **[Screen Capture System](SCREEN_CAPTURE_SYSTEM.md)** - Interactive area capture with Tesseract.js OCR engine
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
 - **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
 - **[Mobile Support System](MOBILE_SUPPORT.md)** - Centralized Bottom Sheet architecture for mobile browsers with gesture support

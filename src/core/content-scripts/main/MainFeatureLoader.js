@@ -22,7 +22,7 @@ export class MainFeatureLoader {
       CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
       ESSENTIAL: ['contentMessageHandler'], // Essential communication
       LAZY_UI: ['vue', 'textSelection'], // UI & Selection (can be promoted)
-      INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation'], // On-demand heavy UI
+      INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation', 'screenCapture'], // On-demand heavy UI
       ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
     };
   }
@@ -102,12 +102,14 @@ export class MainFeatureLoader {
         }
 
         if (this.contentScriptCore && this.contentScriptCore.loadFeature) {
+          console.log(`[MainFeatureLoader] Loading feature: ${featureName} (${category})`);
           await this.contentScriptCore.loadFeature(featureName);
 
           if (process.env.NODE_ENV === 'development') {
             const featureLogger = await this.initializeLogger();
             featureLogger.debug(`[MainFeatureLoader] Loaded feature: ${featureName} (${category})`);
           }
+          console.log(`[MainFeatureLoader] Successfully loaded feature: ${featureName}`);
         }
       } catch (error) {
         await this.handleLoadingError(featureName, category, error);

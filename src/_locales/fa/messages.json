@@ -506,6 +506,9 @@
   "mobile_dashboard_history_label": {
     "message": "تاریخچه"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "تصویربرداری"
+  },
   "mobile_selection_auto_label": {
     "message": "خودکار"
   },
@@ -592,6 +595,9 @@
   },
   "desktop_fab_select_element_label": {
     "message": "انتخاب المان"
+  },
+  "desktop_fab_screen_capture_label": {
+    "message": "تصویربرداری از صفحه"
   },
   "desktop_fab_translate_selection_label": {
     "message": "ترجمه متن انتخاب شده"
@@ -1224,7 +1230,10 @@
     "message": "بازگردانی (Esc کلید)"
   },
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
-    "message": "انتخاب المان با موس"
+    "message": "انتخاب المان"
+  },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "استخراج متن از تصویر (OCR)"
   },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "ورودی (خودکار)"
@@ -1687,6 +1696,9 @@
   },
   "history_search_placeholder": {
     "message": "جستجو در تاریخچه..."
+  },
+  "search_placeholder": {
+    "message": "جستجو..."
   },
   "history_filter": {
     "message": "فیلتر"
@@ -2183,6 +2195,12 @@
   "prompt_preview_desc_batch": {
     "message": "ترجمه دسته‌ای چندین المان یا کل صفحه وب در قالب JSON"
   },
+  "popup_screen_capture_title_icon": {
+    "message": "تصویربرداری از صفحه"
+  },
+  "popup_screen_capture_alt_icon": {
+    "message": "تصویربرداری"
+  },
   "prompt_preview_mode_screen_capture": {
     "message": "ترجمه از روی تصویر"
   },
@@ -2194,5 +2212,113 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+  },
+  "screen_capture_label": {
+    "message": "ضبط"
+  },
+  "screen_capture_full_screen": {
+    "message": "صفحه کامل"
+  },
+  "screen_capture_ocr_language": {
+    "message": "زبان OCR"
+  },
+  "ocr_tab_title": {
+    "message": "تشخیص متن (OCR)"
+  },
+  "ocr_tab_desc": {
+    "message": "مدیریت زبان‌ها و تنظیمات تشخیص متن از روی تصویر (OCR)."
+  },
+  "ocr_enabled_label": {
+    "message": "فعال‌سازی استخراج متن (OCR)"
+  },
+  "ocr_enabled_desc": {
+    "message": "قابلیت استخراج متن از تصاویر و ترجمه آن را فعال می‌کند."
+  },
+  "ocr_context_menu_label": {
+    "message": "نمایش در منوی راست‌کلیک"
+  },
+  "ocr_context_menu_desc": {
+    "message": "اضافه کردن به منوی راست‌کلیک صفحات."
+  },
+  "ocr_languages_label": {
+    "message": "زبان‌های OCR"
+  },
+  "ocr_download_button": {
+    "message": "دانلود"
+  },
+  "ocr_delete_button": {
+    "message": "حذف"
+  },
+  "ocr_status_installed": {
+    "message": "نصب شده"
+  },
+  "ocr_status_not_installed": {
+    "message": "نصب نشده"
+  },
+  "ocr_auto_download_label": {
+    "message": "دانلود خودکار زبان‌های مورد نیاز"
+  },
+  "ocr_auto_download_desc": {
+    "message": "در صورت فعال بودن، هنگام شروع تصویربرداری اگر مدل زبان موجود نباشد، به طور خودکار دانلود می‌شود."
+  },
+  "ocr_cache_clear_button": {
+    "message": "پاکسازی حافظه OCR"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "تمام مدل‌های زبان دانلود شده را برای آزادسازی فضا از حافظه داخلی حذف می‌کند."
+  },
+  "ocr_download_progress": {
+    "message": "در حال دانلود {lang}: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "مدل {lang} با موفقیت دانلود شد."
+  },
+  "ocr_download_error": {
+    "message": "خطا در دانلود مدل {lang}."
+  },
+  "screen_capture_cancel": {
+    "message": "لغو"
+  },
+  "screen_capture_capturing": {
+    "message": "در حال ضبط..."
+  },
+  "screen_capture_status_extracting": {
+    "message": "در حال استخراج متن..."
+  },
+  "screen_capture_select_area": {
+    "message": "ناحیه‌ای را برای ضبط انتخاب کنید"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "کلیک و درگ کنید تا ناحیه را انتخاب کنید"
+  },
+  "screen_capture_press_escape": {
+    "message": "برای لغو ESC را بزنید"
+  },
+  "screen_capture_press_enter": {
+    "message": "برای تأیید ENTER را بزنید"
+  },
+  "screen_capture_error": {
+    "message": "خطا در تصویربرداری"
+  },
+  "screen_capture_error_failed": {
+    "message": "تصویربرداری با شکست مواجه شد. لطفاً دوباره تلاش کنید."
+  },
+  "screen_capture_error_no_text": {
+    "message": "هیچ متنی در ناحیه انتخاب شده یافت نشد."
+  },
+  "screen_capture_error_model": {
+    "message": "خطا در بارگذاری مدل OCR. اتصال اینترنت را بررسی کنید."
+  },
+  "screen_capture_error_model_missing": {
+    "message": "مدل زبان نصب نشده است. لطفاً آن را از تنظیمات OCR دانلود کنید."
+  },
+  "screen_capture_missing_model_status": {
+    "message": "مدل زبان نصب نشده است. "
+  },
+  "screen_capture_missing_model_action": {
+    "message": "لطفا آن را از تنظیمات OCR دانلود کنید."
+  },
+  "screen_capture_retry": {
+    "message": "تلاش مجدد"
   }
 }

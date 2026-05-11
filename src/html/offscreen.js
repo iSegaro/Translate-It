@@ -158,6 +158,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCachedAudioPlayback(cleanMessage.audioData, sendResponse);
     return true;
   }
+  else if (action === "OCR_PROCESS" && cleanMessage.data) {
+    handleOCRProcess(cleanMessage.data, sendResponse);
+    return true; // keep async channel open
+  }
   else if (action === "GENERATE_COMPOSITE_ICON" && cleanMessage.data) {
     // Handle composite icon generation inline
     try {
@@ -919,6 +923,49 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
   }
 }
 
+let ocrEngine = null;
+
+/**
+ * Handle OCR processing with lazy loading
+ */
+async function handleOCRProcess(data, sendResponse) {
+  console.log("[Offscreen] handleOCRProcess started", { lang: data.lang });
+  try {
+    if (!ocrEngine) {
+      console.log("[Offscreen] Loading OCR engine module...");
+      const module = await import('../features/screen-capture/services/ocrEngine.js');
+      ocrEngine = module;
+      console.log("[Offscreen] OCR engine module loaded");
+    }
+
+    // Import language mapping utility
+    const { toTesseractLanguageCode } = await import('../features/screen-capture/utils/ocrLanguageMap.js');
+
+    const { image, lang, coordinates } = data;
+    const tesseractLang = toTesseractLanguageCode(lang); // Convert to valid Tesseract language code
+
+    console.log("[Offscreen] Starting recognition with language:", tesseractLang);
+    const text = await ocrEngine.recognize(image, tesseractLang, coordinates);
+    console.log("[Offscreen] Recognition successful, extracted text length:", text?.length);
+    sendResponse({ success: true, text });
+  } catch (error) {
+    console.error("[Offscreen] OCR process failed. Full error object:", error);
+
+    // Extract as much info as possible
+    let errorMessage = "Unknown OCR error";
+    if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object') {
+      errorMessage = error.message || error.statusText || JSON.stringify(error);
+    }
+
+    sendResponse({
+      success: false,
+      error: errorMessage,
+      stack: error?.stack || new Error().stack
+    });
+  }
+}
 // Cleanup resources when page unloads
 resourceTracker.addEventListener(window, 'beforeunload', () => {
   logger.debug('Offscreen document unloading, cleaning up resources...');
