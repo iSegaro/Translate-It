@@ -41,6 +41,7 @@ The wrapper for Tesseract.js v7 that manages the OCR lifecycle.
 
 **Key Features:**
 - Local Asset Loading: Strictly uses local worker and core scripts from `assets/ocr/` to comply with CSP policies.
+- Smart Core Selection: Provides multiple WASM cores (Standard, SIMD, and Relaxed-SIMD) allowing Tesseract.js to automatically select the most performant engine based on the user's CPU capabilities.
 - Modern API: Implements the 3-argument `createWorker(lang, oem, options)` signature for stable initialization in extension environments.
 - Idle Management: Automatically terminates the Tesseract worker after 5 minutes of inactivity to reclaim memory.
 
@@ -89,7 +90,7 @@ To ensure reliability in restricted extension environments, the worker is initia
 ```javascript
 worker = await createWorker(lang, 1, {
   workerPath: browser.runtime.getURL('assets/ocr/worker.min.js'),
-  corePath: browser.runtime.getURL('assets/ocr/tesseract-core-simd-lstm.wasm.js'),
+  corePath: browser.runtime.getURL('assets/ocr/'), // Points to dir for smart core selection
   cachePath: '.', // Instructs Tesseract to use IndexedDB in the current scope
   cacheMethod: settings.OCR_AUTO_DOWNLOAD ? 'write' : 'readOnly',
   workerBlobURL: false // Mandatory to prevent CSP Network Errors
@@ -135,7 +136,7 @@ The system achieves "True Offline" capability through the following strategy:
 1. First use/Download: When a language is first requested, it is downloaded from the projectnaptha CDN.
 2. Cache Store: The model is saved to IndexedDB (`translate-it-ocr-models`).
 3. Subsequent Use: `ocrEngine` detects the cached model and instructs Tesseract to use it directly, bypassing any network calls.
-4. Deployment: Critical OCR binaries (Worker/Core/Wasm) are bundled within the extension package under `assets/ocr/`.
+4. Deployment: Critical OCR binaries (Worker/Core/Wasm) are bundled within the extension package under `assets/ocr/`. This includes multiple WASM versions (Standard, SIMD, Relaxed-SIMD) to ensure optimal performance on any hardware without runtime errors.
 
 ## Debugging
 
