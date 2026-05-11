@@ -1,3 +1,15 @@
+#### v1.15.0 – Released on May 11, 2026
+
+##### Added
+
+- Added [Screen Capture](#/ocr) to extract and translate text from any visual area, including images and videos, with full offline support ([#120](https://github.com/iSegaro/Translate-It/pull/120))
+
+##### Changed
+
+- Improved overall performance and responsiveness
+
+---
+
 #### v1.14.1 – Released on May 09, 2026
 
 ##### Added
