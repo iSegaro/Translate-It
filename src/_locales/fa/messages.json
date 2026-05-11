@@ -1904,6 +1904,15 @@
   "window_translation_placeholder": {
     "message": "ترجمه اینجا نمایش داده می‌شود"
   },
+  "window_pin": {
+    "message": "ثابت کردن پنجره"
+  },
+  "window_unpin": {
+    "message": "آزاد کردن پنجره"
+  },
+  "window_cycle_dock": {
+    "message": "تغییر حالت چسبیدن (هیچکدام / چپ / راست)"
+  },
   "action_copy_text": {
     "message": "کپی متن"
   },

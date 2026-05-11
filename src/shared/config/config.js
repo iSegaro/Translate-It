@@ -233,6 +233,9 @@ export const CONFIG = {
   TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   SHOW_MOBILE_FAB: true, // نمایش دکمه دسترسی سریع در موبایل
+  WINDOW_IS_PINNED: false, // پنجره ترجمه پین شده باشد یا نه
+  WINDOW_DOCK_MODE: 'none', // حالت چسبیدن پنجره (none, left, right)
+  WINDOW_DOCKED_WIDTH: 350, // عرض پنجره در حالت چسبیده
   DESKTOP_FAB_POSITION: { 
     side: 'right', 
     y: -1 

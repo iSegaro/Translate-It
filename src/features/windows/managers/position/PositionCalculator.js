@@ -57,7 +57,7 @@ export class PositionCalculator {
   _applySmartPositioning(rect, preferredX, preferredY) {
     // Get viewport dimensions for intelligent positioning
     const viewport = {
-      width: window.innerWidth,
+      width: document.documentElement.clientWidth || window.innerWidth,
       height: window.innerHeight
     };
     
@@ -120,17 +120,19 @@ export class PositionCalculator {
 
     // Ensure the final position stays within viewport bounds
     const margin = WindowsConfig.POSITIONING.VIEWPORT_MARGIN;
+    const vw = targetWindow.document.documentElement.clientWidth || targetWindow.innerWidth;
+    const vh = targetWindow.innerHeight;
     finalPosition.left = Math.max(margin, 
-                         Math.min(finalPosition.left, targetWindow.innerWidth - iconSize - margin));
+                         Math.min(finalPosition.left, vw - iconSize - margin));
     finalPosition.top = Math.max(margin, 
-                        Math.min(finalPosition.top, targetWindow.innerHeight - iconSize - margin));
+                        Math.min(finalPosition.top, vh - iconSize - margin));
 
     this.logger.debug('Calculated final icon position', {
       original: originalPosition,
       scroll: { x: targetWindow.scrollX, y: targetWindow.scrollY },
       iconSize,
       final: finalPosition,
-      viewport: { width: targetWindow.innerWidth, height: targetWindow.innerHeight },
+      viewport: { width: vw, height: vh },
       constraints: { margin }
     });
 

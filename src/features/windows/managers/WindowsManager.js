@@ -206,6 +206,12 @@ export class WindowsManager extends ResourceTracker {
       // Listen for global selection clear events
       this._selectionClearHandler = () => {
         if (this.state.isVisible || this.state.isIconMode) {
+          // Prevent dismissal if the window is pinned
+          if (this.state.isPinned) {
+            this.logger.debug('Global selection clear ignored: Window is pinned');
+            return;
+          }
+
           this.logger.debug('Global selection clear received, dismissing UI');
           this.dismiss(false);
         }
@@ -388,6 +394,28 @@ export class WindowsManager extends ResourceTracker {
 
     const preserveSelection = this._isIconToWindowTransition || isOnClickMode || isOnFabClickMode;
     
+    // Support for updating existing window if pinned or docked
+    // We do this regardless of selectionTranslationMode because if a window is kept open, 
+    // the user likely wants the new translation to appear there immediately.
+    if (this.state.isVisible && !this.state.isIconMode && 
+        (this.state.isPinned || this.state.dockMode !== 'none')) {
+      this.logger.info('Updating existing pinned/docked window');
+      
+      // Cancel previous translation if any
+      if (this.translationHandler && typeof this.translationHandler.cancelAllTranslations === 'function') {
+        this.translationHandler.cancelAllTranslations();
+      }
+      this.state.setTranslationCancelled(false);
+
+      // Clear manual provider override for completely new selections
+      if (!this._isIconToWindowTransition) {
+        this.state.setProvider(null);
+      }
+      
+      await this._updateExistingWindow(selectedText, options);
+      return;
+    }
+
     // Clear manual provider override for completely new selections
     if (!this._isIconToWindowTransition) {
       this.state.setProvider(null);
@@ -414,6 +442,85 @@ export class WindowsManager extends ResourceTracker {
       } else {
         await this._showWindow(selectedText, position, options);
       }
+    } finally {
+      this.state.setProcessing(false);
+    }
+  }
+
+  /**
+   * Update existing visible window with new translation
+   * @param {string} selectedText - New text to translate
+   * @param {Object} options - Translation options
+   * @private
+   */
+  async _updateExistingWindow(selectedText, options = {}) {
+    if (!selectedText) return;
+
+    const windowId = this.state.activeWindowId;
+    if (!windowId) {
+      this.logger.warn('Cannot update existing window: activeWindowId is null');
+      return;
+    }
+
+    this.logger.info('Updating existing window with new text', { windowId, textLength: selectedText.length });
+
+    // 1. Update state
+    this.state.setOriginalText(selectedText);
+    this.state.setProcessing(true);
+
+    // 2. Show loading in existing window
+    // We update the window to show loading state but KEEP it at normal size
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true,
+      isError: false,
+      initialTranslatedText: '',
+      selectedText // Update original text in UI too
+    });
+
+    try {
+      const translationResult = await this._startTranslationProcess(selectedText, windowId, options);
+
+      // Check if translation was cancelled or returned empty
+      if (!translationResult || this.state.isTranslationCancelled) {
+        this.logger.info('Existing window translation cancelled or null');
+        return;
+      }
+
+      // 3. Update window with result
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isStreaming: false,
+        isError: false,
+        initialTranslatedText: translationResult.translatedText,
+        sourceLanguage: translationResult.sourceLanguage || 'auto',
+        detectedSourceLanguage: translationResult.sourceLanguage,
+        targetLanguage: translationResult.targetLanguage,
+        provider: translationResult.provider
+      });
+
+      this.state.setProvider(translationResult.provider);
+      
+    } catch (error) {
+      if (this.state.isTranslationCancelled) {
+        this.logger.debug('Ignoring error in cancelled translation');
+        return;
+      }
+
+      this.logger.debug('Update existing window translation failed:', error.message);
+      
+      const errorInfo = await this.errorHandler.getErrorForUI(error, 'windows-translation');
+      const fallbackProvider = this.translationHandler.getEffectiveProvider(selectedText, { provider: this.state.provider });
+      
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false,
+        isStreaming: false,
+        isError: true,
+        errorType: errorInfo.type,
+        canRetry: errorInfo.canRetry,
+        needsSettings: errorInfo.needsSettings,
+        initialTranslatedText: errorInfo.message,
+        provider: fallbackProvider
+      });
     } finally {
       this.state.setProcessing(false);
     }
@@ -589,6 +696,12 @@ export class WindowsManager extends ResourceTracker {
     this._dismissHandler = (event) => {
       // Handle icon mode or visible window mode
       if (!this.state.isIconMode && !this.state.isVisible) return;
+
+      // Prevent dismissal if the window is pinned
+      if (this.state.isPinned) {
+        this.logger.debug('Dismiss ignored: Window is pinned');
+        return;
+      }
 
       // Skip if currently dragging or just finished dragging a translation window
       // This prevents accidental dismissal after fast drag operations

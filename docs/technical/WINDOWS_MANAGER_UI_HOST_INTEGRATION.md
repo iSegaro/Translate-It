@@ -28,12 +28,30 @@ The WindowsManager has been further decoupled from text selection detection. It 
 3.  **Reaction**: `WindowsManager` receives the event and independently decides whether to show its UI based on:
     - User settings (onClick vs Immediate).
     - Keyboard modifiers (Ctrl key requirement).
+    - **Existing Window State**: If a window is already **Pinned** or **Docked**, it performs an **In-place Update** (bypassing icon display).
     - URL exclusions.
 
-### Key Benefits of Decoupling
-- **Resilience**: The FAB and TTS systems work even if `WindowsManager` is disabled or fails.
-- **Simplification**: `WindowsState` no longer carries FAB-specific flags like `pendingFabTrigger`.
-- **Platform Parity**: Mobile and Desktop now follow the exact same event-driven flow.
+## Pin & Dock System
+
+The translation window now supports persistent states through Pinning and Docking.
+
+### 1. Pinned State
+- **Mechanism**: Prevents automatic dismissal when clicking outside the window or when the global selection is cleared.
+- **Implementation**: `ClickManager` and `WindowsManager` check `state.isPinned` before executing dismissal logic.
+- **Persistence**: Saved via `WINDOW_IS_PINNED` setting.
+
+### 2. Docking & Edge Snapping
+- **Dock Modes**: `none`, `left`, `right`.
+- **Edge Snapping**: Implemented in `usePositioning.js`. When dragging, if the **mouse pointer** reaches within 30px of the viewport edge, the window automatically docks.
+- **Breakaway Logic**: To undock, the user must drag the pointer 100px away from the edge.
+- **Viewport Accuracy**: Uses `document.documentElement.clientWidth` instead of `window.innerWidth` to account for browser scrollbars, ensuring the window is never hidden underneath them.
+- **Resizable Sidebar**: Docked windows take 100vh height and support width resizing via an interactive handle on the inner edge.
+
+### 3. Smart In-place Updates
+To improve performance and eliminate UI flicker, the system now updates existing windows instead of re-creating them:
+- **Trigger**: When a new selection occurs while a window is already visible and Pinned/Docked.
+- **Atomic Update**: Emits an `updateWindow` event with new `selectedText` and `isLoading: true`.
+- **Cancellation**: Automatically cancels any ongoing translation requests from the previous selection to prevent race conditions.
 
 ## Event-Based Communication
 

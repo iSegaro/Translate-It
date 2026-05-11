@@ -1958,6 +1958,15 @@
   "window_translation_placeholder": {
     "message": "Translation will appear here..."
   },
+  "window_pin": {
+    "message": "Pin window"
+  },
+  "window_unpin": {
+    "message": "Unpin window"
+  },
+  "window_cycle_dock": {
+    "message": "Cycle Dock Mode (None / Left / Right)"
+  },
   "action_copy_text": {
     "message": "Copy text"
   },

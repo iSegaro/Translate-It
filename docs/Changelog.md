@@ -3,6 +3,7 @@
 ##### Added
 
 - Added [Screen Capture](#/ocr) to extract and translate text from any visual area, including images and videos, with full offline support ([#120](https://github.com/iSegaro/Translate-It/pull/120))
+- Added **Pin** and **Dock** capabilities with **Edge Snapping**: You can now pin the window to stay open or drag it to the screen edges to dock it as a persistent, resizable sidebar that updates instantly with new selections ([#121](https://github.com/iSegaro/Translate-It/pull/121))
 
 ##### Changed
 
