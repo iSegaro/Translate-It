@@ -399,7 +399,26 @@ watch(() => props.initialSize, (newSize) => {
   }
 });
 
-const windowStyle = computed(() => ({ ...positionStyle.value }));
+const windowStyle = computed(() => {
+  const style = { ...positionStyle.value };
+  const isDocked = dockMode.value !== 'none';
+
+  if (currentSize.value === 'small') {
+    // Override for small loading spinner
+    style.width = `${currentWidth.value}px`;
+    style.height = `${currentHeight.value}px`;
+  } else if (isDocked) {
+    // Docked sidebar dimensions
+    style.width = `${dockedWidth.value}px`;
+    style.height = '100vh';
+  } else {
+    // Normal floating window
+    style.width = 'auto';
+    style.height = 'auto';
+  }
+  
+  return style;
+});
 
 onMounted(async () => {
   // Inject Windows-specific styles lazily

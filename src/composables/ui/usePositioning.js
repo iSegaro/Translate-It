@@ -34,7 +34,7 @@ export function usePositioning(initialPosition, options = {}) {
       return { x: 0, y: 0 };
     }
     if (currentDockMode.value === 'right') {
-      return { x: vw - (currentDockedWidth.value || width), y: 0 };
+      return { x: vw - width, y: 0 };
     }
 
     let x = pos.x ?? pos.left ?? 0;
@@ -120,14 +120,11 @@ export function usePositioning(initialPosition, options = {}) {
 
   // Computed styles for positioning
   const positionStyle = computed(() => {
-    const isDocked = currentDockMode.value !== 'none';
-    
     return {
       position: 'fixed',
       left: `${currentPosition.value.x}px`,
       top: `${currentPosition.value.y}px`,
-      width: isDocked ? `${currentDockedWidth.value}px` : 'auto',
-      height: isDocked ? '100vh' : 'auto',
+      // Width/Height handling is moved to components for better flexibility with loading states
       zIndex: 2147483647
     };
   });
@@ -137,7 +134,8 @@ export function usePositioning(initialPosition, options = {}) {
    */
   function updateDockMode(mode) {
     currentDockMode.value = mode;
-    currentPosition.value = findSmartPosition(currentPosition.value);
+    const width = (mode !== 'none') ? (currentDockedWidth.value || defaultWidth) : defaultWidth;
+    currentPosition.value = findSmartPosition(currentPosition.value, width);
   }
 
   /**
@@ -146,7 +144,7 @@ export function usePositioning(initialPosition, options = {}) {
   function updateDockedWidth(width) {
     currentDockedWidth.value = width;
     if (currentDockMode.value !== 'none') {
-      currentPosition.value = findSmartPosition(currentPosition.value);
+      currentPosition.value = findSmartPosition(currentPosition.value, width);
     }
   }
 
