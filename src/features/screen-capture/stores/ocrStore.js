@@ -9,9 +9,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.SCREEN_CAPTURE, 'OCRStore');
 export const useOCRStore = defineStore('ocr', {
   state: () => ({
     downloadedLanguages: [],
-    isDownloading: false,
-    downloadProgress: 0,
-    currentDownloadingLang: null,
+    downloadingProgress: {}, // { [langCode]: progress }
     // Settings
     defaultOCRLang: 'eng',
   }),
@@ -20,6 +18,12 @@ export const useOCRStore = defineStore('ocr', {
     isDownloaded: (state) => (lang) => {
       const tesseractCode = toTesseractLanguageCode(lang);
       return state.downloadedLanguages.includes(tesseractCode);
+    },
+    isDownloading: (state) => (langCode) => {
+      return state.downloadingProgress[langCode] !== undefined;
+    },
+    getDownloadProgress: (state) => (langCode) => {
+      return state.downloadingProgress[langCode] || 0;
     },
     supportedLanguages: () => {
       return getSupportedOCRCanvasCodes();
@@ -38,13 +42,11 @@ export const useOCRStore = defineStore('ocr', {
     async downloadLanguage(langCode) {
       const tesseractCode = toTesseractLanguageCode(langCode);
 
-      if (this.downloadedLanguages.includes(tesseractCode)) {
+      if (this.downloadedLanguages.includes(tesseractCode) || this.downloadingProgress[langCode] !== undefined) {
         return;
       }
 
-      this.isDownloading = true;
-      this.currentDownloadingLang = langCode;
-      this.downloadProgress = 0;
+      this.downloadingProgress[langCode] = 0;
 
       try {
         // Tesseract.js language data URL (using the fast/lightweight models)
@@ -69,7 +71,7 @@ export const useOCRStore = defineStore('ocr', {
           loaded += value.length;
 
           if (total > 0) {
-            this.downloadProgress = Math.round((loaded / total) * 100);
+            this.downloadingProgress[langCode] = Math.round((loaded / total) * 100);
           }
         }
 
@@ -83,9 +85,7 @@ export const useOCRStore = defineStore('ocr', {
         logger.error(`Error downloading ${tesseractCode}`, error);
         throw error;
       } finally {
-        this.isDownloading = false;
-        this.currentDownloadingLang = null;
-        this.downloadProgress = 0;
+        delete this.downloadingProgress[langCode];
       }
     },
 

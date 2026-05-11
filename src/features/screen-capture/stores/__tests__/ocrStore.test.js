@@ -79,8 +79,8 @@ describe('OCRStore', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('fas.traineddata.gz'));
     expect(ocrCache.saveModel).toHaveBeenCalledWith('fas', expect.any(Uint8Array));
-    expect(store.isDownloading).toBe(false);
-    expect(store.downloadProgress).toBe(0);
+    expect(store.isDownloading('fa')).toBe(false);
+    expect(store.getDownloadProgress('fa')).toBe(0);
   });
 
   it('should handle download error', async () => {
@@ -88,7 +88,7 @@ describe('OCRStore', () => {
     mockFetch.mockResolvedValue({ ok: false });
 
     await expect(store.downloadLanguage('en')).rejects.toThrow();
-    expect(store.isDownloading).toBe(false);
+    expect(store.isDownloading('en')).toBe(false);
   });
 
   it('should delete a language', async () => {

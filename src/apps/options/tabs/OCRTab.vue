@@ -40,7 +40,7 @@
       class="settings-section"
       :class="{ 'is-disabled': !enableScreenCapture }"
     >
-      <div class="languages-header">
+      <div class="section-header">
         <h3>{{ t('ocr_languages_label') }}</h3>
         <div class="search-box">
           <input 
@@ -70,11 +70,11 @@
             <button 
               v-if="!ocrStore.isDownloaded(lang.code)"
               class="btn-download"
-              :disabled="ocrStore.isDownloading"
+              :disabled="ocrStore.isDownloading(lang.code)"
               @click="ocrStore.downloadLanguage(lang.code)"
             >
-              <template v-if="ocrStore.isDownloading && ocrStore.currentDownloadingLang === lang.code">
-                {{ ocrStore.downloadProgress }}%
+              <template v-if="ocrStore.isDownloading(lang.code)">
+                {{ ocrStore.getDownloadProgress(lang.code) }}%
               </template>
               <template v-else>
                 {{ t('ocr_download_button') }}
