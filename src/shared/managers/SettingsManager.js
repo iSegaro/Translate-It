@@ -70,7 +70,7 @@ class SettingsManager {
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
       WINDOW_IS_PINNED: false,
       WINDOW_DOCK_MODE: 'none', // 'none', 'left', 'right'
-      WINDOW_DOCKED_WIDTH: 350,
+      WINDOW_DOCKED_WIDTH: 300,
       MOBILE_FAB_POSITION: { 
         side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
         y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
