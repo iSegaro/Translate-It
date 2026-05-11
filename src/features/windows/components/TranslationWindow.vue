@@ -76,48 +76,6 @@
         </button>
         <button
           class="ti-action-btn"
-          :class="{ 'ti-active': dockMode !== 'none' }"
-          :title="t('window_cycle_dock')"
-          @click.stop="cycleDockMode"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <svg
-            v-if="dockMode === 'none'"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M18 15v3H6v-3H4v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2zM7 9l1.41 1.41L11 7.83V16h2V7.83l2.59 2.58L17 9l-5-5-5 5z"
-            />
-          </svg>
-          <svg
-            v-else-if="dockMode === 'left'"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h5v12H4zm16 0h-9V6h9v12z"
-            />
-          </svg>
-          <svg
-            v-else
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM13 18V6h7v12h-7zM4 18V6h7v12H4z"
-            />
-          </svg>
-        </button>
-        <button
-          class="ti-action-btn"
           :title="t('window_copy_translation')"
           @click.stop="handleCopy"
           @mousedown.stop
@@ -319,22 +277,6 @@ const togglePin = () => {
   const windowsManager = window.windowsManagerInstance;
   if (windowsManager && windowsManager.state) {
     windowsManager.state.setPinned(isPinned.value);
-  }
-};
-
-const cycleDockMode = () => {
-  const modes = ['none', 'left', 'right'];
-  const currentIndex = modes.indexOf(dockMode.value);
-  const nextIndex = (currentIndex + 1) % modes.length;
-  const newMode = modes[nextIndex];
-  dockMode.value = newMode;
-  
-  settings.updateSettingAndPersist('WINDOW_DOCK_MODE', newMode);
-  updateDockMode(newMode);
-  
-  const windowsManager = window.windowsManagerInstance;
-  if (windowsManager && windowsManager.state) {
-    windowsManager.state.setDockMode(newMode);
   }
 };
 
