@@ -407,10 +407,9 @@ export class WindowsManager extends ResourceTracker {
       }
       this.state.setTranslationCancelled(false);
 
-      // Clear manual provider override for completely new selections
-      if (!this._isIconToWindowTransition) {
-        this.state.setProvider(null);
-      }
+      // We DON'T clear manual provider override here. 
+      // If the user manually selected a provider in the pinned/docked window,
+      // we want to respect that choice for the next translation in the same window.
       
       await this._updateExistingWindow(selectedText, options);
       return;
