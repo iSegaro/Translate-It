@@ -36,7 +36,7 @@
       class="ti-dock-resize-handle"
       @mousedown.stop="startResize"
       @touchstart.stop="startResize"
-    ></div>
+    />
 
     <div
       class="ti-window-header"
@@ -352,7 +352,6 @@ const {
   currentPosition,
   isDragging: isPositionDragging,
   currentDockMode,
-  currentDockedWidth,
   positionStyle,
   startDrag,
   updatePosition,
