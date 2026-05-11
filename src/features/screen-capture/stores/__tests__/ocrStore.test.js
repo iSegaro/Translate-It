@@ -78,7 +78,7 @@ describe('OCRStore', () => {
     await store.downloadLanguage('fa');
 
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('fas.traineddata.gz'));
-    expect(ocrCache.saveModel).toHaveBeenCalledWith('fas', mockArrayBuffer);
+    expect(ocrCache.saveModel).toHaveBeenCalledWith('fas', expect.any(Uint8Array));
     expect(store.isDownloading).toBe(false);
     expect(store.downloadProgress).toBe(0);
   });

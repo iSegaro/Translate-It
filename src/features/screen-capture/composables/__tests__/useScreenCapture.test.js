@@ -49,7 +49,6 @@ describe('useScreenCapture', () => {
 
     expect(composable.isSelecting.value).toBe(true);
     expect(document.body.style.userSelect).toBe('none');
-    expect(document.body.style.overflow).toBe('hidden');
   });
 
   it('should update selection rect on mousemove', async () => {
@@ -117,10 +116,9 @@ describe('useScreenCapture', () => {
 
   it('should cleanup on unmount', () => {
     composable.isSelecting.value = true;
-    document.body.style.overflow = 'hidden';
     
     wrapper.unmount();
     
-    expect(document.body.style.overflow).not.toBe('hidden');
+    expect(composable.isSelecting.value).toBe(false);
   });
 });

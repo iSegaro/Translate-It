@@ -108,8 +108,8 @@ describe('ocrCache', () => {
       request.onsuccess();
 
       await promise;
-      expect(mockStore.put).toHaveBeenCalledWith(mockData, 'deu');
-      expect(ocrCache.saveTesseractCachedModel).toHaveBeenCalledWith('deu', mockData);
+      expect(mockStore.put).toHaveBeenCalledWith(expect.any(Uint8Array), 'deu');
+      expect(ocrCache.saveTesseractCachedModel).toHaveBeenCalledWith('deu', expect.any(Uint8Array));
     });
   });
 

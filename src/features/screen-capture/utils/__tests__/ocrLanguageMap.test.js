@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTesseractLanguageCode, OCR_LANGUAGE_MAP, getSupportedLanguageCodes, isLanguageSupported } from '../ocrLanguageMap.js';
+import { toTesseractLanguageCode, OCR_LANGUAGE_MAP, getSupportedOCRCanvasCodes, isLanguageSupported } from '../ocrLanguageMap.js';
 
 describe('ocrLanguageMap', () => {
   describe('OCR_LANGUAGE_MAP', () => {
@@ -53,18 +53,18 @@ describe('ocrLanguageMap', () => {
     });
   });
 
-  describe('getSupportedLanguageCodes', () => {
+  describe('getSupportedOCRCanvasCodes', () => {
     it('should return array of language codes', () => {
-      const codes = getSupportedLanguageCodes();
+      const codes = getSupportedOCRCanvasCodes();
       expect(Array.isArray(codes)).toBe(true);
       expect(codes.length).toBeGreaterThan(0);
     });
 
     it('should contain expected languages', () => {
-      const codes = getSupportedLanguageCodes();
-      expect(codes).toContain('en');
-      expect(codes).toContain('fa');
-      expect(codes).toContain('zh-cn');
+      const codes = getSupportedOCRCanvasCodes();
+      expect(codes).toContain('eng');
+      expect(codes).toContain('fas');
+      expect(codes).toContain('chi_sim');
     });
   });
 

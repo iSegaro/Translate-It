@@ -11,11 +11,13 @@ vi.mock('tesseract.js', () => ({
 vi.mock('../../utils/ocrCache.js', () => ({
   ocrCache: {
     getModel: vi.fn().mockResolvedValue(null),
-    hasModel: vi.fn().mockResolvedValue(false)
+    hasModel: vi.fn().mockResolvedValue(true),
+    migrateTesseractCache: vi.fn().mockResolvedValue()
   },
   default: {
     getModel: vi.fn().mockResolvedValue(null),
-    hasModel: vi.fn().mockResolvedValue(false)
+    hasModel: vi.fn().mockResolvedValue(true),
+    migrateTesseractCache: vi.fn().mockResolvedValue()
   }
 }));
 
@@ -67,7 +69,7 @@ describe('ocrEngine', () => {
 
       expect(result).toBe('Test recognition');
       expect(createWorker).toHaveBeenCalledWith('eng', 1, expect.objectContaining({
-        cacheMethod: 'write',
+        cacheMethod: 'readOnly',
         workerBlobURL: false
       }));
       expect(mockWorker.recognize).toHaveBeenCalledWith('mock-image-data', expect.any(Object));
