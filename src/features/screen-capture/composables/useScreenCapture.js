@@ -50,26 +50,6 @@ export function useScreenCapture() {
   });
 
   // Methods
-  const toggleScroll = (lock) => {
-    if (lock) {
-      // Track listeners for cleanup
-      window.addEventListener("wheel", preventScroll, { passive: false });
-      window.addEventListener("touchmove", preventScroll, { passive: false });
-      activeListeners.value.set('wheel-preventScroll', { target: window, event: 'wheel', handler: preventScroll });
-      activeListeners.value.set('touchmove-preventScroll', { target: window, event: 'touchmove', handler: preventScroll });
-    } else {
-      // Clean up tracked listeners
-      window.removeEventListener("wheel", preventScroll);
-      window.removeEventListener("touchmove", preventScroll);
-      activeListeners.value.delete('wheel-preventScroll');
-      activeListeners.value.delete('touchmove-preventScroll');
-    }
-  };
-
-  const preventScroll = (e) => {
-    e.preventDefault();
-  };
-
   const startSelection = (event) => {
     if (isCapturing.value) return;
 
@@ -92,9 +72,8 @@ export function useScreenCapture() {
     activeListeners.value.set('mousemove', { target: document, event: 'mousemove', handler: handleMouseMove });
     activeListeners.value.set('mouseup', { target: document, event: 'mouseup', handler: handleMouseUp });
 
-    // Prevent text selection and lock scroll during capture
+    // Prevent text selection during capture
     document.body.style.userSelect = "none";
-    toggleScroll(true);
     event.preventDefault();
   };
 
@@ -166,7 +145,6 @@ export function useScreenCapture() {
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
-        toggleScroll(false); // Unlock scroll after successful capture
 
         // Handle empty text as a specific "no-text" error condition
         if (!response.data.text || response.data.text.trim().length === 0) {
@@ -189,7 +167,6 @@ export function useScreenCapture() {
       } catch (err) {
       logger.error("Capture area error:", err);
       error.value = err.message;
-      toggleScroll(false); // Unlock scroll on error
       throw err;
 
     } finally {
@@ -204,7 +181,6 @@ export function useScreenCapture() {
     isSelecting.value = false;
     capturedImage.value = null;
     error.value = null;
-    toggleScroll(false);
   };
 
   const cancelSelection = () => {
@@ -216,7 +192,6 @@ export function useScreenCapture() {
 
     // Restore text selection and unlock scroll
     document.body.style.userSelect = originalStyles.value.bodyUserSelect;
-    toggleScroll(false);
 
     resetSelection();
   };
@@ -294,7 +269,6 @@ export function useScreenCapture() {
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
-        toggleScroll(false); // Unlock scroll if it was locked
         
         // Handle empty text as a specific "no-text" error condition
         if (!response.data.text || response.data.text.trim().length === 0) {
@@ -317,7 +291,6 @@ export function useScreenCapture() {
     } catch (err) {
       logger.error("Full screen capture error:", err);
       error.value = err.message;
-      toggleScroll(false); // Unlock scroll on error
       throw err;
     } finally {
       isCapturing.value = false;
