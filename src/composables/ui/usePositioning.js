@@ -27,15 +27,15 @@ export function usePositioning(initialPosition, options = {}) {
    * Smart positioning: automatically find best position to keep window visible
    */
   function findSmartPosition(pos, width = defaultWidth, height = defaultHeight) {
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = window.innerHeight;
+
     if (currentDockMode.value === 'left') {
       return { x: 0, y: 0 };
     }
     if (currentDockMode.value === 'right') {
-      return { x: window.innerWidth - (currentDockedWidth.value || width), y: 0 };
+      return { x: vw - (currentDockedWidth.value || width), y: 0 };
     }
-
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
 
     let x = pos.x ?? pos.left ?? 0;
     let y = pos.y ?? pos.top ?? 0;

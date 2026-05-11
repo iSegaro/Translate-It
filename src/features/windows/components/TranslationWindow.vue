@@ -506,7 +506,8 @@ const startResize = (event) => {
     }
     
     // Bounds
-    newWidth = Math.max(200, Math.min(newWidth, window.innerWidth * 0.8));
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    newWidth = Math.max(200, Math.min(newWidth, vw * 0.8));
     dockedWidth.value = newWidth;
     updateDockedWidth(newWidth);
   };
