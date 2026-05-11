@@ -448,6 +448,7 @@ const resetSelection = () => {
 const openOCRSettings = () => {
   logger.debug('Opening OCR settings page')
   openOptionsPage('ocr')
+  cancel()
 }
 
 const cancel = () => {
