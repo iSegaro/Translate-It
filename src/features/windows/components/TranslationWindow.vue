@@ -449,7 +449,10 @@ const startResize = (event) => {
     
     // Bounds
     const vw = document.documentElement.clientWidth || window.innerWidth;
-    newWidth = Math.max(200, Math.min(newWidth, vw * 0.8));
+    const minWidth = WindowsConfig.POSITIONING.MIN_DOCKED_WIDTH;
+    const maxWidth = vw * WindowsConfig.POSITIONING.MAX_DOCKED_WIDTH_PERCENT;
+    
+    newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
     dockedWidth.value = newWidth;
     updateDockedWidth(newWidth);
   };
