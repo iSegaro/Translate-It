@@ -293,6 +293,8 @@ export class ContextMenuManager extends ResourceTracker {
   // Prevent concurrent menu setup
   _menuSetupLock = false;
   _pendingSetupPromise = null;
+  _needsRerun = false;
+
   async setupDefaultMenus(locale = null) {
     if (!this.browser?.contextMenus && !browser?.contextMenus) {
       logger.debug("Skipping setupDefaultMenus: contextMenus API not available");
@@ -301,10 +303,10 @@ export class ContextMenuManager extends ResourceTracker {
 
     logger.debug("🔧 [ContextMenuManager] Starting setupDefaultMenus...");
 
-    // Global lock to prevent any race conditions across the entire extension
+    // If already running, mark as needing a rerun and wait for the current one
     if (this._menuSetupLock) {
-      logger.debug("setupDefaultMenus called concurrently, waiting for existing setup to complete");
-      // If there's a pending setup, wait for it instead of skipping
+      logger.debug("setupDefaultMenus called concurrently, marking for rerun");
+      this._needsRerun = true;
       if (this._pendingSetupPromise) {
         await this._pendingSetupPromise;
       }
@@ -312,15 +314,22 @@ export class ContextMenuManager extends ResourceTracker {
     }
 
     this._menuSetupLock = true;
-
-    // Store the promise so concurrent calls can wait for it
-    this._pendingSetupPromise = this._setupMenusInternal(locale);
+    this._needsRerun = false;
 
     try {
-      await this._pendingSetupPromise;
+      // Execute setup, and rerun if requested while we were running
+      do {
+        this._needsRerun = false;
+        this._pendingSetupPromise = this._setupMenusInternal(locale);
+        await this._pendingSetupPromise;
+        logger.debug("[ContextMenuManager] Setup iteration completed", { needsRerun: this._needsRerun });
+      } while (this._needsRerun);
+    } catch (error) {
+      logger.error("Failed to setup default menus:", error);
     } finally {
       this._menuSetupLock = false;
       this._pendingSetupPromise = null;
+      this._needsRerun = false;
     }
   }
 
@@ -356,8 +365,8 @@ export class ContextMenuManager extends ResourceTracker {
       this.createdMenus.clear();
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
-      // Get settings for feature enablement
-      const settings = await storageManager.get(null); // Get all settings to ensure configuration check works
+      // Get settings for feature enablement - Force fresh fetch to ensure cache consistency
+      const settings = await storageManager.get(null, false); 
       
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
       
@@ -464,17 +473,32 @@ export class ContextMenuManager extends ResourceTracker {
         }
 
         // --- 2.3. Screen Capture Menu (Third option in Action menu, also in Page menu) ---
-        if (isScreenCaptureEnabled && visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false) {
+        // Separate Page and Action contexts for Screen Capture to match Select Element logic
+        if (isScreenCaptureEnabled) {
           try {
-            let captureMenuTitle =
+            const captureMenuTitle =
               (await getTranslationString("context_menu_translate_screen", locale)) ||
               "Capture Screen";
-            await this.createMenu({
-              id: SCREEN_CAPTURE_MENU_ID,
-              title: captureMenuTitle,
-              contexts: ["page", "action"],
-            });
-            logger.debug(`Created screen capture menu: "${captureMenuTitle}"`);
+
+            // 2.3.1. Create in Page Context
+            if (visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false) {
+              await this.createMenu({
+                id: `${SCREEN_CAPTURE_MENU_ID}-page`, // Unique ID for page context
+                title: captureMenuTitle,
+                contexts: ["page"],
+              });
+              logger.debug(`Created screen capture page menu: "${captureMenuTitle}"`);
+            }
+
+            // 2.3.2. Create in Action Context
+            if (visibility.ACTION_CONTEXT_SCREEN_CAPTURE !== false) {
+              await this.createMenu({
+                id: `${SCREEN_CAPTURE_MENU_ID}-action`, // Unique ID for action context
+                title: captureMenuTitle,
+                contexts: ["action"],
+              });
+              logger.debug(`Created screen capture action menu: "${captureMenuTitle}"`);
+            }
           } catch (e) {
             logger.error("Error creating screen capture menu:", e);
           }
@@ -734,7 +758,9 @@ export class ContextMenuManager extends ResourceTracker {
           await this._activateSelectElement(tab);
           break;
 
-        case SCREEN_CAPTURE_MENU_ID: {
+        case `${SCREEN_CAPTURE_MENU_ID}-page`:
+        case `${SCREEN_CAPTURE_MENU_ID}-action`:
+        case SCREEN_CAPTURE_MENU_ID: { // Keep original ID for backward compatibility during transitions
           const targetTab = tab || (await browser.tabs.query({ active: true, currentWindow: true }))[0];
           if (targetTab?.id) {
             const backgroundService = globalThis.backgroundService;
@@ -885,15 +911,26 @@ export class ContextMenuManager extends ResourceTracker {
 
           // 2. UI SYNC:
           // Rebuild menus if relevant settings changed
-          if (
-            changes.TRANSLATION_API || 
-            changes.TRANSLATE_WITH_SELECT_ELEMENT || 
-            changes.EXTENSION_ENABLED ||
-            changes.DEBUG_MODE ||
-            changes.CONTEXT_MENU_VISIBILITY
-          ) {
+          const relevantKeys = [
+            'TRANSLATION_API', 
+            'TRANSLATE_WITH_SELECT_ELEMENT', 
+            'ENABLE_SCREEN_CAPTURE',
+            'MODE_PROVIDERS', 
+            'EXTENSION_ENABLED', 
+            'DEBUG_MODE', 
+            'CONTEXT_MENU_VISIBILITY'
+          ];
+          
+          const isRelevantChange = Object.keys(changes).some(key => 
+            relevantKeys.includes(key) || 
+            key.endsWith('_API_KEY') || 
+            key.endsWith('_API_URL') ||
+            key.endsWith('_API_MODEL')
+          );
+
+          if (isRelevantChange) {
             logger.info(
-              "Settings changed in storage. Rebuilding context menus for synchronization."
+              "Relevant settings changed in storage. Rebuilding context menus for synchronization."
             );
             this.setupDefaultMenus();
           }
