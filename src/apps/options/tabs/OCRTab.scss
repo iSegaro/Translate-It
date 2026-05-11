@@ -175,11 +175,12 @@
       }
 
       .btn-download {
-        background: var(--accent-color);
-        color: white;
+        background: var(--button-bg-color);
+        color: var(--button-text-color, white);
         border: none;
 
         &:hover:not(:disabled) {
+          background: var(--button-hover-bg-color);
           filter: brightness(1.1);
         }
 
