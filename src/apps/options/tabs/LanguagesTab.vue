@@ -220,14 +220,14 @@
                   <label class="setting-label mb-sm">{{ t('dict_setting_display_options') || 'Display Options' }}:</label>
                   <div class="checkbox-list-vertical">
                     <BaseCheckbox 
-                      v-model="showPronunciation" 
-                      :label="t('dict_setting_show_pronunciation')" 
+                      v-model="showPos" 
+                      :label="t('dict_setting_show_pos')" 
                       :disabled="!enableDictionary || !isGoogleDictionary"
                       class="mb-xs"
                     />
                     <BaseCheckbox 
-                      v-model="showPos" 
-                      :label="t('dict_setting_show_pos')" 
+                      v-model="showPronunciation" 
+                      :label="t('dict_setting_show_pronunciation')" 
                       :disabled="!enableDictionary || !isGoogleDictionary"
                       class="mb-xs"
                     />

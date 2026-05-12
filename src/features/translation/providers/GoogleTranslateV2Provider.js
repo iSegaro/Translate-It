@@ -310,15 +310,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const data = candidateData;
     let markdownOutput = "";
 
-    // 1. Pronunciation
-    if (showPronunciation) {
-      const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
-      if (pronunciation) {
-        markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
-      }
-    }
-
-    // 2. Dictionary Meanings (Parts of Speech & Synonyms)
+    // 1. Dictionary Meanings (Parts of Speech & Synonyms)
     if (showPos && data.dict && Array.isArray(data.dict)) {
       data.dict.forEach((d) => {
         const pos = d.pos || "";
@@ -327,6 +319,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           markdownOutput += `${pos}: ${terms.join(", ")}\n`;
         }
       });
+    }
+
+    // 2. Pronunciation (Moved to before Definitions)
+    if (showPronunciation) {
+      const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
+      if (pronunciation) {
+        markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
+      }
     }
 
     // 3. Definitions
