@@ -30,7 +30,7 @@
   <img src="./docs/Images/Options.jpg" alt="Translate It Extension" height="400" />
 </p>
 
-**Translate It!** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
+**Translate It** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
 
 ---
 
@@ -50,21 +50,43 @@
 - **Progressive Streaming Engine:** Don't wait for large translations! The system splits long texts into optimized segments and renders them in real-time as they arrive, providing a fluid and responsive experience across all providers.
 - **10+ Providers:** Switch between advanced AI models (LLMs) and traditional providers (Google, Microsoft, DeepL) instantly.
 
-### 2. Screen Capture & OCR (Anything-to-Text)
+<br>
+
+### 2. Surgical Element Translation (Point-and-Click)
+- **Visual Highlight:** Activate the mode and hover over any paragraph, button, or menu to see a real-time blue highlight. Click to translate that specific element instantly.
+- **Layout Preservation:** Translate text directly inside the website's structure. Your page layout remains 100% intact.
+- **Hover Preview:** Need to see the source? Simply hover over any translated element to see the original text in a surgical tooltip.
+<!-- ELEMENT_SELECTION_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 3. Smart Whole-Page Translation (Lazy-Loading)
+- **Infinite Scrolling Support:** Automatically detects and translates new content as you scroll down. Perfect for social media and long-form articles.
+- **Dual Execution Modes:** 
+  - **Fluid Mode:** Translates content in real-time as it enters the viewport.
+  - **On-Stop Mode:** Waits for you to finish scrolling before initiating translation, saving API costs and reducing visual noise.
+<!-- WHOLE_PAGE_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 4. Screen Capture & OCR (Anything-to-Text)
 - **Visual Translation:** Capture and translate text from images, videos, PDFs, or any non-selectable web area.
 - **Offline Engine:** Powered by Tesseract.js with local model caching for "True Offline" privacy.
 <!-- OCR_SCREENSHOT_PLACEHOLDER -->
 
-### 3. Smart Optimization Slider (Economy vs. Turbo)
+<br>
+
+### 5. Smart Optimization Slider (Economy vs. Turbo)
 Take full control over your API costs and UI speed with **Optimization Levels (1-5)**:
 - **Economy Mode (Level 1):** Packs 70% more text per request. Perfect for saving AI tokens and preventing IP bans on traditional providers.
 - **Turbo Mode (Level 5):** Maximizes concurrency for the fastest possible UI response.
 <!-- OPTIMIZATION_SLIDER_PLACEHOLDER -->
 
-### 4. Cross-Platform Ergonomics
+<br>
+
+### 6. Cross-Platform Ergonomics
 - **Mobile Bottom Sheet:** A native-like, thumb-friendly interface for mobile browsers (Firefox Android, Kiwi, Lemur) with gesture support.
-- **Desktop FAB Menu:** A draggable, persistent floating action button for instant access to OCR and Page Translation.
-- **Shadow DOM Isolation:** The UI never breaks the website's layout and is immune to website CSS conflicts.
+- **Desktop/Mobile FAB Menu:** A draggable, persistent floating action button for instant access to OCR, Page Translation, Element Mode, and rapid feature toggles (like instant TTS or direct-translation mode).
 
 ---
 
@@ -73,7 +95,9 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 | Feature | Description |
 | :--- | :--- |
 | **Text Selection** | Instant translation icon/box right where you select text. |
-| **Whole Page** | Automatically translate entire pages with smart lazy-loading. |
+| **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
+| **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
+| **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
 | **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
 | **Smart Dictionary** | Definitions, synonyms, and usage examples with multi-accent TTS. |
 | **History & Export** | Keep track of your translations and export them for later use. |
