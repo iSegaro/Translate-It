@@ -322,7 +322,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         const entries = d.entry || [];
         entries.forEach((entry) => {
           if (entry.gloss) {
-            markdownOutput += `${pos ? `(${pos}) ` : ""}${entry.gloss}\n`;
+            markdownOutput += `- ${pos ? `(${pos}) ` : ""}${entry.gloss}\n`;
           }
         });
       });
@@ -335,7 +335,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       data.examples.example.slice(0, 5).forEach((ex) => {
         if (ex.text) {
           const cleanText = ex.text.replace(/<[^>]*>?/gm, "");
-          markdownOutput += `${cleanText}\n`;
+          markdownOutput += `- ${cleanText}\n`;
         }
       });
     }
