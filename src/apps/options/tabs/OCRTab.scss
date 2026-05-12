@@ -1,3 +1,5 @@
+@use "@/assets/styles/base/variables" as *;
+
 .ocr-tab {
   padding: 1rem;
 
@@ -22,15 +24,16 @@
     .legend-actions-wrapper {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: $spacing-sm;
 
-      .provider-action-label {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        white-space: nowrap;
+      .legend-action-label {
+        font-size: $font-size-xs !important;
+        color: var(--color-text-secondary) !important;
+        white-space: nowrap !important;
+        font-weight: normal !important;
 
         &.is-disabled {
-          opacity: 0.5;
+          opacity: 0.5 !important;
         }
       }
 
@@ -39,8 +42,8 @@
         .ti-provider-button {
           padding: 4px 8px !important;
           height: 28px !important;
-          font-size: 0.85rem !important;
-          background: var(--bg-primary) !important;
+          font-size: $font-size-xs !important;
+          background: var(--color-surface) !important;
 
           .ti-api-provider-icon {
             width: 14px !important;

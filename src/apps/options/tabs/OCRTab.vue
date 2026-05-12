@@ -18,7 +18,7 @@
           class="legend-actions-wrapper"
         >
           <span 
-            class="provider-action-label"
+            class="legend-action-label"
             :class="{ 'is-disabled': !enableScreenCapture }"
           >{{ t('provider_label') }}:</span>
           <ProviderSelector
