@@ -448,27 +448,57 @@
   }
   
   .toolbar-content {
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
   
   .toolbar-btn {
-    padding: 6px 8px;
+    padding: 6px;
     font-size: 12px;
+    flex-shrink: 0;
   }
 
   .ocr-language-select {
-    flex: 1 1 100%;
-    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    justify-content: flex-start;
+  }
+
+  .ocr-language-label {
+    display: none;
   }
 
   .ocr-language-dropdown {
     min-width: 0;
     flex: 1;
+    max-width: 120px;
   }
   
   .btn-text {
     display: none;
+  }
+
+  .capture-options,
+  .action-buttons {
+    gap: 4px;
+  }
+  
+  .capture-loading {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ss-border);
+    justify-content: center;
+    width: 100%;
+  }
+
+  .toolbar-hint {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 10px;
   }
   
   .instruction-shortcuts {
