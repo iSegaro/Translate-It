@@ -18,6 +18,22 @@ This document describes the successful migration of the WindowsManager system to
 - Complete separation of concerns
 - Full CSS/JS isolation from host webpage
 
+## Architecture & Modularization
+
+To manage growing complexity (previously over 2000 lines), the `WindowsManager` has been refactored into a **Facade Pattern**. The main class now delegates specialized responsibilities to dedicated sub-managers.
+
+### 1. Internal Modular Structure
+- **`WindowsManager` (Facade)**: The primary entry point and singleton. It coordinates high-level operations and maintains the public API.
+- **`DisplayManager`**: Handles all UI presentation logic, including showing translation windows, icons, and mobile sheets. It manages the two-phase loading process.
+- **`DismissalManager`**: Manages the complex logic for dismissing UI elements, handling outside clicks, and coordinating text selection preservation.
+- **`EventCoordinator`**: Orchestrates event listeners for the `PageEventBus` and handles cross-frame messaging logic.
+
+### 2. Benefits of Modularization
+- **Single Responsibility**: Each sub-manager focuses on a specific domain (Display, Dismissal, or Events).
+- **Reduced Cognitive Load**: Files are now smaller and focused (~200-500 lines instead of 2000+).
+- **Testability**: Independent managers can be unit-tested more effectively.
+- **Safe Development**: Changes to dismissal logic are isolated from presentation logic, reducing the risk of regressions.
+
 ## Selection Coordinator Integration (2026)
 
 The WindowsManager has been further decoupled from text selection detection. It no longer acts as a gateway for other UI modules (like FAB). Instead, it operates as a subscriber to global selection events.
@@ -121,9 +137,10 @@ To improve performance and eliminate UI flicker, the system now updates existing
 - Better memory management with Vue's reactivity system
 
 ### 2. Maintainability
-- Clear separation between business logic and UI rendering
-- Consistent UI patterns across the extension
-- Easier debugging with centralized UI management
+- **Facade Architecture**: Logic is split into specialized sub-managers (`DisplayManager`, `DismissalManager`, `EventCoordinator`).
+- **Clear separation** between business logic and UI rendering.
+- **Consistent UI patterns** across the extension.
+- **Easier debugging** with centralized UI management and modular logic.
 
 ### 3. Isolation & Security
 - Complete CSS isolation through Shadow DOM
@@ -138,7 +155,7 @@ To improve performance and eliminate UI flicker, the system now updates existing
 ## Migration Status
 
 
-### 🎯 Future Improvements
+### Future Improvements
 - [ ] Enhanced accessibility features (ARIA attributes)
 - [ ] User-customizable UI themes
 - [ ] Advanced positioning algorithms (e.g., collision detection)
