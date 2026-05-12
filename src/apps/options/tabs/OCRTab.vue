@@ -13,7 +13,10 @@
       :legend="t('ocr_toggle_section_title') || t('ocr_tab_title')"
     >
       <template #header>
-        <div class="legend-actions-wrapper">
+        <div 
+          id="OCR_PROVIDER_SELECTOR"
+          class="legend-actions-wrapper"
+        >
           <span 
             class="provider-action-label"
             :class="{ 'is-disabled': !enableScreenCapture }"
