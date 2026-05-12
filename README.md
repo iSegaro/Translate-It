@@ -37,7 +37,7 @@
 ## Why Translate It?
 
 - **Privacy First:** OCR and core processes happen locally. Your data stays in your browser.
-- **AI-Powered:** Support for Gemini, OpenAI, DeepSeek, Claude, and more.
+- **AI-Powered:** Support for Gemini, OpenAI, DeepSeek and more.
 - **Cost-Efficient:** Save up to **70% on AI tokens** with the unique Economy Mode.
 - **Performance-Driven:** Smart-loading architecture reduces memory usage by **20-30%**.
 - **Platform Agnostic:** Seamless experience from **Desktop Chrome** to **Android Firefox**.
@@ -53,7 +53,7 @@
 <br>
 
 ### 2. Surgical Element Translation (Point-and-Click)
-- **Visual Highlight:** Activate the mode and hover over any paragraph, button, or menu to see a real-time blue highlight. Click to translate that specific element instantly.
+- **Visual Highlight:** Activate the mode and hover over any paragraph, button, or menu to see a real-time orange highlight. Click to translate that specific element instantly.
 - **Layout Preservation:** Translate text directly inside the website's structure. Your page layout remains 100% intact.
 - **Hover Preview:** Need to see the source? Simply hover over any translated element to see the original text in a surgical tooltip.
 <!-- ELEMENT_SELECTION_SCREENSHOT_PLACEHOLDER -->
