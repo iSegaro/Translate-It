@@ -2335,5 +2335,14 @@
   },
   "screen_capture_retry": {
     "message": "Retry"
+  },
+  "dict_pronunciation": {
+    "message": "Pronunciation"
+  },
+  "dict_definitions": {
+    "message": "Definitions"
+  },
+  "dict_examples": {
+    "message": "Examples"
   }
 }

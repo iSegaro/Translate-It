@@ -2335,5 +2335,14 @@
   },
   "screen_capture_retry": {
     "message": "再試行"
+  },
+  "dict_pronunciation": {
+    "message": "発音"
+  },
+  "dict_definitions": {
+    "message": "定義"
+  },
+  "dict_examples": {
+    "message": "例文"
   }
 }

@@ -14,6 +14,7 @@ import {
   TranslationMode,
   getGoogleTranslateV2UrlAsync
 } from "@/shared/config/config.js";
+import { getTranslationString } from "@/utils/i18n/i18n.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslateV2');
 
@@ -245,7 +246,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
     // Handle dictionary formatting for single segment
     if (chunkTexts.length === 1 && responseObj?.candidateText) {
-      const formattedDictionary = this._formatDictionaryAsMarkdown(responseObj.candidateText);
+      const formattedDictionary = await this._formatDictionaryAsMarkdown(responseObj.candidateText);
       const translatedWithDict = `${responseObj.translatedText}\n\n${formattedDictionary}`;
       
       logger.info(`[GoogleV2] Translation with dictionary completed successfully`);
@@ -262,8 +263,13 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     return finalResult;
   }
 
-  _formatDictionaryAsMarkdown(candidateData) {
+  async _formatDictionaryAsMarkdown(candidateData) {
     if (!candidateData) return "";
+
+    // Load translated labels
+    const labelPronunciation = await getTranslationString('dict_pronunciation') || 'Pronunciation';
+    const labelDefinitions = await getTranslationString('dict_definitions') || 'Definitions';
+    const labelExamples = await getTranslationString('dict_examples') || 'Examples';
 
     // Support legacy string format (from array response)
     if (typeof candidateData === "string") {
@@ -293,7 +299,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     // 1. Pronunciation
     const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
     if (pronunciation) {
-      markdownOutput += `Pronunciation: /${pronunciation}/\n`;
+      markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
     }
 
     // 2. Dictionary Meanings (Parts of Speech & Synonyms)
@@ -310,7 +316,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     // 3. Definitions
     if (data.definitions && Array.isArray(data.definitions)) {
       if (markdownOutput) markdownOutput += "\n";
-      markdownOutput += `Definitions:\n`;
+      markdownOutput += `${labelDefinitions}:\n`;
       data.definitions.forEach((d) => {
         const pos = d.pos || "";
         const entries = d.entry || [];
@@ -325,7 +331,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     // 4. Examples (with HTML stripping for safety)
     if (data.examples?.example && Array.isArray(data.examples.example)) {
       if (markdownOutput) markdownOutput += "\n";
-      markdownOutput += `Examples:\n`;
+      markdownOutput += `${labelExamples}:\n`;
       data.examples.example.slice(0, 5).forEach((ex) => {
         if (ex.text) {
           const cleanText = ex.text.replace(/<[^>]*>?/gm, "");
