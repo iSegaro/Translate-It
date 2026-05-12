@@ -215,32 +215,32 @@
                 <div 
                   id="DICTIONARY_DISPLAY_OPTIONS"
                   class="dictionary-display-options mt-md"
-                  :class="{ 'is-disabled': !enableDictionary }"
+                  :class="{ 'is-disabled': !enableDictionary || !isGoogleDictionary }"
                 >
                   <label class="setting-label mb-sm">{{ t('dict_setting_display_options') || 'Display Options' }}:</label>
                   <div class="checkbox-list-vertical">
                     <BaseCheckbox 
                       v-model="showPronunciation" 
                       :label="t('dict_setting_show_pronunciation')" 
-                      :disabled="!enableDictionary"
+                      :disabled="!enableDictionary || !isGoogleDictionary"
                       class="mb-xs"
                     />
                     <BaseCheckbox 
                       v-model="showPos" 
                       :label="t('dict_setting_show_pos')" 
-                      :disabled="!enableDictionary"
+                      :disabled="!enableDictionary || !isGoogleDictionary"
                       class="mb-xs"
                     />
                     <BaseCheckbox 
                       v-model="showDefinitions" 
                       :label="t('dict_setting_show_definitions')" 
-                      :disabled="!enableDictionary"
+                      :disabled="!enableDictionary || !isGoogleDictionary"
                       class="mb-xs"
                     />
                     <BaseCheckbox 
                       v-model="showExamples" 
                       :label="t('dict_setting_show_examples')" 
-                      :disabled="!enableDictionary"
+                      :disabled="!enableDictionary || !isGoogleDictionary"
                     />
                   </div>
                 </div>
@@ -525,6 +525,10 @@ const latinScriptPreference = createScriptSetting('latin-script', 'none')
 // --- Dictionary Logic ---
 const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
 const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
+const isGoogleDictionary = computed(() => {
+  const provider = dictionaryProvider.value === 'default' ? selectedProvider.value : dictionaryProvider.value
+  return [ProviderRegistryIds.GOOGLE, ProviderRegistryIds.GOOGLE_V2].includes(provider)
+})
 const showPronunciation = createSetting('DICTIONARY_SHOW_PRONUNCIATION', true)
 const showPos = createSetting('DICTIONARY_SHOW_POS', true)
 const showDefinitions = createSetting('DICTIONARY_SHOW_DEFINITIONS', true)
