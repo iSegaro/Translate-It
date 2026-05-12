@@ -1,8 +1,9 @@
-#### v1.15.1 – Released on May XX, 2026
+#### v1.15.1 – Released on May 13, 2026
 
 ##### Added
 
 - Added the ability to choose a translation provider for [OCR translations](#/ocr?highlight=OCR_PROVIDER_SELECTOR)
+- Improved dictionary results with more detailed information such as pronunciations, synonyms, definitions, and examples, along with new [Dictionary Display Options](#/languages?highlight=DICTIONARY_DISPLAY_OPTIONS) to customize which sections are displayed
 
 ---
 
