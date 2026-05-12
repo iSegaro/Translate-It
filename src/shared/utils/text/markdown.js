@@ -106,31 +106,37 @@ export class SimpleMarkdown {
       if (trimmed.startsWith("###### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h6");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(7);
         listItems = [];
       } else if (trimmed.startsWith("##### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h5");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(6);
         listItems = [];
       } else if (trimmed.startsWith("#### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h4");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(5);
         listItems = [];
       } else if (trimmed.startsWith("### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h3");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(4);
         listItems = [];
       } else if (trimmed.startsWith("## ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h2");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(3);
         listItems = [];
       } else if (trimmed.startsWith("# ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h1");
+        currentSection.setAttribute("dir", "auto");
         currentSection.textContent = trimmed.substring(2);
         listItems = [];
       }
@@ -139,9 +145,11 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "UL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ul");
+          currentSection.setAttribute("dir", "auto");
           listItems = [];
         }
         const li = document.createElement("li");
+        li.setAttribute("dir", "auto");
         const content = trimmed.replace(/^\s*([-*•])\s+/, '');
         li.appendChild(this._parseInline(content));
         listItems.push(li);
@@ -151,9 +159,11 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "OL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ol");
+          currentSection.setAttribute("dir", "auto");
           listItems = [];
         }
         const li = document.createElement("li");
+        li.setAttribute("dir", "auto");
         li.appendChild(this._parseInline(trimmed.replace(/^\d+\.\s/, "")));
         listItems.push(li);
       }
@@ -161,6 +171,7 @@ export class SimpleMarkdown {
       else if (trimmed.startsWith("```")) {
         this._finishSection(container, currentSection, listItems);
         const codeBlock = document.createElement("pre");
+        codeBlock.setAttribute("dir", "ltr");
         const code = document.createElement("code");
 
         // Collect code content
@@ -189,6 +200,7 @@ export class SimpleMarkdown {
       else if (trimmed.startsWith("> ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("blockquote");
+        currentSection.setAttribute("dir", "auto");
         currentSection.appendChild(this._parseInline(trimmed.substring(2)));
         listItems = [];
       }
@@ -199,6 +211,7 @@ export class SimpleMarkdown {
         
         // Create a new paragraph specifically for this label
         currentSection = document.createElement("p");
+        currentSection.setAttribute("dir", "auto");
         currentSection.appendChild(this._parseLabelLine(trimmed));
         listItems = [];
       }
@@ -213,6 +226,7 @@ export class SimpleMarkdown {
         // Always create a new paragraph for each non-empty line
         this._finishSection(container, currentSection, []);
         currentSection = document.createElement("p");
+        currentSection.setAttribute("dir", "auto");
         listItems = [];
 
         currentSection.appendChild(this._parseInline(trimmed));

@@ -220,6 +220,11 @@
   overflow-y: auto !important;
   overflow-x: hidden !important;
 
+  // Ensure elements with dir="auto" or dir="ltr/rtl" can control their own alignment
+  [dir] {
+    text-align: start !important;
+  }
+
   .placeholder-message {
     color: #6c757d !important;
     font-style: italic !important;
