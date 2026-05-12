@@ -70,7 +70,7 @@
               :placeholder="t('search_placeholder')"
               class="search-input"
               :disabled="!enableScreenCapture"
-            />
+            >
           </div>
         </div>
       </template>
