@@ -126,6 +126,10 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
       kc: '7'
     };
 
+    if (shouldIncludeDictionary) {
+      params.dj = '1';
+    }
+
     if (tk) params.tk = tk;
 
     Object.entries(params).forEach(([key, value]) => {
@@ -155,16 +159,29 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         body: body.toString()
       },
       extractResponse: (data) => {
-        if (!data || !data[0]) {
+        if (!data || (!data[0] && !data.sentences)) {
           logger.warn('[GoogleV2] Empty or invalid response data');
           return { translatedText: "", candidateText: "" };
         }
 
-        // Capture detected source language if available (usually at index 2 or index 8)
-        this._setDetectedLanguage(data[2] || (data[8] && data[8][0] && data[8][0][0]));
+        // Capture detected source language if available
+        // dj=1 uses data.src, legacy uses index 2 or index 8
+        this._setDetectedLanguage(data.src || data[2] || (data[8] && data[8][0] && data[8][0][0]));
 
-        // For single segments, keep existing stable behavior
+        // For single segments, keep existing stable behavior but add JSON support
         if (chunkTexts.length === 1) {
+          // If dj=1 was used, data.sentences will exist
+          if (data.sentences) {
+            const translatedText = data.sentences
+              .filter(s => s.trans)
+              .map(s => s.trans)
+              .join('');
+            
+            // Pass the whole data object for rich markdown formatting
+            return { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+          }
+
+          // Fallback to legacy array format
           const translatedText = data[0].map(segment => segment[0] || "").join('');
           
           let candidateText = "";
@@ -180,7 +197,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         }
 
         // For multiple segments, reconstruct the array to prevent delimiter leakage.
-        // Google often splits our delimiters ([[---]]) and attaches brackets to adjacent text.
+        // Multiple segments NEVER use dj=1 in our implementation, so we keep the legacy logic.
         const segments = data[0];
         const results = new Array(chunkTexts.length).fill("");
         let currentIdx = 0;
@@ -191,7 +208,6 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
           const orig = segment[1] || "";
           
           // Identify if this segment is part of the delimiter pattern
-          // Includes artifacts from all major providers: Bing (—–…ـ), Google (·・), and common dashes/dots
           const isDelimiterPart = /^[[\]\s\n\r.——–…ـ·・-]+$/.test(orig) && 
                                   (orig.includes('-') || orig.includes('.') || orig.includes('[') || orig.includes(']') || 
                                    orig.includes('—') || orig.includes('–') || orig.includes('…') || orig.includes('ـ') || 
@@ -207,15 +223,11 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
           inDelimiterZone = false;
           if (currentIdx < results.length) {
-            // Clean any delimiter remnants using centralized BIDI scrubbing
             const cleanTrans = TraditionalTextProcessor.scrubBidiArtifacts(trans);
             results[currentIdx] += cleanTrans;
           }
         }
 
-        // Fallback: If reconstruction resulted in empty segments for non-empty originals
-        // (which means Google merged segments unpredictably), fallback to joined string 
-        // and let the robust SegmentMapper handle it.
         const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && chunkTexts[i].trim());
         if (hasEmpty) {
           const joinedResult = data[0].map(segment => segment[0] || "").join('');
@@ -250,26 +262,78 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     return finalResult;
   }
 
-  _formatDictionaryAsMarkdown(candidateText) {
-    if (!candidateText || candidateText.trim() === "") {
-      return "";
-    }
-    const lines = candidateText.trim().split("\n").filter((line) => line.trim() !== "");
-    if (lines.length === 0) return "";
+  _formatDictionaryAsMarkdown(candidateData) {
+    if (!candidateData) return "";
 
-    let markdownOutput = "";
-    lines.forEach((line) => {
-      const colonIndex = line.indexOf(":");
-      if (colonIndex > 0) {
-        const partOfSpeech = line.substring(0, colonIndex).trim();
-        const terms = line.substring(colonIndex + 1).trim();
-        if (partOfSpeech && terms) {
-          markdownOutput += `**${partOfSpeech}**: ${terms}\n\n`;
+    // Support legacy string format (from array response)
+    if (typeof candidateData === "string") {
+      const lines = candidateData.trim().split("\n").filter((line) => line.trim() !== "");
+      if (lines.length === 0) return "";
+
+      let markdownOutput = "";
+      lines.forEach((line) => {
+        const colonIndex = line.indexOf(":");
+        if (colonIndex > 0) {
+          const partOfSpeech = line.substring(0, colonIndex).trim();
+          const terms = line.substring(colonIndex + 1).trim();
+          if (partOfSpeech && terms) {
+            markdownOutput += `${partOfSpeech}: ${terms}\n`;
+          }
+        } else if (line.trim()) {
+          markdownOutput += `${line.trim()}\n`;
         }
-      } else if (line.trim()) {
-        markdownOutput += `**${line.trim()}**\n\n`;
-      }
-    });
+      });
+      return markdownOutput.trim();
+    }
+
+    // Support new JSON format (dj=1)
+    const data = candidateData;
+    let markdownOutput = "";
+
+    // 1. Pronunciation
+    const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
+    if (pronunciation) {
+      markdownOutput += `Pronunciation: /${pronunciation}/\n`;
+    }
+
+    // 2. Dictionary Meanings (Parts of Speech & Synonyms)
+    if (data.dict && Array.isArray(data.dict)) {
+      data.dict.forEach((d) => {
+        const pos = d.pos || "";
+        const terms = d.terms || [];
+        if (pos && terms.length > 0) {
+          markdownOutput += `${pos}: ${terms.join(", ")}\n`;
+        }
+      });
+    }
+
+    // 3. Definitions
+    if (data.definitions && Array.isArray(data.definitions)) {
+      if (markdownOutput) markdownOutput += "\n";
+      markdownOutput += `Definitions:\n`;
+      data.definitions.forEach((d) => {
+        const pos = d.pos || "";
+        const entries = d.entry || [];
+        entries.forEach((entry) => {
+          if (entry.gloss) {
+            markdownOutput += `${pos ? `(${pos}) ` : ""}${entry.gloss}\n`;
+          }
+        });
+      });
+    }
+
+    // 4. Examples (with HTML stripping for safety)
+    if (data.examples?.example && Array.isArray(data.examples.example)) {
+      if (markdownOutput) markdownOutput += "\n";
+      markdownOutput += `Examples:\n`;
+      data.examples.example.slice(0, 5).forEach((ex) => {
+        if (ex.text) {
+          const cleanText = ex.text.replace(/<[^>]*>?/gm, "");
+          markdownOutput += `${cleanText}\n`;
+        }
+      });
+    }
+
     return markdownOutput.trim();
   }
 }
