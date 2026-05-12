@@ -246,7 +246,7 @@
     "message": "روش‌های ترجمه"
   },
   "prompt_tab_title": {
-    "message": "تنظیمات پرامپت"
+    "message": "تنظیمات پرامت"
   },
   "api_tab_title": {
     "message": "تنظیمات API"
@@ -1476,7 +1476,7 @@
     "message": "تب در دسترس نیست."
   },
   "ERRORS_EMPTY_PROMPT": {
-    "message": "متن پرامپت خالی یا نامعتبر است."
+    "message": "متن پرامت خالی یا نامعتبر است."
   },
   "ERRORS_TEXT_TOO_LONG": {
     "message": "متن انتخاب شده بیش از حد طولانی است. لطفا بخش کوتاه‌تری را انتخاب کنید."
@@ -1563,19 +1563,19 @@
     "message": "بخش پیشرفته"
   },
   "prompt_source_help": {
-    "message": "زبان مبدا را برای پرامپت انتخاب کنید."
+    "message": "زبان مبدا را برای پرامت انتخاب کنید."
   },
   "prompt_target_help": {
-    "message": "زبان مقصد را برای پرامپت انتخاب کنید."
+    "message": "زبان مقصد را برای پرامت انتخاب کنید."
   },
   "prompt_text_help": {
     "message": "متنی که می‌خواهید ترجمه یا پردازش شود را وارد کنید."
   },
   "prompt_preview_button": {
-    "message": "پیش‌نمایش پرامپت‌های تولید شده"
+    "message": "پیش‌نمایش پرامت‌های تولید شده"
   },
   "prompt_preview_loading": {
-    "message": "در حال تولید پرامپت‌ها..."
+    "message": "در حال تولید پرامت‌ها..."
   },
   "prompt_preview_note": {
     "message": "این مثال‌ها نشان می‌دهند که الگوی شما در حالت‌های مختلف ترجمه چگونه استفاده می‌شود"
@@ -1713,10 +1713,10 @@
     "message": "کلید API باید حداقل ۱۰ کاراکتر باشد و بدون فاصله"
   },
   "validation_prompt_template_empty": {
-    "message": "الگوی پرامپت نمی‌تواند خالی باشد."
+    "message": "الگوی پرامت نمی‌تواند خالی باشد."
   },
   "validation_prompt_template_missing_placeholders": {
-    "message": "الگوی پرامپت باید شامل موارد زیر باشد: {placeholders}"
+    "message": "الگوی پرامت باید شامل موارد زیر باشد: {placeholders}"
   },
   "validation_invalid_domains": {
     "message": "دامینه‌های نامعتبر: {domains}"
