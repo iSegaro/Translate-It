@@ -1,3 +1,11 @@
+#### v1.15.1 – Released on May XX, 2026
+
+##### Added
+
+- Added the ability to choose a translation provider for [OCR translations](#/ocr?highlight=OCR_PROVIDER_SELECTOR)
+
+---
+
 #### v1.15.0 – Released on May 11, 2026
 
 ##### Added
