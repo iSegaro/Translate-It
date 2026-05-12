@@ -239,17 +239,21 @@ export class SimpleMarkdown {
     // - "**noun:** test, experiment" (markdown bold)
     // - "اسم: آزمایش" (regular labels)
     // - "- **Meaning**: آزمایش" (list item label)
+    // - "تعاریف (Definitions):" (label with no content after colon)
     const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
 
-    // 1. Check for markdown bold labels: **Label**: content
+    // 1. Check for markdown bold labels: **Label**: content (content is optional)
     // We look for ** at start, some characters, then a colon (either inside or outside the last **)
-    const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*)$/;
+    const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*|:)$/;
 
-    // 2. Check for regular labels: Label: content
-    // More strict pattern: label should be at start of line, followed by colon and content
-    const regularLabelPattern = /^[^:\s]+\s*:\s*.+$/;
+    // 2. Check for regular labels: Label: content (content is optional)
+    // More strict pattern: label should be at start of line, followed by colon
+    const regularLabelPattern = /^[^:\s]+\s*:\s*.*$/;
 
-    return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
+    // 3. Specifically allow lines ending in a colon (header-style labels)
+    const endsWithColonPattern = /^.*:$/;
+
+    return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText) || endsWithColonPattern.test(trimmedText);
   }
 
   static _parseLabelLine(text) {
@@ -257,7 +261,7 @@ export class SimpleMarkdown {
     
     // Robust regex to capture label and content regardless of bold marker position
     // Group 1: Label part (including possible ** markers)
-    // Group 2: Content part
+    // Group 2: Content part (optional)
     const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
 
     if (!match) {
@@ -266,7 +270,7 @@ export class SimpleMarkdown {
     }
 
     const labelPart = match[1].trim();
-    const content = match[2].trim();
+    const content = match[2] ? match[2].trim() : "";
 
     // Create a bold element for the label and strip any markdown markers
     const labelElement = document.createElement("strong");
@@ -277,8 +281,10 @@ export class SimpleMarkdown {
 
     // Content after colon should NOT be parsed as markdown in dictionary context
     // to prevent nested formatting issues.
-    const textNode = document.createTextNode(content);
-    span.appendChild(textNode);
+    if (content) {
+      const textNode = document.createTextNode(content);
+      span.appendChild(textNode);
+    }
 
     return span;
   }
