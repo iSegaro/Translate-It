@@ -184,7 +184,7 @@
   --input-text-color: #e8eaed;
   --input-border-color: #5f6368;
   --input-focus-border-color: #3b82f6;
-  --input-focus-shadow-color: rgba(59, 130, 246, 0.3);
+  --input-focus-shadow-color: rgb(59 130 246 / 30%);
   --button-bg-color: #3b82f6;
   --button-text-color: #fff;
   --button-hover-bg-color: #2563eb;
@@ -195,7 +195,7 @@
   // Component specific colors
   --accent-color: #3b82f6;
   --accent-color-rgb: 59, 130, 246;
-  --accent-color-alpha: rgba(59, 130, 246, 0.2);
+  --accent-color-alpha: rgb(59 130 246 / 20%);
   --placeholder-color: #888;
   
   // Icon filters
@@ -210,7 +210,7 @@
   --color-surface: #242d44; /* Ensure dark theme background is blue */
   --color-surface-alpha: rgb(30 31 34 / 85%); /* More neutral dark grey with higher opacity */
   --color-border-alpha: rgb(255 255 255 / 10%);
-  --color-primary-alpha: rgba(59, 130, 246, 0.3);
+  --color-primary-alpha: rgb(59 130 246 / 30%);
   --color-surface-shadow: rgb(255 255 255 / 10%);
   --color-background-hover: rgb(255 255 255 / 10%);
   --color-button-surface: rgb(32 33 36 / 95%);
