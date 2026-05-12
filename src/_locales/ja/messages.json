@@ -260,6 +260,9 @@
   "ocr_tab_title": {
     "message": "スクリーンOCR"
   },
+  "ocr_toggle_section_title": {
+    "message": "OCR設定"
+  },
   "ocr_tab_desc": {
     "message": "画面上のテキスト認識 (OCR) の言語と設定を管理します。"
   },

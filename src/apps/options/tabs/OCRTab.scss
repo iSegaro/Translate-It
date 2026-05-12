@@ -17,6 +17,72 @@
     }
   }
 
+  /* Fieldset Header Actions alignment */
+  :deep(.base-fieldset__header-actions) {
+    .legend-actions-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+
+      .provider-action-label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+
+        &.is-disabled {
+          opacity: 0.5;
+        }
+      }
+
+      /* Adjust provider button to match ActivationTab compact style */
+      .ti-provider-button-container {
+        .ti-provider-button {
+          padding: 4px 8px !important;
+          height: 28px !important;
+          font-size: 0.85rem !important;
+          background: var(--bg-primary) !important;
+
+          .ti-api-provider-icon {
+            width: 14px !important;
+            height: 14px !important;
+          }
+
+          .dropdown-arrow {
+            width: 12px !important;
+            height: 12px !important;
+          }
+        }
+      }
+
+      .search-box {
+        max-width: 250px;
+        min-width: 150px;
+
+        .search-input {
+          width: 100%;
+          padding: 4px 8px;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          font-size: 0.85rem;
+          height: 28px;
+          transition: border-color 0.2s;
+
+          &:focus {
+            outline: none;
+            border-color: var(--accent-color);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+  }
+
   .settings-section {
     background: var(--bg-secondary);
     border-radius: 12px;
@@ -30,70 +96,32 @@
       pointer-events: none;
       filter: grayscale(0.5);
     }
+  }
 
-    .setting-group {
-      transition: all 0.3s ease;
+  .setting-group {
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
 
-      &.is-disabled {
-        opacity: 0.5;
-        pointer-events: none;
-      }
-
-      .setting-description {
-        display: block;
-        margin-top: 0.5rem;
-        color: var(--text-secondary);
-        font-size: 0.85rem;
-        margin-bottom: 0;
-      }
+    &:first-child {
+      margin-top: 0.5rem; /* Add space for header actions */
     }
 
-    h3 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 1.25rem;
-      color: var(--text-primary);
+    &:last-child {
+      margin-bottom: 0;
     }
 
-    p {
+    &.is-disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .setting-description {
+      display: block;
+      margin-top: 0.5rem;
       color: var(--text-secondary);
       font-size: 0.85rem;
-      margin-bottom: 1rem;
-    }
-
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.25rem;
-      flex-wrap: wrap;
-      gap: 1rem;
-
-      h3 {
-        margin-bottom: 0;
-      }
-
-      .search-box {
-        flex: 1;
-        max-width: 300px;
-        min-width: 200px;
-
-        .search-input {
-          width: 100%;
-          padding: 0.5rem 0.75rem;
-          border-radius: 6px;
-          border: 1px solid var(--border-color);
-          background: var(--bg-primary);
-          color: var(--text-primary);
-          font-size: 0.85rem;
-          transition: border-color 0.2s;
-
-          &:focus {
-            outline: none;
-            border-color: var(--accent-color);
-          }
-        }
-      }
+      margin-bottom: 0;
+      padding-inline-start: 32px;
     }
   }
 
@@ -125,6 +153,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 0.75rem;
+    margin-top: 1.25rem; /* Add space to prevent overlap with header search box */
   }
 
   .language-item {
@@ -203,11 +232,11 @@
     }
   }
 
-  .danger-zone {
-    border-color: var(--text-danger, #ff4d4f);
+  .danger-zone-fieldset {
+    border-color: var(--text-danger, #ff4d4f) !important;
     
-    h3 {
-      color: var(--text-danger, #ff4d4f);
+    :deep(.base-fieldset__legend) {
+      color: var(--text-danger, #ff4d4f) !important;
     }
   }
 

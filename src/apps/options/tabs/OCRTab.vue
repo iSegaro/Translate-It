@@ -8,7 +8,27 @@
     </div>
 
     <!-- OCR Toggle Section -->
-    <div class="settings-section ocr-toggle-section">
+    <BaseFieldset
+      id="ocr_toggle_section"
+      :legend="t('ocr_toggle_section_title') || t('ocr_tab_title')"
+    >
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="provider-action-label"
+            :class="{ 'is-disabled': !enableScreenCapture }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="ocrProvider"
+            allow-default
+            mode="button"
+            only-configured
+            :is-global="false"
+            :disabled="!enableScreenCapture"
+          />
+        </div>
+      </template>
+
       <div class="setting-group">
         <BaseCheckbox
           id="ENABLE_SCREEN_CAPTURE"
@@ -34,23 +54,26 @@
           {{ t('ocr_context_menu_desc') }}
         </p>
       </div>
-    </div>
+    </BaseFieldset>
 
-    <div
-      class="settings-section"
-      :class="{ 'is-disabled': !enableScreenCapture }"
+    <BaseFieldset
+      id="ocr_languages_section"
+      :legend="t('ocr_languages_label')"
+      :disabled="!enableScreenCapture"
     >
-      <div class="section-header">
-        <h3>{{ t('ocr_languages_label') }}</h3>
-        <div class="search-box">
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            :placeholder="t('search_placeholder')"
-            class="search-input"
-          >
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <div class="search-box">
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              :placeholder="t('search_placeholder')"
+              class="search-input"
+              :disabled="!enableScreenCapture"
+            />
+          </div>
         </div>
-      </div>
+      </template>
       
       <div class="language-list">
         <div 
@@ -90,10 +113,13 @@
           </div>
         </div>
       </div>
-    </div>
+    </BaseFieldset>
 
-    <div class="settings-section danger-zone">
-      <h3>{{ t('ocr_cache_clear_button') }}</h3>
+    <BaseFieldset
+      id="ocr_danger_zone"
+      :legend="t('ocr_cache_clear_button')"
+      class="danger-zone-fieldset"
+    >
       <p>{{ t('ocr_cache_clear_desc') }}</p>
       <button 
         class="btn-danger"
@@ -101,7 +127,7 @@
       >
         {{ t('ocr_cache_clear_button') }}
       </button>
-    </div>
+    </BaseFieldset>
   </div>
 </template>
 
@@ -115,20 +141,24 @@ import { SUPPORTED_OCR_LANGUAGES } from '@/features/screen-capture/utils/ocrLang
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import { TranslationMode } from '@/shared/config/config.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseFieldset from '@/components/base/BaseFieldset.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OCRTab')
 const { t } = useUnifiedI18n()
 const ocrStore = useOCRStore()
 const settingsStore = useSettingsStore()
-const { createSetting } = useTabSettings(settingsStore, logger)
+const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
 
 const searchQuery = ref('')
 
 // Settings
 const enableScreenCapture = createSetting('ENABLE_SCREEN_CAPTURE', true)
+const ocrProvider = createProviderSetting(TranslationMode.ScreenCapture)
 const showInContextMenu = createSetting('CONTEXT_MENU_VISIBILITY', {}, {
   transformGet: (visibility) => visibility.PAGE_CONTEXT_SCREEN_CAPTURE !== false,
   transformSet: (value) => {

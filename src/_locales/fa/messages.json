@@ -260,6 +260,9 @@
   "ocr_tab_title": {
     "message": "تشخیص متن (OCR)"
   },
+  "ocr_toggle_section_title": {
+    "message": "تنظیمات تشخیص متن"
+  },
   "ocr_tab_desc": {
     "message": "مدیریت زبان‌ها و تنظیمات تشخیص متن از روی تصویر (OCR)."
   },

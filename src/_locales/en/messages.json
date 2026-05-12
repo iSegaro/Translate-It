@@ -260,6 +260,9 @@
   "ocr_tab_title": {
     "message": "Screen OCR"
   },
+  "ocr_toggle_section_title": {
+    "message": "Screen OCR Settings"
+  },
   "ocr_tab_desc": {
     "message": "Manage languages and settings for on-screen text recognition (OCR)."
   },
