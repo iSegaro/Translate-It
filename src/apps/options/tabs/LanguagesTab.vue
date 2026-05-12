@@ -210,6 +210,40 @@
                 <p class="setting-description">
                   {{ t('enable_dictionary_translation_description') }}
                 </p>
+
+                <!-- Dictionary Display Options -->
+                <div 
+                  id="DICTIONARY_DISPLAY_OPTIONS"
+                  class="dictionary-display-options mt-md"
+                  :class="{ 'is-disabled': !enableDictionary }"
+                >
+                  <label class="setting-label mb-sm">{{ t('dict_setting_display_options') || 'Display Options' }}:</label>
+                  <div class="checkbox-list-vertical">
+                    <BaseCheckbox 
+                      v-model="showPronunciation" 
+                      :label="t('dict_setting_show_pronunciation')" 
+                      :disabled="!enableDictionary"
+                      class="mb-xs"
+                    />
+                    <BaseCheckbox 
+                      v-model="showPos" 
+                      :label="t('dict_setting_show_pos')" 
+                      :disabled="!enableDictionary"
+                      class="mb-xs"
+                    />
+                    <BaseCheckbox 
+                      v-model="showDefinitions" 
+                      :label="t('dict_setting_show_definitions')" 
+                      :disabled="!enableDictionary"
+                      class="mb-xs"
+                    />
+                    <BaseCheckbox 
+                      v-model="showExamples" 
+                      :label="t('dict_setting_show_examples')" 
+                      :disabled="!enableDictionary"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -491,6 +525,10 @@ const latinScriptPreference = createScriptSetting('latin-script', 'none')
 // --- Dictionary Logic ---
 const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
 const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
+const showPronunciation = createSetting('DICTIONARY_SHOW_PRONUNCIATION', true)
+const showPos = createSetting('DICTIONARY_SHOW_POS', true)
+const showDefinitions = createSetting('DICTIONARY_SHOW_DEFINITIONS', true)
+const showExamples = createSetting('DICTIONARY_SHOW_EXAMPLES', true)
 
 const arabicScriptOptions = computed(() => [
   { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },

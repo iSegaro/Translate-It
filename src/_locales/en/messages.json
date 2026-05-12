@@ -2344,5 +2344,20 @@
   },
   "dict_examples": {
     "message": "Examples"
+  },
+  "dict_setting_display_options": {
+    "message": "Display Options"
+  },
+  "dict_setting_show_pronunciation": {
+    "message": "Show Pronunciation"
+  },
+  "dict_setting_show_pos": {
+    "message": "Show Parts of Speech (Noun, Verb...)"
+  },
+  "dict_setting_show_definitions": {
+    "message": "Show Definitions"
+  },
+  "dict_setting_show_examples": {
+    "message": "Show Examples"
   }
 }

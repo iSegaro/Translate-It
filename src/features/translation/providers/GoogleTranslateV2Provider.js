@@ -12,7 +12,11 @@ import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
   getEnableDictionaryAsync,
   TranslationMode,
-  getGoogleTranslateV2UrlAsync
+  getGoogleTranslateV2UrlAsync,
+  getDictionaryShowPronunciationAsync,
+  getDictionaryShowPosAsync,
+  getDictionaryShowDefinitionsAsync,
+  getDictionaryShowExamplesAsync
 } from "@/shared/config/config.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 
@@ -266,6 +270,14 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   async _formatDictionaryAsMarkdown(candidateData) {
     if (!candidateData) return "";
 
+    // Load user display preferences
+    const [showPronunciation, showPos, showDefinitions, showExamples] = await Promise.all([
+      getDictionaryShowPronunciationAsync(),
+      getDictionaryShowPosAsync(),
+      getDictionaryShowDefinitionsAsync(),
+      getDictionaryShowExamplesAsync()
+    ]);
+
     // Load translated labels
     const labelPronunciation = await getTranslationString('dict_pronunciation') || 'Pronunciation';
     const labelDefinitions = await getTranslationString('dict_definitions') || 'Definitions';
@@ -282,7 +294,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
         if (colonIndex > 0) {
           const partOfSpeech = line.substring(0, colonIndex).trim();
           const terms = line.substring(colonIndex + 1).trim();
-          if (partOfSpeech && terms) {
+          
+          // Check if POS should be shown
+          if (showPos && partOfSpeech && terms) {
             markdownOutput += `${partOfSpeech}: ${terms}\n`;
           }
         } else if (line.trim()) {
@@ -297,13 +311,15 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     let markdownOutput = "";
 
     // 1. Pronunciation
-    const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
-    if (pronunciation) {
-      markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
+    if (showPronunciation) {
+      const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
+      if (pronunciation) {
+        markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
+      }
     }
 
     // 2. Dictionary Meanings (Parts of Speech & Synonyms)
-    if (data.dict && Array.isArray(data.dict)) {
+    if (showPos && data.dict && Array.isArray(data.dict)) {
       data.dict.forEach((d) => {
         const pos = d.pos || "";
         const terms = d.terms || [];
@@ -314,7 +330,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     }
 
     // 3. Definitions
-    if (data.definitions && Array.isArray(data.definitions)) {
+    if (showDefinitions && data.definitions && Array.isArray(data.definitions)) {
       if (markdownOutput) markdownOutput += "\n";
       markdownOutput += `${labelDefinitions}:\n`;
       data.definitions.forEach((d) => {
@@ -329,7 +345,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     }
 
     // 4. Examples (with HTML stripping for safety)
-    if (data.examples?.example && Array.isArray(data.examples.example)) {
+    if (showExamples && data.examples?.example && Array.isArray(data.examples.example)) {
       if (markdownOutput) markdownOutput += "\n";
       markdownOutput += `${labelExamples}:\n`;
       data.examples.example.slice(0, 5).forEach((ex) => {
