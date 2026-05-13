@@ -42,6 +42,41 @@
           {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
         </span>
       </div>
+
+      <div 
+        class="sub-options-group"
+        :class="{ open: showDesktopFab }"
+      >
+        <div 
+          id="FAB_CUSTOMIZATION_SETTINGS"
+          class="sub-options-inner fab-appearance-options"
+        >
+          <div class="fab-appearance-item opacity-item">
+            <BaseRange
+              id="FAB_IDLE_OPACITY"
+              v-model="fabIdleOpacity"
+              :label="t('fab_idle_opacity_label') || 'Idle Fade Opacity'"
+              value-suffix="%"
+              min="0"
+              max="100"
+              :disabled="!extensionEnabled || !showDesktopFab"
+            />
+          </div>
+
+          <div class="separator-v" />
+
+          <div class="fab-appearance-item size-item">
+            <label class="setting-label">{{ t('fab_size_label') || 'Icon Size' }}</label>
+            <BaseSelect
+              id="FAB_SIZE"
+              v-model="fabSize"
+              :options="fabSizeOptions"
+              :disabled="!extensionEnabled || !showDesktopFab"
+              class="compact-select"
+            />
+          </div>
+        </div>
+      </div>
     </BaseFieldset>
 
     <!-- Text Field Translation -->
@@ -477,6 +512,7 @@ import { useHighlightManager } from '../composables/useHighlightManager.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseRange from '@/components/base/BaseRange.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
@@ -513,6 +549,16 @@ const mobileModeOptions = computed(() => [
   { value: MOBILE_CONSTANTS.UI_MODE.AUTO, label: t('mobile_ui_mode_auto') },
   { value: MOBILE_CONSTANTS.UI_MODE.MOBILE, label: t('mobile_ui_mode_mobile') },
   { value: MOBILE_CONSTANTS.UI_MODE.DESKTOP, label: t('mobile_ui_mode_desktop') }
+])
+
+const fabIdleOpacity = createSetting('FAB_IDLE_OPACITY', 20)
+const fabSize = createSetting('FAB_SIZE', '1')
+
+const fabSizeOptions = computed(() => [
+  { value: '0.8', label: t('fab_size_small') || 'Small' },
+  { value: '1', label: t('fab_size_default') || 'Default' },
+  { value: '1.2', label: t('fab_size_large') || 'Large' },
+  { value: '1.5', label: t('fab_size_extra_large') || 'Extra Large' }
 ])
 
 // Text Fields

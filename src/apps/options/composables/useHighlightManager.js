@@ -78,6 +78,7 @@ export function useHighlightManager() {
         if (id === 'DEBUG_MODE' || id.startsWith('LOG_LEVEL_')) return 'debug';
         if (id.startsWith('DICTIONARY_')) return 'dictionary';
         if (id.startsWith('BILINGUAL_')) return 'bilingual';
+        if (id.startsWith('FAB_')) return 'fab';
         if (id.startsWith('AI_OPT_')) return 'ai';
         if (id.startsWith('OPTIMIZATION_')) return 'api';
         
