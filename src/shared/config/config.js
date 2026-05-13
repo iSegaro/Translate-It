@@ -261,8 +261,8 @@ export const CONFIG = {
   // --- Dictionary Display Settings ---
   DICTIONARY_SHOW_PRONUNCIATION: true,
   DICTIONARY_SHOW_POS: true, // Parts of Speech (Noun, Verb, etc.)
-  DICTIONARY_SHOW_DEFINITIONS: true,
-  DICTIONARY_SHOW_EXAMPLES: true,
+  DICTIONARY_SHOW_DEFINITIONS: false,
+  DICTIONARY_SHOW_EXAMPLES: false,
 
   // --- Versioning ---
   PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)

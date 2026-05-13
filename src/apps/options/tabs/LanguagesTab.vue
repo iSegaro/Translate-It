@@ -523,7 +523,7 @@ const devanagariScriptPreference = createScriptSetting('devanagari-script', 'hi'
 const latinScriptPreference = createScriptSetting('latin-script', 'none')
 
 // --- Dictionary Logic ---
-const enableDictionary = createSetting('ENABLE_DICTIONARY', false)
+const enableDictionary = createSetting('ENABLE_DICTIONARY', true)
 const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
 const isGoogleDictionary = computed(() => {
   const provider = dictionaryProvider.value === 'default' ? selectedProvider.value : dictionaryProvider.value
@@ -531,8 +531,8 @@ const isGoogleDictionary = computed(() => {
 })
 const showPronunciation = createSetting('DICTIONARY_SHOW_PRONUNCIATION', true)
 const showPos = createSetting('DICTIONARY_SHOW_POS', true)
-const showDefinitions = createSetting('DICTIONARY_SHOW_DEFINITIONS', true)
-const showExamples = createSetting('DICTIONARY_SHOW_EXAMPLES', true)
+const showDefinitions = createSetting('DICTIONARY_SHOW_DEFINITIONS', false)
+const showExamples = createSetting('DICTIONARY_SHOW_EXAMPLES', false)
 
 const arabicScriptOptions = computed(() => [
   { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },
