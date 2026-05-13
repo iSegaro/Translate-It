@@ -223,7 +223,8 @@ export class TranslationHandler {
             translatedText: response.translatedText,
             sourceLanguage: response.sourceLanguage || response.detectedSourceLanguage || payload.from,
             targetLanguage: response.targetLanguage || payload.to,
-            provider: payload.provider
+            provider: payload.provider,
+            mode: payload.mode
           };
         }
 
@@ -233,7 +234,8 @@ export class TranslationHandler {
         
         return {
           ...finalResult,
-          provider: payload.provider
+          provider: payload.provider,
+          mode: payload.mode
         };
 
       } catch (error) {

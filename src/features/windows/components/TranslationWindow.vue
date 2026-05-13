@@ -202,6 +202,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
+import { TranslationMode } from '@/shared/config/config.js';
 import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
@@ -227,7 +228,8 @@ const props = defineProps({
   targetLanguage: { type: String, default: 'auto' }, 
   sourceLanguage: { type: String, default: 'auto' },
   detectedSourceLanguage: { type: String, default: undefined },
-  provider: { type: String, default: '' } 
+  provider: { type: String, default: '' },
+  translationMode: { type: String, default: null }
 });
 
 const emit = defineEmits(['close', 'speak']);
@@ -297,6 +299,11 @@ const errorMessage = computed(() => props.isError ? props.initialTranslatedText 
 
 // Check if current translation is in dictionary mode
 const isDictionary = computed(() => {
+  if (props.translationMode === TranslationMode.Dictionary_Translation || props.translationMode === TranslationMode.LEGACY_DICTIONARY) {
+    return true;
+  }
+  
+  // Robust fallbacks
   return props.provider === 'vajehyab' || 
          (props.initialTranslatedText && props.initialTranslatedText.includes('**')) || 
          (props.initialTranslatedText && props.initialTranslatedText.startsWith('###'));
