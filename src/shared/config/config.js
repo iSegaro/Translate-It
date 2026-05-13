@@ -244,6 +244,8 @@ export const CONFIG = {
     side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
     y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
   }, // موقعیت دکمه شناور موبایل (سمت و ارتفاع)
+  FAB_IDLE_OPACITY: 20, // میزان شفافیت دکمه شناور در حالت بیکار (0-100)
+  FAB_SIZE: "1", // ضریب اندازه دکمه شناور (0.8, 1, 1.2, 1.5)
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
@@ -261,8 +263,8 @@ export const CONFIG = {
   // --- Dictionary Display Settings ---
   DICTIONARY_SHOW_PRONUNCIATION: true,
   DICTIONARY_SHOW_POS: true, // Parts of Speech (Noun, Verb, etc.)
-  DICTIONARY_SHOW_DEFINITIONS: true,
-  DICTIONARY_SHOW_EXAMPLES: true,
+  DICTIONARY_SHOW_DEFINITIONS: false,
+  DICTIONARY_SHOW_EXAMPLES: false,
 
   // --- Versioning ---
   PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
@@ -1417,6 +1419,14 @@ export const getSidepanelMaxCharsAsync = async () => {
 
 export const getSelectionMaxCharsAsync = async () => {
   return getSettingValueAsync("SELECTION_MAX_CHARS", CONFIG.SELECTION_MAX_CHARS);
+};
+
+export const getFabIdleOpacityAsync = async () => {
+  return getSettingValueAsync("FAB_IDLE_OPACITY", CONFIG.FAB_IDLE_OPACITY);
+};
+
+export const getFabSizeAsync = async () => {
+  return getSettingValueAsync("FAB_SIZE", CONFIG.FAB_SIZE);
 };
 
 export const getSelectElementMaxCharsAsync = async () => {

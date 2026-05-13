@@ -1589,6 +1589,24 @@
   "appearance_section_title": {
     "message": "ظاهر"
   },
+  "fab_idle_opacity_label": {
+    "message": "شفافیت آیکون"
+  },
+  "fab_size_label": {
+    "message": "اندازه آیکون"
+  },
+  "fab_size_small": {
+    "message": "کوچک"
+  },
+  "fab_size_default": {
+    "message": "پیش‌فرض"
+  },
+  "fab_size_large": {
+    "message": "بزرگ"
+  },
+  "fab_size_extra_large": {
+    "message": "خیلی بزرگ"
+  },
   "font_settings_title": {
     "message": "تنظیمات فونت"
   },

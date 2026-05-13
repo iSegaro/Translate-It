@@ -1,3 +1,11 @@
+#### v1.15.2 – Released on May XX, 2026
+
+##### Added
+
+- Added customizable **Idle Opacity** and **Icon Size** for the [Quick Action Button (FAB)](#/activation?highlight=FAB_CUSTOMIZATION_SETTINGS)
+
+---
+
 #### v1.15.1 – Released on May 13, 2026
 
 ##### Added

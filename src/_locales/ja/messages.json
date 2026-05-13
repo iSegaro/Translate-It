@@ -1589,6 +1589,24 @@
   "appearance_section_title": {
     "message": "外観"
   },
+  "fab_idle_opacity_label": {
+    "message": "アイコンの不透明度"
+  },
+  "fab_size_label": {
+    "message": "アイコンのサイズ"
+  },
+  "fab_size_small": {
+    "message": "小"
+  },
+  "fab_size_default": {
+    "message": "デフォルト"
+  },
+  "fab_size_large": {
+    "message": "大"
+  },
+  "fab_size_extra_large": {
+    "message": "特大"
+  },
   "font_settings_title": {
     "message": "フォント設定"
   },

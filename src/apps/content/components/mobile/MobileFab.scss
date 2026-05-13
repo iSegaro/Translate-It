@@ -3,21 +3,24 @@
 .mobile-fab {
 
   /* Responsive Sizing Variables */
-  --fab-size: 54px;
-  --fab-icon-size: 28px;
-  --fab-visible-width: 18px; /* How much of the FAB is visible at the screen edge */
+  --fab-scale: 1; /* Provided by Vue inline style */
+  --base-fab-size: 64px;
+  --base-fab-icon-size: 34px;
+  --fab-size: calc(var(--base-fab-size) * var(--fab-scale));
+  --fab-icon-size: calc(var(--base-fab-icon-size) * var(--fab-scale));
+  --fab-visible-width: 22px; /* How much of the FAB is visible at the screen edge */
   
   /* Media Queries for Responsive Scaling */
   @media (width >= 576px) { // Tablet
-    --fab-size: 64px;
-    --fab-icon-size: 34px;
-    --fab-visible-width: 22px;
+    --base-fab-size: 76px;
+    --base-fab-icon-size: 40px;
+    --fab-visible-width: 26px;
   }
 
   @media (width >= 992px) { // Desktop / Large Screen
-    --fab-size: 72px;
-    --fab-icon-size: 40px;
-    --fab-visible-width: 26px;
+    --base-fab-size: 86px;
+    --base-fab-icon-size: 48px;
+    --fab-visible-width: 30px;
   }
 
   /* Default values for CSS Variables */
@@ -54,10 +57,6 @@
   /* State Overrides */
   &.is-hidden {
     display: none !important;
-  }
-
-  &.is-idle:not(.is-dragging, :hover) {
-    --fab-opacity: 0.2 !important;
   }
 
   &.is-unstable {

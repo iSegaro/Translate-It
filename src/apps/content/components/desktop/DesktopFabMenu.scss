@@ -2,42 +2,33 @@
 
 .desktop-fab-container {
   /* Responsive Sizing Variables */
-  --fab-size: 54px;
-  --fab-icon-size: 32px;
+  --fab-scale: 1; /* Provided by Vue inline style */
+  --base-fab-size: 54px;
+  --base-fab-icon-size: 32px;
+  --fab-size: calc(var(--base-fab-size) * var(--fab-scale));
+  --fab-icon-size: calc(var(--base-fab-icon-size) * var(--fab-scale));
   --fab-edge-offset: 25px; /* Amount hidden off-screen */
   --fab-active-translate: 18px; /* Amount it moves inward when active */
-  --badge-size: 32px;
-  --badge-icon-size: 18px;
-  --badge-offset: 42px; /* Vertical spacing between badges */
-  --translate-badge-size: 20px;
+  --badge-size: calc(32px * var(--fab-scale));
+  --badge-icon-size: calc(18px * var(--fab-scale));
+  --badge-offset: calc(42px * var(--fab-scale)); /* Vertical spacing between badges */
+  --translate-badge-size: calc(20px * var(--fab-scale));
   --menu-min-width: 190px;
   --menu-font-size: 13px;
 
   /* Media Queries for Responsive Scaling */
   @media (max-width: 576px) { // Small screens (Mobile)
-    --fab-size: 48px;
-    --fab-icon-size: 28px;
+    --base-fab-size: 48px;
+    --base-fab-icon-size: 28px;
     --fab-edge-offset: 22px;
     --fab-active-translate: 15px;
-    --badge-size: 28px;
-    --badge-icon-size: 16px;
-    --badge-offset: 36px;
-    --translate-badge-size: 18px;
-    --menu-min-width: 170px;
-    --menu-font-size: 12px;
   }
 
   @media (min-width: 1200px) { // Extra Large screens
-    --fab-size: 64px;
-    --fab-icon-size: 38px;
+    --base-fab-size: 64px;
+    --base-fab-icon-size: 38px;
     --fab-edge-offset: 30px;
     --fab-active-translate: 22px;
-    --badge-size: 36px;
-    --badge-icon-size: 20px;
-    --badge-offset: 48px;
-    --translate-badge-size: 24px;
-    --menu-min-width: 210px;
-    --menu-font-size: 14px;
   }
 
   display: flex !important;
