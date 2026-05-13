@@ -44,6 +44,7 @@
         :source-language="window.sourceLanguage || 'auto'"
         :detected-source-language="window.detectedSourceLanguage"
         :provider="window.provider"
+        :translation-mode="window.mode"
         @close="onTranslationWindowClose"
         @speak="onTranslationWindowSpeak"
       />

@@ -197,7 +197,8 @@ export class DisplayManager {
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
-        provider: translationResult.provider
+        provider: translationResult.provider,
+        mode: translationResult.mode
       });
 
       this.state.setProvider(translationResult.provider);
@@ -438,7 +439,8 @@ export class DisplayManager {
         sourceLanguage: translationResult.sourceLanguage || 'auto',
         detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
-        provider: translationResult.provider
+        provider: translationResult.provider,
+        mode: translationResult.mode
       });
       
       this.state.setProvider(translationResult.provider);

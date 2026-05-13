@@ -2335,5 +2335,29 @@
   },
   "screen_capture_retry": {
     "message": "再試行"
+  },
+  "dict_pronunciation": {
+    "message": "発音"
+  },
+  "dict_definitions": {
+    "message": "定義"
+  },
+  "dict_examples": {
+    "message": "例文"
+  },
+  "dict_setting_display_options": {
+    "message": "表示オプション"
+  },
+  "dict_setting_show_pronunciation": {
+    "message": "発音を表示"
+  },
+  "dict_setting_show_pos": {
+    "message": "品詞を表示（名詞、動詞など）"
+  },
+  "dict_setting_show_definitions": {
+    "message": "定義を表示"
+  },
+  "dict_setting_show_examples": {
+    "message": "例文を表示"
   }
 }

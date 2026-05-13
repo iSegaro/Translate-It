@@ -2335,5 +2335,29 @@
   },
   "screen_capture_retry": {
     "message": "تلاش مجدد"
+  },
+  "dict_pronunciation": {
+    "message": "تلفظ"
+  },
+  "dict_definitions": {
+    "message": "تعاریف"
+  },
+  "dict_examples": {
+    "message": "مثال‌ها"
+  },
+  "dict_setting_display_options": {
+    "message": "گزینه‌های نمایش"
+  },
+  "dict_setting_show_pronunciation": {
+    "message": "نمایش تلفظ"
+  },
+  "dict_setting_show_pos": {
+    "message": "نمایش نقش کلمات (اسم، فعل و...)"
+  },
+  "dict_setting_show_definitions": {
+    "message": "نمایش تعاریف"
+  },
+  "dict_setting_show_examples": {
+    "message": "نمایش مثال‌ها"
   }
 }

@@ -258,6 +258,12 @@ export const CONFIG = {
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
+  // --- Dictionary Display Settings ---
+  DICTIONARY_SHOW_PRONUNCIATION: true,
+  DICTIONARY_SHOW_POS: true, // Parts of Speech (Noun, Verb, etc.)
+  DICTIONARY_SHOW_DEFINITIONS: true,
+  DICTIONARY_SHOW_EXAMPLES: true,
+
   // --- Versioning ---
   PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
 
@@ -804,6 +810,22 @@ export const getTargetLanguageAsync = async () => {
 
 export const getEnableDictionaryAsync = async () => {
   return getSettingValueAsync("ENABLE_DICTIONARY", CONFIG.ENABLE_DICTIONARY);
+};
+
+export const getDictionaryShowPronunciationAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_PRONUNCIATION", CONFIG.DICTIONARY_SHOW_PRONUNCIATION);
+};
+
+export const getDictionaryShowPosAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_POS", CONFIG.DICTIONARY_SHOW_POS);
+};
+
+export const getDictionaryShowDefinitionsAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_DEFINITIONS", CONFIG.DICTIONARY_SHOW_DEFINITIONS);
+};
+
+export const getDictionaryShowExamplesAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_EXAMPLES", CONFIG.DICTIONARY_SHOW_EXAMPLES);
 };
 
 export const getMobileUiModeAsync = async () => {
