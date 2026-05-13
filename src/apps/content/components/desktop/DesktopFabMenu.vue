@@ -312,9 +312,11 @@ const ANIMATION_CONFIG = {
   STANDARD_EASING: 'ease',
   IDLE_TIMEOUT: 500,
   LEAVE_DELAY: 400,
-  OPACITY_DIMMED: 0.2,
   OPACITY_FULL: 1
 };
+
+const fabIdleOpacity = computed(() => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100);
+const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || '1');
 
 const isMenuOpen = ref(false);
 const isFaded = ref(true);
@@ -612,7 +614,7 @@ const containerStyle = computed(() => {
     opacityValue = 0;
     pointerEvents = 'none';
   } else if (isFaded.value && !isHovered.value && !isMenuOpen.value && !isDragging.value) {
-    opacityValue = ANIMATION_CONFIG.OPACITY_DIMMED; 
+    opacityValue = fabIdleOpacity.value; 
   }
 
   const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
@@ -629,7 +631,8 @@ const containerStyle = computed(() => {
   const style = {
     '--fab-opacity': opacityValue,
     '--fab-pointer-events': pointerEvents,
-    '--fab-transition': transitionStr
+    '--fab-transition': transitionStr,
+    '--fab-scale': fabScale.value
   };
 
   if (verticalPos.value === -1) {
