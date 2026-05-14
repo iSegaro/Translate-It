@@ -11,6 +11,7 @@ Translate It! brings a high performance, modular translation engine directly int
 
 * 10+ AI & Standard Providers: Choose between Gemini, OpenAI, DeepL, Microsoft and more.
 * 70% Token Savings: Use our unique Economy Mode to pack more text into every request, slashing your AI API costs.
+* Zero-Pressure Engineering: Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
 * Privacy First OCR: Translate text from images, videos, and PDFs using our Offline OCR engine. Your visual data never leaves your browser.
 * Progressive Streaming: Don't wait! Large paragraphs are rendered in real-time as they arrive, providing a fluid, zero lag experience.
 
