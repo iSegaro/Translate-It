@@ -2,21 +2,15 @@
 
 ## Overview
 
-This document describes the successful migration of the WindowsManager system to use the centralized Vue.js UI Host architecture. The WindowsManager now communicates with the UI Host through event-based messaging instead of direct DOM manipulation.
+The **WindowsManager** system is built upon a centralized Vue.js UI Host architecture. It manages the lifecycle of translation windows and icons through event-based messaging with the UI Host, which resides within a secure Shadow DOM. This ensures complete CSS/JS isolation and a clear separation between business logic and UI rendering.
 
-## Architecture Changes
+## Architecture
 
-### Before Migration
-- WindowsManager directly manipulated DOM elements
-- Created and managed UI elements internally
-- Mixed business logic with UI rendering
-- No CSS/JS isolation from host webpage
-
-### After Migration
-- WindowsManager emits events for UI operations
-- Vue UI Host handles all UI rendering in Shadow DOM
-- Complete separation of concerns
-- Full CSS/JS isolation from host webpage
+The system follows a strict **Decoupled Architecture**:
+- **WindowsManager**: Acts as the business logic orchestrator, managing state and coordinating events.
+- **Vue UI Host**: Handles all UI rendering and user interaction within the Shadow DOM.
+- **Event-Based Communication**: All interaction between the logic and UI layers occurs via `PageEventBus`.
+- **Shadow DOM Isolation**: Prevents host webpage styles from leaking into the extension UI and vice-versa.
 
 ## Architecture & Modularization
 
@@ -152,15 +146,6 @@ To improve performance and eliminate UI flicker, the system now updates existing
 - Better handling of iframe scenarios
 - Improved cross-frame communication
 
-## Migration Status
-
-
-### Future Improvements
-- [ ] Enhanced accessibility features (ARIA attributes)
-- [ ] User-customizable UI themes
-- [ ] Advanced positioning algorithms (e.g., collision detection)
-- [ ] Performance optimizations for very high-frequency events
-
 ## Error Management Integration
 
 The WindowsManager system is fully integrated with the centralized **Error Management System**:
@@ -245,41 +230,12 @@ pageEventBus.emit('translation-window-change-provider', {
 
 ## Testing
 
-### Manual Testing
-Run the test script in browser console:
-```javascript
-testWindowsManagerIntegration();
-```
-
-### Automated Testing
 The system supports:
 - Unit tests for event emission
 - Integration tests with Vue components
 - Cross-browser compatibility tests
 - Performance benchmarking
 
-## Backward Compatibility
-
-The migration maintains full backward compatibility:
-- Existing WindowsManager API remains unchanged
-- All external interfaces preserved
-- No breaking changes for consumers
-- Seamless transition for users
-
-## Performance Metrics
-
-### Before Migration
-- DOM manipulation: ~5ms per operation
-- Memory usage: Higher due to direct DOM references
-- Style recalculation: Frequent due to inline styles
-
-### After Migration (2025 CSS Architecture)
-- Event emission: <1ms per operation
-- Memory usage: Optimized through Vue's reactivity + CSS containment
-- Style recalculation: Minimal due to CSS Grid and modern layout methods
-- CSS Variables: Safe interpolation with fallback values
-- Performance: Enhanced through CSS containment and modern overflow handling
-
 ## Conclusion
 
-The WindowsManager integration with the Vue UI Host represents a significant architectural improvement that enhances performance, maintainability, and user experience while maintaining full backward compatibility with existing systems.
+The WindowsManager integration with the Vue UI Host represents a significant architectural improvement that enhances performance, maintainability, and user experience while maintaining a secure and isolated environment for the extension UI.

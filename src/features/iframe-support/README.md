@@ -13,7 +13,9 @@ src/features/iframe-support/
 ├── managers/
 │   └── IFrameManager.js          # Core management, registry & coordinate mapping
 ├── composables/
-│   └── useIFrameSupport.js       # Vue 3 composables (isTopFrame detection, etc.)
+│   ├── useIFrameSupport.js       # Vue 3 composables (isTopFrame detection, etc.)
+│   └── useIFrameSupportLazy.js   # Lazy-loaded iframe support
+├── IFrameSupportFactory.js       # Factory for creating iframe support instances
 ├── index.js                      # Entry point for feature discovery
 └── README.md                     # This file
 ```
@@ -27,7 +29,7 @@ src/features/iframe-support/
 ### Cross-Frame Coordination
 - **Event Synchronization**: Coordinated `ESC` key, `Revert`, and `Deactivation` across all frames.
 - **Smart Click Detection**: Clicks inside iframes correctly dismiss UI elements in the main frame.
-- **Progress Aggregation**: Hierarchical reporting where iframes send stats to the main frame for a unified FAB progress display.
+- **Progress Aggregation**: Hierarchical reporting where iframes send stats to the main frame for a unified FAB progress display (via `MainFrameAggregator.js`).
 
 ### Intelligent Viewport Translation
 - **Browser-Native Detection**: Leverages standard `IntersectionObserver` within iframes to detect visibility relative to the top-level viewport.
@@ -41,8 +43,8 @@ src/features/iframe-support/
 
 ### 1. Automatic Initialization
 The system is automatically handled by the manifest/background flow and the two entry points:
-- `content-main.js` (Top frame only, declarative content script)
-- `content-iframe.js` (Subframes only, injected programmatically after subframe DOM is ready)
+- `index-main.js` (Top frame only, declarative content script)
+- `index-iframe.js` (Subframes only, injected programmatically after subframe DOM is ready)
 
 ### 2. Vue Composable Usage (Standardized)
 

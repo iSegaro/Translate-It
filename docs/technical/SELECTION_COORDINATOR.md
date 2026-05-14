@@ -85,4 +85,3 @@ Both platforms now follow the exact same architectural pattern. A selection in a
 
 ---
 
-**Current Status**: Fully Implemented & Decoupled (March 2026)

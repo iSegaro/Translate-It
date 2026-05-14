@@ -1,8 +1,8 @@
-# Unified Messaging System - Practical Guide
+# Messaging System - Practical Guide
 
 The extension's messaging system has been **unified and simplified** using `UnifiedMessaging.js` with intelligent timeout management, replacing the complex Smart Messaging architecture. The system now provides direct `runtime.sendMessage` with action-specific timeouts for optimal performance while maintaining simplicity and reliability.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. In Vue Components
 
@@ -87,7 +87,7 @@ messageHandler.registerHandler(MessageActions.GET_PROVIDERS, async (message) => 
 messageHandler.listen()
 ```
 
-## ⚡ Unified Messaging Features
+## Unified Messaging Features
 
 ### Intelligent Timeout Management & Streaming Coordination
 
@@ -97,12 +97,12 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - `GET_SETTINGS`, `SET_SETTINGS` - 3000ms
 - `GET_SELECT_ELEMENT_STATE` - 2000ms
 - `SHOW_NOTIFICATION` - 2000ms
-- `OPEN_SIDEPANEL` - 3000ms
+- `OPEN_SIDE_PANEL` - 3000ms
 - UI and settings operations
 
-**Medium Actions** (12-15 second timeout):
-- `TRANSLATE`, `TRANSLATE_SELECTION` - 12000-15000ms
-- `TRANSLATE_TEXT` - 12000ms
+**Medium Actions** (2-minute timeout):
+- `TRANSLATE`, `TRANSLATE_SELECTION` - 120000ms (to allow for AI model latency)
+- `TRANSLATE_TEXT` - 120000ms
 - `TEST_PROVIDER` - 8000ms
 - Translation operations
 
@@ -113,7 +113,7 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - Media processing operations
 
 **Streaming Translation Support** (Select Element Mode):
-- **Smart Timeout Management**: Dynamic timeouts based on text size and segment count
+- **Smart Timeout Management**: Up to 300,000ms (5 minutes) for large content
 - **Progress Reporting**: Real-time streaming updates with UnifiedTranslationCoordinator
 - **Fallback Handling**: Graceful degradation from streaming to regular translation
 - **Context-Aware Routing**: Automatic detection of streaming vs. regular translation needs
@@ -160,7 +160,7 @@ const response = await sendMessage(message)
 const response = await sendMessage(message, { timeout: 10000 })
 ```
 
-## 📋 Message Actions
+## Message Actions
 
 All available actions in `MessageActions.js`:
 
@@ -181,12 +181,12 @@ MessageActions.TRANSLATION_STREAM_END       // Translation completion
 MessageActions.TRANSLATION_RESULT_UPDATE    // Final result delivery
 
 // TTS
-MessageActions.TTS_SPEAK
+MessageActions.GOOGLE_TTS_SPEAK
 MessageActions.TTS_STOP
 
 // Sidepanel
-MessageActions.OPEN_SIDEPANEL
-MessageActions.UPDATE_SIDEPANEL_STATE
+MessageActions.OPEN_SIDE_PANEL
+MessageActions.SELECTED_TEXT_FOR_SIDEPANEL
 
 // Coordination
 MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
@@ -228,7 +228,7 @@ MessageActions.CANCEL_TRANSLATION           // Cancel ongoing translations
 }
 ```
 
-## 🎯 Context Types
+## Context Types
 
 ```javascript
 MessagingContexts.POPUP      // popup.html
@@ -239,9 +239,9 @@ MessagingContexts.CONTENT    // content script
 MessagingContexts.OFFSCREEN  // offscreen document
 ```
 
-## 💡 Best Practices
+## Best Practices
 
-### ✅ Good Practices
+### Good Practices
 
 ```javascript
 // Use MessageFormat
@@ -259,7 +259,7 @@ if (message.context !== 'sidepanel') {
 }
 ```
 
-### ❌ Bad Practices
+### Bad Practices
 
 ```javascript
 // ❌ Manual message without MessageFormat
@@ -277,7 +277,7 @@ browser.runtime.onMessage.addListener((message) => {
 })
 ```
 
-## 🔍 Debugging
+## Debugging
 
 ### Enable Logging
 
@@ -296,7 +296,7 @@ logger.error('Message failed:', error)
 2. Go to Console
 3. Filter with `[Messaging]`
 
-## 🏗️ File Structure
+## File Structure
 
 ```
 src/shared/messaging/
@@ -317,10 +317,11 @@ src/shared/messaging/
 src/core/services/translation/
 ├── UnifiedTranslationService.js          # 🆕 Centralized translation coordination
 ├── TranslationRequestTracker.js          # 🆕 Request lifecycle management
-└── TranslationResultDispatcher.js         # 🆕 Intelligent result routing
+├── UnifiedResultDispatcher.js            # 🆕 Intelligent result routing
+└── UnifiedModeCoordinator.js             # 🆕 Mode-specific logic coordination
 ```
 
-## 🚨 Common Issues
+## Common Issues
 
 **Message not received?**
 - Check if message listener is properly registered
@@ -334,89 +335,6 @@ src/core/services/translation/
 **Performance issues?**
 - Don't send large data
 - Check for message loops
-
----
-
-## 🚀 Migration Guide
-
-### From SmartMessaging/ReliableMessaging to UnifiedMessaging
-
-**Old Code:**
-```javascript
-import { sendSmart } from '@/messaging/core/SmartMessaging.js'
-const response = await sendSmart(message)
-```
-
-**New Code:**
-```javascript
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
-const response = await sendMessage(message) // Automatic timeout management!
-```
-
-### MessageHandler Migration
-
-**Old Code:**
-```javascript
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Manual handling
-})
-```
-
-**New Code:**
-```javascript
-import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
-const messageHandler = createMessageHandler()
-messageHandler.registerHandler(action, handler)
-messageHandler.listen()
-```
-
-### Key Changes
-
-- **Eliminated race conditions**: Single unified messaging system
-- **Context-specific handlers**: No more listener conflicts
-- **Centralized error handling**: ExtensionContextManager integration
-- **Simplified API**: Direct sendMessage() with automatic timeouts
-- **Streaming coordination**: UnifiedTranslationCoordinator for large translation operations
-- **Smart timeout management**: Dynamic timeout calculation based on content complexity
-- **Content script integration**: Seamless integration layer for streaming responses
-
-### New Streaming Features
-
-```javascript
-// Automatic streaming detection and coordination
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
-
-// For Select Element mode with large content, streaming is automatically enabled
-const message = MessageFormat.create(
-  MessageActions.TRANSLATE,
-  { text: largeText, context: 'select-element' },
-  'content'
-)
-
-// UnifiedMessaging automatically routes through UnifiedTranslationCoordinator
-// if streaming conditions are met (context: 'select-element', text > 2000 chars)
-const response = await sendMessage(message)
-```
-
-### Integration Points
-
-```javascript
-// Content Script Integration for streaming responses
-import {
-  initializeContentScriptIntegration,
-  registerTranslation
-} from '@/shared/messaging/core/ContentScriptIntegration.js'
-
-// Initialize integration layer
-await initializeContentScriptIntegration()
-
-// Register for streaming responses
-registerTranslation(messageId, {
-  onStreamUpdate: (data) => console.log('Streaming update:', data),
-  onStreamEnd: (data) => console.log('Streaming completed:', data),
-  onError: (error) => console.error('Streaming error:', error)
-})
-```
 
 ---
 

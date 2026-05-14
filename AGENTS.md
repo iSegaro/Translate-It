@@ -17,7 +17,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **Vue.js Apps**: Three separate applications (Popup, Sidepanel, Options).
 - **Pinia Stores**: Reactive state management.
 - **Composables**: Reusable business logic.
-- **Unified TTS System**: A fully integrated TTS system with automatic language fallback and cross-context coordination.
+- **TTS System**: A fully integrated TTS system with automatic language fallback and cross-context coordination.
 - **Touch & Mobile Support**: A "Touch-First" ergonomic UI with a bottom sheet architecture, gesture support, and smart feature detection for touch-capable devices.
 - **Desktop FAB System**: A persistent floating action button with smart fading, vertical draggability, and integrated TTS/Selection controls.
 - **Windows Manager**: Event-driven UI management with Vue components and iframe support.
@@ -75,8 +75,8 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
 
 ### Feature-Based Organization
 - **`src/features/`**: Each feature is self-contained and independent.
-  - `translation/`: **Unified Translation Engine ** – coordination, request tracking, and delivery.
-  - `tts/`: **Unified TTS System** – `useTTSSmart.js` as the single source of truth.
+  - `translation/`: **Translation Engine ** – coordination, request tracking, and delivery.
+  - `tts/`: **TTS System** – `useTTSSmart.js` as the single source of truth.
   - `mobile/`: **Touch & Mobile Support** – Bottom sheet UI and touch logic.
   - `screen-capture/`: OCR and image translation.
   - `element-selection/`: **Redesigned Element Selection** – SelectionManager and services.
@@ -85,7 +85,7 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
   - `shortcuts/`: Keyboard shortcut handling.
   - `exclusion/`: Smart Handler Registration and ExclusionChecker.
   - `notifications/`: Centralized notification management.
-  - `text-actions/`: Unified copy/paste/TTS actions.
+  - `text-actions/`: Copy/Paste/TTS actions.
   - `windows/`: Event-driven UI management.
   - `iframe-support/`: Multi-context iframe support.
   - `history/`: Translation history and export logic.
@@ -104,33 +104,48 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
 Comprehensive documentation is available in the `docs/` folder:
 
 ### Core Documentation
-- **`docs/technical/ARCHITECTURE.md`**: Full project architecture.
-- **`docs/technical/LOGGING_SYSTEM.md`**: **Structured Logging** – Guide to the linear and production-aware system.
-- **`docs/technical/MessagingSystem.md`**: Unified Messaging System.
-- **`docs/technical/TRANSLATION_SYSTEM.md`**: Translation engine and providers.
-- **`docs/technical/PROVIDERS.md`**: Complete guide to implementing providers.
-- **`docs/technical/ERROR_MANAGEMENT_SYSTEM.md`**: Error management and context safety.
-- **`docs/technical/STORAGE_MANAGER.md`**: Storage management with caching.
-- **`docs/technical/MEMORY_GARBAGE_COLLECTOR.md`**: Advanced memory management.
-- **`docs/technical/PROXY_SYSTEM.md`**: Extension-only proxy system using Strategy Pattern.
+- [**ARCHITECTURE.md**](docs/technical/ARCHITECTURE.md): Full project architecture and system overview.
+- [**MessagingSystem.md**](docs/technical/MessagingSystem.md): **Messaging System** – Race-condition-free communication.
+- [**TRANSLATION_SYSTEM.md**](docs/technical/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
+- [**PROVIDERS.md**](docs/technical/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
+- [**ERROR_MANAGEMENT_SYSTEM.md**](docs/technical/ERROR_MANAGEMENT_SYSTEM.md): Centralized error management and context safety.
+- [**STORAGE_MANAGER.md**](docs/technical/STORAGE_MANAGER.md): **StorageCore Guide** – Unified storage API with caching.
+- [**LOGGING_SYSTEM.md**](docs/technical/LOGGING_SYSTEM.md): **Structured Logging** – Component-based levels and performance.
+- [**MEMORY_GARBAGE_COLLECTOR.md**](docs/technical/MEMORY_GARBAGE_COLLECTOR.md): **ResourceTracker** – Advanced memory management.
+- [**PROXY_SYSTEM.md**](docs/technical/PROXY_SYSTEM.md): Extension-only proxy system using Strategy Pattern.
+- [**TOAST_INTEGRATION_SYSTEM.md**](docs/technical/TOAST_INTEGRATION_SYSTEM.md): **Toast System** – Event-driven notifications and actions.
+- [**CSS_ARCHITECTURE.md**](docs/technical/CSS_ARCHITECTURE.md): Modern principled CSS and Shadow DOM isolation.
+- [**CSS_VARIABLES_GUIDE.md**](docs/technical/CSS_VARIABLES_GUIDE.md): Design tokens and safe SCSS variable functions.
+- [**COMPONENT_ADJACENT_SCSS.md**](docs/technical/COMPONENT_ADJACENT_SCSS.md): Rules for component-specific style management.
+- [**ELEMENT_DETECTION_SERVICE.md**](docs/technical/ELEMENT_DETECTION_SERVICE.md): Centralized element detection and caching.
+- [**LANGUAGE_DETECTION.md**](docs/technical/LANGUAGE_DETECTION.md): Hierarchical language and direction detection.
+- [**LOCALIZATION.md**](docs/technical/LOCALIZATION.md): Internationalization and locale management guide.
+- [**TESTING_STRATEGY.md**](docs/technical/TESTING_STRATEGY.md): Unit, integration, and UI testing guidelines.
+- [**STATS_MANAGER.md**](docs/technical/STATS_MANAGER.md): System for tracking usage statistics and analytics.
+- [**TRANSLATION_PROVIDER_LOGIC.md**](docs/technical/TRANSLATION_PROVIDER_LOGIC.md): Waterfall logic for provider selection.
 
 ### Feature Documentation
-- **`docs/technical/TOUCH_MOBILE_SUPPORT.md`**: **Touch & Mobile Support** – Touch-First UI and Bottom Sheet.
-- **`docs/technical/DESKTOP_FAB_SYSTEM.md`**: **Desktop FAB System** – Persistent floating button guide.
-- **`docs/technical/TTS_SYSTEM.md`**: Unified TTS System.
-- **`docs/technical/TEXT_SELECTION_SYSTEM.md`**: Modular Text Selection System.
-- **`docs/technical/TOAST_INTEGRATION_SYSTEM.md`**: Unified Notification System.
-- **`docs/technical/CSS_ARCHITECTURE.md`**: Modern CSS Architecture.
-- **`docs/technical/UI_HOST_SYSTEM.md`**: UI Host architecture.
-- **`docs/technical/SELECT_ELEMENT_SYSTEM.md`**: Redesigned Element Selection System.
-- **`docs/technical/SCREEN_CAPTURE_SYSTEM.md`**: **Screen Capture System** – Interactive area capture and Tesseract.js OCR engine.
+- [**MOBILE_SUPPORT.md**](docs/technical/MOBILE_SUPPORT.md): **Touch & Mobile Support** – Bottom Sheet and gestures.
+- [**DESKTOP_FAB_SYSTEM.md**](docs/technical/DESKTOP_FAB_SYSTEM.md): **Desktop FAB System** – Persistent floating action button.
+- [**TTS_SYSTEM.md**](docs/technical/TTS_SYSTEM.md): **TTS** – Stateful playback and cross-context controls.
+- [**TEXT_SELECTION_SYSTEM.md**](docs/technical/TEXT_SELECTION_SYSTEM.md): **Text Selection** – Site handlers and field interaction.
+- [**SELECT_ELEMENT_SYSTEM.md**](docs/technical/SELECT_ELEMENT_SYSTEM.md): **Element Selection** – Interactive DOM selection.
+- [**SCREEN_CAPTURE_SYSTEM.md**](docs/technical/SCREEN_CAPTURE_SYSTEM.md): **OCR System** – Interactive capture and Tesseract.js.
+- [**WHOLE_PAGE_TRANSLATION.md**](docs/technical/WHOLE_PAGE_TRANSLATION.md): **Page Translation** – Recursive batch processing.
+- [**TEXT_ACTIONS_SYSTEM.md**](docs/technical/TEXT_ACTIONS_SYSTEM.md): **Text Actions** – Copy/paste/TTS logic integration.
+- [**UI_HOST_SYSTEM.md**](docs/technical/UI_HOST_SYSTEM.md): **Shadow DOM Host** – Centralized in-page UI management.
+- [**WINDOWS_MANAGER_UI_HOST_INTEGRATION.md**](docs/technical/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md): **Facade Pattern** – Refactored window management.
+- [**SELECTION_COORDINATOR.md**](docs/technical/SELECTION_COORDINATOR.md): **Pub/Sub Model** – Events between UI managers.
+- [**SMART_HANDLER_REGISTRATION_SYSTEM.md**](docs/technical/SMART_HANDLER_REGISTRATION_SYSTEM.md): Feature lifecycle and exclusion logic.
+- [**OPTIONS_PAGE.md**](docs/technical/OPTIONS_PAGE.md): Configuration hub and settings application logic.
+- [**OPTIMIZATION_LEVELS.md**](docs/technical/OPTIMIZATION_LEVELS.md): Speed vs. Cost scaling strategies.
 
 ## Additional Resources
-- **`docs/Images/`**: Architectural images and diagrams.
-- **`docs/guides/Introduce.mp4`**: Introduction video.
-- **`docs/guides/HowToGet-APIKey.mp4`**: Guide for API configuration.
+- [**Images/**](docs/Images/): Architectural images and diagrams.
+- [**Introduce.mp4**](docs/guides/Introduce.mp4): Introduction video.
+- [**HowToGet-APIKey.mp4**](docs/guides/HowToGet-APIKey.mp4): Guide for API configuration.
 
-## Benefits of the New Architecture
+## Benefits
 
 ### Feature-Based Organization
 - **Self-Sufficiency**: Every feature holds all its relevant files in one place.
@@ -171,7 +186,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - **Actionable Notifications**: Interactive buttons for "cancel" and "action."
 - **Cross-Context Support**: Unified usage across all contexts and iframes.
 
-### Unified Translation Service
+### Translation Service
 - **Centralized Coordination**: All requests coordinated through `UnifiedTranslationService`.
 - **Duplicate Prevention**: `TranslationRequestTracker` prevents redundant processing.
 - **Intelligent Routing**: Results delivered based on translation mode (Field, Select Element, Standard).
@@ -192,4 +207,4 @@ Comprehensive documentation is available in the `docs/` folder:
 - **Touch-Optimized**: Native-like performance on touch devices.
 - **Modular Logging**: Components-based logging with production awareness.
 - **Advanced Memory Management**: ResourceTracker and Memory Garbage Collector with integrated Critical Protection System.
-- **Unified TTS System**: Full cross-context coordination and auto-language fallback.
+- **TTS System**: Full cross-context coordination and auto-language fallback.

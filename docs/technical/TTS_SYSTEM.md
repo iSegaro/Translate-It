@@ -174,4 +174,4 @@ Users can control the system through the **TTS Tab** in Options:
 - **Resolution**: Verify `dialectPriorities` in `TTSVoiceService.js`. If the preferred dialect (e.g., `en-us`) is not in the live voice list, the system falls back to the first alphabetical match.
 
 ---
-**Last Updated**: April 6, 2026
+**Last Updated**: April 2026

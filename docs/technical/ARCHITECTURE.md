@@ -2,38 +2,12 @@
 
 ## Overview
 
-**Modern Vue.js browser extension** for AI-powered translation supporting **Chrome and Firefox** with **Manifest V3**. Built with comprehensive modular architecture, advanced state management, and robust error handling.
+**Modern Vue.js browser extension** for AI-powered translation with comprehensive cross-platform support. Built with a modular architecture and advanced state management, it seamlessly operates across:
 
-## Current Status
-
-**Latest Optimizations:**
-- **Advanced Code Splitting** - Sophisticated bundle splitting with lazy loading for features, languages, and utilities
-- **Content Script Smart Loading** - Dynamic import architecture with feature categorization (CRITICAL, ESSENTIAL, ON_DEMAND, INTERACTIVE)
-- **Memory Usage Optimization** - Intelligent lazy loading and cleanup with significant memory reduction
-- **Language System Optimization** - Granular loading with specialized loaders for translation, TTS, and interface languages
-- **Utils Factory Integration** - Complete lazy loading system for utility modules
-- **Bundle Size Optimization** - Total package reduced to ~2.98MB (40% smaller than previous webpack build)
-- **Complete Vue.js Migration** - Modern reactive component architecture
-- **Modular System Design** - 18+ specialized modules and systems
-- **Advanced State Management** - Pinia stores with reactive data
-- **Comprehensive Error Handling** - Unified error management system
-- **Cross-Frame Communication** - Advanced iframe support
-- **IFrame Support System** - Streamlined iframe functionality with ResourceTracker integration
-- **Unified TTS System (2025)** - Complete TTS unification with automatic language fallback
-- **Selection Coordinator System (2026)** - Decoupled Pub/Sub architecture for multi-module selection awareness (Windows, FAB, TTS)
-- **Text Selection System (2025)** - Modular architecture with SiteHandlerRegistry
-- **Unified Translation Service (2025)** - Centralized translation coordination
-- **Storage Management** - Centralized storage with caching
-- **Logging System** - Production-ready structured logging
-- **Provider System** - 10+ translation providers with hierarchical factory pattern
-- **Cross-Browser Support** - Chrome and Firefox MV3
-- **UI Host System** - Centralized Vue app in Shadow DOM
-- **Unified Messaging System** - Race-condition-free messaging with intelligent timeouts
-- **Smart Handler Registration** - Feature-based exclusion with dynamic lifecycle
-- **Memory Garbage Collector** - Advanced memory management with Critical Protection
-- **Toast Integration System (2025)** - Vue Sonner integration with actionable notifications
-- **Modern CSS Architecture (2025)** - Grid layout with containment and safe variables
-- **Element Detection Service (2025)** - Centralized element detection with caching
+- **Browsers**: Full compatibility with **Chrome** and **Firefox** using **Manifest V3**.
+- **Platforms**: Robust support for **Desktop**, **Mobile (Android)**, and **ChromeOS**.
+- **Environments**: Optimized for both **Standard Desktop** and **Touch-First** interfaces.
+- **Architecture**: AI-powered core with 18+ specialized modules and robust error handling.
 
 ---
 
@@ -52,20 +26,28 @@
 - **[Proxy System](PROXY_SYSTEM.md)** - Extension-only proxy system with Strategy Pattern for accessing geo-restricted translation services
 - **[Toast Integration System](TOAST_INTEGRATION_SYSTEM.md)** - Comprehensive Vue Sonner toast integration with actionable notifications and event-driven architecture
 - **[CSS Architecture](CSS_ARCHITECTURE.md)** - Modern principled CSS with Grid layout, containment, safe variable functions, and future-proof SCSS patterns
+- **[CSS Variables Guide](CSS_VARIABLES_GUIDE.md)** - Comprehensive guide for using and extending CSS variables
+- **[Component-Adjacent SCSS](COMPONENT_ADJACENT_SCSS.md)** - Rules for managing component-specific styles
 - **[Element Detection Service](ELEMENT_DETECTION_SERVICE.md)** - Centralized element detection system with optimized DOM queries and caching
+- **[Language Detection](LANGUAGE_DETECTION.md)** - Hierarchical language and direction detection system with provider feedback loop
+- **[Localization](LOCALIZATION.md)** - Guide for internationalization and locale management
+- **[Stats Manager](STATS_MANAGER.md)** - System for tracking usage statistics and analytics
+- **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)** - Detailed waterfall logic for provider selection
 
 ### Feature-Specific Documentation
 - **[Smart Handler Registration System](SMART_HANDLER_REGISTRATION_SYSTEM.md)** - Dynamic feature lifecycle management with exclusion logic
 - **[Windows Manager Integration](WINDOWS_MANAGER_UI_HOST_INTEGRATION.md)** - Guide for the event-driven integration with the UI Host
 - **[Text Actions System](TEXT_ACTIONS_SYSTEM.md)** - Copy/paste/TTS functionality with Vue integration
 - **[TTS System](TTS_SYSTEM.md)** - Advanced Text-to-Speech with stateful Play/Pause/Resume controls
-- **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - **Modular Architecture (2025)** - Static import system, site handler registry, professional editor support with drag detection
-- **[Selection Coordinator](SELECTION_COORDINATOR.md)** - **Decoupled Architecture (2026)** - Pub/Sub model for selection events between managers (Windows, FAB, TTS)
+- **[Text Selection System](TEXT_SELECTION_SYSTEM.md)** - Static import system, site handler registry, professional editor support with drag detection
+- **[Selection Coordinator](SELECTION_COORDINATOR.md)** - Pub/Sub model for selection events between managers (Windows, FAB, TTS)
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
+- **[Whole Page Translation System](WHOLE_PAGE_TRANSLATION.md)** - Recursive translation of web pages with dynamic batching
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[Screen Capture System](SCREEN_CAPTURE_SYSTEM.md)** - Interactive area capture with Tesseract.js OCR engine
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
-- **[IFrame Support System](../features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
+- **[Optimization Levels](OPTIMIZATION_LEVELS.md)** - Strategy for balancing speed vs. cost in translations
+- **[IFrame Support System](../../src/features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
 - **[Mobile Support System](MOBILE_SUPPORT.md)** - Centralized Bottom Sheet architecture for mobile browsers with gesture support
 - **[Desktop FAB System](DESKTOP_FAB_SYSTEM.md)** - Floating action menu for quick access to translation features on desktop
 
@@ -81,9 +63,8 @@
 3. **Translation Features**: [Translation System](TRANSLATION_SYSTEM.md) → [Provider Implementation Guide](PROVIDERS.md)
 4. **Provider Development**: [Provider Implementation Guide](PROVIDERS.md) → [Provider System](#-provider-system)
 5. **UI Development**: [Windows Manager](WINDOWS_MANAGER.md) → [Text Actions](TEXT_ACTIONS_SYSTEM.md)
-6. **IFrame Integration**: [IFrame Support System](../features/iframe-support/README.md) → [Cross-Frame Communication](#-smart-messaging-system)
-7. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
-8. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
+6. **Error Handling**: [Error Management](ERROR_MANAGEMENT_SYSTEM.md) → [Logging System](LOGGING_SYSTEM.md)
+7. **Storage Operations**: [Storage Manager](STORAGE_MANAGER.md)
 
 ---
 
@@ -122,7 +103,7 @@
 │                   CONTENT LAYER                                │
 │  Content Scripts → Smart Feature Management → UI Host System   │
 │  Feature-Based Registration → Dynamic Handler Lifecycle        │
-│  Principled Text Selection (2025) → Element Selection → Text Field Icons → Context Integration → Toast Notifications │
+│  Principled Text Selection → Element Selection → Text Field Icons → Context Integration → Toast Notifications │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -132,252 +113,194 @@
 
 ```
 src/
-├── apps/                     # Vue Applications (Entry Points)
-│   ├── popup/                  # PopupApp.vue + components
+├── apps/                           # Vue Applications (Entry Points)
+│   ├── popup/                      # PopupApp.vue + components
 │   │   ├── PopupApp.vue            # Main popup application
 │   │   └── components/             # Popup-specific components
-│   ├── sidepanel/              # SidepanelApp.vue + components  
+│   ├── sidepanel/                  # SidepanelApp.vue + components  
 │   │   ├── SidepanelApp.vue        # Main sidepanel application
 │   │   ├── SidepanelLayout.vue     # Layout wrapper
 │   │   └── components/             # Sidepanel components
-│   ├── options/                # OptionsApp.vue + tabs
+│   ├── options/                    # OptionsApp.vue + tabs
 │   │   ├── OptionsApp.vue          # Main options application
 │   │   ├── OptionsLayout.vue       # Layout wrapper
 │   │   ├── OptionsSidebar.vue      # Options sidebar
 │   │   ├── About.vue               # About page
 │   │   ├── components/             # Options components
 │   │   └── tabs/                   # Configuration tabs
-│   └── content/                # ContentApp.vue (UI Host)
+│   └── content/                    # ContentApp.vue (UI Host)
 │       └── components/             # Content UI components
 │
-├── 🧩 components/              # Vue Components (Preserved Structure)
-│   ├── base/                   # Base UI components
-│   ├── shared/                 # Shared components
+├── components/                     # Vue Components (Preserved Structure)
+│   ├── base/                       # Base UI components
+│   ├── shared/                     # Shared components
 │   │   ├── LanguageSelector.vue    # Language selection
 │   │   ├── ProviderSelector.vue    # Provider selection
 │   │   ├── TranslationDisplay.vue  # Translation display
 │   │   ├── TranslationInputField.vue # Input field
 │   │   ├── UnifiedTranslationInput.vue # Unified input
 │   │   └── TTSButton.vue           # TTS controls
-│   ├── feature/                # Feature-specific components
+│   ├── feature/                    # Feature-specific components
 │   │   └── api-settings/           # API configuration
-│   ├── layout/                 # Layout components
-│   ├── popup/                  # Popup components
-│   ├── sidepanel/              # Sidepanel components  
-│   └── content/                # Content script components
+│   ├── layout/                     # Layout components
+│   ├── popup/                      # Popup components
+│   └── content/                    # Content script components
 │
-├── 🎨 composables/             # Vue Composables (Reorganized)
-│   ├── core/                  # useExtensionAPI, useBrowserAPI
+├── composables/                    # Vue Composables (Reorganized)
+│   ├── core/                       # useExtensionAPI, useBrowserAPI
 │   │   ├── useDirectMessage.js     # Direct messaging
 │   │   └── useExtensionAPI.js      # Extension API wrapper
-│   ├── ui/                    # useUI, usePopupResize  
+│   ├── ui/                         # useUI, usePopupResize  
 │   │   ├── usePopupResize.js       # Popup resizing
 │   │   └── useUI.js                # UI state management
-│   ├── storage/               # useStorage, useStorageItem
-│   └── shared/                # Other shared composables
+│   └── shared/                     # Other shared composables
 │       ├── useClipboard.js         # Clipboard operations
 │       ├── useErrorHandler.js      # Error handling
 │       ├── useI18n.js              # Internationalization
 │       ├── useLanguages.js         # Language management
 │       └── useUnifiedI18n.js       # Unified i18n
 │
-├── 🏪 features/               # Feature-Based Organization (NEW)
+├── features/                       # Feature-Based Organization
 │   ├── translation/
-│   │   ├── core/              # TranslationEngine, ProviderFactory, StreamingManager
+│   │   ├── core/                   # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
-│   │   ├── handlers/          # handleTranslate.js, handleTranslationResult.js
-│   │   ├── stores/            # translation.js store
-│   │   ├── composables/       # useTranslation, useTranslationModes
-│   │   ├── providers/         # BaseProvider, BaseTranslateProvider, BaseAIProvider, Google, OpenAI, DeepSeek, etc.
-│   │   ├── services/          # UnifiedTranslationService integration (moved to core/services)
-│   │   └── utils/             # Translation utilities
-│   ├── tts/                   # UNIFIED TTS SYSTEM (2025)
-│   │   ├── handlers/          # TTS background handlers
-│   │   ├── composables/       # useTTSSmart.js - SINGLE SOURCE OF TRUTH
-│   │   └── core/              # TTSGlobalManager - exclusive playback coordination
+│   │   ├── handlers/               # handleTranslate.js, handleTranslationResult.js
+│   │   ├── stores/                 # translation.js store
+│   │   ├── composables/            # useTranslation, useTranslationModes
+│   │   ├── providers/              # Provider system (see below)
+│   │   │   ├── ProviderFactory.js  # Provider factory
+│   │   │   ├── ProviderRegistry.js # Provider registration
+│   │   │   ├── BaseProvider.js     # Base provider class
+│   │   │   └── implementations/    # Google, OpenAI, DeepSeek, etc.
+│   │   ├── services/               # Unified Translation Service integration
+│   │   └── utils/                  # Translation utilities
+│   ├── tts/                        # UNIFIED TTS SYSTEM
+│   │   ├── handlers/               # TTS background handlers
+│   │   ├── composables/            # useTTSSmart.js - SINGLE SOURCE OF TRUTH
+│   │   └── core/                   # TTSGlobalManager - exclusive playback coordination
 │   ├── screen-capture/
-│   │   ├── handlers/          # Background capture handlers
-│   │   ├── stores/            # capture.js store
-│   │   ├── composables/       # useScreenCapture
-│   │   ├── managers/          # Capture managers
-│   │   └── utils/             # Image processing
+│   │   ├── handlers/               # Background capture handlers
+│   │   ├── stores/                 # capture.js store
+│   │   ├── composables/            # useScreenCapture
+│   │   ├── managers/               # Capture managers
+│   │   └── utils/                  # Image processing
 │   ├── element-selection/
-│   │   ├── managers/          # SelectElementManager
-│   │   ├── handlers/          # SelectElementHandler
-│   │   └── utils/             # Selection utilities
+│   │   ├── managers/               # SelectElementManager
+│   │   ├── handlers/               # SelectElementHandler
+│   │   └── utils/                  # Selection utilities
 │   ├── text-selection/
-│   │   └── handlers/          # TextSelectionHandler
+│   │   └── handlers/               # TextSelectionHandler
 │   ├── text-field-interaction/
-│   │   ├── managers/          # TextFieldIconManager
-│   │   └── handlers/          # TextFieldIconHandler
+│   │   ├── managers/               # TextFieldIconManager
+│   │   └── handlers/               # TextFieldIconHandler
 │   ├── shortcuts/
-│   │   └── handlers/          # ShortcutHandler
+│   │   └── handlers/               # ShortcutHandler
 │   ├── exclusion/
-│   │   ├── core/              # ExclusionChecker
-│   │   └── composables/       # useExclusionChecker
+│   │   ├── core/                   # ExclusionChecker
+│   │   └── composables/            # useExclusionChecker
 │   ├── text-actions/
-│   │   ├── composables/       # useCopyAction, usePasteAction
-│   │   └── components/        # ActionToolbar, CopyButton
+│   │   ├── composables/            # useCopyAction, usePasteAction
+│   │   └── components/             # ActionToolbar, CopyButton
 │   ├── windows/
-│   │   ├── managers/          # WindowsManager (business logic)
-│   │   ├── handlers/          # WindowsManagerHandler
-│   │   ├── components/        # TranslationWindow
-│   │   ├── composables/       # useWindowsManager
-│   │   └── managers/          # Position, animation, theme managers
+│   │   ├── managers/               # WindowsManager (business logic)
+│   │   ├── handlers/               # WindowsManagerHandler
+│   │   ├── components/             # TranslationWindow
+│   │   ├── composables/            # useWindowsManager
+│   │   └── managers/               # Position, animation, theme managers
 │   ├── iframe-support/
-│   │   ├── managers/          # IFrameManager (core functionality)
-│   │   ├── composables/       # useIFrameSupport, useIFrameDetection (simplified)
-│   │   └── README.md          # Streamlined documentation
-│   ├── notifications/           # Toast Integration System (2025)
-│   │   ├── NotificationSystem.js    # Main notification manager
+│   │   ├── managers/               # IFrameManager (core functionality)
+│   │   ├── composables/            # useIFrameSupport, useIFrameDetection (simplified)
+│   │   └── README.md               # Streamlined documentation
+│   ├── notifications/              # Toast Integration System
+│   │   ├── NotificationSystem.js   # Main notification manager
 │   │   ├── handlers/               # Event handlers
 │   │   ├── types/                  # Notification types
 │   │   └── index.js                # Notification exports
 │   ├── history/
-│   │   ├── stores/            # history.js store
-│   │   ├── composables/       # useHistory
-│   │   ├── components/        # History components
-│   │   └── storage/           # History storage logic
+│   │   ├── stores/                 # history.js store
+│   │   ├── composables/            # useHistory
+│   │   ├── components/             # History components
+│   │   └── storage/                # History storage logic
 │   └── settings/
-│       ├── stores/            # settings.js store
-│       ├── composables/       # Settings composables
-│       └── storage/           # Settings storage
+│       ├── stores/                 # settings.js store
+│       ├── composables/            # Settings composables
+│       └── storage/                # Settings storage
 │
-├── 🔧 shared/                 # Shared Systems (Moved from top-level)
-│   ├── messaging/             # Smart messaging system
-│   │   ├── core/              # MessagingCore, SmartMessaging
-│   │   ├── composables/       # useMessaging
-│   │   └── toast/                 # Toast Integration System (2025)
+├── shared/                         # Shared Systems (Moved from top-level)
+│   ├── messaging/                  # Unified Messaging system
+│   │   ├── core/                   # MessagingCore, UnifiedMessaging, MessageHandler
+│   │   ├── composables/            # useMessaging
+│   │   └── toast/                  # Toast Integration System
 │   │       ├── ToastIntegration.js # Main toast controller
 │   │       ├── ToastEventHandler.js # Event interception
 │   │       ├── ToastElementDetector.js # Element detection
-│   │       ├── constants.js       # Toast configuration
+│   │       ├── constants.js        # Toast configuration
 │   │       └── index.js            # Toast exports
-│   ├── storage/               # Storage management
-│   │   ├── core/              # StorageCore, SecureStorage
-│   │   └── composables/       # useStorage, useStorageItem
-│   ├── error-management/      # Error handling
-│   │   ├── ErrorHandler.js    # Main error handler
-│   │   ├── ErrorMatcher.js    # Error matching
-│   │   └── ErrorMessages.js   # Error messages
-│   ├── logging/               # Logging system
-│   │   ├── logger.js          # Main logger
-│   │   └── logConstants.js    # Log constants
-│   ├── services/              # Shared Services
+│   ├── storage/                    # Storage management
+│   │   ├── core/                   # StorageCore, SecureStorage
+│   │   └── composables/            # useStorage, useStorageItem
+│   ├── error-management/           # Error handling
+│   │   ├── ErrorHandler.js         # Main error handler
+│   │   ├── ErrorMatcher.js         # Error matching
+│   │   └── ErrorMessages.js        # Error messages
+│   ├── logging/                    # Logging system
+│   │   ├── logger.js               # Main logger
+│   │   └── logConstants.js         # Log constants
+│   ├── services/                   # Shared Services
 │   │   ├── ElementDetectionConfig.js # Centralized selector configuration
 │   │   └── ElementDetectionService.js # Optimized element detection with caching
-│   └── config/                # Configuration
-│       └── config.js          # Application config
+│   └── config/                     # Configuration
+│       └── config.js               # Application config
 │
-├── 🏗️ core/                  # Core Infrastructure
-│   ├── background/            # Service worker & lifecycle
-│   │   ├── index.js           # Background entry point
-│   │   ├── feature-loader.js  # Feature loading
-│   │   ├── handlers/          # Background message handlers
-│   │   └── listeners/         # Event listeners
-│   ├── content-scripts/       # Content script entry (Smart Loading)
-│   ├── services/              # Core Services (NEW)
-│   │   └── translation/       # Unified Translation Service (2025)
+├── core/                           # Core Infrastructure
+│   ├── background/                 # Service worker & lifecycle
+│   │   ├── index.js                # Background entry point
+│   │   ├── feature-loader.js       # Feature loading
+│   │   ├── handlers/               # Background message handlers
+│   │   └── listeners/              # Event listeners
+│   ├── content-scripts/            # Content script entry (Smart Loading)
+│   │   ├── index-main.js           # Main content script
+│   │   ├── index-iframe.js         # IFrame content script
+│   │   ├── ContentScriptCore.js    # Core loading logic
+│   │   └── chunks/                 # Lazy-loaded feature chunks
+│   ├── services/                   # Core Services
+│   │   └── translation/            # Unified Translation Service
 │   │       ├── UnifiedTranslationService.js     # Central translation coordinator
 │   │       ├── TranslationRequestTracker.js     # Request lifecycle management
 │   │       └── TranslationResultDispatcher.js   # Intelligent result routing
-│   ├── memory/                # Memory Garbage Collector System with Critical Protection
-│   │   ├── MemoryManager.js   # Core memory management with critical resource support
-│   │   ├── ResourceTracker.js # Resource tracking mixin with critical protection
-│   │   ├── SmartCache.js      # TTL-based caching
-│   │   ├── GlobalCleanup.js   # Lifecycle cleanup hooks
-│   │   ├── MemoryMonitor.js   # Memory usage monitoring
-│   │   └── index.js           # Module exports
-│   ├── managers/              # Core managers
-│   │   ├── core/              # LifecycleManager
-│   │   ├── content/           # FeatureManager, TextSelectionManager
-│   │   └── browser-specific/  # Browser-specific managers
-│   ├── helpers.js             # Core helper functions
-│   ├── validation.js          # Data validation
-│   ├── extensionContext.js    # Extension context management
-│   └── tabPermissions.js      # Tab permissions
+│   ├── memory/                     # Memory Garbage Collector System with Critical Protection
+│   │   ├── MemoryManager.js        # Core memory management with critical resource support
+│   │   ├── ResourceTracker.js      # Resource tracking mixin with critical protection
+│   │   ├── SmartCache.js           # TTL-based caching
+│   │   ├── GlobalCleanup.js        # Lifecycle cleanup hooks
+│   │   ├── MemoryMonitor.js        # Memory usage monitoring
+│   │   └── index.js                # Module exports
+│   ├── managers/                   # Core managers
+│   │   ├── core/                   # LifecycleManager
+│   │   ├── content/                # FeatureManager, TextSelectionManager
+│   │   ├── browser-specific/       # Browser-specific managers
+│   │   └── context-menu.js         # Context menu management
+│   ├── helpers.js                  # Core helper functions
+│   ├── validation.js               # Data validation
+│   ├── extensionContext.js         # Extension context management
+│   └── tabPermissions.js           # Tab permissions
 │
-├── 🛠️ utils/                 # Pure Utilities (Simplified)
-│   ├── browser/               # Browser compatibility
-│   ├── text/                  # Text processing utilities
-│   │   ├── core/              # Modern text processing (2025)
-│   │   │   ├── FieldDetector.js    # Modern field detection
-│   │   │   ├── SelectionDetector.js # Modern selection detection
-│   │   │   └── types.js            # Shared types and interfaces
-│   │   ├── registry/          # Site Handler Registry (2025)
-│   │   │   └── SiteHandlerRegistry.js # Handler management
-│   │   ├── sites/             # Site-specific handlers (2025)
-│   │   │   ├── base/               # Base handler classes
-│   │   │   │   ├── BaseSiteHandler.js    # Abstract base
-│   │   │   │   ├── GoogleSuiteHandler.js # Google Docs/Slides
-│   │   │   │   └── MicrosoftOfficeHandler.js # MS Office
-│   │   │   ├── ZohoWriterHandler.js    # Zoho Writer support
-│   │   │   ├── WPSHandler.js           # WPS Office support
-│   │   │   └── NotionHandler.js        # Notion workspace support
-│   │   ├── FieldDetector.js   # Legacy wrapper (backward compatibility)
-│   │   ├── SelectionDetector.js # Legacy wrapper (backward compatibility)
-│   │   ├── detection.js       # Text detection
-│   │   ├── extraction.js      # Text extraction
-│   │   ├── markdown.js        # Markdown processing
-│   │   └── textDetection.js   # Text detection utilities
-│   ├── ui/                    # UI utilities
-│   │   └── html-sanitizer.js  # HTML sanitization
-│   ├── i18n/                  # Internationalization utils
-│   ├── framework/             # Framework compatibility
-│   └── rendering/             # Rendering utilities
-│   │   ├── common/                 # Common operations
-│   │   └── index.js                # Handler registry
-│   └── listeners/          # Event listeners
-│       └── onContextMenuClicked.js # Context menu events
+├── utils/                          # Pure Utilities (Simplified)
+│   ├── browser/                    # Browser compatibility
+│   ├── dom/                        # DOM utilities
+│   ├── text/                       # Text processing utilities
+│   ├── ui/                         # UI utilities
+│   ├── i18n/                       # Internationalization utils
+│   ├── rendering/                  # Rendering utilities
+│   └── UtilsFactory.js             # Lazy loading utility factory
 │
-├── 🏭 providers/           # Translation provider system
-│   ├── core/
-│   │   ├── ProviderFactory.js      # Provider factory
-│   │   ├── ProviderRegistry.js     # Provider registration
-│   │   └── BaseProvider.js         # Base provider class
-│   ├── implementations/    # Provider implementations
-│   │   ├── google/                 # Google services
-│   │   │   ├── GoogleTranslate.js  # Google Translate
-│   │   │   └── GoogleGemini.js     # Google Gemini
-│   │   ├── openai/                 # OpenAI services
-│   │   │   ├── OpenAI.js           # OpenAI provider
-│   │   │   └── OpenRouter.js       # OpenRouter provider
-│   │   ├── microsoft/              # Microsoft services
-│   │   │   └── BingTranslate.js    # Bing Translate
-│   │   ├── browser/                # Browser APIs
-│   │   │   └── BrowserAPI.js       # Native browser translation
-│   │   └── custom/                 # Custom providers
-│   │       ├── DeepSeek.js         # DeepSeek provider
-│   │       ├── WebAI.js            # WebAI provider
-│   │       ├── YandexTranslate.js  # Yandex provider
-│   │       └── CustomProvider.js   # Generic custom provider
-│   ├── register-providers.js       # Provider registration
-│   └── index.js                    # Provider exports
-│
-├── 📄 content-scripts/       # Content scripts (Smart Loading)
-│   ├── index.js              # Main entry with smart loading
-│   ├── ContentScriptCore.js  # Core loading logic
-│   └── chunks/               # Lazy-loaded feature chunks
-│       ├── lazy-vue-app.js
-│       ├── lazy-features.js
-│       ├── lazy-text-selection.js
-│       ├── lazy-windows-manager.js
-│       └── lazy-text-field-icon.js
-│
-├── 🎨 assets/              # Static assets
-│   ├── icons/              # Application icons
-│   └── styles/             # Global styles
-│       ├── global.scss             # Global styles
-│       ├── variables.scss          # CSS variables
-│       └── _api-settings-common.scss # API settings styles
-│
-└── 🔧 managers/            # System managers
-    ├── core/
-    │   └── LifecycleManager.js     # Central message router
-    ├── content/select-element/
-    │           └── SelectElementManager.js # Element selection manager
-    └── browser-specific/   # Browser-specific implementations
-        └── tts/                    # TTS implementations
+└── assets/                         # Static assets
+    ├── icons/                      # Application icons
+    ├── fonts/                      # Extension fonts
+    └── styles/                     # Global styles
+        ├── global.scss             # Global styles
+        ├── variables.scss          # CSS variables
+        └── _api-settings-common.scss # API settings styles
 ```
 
 ---
@@ -389,35 +312,38 @@ The content script implements an intelligent, interaction-based loading system t
 
 **Loading Strategy**:
 ```
-Content Script Entry (index.js)
+Content Script Entry (index-main.js)
     ↓ (Ultra-minimal footprint - ~5KB)
 ContentScriptCore (Dynamic Import)
-    ↓ (Smart categorization)
+    ↓ (Smart categorization via MainFeatureLoader)
 Feature Categories:
     ├── CRITICAL: [messaging, extensionContext] - Load immediately
-    ├── ESSENTIAL: [textSelection, windowsManager, vue] - Load after 500ms
-    ├── INTERACTIVE: [] - Load on user interaction
-    └── ON_DEMAND: [shortcut, textFieldIcon] - Load after 2s or on demand
+    ├── ESSENTIAL: [contentMessageHandler] - Load after 400ms
+    ├── LAZY_UI: [vue, textSelection] - Load after 2.5s or on demand
+    ├── INTERACTIVE: [windowsManager, selectElement, pageTranslation, screenCapture] - Load on user interaction
+    └── ON_DEMAND: [shortcut, textFieldIcon] - Load after 4s or on demand
 ```
 
 **Smart Loading Features**:
 - **Feature Categorization**: Features grouped by priority and loading strategy
-- **Interaction Detection**: Monitors user actions to trigger preloading
-- **Dynamic Imports**: Code splitting with lazy-loaded chunks
-- **Memory Optimization**: 20-30% memory reduction through selective loading
-- **Performance**: Minimal initial footprint with on-demand expansion
+- **Interaction Detection**: Monitors user actions via `InteractionCoordinator` to trigger preloading
+- **Dynamic Imports**: Code splitting with lazy-loaded chunks via `lazy-features.js`
+- **Memory Optimization**: Significant memory reduction through selective loading
+- **Idle Deadline Loading**: Uses `requestIdleCallback` for lower priority categories (`LAZY_UI`, `ON_DEMAND`)
 
 **Key Components**:
-- **index.js**: Ultra-minimal entry point with smart loading logic
-- **ContentScriptCore.js**: Core loading management system
-- **Lazy Chunks**: Dynamically loaded feature modules
-- **Smart Listeners**: Event-based feature activation
+- **index-main.js**: Ultra-minimal entry point with initial architecture loading
+- **ContentScriptCore.js**: Core instance managing base infrastructure
+- **MainFeatureLoader.js**: The brain coordinating prioritized loading stages
+- **InteractionCoordinator.js**: Gatekeeper monitoring user events for interactive triggers
+- **lazy-features.js**: Actual dynamic import executor and feature registry
 
 **Loading Flow**:
-1. **Critical Phase**: Load core infrastructure immediately
-2. **Essential Phase**: Load core translation features after 500ms
-3. **Interactive Phase**: Load features on user interaction detection
-4. **On-Demand Phase**: Load optional features after 2s or when needed
+1. **Critical Phase**: Load core infrastructure (Messaging, Context) immediately
+2. **Essential Phase**: Load core communication handlers after 400ms
+3. **Lazy UI Phase**: Load Vue and selection detection after 2.5s (uses Idle Deadline)
+4. **Interactive Phase**: Load heavy features (Windows, Selection, Screen Capture) on user interaction
+5. **On-Demand Phase**: Load optional features (Shortcuts, Icons) after 4s (uses Idle Deadline)
 
 ---
 
@@ -461,7 +387,7 @@ The project has undergone significant performance improvements through advanced 
 
 ## Shared Systems Architecture
 
-### Toast Integration System (2025)
+### Toast Integration System
 Comprehensive toast notification system providing **event-driven, actionable notifications** with Vue Sonner integration. See **[Toast Integration System Documentation](TOAST_INTEGRATION_SYSTEM.md)** for complete details.
 
 **Architecture**:
@@ -675,7 +601,7 @@ const handleStreamingTranslation = async (message) => {
 
 ---
 
-## Unified Translation Service (2025)
+## Unified Translation Service
 
 ### Overview
 The **Unified Translation Service** is the central coordination system for all translation operations in the extension. It provides **centralized coordination**, **duplicate prevention**, and **intelligent result routing** while maintaining **comprehensive lifecycle management** for all translation requests.
@@ -860,11 +786,11 @@ export class FeatureLoader {
     
     if (hasOffscreen) {
       // Chrome: Use offscreen documents
-      const { OffscreenTTSManager } = await import("@/managers/browser-specific/tts/TTSChrome.js")
+      const { OffscreenTTSManager } = await import("@/core/managers/browser-specific/tts/TTSChrome.js")
       return new OffscreenTTSManager()
     } else {
       // Firefox: Use background page audio
-      const { BackgroundTTSManager } = await import("@/managers/browser-specific/tts/TTSFirefox.js")
+      const { BackgroundTTSManager } = await import("@/core/managers/browser-specific/tts/TTSFirefox.js")
       return new BackgroundTTSManager()
     }
   }
@@ -877,7 +803,7 @@ export class FeatureLoader {
 
 ### Factory Pattern
 ```javascript
-import { ProviderFactory } from '@/providers/core/ProviderFactory.js'
+import { ProviderFactory } from '@/features/translation/providers/ProviderFactory.js'
 
 const provider = ProviderFactory.create('openai', config)
 const result = await provider.translate(text, options)
@@ -915,7 +841,7 @@ The extension uses Pinia for reactive state management across all Vue applicatio
 **Core Stores:**
 ```javascript
 // Global settings store
-import { useSettingsStore } from '@/store/core/settings.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 const settings = useSettingsStore()
 await settings.updateProvider('openai')
@@ -925,20 +851,14 @@ await settings.saveApiKey('OPENAI_API_KEY', 'sk-...')
 **Feature-Specific Stores:**
 ```javascript
 // Translation state
-import { useTranslationStore } from '@/store/modules/translation.js'
+import { useTranslationStore } from '@/features/translation/stores/translation.js'
 const translation = useTranslationStore()
 translation.setResult(translatedText)
 
 // History management
-import { useHistoryStore } from '@/store/modules/history.js'
+import { useHistoryStore } from '@/features/history/stores/history.js'
 const history = useHistoryStore()
 await history.addEntry(originalText, translatedText)
-
-// TTS state
-import { useTTSStore } from '@/store/modules/tts.js'
-const tts = useTTSStore()
-await tts.speak(text, language)
-
 
 // Provider management
 import { useProvidersStore } from '@/store/modules/providers.js'
@@ -1005,25 +925,22 @@ The extension follows a consistent pattern for integrating Vue components with b
 </template>
 
 <script setup>
-import { useTranslationModes } from '@/composables/useTranslationModes.js'
-import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
-import { useSettingsStore } from '@/store/core/settings.js'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 // Reactive state management
 const settings = useSettingsStore()
-const { triggerTranslation, isTranslating, translationResult } = usePopupTranslation()
+const { triggerTranslation, isTranslating, translatedText: translationResult } = useUnifiedTranslation('popup')
 const { handleError } = useErrorHandler()
 
 // Translation logic
 const handleTranslate = async () => {
   try {
-    await triggerTranslation({
-      text: inputText.value,
-      sourceLang: settings.SOURCE_LANG,
-      targetLang: settings.TARGET_LANG,
-      provider: settings.PROVIDER
-    })
+    await triggerTranslation(
+      settings.SOURCE_LANG,
+      settings.TARGET_LANG
+    )
   } catch (error) {
     await handleError(error, { context: 'translation-box' })
   }
@@ -1035,7 +952,7 @@ const handleTranslate = async () => {
 ```
 Vue Component
     ↓ (composable)
-Composable Logic (usePopupTranslation)
+Composable Logic (useUnifiedTranslation)
     ↓ (useMessaging)
 Messaging System (MessageFormat.create)
     ↓ (browser.runtime.sendMessage)
@@ -1055,7 +972,7 @@ All systems integrate with the centralized error management:
 
 ```javascript
 // In any component or composable
-import { useErrorHandler } from '@/composables/useErrorHandler.js'
+import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
 const { handleError } = useErrorHandler()
@@ -1261,9 +1178,9 @@ export const useTranslationStore = defineStore('translation', {
 ## Essential Files
 
 ### Vue Application Entry Points
-- `src/views/popup/PopupApp.vue` - Main popup application
-- `src/views/sidepanel/SidepanelApp.vue` - Sidepanel application
-- `src/views/options/OptionsApp.vue` - Options page application
+- `src/apps/popup/PopupApp.vue` - Main popup application
+- `src/apps/sidepanel/SidepanelApp.vue` - Sidepanel application
+- `src/apps/options/OptionsApp.vue` - Options page application
 
 ### Core System Files
 - `src/shared/messaging/core/UnifiedMessaging.js` - Core messaging with timeout management
@@ -1271,11 +1188,11 @@ export const useTranslationStore = defineStore('translation', {
 - `src/shared/messaging/core/MessageActions.js` - Message type definitions
 - `src/shared/messaging/core/MessageFormat.js` - Message format utilities
 - `src/shared/messaging/composables/useMessaging.js` - Vue messaging integration
-- `src/background/index.js` - Background service worker entry
-- `src/background/feature-loader.js` - Feature loading system
-- `src/managers/core/LifecycleManager.js` - Central message router
+- `src/core/background/index.js` - Background service worker entry
+- `src/core/background/feature-loader.js` - Feature loading system
+- `src/core/managers/core/LifecycleManager.js` - Central message router
 
-### Unified Translation Service (2025)
+### Unified Translation Service
 - `src/core/services/translation/UnifiedTranslationService.js` - Central translation coordinator
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
 - `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
@@ -1283,25 +1200,24 @@ export const useTranslationStore = defineStore('translation', {
 - `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
 
 ### Provider System
-- `src/providers/core/ProviderFactory.js` - Provider factory and management
-- `src/providers/core/BaseProvider.js` - Base provider interface
-- `src/providers/implementations/` - All translation provider implementations
+- `src/features/translation/providers/ProviderFactory.js` - Provider factory and management
+- `src/features/translation/providers/BaseProvider.js` - Base provider interface
+- `src/features/translation/providers/` - All translation provider implementations
 
 ### State Management
 - `src/store/core/settings.js` - Global settings store
 - `src/store/modules/translation.js` - Translation state management
-- `src/utils/core/StorageManager.js` - Centralized storage system
+- `src/shared/storage/core/StorageCore.js` - Centralized storage system
 
 ### Core Systems
-- `src/utils/core/logger.js` - Unified logging system
-- `src/utils/core/extensionContext.js` - Extension context management
-- `src/error-management/ErrorHandler.js` - Centralized error handling
+- `src/shared/logging/logger.js` - Unified logging system
+- `src/core/extensionContext.js` - Extension context management
+- `src/shared/error-management/ErrorHandler.js` - Centralized error handling
 
 ### Key Composables
-- `src/composables/usePopupTranslation.js` - Popup translation logic
-- `src/composables/useSidepanelTranslation.js` - Sidepanel translation logic
-- `src/composables/useErrorHandler.js` - Error handling composable
-- `src/composables/actions/useTextActions.js` - Text action functionality
+- `src/features/translation/composables/useUnifiedTranslation.js` - Unified translation logic for popup and sidepanel
+- `src/composables/shared/useErrorHandler.js` - Error handling composable
+- `src/features/text-actions/composables/useTextActions.js` - Text action functionality
 
 ### Shared Components
 - `src/components/shared/TranslationDisplay.vue` - Translation result display
@@ -1313,14 +1229,14 @@ export const useTranslationStore = defineStore('translation', {
 ### Background Handlers
 - `src/features/translation/handlers/handleTranslate.js` - Main translation handler (integrated with UnifiedTranslationService)
 - `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processing
-- `src/background/handlers/vue-integration/` - Vue-specific handlers
-- `src/background/handlers/tts/` - Text-to-speech handlers
-- `src/background/handlers/element-selection/` - Element selection handlers
+- `src/core/background/handlers/vue-integration/` - Vue-specific handlers
+- `src/features/tts/handlers/` - Text-to-speech handlers
+- `src/features/element-selection/handlers/` - Element selection handlers
 
 ### Content Scripts
 - `src/core/content-scripts/index-main.js` - Main content script entry point (Top Frame)
 - `src/core/content-scripts/index-iframe.js` - Lightweight content script for iframes
-- `src/managers/content/select-element/SelectElementManager.js` - Element selection manager
+- `src/features/element-selection/SelectElementManager.js` - Element selection manager
 
 ---
 
@@ -1447,9 +1363,9 @@ src/composables/actions/
 ## TTS (Text-to-Speech) System
 
 ### Overview
-A **fully unified, stateful TTS system** with complete Play/Pause/Resume/Stop controls and exclusive playback across all extension contexts. The system has been **completely unified (2025)** around a single composable that eliminates all duplicate implementations. See [TTS System Documentation](TTS_SYSTEM.md) for complete details.
+A **fully unified, stateful TTS system** with complete Play/Pause/Resume/Stop controls and exclusive playback across all extension contexts. The system has been **completely unified** around a single composable that eliminates all duplicate implementations. See [TTS System Documentation](TTS_SYSTEM.md) for complete details.
 
-**Unified Architecture (2025):**
+**Unified Architecture:**
 - **Single Source of Truth**: `useTTSSmart.js` - The only TTS composable used across all contexts
 - **Zero Duplicate Code**: Eliminated 600+ lines of redundant `TTSManager.js` implementation
 - **Language Fallback System**: Automatic mapping for unsupported languages (Persian→Arabic, Kurdish→Arabic, etc.)
@@ -1482,12 +1398,77 @@ Cross-Browser Audio Playback (Chrome: Offscreen, Firefox: Direct)
 - **Rich UI Feedback**: 5-state visual system with circular progress indicators
 - **Cross-Browser Compatibility**: Seamless Chrome (Offscreen) and Firefox (Direct) support
 
-**Benefits of Complete Unification (2025):**
+**Benefits of Complete Unification:**
 - **Single Composable**: Zero duplicate implementations across codebase
 - **Performance**: 600+ lines of redundant code eliminated
 - **Language Support**: All languages work through intelligent fallback mapping
 - **Maintainability**: Single system to debug and enhance
 - **Consistency**: Identical TTS experience across all extension contexts
+
+---
+
+## Whole Page Translation System
+
+### Overview
+Comprehensive system for recursive translation of entire web pages. It uses the `domtranslator` library with a layered architecture including `PageTranslationManager`, `Scheduler`, and `ScrollTracker`. See [Whole Page Translation Documentation](WHOLE_PAGE_TRANSLATION.md) for complete details.
+
+### Key Features
+- **Dynamic Chunk Scaling**: Automatically adjusts batch sizes based on Optimization Levels (Speed vs. Cost).
+- **Memory-Safe Purging**: "Smart Purge" policy for infinite scrolling to prevent RAM exhaustion.
+- **Activity-Aware Scheduling**: Defers translation until scrolling and DOM mutations cease.
+- **Circuit Breaker Integration**: Protects against provider rate limits during heavy translations.
+
+---
+
+## Text Selection System
+
+### Overview
+Advanced text selection handling designed for both standard web content and complex "Professional Editors" where native selection APIs are insufficient. It uses a registry-based approach for domain-specific handling. See [Text Selection System Documentation](TEXT_SELECTION_SYSTEM.md) for complete details.
+
+### Key Features
+- **Site Handler Registry**: Pluggable architecture for extracting text from complex apps (Google Docs, Microsoft Office, Notion, etc.).
+- **Selection Coordinator**: Decoupled Pub/Sub architecture to synchronize selection state across features like TTS, FAB, and Windows.
+- **Drag Detection**: Intelligent differentiation between text selection and UI interaction (e.g., dragging the translation window).
+- **Static Import System**: Optimized for performance with minimal runtime overhead.
+
+---
+
+## Select Element System
+
+### Overview
+Interactive mode for translating specific DOM elements with high precision and context awareness. It features a decoupled architecture for selection logic and translation orchestration. See [Select Element System Documentation](SELECT_ELEMENT_SYSTEM.md) for complete details.
+
+### Key Features
+- **Smart Logical Block Batching**: Groups text nodes by block-level parents to preserve semantic context.
+- **UID Resilient Mapping**: Uses a 1:1 node UID system for robust result re-insertion.
+- **Real-Time Streaming**: Progressively updates the UI as logical blocks complete translation.
+- **Hover Original Preview**: Integrated `HoverPreviewManager` for viewing original text via tooltips.
+
+---
+
+## Screen Capture & OCR System
+
+### Overview
+Visual text extraction system using Tesseract.js to translate text from images, videos, and complex layouts. It operates in a secure, privacy-focused manner with local execution. See [Screen Capture Documentation](SCREEN_CAPTURE_SYSTEM.md) for complete details.
+
+### Key Features
+- **Two-Frame Transparency**: Ensures selection overlays are invisible during browser tab capture.
+- **Smart OCR Cores**: Automatically selects optimal WASM cores (SIMD/Relaxed-SIMD) based on hardware.
+- **Offline Model Caching**: Uses IndexedDB to store and inject OCR models for offline capability.
+- **Offscreen Processing**: (Chrome) Runs heavy computations in offscreen contexts to keep background responsive.
+
+---
+
+## Language Detection & Direction System
+
+### Overview
+A centralized, high-precision system for identifying language and text direction (RTL/LTR). It follows a "Detection Inheritance" philosophy, prioritizing verified results from translation providers. See [Language Detection Documentation](LANGUAGE_DETECTION.md) for complete details.
+
+### Key Features
+- **Hierarchical Priority Flow**: Uses a multi-layered strategy (Provider Feedback → Deterministic Unicode Markers → Statistical Browser API → Heuristic Fallback).
+- **Strong Directional Analysis**: Implements Unicode Bidirectional Algorithm principles for majority-voting direction detection.
+- **Trust Filter**: Context-aware validation (UI Language + Active Target) to prevent false positives on short strings.
+- **Provider Feedback Loop**: Verified detections from AI/Translation engines are cached and shared across all modules (TTS, UI, etc.).
 
 ---
 
@@ -1540,7 +1521,7 @@ Streamlined iframe support system that provides essential iframe functionality w
 ```
 Content Script Detection → IFrameManager → Frame Registration
     ↓
-ResourceTracker Cleanup → SmartMessaging Integration
+ResourceTracker Cleanup → Unified Messaging Integration
     ↓
 Vue UI Host → Event-Based Communication → SelectElement Support
 ```
@@ -1555,7 +1536,7 @@ Vue UI Host → Event-Based Communication → SelectElement Support
 ---
 
 
-## 💾 Storage Manager System
+## Storage Manager System
 
 ### Overview
 Centralized storage management with intelligent caching and event system. See [Storage Manager Documentation](STORAGE_MANAGER.md) for complete details.
@@ -1584,7 +1565,7 @@ const { data, save } = useStorage(['API_KEY', 'PROVIDER'])
 
 ---
 
-## ⚠️ Error Management System
+## Error Management System
 
 ### Overview
 Unified error handling system with extension context awareness. See [Error Management Documentation](ERROR_MANAGEMENT_SYSTEM.md) for complete details.
@@ -1620,7 +1601,7 @@ const result = await ExtensionContextManager.safeSendMessage(message, context)
 
 ---
 
-## 📊 Logging System
+## Logging System
 
 ### Overview
 Modern structured logging with environment awareness and performance optimization. See [Logging System Documentation](LOGGING_SYSTEM.md) for complete details.
@@ -1665,7 +1646,7 @@ const performAction = async () => {
 
 ---
 
-## 🚀 Performance Benefits
+## Performance Benefits
 
 ### Unified Messaging Results
 - **Eliminated race conditions** between competing listeners
@@ -1707,7 +1688,7 @@ const performAction = async () => {
 
 ---
 
-## 🎯 Development Workflow
+## Development Workflow
 
 ### For New Features
 1. **Plan**: Identify which systems are involved (Vue components, stores, background handlers, etc.)

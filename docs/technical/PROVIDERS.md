@@ -12,15 +12,15 @@ This document provides a comprehensive guide for implementing translation provid
 
 The system is built upon a layered execution pipeline:
 
-1.  **ProviderCoordinator (Orchestrator)**: The entry point for all translation requests. It handles:
+1.  **ProviderCoordinator** (`src/features/translation/core/ProviderCoordinator.js`): The central orchestration hub for all translation requests. It handles:
     - Language Swapping (Bilingual Logic).
-    - Auto-detection fallbacks.
+    - Auto-detection fallbacks via `LanguageDetectionService`.
     - Result cleaning and normalization.
-    - Unified Response generation.
-2.  **OptimizedJsonHandler**: A specialized orchestrator for complex, high-volume tasks (like Select Element) that manages intelligent batching and real-time streaming to the browser tabs.
-3.  **BaseProvider / BaseAIProvider / BaseTranslateProvider**: Modular base classes that implement provider-specific logic (JSON mode, character limits, prompt prep).
-4.  **Provider Utilities**: Specialized modules in `providers/utils/` that handle heavy lifting like API execution (`ProviderRequestEngine`), parsing (`AIResponseParser`), and text processing (`AITextProcessor`).
-5.  **ProviderManifest**: The single source of truth for provider metadata, lazy loading, and UI display settings.
+    - Coordination with `QueueManager` and `RateLimitManager`.
+2.  **OptimizedJsonHandler** (`src/features/translation/core/managers/OptimizedJsonHandler.js`): A specialized orchestrator for complex, high-volume tasks (like Select Element) that manages intelligent batching and real-time streaming.
+3.  **BaseProvider / BaseAIProvider / BaseTranslateProvider**: Modular base classes in `src/features/translation/providers/` that implement provider-specific logic (JSON mode, character limits, prompt prep).
+4.  **Provider Utilities**: Specialized modules in `src/features/translation/providers/utils/` that handle heavy lifting like API execution (`ProviderRequestEngine`), parsing (`AIResponseParser`), and text processing (`AITextProcessor`).
+5.  **ProviderManifest**: The single source of truth for provider metadata, located in `src/features/translation/providers/ProviderManifest.js`.
 
 ---
 
@@ -40,7 +40,7 @@ To prevent runtime crashes (like "split is not a function"), all providers (via 
 
 ---
 
-## Modularized Utilities (`providers/utils/`)
+## Modularized Utilities (`src/features/translation/providers/utils/`)
 
 ### 1. Request & Execution
 - **ProviderRequestEngine**: Centralizes API call execution, header preparation, proxy handling, and orchestrates the **Multi-API Key Failover** lifecycle.
@@ -59,7 +59,7 @@ To prevent runtime crashes (like "split is not a function"), all providers (via 
 
 ## Provider Implementation Workflow
 
-### 1. Define Constants (`ProviderConstants.js`)
+### 1. Define Constants (`src/features/translation/providers/ProviderConstants.js`)
 Add the constant ID and Name:
 - `ProviderNames.YOUR_PROVIDER`: The class name (e.g., `'YourTranslate'`)
 - `ProviderRegistryIds.YOUR_ID`: The registry ID (e.g., `'yourid'`)
@@ -82,7 +82,7 @@ For providers that require specialized text processing (e.g., Dictionary lookups
 - Use `_executeApiCall` with explicit `sessionId` and `charCount` reporting to maintain statistical accuracy.
 - Ensure the result adheres to the **Unified Response Contract**.
 
-### 3. Register in the Manifest (`ProviderManifest.js`)
+### 3. Register in the Manifest (`src/features/translation/providers/ProviderManifest.js`)
 Add to `PROVIDER_MANIFEST`. This handles UI registration, icon mapping, and **Capability Gating**.
 
 #### Provider Features (Capabilities)
