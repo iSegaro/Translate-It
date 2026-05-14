@@ -30,7 +30,7 @@
   <img src="./docs/Images/Options.jpg" alt="Translate It Extension" height="400" />
 </p>
 
-**Translate It** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
+**Translate It** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Engineered with a "zero-pressure" philosophy, it is optimized to run seamlessly in modern browsers without taxing system resources or bloating RAM, even when dozens of tabs are active. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
 
 ---
 
@@ -39,7 +39,7 @@
 - **Privacy First:** OCR and core processes happen locally. Your data stays in your browser.
 - **AI-Powered:** Support for Gemini, OpenAI, DeepSeek and more.
 - **Cost-Efficient:** Save up to **70% on AI tokens** with the unique Economy Mode.
-- **Performance-Driven:** Smart-loading architecture reduces memory usage by **20-30%**.
+- **Zero-Pressure Engineering:** Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
 - **Platform Agnostic:** Seamless experience from **Desktop Chrome** to **Android Firefox**.
 
 ---
