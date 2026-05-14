@@ -36,7 +36,7 @@
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
-    <b>YouTube でデモを見る</b>
+    <b>YouTubeでデモを見る</b>
   </a>
   <br>
   <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
