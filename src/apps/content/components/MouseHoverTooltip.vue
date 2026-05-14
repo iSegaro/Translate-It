@@ -3,25 +3,29 @@
     v-if="isVisible"
     ref="tooltipRef"
     class="ti-mouse-hover-tooltip"
-    :dir="direction"
     :style="{ '--tooltip-transform': `translate3d(${position.x}px, ${position.y}px, 0)` }"
   >
-    <div class="ti-mouse-hover-content">
-      {{ translatedText }}
-    </div>
+    <TranslationDisplay
+      :content="translatedText"
+      :target-language="targetLanguage"
+      mode="popup"
+      :show-toolbar="false"
+      class="ti-mouse-hover-display"
+    />
   </div>
 </template>
 
 <script setup>
 import './MouseHoverTooltip.scss'
-import { ref, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, nextTick, onUnmounted } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 
 const isVisible = ref(false);
 const translatedText = ref('');
-const direction = ref('ltr');
+const targetLanguage = ref('en');
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 let autoHideTimer = null;
@@ -38,7 +42,10 @@ const showTooltip = async (detail) => {
   }
 
   translatedText.value = detail.translatedText;
-  direction.value = detail.direction || 'ltr';
+  
+  // Get target language for correct font and direction rendering
+  targetLanguage.value = settingsManager.get('TARGET_LANGUAGE', 'fa');
+  
   isVisible.value = true;
   
   await nextTick();

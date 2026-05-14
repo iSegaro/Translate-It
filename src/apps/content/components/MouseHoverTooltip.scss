@@ -5,33 +5,32 @@
   left: 0 !important;
   z-index: 2147483647 !important;
   pointer-events: none !important; /* Important to prevent interference with page events */
-  max-width: 350px !important;
+  max-width: 380px !important;
+  min-width: 120px !important;
   background: var(--ti-bg-primary, #ffffff) !important;
-  color: var(--ti-text-primary, #333333) !important;
-  padding: 8px 12px !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   border: 1px solid var(--ti-border-color, #e0e0e0) !important;
-  font-family: var(--ti-font-family, sans-serif) !important;
-  font-size: 14px !important;
-  line-height: 1.5 !important;
   transition: opacity 0.2s ease-in-out !important;
   transform: var(--tooltip-transform, none) !important;
   overflow: hidden !important;
-  word-wrap: break-word !important;
 }
 
-.ti-mouse-hover-content {
-  display: block !important;
-}
+.ti-mouse-hover-display {
+  background: transparent !important;
+  padding: 4px !important;
+  border: none !important;
+  box-shadow: none !important;
 
-.ti-mouse-hover-tooltip[dir='rtl'] {
-  text-align: right !important;
+  :deep(.ti-translation-content) {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
 }
 
 :host-context(.theme-dark) .ti-mouse-hover-tooltip {
   background: #2d2d2d !important;
-  color: #e0e0e0 !important;
   border-color: #444444 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
