@@ -365,6 +365,60 @@
   "activation_group_page_selection_title": {
     "message": "On-Page Selection"
   },
+  "activation_group_mouse_hover_title": {
+    "message": "Mouse on Hover Translation"
+  },
+  "mouse_hover_translation_enabled_label": {
+    "message": "Enable Mouse on Hover Translation"
+  },
+  "mouse_hover_translation_enabled_description": {
+    "message": "Automatically translate text when you hover over it."
+  },
+  "mouse_hover_scope_label": {
+    "message": "Translation Scope"
+  },
+  "mouse_hover_scope_word": {
+    "message": "Word"
+  },
+  "mouse_hover_scope_sentence": {
+    "message": "Sentence"
+  },
+  "mouse_hover_scope_container": {
+    "message": "Container"
+  },
+  "mouse_hover_trigger_label": {
+    "message": "Trigger"
+  },
+  "mouse_hover_trigger_hover": {
+    "message": "Immediate (Hover)"
+  },
+  "mouse_hover_trigger_ctrl": {
+    "message": "Ctrl + Hover"
+  },
+  "mouse_hover_trigger_alt": {
+    "message": "Alt + Hover"
+  },
+  "mouse_hover_trigger_shift": {
+    "message": "Shift + Hover"
+  },
+  "mouse_hover_delay_label": {
+    "message": "Hover Delay"
+  },
+  "mouse_hover_autoclose_label": {
+    "message": "Auto-Close Tooltip"
+  },
+  "mouse_hover_autoclose_mouseleave": {
+    "message": "On Mouse Leave"
+  },
+  "mouse_hover_autoclose_timer": {
+    "message": "After Time"
+  },
+  "mouse_hover_timer_label": {
+    "message": "Display Time (ms)"
+  },
+  "mouse_hover_show_container_border_label": {
+    "message": "Show border around container"
+  },
   "activation_group_dictionary_title": {
     "message": "Dictionary Mode"
   },

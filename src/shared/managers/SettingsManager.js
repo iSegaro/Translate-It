@@ -98,7 +98,15 @@ class SettingsManager {
         ACTION_CONTEXT_OPTIONS: true,
         ACTION_CONTEXT_SHORTCUTS: true,
         ACTION_CONTEXT_HELP: true
-      }
+      },
+      // Mouse on Hover Translation Settings
+      MOUSE_HOVER_TRANSLATION_ENABLED: false,
+      MOUSE_HOVER_SCOPE: 'sentence',
+      MOUSE_HOVER_TRIGGER: 'hover',
+      MOUSE_HOVER_DELAY: 500,
+      MOUSE_HOVER_AUTO_CLOSE: 'mouseleave',
+      MOUSE_HOVER_TIMER_DURATION: 3000,
+      MOUSE_HOVER_SHOW_CONTAINER_BORDER: true
     }
 
     logger.debug('SettingsManager singleton created')
@@ -505,7 +513,8 @@ class SettingsManager {
       'ENABLE_DICTIONARY',
       'ENHANCED_TRIPLE_CLICK_DRAG',
       'SHOW_DESKTOP_FAB',
-      'MOBILE_UI_MODE'
+      'MOBILE_UI_MODE',
+      'MOUSE_HOVER_TRANSLATION_ENABLED'
     ]
 
     for (const key of frequentlyAccessed) {

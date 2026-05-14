@@ -352,6 +352,135 @@
       </div>
     </BaseFieldset>
 
+    <!-- Mouse on Hover Translation -->
+    <BaseFieldset 
+      id="activation_group_mouse_hover"
+      :legend="t('activation_group_mouse_hover_title') || 'Mouse on Hover Translation'"
+    >
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="mouseHoverProvider"
+            allow-default
+            mode="button"
+            required-feature="bulk"
+            only-configured
+            :is-global="false"
+            :disabled="!extensionEnabled || !mouseHoverEnabled"
+          />
+        </div>
+      </template>
+
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="mouseHoverEnabled"
+          :disabled="!extensionEnabled"
+          :label="t('mouse_hover_translation_enabled_label') || 'Enable Mouse on Hover Translation'"
+        />
+        <span class="setting-description">
+          {{ t('mouse_hover_translation_enabled_description') || 'Automatically translate text when you hover over it.' }}
+        </span>
+      </div>
+
+      <div 
+        class="sub-options-group"
+        :class="{ open: mouseHoverEnabled }"
+      >
+        <div class="sub-options-inner">
+          <!-- Scope & Trigger -->
+          <div class="setting-row multi-select-row">
+            <div class="setting-item">
+              <label class="setting-label">{{ t('mouse_hover_scope_label') || 'Translation Scope' }}</label>
+              <BaseSelect
+                v-model="mouseHoverScope"
+                :options="mouseHoverScopeOptions"
+                :disabled="!extensionEnabled || !mouseHoverEnabled"
+                class="compact-select"
+              />
+            </div>
+            <div class="setting-item">
+              <label class="setting-label">{{ t('mouse_hover_trigger_label') || 'Trigger' }}</label>
+              <BaseSelect
+                v-model="mouseHoverTrigger"
+                :options="mouseHoverTriggerOptions"
+                :disabled="!extensionEnabled || !mouseHoverEnabled"
+                class="compact-select"
+              />
+            </div>
+          </div>
+
+          <!-- Delay -->
+          <div class="delay-setting-container">
+            <span 
+              class="delay-label"
+              :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+            >{{ t('mouse_hover_delay_label') || 'Hover Delay' }}:</span>
+            <div class="number-input-container inline-delay-input">
+              <input
+                v-model.number="mouseHoverDelay"
+                type="number"
+                min="100"
+                max="5000"
+                step="100"
+                class="base-number-input compact-input"
+                :disabled="!extensionEnabled || !mouseHoverEnabled"
+              >
+              <span 
+                class="unit-label"
+                :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+              >ms</span>
+            </div>
+          </div>
+
+          <!-- Auto Close -->
+          <div class="setting-row multi-select-row">
+            <div class="setting-item">
+              <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
+              <BaseSelect
+                v-model="mouseHoverAutoClose"
+                :options="mouseHoverAutoCloseOptions"
+                :disabled="!extensionEnabled || !mouseHoverEnabled"
+                class="compact-select"
+              />
+            </div>
+            <div 
+              v-if="mouseHoverAutoClose === 'timer'"
+              class="setting-item"
+            >
+              <label class="setting-label">{{ t('mouse_hover_timer_label') || 'Display Time (ms)' }}</label>
+              <div class="number-input-container inline-delay-input">
+                <input
+                  v-model.number="mouseHoverTimerDuration"
+                  type="number"
+                  min="1000"
+                  max="30000"
+                  step="500"
+                  class="base-number-input compact-input"
+                  :disabled="!extensionEnabled || !mouseHoverEnabled"
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Container Border -->
+          <div 
+            v-if="mouseHoverScope === 'container'"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="mouseHoverShowBorder"
+              :disabled="!extensionEnabled || !mouseHoverEnabled"
+              :label="t('mouse_hover_show_container_border_label') || 'Show border around container'"
+            />
+          </div>
+        </div>
+      </div>
+    </BaseFieldset>
+
     <!-- Whole Page Translation -->
     <BaseFieldset 
       id="FIELDSET_WHOLE_PAGE"
@@ -603,10 +732,38 @@ const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HID
   transformSet: (v) => !v
 })
 
+// Mouse on Hover
+const mouseHoverEnabled = createSetting('MOUSE_HOVER_TRANSLATION_ENABLED', false)
+const mouseHoverScope = createSetting('MOUSE_HOVER_SCOPE', 'sentence')
+const mouseHoverTrigger = createSetting('MOUSE_HOVER_TRIGGER', 'hover')
+const mouseHoverDelay = createSetting('MOUSE_HOVER_DELAY', 500)
+const mouseHoverAutoClose = createSetting('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave')
+const mouseHoverTimerDuration = createSetting('MOUSE_HOVER_TIMER_DURATION', 3000)
+const mouseHoverShowBorder = createSetting('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)
+
+const mouseHoverScopeOptions = computed(() => [
+  { value: 'word', label: t('mouse_hover_scope_word') || 'Word' },
+  { value: 'sentence', label: t('mouse_hover_scope_sentence') || 'Sentence' },
+  { value: 'container', label: t('mouse_hover_scope_container') || 'Container' }
+])
+
+const mouseHoverTriggerOptions = computed(() => [
+  { value: 'hover', label: t('mouse_hover_trigger_hover') || 'Immediate (Hover)' },
+  { value: 'ctrl', label: t('mouse_hover_trigger_ctrl') || 'Ctrl + Hover' },
+  { value: 'alt', label: t('mouse_hover_trigger_alt') || 'Alt + Hover' },
+  { value: 'shift', label: t('mouse_hover_trigger_shift') || 'Shift + Hover' }
+])
+
+const mouseHoverAutoCloseOptions = computed(() => [
+  { value: 'mouseleave', label: t('mouse_hover_autoclose_mouseleave') || 'On Mouse Leave' },
+  { value: 'timer', label: t('mouse_hover_autoclose_timer') || 'After Time' }
+])
+
 const fieldProvider = createProviderSetting(TranslationMode.Field)
 const selectElementProvider = createProviderSetting(TranslationMode.Select_Element)
 const selectionProvider = createProviderSetting(TranslationMode.Selection)
 const pageProvider = createProviderSetting(TranslationMode.Page)
+const mouseHoverProvider = createProviderSetting(TranslationMode.MouseHover)
 
 // --- Validation Feedback ---
 
@@ -619,7 +776,8 @@ const handleValidationFeedback = (e) => {
       [TranslationMode.Field]: 'activation_group_text_fields',
       [TranslationMode.Select_Element]: 'activation_group_select_element',
       [TranslationMode.Selection]: 'activation_group_page_selection',
-      [TranslationMode.Page]: 'FIELDSET_WHOLE_PAGE'
+      [TranslationMode.Page]: 'FIELDSET_WHOLE_PAGE',
+      [TranslationMode.MouseHover]: 'activation_group_mouse_hover'
     };
     
     const id = modeToId[mode];

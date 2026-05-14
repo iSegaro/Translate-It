@@ -365,6 +365,60 @@
   "activation_group_page_selection_title": {
     "message": "انتخاب در صفحه"
   },
+  "activation_group_mouse_hover_title": {
+    "message": "ترجمه با حرکت موس (Hover)"
+  },
+  "mouse_hover_translation_enabled_label": {
+    "message": "فعال‌سازی ترجمه با حرکت موس"
+  },
+  "mouse_hover_translation_enabled_description": {
+    "message": "ترجمه خودکار متن هنگامی که موس را روی آن نگه می‌دارید."
+  },
+  "mouse_hover_scope_label": {
+    "message": "محدوده ترجمه"
+  },
+  "mouse_hover_scope_word": {
+    "message": "کلمه"
+  },
+  "mouse_hover_scope_sentence": {
+    "message": "جمله"
+  },
+  "mouse_hover_scope_container": {
+    "message": "کل بلاک (Container)"
+  },
+  "mouse_hover_trigger_label": {
+    "message": "نحوه فعال‌سازی"
+  },
+  "mouse_hover_trigger_hover": {
+    "message": "فقط مکث موس"
+  },
+  "mouse_hover_trigger_ctrl": {
+    "message": "Ctrl + مکث موس"
+  },
+  "mouse_hover_trigger_alt": {
+    "message": "Alt + مکث موس"
+  },
+  "mouse_hover_trigger_shift": {
+    "message": "Shift + مکث موس"
+  },
+  "mouse_hover_delay_label": {
+    "message": "زمان انتظار"
+  },
+  "mouse_hover_autoclose_label": {
+    "message": "نحوه بسته شدن"
+  },
+  "mouse_hover_autoclose_mouseleave": {
+    "message": "خروج موس از متن"
+  },
+  "mouse_hover_autoclose_timer": {
+    "message": "پس از زمان مشخص"
+  },
+  "mouse_hover_timer_label": {
+    "message": "زمان نمایش (میلی‌ثانیه)"
+  },
+  "mouse_hover_show_container_border_label": {
+    "message": "نمایش حاشیه دور بلاک متن"
+  },
   "activation_group_dictionary_title": {
     "message": "حالت دیکشنری"
   },

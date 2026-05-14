@@ -36,6 +36,7 @@ export const LOG_COMPONENTS = {
   HISTORY: 'History',             // src/features/history/
   SETTINGS: 'Settings',           // src/features/settings/
   WINDOWS: 'Windows',             // src/features/windows/
+  ON_HOVER: 'OnHover',             // src/features/mouse-hover/
 
   // Mobile
   MOBILE: 'Mobile',               // src/features/mobile/
@@ -83,7 +84,7 @@ export const LOG_CATEGORIES = {
       LOG_COMPONENTS.TEXT_ACTIONS, LOG_COMPONENTS.TEXT_SELECTION, LOG_COMPONENTS.TRANSLATION,
       LOG_COMPONENTS.PAGE_TRANSLATION, LOG_COMPONENTS.SHORTCUTS, LOG_COMPONENTS.EXCLUSION,
       LOG_COMPONENTS.SCREEN_CAPTURE, LOG_COMPONENTS.SUBTITLE, LOG_COMPONENTS.TTS,
-      LOG_COMPONENTS.MOBILE, LOG_COMPONENTS.DESKTOP_FAB
+      LOG_COMPONENTS.MOBILE, LOG_COMPONENTS.DESKTOP_FAB, LOG_COMPONENTS.ON_HOVER
     ]
   },
   SERVICES: {
