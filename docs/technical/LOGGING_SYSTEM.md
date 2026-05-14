@@ -49,10 +49,13 @@ logger.debug(`Complex State: ${JSON.stringify(heavyObject)}`)
 ## Configuration
 
 ### 1. Options Page (Recommended)
-Manage log levels via the UI:
-- **Location**: `Options Page` -> `Advance Tab` -> `Debug Mode`.
-- **Features**: Toggle global Debug Mode and set granular levels for every component.
-- **Sync**: Changes are broadcasted to all contexts (Background, Content, Sidepanel) in real-time via `DebugModeBridge`.
+The primary way to manage log levels is through the Options UI:
+- **Location**: `Options Page` -> `Advance Tab` (`AdvanceTab.vue`).
+- **Section**: Look for the **Debug Mode** accordion (`DEBUG_MODE_SECTION`).
+- **Features**: 
+  - **Global Toggle**: Enables/disables the debug override system.
+  - **Granular Control**: Set specific log levels (Error to Debug) for individual components organized by categories (UI, Background, Messaging, etc.).
+- **Sync**: Changes are broadcasted to all extension contexts (Background, Content, Sidepanel) in real-time via the `DebugModeBridge`.
 
 ### 2. Default Values
 To change default verbosity permanently:

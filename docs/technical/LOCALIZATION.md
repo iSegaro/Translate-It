@@ -4,7 +4,7 @@
 
 Translate-It uses a **Manifest-Driven Architecture** for localization. Instead of manually managing multiple JSON files, all supported UI languages are defined in a central manifest. Automated scripts handle synchronization and consistency across the project.
 
-This guide covers **UI localization only**. Runtime text language detection is documented separately in `docs/technical/LANGUAGE_DETECTION.md`.
+This guide covers **UI localization only**. Runtime text language detection is documented separately in **[Language Detection](LANGUAGE_DETECTION.md)**.
 
 ## Architecture Components
 

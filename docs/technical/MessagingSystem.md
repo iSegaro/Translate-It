@@ -118,7 +118,7 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - **Fallback Handling**: Graceful degradation from streaming to regular translation
 - **Context-Aware Routing**: Automatic detection of streaming vs. regular translation needs
 
-### Unified Translation Service Integration (2025)
+### Unified Translation Service Integration
 
 The messaging system is now fully integrated with the **Unified Translation Service** for centralized coordination of all translation operations:
 
@@ -303,11 +303,11 @@ src/shared/messaging/
 ├── core/
 │   ├── MessagingCore.js                  # MessageFormat, Contexts, utilities
 │   ├── MessageActions.js                 # All available actions
-│   ├── UnifiedMessaging.js               # 🆕 Unified messaging system
-│   ├── UnifiedTranslationCoordinator.js  # 🆕 Translation streaming coordination
-│   ├── StreamingTimeoutManager.js        # 🆕 Smart timeout management for streaming
-│   ├── StreamingResponseHandler.js       # 🆕 Streaming response coordination
-│   ├── ContentScriptIntegration.js       # 🆕 Content script integration layer
+│   ├── UnifiedMessaging.js               # Unified messaging system
+│   ├── UnifiedTranslationCoordinator.js  # Translation streaming coordination
+│   ├── StreamingTimeoutManager.js        # Smart timeout management for streaming
+│   ├── StreamingResponseHandler.js       # Streaming response coordination
+│   ├── ContentScriptIntegration.js       # Content script integration layer
 │   └── MessageHandler.js                 # Centralized message handling
 ├── composables/
 │   └── useMessaging.js                   # Vue composable (uses UnifiedMessaging)
@@ -315,10 +315,10 @@ src/shared/messaging/
     └── MessagingCore.test.js
 
 src/core/services/translation/
-├── UnifiedTranslationService.js          # 🆕 Centralized translation coordination
-├── TranslationRequestTracker.js          # 🆕 Request lifecycle management
-├── UnifiedResultDispatcher.js            # 🆕 Intelligent result routing
-└── UnifiedModeCoordinator.js             # 🆕 Mode-specific logic coordination
+├── UnifiedTranslationService.js          # Centralized translation coordination
+├── TranslationRequestTracker.js          # Request lifecycle management
+├── UnifiedResultDispatcher.js            # Intelligent result routing
+└── UnifiedModeCoordinator.js             # Mode-specific logic coordination
 ```
 
 ## Common Issues
@@ -338,4 +338,4 @@ src/core/services/translation/
 
 ---
 
-**Summary:** UnifiedMessaging provides **race-condition-free messaging** with **intelligent timeout management** and **streaming coordination**. The new UnifiedTranslationCoordinator ensures **efficient handling of large translation operations** while maintaining **context isolation** and **automatic fallback capabilities**. 🚀
+**Summary:** UnifiedMessaging provides **race-condition-free messaging** with **intelligent timeout management** and **streaming coordination**. The new UnifiedTranslationCoordinator ensures **efficient handling of large translation operations** while maintaining **context isolation** and **automatic fallback capabilities**.

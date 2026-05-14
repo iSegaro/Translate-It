@@ -60,3 +60,5 @@ https://github.com/crimx/ext-saladict/tree/dev/src/components/dictionaries
 ---
 
 ## Documentation
+
+- [Dictionary Integration Plan](backlog/DICTIONARY_INTEGRATION_PLAN.md)
