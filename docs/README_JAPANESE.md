@@ -32,6 +32,18 @@
 
 **Translate It** は単なる翻訳ツールではありません。あらゆるデバイスで言語の壁を越えるために設計された、高性能でモジュール式のエコシステムです。「ゼロプレッシャー」の哲学に基づいて設計されており、数十のタブが開いている状態でも、システムリソースに負荷をかけたり RAM を膨張させたりすることなく、モダンブラウザでシームレスに動作するように最適化されています。**Vue.js 3** で構築され、**10 以上のプロバイダー**に対応。プライバシー、スピード、そしてコスト効率に重点を置いた、ウェブ翻訳への緻密なアプローチを提供します。
 
+<br>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <b>YouTube でデモを見る</b>
+  </a>
+  <br>
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <img src="./Images/Windows.png" alt="動画を見る" width="560" />
+  </a>
+</p>
+
 ---
 
 ## なぜ Translate It なのか？

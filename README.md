@@ -32,6 +32,18 @@
 
 **Translate It** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Engineered with a "zero-pressure" philosophy, it is optimized to run seamlessly in modern browsers without taxing system resources or bloating RAM, even when dozens of tabs are active. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
 
+<br>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <b>Watch Demo on YouTube</b>
+  </a>
+  <br>
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <img src="./docs/Images/Windows.png" alt="Watch the video" width="560" />
+  </a>
+</p>
+
 ---
 
 ## Why Translate It?
