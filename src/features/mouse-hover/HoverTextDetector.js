@@ -17,13 +17,26 @@ export class HoverTextDetector {
    */
   static detect(x, y, scope = 'sentence') {
     const range = this._getRangeAt(x, y);
-    if (!range) return null;
+    if (!range) {
+      // logger.debug('No range found at point');
+      return null;
+    }
 
     const node = range.startContainer;
-    if (node.nodeType !== Node.TEXT_NODE) return null;
+    if (!node) return null;
+
+    if (node.nodeType !== Node.TEXT_NODE) {
+      logger.debug(`Range found but container is not a text node (type: ${node.nodeType}, tag: ${node.tagName})`);
+      return null;
+    }
 
     // Check if the node is empty or just whitespace
-    if (!node.textContent.trim()) return null;
+    if (!node.textContent.trim()) {
+      // logger.debug('Detected text node is empty or whitespace');
+      return null;
+    }
+
+    logger.debug(`Detected text node: "${node.textContent.substring(0, 20)}..."`);
 
     switch (scope) {
       case 'word':

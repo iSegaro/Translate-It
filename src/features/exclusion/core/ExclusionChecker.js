@@ -216,8 +216,11 @@ export class ExclusionChecker {
         return screenCaptureVal;
       }
 
-      case 'mouseHover':
-        return settingsManager.get('MOUSE_HOVER_TRANSLATION_ENABLED', false);
+      case 'mouseHover': {
+        const hoverEnabled = settingsManager.get('MOUSE_HOVER_TRANSLATION_ENABLED', false);
+        logger.debug(`Checking mouseHover enablement: ${hoverEnabled}`);
+        return hoverEnabled;
+      }
 
       default:
         logger.debug(`Feature ${featureName} hit default case in isFeatureEnabled (false)`);

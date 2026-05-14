@@ -21,7 +21,7 @@ export class MainFeatureLoader {
     this.FEATURE_CATEGORIES = {
       CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
       ESSENTIAL: ['contentMessageHandler'], // Essential communication
-      LAZY_UI: ['vue', 'textSelection'], // UI & Selection (can be promoted)
+      LAZY_UI: ['vue', 'textSelection', 'mouseHover'], // UI & Selection (can be promoted)
       INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation', 'screenCapture'], // On-demand heavy UI
       ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
     };

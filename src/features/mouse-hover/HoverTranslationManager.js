@@ -1,4 +1,5 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+console.log('[MouseHover] Script loading...');
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { HoverTextDetector } from './HoverTextDetector.js';
@@ -12,6 +13,8 @@ import { ElementDetectionService } from '@/shared/services/ElementDetectionServi
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
+logger.debug('HoverTranslationManager module loaded');
+
 /**
  * HoverTranslationManager - Manages "Mouse on Hover" translation logic
  * Handles event listening, trigger conditions, delays, and coordination.
@@ -23,6 +26,7 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentText = null;
     this.currentElement = null;
     this.hoverTimer = null;
+    this.lastPosition = { x: 0, y: 0 };
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -34,15 +38,24 @@ export class HoverTranslationManager extends ResourceTracker {
    * Activate the hover translation feature
    */
   async activate() {
-    if (this.isActive) return true;
+    logger.debug('HoverTranslationManager.activate() called');
+    if (this.isActive) {
+      logger.debug('HoverTranslationManager already active');
+      return true;
+    }
 
-    // Use ResourceTracker to manage event listeners
-    this.addEventListener(document, 'mousemove', this.handleMouseMove);
-    this.addEventListener(document, 'keydown', this.handleKeyDown);
-    
-    this.isActive = true;
-    logger.init('Hover translation manager activated');
-    return true;
+    try {
+      // Use ResourceTracker to manage event listeners
+      this.addEventListener(document, 'mousemove', this.handleMouseMove, { passive: true });
+      this.addEventListener(document, 'keydown', this.handleKeyDown, { passive: true });
+      
+      this.isActive = true;
+      logger.info('Hover translation manager activated and listening');
+      return true;
+    } catch (error) {
+      logger.error('Failed to activate HoverTranslationManager:', error);
+      return false;
+    }
   }
 
   /**
@@ -65,6 +78,12 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle mouse move events with debouncing logic
    */
   handleMouseMove(event) {
+    // Check if mouse actually moved significantly to avoid noise
+    const dist = Math.hypot(event.clientX - this.lastPosition.x, event.clientY - this.lastPosition.y);
+    if (dist < 2) return;
+    
+    this.lastPosition = { x: event.clientX, y: event.clientY };
+
     // Skip if mouse is over extension UI elements
     if (ElementDetectionService.getInstance().isUIElement(event.target)) {
       this._cancelPendingHover();
@@ -79,17 +98,13 @@ export class HoverTranslationManager extends ResourceTracker {
       return;
     }
 
-    // Identify if the mouse is over an element we already processed
-    if (event.target === this.currentElement) {
-      return;
-    }
-
     this._cancelPendingHover();
     this.currentElement = event.target;
 
     const delay = settingsManager.get('MOUSE_HOVER_DELAY', 500);
     
     this.hoverTimer = setTimeout(() => {
+      logger.debug('Hover delay reached, starting processing...');
       this._processHover(event);
     }, delay);
   }
@@ -103,7 +118,6 @@ export class HoverTranslationManager extends ResourceTracker {
 
     if (this._isModifierPressed(event, trigger)) {
       // If modifier is pressed, we might want to trigger immediately if mouse is already over text
-      // But for now, we'll rely on mousemove + modifier check for simplicity and performance
     }
   }
 
@@ -125,12 +139,25 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   async _processHover(event) {
     const scope = settingsManager.get('MOUSE_HOVER_SCOPE', 'sentence');
+    logger.debug(`Detecting text with scope: ${scope} at ${event.clientX}, ${event.clientY}`);
     const detection = HoverTextDetector.detect(event.clientX, event.clientY, scope);
 
-    if (!detection || !detection.text || detection.text === this.currentText) {
+    if (!detection) {
+      logger.debug('No text detected at cursor position');
       return;
     }
 
+    if (!detection.text) {
+      logger.debug('Detection returned empty text');
+      return;
+    }
+
+    if (detection.text === this.currentText) {
+      logger.debug('Detected text is the same as current, skipping');
+      return;
+    }
+
+    logger.info(`Hover translation triggered for: "${detection.text.substring(0, 50)}..."`);
     this.currentText = detection.text;
     const element = detection.element;
 
@@ -151,12 +178,15 @@ export class HoverTranslationManager extends ResourceTracker {
     element.addEventListener('mouseleave', leaveHandler);
 
     try {
+      const targetLanguage = settingsManager.get('TARGET_LANGUAGE', 'en');
       const result = await contentScriptIntegration.sendTranslationRequest({
         action: MessageActions.TRANSLATE,
         messageId: `hover-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         data: {
           text: detection.text,
-          mode: TranslationMode.MouseHover
+          mode: TranslationMode.MouseHover,
+          sourceLanguage: 'auto',
+          targetLanguage: targetLanguage
         },
         context: MessageContexts.CONTENT
       });
