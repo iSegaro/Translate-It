@@ -27,6 +27,7 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentElement = null;
     this.hoverTimer = null;
     this.lastPosition = { x: 0, y: 0 };
+    this.lastMouseEvent = null;
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -48,6 +49,7 @@ export class HoverTranslationManager extends ResourceTracker {
       // Use ResourceTracker to manage event listeners
       this.addEventListener(document, 'mousemove', this.handleMouseMove, { passive: true });
       this.addEventListener(document, 'keydown', this.handleKeyDown, { passive: true });
+      this.addEventListener(document, 'mouseleave', this.handleMouseLeave, { passive: true });
       
       this.isActive = true;
       logger.info('Hover translation manager activated and listening');
@@ -66,6 +68,7 @@ export class HoverTranslationManager extends ResourceTracker {
 
     this.cleanup(); // Clean up all listeners and timers
     this.isActive = false;
+    this.lastMouseEvent = null;
     
     // Notify UI to hide tooltip
     pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
@@ -78,6 +81,9 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle mouse move events with debouncing logic
    */
   handleMouseMove(event) {
+    // Store last mouse event for keydown trigger
+    this.lastMouseEvent = event;
+
     // Check if mouse actually moved significantly to avoid noise
     const dist = Math.hypot(event.clientX - this.lastPosition.x, event.clientY - this.lastPosition.y);
     if (dist < 2) return;
@@ -117,7 +123,16 @@ export class HoverTranslationManager extends ResourceTracker {
     if (trigger === 'hover') return;
 
     if (this._isModifierPressed(event, trigger)) {
-      // If modifier is pressed, we might want to trigger immediately if mouse is already over text
+      // If we have a stored mouse event and we're over an element
+      if (this.lastMouseEvent && this.lastMouseEvent.target) {
+        logger.debug(`Modifier key ${trigger} pressed while mouse over element, triggering immediate hover check`);
+        this._cancelPendingHover();
+        
+        // Trigger check with a very small safety delay
+        this.hoverTimer = setTimeout(() => {
+          this._processHover(this.lastMouseEvent);
+        }, 50);
+      }
     }
   }
 
@@ -131,6 +146,7 @@ export class HoverTranslationManager extends ResourceTracker {
     }
     this._cancelPendingHover();
     this.currentElement = null;
+    this.lastMouseEvent = null;
   }
 
   /**
