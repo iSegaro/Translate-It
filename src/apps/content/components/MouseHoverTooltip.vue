@@ -113,6 +113,16 @@ const calculatePosition = (pos) => {
   position.value = { x, y };
 };
 
+// Expose for testing
+defineExpose({
+  isVisible,
+  translatedText,
+  position,
+  showTooltip,
+  hideTooltip,
+  calculatePosition
+});
+
 // Safe event listening with automatic cleanup
 tracker.addEventListener(pageEventBus, 'MOUSE_HOVER_TRANSLATION_READY', showTooltip);
 tracker.addEventListener(pageEventBus, 'MOUSE_HOVER_HIDE_TOOLTIP', hideTooltip);
