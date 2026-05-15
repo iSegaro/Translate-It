@@ -734,9 +734,9 @@ const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HID
 
 // Mouse on Hover
 const mouseHoverEnabled = createSetting('MOUSE_HOVER_TRANSLATION_ENABLED', false)
-const mouseHoverScope = createSetting('MOUSE_HOVER_SCOPE', 'sentence')
-const mouseHoverTrigger = createSetting('MOUSE_HOVER_TRIGGER', 'hover')
-const mouseHoverDelay = createSetting('MOUSE_HOVER_DELAY', 500)
+const mouseHoverScope = createSetting('MOUSE_HOVER_SCOPE', 'container')
+const mouseHoverTrigger = createSetting('MOUSE_HOVER_TRIGGER', 'ctrl')
+const mouseHoverDelay = createSetting('MOUSE_HOVER_DELAY', 300)
 const mouseHoverAutoClose = createSetting('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave')
 const mouseHoverTimerDuration = createSetting('MOUSE_HOVER_TIMER_DURATION', 3000)
 const mouseHoverShowBorder = createSetting('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)
