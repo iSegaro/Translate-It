@@ -99,10 +99,11 @@ export class HoverTranslationManager extends ResourceTracker {
     
     this.lastPosition = { x: event.clientX, y: event.clientY };
 
-    // Skip if mouse is over extension UI elements
+    // Skip if mouse is over extension UI elements (like the tooltip itself)
     if (ElementDetectionService.getInstance().isUIElement(event.target)) {
       this._cancelPendingHover();
-      this._handleMouseOut();
+      // DO NOT call _handleMouseOut here, as we want to keep the tooltip open
+      // while the user is interacting with it (e.g., scrolling).
       return;
     }
 
@@ -227,7 +228,12 @@ export class HoverTranslationManager extends ResourceTracker {
     }
 
     // Add leave listener to the specific element
-    const leaveHandler = () => {
+    const leaveHandler = (leaveEvent) => {
+      // If we're moving into a UI element (like the tooltip), don't close
+      if (leaveEvent.relatedTarget && ElementDetectionService.getInstance().isUIElement(leaveEvent.relatedTarget)) {
+        return;
+      }
+
       if (originalStyle !== undefined) element.style.outline = originalStyle;
       this.handleMouseLeave();
       element.removeEventListener('mouseleave', leaveHandler);
