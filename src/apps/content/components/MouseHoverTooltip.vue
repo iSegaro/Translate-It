@@ -8,7 +8,7 @@
     <TranslationDisplay
       :content="translatedText"
       :target-language="targetLanguage"
-      mode="popup"
+      mode="standard"
       :show-toolbar="false"
       max-height="40vh"
       class="ti-mouse-hover-display"
@@ -18,23 +18,26 @@
 
 <script setup>
 import './MouseHoverTooltip.scss'
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, computed } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'MouseHoverTooltip');
+const settingsStore = useSettingsStore();
 const isVisible = ref(false);
 const translatedText = ref('');
-const targetLanguage = ref('en');
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 const isError = ref(false);
 
 const tracker = useResourceTracker('mouse-hover-tooltip');
+
+// Reactive target language
+const targetLanguage = computed(() => settingsStore.targetLanguage || 'fa');
 
 const showTooltip = async (detail) => {
   if (!detail.translatedText) return;
@@ -47,9 +50,6 @@ const showTooltip = async (detail) => {
   isError.value = false;
   translatedText.value = detail.translatedText;
   
-  // Get target language for correct font and direction rendering
-  targetLanguage.value = settingsManager.get('TARGET_LANGUAGE', 'fa');
-  
   // Wait for content update and DOM reset
   await nextTick();
   isVisible.value = true;
@@ -59,9 +59,9 @@ const showTooltip = async (detail) => {
   calculatePosition(detail.position);
 
   // Setup auto-hide if configured for timer
-  const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
+  const autoClose = settingsStore.settings?.MOUSE_HOVER_AUTO_CLOSE || 'mouseleave';
   if (autoClose === 'timer') {
-    const duration = settingsManager.get('MOUSE_HOVER_TIMER_DURATION', 3000);
+    const duration = settingsStore.settings?.MOUSE_HOVER_TIMER_DURATION || 3000;
     tracker.setTimeout(() => {
       hideTooltip();
     }, duration);
