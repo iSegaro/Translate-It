@@ -10,6 +10,7 @@
       :target-language="targetLanguage"
       mode="popup"
       :show-toolbar="false"
+      max-height="40vh"
       class="ti-mouse-hover-display"
     />
   </div>
