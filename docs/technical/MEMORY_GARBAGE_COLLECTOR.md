@@ -98,6 +98,7 @@ The central coordinator that manages all resources and provides cleanup function
 - `trackEventListener(element, event, handler, groupId, options)` - Track event listeners with critical protection
 - `trackCache(cache, options, groupId)` - Track cache instances
 - `cleanupGroup(groupId)` - Cleanup resources by group
+- `clearGroupTimers(groupId)` - Clear only timers and intervals for a specific group
 - `getMemoryStats()` - Get memory usage statistics
 
 **Critical Protection:**
@@ -113,6 +114,9 @@ A mixin class that provides convenient methods for tracking resources in other c
 - `addEventListener(element, event, handler, options)` - Universal event listener tracking with critical support
 - `trackTimeout(callback, delay)` - Track timeouts
 - `trackInterval(callback, delay)` - Track intervals
+- `setTimeout(callback, delay)` - Alias for `trackTimeout` (standard JS ergonomics)
+- `setInterval(callback, delay)` - Alias for `trackInterval` (standard JS ergonomics)
+- `clearAllTimers()` - Clear only active timeouts and intervals for this tracker
 - `trackResource(id, cleanupFn, options)` - Track custom resources with critical protection
 - `trackCache(cache, options)` - Track cache instances
 - `cleanup()` - Cleanup all tracked resources (respects critical flags)
@@ -453,24 +457,37 @@ tracker.addEventListener(document, 'mousedown', handleMouseDown, { critical: tru
 tracker.addEventListener(document, 'dblclick', handleDoubleClick, { capture: true, critical: true })
 ```
 
-##### `trackTimeout(callback, delay)`
+##### `trackTimeout(callback, delay)` / `setTimeout(callback, delay)`
 
-Add timeout with automatic cleanup.
+Add timeout with automatic cleanup. `setTimeout` is an ergonomic alias.
 
 ```javascript
-const timerId = tracker.trackTimeout(() => {
+// Using alias (Recommended)
+const timerId = tracker.setTimeout(() => {
   console.log('Done!')
+}, 1000)
+
+// Using standard method
+tracker.trackTimeout(() => { /* ... */ }, 1000)
+```
+
+##### `trackInterval(callback, delay)` / `setInterval(callback, delay)`
+
+Add interval with automatic cleanup. `setInterval` is an ergonomic alias.
+
+```javascript
+const intervalId = tracker.setInterval(() => {
+  console.log('Tick!')
 }, 1000)
 ```
 
-##### `trackInterval(callback, delay)`
+##### `clearAllTimers()`
 
-Add interval with automatic cleanup.
+Clear all active timeouts and intervals associated with this tracker instance. Useful for resetting state without removing event listeners.
 
 ```javascript
-const intervalId = tracker.trackInterval(() => {
-  console.log('Tick!')
-}, 1000)
+// Clear all timers (e.g., when a tooltip is about to be reshown)
+tracker.clearAllTimers()
 ```
 
 ##### `trackResource(id, cleanupFn, options?)`
@@ -517,7 +534,8 @@ const tracker = useResourceTracker('my-component')
 1. **Vue Components Only**: Use only in Vue components, not in regular classes
 2. **Unique Group IDs**: Use unique IDs for each component
 3. **Automatic Cleanup**: Never call manual cleanup
-4. **Performance**: Very low overhead
+4. **Ergonomic Aliases**: Prefer `setTimeout` and `setInterval` for better readability
+5. **Granular Cleanup**: Use `clearAllTimers()` for safe state resets
 
 ### Integration with Other Systems
 
@@ -614,6 +632,13 @@ describe('ResourceTracker', () => {
 
     tracker.cleanup()
     expect(mockElement.removeEventListener).toHaveBeenCalled()
+  })
+
+  it('should clear only timers with clearAllTimers', () => {
+    const tracker = new ResourceTracker('test')
+    tracker.setTimeout(() => {}, 1000)
+    tracker.clearAllTimers()
+    // Timers are cleared but tracker stays active
   })
 })
 ```
@@ -758,6 +783,7 @@ window.addEventListener('beforeunload', () => {
 3. **Cleanup on Destroy**: Always call cleanup() when components are destroyed
 4. **Monitor Memory Usage**: Regularly check memory statistics
 5. **Handle Custom Events**: Use the universal addEventListener for all event types
+6. **Prefer Ergonomic Timer Methods**: Use `setTimeout` and `setInterval` for cleaner code
 
 ## Related Systems
 
@@ -774,13 +800,15 @@ window.addEventListener('beforeunload', () => {
 - `trackEventListener(element, event, handler, groupId?, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?, groupId?)`
 - `cleanupGroup(groupId)` - Respects critical protection
+- `clearGroupTimers(groupId)` - Clear only timers/intervals in a group
 - `cleanupResource(resourceId)` - Skips critical resources
 - `getMemoryStats()`
 
 ### ResourceTracker API
 - `addEventListener(element, event, handler, options?)` - Options: `{ critical: boolean, ...DOMOptions }`
-- `trackTimeout(callback, delay)`
-- `trackInterval(callback, delay)`
+- `trackTimeout(callback, delay)` / `setTimeout(callback, delay)`
+- `trackInterval(callback, delay)` / `setInterval(callback, delay)`
+- `clearAllTimers()` - Clear only active timeouts and intervals
 - `trackResource(id, cleanupFn, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?)`
 - `cleanup()` - Respects critical protection
