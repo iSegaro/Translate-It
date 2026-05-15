@@ -79,6 +79,7 @@ export async function loadFeature(featureName, force = false) {
       case 'shortcut': loadingPromise = loadShortcutFeature(force); break;
       case 'pageTranslation': loadingPromise = loadPageTranslationFeature(); break;
       case 'screenCapture': loadingPromise = loadScreenCaptureFeature(force); break;
+      case 'mouseHover': loadingPromise = loadMouseHoverFeature(); break;
       default: throw new Error(`Unknown feature: ${featureName}`);
     }
 
@@ -230,6 +231,22 @@ async function loadScreenCaptureFeature(force = false) {
   return featureManager.getFeatureHandler('screenCapture');
 }
 
+async function loadMouseHoverFeature() {
+  if (!featureManager) {
+    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+    featureManager = FeatureManager.getInstance();
+  }
+
+  const exclusionChecker = ExclusionChecker.getInstance();
+  if (await exclusionChecker.isFeatureAllowed('mouseHover')) {
+    await featureManager.activateFeature('mouseHover');
+  } else {
+    logger.debug('MouseHover is blocked by exclusion, skipping activation');
+    return null;
+  }
+  return featureManager.getFeatureHandler('mouseHover');
+}
+
 export async function loadCoreFeatures() {
   try {
     const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
@@ -273,6 +290,7 @@ export async function loadFeatureOnDemand(featureName) {
     screenCapture: async () => await loadFeature('screenCapture'),
     shortcut: async () => await loadFeature('shortcut'),
     textFieldIcon: async () => await loadFeature('textFieldIcon'),
+    mouseHover: async () => await loadFeature('mouseHover'),
     vue: async () => {
       if (window.translateItContentCore?.loadVueApp) {
         await window.translateItContentCore.loadVueApp();

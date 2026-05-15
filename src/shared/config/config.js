@@ -25,6 +25,7 @@ export const TranslationMode = {
   Mobile_Translate: MessageContexts.MOBILE_TRANSLATE,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+  MouseHover: 'mouse_hover', // Mouse on hover translation
   
   // Legacy aliases for backward compatibility
   LEGACY_FIELD: 'field',
@@ -260,6 +261,15 @@ export const CONFIG = {
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
 
+  // --- Mouse on Hover Translation Settings ---
+  MOUSE_HOVER_TRANSLATION_ENABLED: false, // فعال بودن ترجمه با حرکت موس
+  MOUSE_HOVER_SCOPE: 'container', // محدوده ترجمه: word, sentence, container
+  MOUSE_HOVER_TRIGGER: 'ctrl', // نحوه فعال‌سازی: hover, ctrl, alt, shift
+  MOUSE_HOVER_DELAY: 300, // زمان انتظار برای شروع ترجمه (میلی‌ثانیه)
+  MOUSE_HOVER_AUTO_CLOSE: 'mouseleave', // نحوه بسته شدن: mouseleave, timer
+  MOUSE_HOVER_TIMER_DURATION: 3000, // زمان نمایش تولتیپ در حالت timer (میلی‌ثانیه)
+  MOUSE_HOVER_SHOW_CONTAINER_BORDER: true, // نمایش حاشیه دور کانتینر در حالت container
+
   // --- Dictionary Display Settings ---
   DICTIONARY_SHOW_PRONUNCIATION: true,
   DICTIONARY_SHOW_POS: true, // Parts of Speech (Noun, Verb, etc.)
@@ -283,9 +293,9 @@ export const CONFIG = {
     [TranslationMode.Selection]: true, // WindowsManager
     [TranslationMode.Page]: false,     // Default disabled for whole page to prevent checkerboarding
     [TranslationMode.Dictionary_Translation]: true,
-    [TranslationMode.ScreenCapture]: true
-  },
-
+    [TranslationMode.ScreenCapture]: true,
+    [TranslationMode.MouseHover]: true
+    },
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه

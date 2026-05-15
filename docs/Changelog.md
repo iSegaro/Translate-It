@@ -1,7 +1,8 @@
-#### v1.15.2 – Released on May XX, 2026
+#### v1.16.0 – Released on May XX, 2026
 
 ##### Added
 
+- Added [Mouse on Hover Translation](#/activation?highlight=activation_group_mouse_hover) for instant, frictionless translation by simply hovering over text or containers
 - Added customizable **Idle Opacity** and **Icon Size** for the [Quick Action Button (FAB)](#/activation?highlight=FAB_CUSTOMIZATION_SETTINGS)
 
 ---

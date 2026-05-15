@@ -85,6 +85,9 @@
 
       <!-- Page Translation Original Text Tooltip -->
       <PageTranslationTooltip />
+
+      <!-- Mouse on Hover Translation Tooltip -->
+      <MouseHoverTooltip />
     </template>
 
     <!-- 
@@ -139,6 +142,7 @@ const ScreenSelector = defineAsyncComponent(() => import('@/components/content/S
 const TranslationWindow = defineAsyncComponent(() => import('@/features/windows/components/TranslationWindow.vue'));
 const TranslationIcon = defineAsyncComponent(() => import('@/features/windows/components/TranslationIcon.vue'));
 const PageTranslationTooltip = defineAsyncComponent(() => import('./components/PageTranslationTooltip.vue'));
+const MouseHoverTooltip = defineAsyncComponent(() => import('./components/MouseHoverTooltip.vue'));
 
 // Device-Specific Lazy Components
 const MobileSheet = defineAsyncComponent(() => import('./components/mobile/MobileSheet.vue'));

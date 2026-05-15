@@ -103,7 +103,7 @@ export class FeatureManager extends ResourceTracker {
   async evaluateAndRegisterFeatures() {
     // Order matters: contentMessageHandler should be activated first
     // selectElement is managed directly by FeatureManager with its own Critical Protection
-    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
+    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture', 'mouseHover'];
 
     logger.debug('Evaluating features for registration:', features);
 
@@ -152,6 +152,7 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async activateFeature(featureName) {
+    logger.debug(`[FeatureManager] Request to activate feature: ${featureName}`);
     if (this.activeFeatures.has(featureName)) {
       // logger.trace(`Feature ${featureName} already active`);
       return;
@@ -168,10 +169,9 @@ export class FeatureManager extends ResourceTracker {
     }
 
     try {
-      logger.debug(`Activating feature: ${featureName}`);
-
       // Load and initialize feature handler
       let handler;
+      logger.debug(`[FeatureManager] Loading handler for: ${featureName}`);
       if (featureName === 'textSelection') {
         // Use singleton pattern for SimpleTextSelectionHandler
         const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
@@ -185,12 +185,12 @@ export class FeatureManager extends ResourceTracker {
       }
 
       if (handler) {
+        logger.debug(`[FeatureManager] Executing .activate() for: ${featureName}`);
         const success = await handler.activate();
         if (success !== false) { // Consider true or undefined as success
           this.featureHandlers.set(featureName, handler);
           this.activeFeatures.add(featureName);
-
-          // Special integration: Connect SelectElementManager to ContentMessageHandler
+          logger.info(`[FeatureManager] Feature '${featureName}' activated successfully`);
           if (featureName === 'selectElement') {
             try {
               const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
@@ -352,6 +352,10 @@ export class FeatureManager extends ResourceTracker {
           HandlerClass = ScreenCaptureHandler;
           break;
         }
+        case 'mouseHover': {
+          const { hoverTranslationManager } = await import('@/features/mouse-hover/HoverTranslationManager.js');
+          return hoverTranslationManager;
+        }
         default:
           logger.error(`Unknown feature: ${featureName}`);
           return null;
@@ -377,7 +381,8 @@ export class FeatureManager extends ResourceTracker {
         'SHOW_DESKTOP_FAB',
         'MOBILE_UI_MODE',
         'EXCLUDED_SITES',
-        'ENABLE_SCREEN_CAPTURE'
+        'ENABLE_SCREEN_CAPTURE',
+        'MOUSE_HOVER_TRANSLATION_ENABLED'
       ];
       
       this.settingsListener = async (data) => {
@@ -450,7 +455,7 @@ export class FeatureManager extends ResourceTracker {
     try {
       // Order matters: contentMessageHandler should be evaluated first
       // selectElement is managed directly by FeatureManager with its own Critical Protection
-      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture'];
+      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture', 'mouseHover'];
 
       logger.debug('Re-evaluating all features');
 

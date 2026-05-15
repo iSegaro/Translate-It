@@ -101,7 +101,8 @@ export class ExclusionChecker {
         'SHOW_DESKTOP_FAB',
         'EXTENSION_ENABLED',
         'WHOLE_PAGE_TRANSLATION_ENABLED',
-        'ENABLE_SCREEN_CAPTURE'
+        'ENABLE_SCREEN_CAPTURE',
+        'MOUSE_HOVER_TRANSLATION_ENABLED'
       ];
 
       featureSettings.forEach(setting => {
@@ -215,6 +216,12 @@ export class ExclusionChecker {
         return screenCaptureVal;
       }
 
+      case 'mouseHover': {
+        const hoverEnabled = settingsManager.get('MOUSE_HOVER_TRANSLATION_ENABLED', false);
+        logger.debug(`Checking mouseHover enablement: ${hoverEnabled}`);
+        return hoverEnabled;
+      }
+
       default:
         logger.debug(`Feature ${featureName} hit default case in isFeatureEnabled (false)`);
         return false;
@@ -242,7 +249,7 @@ export class ExclusionChecker {
       await this.initialize();
     }
 
-    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation', 'screenCapture'];
+    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation', 'screenCapture', 'mouseHover'];
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,
