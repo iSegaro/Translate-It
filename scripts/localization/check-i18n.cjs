@@ -93,7 +93,7 @@ if (unusedKeys.length === 0) {
     
     try {
       execSync(`node ${path.join(__dirname, 'sync-i18n.cjs')} --fix`, { stdio: 'inherit' });
-    } catch (e) {
+    } catch {
       console.error('❌ Failed to sync after check. Please run sync-i18n.cjs --fix manually.');
     }
   } else {

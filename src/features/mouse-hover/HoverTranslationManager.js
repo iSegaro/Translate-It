@@ -182,7 +182,7 @@ export class HoverTranslationManager extends ResourceTracker {
   /**
    * Handle mouse leave to hide tooltip or cancel pending hover
    */
-  handleMouseLeave(event) {
+  handleMouseLeave() {
     this._handleMouseOut();
   }
 

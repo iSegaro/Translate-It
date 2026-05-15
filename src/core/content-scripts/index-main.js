@@ -15,7 +15,6 @@ if (!window.translateItContentScriptCore) {
 let contentScriptCore = null;
 
 // Logging state
-let logger = null;
 let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 

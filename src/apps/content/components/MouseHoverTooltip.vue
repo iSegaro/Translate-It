@@ -18,7 +18,7 @@
 
 <script setup>
 import './MouseHoverTooltip.scss'
-import { ref, nextTick, onUnmounted } from 'vue';
+import { ref, nextTick } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';

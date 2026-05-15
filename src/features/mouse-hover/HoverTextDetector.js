@@ -116,7 +116,38 @@ export class HoverTextDetector {
     const offset = range.startOffset;
     const text = node.textContent;
 
-    // Find word boundaries
+    // 1. Primary approach: Use Intl.Segmenter (Modern, supports all languages including CJK)
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      try {
+        const lang = document.documentElement.lang || 'en';
+        const segmenter = new Intl.Segmenter(lang, { granularity: 'word' });
+        const segments = segmenter.segment(text);
+        
+        for (const segment of segments) {
+          if (offset >= segment.index && offset < segment.index + segment.segment.length) {
+            // Only accept word-like segments (skips whitespace/punctuation)
+            if (!segment.isWordLike) return null;
+            
+            const word = segment.segment.trim();
+            if (!word) return null;
+
+            const wordRange = document.createRange();
+            wordRange.setStart(node, segment.index);
+            wordRange.setEnd(node, segment.index + segment.segment.length);
+            
+            return {
+              text: word,
+              element: node.parentElement,
+              rect: wordRange.getBoundingClientRect()
+            };
+          }
+        }
+      } catch (e) {
+        logger.debug('Intl.Segmenter failed, falling back to manual detection', e);
+      }
+    }
+
+    // 2. Fallback approach: Manual boundary detection using Unicode-aware regex
     let start = offset;
     while (start > 0 && !this._isSeparator(text[start - 1])) {
       start--;
@@ -130,7 +161,6 @@ export class HoverTextDetector {
     const word = text.substring(start, end).trim();
     if (!word) return null;
 
-    // Create a range for the word to get its bounding box
     const wordRange = document.createRange();
     wordRange.setStart(node, start);
     wordRange.setEnd(node, end);
@@ -151,8 +181,8 @@ export class HoverTextDetector {
     const offset = range.startOffset;
     const text = node.textContent;
 
-    // Basic sentence separators
-    const separators = /[.!?\n\r]/;
+    // Sentence separators including Persian/Arabic (؟ and ؛)
+    const separators = /[.!?\n\r؟؛]/;
 
     // Find sentence boundaries within the same text node
     let start = offset;
@@ -202,10 +232,18 @@ export class HoverTextDetector {
   }
 
   /**
-   * Helper to check for word separators
+   * Helper to check for word separators.
+   * Improved to support Unicode and correctly handle Persian ZWNJ (\u200C).
    * @private
    */
   static _isSeparator(char) {
-    return /[\s\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/.test(char);
+    // A separator is anything that is NOT a Letter, Mark (accents), or Number.
+    // Note: \u200C (ZWNJ) is technically a 'Format' character, not a letter, 
+    // so we explicitly exclude it from being a separator.
+    if (char === '\u200C') return false; 
+    
+    // Using Unicode property escapes for broad language support
+    // L: Letter, M: Mark (diacritics/accents), N: Number
+    return !/[\p{L}\p{M}\p{N}]/u.test(char);
   }
 }

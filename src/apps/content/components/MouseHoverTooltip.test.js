@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import MouseHoverTooltip from './MouseHoverTooltip.vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { settingsManager } from '@/shared/managers/SettingsManager.js';
 
 // Mock dependencies
 vi.mock('@/core/PageEventBus.js', () => ({
