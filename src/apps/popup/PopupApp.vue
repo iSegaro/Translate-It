@@ -106,12 +106,16 @@ import { useUnifiedTranslation } from '@/features/translation/composables/useUni
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { useGlobalFont } from '@/composables/shared/useFont.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
 
 // Resource tracker for automatic cleanup of timeouts and listeners
 const tracker = useResourceTracker('popup-app')
+
+// Global font management
+const { applyGlobalCSSVariables } = useGlobalFont()
 
 /**
  * Preload languages in parallel with other initialization tasks
@@ -213,7 +217,10 @@ const initialize = async () => {
       )
     ])
 
-    // Step 3: Apply user's theme preference
+    // Step 3: Apply global font variables
+    applyGlobalCSSVariables()
+
+    // Step 4: Apply user's theme preference
     const settings = settingsStore.settings
     await applyThemeLazy(settings.THEME)
     

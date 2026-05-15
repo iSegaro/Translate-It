@@ -11,7 +11,8 @@
   flex-direction: column;
   align-items: center; /* Center horizontally */
   justify-content: flex-start; /* Keep it at the top vertically */
-  font-family: "Vazirmatn", "Segoe UI", sans-serif;
+  font-family: var(--translation-font-family, "Vazirmatn", "Segoe UI", sans-serif);
+  font-size: var(--translation-font-size, 14px);
   color: var(--text-color);
   overflow-x: hidden;
 }

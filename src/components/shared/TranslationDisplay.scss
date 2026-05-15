@@ -43,7 +43,6 @@
     .ti-translation-content {
       height: 100% !important;
       flex: 1 !important;
-      font-size: var(--translation-font-size, 13px) !important;
       padding: 40px 12px 12px 12px !important;
     }
   }
@@ -78,7 +77,6 @@
       background-color: transparent !important;
       padding: 12px !important;
       min-height: auto !important;
-      font-size: var(--translation-font-size, 14px) !important;
 
       // Fix for extra space when first element is a heading (e.g. Vajehyab)
       .simple-markdown > :first-child {
@@ -130,7 +128,6 @@
 
     .ti-translation-content {
       padding: 4px 8px !important;
-      font-size: var(--translation-font-size, 16px) !important;
       color: var(--ti-mobile-accent, #1c7ed6) !important;
       max-height: 250px !important;
       line-height: 1.5 !important;
@@ -205,10 +202,6 @@
   width: 100% !important;
   padding: 32px 10px 10px 10px !important;
   border-radius: 8px !important;
-  font-family: var(--translation-font-family, inherit) !important;
-  font-size: var(--translation-font-size, 14px) !important;
-  direction: var(--translation-direction, ltr) !important;
-  text-align: var(--translation-text-align, left) !important;
   box-sizing: border-box !important;
   min-height: 50px !important;
   background-color: transparent !important;

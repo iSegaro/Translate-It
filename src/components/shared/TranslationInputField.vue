@@ -2,6 +2,7 @@
   <div
     class="ti-textarea-container"
     :class="{ 'ti-has-content': hasContent }"
+    :style="cssVariables"
   >
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
@@ -27,6 +28,7 @@
       :tabindex="tabindex"
       :class="textareaClass"
       class="ti-translation-textarea"
+      :style="fontStyles"
       autofocus
       @input="handleInput"
       @keydown="handleKeydown"
@@ -42,10 +44,10 @@ import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
 import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { AUTO_DETECT_VALUE } from '../../shared/config/constants';
+import { AUTO_DETECT_VALUE } from '@/shared/config/constants';
+import { useFont } from "@/composables/shared/useFont.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
-
 
 // Props
 const props = defineProps({
@@ -127,6 +129,15 @@ const textareaRef = ref(null)
 
 // Composables
 const { handleError } = useErrorHandler()
+
+const { fontStyles, cssVariables } = useFont(
+  computed(() => props.detectedSourceLanguage || props.language),
+  {
+    enableSmartDetection: true,
+    fallbackFont: "system",
+    enableCSSVariables: true
+  }
+);
 
 // Computed
 const hasContent = computed(() => props.modelValue.trim().length > 0)

@@ -50,10 +50,14 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTSGlobalManager } from '@/features/tts/core/TTSGlobalManager.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { useGlobalFont } from '@/composables/shared/useFont.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelApp');
 
 // Static import is now used for SidepanelLayout
+
+// Global font management
+const { applyGlobalCSSVariables } = useGlobalFont()
 
 // Language preloading utility
 const usePreloadLanguages = async () => {
@@ -148,7 +152,10 @@ const initialize = async () => {
     ])
     logger.debug('Settings store loaded and languages preloaded')
 
-    // Step 3: Apply theme
+    // Step 3: Apply global font variables
+    applyGlobalCSSVariables()
+
+    // Step 4: Apply theme
     const settings = settingsStore.settings
     logger.debug('Applying initial theme:', settings.THEME)
     await applyThemeLazy(settings.THEME)
