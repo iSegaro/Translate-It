@@ -32,7 +32,7 @@ const translatedText = ref('');
 const targetLanguage = ref('en');
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
-let autoHideTimer = null;
+const isError = ref(false);
 
 const tracker = useResourceTracker('mouse-hover-tooltip');
 
@@ -40,13 +40,11 @@ const showTooltip = async (detail) => {
   if (!detail.translatedText) return;
   
   // Clear any existing timer
-  if (autoHideTimer) {
-    clearTimeout(autoHideTimer);
-    autoHideTimer = null;
-  }
+  tracker.clearAllTimers();
 
   // CRITICAL: Hide first to reset dimensions and prevent ghosting from previous position
   isVisible.value = false;
+  isError.value = false;
   translatedText.value = detail.translatedText;
   
   // Get target language for correct font and direction rendering
@@ -64,22 +62,31 @@ const showTooltip = async (detail) => {
   const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
   if (autoClose === 'timer') {
     const duration = settingsManager.get('MOUSE_HOVER_TIMER_DURATION', 3000);
-    autoHideTimer = setTimeout(() => {
+    tracker.setTimeout(() => {
       hideTooltip();
     }, duration);
   }
 };
 
+const showError = (detail) => {
+  isVisible.value = true;
+  isError.value = true;
+  translatedText.value = detail.error?.message || 'Translation failed';
+  
+  tracker.clearAllTimers();
+  tracker.setTimeout(() => {
+    hideTooltip();
+  }, 3000);
+};
+
 const hideTooltip = () => {
   isVisible.value = false;
+  isError.value = false;
   
   // Notify manager that tooltip is hidden so it can reset its cache
   pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN');
   
-  if (autoHideTimer) {
-    clearTimeout(autoHideTimer);
-    autoHideTimer = null;
-  }
+  tracker.clearAllTimers();
 };
 
 const calculatePosition = (pos) => {
@@ -125,9 +132,6 @@ defineExpose({
 
 // Safe event listening with automatic cleanup
 tracker.addEventListener(pageEventBus, 'MOUSE_HOVER_TRANSLATION_READY', showTooltip);
+tracker.addEventListener(pageEventBus, 'MOUSE_HOVER_TRANSLATION_ERROR', showError);
 tracker.addEventListener(pageEventBus, 'MOUSE_HOVER_HIDE_TOOLTIP', hideTooltip);
-
-onUnmounted(() => {
-  if (autoHideTimer) clearTimeout(autoHideTimer);
-});
 </script>
