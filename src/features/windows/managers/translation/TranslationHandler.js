@@ -9,7 +9,6 @@ import { ProviderRegistryIds } from "@/features/translation/providers/ProviderCo
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";
@@ -38,15 +37,7 @@ export class TranslationHandler {
     };
 
     let translationMode = options.mode || TranslationMode.Selection;
-    const isDictionaryCandidate = isSingleWordOrShortPhrase(selectedText);
-    if (!options.mode && settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
-      translationMode = TranslationMode.Dictionary_Translation;
-    }
-
     let modeSpecificProvider = settings.MODE_PROVIDERS?.[translationMode];
-    if (!options.provider && !modeSpecificProvider && translationMode === TranslationMode.Dictionary_Translation) {
-      modeSpecificProvider = settings.MODE_PROVIDERS?.[TranslationMode.Selection];
-    }
 
     return options.provider || modeSpecificProvider || settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
   }
@@ -78,18 +69,8 @@ export class TranslationHandler {
 
       // Determine translation mode
       let translationMode = options.mode || TranslationMode.Selection;
-      const isDictionaryCandidate = isSingleWordOrShortPhrase(selectedText);
-      if (!options.mode && settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
-        translationMode = TranslationMode.Dictionary_Translation;
-      }
-
       let modeSpecificProvider = settings.MODE_PROVIDERS?.[translationMode];
       
-      if (!options.provider && !modeSpecificProvider && translationMode === TranslationMode.Dictionary_Translation) {
-        modeSpecificProvider = settings.MODE_PROVIDERS?.[TranslationMode.Selection];
-        this.logger.debug('Dictionary mode fallback to Selection provider:', modeSpecificProvider);
-      }
-
       const finalProvider = options.provider || modeSpecificProvider || settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
 
       // Generate unique messageId
