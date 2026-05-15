@@ -280,15 +280,17 @@ export class SimpleMarkdown {
     if (!this.RTL_REGEX.test(trimmed)) return "ltr";
 
     // 2. If it's a label line (Label: Content), prioritize content direction
-    const labelMatch = trimmed.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
-    if (labelMatch) {
-      const content = labelMatch[2].trim();
-      if (content) {
-        // Priority: If content has LTR characters, it should be LTR 
-        // despite potential RTL labels (covers dictionary case: "Noun: آزمایش")
-        if (this.LTR_PRIORITY_REGEX.test(content)) return "ltr";
-        // If content is purely RTL
-        if (this.RTL_REGEX.test(content)) return "rtl";
+    if (this._isLabelLine(trimmed)) {
+      const labelMatch = trimmed.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+      if (labelMatch) {
+        const content = labelMatch[2].trim();
+        if (content) {
+          // Priority: If content has LTR characters, it should be LTR 
+          // despite potential RTL labels (covers dictionary case: "Noun: آزمایش")
+          if (this.LTR_PRIORITY_REGEX.test(content)) return "ltr";
+          // If content is purely RTL
+          if (this.RTL_REGEX.test(content)) return "rtl";
+        }
       }
     }
 
