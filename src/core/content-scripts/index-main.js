@@ -20,26 +20,27 @@ let getScopedLogger = null;
 let LOG_COMPONENTS = null;
 
 /**
- * Lazy load logging dependencies to reduce initial bundle size.
+ * Lazy load logging dependencies and get a scoped logger.
+ * @param {string} subComponent - Name of the sub-component.
  */
-async function initializeLogger() {
-  if (logger) return logger;
+async function initializeLogger(subComponent = 'Main') {
   try {
-    const [{ getScopedLogger: scopedLogger }, { LOG_COMPONENTS: logComponents }] = await Promise.all([
-      import('@/shared/logging/logger.js'),
-      import('@/shared/logging/logConstants.js')
-    ]);
-    getScopedLogger = scopedLogger;
-    LOG_COMPONENTS = logComponents;
-    logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'ContentScriptIndex');
-    return logger;
+    if (!getScopedLogger || !LOG_COMPONENTS) {
+      const [{ getScopedLogger: scopedLogger }, { LOG_COMPONENTS: logComponents }] = await Promise.all([
+        import('@/shared/logging/logger.js'),
+        import('@/shared/logging/logConstants.js')
+      ]);
+      getScopedLogger = scopedLogger;
+      LOG_COMPONENTS = logComponents;
+    }
+    return getScopedLogger(LOG_COMPONENTS.CONTENT, subComponent);
   } catch {
     // Fallback logger if loading fails
     return {
       debug: () => {},
-      info: (...args) => console.log('[ContentScriptIndex]', ...args),
-      warn: (...args) => console.warn('[ContentScriptIndex]', ...args),
-      error: (...args) => console.error('[ContentScriptIndex]', ...args)
+      info: (...args) => console.log(`[Content.${subComponent}]`, ...args),
+      warn: (...args) => console.warn(`[Content.${subComponent}]`, ...args),
+      error: (...args) => console.error(`[Content.${subComponent}]`, ...args)
     };
   }
 }
@@ -97,12 +98,12 @@ async function initializeLogger() {
       import('@/shared/messaging/core/MessageActions.js')
     ]);
 
-    const scriptLogger = await initializeLogger();
+    const scriptLogger = await initializeLogger('Main');
 
     if (process.env.NODE_ENV === 'development') {
       scriptLogger.debug('Initializing main frame content script (Modular mode)');
     }
-    console.log('[ContentScript] Main frame initialized');
+    scriptLogger.info('Main frame initialized');
 
     // 6. INITIALIZE CORE
     try {

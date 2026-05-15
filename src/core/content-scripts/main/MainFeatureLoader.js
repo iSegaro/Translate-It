@@ -7,6 +7,7 @@ export class MainFeatureLoader {
     this.contentScriptCore = contentScriptCore;
     this.initializeLogger = initializeLogger;
     this.featureLoadPromises = new Map();
+    this.logger = null;
 
     // Smart loading configuration
     this.LOAD_STRATEGIES = {
@@ -28,11 +29,27 @@ export class MainFeatureLoader {
   }
 
   /**
+   * Lazy load the logger instance.
+   * Note: This logger uses the 'Content' component level (LOG_COMPONENTS.CONTENT).
+   * To see these logs, ensure the 'Content' log level is set to INFO (2) or higher in Options.
+   */
+  async getLogger() {
+    if (this.logger) return this.logger;
+    try {
+      this.logger = await this.initializeLogger('MainFeatureLoader');
+      return this.logger;
+    } catch {
+      return console;
+    }
+  }
+
+  /**
    * Promotes a feature to load immediately.
    */
   async promoteFeature(featureName) {
     if (process.env.NODE_ENV === 'development') {
-      console.debug(`[MainFeatureLoader] Promoting feature: ${featureName}`);
+      const logger = await this.getLogger();
+      logger.debug(`Promoting feature: ${featureName}`);
     }
     return this.loadFeature(featureName, 'INTERACTIVE');
   }
@@ -102,14 +119,14 @@ export class MainFeatureLoader {
         }
 
         if (this.contentScriptCore && this.contentScriptCore.loadFeature) {
-          console.log(`[MainFeatureLoader] Loading feature: ${featureName} (${category})`);
+          const logger = await this.getLogger();
+          logger.info(`Loading feature: ${featureName} (${category})`);
           await this.contentScriptCore.loadFeature(featureName);
 
           if (process.env.NODE_ENV === 'development') {
-            const featureLogger = await this.initializeLogger();
-            featureLogger.debug(`[MainFeatureLoader] Loaded feature: ${featureName} (${category})`);
+            logger.debug(`Loaded feature: ${featureName} (${category})`);
           }
-          console.log(`[MainFeatureLoader] Successfully loaded feature: ${featureName}`);
+          logger.info(`Successfully loaded feature: ${featureName}`);
         }
       } catch (error) {
         await this.handleLoadingError(featureName, category, error);
@@ -136,8 +153,8 @@ export class MainFeatureLoader {
       }
     } catch { /* ignore */ }
 
-    const errorLogger = await this.initializeLogger();
-    errorLogger.warn(`[MainFeatureLoader] Failed to load feature ${featureName}`, {
+    const errorLogger = await this.getLogger();
+    errorLogger.warn(`Failed to load feature ${featureName}`, {
       error: error.message || error,
       category,
       stack: error.stack
