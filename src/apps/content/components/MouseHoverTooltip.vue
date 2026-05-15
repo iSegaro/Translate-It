@@ -21,8 +21,11 @@ import { ref, nextTick, onUnmounted } from 'vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 
+const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'MouseHoverTooltip');
 const isVisible = ref(false);
 const translatedText = ref('');
 const targetLanguage = ref('en');
@@ -41,13 +44,18 @@ const showTooltip = async (detail) => {
     autoHideTimer = null;
   }
 
+  // CRITICAL: Hide first to reset dimensions and prevent ghosting from previous position
+  isVisible.value = false;
   translatedText.value = detail.translatedText;
   
   // Get target language for correct font and direction rendering
   targetLanguage.value = settingsManager.get('TARGET_LANGUAGE', 'fa');
   
+  // Wait for content update and DOM reset
+  await nextTick();
   isVisible.value = true;
   
+  // Wait for new dimensions to be calculated by the browser
   await nextTick();
   calculatePosition(detail.position);
 
@@ -79,14 +87,23 @@ const calculatePosition = (pos) => {
 
   const offset = 15;
   let x = pos.x + offset;
-  let y = pos.y + offset; // Show below the cursor to avoid overlapping text
+  let y = pos.y - rect.height - offset; // Default: show ABOVE the cursor
 
-  // Adjust if going off screen
-  if (x + rect.width > viewportWidth) x = pos.x - rect.width - offset;
-  if (x < 10) x = 10;
+  // Adjust Y position if it goes off the top of the screen
+  if (y < 10) {
+    // Not enough space above, show BELOW the cursor instead
+    y = pos.y + offset;
+    logger.debug('Not enough space above cursor, flipping tooltip to bottom');
+  }
+
+  // Adjust X position if it goes off the right edge
+  if (x + rect.width > viewportWidth - 10) {
+    x = pos.x - rect.width - offset;
+  }
   
-  if (y + rect.height > viewportHeight) y = pos.y - rect.height - offset;
-  if (y < 10) y = 10;
+  // Final safety checks for viewport boundaries
+  if (x < 10) x = 10;
+  if (y + rect.height > viewportHeight - 10) y = viewportHeight - rect.height - 10;
 
   position.value = { x, y };
 };
