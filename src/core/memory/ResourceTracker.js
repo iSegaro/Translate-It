@@ -63,6 +63,11 @@ class ResourceTracker {
     return timerId;
   }
 
+  /** Alias for trackTimeout */
+  setTimeout(callback, delay) {
+    return this.trackTimeout(callback, delay);
+  }
+
   trackInterval(callback, delay) {
     const intervalId = setInterval(callback, delay);
 
@@ -73,6 +78,11 @@ class ResourceTracker {
     this.memoryManager.trackTimer(intervalId, this.groupId);
 
     return intervalId;
+  }
+
+  /** Alias for trackInterval */
+  setInterval(callback, delay) {
+    return this.trackInterval(callback, delay);
   }
 
   addEventListener(element, event, handler, options = null) {
@@ -171,6 +181,21 @@ class ResourceTracker {
     if (shouldEnableDebugging()) {
       this.resources.delete(`timer_${timerId}`);
       this.resources.delete(`interval_${timerId}`);
+    }
+  }
+
+  /**
+   * Clear all active timeouts and intervals for this tracker
+   */
+  clearAllTimers() {
+    this.memoryManager.clearGroupTimers(this.groupId);
+    
+    if (shouldEnableDebugging()) {
+      for (const resourceId of this.resources) {
+        if (resourceId.startsWith('timer_') || resourceId.startsWith('interval_')) {
+          this.resources.delete(resourceId);
+        }
+      }
     }
   }
 

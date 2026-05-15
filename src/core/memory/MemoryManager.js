@@ -485,8 +485,8 @@ class MemoryManager {
     if (resourceIds) {
       const idsToCleanup = Array.from(resourceIds)
       idsToCleanup.forEach(resourceId => {
-        if (resourceId.startsWith('timer_')) {
-          const timerId = parseInt(resourceId.replace('timer_', ''))
+        if (resourceId.startsWith('timer_') || resourceId.startsWith('interval_')) {
+          const timerId = parseInt(resourceId.replace(/^(timer_|interval_)/, ''))
           clearTimeout(timerId)
           clearInterval(timerId)
           this.timers.delete(timerId)
@@ -495,6 +495,26 @@ class MemoryManager {
         }
       })
       this.groups.delete(groupId)
+    }
+  }
+
+  /**
+   * Clear only timers and intervals in a group
+   * @param {string} groupId - Group identifier
+   */
+  clearGroupTimers(groupId) {
+    const resourceIds = this.groups.get(groupId)
+    if (resourceIds) {
+      const ids = Array.from(resourceIds)
+      ids.forEach(resourceId => {
+        if (resourceId.startsWith('timer_') || resourceId.startsWith('interval_')) {
+          const timerId = parseInt(resourceId.replace(/^(timer_|interval_)/, ''))
+          clearTimeout(timerId)
+          clearInterval(timerId)
+          this.timers.delete(timerId)
+          resourceIds.delete(resourceId)
+        }
+      })
     }
   }
 

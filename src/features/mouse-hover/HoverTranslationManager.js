@@ -153,7 +153,7 @@ export class HoverTranslationManager extends ResourceTracker {
 
     const delay = settingsManager.get('MOUSE_HOVER_DELAY', 500);
     
-    this.hoverTimer = setTimeout(() => {
+    this.hoverTimer = this.setTimeout(() => {
       this._processHover(event);
     }, delay);
   }
@@ -172,7 +172,7 @@ export class HoverTranslationManager extends ResourceTracker {
         this._cancelPendingHover();
         
         // Trigger check with a very small safety delay
-        this.hoverTimer = setTimeout(() => {
+        this.hoverTimer = this.setTimeout(() => {
           this._processHover(this.lastMouseEvent);
         }, MODIFIER_TRIGGER_DELAY);
       }
@@ -305,7 +305,7 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   _cancelPendingHover() {
     if (this.hoverTimer) {
-      clearTimeout(this.hoverTimer);
+      this.clearTimer(this.hoverTimer);
       this.hoverTimer = null;
     }
   }
