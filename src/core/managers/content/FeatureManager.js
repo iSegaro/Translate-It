@@ -152,7 +152,7 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async activateFeature(featureName) {
-    logger.debug(`[FeatureManager] Request to activate feature: ${featureName}`);
+    logger.debug(`Request to activate feature: ${featureName}`);
     if (this.activeFeatures.has(featureName)) {
       // logger.trace(`Feature ${featureName} already active`);
       return;
@@ -171,7 +171,7 @@ export class FeatureManager extends ResourceTracker {
     try {
       // Load and initialize feature handler
       let handler;
-      logger.debug(`[FeatureManager] Loading handler for: ${featureName}`);
+      logger.debug(`Loading handler for: ${featureName}`);
       if (featureName === 'textSelection') {
         // Use singleton pattern for SimpleTextSelectionHandler
         const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
@@ -185,12 +185,12 @@ export class FeatureManager extends ResourceTracker {
       }
 
       if (handler) {
-        logger.debug(`[FeatureManager] Executing .activate() for: ${featureName}`);
+        logger.debug(`Executing .activate() for: ${featureName}`);
         const success = await handler.activate();
         if (success !== false) { // Consider true or undefined as success
           this.featureHandlers.set(featureName, handler);
           this.activeFeatures.add(featureName);
-          logger.info(`[FeatureManager] Feature '${featureName}' activated successfully`);
+          logger.info(`Feature '${featureName}' activated successfully`);
           if (featureName === 'selectElement') {
             try {
               const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
