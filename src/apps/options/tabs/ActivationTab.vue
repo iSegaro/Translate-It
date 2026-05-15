@@ -519,6 +519,7 @@
 
       <div class="setting-group">
         <BaseCheckbox
+          id="MOUSE_HOVER_TRANSLATION_ENABLED"
           v-model="mouseHoverEnabled"
           :disabled="!extensionEnabled"
           :label="t('mouse_hover_translation_enabled_label') || 'Enable Mouse on Hover Translation'"
@@ -538,6 +539,7 @@
             <label class="setting-label">{{ t('mouse_hover_scope_label') || 'Translation Scope' }}</label>
             <div class="setting-control-group">
               <BaseSelect
+                id="MOUSE_HOVER_SCOPE"
                 v-model="mouseHoverScope"
                 :options="mouseHoverScopeOptions"
                 :disabled="!extensionEnabled || !mouseHoverEnabled"
@@ -548,6 +550,7 @@
                 class="inline-checkbox-wrapper"
               >
                 <BaseCheckbox
+                  id="MOUSE_HOVER_SHOW_CONTAINER_BORDER"
                   v-model="mouseHoverShowBorder"
                   :disabled="!extensionEnabled || !mouseHoverEnabled"
                   :label="t('mouse_hover_show_container_border_label') || 'Show border around container'"
@@ -560,6 +563,7 @@
           <div class="horizontal-setting-row">
             <label class="setting-label">{{ t('mouse_hover_trigger_label') || 'Trigger' }}</label>
             <BaseSelect
+              id="MOUSE_HOVER_TRIGGER"
               v-model="mouseHoverTrigger"
               :options="mouseHoverTriggerOptions"
               :disabled="!extensionEnabled || !mouseHoverEnabled"
@@ -575,6 +579,7 @@
             >{{ t('mouse_hover_delay_label') || 'Hover Delay' }}:</span>
             <div class="number-input-container inline-delay-input">
               <input
+                id="MOUSE_HOVER_DELAY"
                 v-model.number="mouseHoverDelay"
                 type="number"
                 min="100"
@@ -595,6 +600,7 @@
             <div class="setting-item">
               <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
               <BaseSelect
+                id="MOUSE_HOVER_AUTO_CLOSE"
                 v-model="mouseHoverAutoClose"
                 :options="mouseHoverAutoCloseOptions"
                 :disabled="!extensionEnabled || !mouseHoverEnabled"
@@ -608,6 +614,7 @@
               <label class="setting-label">{{ t('mouse_hover_timer_label') || 'Display Time (ms)' }}</label>
               <div class="number-input-container inline-delay-input">
                 <input
+                  id="MOUSE_HOVER_TIMER_DURATION"
                   v-model.number="mouseHoverTimerDuration"
                   type="number"
                   min="1000"
