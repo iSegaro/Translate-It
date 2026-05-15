@@ -116,6 +116,7 @@ export class TranslationEngine {
     }
 
     const providerClass = providerInstance.constructor;
+    const originalMode = mode; // Preserve the original mode (e.g., MouseHover)
 
     // 1. Dictionary / Mode Downgrade logic
     mode = await this._resolveTranslationMode(data, providerClass);
@@ -141,6 +142,7 @@ export class TranslationEngine {
     // 5. Standard execution via ProviderCoordinator
     const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
       mode: mode,
+      originalMode: originalMode, // Pass original mode for bilingual/swap logic
       uiContext: uiContext, // Pass UI context (popup, sidepanel, etc.)
       originalSourceLang,
       originalTargetLang,

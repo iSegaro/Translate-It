@@ -54,7 +54,11 @@ export class ProviderCoordinator {
           sourceLang,
           targetLang,
           originalSource,
-          { providerName, mode: translateMode }
+          { 
+            providerName, 
+            mode: translateMode,
+            originalMode: options.originalMode // Prioritize original interaction mode
+          }
         );
 
         processedSourceLang = swappedSource;
