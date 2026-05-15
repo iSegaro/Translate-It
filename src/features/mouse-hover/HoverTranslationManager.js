@@ -1,5 +1,4 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-console.log('[MouseHover] Script loading...');
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { HoverTextDetector } from './HoverTextDetector.js';
@@ -13,13 +12,24 @@ import { ElementDetectionService } from '@/shared/services/ElementDetectionServi
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
-logger.debug('HoverTranslationManager module loaded');
+// Constants for magic numbers
+const MOUSE_MOVEMENT_THRESHOLD = 2; // pixels
+const MODIFIER_TRIGGER_DELAY = 50; // ms
 
 /**
  * HoverTranslationManager - Manages "Mouse on Hover" translation logic
  * Handles event listening, trigger conditions, delays, and coordination.
  */
 export class HoverTranslationManager extends ResourceTracker {
+  static instance = null;
+
+  static getInstance() {
+    if (!HoverTranslationManager.instance) {
+      HoverTranslationManager.instance = new HoverTranslationManager();
+    }
+    return HoverTranslationManager.instance;
+  }
+
   constructor() {
     super('hover-translation-manager');
     this.isActive = false;
@@ -98,7 +108,7 @@ export class HoverTranslationManager extends ResourceTracker {
 
     // Check if mouse actually moved significantly to avoid noise
     const dist = Math.hypot(event.clientX - this.lastPosition.x, event.clientY - this.lastPosition.y);
-    if (dist < 2) return;
+    if (dist < MOUSE_MOVEMENT_THRESHOLD) return;
     
     this.lastPosition = { x: event.clientX, y: event.clientY };
 
@@ -164,7 +174,7 @@ export class HoverTranslationManager extends ResourceTracker {
         // Trigger check with a very small safety delay
         this.hoverTimer = setTimeout(() => {
           this._processHover(this.lastMouseEvent);
-        }, 50);
+        }, MODIFIER_TRIGGER_DELAY);
       }
     }
   }
@@ -246,7 +256,8 @@ export class HoverTranslationManager extends ResourceTracker {
       element.style.outlineOffset = '2px';
     }
 
-    // Add leave listener to the specific element for immediate cleanup
+    // Use ResourceTracker to manage the element's mouseleave listener
+    // This ensures cleanup if multiple hovers happen quickly or if the feature is deactivated
     const leaveHandler = (leaveEvent) => {
       // If we're moving into a UI element (like the tooltip), don't close
       if (leaveEvent.relatedTarget && ElementDetectionService.getInstance().isUIElement(leaveEvent.relatedTarget)) {
@@ -255,9 +266,10 @@ export class HoverTranslationManager extends ResourceTracker {
 
       this._removeBorder();
       this.handleMouseLeave();
-      element.removeEventListener('mouseleave', leaveHandler);
     };
-    element.addEventListener('mouseleave', leaveHandler);
+    
+    // Track listener on specific element; ResourceTracker handles removal of the old one if re-added
+    this.addEventListener(element, 'mouseleave', leaveHandler, { once: true });
 
     try {
       const targetLanguage = settingsManager.get('TARGET_LANGUAGE', 'en');
@@ -283,6 +295,7 @@ export class HoverTranslationManager extends ResourceTracker {
       }
     } catch (error) {
       logger.error('Hover translation failed:', error);
+      pageEventBus.emit('MOUSE_HOVER_TRANSLATION_ERROR', { error });
     }
   }
 
@@ -319,4 +332,5 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 }
 
-export const hoverTranslationManager = new HoverTranslationManager();
+export const hoverTranslationManager = HoverTranslationManager.getInstance();
+
