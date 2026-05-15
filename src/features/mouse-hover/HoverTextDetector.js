@@ -3,6 +3,9 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTextDetector');
 
+// Hit-test tolerance in pixels - small buffer for better UX when mouse is near text edges
+const HIT_TEST_TOLERANCE = 5;
+
 /**
  * HoverTextDetector - Utility for extracting text under the mouse cursor
  * Supports 'word', 'sentence', and 'container' scopes.
@@ -55,7 +58,7 @@ export class HoverTextDetector {
     // with a small tolerance for better UX.
     // Also verify using elementFromPoint to handle potential CSS transforms correctly.
     if (result && result.rect) {
-      const tolerance = 5; // 5px tolerance is usually good for small text
+      const tolerance = HIT_TEST_TOLERANCE;
       const isOverRect = (
         x >= result.rect.left - tolerance &&
         x <= result.rect.right + tolerance &&
