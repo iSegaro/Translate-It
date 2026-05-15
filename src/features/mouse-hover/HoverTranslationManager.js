@@ -287,6 +287,16 @@ export class HoverTranslationManager extends ResourceTracker {
       });
 
       if (result && result.translatedText) {
+        // Check if translation is redundant (same as original text)
+        // We skip showing the tooltip if the text didn't change (e.g. Bilingual is OFF and text is already in target language)
+        const isRedundant = result.translatedText.trim() === detection.text.trim();
+
+        if (isRedundant) {
+          logger.debug('Redundant translation detected (same as original), skipping tooltip display');
+          this._handleMouseOut();
+          return;
+        }
+
         pageEventBus.emit('MOUSE_HOVER_TRANSLATION_READY', {
           originalText: detection.text,
           translatedText: result.translatedText,
