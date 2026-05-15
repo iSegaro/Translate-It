@@ -28,6 +28,7 @@ export class HoverTranslationManager extends ResourceTracker {
     this.hoverTimer = null;
     this.lastPosition = { x: 0, y: 0 };
     this.lastMouseEvent = null;
+    this.currentRect = null; // Rectangle Cache for performance optimization
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -93,6 +94,7 @@ export class HoverTranslationManager extends ResourceTracker {
     // Skip if mouse is over extension UI elements
     if (ElementDetectionService.getInstance().isUIElement(event.target)) {
       this._cancelPendingHover();
+      this._handleMouseOut();
       return;
     }
 
@@ -101,7 +103,27 @@ export class HoverTranslationManager extends ResourceTracker {
     // Check modifier key if required
     if (trigger !== 'hover' && !this._isModifierPressed(event, trigger)) {
       this._cancelPendingHover();
+      this._handleMouseOut();
       return;
+    }
+
+    // Proactive check: If we're already showing a tooltip or have a detected area, 
+    // check if we've left the bounds to improve responsiveness.
+    if (this.currentRect && settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') === 'mouseleave') {
+      const isStillInside = (
+        event.clientX >= this.currentRect.left &&
+        event.clientX <= this.currentRect.right &&
+        event.clientY >= this.currentRect.top &&
+        event.clientY <= this.currentRect.bottom
+      );
+
+      if (isStillInside) {
+        // We are still within the same word/sentence area, NO NEED to recalculate anything
+        return;
+      }
+      
+      // We left the previously detected rectangle
+      this._handleMouseOut();
     }
 
     this._cancelPendingHover();
@@ -110,7 +132,6 @@ export class HoverTranslationManager extends ResourceTracker {
     const delay = settingsManager.get('MOUSE_HOVER_DELAY', 500);
     
     this.hoverTimer = setTimeout(() => {
-      logger.debug('Hover delay reached, starting processing...');
       this._processHover(event);
     }, delay);
   }
@@ -140,13 +161,22 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle mouse leave to hide tooltip or cancel pending hover
    */
   handleMouseLeave(event) {
+    this._handleMouseOut();
+  }
+
+  /**
+   * Internal helper to handle mouse leaving text area
+   * @private
+   */
+  _handleMouseOut() {
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
       pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
+      this.currentText = null; // Clear state so we don't think a tooltip is still showing
+      this.currentRect = null; // Reset rectangle cache
     }
     this._cancelPendingHover();
     this.currentElement = null;
-    this.lastMouseEvent = null;
   }
 
   /**
@@ -155,16 +185,17 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   async _processHover(event) {
     const scope = settingsManager.get('MOUSE_HOVER_SCOPE', 'sentence');
-    logger.debug(`Detecting text with scope: ${scope} at ${event.clientX}, ${event.clientY}`);
     const detection = HoverTextDetector.detect(event.clientX, event.clientY, scope);
 
     if (!detection) {
-      logger.debug('No text detected at cursor position');
+      logger.debug('No text detected at cursor position during processing');
+      // If we've moved to empty space, ensure tooltip is hidden
+      this._handleMouseOut();
       return;
     }
 
     if (!detection.text) {
-      logger.debug('Detection returned empty text');
+      this._handleMouseOut();
       return;
     }
 
@@ -175,6 +206,7 @@ export class HoverTranslationManager extends ResourceTracker {
 
     logger.info(`Hover translation triggered for: "${detection.text.substring(0, 50)}..."`);
     this.currentText = detection.text;
+    this.currentRect = detection.rect; // Cache the rectangle for future movement checks
     const element = detection.element;
 
     // Add visual feedback (border) if scope is container
