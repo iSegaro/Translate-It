@@ -9,6 +9,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
+import { ExtensionContextManager } from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
@@ -294,6 +295,11 @@ export class HoverTranslationManager extends ResourceTracker {
         });
       }
     } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        logger.debug('Hover translation skipped: Extension context invalidated');
+        return;
+      }
+
       logger.error('Hover translation failed:', error);
       pageEventBus.emit('MOUSE_HOVER_TRANSLATION_ERROR', { error });
     }
