@@ -100,6 +100,12 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 - **Mobile Bottom Sheet:** A native-like, thumb-friendly interface for mobile browsers (Firefox Android, Kiwi, Lemur) with gesture support.
 - **Desktop/Mobile FAB Menu:** A draggable, persistent floating action button for instant access to OCR, Page Translation, Element Mode, and rapid feature toggles (like instant TTS or direct-translation mode).
 
+<br>
+
+### 7. Mouse on Hover (Instant Glance)
+- **Glance-to-Translate:** Move your mouse over any text while holding a modifier key (like Ctrl) to see an instant translation in a non-intrusive tooltip.
+- **Smart Scoping:** Choose your focus: translate a single **Word**, a full **Sentence**, or the entire **Container** block automatically.
+
 ---
 
 ## Features at a Glance
@@ -109,6 +115,7 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 | **Text Selection** | Instant translation icon/box right where you select text. |
 | **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
 | **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
+| **Mouse Hover** | Instant translation tooltip triggered by moving mouse over text (supports Word/Sentence/Container scopes). |
 | **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
 | **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
 | **Smart Dictionary** | Definitions, synonyms, and usage examples with multi-accent TTS. |
