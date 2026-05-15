@@ -10,7 +10,6 @@ import {
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
-  getEnableDictionaryAsync,
   TranslationMode,
   getGoogleTranslateV2UrlAsync,
   getDictionaryShowPronunciationAsync,
@@ -105,15 +104,8 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const sl = this._getLangCode(sourceLang);
     const tl = this._getLangCode(targetLang);
 
-    const isDictionaryEnabled = await getEnableDictionaryAsync();
-    // Dictionary should only be enabled for single-segment translations and NOT in Field, Select Element or Page mode.
-    const isExcludedMode = translateMode === TranslationMode.Field || 
-                          translateMode === TranslationMode.Page || 
-                          translateMode === TranslationMode.Select_Element;
-
-    const shouldIncludeDictionary = isDictionaryEnabled && 
-                                    chunkTexts.length === 1 && 
-                                    !isExcludedMode;
+        // Dictionary mode is explicitly requested by the translation engine
+    const shouldIncludeDictionary = translateMode === TranslationMode.Dictionary_Translation;
 
     const apiUrl = await getGoogleTranslateV2UrlAsync();
     const url = new URL(apiUrl);

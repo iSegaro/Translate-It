@@ -2,7 +2,6 @@
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
 import { 
   getGoogleTranslateUrlAsync,
-  getEnableDictionaryAsync,
   getDictionaryShowPronunciationAsync,
   getDictionaryShowPosAsync,
   getDictionaryShowDefinitionsAsync,
@@ -60,18 +59,8 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
    */
   async _translateChunk(chunkTexts, sourceLang, targetLang, translateMode, abortController, retryAttempt, segmentCount, chunkIndex, totalChunks, options = {}) {
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
-    const isDictionaryEnabled = await getEnableDictionaryAsync();
-
-    // Add key info log for translation start
-    logger.info(`[Google] Starting translation: ${chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER).length} chars`);
-    // Dictionary should only be enabled for single-segment translations and NOT in Field, Select Element or Page mode.
-    const isExcludedMode = translateMode === TranslationMode.Field || 
-                          translateMode === TranslationMode.Page || 
-                          translateMode === TranslationMode.Select_Element;
-
-    const shouldIncludeDictionary = isDictionaryEnabled && 
-                                    chunkTexts.length === 1 && 
-                                    !isExcludedMode;
+        // Dictionary mode is explicitly requested by the translation engine
+    const shouldIncludeDictionary = translateMode === TranslationMode.Dictionary_Translation;
 
     const apiUrl = await getGoogleTranslateUrlAsync();
     
