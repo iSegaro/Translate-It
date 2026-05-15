@@ -618,6 +618,24 @@ describe('SimpleMarkdown', () => {
     });
   });
 
+  describe('Preferred Direction', () => {
+    it('should use preferredDir as fallback for mixed content', () => {
+      const mixedText = 'Test ترجمه';
+      // Without preferredDir, it might default to ltr because it starts with English
+      const rendered = SimpleMarkdown.render(mixedText, 'rtl');
+      // rendered is a div.simple-markdown containing a p
+      const p = rendered.querySelector('p');
+      expect(p.getAttribute('dir')).toBe('rtl');
+    });
+
+    it('should still detect pure LTR even if preferredDir is RTL', () => {
+      const pureLtr = 'Pure English text';
+      const rendered = SimpleMarkdown.render(pureLtr, 'rtl');
+      const p = rendered.querySelector('p');
+      expect(p.getAttribute('dir')).toBe('ltr');
+    });
+  });
+
   describe('Performance and Edge Cases', () => {
     it('should handle very long text', () => {
       const longText = 'Word '.repeat(1000);

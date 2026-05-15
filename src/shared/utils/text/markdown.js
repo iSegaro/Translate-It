@@ -26,7 +26,7 @@ export class SimpleMarkdown {
   // Matches parenthesized RTL text at the start of a line (e.g., "(اسم)")
   static PARENTHESIZED_RTL_START = new RegExp(`^\\s*\\([${SimpleMarkdown.RTL_REGEX.source.slice(1, -1)}\\s]+\\)`);
 
-  static render(markdown) {
+  static render(markdown, preferredDir = "auto") {
     if (!markdown || typeof markdown !== "string") {
       return "";
     }
@@ -119,37 +119,37 @@ export class SimpleMarkdown {
       if (trimmed.startsWith("###### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h6");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(7)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(7), preferredDir));
         currentSection.textContent = trimmed.substring(7);
         listItems = [];
       } else if (trimmed.startsWith("##### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h5");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(6)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(6), preferredDir));
         currentSection.textContent = trimmed.substring(6);
         listItems = [];
       } else if (trimmed.startsWith("#### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h4");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(5)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(5), preferredDir));
         currentSection.textContent = trimmed.substring(5);
         listItems = [];
       } else if (trimmed.startsWith("### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h3");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(4)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(4), preferredDir));
         currentSection.textContent = trimmed.substring(4);
         listItems = [];
       } else if (trimmed.startsWith("## ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h2");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(3)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(3), preferredDir));
         currentSection.textContent = trimmed.substring(3);
         listItems = [];
       } else if (trimmed.startsWith("# ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h1");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(2)));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(2), preferredDir));
         currentSection.textContent = trimmed.substring(2);
         listItems = [];
       }
@@ -158,12 +158,12 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "UL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ul");
-          currentSection.setAttribute("dir", "auto"); // Container stays auto to handle mixed items
+          currentSection.setAttribute("dir", preferredDir); // Use preferred direction
           listItems = [];
         }
         const li = document.createElement("li");
         const content = trimmed.replace(/^\s*([-*•])\s+/, '');
-        li.setAttribute("dir", this._detectDirection(content));
+        li.setAttribute("dir", this._detectDirection(content, preferredDir));
         li.appendChild(this._parseInline(content));
         listItems.push(li);
       }
@@ -172,12 +172,12 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "OL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ol");
-          currentSection.setAttribute("dir", "auto");
+          currentSection.setAttribute("dir", preferredDir); // Use preferred direction
           listItems = [];
         }
         const li = document.createElement("li");
         const content = trimmed.replace(/^\d+\.\s/, "");
-        li.setAttribute("dir", this._detectDirection(content));
+        li.setAttribute("dir", this._detectDirection(content, preferredDir));
         li.appendChild(this._parseInline(content));
         listItems.push(li);
       }
@@ -215,7 +215,7 @@ export class SimpleMarkdown {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("blockquote");
         const content = trimmed.substring(2);
-        currentSection.setAttribute("dir", this._detectDirection(content));
+        currentSection.setAttribute("dir", this._detectDirection(content, preferredDir));
         currentSection.appendChild(this._parseInline(content));
         listItems = [];
       }
@@ -226,7 +226,7 @@ export class SimpleMarkdown {
         
         // Create a new paragraph specifically for this label
         currentSection = document.createElement("p");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed, preferredDir));
         currentSection.appendChild(this._parseLabelLine(trimmed));
         listItems = [];
       }
@@ -241,7 +241,7 @@ export class SimpleMarkdown {
         // Always create a new paragraph for each non-empty line
         this._finishSection(container, currentSection, []);
         currentSection = document.createElement("p");
-        currentSection.setAttribute("dir", this._detectDirection(trimmed));
+        currentSection.setAttribute("dir", this._detectDirection(trimmed, preferredDir));
         listItems = [];
 
         currentSection.appendChild(this._parseInline(trimmed));
@@ -267,13 +267,14 @@ export class SimpleMarkdown {
    * Detects the best directionality for a piece of text.
    * Prioritizes content over labels and handles mixed directionality.
    * @param {string} text 
+   * @param {string} preferredDir - Fallback direction if mixed or empty
    * @returns {string} "ltr", "rtl", or "auto"
    */
-  static _detectDirection(text) {
-    if (!text || typeof text !== "string") return "auto";
+  static _detectDirection(text, preferredDir = "auto") {
+    if (!text || typeof text !== "string") return preferredDir;
     
     const trimmed = text.trim();
-    if (!trimmed) return "auto";
+    if (!trimmed) return preferredDir;
     
     // 1. If no RTL characters at all, it's definitely LTR
     if (!this.RTL_REGEX.test(trimmed)) return "ltr";
@@ -299,8 +300,8 @@ export class SimpleMarkdown {
       if (/[a-zA-Z]/.test(remaining)) return "ltr";
     }
 
-    // 4. Default to auto for other mixed cases
-    return "auto";
+    // 4. Default to preferredDir for other mixed cases
+    return preferredDir;
   }
 
   static _isLabelLine(text) {
