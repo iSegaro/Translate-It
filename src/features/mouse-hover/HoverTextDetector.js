@@ -53,18 +53,29 @@ export class HoverTextDetector {
 
     // Hit-test: Ensure the mouse is actually over the bounding box of the detected text
     // with a small tolerance for better UX.
+    // Also verify using elementFromPoint to handle potential CSS transforms correctly.
     if (result && result.rect) {
       const tolerance = 5; // 5px tolerance is usually good for small text
-      const isOver = (
+      const isOverRect = (
         x >= result.rect.left - tolerance &&
         x <= result.rect.right + tolerance &&
         y >= result.rect.top - tolerance &&
         y <= result.rect.bottom + tolerance
       );
 
-      if (!isOver) {
+      if (!isOverRect) {
         logger.debug('Mouse is not directly over the detected text bounding box, skipping.');
         return null;
+      }
+
+      // Verify the element at the point is actually our target or its descendant
+      // This helps with CSS transforms where getBoundingClientRect might be misleading
+      if (typeof document.elementFromPoint === 'function') {
+        const elementAtPoint = document.elementFromPoint(x, y);
+        if (elementAtPoint && result.element && !result.element.contains(elementAtPoint) && !elementAtPoint.contains(result.element)) {
+          logger.debug('Hit-test failed: element at point does not match detected container');
+          return null;
+        }
       }
     }
 
