@@ -34,6 +34,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **Smart Handler Registration**: A registration system for smart handlers with dynamic activation/deactivation based on settings and URL exclusions.
 - **Content Script Smart Loading**: Intelligent loading system with feature categorization (CRITICAL, ESSENTIAL, ON_DEMAND, INTERACTIVE), improving memory usage by 20-30%.
 - **Advanced Code Splitting**: Smart bundle separation with on-demand loading for features, languages, and utilities.
+- **Mouse on Hover**: High-performance "zero-click" translation with word/sentence/container scopes and modifier-key support.
 
 ## Translation Methods
 1. **Text Selection**: Translates selected text via an icon or direct box display.
@@ -44,7 +45,8 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 6. **Sidepanel**: A full-featured interface in the browser's sidepanel.
 7. **Screen Capture**: Image translation using OCR.
 8. **Context Menu**: Access via the right-click menu.
-9. **Keyboard Shortcuts**: Customizable hotkeys.
+9. **Mouse on Hover**: Instant translation by hovering over text with optional modifier keys.
+10. **Keyboard Shortcuts**: Customizable hotkeys.
 
 ## Provider Development
 The system utilizes a provider hierarchy pattern:
@@ -82,6 +84,7 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
   - `element-selection/`: **Redesigned Element Selection** – SelectionManager and services.
   - `text-selection/`: Selection management and FieldDetector.
   - `text-field-interaction/`: In-field icons and interaction logic.
+  - `mouse-hover/`: **Mouse on Hover** – Optimized text detection and tooltip coordination.
   - `shortcuts/`: Keyboard shortcut handling.
   - `exclusion/`: Smart Handler Registration and ExclusionChecker.
   - `notifications/`: Centralized notification management.
@@ -131,6 +134,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**TEXT_SELECTION_SYSTEM.md**](docs/technical/TEXT_SELECTION_SYSTEM.md): **Text Selection** – Site handlers and field interaction.
 - [**SELECT_ELEMENT_SYSTEM.md**](docs/technical/SELECT_ELEMENT_SYSTEM.md): **Element Selection** – Interactive DOM selection.
 - [**SCREEN_CAPTURE_SYSTEM.md**](docs/technical/SCREEN_CAPTURE_SYSTEM.md): **OCR System** – Interactive capture and Tesseract.js.
+- [**MOUSE_HOVER_SYSTEM.md**](docs/technical/MOUSE_HOVER_SYSTEM.md): **Mouse on Hover** – Optimized detection and tooltip coordination.
 - [**WHOLE_PAGE_TRANSLATION.md**](docs/technical/WHOLE_PAGE_TRANSLATION.md): **Page Translation** – Recursive batch processing.
 - [**TEXT_ACTIONS_SYSTEM.md**](docs/technical/TEXT_ACTIONS_SYSTEM.md): **Text Actions** – Copy/paste/TTS logic integration.
 - [**UI_HOST_SYSTEM.md**](docs/technical/UI_HOST_SYSTEM.md): **Shadow DOM Host** – Centralized in-page UI management.

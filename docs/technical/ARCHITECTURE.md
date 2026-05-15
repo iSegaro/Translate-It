@@ -45,6 +45,7 @@
 - **[Whole Page Translation System](WHOLE_PAGE_TRANSLATION.md)** - Recursive translation of web pages with dynamic batching
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[Screen Capture System](SCREEN_CAPTURE_SYSTEM.md)** - Interactive area capture with Tesseract.js OCR engine
+- **[Mouse Hover System](MOUSE_HOVER_SYSTEM.md)** - High-performance "zero-click" translation with word/sentence/container detection
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
 - **[Optimization Levels](OPTIMIZATION_LEVELS.md)** - Strategy for balancing speed vs. cost in translations
 - **[IFrame Support System](../../src/features/iframe-support/README.md)** - Streamlined iframe functionality with essential components and Vue integration
@@ -201,6 +202,10 @@ src/
 │   ├── text-field-interaction/
 │   │   ├── managers/               # TextFieldIconManager
 │   │   └── handlers/               # TextFieldIconHandler
+│   ├── mouse-hover/
+│   │   ├── HoverTranslationManager.js # Central orchestrator
+│   │   ├── HoverTextDetector.js    # Intelligence engine
+│   │   └── components/             # Hover-specific components
 │   ├── shortcuts/
 │   │   └── handlers/               # ShortcutHandler
 │   ├── exclusion/
@@ -332,7 +337,7 @@ ContentScriptCore (Dynamic Import)
 Feature Categories:
     ├── CRITICAL: [messaging, extensionContext] - Load immediately
     ├── ESSENTIAL: [contentMessageHandler] - Load after 400ms
-    ├── LAZY_UI: [vue, textSelection] - Load after 2.5s or on demand
+    ├── LAZY_UI: [vue, textSelection, mouseHover] - Load after 2.5s or on demand
     ├── INTERACTIVE: [windowsManager, selectElement, pageTranslation, screenCapture] - Load on user interaction
     └── ON_DEMAND: [shortcut, textFieldIcon] - Load after 4s or on demand
 ```
@@ -1016,6 +1021,28 @@ The screen capture system enables visual text extraction from images, videos, an
 
 ### Documentation
 For detailed information on the capture lifecycle, Tesseract.js configuration, and the two-frame transparency pattern, refer to the **[Screen Capture System Documentation](SCREEN_CAPTURE_SYSTEM.md)**.
+
+</details>
+
+---
+
+## Mouse on Hover System
+
+<details>
+<summary>View Mouse on Hover details</summary>
+
+### Overview
+The mouse on hover system provides a high-performance, "zero-click" translation experience by detecting text under the cursor and showing a tooltip. It is designed to be extremely responsive while maintaining 60fps performance through intelligent caching.
+
+### Architecture and Integration
+- **HoverTranslationManager**: The central orchestrator that manages event listening, trigger conditions (hover delay, modifier keys), and coordination with the UI.
+- **HoverTextDetector**: A specialized engine that uses browser range APIs for high-precision detection of words, sentences, or containers.
+- **Rectangle Cache**: An optimization layer that stores the bounding box of the detected text, skipping expensive DOM lookups as long as the mouse remains within the same area.
+- **Shadow DOM Tooltip**: Renders the translation within an isolated UI Host component (`MouseHoverTooltip.vue`), using smart positioning to avoid viewport clipping.
+- **Modifier Key Integration**: Supports instant translation when pressing Ctrl/Alt/Shift while hovering over text.
+
+### Documentation
+For detailed information on detection scopes, performance benchmarks, and positioning logic, refer to the **[Mouse on Hover System Documentation](MOUSE_HOVER_SYSTEM.md)**.
 
 </details>
 
