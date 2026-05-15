@@ -1,4 +1,15 @@
 /* src/apps/content/components/MouseHoverTooltip.scss */
+/**
+ * MouseHoverTooltip Styles
+ * 
+ * ARCHITECTURE NOTE:
+ * This component uses Shadow DOM isolation. According to CSS_ARCHITECTURE.md:
+ * 1. !important is MANDATORY for all properties to ensure host page styles 
+ *    do not bleed into the isolated Shadow DOM UI.
+ * 2. Variables (var(--ti-...)) are used to maintain theme consistency.
+ * 3. translate3d is used for hardware-accelerated positioning.
+ */
+
 .ti-mouse-hover-tooltip {
   position: fixed !important;
   top: 0 !important;
