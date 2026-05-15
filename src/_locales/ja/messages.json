@@ -368,6 +368,9 @@
   "activation_group_dictionary_title": {
     "message": "辞書モード"
   },
+  "activation_group_mouse_hover_title": {
+    "message": "マウスホバー翻訳"
+  },
   "import_export_export_title": {
     "message": "設定のエクスポート"
   },
@@ -543,7 +546,58 @@
     "message": "テキスト選択時の翻訳を有効にする"
   },
   "translate_on_text_selection_description": {
-    "message": "ページ上のテキストを選択した後、自動的またはアイコンを介して翻訳をトリガーできるようにします。"
+    "message": "ページ上のテキストを選択した後、自動的またはアイコンを介して翻訳をトリガーできるようにできるようにします。"
+  },
+  "mouse_hover_translation_enabled_label": {
+    "message": "マウスホバー翻訳を有効にする"
+  },
+  "mouse_hover_translation_enabled_description": {
+    "message": "テキストの上にマウスを置いたときに自動的に翻訳します。"
+  },
+  "mouse_hover_scope_label": {
+    "message": "翻訳範囲"
+  },
+  "mouse_hover_scope_word": {
+    "message": "単語"
+  },
+  "mouse_hover_scope_sentence": {
+    "message": "一文"
+  },
+  "mouse_hover_scope_container": {
+    "message": "コンテナ"
+  },
+  "mouse_hover_trigger_label": {
+    "message": "トリガー"
+  },
+  "mouse_hover_trigger_hover": {
+    "message": "即時（ホバー）"
+  },
+  "mouse_hover_trigger_ctrl": {
+    "message": "Ctrl + ホバー"
+  },
+  "mouse_hover_trigger_alt": {
+    "message": "Alt + ホバー"
+  },
+  "mouse_hover_trigger_shift": {
+    "message": "Shift + ホバー"
+  },
+  "mouse_hover_delay_label": {
+    "message": "ホバー遅延"
+  },
+  "mouse_hover_autoclose_label": {
+    "message": "ツールチップの自動非表示"
+  },
+  "mouse_hover_autoclose_mouseleave": {
+    "message": "マウスが離れたとき"
+  },
+  "mouse_hover_autoclose_timer": {
+    "message": "一定時間後"
+  },
+  "mouse_hover_timer_label": {
+    "message": "表示時間 (ms)"
+  },
+  "mouse_hover_show_container_border_label": {
+    "message": "コンテナの境界線を表示する"
   },
   "mobile_dashboard_page_label": {
     "message": "ページ"
