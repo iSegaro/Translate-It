@@ -55,6 +55,7 @@ vi.mock("./managers/OptimizedJsonHandler.js", () => {
 // 3. Imports
 import { TranslationEngine } from './translation-engine.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { getEnableDictionaryAsync } from "@/shared/config/config.js";
 
 // 4. Other dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -75,11 +76,24 @@ vi.mock("@/shared/config/config.js", () => ({
   },
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('auto')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
+  getEnableDictionaryAsync: vi.fn(() => Promise.resolve(true)),
   getPopupMaxCharsAsync: vi.fn(() => Promise.resolve(5000)),
   getSidepanelMaxCharsAsync: vi.fn(() => Promise.resolve(10000)),
   getSelectionMaxCharsAsync: vi.fn(() => Promise.resolve(5000)),
   getSelectElementMaxCharsAsync: vi.fn(() => Promise.resolve(300000)),
-  TranslationMode: { Selection: 'selection', Page: 'page', Dictionary_Translation: 'dictionary', Select_Element: 'select_element' }
+  TranslationMode: { 
+    Selection: 'selection', 
+    Page: 'page', 
+    Dictionary_Translation: 'dictionary', 
+    Select_Element: 'select_element',
+    MouseHover: 'mouse_hover',
+    Field: 'field',
+    Popup_Translate: 'popup'
+  }
+}));
+
+vi.mock("@/shared/utils/text/textAnalysis.js", () => ({
+  isSingleWordOrShortPhrase: vi.fn((text) => text && text.trim().split(/\s+/).length === 1)
 }));
 
 // Mock ErrorMatcher using central mock
@@ -91,6 +105,8 @@ describe('TranslationEngine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     engine = new TranslationEngine();
+    // Reset default mock behaviors
+    getEnableDictionaryAsync.mockResolvedValue(true);
   });
 
   describe('handleMessage', () => {
@@ -99,10 +115,11 @@ describe('TranslationEngine', () => {
         action: MessageActions.TRANSLATE,
         messageId: 'test-123',
         data: {
-          text: 'Hello',
+          text: 'Hello world',
           provider: 'google',
           sourceLanguage: 'en',
-          targetLanguage: 'fa'
+          targetLanguage: 'fa',
+          mode: 'selection'
         }
       };
 
@@ -110,6 +127,7 @@ describe('TranslationEngine', () => {
 
       expect(result.success).toBe(true);
       expect(result.translatedText).toBe('Translated Result');
+      expect(result.mode).toBe('selection'); // Not upgraded because multi-word
     });
 
     it('should handle errors and return formatted error response', async () => {
@@ -143,13 +161,65 @@ describe('TranslationEngine', () => {
     });
   });
 
-  describe('Mode Resolution', () => {
+  describe('Mode Resolution & Dictionary Upgrade', () => {
+    it('should upgrade MouseHover with single word to dictionary mode', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.constructor.supportsDictionary = true;
+
+      const data = { text: 'apple', mode: 'mouse_hover' };
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
+
+      expect(resolvedMode).toBe('dictionary');
+    });
+
+    it('should NOT upgrade Page translation with single word', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.constructor.supportsDictionary = true;
+
+      const data = { text: 'apple', mode: 'page' };
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
+
+      expect(resolvedMode).toBe('page'); // Stays page
+    });
+
+    it('should NOT upgrade Select Element with single word', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.constructor.supportsDictionary = true;
+
+      const data = { text: 'apple', mode: 'select_element' };
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
+
+      expect(resolvedMode).toBe('select_element'); // Stays select_element
+    });
+
+    it('should NOT upgrade if dictionary is disabled in settings', async () => {
+      getEnableDictionaryAsync.mockResolvedValue(false);
+
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.constructor.supportsDictionary = true;
+
+      const data = { text: 'apple', mode: 'mouse_hover' };
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
+
+      expect(resolvedMode).toBe('mouse_hover');
+    });
+
+    it('should NOT upgrade if text is not a single word', async () => {
+      const mockProvider = await engine.getProvider('google');
+      mockProvider.constructor.supportsDictionary = true;
+
+      const data = { text: 'this is a sentence', mode: 'mouse_hover' };
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
+
+      expect(resolvedMode).toBe('mouse_hover');
+    });
+
     it('should downgrade dictionary mode if provider does not support it', async () => {
       const mockProvider = await engine.getProvider('google');
       mockProvider.constructor.supportsDictionary = false;
 
       const data = { text: 'word', mode: 'dictionary' };
-      const resolvedMode = engine._resolveTranslationMode(data, mockProvider.constructor);
+      const resolvedMode = await engine._resolveTranslationMode(data, mockProvider.constructor);
 
       expect(resolvedMode).toBe('selection');
     });
