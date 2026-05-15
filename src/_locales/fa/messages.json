@@ -2162,6 +2162,9 @@
   "bilingual_mode_selection_label": {
     "message": "انتخاب متن"
   },
+  "bilingual_mode_mouse_hover_label": {
+    "message": "ترجمه با نگه داشتن ماوس"
+  },
   "bilingual_mode_select_element_label": {
     "message": "انتخاب المان"
   },

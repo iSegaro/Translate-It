@@ -2162,8 +2162,11 @@
   "bilingual_mode_selection_label": {
     "message": "テキスト選択"
   },
+  "bilingual_mode_mouse_hover_label": {
+    "message": "マウスオーバー翻訳"
+  },
   "bilingual_mode_select_element_label": {
-    "message": "要素選択"
+    "message": "要素を選択"
   },
   "bilingual_mode_field_label": {
     "message": "テキストフィールド"

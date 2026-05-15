@@ -486,9 +486,10 @@ const currentOptimizationLevel = computed({
 
 // --- Bilingual Logic ---
 
-const visibleBilingualModes = [TranslationMode.Selection, TranslationMode.Select_Element, TranslationMode.Field, TranslationMode.Popup_Translate, TranslationMode.Page]
+const visibleBilingualModes = [TranslationMode.Selection, TranslationMode.MouseHover, TranslationMode.Select_Element, TranslationMode.Field, TranslationMode.Popup_Translate, TranslationMode.Page]
 const modeLabels = computed(() => ({
   [TranslationMode.Selection]: t('bilingual_mode_selection_label'),
+  [TranslationMode.MouseHover]: t('bilingual_mode_mouse_hover_label'),
   [TranslationMode.Select_Element]: t('bilingual_mode_select_element_label'),
   [TranslationMode.Field]: t('bilingual_mode_field_label'),
   [TranslationMode.Popup_Translate]: t('bilingual_mode_popup_label'),
