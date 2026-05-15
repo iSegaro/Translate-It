@@ -29,6 +29,8 @@ export class HoverTranslationManager extends ResourceTracker {
     this.lastPosition = { x: 0, y: 0 };
     this.lastMouseEvent = null;
     this.currentRect = null; // Rectangle Cache for performance optimization
+    this.borderedElement = null; // Tracking element with active border
+    this.originalOutline = null; // Storing original style to restore later
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -60,6 +62,7 @@ export class HoverTranslationManager extends ResourceTracker {
         this.currentText = null;
         this.currentRect = null;
         this.currentElement = null;
+        this._removeBorder();
       });
 
       return true;
@@ -181,11 +184,24 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentText = null; // Reset text cache
     this.currentRect = null; // Reset rectangle cache
     this.currentElement = null;
+    this._removeBorder();
     this._cancelPendingHover();
 
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
       pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
+    }
+  }
+
+  /**
+   * Remove the visual border from the current element
+   * @private
+   */
+  _removeBorder() {
+    if (this.borderedElement) {
+      this.borderedElement.style.outline = this.originalOutline || '';
+      this.borderedElement = null;
+      this.originalOutline = null;
     }
   }
 
@@ -219,22 +235,25 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentRect = detection.rect; // Cache the rectangle for future movement checks
     const element = detection.element;
 
+    // Clean up any previous border before applying new one
+    this._removeBorder();
+
     // Add visual feedback (border) if scope is container
-    let originalStyle = '';
     if (scope === 'container' && settingsManager.get('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)) {
-      originalStyle = element.style.outline;
+      this.borderedElement = element;
+      this.originalOutline = element.style.outline;
       element.style.outline = '2px solid var(--ti-primary-color, #4285f4)';
       element.style.outlineOffset = '2px';
     }
 
-    // Add leave listener to the specific element
+    // Add leave listener to the specific element for immediate cleanup
     const leaveHandler = (leaveEvent) => {
       // If we're moving into a UI element (like the tooltip), don't close
       if (leaveEvent.relatedTarget && ElementDetectionService.getInstance().isUIElement(leaveEvent.relatedTarget)) {
         return;
       }
 
-      if (originalStyle !== undefined) element.style.outline = originalStyle;
+      this._removeBorder();
       this.handleMouseLeave();
       element.removeEventListener('mouseleave', leaveHandler);
     };
