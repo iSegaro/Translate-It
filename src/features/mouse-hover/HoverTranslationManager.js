@@ -54,6 +54,14 @@ export class HoverTranslationManager extends ResourceTracker {
       
       this.isActive = true;
       logger.info('Hover translation manager activated and listening');
+      
+      // Listen for when tooltip is hidden (could be via timer or other means)
+      this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_HIDDEN', () => {
+        this.currentText = null;
+        this.currentRect = null;
+        this.currentElement = null;
+      });
+
       return true;
     } catch (error) {
       logger.error('Failed to activate HoverTranslationManager:', error);
@@ -169,14 +177,15 @@ export class HoverTranslationManager extends ResourceTracker {
    * @private
    */
   _handleMouseOut() {
+    this.currentText = null; // Reset text cache
+    this.currentRect = null; // Reset rectangle cache
+    this.currentElement = null;
+    this._cancelPendingHover();
+
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
       pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
-      this.currentText = null; // Clear state so we don't think a tooltip is still showing
-      this.currentRect = null; // Reset rectangle cache
     }
-    this._cancelPendingHover();
-    this.currentElement = null;
   }
 
   /**

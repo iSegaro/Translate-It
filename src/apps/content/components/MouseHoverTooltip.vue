@@ -71,6 +71,10 @@ const showTooltip = async (detail) => {
 
 const hideTooltip = () => {
   isVisible.value = false;
+  
+  // Notify manager that tooltip is hidden so it can reset its cache
+  pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN');
+  
   if (autoHideTimer) {
     clearTimeout(autoHideTimer);
     autoHideTimer = null;
