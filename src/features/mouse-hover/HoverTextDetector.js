@@ -38,16 +38,37 @@ export class HoverTextDetector {
 
     logger.debug(`Detected text node: "${node.textContent.substring(0, 20)}..."`);
 
+    let result = null;
     switch (scope) {
       case 'word':
-        return this._detectWord(range);
+        result = this._detectWord(range);
+        break;
       case 'sentence':
-        return this._detectSentence(range);
+        result = this._detectSentence(range);
+        break;
       case 'container':
-        return this._detectContainer(node);
-      default:
-        return null;
+        result = this._detectContainer(node);
+        break;
     }
+
+    // Hit-test: Ensure the mouse is actually over the bounding box of the detected text
+    // with a small tolerance for better UX.
+    if (result && result.rect) {
+      const tolerance = 5; // 5px tolerance is usually good for small text
+      const isOver = (
+        x >= result.rect.left - tolerance &&
+        x <= result.rect.right + tolerance &&
+        y >= result.rect.top - tolerance &&
+        y <= result.rect.bottom + tolerance
+      );
+
+      if (!isOver) {
+        logger.debug('Mouse is not directly over the detected text bounding box, skipping.');
+        return null;
+      }
+    }
+
+    return result;
   }
 
   /**
