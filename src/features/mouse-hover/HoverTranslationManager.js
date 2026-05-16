@@ -12,6 +12,9 @@ import { ElementDetectionService } from '@/shared/services/ElementDetectionServi
 import { ExtensionContextManager } from '@/core/extensionContext.js';
 import { isEditable } from '@/core/helpers.js';
 
+// Import CSS as inline string
+import hoverStyles from './HoverHighlight.scss?inline';
+
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
 // Constants for magic numbers
@@ -43,7 +46,6 @@ export class HoverTranslationManager extends ResourceTracker {
     this.lastMouseEvent = null;
     this.currentRect = null; // Rectangle Cache for performance optimization
     this.borderedElement = null; // Tracking element with active border
-    this.originalOutline = null; // Storing original style to restore later
     this.currentMessageId = null; // Tracking active translation request
     
     // Bind handlers
@@ -63,6 +65,8 @@ export class HoverTranslationManager extends ResourceTracker {
     }
 
     try {
+      await this._ensureStylesInjected();
+
       // Use ResourceTracker to manage event listeners
       this.addEventListener(document, 'mousemove', this.handleMouseMove, { passive: true });
       this.addEventListener(document, 'keydown', this.handleKeyDown, { passive: true });
@@ -229,18 +233,8 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   _removeBorder() {
     if (this.borderedElement) {
-      this.borderedElement.style.outline = this.originalOutline || '';
-      this.borderedElement.style.outlineOffset = this.originalOutlineOffset || '';
-      this.borderedElement.style.boxShadow = this.originalBoxShadow || '';
-      this.borderedElement.style.transition = this.originalTransition || '';
-      this.borderedElement.style.borderRadius = this.originalBorderRadius || '';
-      
+      this.borderedElement.classList.remove('ti-hover-container-highlight');
       this.borderedElement = null;
-      this.originalOutline = null;
-      this.originalOutlineOffset = null;
-      this.originalBoxShadow = null;
-      this.originalTransition = null;
-      this.originalBorderRadius = null;
     }
   }
 
@@ -296,18 +290,7 @@ export class HoverTranslationManager extends ResourceTracker {
     // Add visual feedback (border) if scope is container
     if (scope === 'container' && settingsManager.get('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)) {
       this.borderedElement = element;
-      this.originalOutline = element.style.outline;
-      this.originalOutlineOffset = element.style.outlineOffset;
-      this.originalBoxShadow = element.style.boxShadow;
-      this.originalTransition = element.style.transition;
-      this.originalBorderRadius = element.style.borderRadius;
-
-      // Professional, subtle and rounded look with "breathing space"
-      element.style.outline = '1.5px solid var(--ti-primary-color, #4285f4)';
-      element.style.outlineOffset = '6px';
-      element.style.borderRadius = '8px'; // Rounded corners for a modern feel
-      element.style.boxShadow = '0 0 10px rgba(66, 133, 244, 0.15)';
-      element.style.transition = 'outline 0.2s ease, box-shadow 0.2s ease, outline-offset 0.2s ease, border-radius 0.2s ease';
+      element.classList.add('ti-hover-container-highlight');
     }
 
     // Use ResourceTracker to manage the element's mouseleave listener
@@ -423,6 +406,17 @@ export class HoverTranslationManager extends ResourceTracker {
       if (this.currentMessageId === messageId) {
         this.currentMessageId = null;
       }
+    }
+  }
+
+  /**
+   * Ensure necessary CSS styles are injected for hover highlighting
+   * @private
+   */
+  async _ensureStylesInjected() {
+    const contentCore = window.translateItContentCore;
+    if (contentCore && typeof contentCore.injectMainDOMStyles === 'function') {
+      contentCore.injectMainDOMStyles(hoverStyles, 'translate-it-hover-highlight-styles');
     }
   }
 
