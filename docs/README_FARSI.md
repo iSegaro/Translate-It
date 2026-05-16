@@ -165,8 +165,13 @@
 
 ---
 
-## لایسنس
-منتشر شده تحت لایسنس **MIT**.
+## مجوز
+
+این پروژه تحت مجوز **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** منتشر شده است.
+
+Copyright (c) 2025-2026 Mohammad Khani and iSegar0.
+
+برای اطلاعات بیشتر، فایل [LICENSE](../LICENSE) را مشاهده کنید.
 
 ---
 
