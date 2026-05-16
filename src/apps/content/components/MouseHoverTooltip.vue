@@ -12,6 +12,9 @@
       :show-toolbar="false"
       max-height="40vh"
       class="ti-mouse-hover-display"
+      :error="errorMessage"
+      :error-type="errorType"
+      :is-streaming="isStreaming"
     />
   </div>
 </template>
@@ -30,6 +33,8 @@ const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'MouseHoverTooltip');
 const settingsStore = useSettingsStore();
 const isVisible = ref(false);
 const translatedText = ref('');
+const errorMessage = ref('');
+const errorType = ref(null);
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 const isError = ref(false);
@@ -54,6 +59,8 @@ const showTooltip = async (detail) => {
   if (!wasVisible) {
     isVisible.value = false;
     isError.value = false;
+    errorMessage.value = '';
+    errorType.value = null;
   }
   
   translatedText.value = detail.translatedText;
@@ -86,7 +93,9 @@ const showTooltip = async (detail) => {
 const showError = (detail) => {
   isVisible.value = true;
   isError.value = true;
-  translatedText.value = detail.error?.message || 'Translation failed';
+  errorMessage.value = detail.error?.message || 'Translation failed';
+  errorType.value = detail.error?.type || null;
+  translatedText.value = '';
   
   tracker.clearAllTimers();
   tracker.setTimeout(() => {
@@ -97,6 +106,8 @@ const showError = (detail) => {
 const hideTooltip = () => {
   isVisible.value = false;
   isError.value = false;
+  errorMessage.value = '';
+  errorType.value = null;
   
   // Notify manager that tooltip is hidden so it can reset its cache
   pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN');
