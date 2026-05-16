@@ -10,6 +10,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
 import { ExtensionContextManager } from '@/core/extensionContext.js';
+import { isEditable } from '@/core/helpers.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
@@ -121,6 +122,13 @@ export class HoverTranslationManager extends ResourceTracker {
       return;
     }
 
+    // Skip if mouse is over editable elements (inputs, textareas, etc.)
+    if (isEditable(event.target)) {
+      this._cancelPendingHover();
+      this._handleMouseOut();
+      return;
+    }
+
     const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
     
     // Check modifier key if required
@@ -165,6 +173,11 @@ export class HoverTranslationManager extends ResourceTracker {
   handleKeyDown(event) {
     const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
     if (trigger === 'hover') return;
+
+    // Ignore modifier keys if user is typing in a field (focused on an editable element)
+    if (isEditable(document.activeElement)) {
+      return;
+    }
 
     if (this._isModifierPressed(event, trigger)) {
       // If we have a stored mouse event and we're over an element
