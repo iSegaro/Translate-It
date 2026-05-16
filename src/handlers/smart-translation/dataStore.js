@@ -36,8 +36,9 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   let targetSelector = null;
 
   if (target) {
-    if (target.className) {
-      const classes = target.className.split(' ').filter(c => c.trim()).join('.');
+    const className = typeof target.className === 'string' ? target.className : (target.getAttribute && target.getAttribute('class')) || '';
+    if (className) {
+      const classes = className.split(' ').filter(c => c.trim()).join('.');
       if (classes) {
         targetSelector = `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ''}.${classes}`;
       }

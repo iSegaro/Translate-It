@@ -354,7 +354,7 @@ export class TextFieldIconManager extends ResourceTracker {
       const activeIcon = state.activeTranslateIcon;
       const isWindowsManagerIcon = activeIcon && (
         activeIcon.id?.startsWith('translation-icon-') ||
-        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.classList?.contains('translation-icon') ||
         activeIcon.getAttribute?.('data-translate-icon')
       );
 
@@ -533,7 +533,7 @@ export class TextFieldIconManager extends ResourceTracker {
       const activeIcon = state.activeTranslateIcon;
       const isWindowsManagerIcon = activeIcon && (
         activeIcon.id?.startsWith('translation-icon-') ||
-        activeIcon.className?.includes('translation-icon') ||
+        activeIcon.classList?.contains('translation-icon') ||
         activeIcon.getAttribute?.('data-translate-icon')
       );
 
