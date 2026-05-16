@@ -21,6 +21,7 @@ export class FeatureManager extends ResourceTracker {
 
     super();
     this.activeFeatures = new Set();
+    this.requestedFeatures = new Set();
     this.featureHandlers = new Map();
     this.exclusionChecker = ExclusionChecker.getInstance();
     this.initialized = false;
@@ -70,6 +71,8 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async initialize() {
+    if (this.initialized) return;
+
     try {
       logger.init('Initializing FeatureManager');
 
@@ -101,26 +104,39 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async evaluateAndRegisterFeatures() {
-    // Order matters: contentMessageHandler should be activated first
-    // selectElement is managed directly by FeatureManager with its own Critical Protection
-    const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture', 'mouseHover'];
-
-    logger.debug('Evaluating features for registration:', features);
-
-    for (const feature of features) {
-      const shouldActivate = await this.shouldActivateFeature(feature);
-
-      if (shouldActivate) {
-        await this.activateFeature(feature);
-      }
+    try {
+      logger.debug('FeatureManager ready for on-demand activation');
+      
+      // Inject dependencies for any already active features (failsafe)
+      await this.injectDependencies();
+    } catch (error) {
+      logger.error('Error in evaluateAndRegisterFeatures:', error);
     }
+  }
 
-    logger.debug('Feature evaluation complete', {
-      activeFeatures: Array.from(this.activeFeatures)
-    });
-
-    // Inject dependencies after all features are evaluated
-    await this.injectDependencies();
+  /**
+   * Main entry point for requesting feature activation.
+   * Features will only be activated if allowed by the exclusion checker.
+   */
+  async requestFeatureActivation(featureName, force = false) {
+    logger.debug(`Request to activate feature: ${featureName} (force=${force})`);
+    
+    // Ensure manager is initialized (sets up listeners, exclusion checker, etc.)
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    // Track that this feature has been formally requested
+    this.requestedFeatures.add(featureName);
+    
+    const shouldActivate = force || await this.shouldActivateFeature(featureName);
+    if (shouldActivate) {
+      await this.activateFeature(featureName);
+    } else {
+      logger.debug(`Feature ${featureName} activation skipped (not allowed)`);
+    }
+    
+    return this.getFeatureHandler(featureName);
   }
 
   async injectDependencies() {
@@ -453,11 +469,10 @@ export class FeatureManager extends ResourceTracker {
     this._evaluationInProgress = true;
 
     try {
-      // Order matters: contentMessageHandler should be evaluated first
-      // selectElement is managed directly by FeatureManager with its own Critical Protection
-      const features = ['contentMessageHandler', 'selectElement', 'windowsManager', 'textSelection', 'textFieldIcon', 'shortcut', 'pageTranslation', 'screenCapture', 'mouseHover'];
+      // Re-evaluate only features that have been requested by the loader
+      const features = Array.from(this.requestedFeatures);
 
-      logger.debug('Re-evaluating all features');
+      logger.debug('Re-evaluating requested features', { features });
 
       for (const feature of features) {
         const shouldBeActive = await this.shouldActivateFeature(feature);

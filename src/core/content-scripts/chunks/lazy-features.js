@@ -4,7 +4,6 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LazyFeatures');
 
@@ -50,7 +49,7 @@ export function getFeatureInstance(featureName) {
 }
 
 /**
- * Load a feature lazily. Use force=true for utility features needed for Revert.
+ * Load a feature lazily. Delegates to FeatureManager for logical activation.
  */
 export async function loadFeature(featureName, force = false) {
   // Check if already loaded
@@ -65,186 +64,50 @@ export async function loadFeature(featureName, force = false) {
     return null;
   }
 
-  try {
-    logger.debug(`Loading feature: ${featureName}${force ? ' (forced)' : ''}`);
+  const loadPromise = (async () => {
+    try {
+      logger.debug(`Loading feature via FeatureManager: ${featureName}${force ? ' (forced)' : ''}`);
 
-    let loadingPromise;
+      if (!featureManager) {
+        const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+        featureManager = FeatureManager.getInstance();
+        window.featureManager = featureManager;
+      }
 
-    switch (featureName) {
-      case 'textSelection': loadingPromise = loadTextSelectionFeature(); break;
-      case 'windowsManager': loadingPromise = loadWindowsManagerFeature(force); break;
-      case 'textFieldIcon': loadingPromise = loadTextFieldIconFeature(); break;
-      case 'contentMessageHandler': loadingPromise = loadContentMessageHandlerFeature(); break;
-      case 'selectElement': loadingPromise = loadSelectElementFeature(force); break;
-      case 'shortcut': loadingPromise = loadShortcutFeature(force); break;
-      case 'pageTranslation': loadingPromise = loadPageTranslationFeature(); break;
-      case 'screenCapture': loadingPromise = loadScreenCaptureFeature(force); break;
-      case 'mouseHover': loadingPromise = loadMouseHoverFeature(); break;
-      default: throw new Error(`Unknown feature: ${featureName}`);
+      // Delegate to FeatureManager for logical activation and permission checking
+      const handler = await featureManager.requestFeatureActivation(featureName, force);
+
+      if (!handler) {
+        logger.debug(`Feature ${featureName} activation returned no handler (likely blocked by exclusion)`);
+        return null;
+      }
+
+      // Handle specific return types for backward compatibility with existing consumers
+      let instance = handler;
+      if (featureName === 'windowsManager' && typeof handler.getWindowsManager === 'function') {
+        instance = handler.getWindowsManager();
+      } else if (featureName === 'textSelection' && handler.selectionManager) {
+        instance = handler.selectionManager;
+      } else if (featureName === 'textFieldIcon' && typeof handler.getManager === 'function') {
+        instance = handler.getManager();
+      }
+
+      if (instance) {
+        loadedFeatures.set(featureName, instance);
+        logger.debug(`Feature instance cached: ${featureName}`);
+      }
+      
+      return instance;
+    } catch (error) {
+      logger.error(`Failed to load feature ${featureName}:`, error);
+      throw error;
+    } finally {
+      loadingPromises.delete(featureName);
     }
+  })();
 
-    loadingPromises.set(featureName, loadingPromise);
-    const featureInstance = await loadingPromise;
-
-    if (featureInstance) {
-      loadedFeatures.set(featureName, featureInstance);
-      logger.debug(`Feature loaded and cached: ${featureName}`);
-    } else {
-      logger.debug(`Feature ${featureName} not cached (returned null)`);
-    }
-    
-    loadingPromises.delete(featureName);
-    return featureInstance;
-  } catch (error) {
-    logger.error(`Failed to load feature ${featureName}:`, error);
-    loadingPromises.delete(featureName);
-    throw error;
-  }
-}
-
-async function loadShortcutFeature(force = false) {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-    window.featureManager = featureManager;
-  }
-  
-  // Use ExclusionChecker directly for robust validation
-  const exclusionChecker = ExclusionChecker.getInstance();
-  const isAllowed = force || await exclusionChecker.isFeatureAllowed('shortcut');
-
-  if (isAllowed) {
-    await featureManager.activateFeature('shortcut');
-  } else {
-    logger.debug('Shortcut is blocked by exclusion, skipping activation');
-    return null;
-  }
-  return featureManager.getFeatureHandler('shortcut');
-}
-
-async function loadWindowsManagerFeature(force = false) {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  const isAllowed = force || await exclusionChecker.isFeatureAllowed('windowsManager');
-
-  if (isAllowed) {
-    await featureManager.activateFeature('windowsManager');
-  } else {
-    logger.debug('WindowsManager is blocked by exclusion, skipping activation');
-    return null;
-  }
-  const handler = featureManager.getFeatureHandler('windowsManager');
-  return handler ? handler.getWindowsManager() : null;
-}
-
-async function loadTextSelectionFeature() {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  if (await exclusionChecker.isFeatureAllowed('textSelection')) {
-    await featureManager.activateFeature('textSelection');
-  } else {
-    logger.debug('TextSelection is blocked by exclusion, skipping activation');
-    return null;
-  }
-  const handler = featureManager.getFeatureHandler('textSelection');
-  return handler ? handler.selectionManager : null;
-}
-
-async function loadTextFieldIconFeature() {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  if (await exclusionChecker.isFeatureAllowed('textFieldIcon')) {
-    await featureManager.activateFeature('textFieldIcon');
-  } else {
-    logger.debug('TextFieldIcon is blocked by exclusion, skipping activation');
-    return null;
-  }
-  const handler = featureManager.getFeatureHandler('textFieldIcon');
-  return handler ? handler.getManager() : null;
-}
-
-async function loadContentMessageHandlerFeature() {
-  const { contentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
-  await contentMessageHandler.activate();
-  return contentMessageHandler;
-}
-
-async function loadSelectElementFeature(force = false) {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  const isAllowed = force || await exclusionChecker.isFeatureAllowed('selectElement');
-
-  if (isAllowed) {
-    await featureManager.activateFeature('selectElement');
-  } else {
-    logger.debug('SelectElement is blocked by exclusion, skipping activation');
-    return null;
-  }
-  return featureManager.getFeatureHandler('selectElement');
-}
-
-async function loadPageTranslationFeature() {
-  const { pageTranslationManager } = await import('@/features/page-translation/PageTranslationManager.js');
-  
-  const exclusionChecker = ExclusionChecker.getInstance();
-  if (await exclusionChecker.isFeatureAllowed('pageTranslation')) {
-    if (!pageTranslationManager.isActive) await pageTranslationManager.activate();
-  } else {
-    logger.debug('PageTranslation is blocked by exclusion, skipping activation');
-    return null;
-  }
-  
-  return pageTranslationManager;
-}
-
-async function loadScreenCaptureFeature(force = false) {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  const isAllowed = force || await exclusionChecker.isFeatureAllowed('screenCapture');
-
-  if (isAllowed) {
-    await featureManager.activateFeature('screenCapture');
-  } else {
-    logger.debug('ScreenCapture is blocked by exclusion, skipping activation');
-    return null;
-  }
-  return featureManager.getFeatureHandler('screenCapture');
-}
-
-async function loadMouseHoverFeature() {
-  if (!featureManager) {
-    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-    featureManager = FeatureManager.getInstance();
-  }
-
-  const exclusionChecker = ExclusionChecker.getInstance();
-  if (await exclusionChecker.isFeatureAllowed('mouseHover')) {
-    await featureManager.activateFeature('mouseHover');
-  } else {
-    logger.debug('MouseHover is blocked by exclusion, skipping activation');
-    return null;
-  }
-  return featureManager.getFeatureHandler('mouseHover');
+  loadingPromises.set(featureName, loadPromise);
+  return await loadPromise;
 }
 
 export async function loadCoreFeatures() {
@@ -267,13 +130,10 @@ async function initializeAndActivateFeatures() {
     window.featureManager = featureManager;
   }
   if (!featuresInitialized) {
-    const exclusionChecker = ExclusionChecker.getInstance();
     for (const featureName of CORE_FEATURES) {
       if (featureName === 'vue') continue;
       try {
-        if (await exclusionChecker.isFeatureAllowed(featureName)) {
-          await featureManager.activateFeature(featureName);
-        }
+        await loadFeature(featureName);
       } catch { /* ignore */ }
     }
     featuresInitialized = true;
@@ -308,12 +168,12 @@ export function getFeatureManager() { return featureManager; }
 export function areFeaturesLoaded() { return featuresInitialized; }
 
 export async function activateFeature(featureName) {
-  if (!featureManager) await initializeAndActivateFeatures();
+  if (!featureManager) {
+    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+    featureManager = FeatureManager.getInstance();
+  }
   try { 
-    const exclusionChecker = ExclusionChecker.getInstance();
-    if (await exclusionChecker.isFeatureAllowed(featureName)) {
-      await featureManager.activateFeature(featureName);
-    }
+    await featureManager.requestFeatureActivation(featureName);
   } catch { /* ignore */ }
 }
 
