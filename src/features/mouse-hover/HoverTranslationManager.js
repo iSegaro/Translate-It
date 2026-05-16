@@ -3,7 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
-import { contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
+import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
@@ -43,6 +43,7 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentRect = null; // Rectangle Cache for performance optimization
     this.borderedElement = null; // Tracking element with active border
     this.originalOutline = null; // Storing original style to restore later
+    this.currentMessageId = null; // Tracking active translation request
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
@@ -285,11 +286,45 @@ export class HoverTranslationManager extends ResourceTracker {
     // Track listener on specific element; ResourceTracker handles removal of the old one if re-added
     this.addEventListener(element, 'mouseleave', leaveHandler, { once: true });
 
+    // Cancel any previous active request
+    if (this.currentMessageId) {
+      contentScriptIntegration.cancelTranslationRequest(this.currentMessageId, 'New hover triggered');
+    }
+
+    const messageId = `hover-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    this.currentMessageId = messageId;
+    const accumulatedResults = new Map();
+
     try {
+      // Register for streaming updates
+      registerTranslation(messageId, {
+        onStreamUpdate: (data) => {
+          if (data.data) {
+            const batchText = Array.isArray(data.data) ? data.data.join('') : String(data.data);
+            const index = typeof data.batchIndex === 'number' ? data.batchIndex : accumulatedResults.size;
+            accumulatedResults.set(index, batchText);
+            
+            const partialText = Array.from(accumulatedResults.keys())
+              .sort((a, b) => a - b)
+              .map(i => accumulatedResults.get(i))
+              .join('');
+
+            // Emit progressive result
+            pageEventBus.emit('MOUSE_HOVER_TRANSLATION_READY', {
+              originalText: detection.text,
+              translatedText: partialText,
+              position: { x: event.clientX, y: event.clientY },
+              direction: data.direction || 'ltr',
+              isStreaming: true
+            });
+          }
+        }
+      });
+
       const targetLanguage = settingsManager.get('TARGET_LANGUAGE', 'en');
       const result = await contentScriptIntegration.sendTranslationRequest({
         action: MessageActions.TRANSLATE,
-        messageId: `hover-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        messageId: messageId,
         data: {
           text: detection.text,
           mode: TranslationMode.MouseHover,
@@ -299,10 +334,13 @@ export class HoverTranslationManager extends ResourceTracker {
         context: MessageContexts.CONTENT
       });
 
-      if (result && result.translatedText) {
+      // Defensive result check (consistent with other features)
+      const translatedText = result?.translatedText ?? result?.data?.translatedText ?? result?.result?.translatedText;
+      const direction = result?.direction ?? result?.data?.direction ?? result?.result?.direction ?? 'ltr';
+
+      if (translatedText && this.currentMessageId === messageId) {
         // Check if translation is redundant (same as original text)
-        // We skip showing the tooltip if the text didn't change (e.g. Bilingual is OFF and text is already in target language)
-        const isRedundant = result.translatedText.trim() === detection.text.trim();
+        const isRedundant = translatedText.trim() === detection.text.trim();
 
         if (isRedundant) {
           logger.debug('Redundant translation detected (same as original), skipping tooltip display');
@@ -312,9 +350,10 @@ export class HoverTranslationManager extends ResourceTracker {
 
         pageEventBus.emit('MOUSE_HOVER_TRANSLATION_READY', {
           originalText: detection.text,
-          translatedText: result.translatedText,
+          translatedText: translatedText,
           position: { x: event.clientX, y: event.clientY },
-          direction: result.direction || 'ltr'
+          direction: direction,
+          isStreaming: false
         });
       }
     } catch (error) {
@@ -323,8 +362,17 @@ export class HoverTranslationManager extends ResourceTracker {
         return;
       }
 
+      // Ignore intentional cancellations
+      if (error.message === 'Handler cancelled' || error.type === 'HANDLER_CANCELLED' || error.isCancelled) {
+        return;
+      }
+
       logger.error('Hover translation failed:', error);
       pageEventBus.emit('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+    } finally {
+      if (this.currentMessageId === messageId) {
+        this.currentMessageId = null;
+      }
     }
   }
 

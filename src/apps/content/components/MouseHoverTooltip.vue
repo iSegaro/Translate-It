@@ -33,6 +33,7 @@ const translatedText = ref('');
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 const isError = ref(false);
+const isStreaming = ref(false);
 
 const tracker = useResourceTracker('mouse-hover-tooltip');
 
@@ -45,26 +46,40 @@ const showTooltip = async (detail) => {
   // Clear any existing timer
   tracker.clearAllTimers();
 
-  // CRITICAL: Hide first to reset dimensions and prevent ghosting from previous position
-  isVisible.value = false;
-  isError.value = false;
+  const wasVisible = isVisible.value;
+  isStreaming.value = !!detail.isStreaming;
+
+  // Only hide and reset if it wasn't already visible (new hover)
+  // This prevents flickering during streaming updates
+  if (!wasVisible) {
+    isVisible.value = false;
+    isError.value = false;
+  }
+  
   translatedText.value = detail.translatedText;
   
   // Wait for content update and DOM reset
   await nextTick();
-  isVisible.value = true;
   
-  // Wait for new dimensions to be calculated by the browser
-  await nextTick();
-  calculatePosition(detail.position);
+  if (!wasVisible) {
+    isVisible.value = true;
+    // Wait for new dimensions to be calculated by the browser
+    await nextTick();
+    calculatePosition(detail.position);
+  } else {
+    // If already visible, just update position in case content changed significantly
+    calculatePosition(detail.position);
+  }
 
-  // Setup auto-hide if configured for timer
-  const autoClose = settingsStore.settings?.MOUSE_HOVER_AUTO_CLOSE || 'mouseleave';
-  if (autoClose === 'timer') {
-    const duration = settingsStore.settings?.MOUSE_HOVER_TIMER_DURATION || 3000;
-    tracker.setTimeout(() => {
-      hideTooltip();
-    }, duration);
+  // Setup auto-hide if configured for timer, but ONLY if not streaming
+  if (!isStreaming.value) {
+    const autoClose = settingsStore.settings?.MOUSE_HOVER_AUTO_CLOSE || 'mouseleave';
+    if (autoClose === 'timer') {
+      const duration = settingsStore.settings?.MOUSE_HOVER_TIMER_DURATION || 3000;
+      tracker.setTimeout(() => {
+        hideTooltip();
+      }, duration);
+    }
   }
 };
 
