@@ -179,6 +179,20 @@ export class MainFrameCoordinator {
 
         // Forward other events to the local PageEventBus
         if (type && pageEventBus) {
+          // Special handling for positions from iframes:
+          // Transform iframe-relative coordinates to top-frame coordinates
+          if (data && data.position && !data.position._isTransformed) {
+            const iframeElement = this._getIframeElement(event.source);
+            if (iframeElement) {
+              const rect = iframeElement.getBoundingClientRect();
+              data.position.x += rect.left;
+              data.position.y += rect.top;
+              data.position._isTransformed = true; // Avoid double transformation
+              
+              logger.debug(`Transformed iframe position for ${type}:`, data.position);
+            }
+          }
+          
           pageEventBus.emit(type, data);
         }
       }
@@ -186,6 +200,25 @@ export class MainFrameCoordinator {
       // 2. Handle specific UI/Interaction signals from iframes
       this.handleInteractionSignals(event.data);
     });
+  }
+
+  /**
+   * Helper to find the <iframe> element associated with a window source.
+   * @param {Window} sourceWindow - The contentWindow of the iframe.
+   * @returns {HTMLIFrameElement|null}
+   */
+  _getIframeElement(sourceWindow) {
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      for (const iframe of iframes) {
+        if (iframe.contentWindow === sourceWindow) {
+          return iframe;
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to find iframe element for coordinate transformation', error);
+    }
+    return null;
   }
 
   /**

@@ -66,7 +66,7 @@ if (!window.translateItContentScriptCore) {
       } catch { /* ignore */ }
 
       // Load Lite Features
-      const LITE_FEATURES = ['messaging', 'extensionContext', 'contentMessageHandler'];
+      const LITE_FEATURES = ['messaging', 'extensionContext', 'contentMessageHandler', 'mouseHover'];
       for (const feature of LITE_FEATURES) {
         await contentScriptCore.loadFeature(feature);
       }

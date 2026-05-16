@@ -20,7 +20,13 @@ export function IFrameContentScriptCore() {
     return await loadFeatureOnDemand(featureName);
   };
 
-  core.injectMainDOMStyles = function() {
+  core.injectMainDOMStyles = function(css, id = 'translate-it-main-dom-styles') {
+    if (css && id) {
+      this.injectStyles(css, id);
+      return;
+    }
+    
+    // Fallback for default lite styles
     const liteCss = `
       :root { --translate-highlight-color: #ff8800; }
       .translate-it-element-highlighted { outline: 3px solid var(--translate-highlight-color) !important; }

@@ -101,7 +101,7 @@ export class HoverTranslationManager extends ResourceTracker {
     this.lastMouseEvent = null;
     
     // Notify UI to hide tooltip
-    pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
+    this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
     
     logger.debug('Hover translation manager deactivated');
     return true;
@@ -223,7 +223,7 @@ export class HoverTranslationManager extends ResourceTracker {
 
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
-      pageEventBus.emit('MOUSE_HOVER_HIDE_TOOLTIP');
+      this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
     }
   }
 
@@ -343,7 +343,7 @@ export class HoverTranslationManager extends ResourceTracker {
               .join('');
 
             // Emit progressive result
-            pageEventBus.emit('MOUSE_HOVER_TRANSLATION_READY', {
+            this._emitPageEvent('MOUSE_HOVER_TRANSLATION_READY', {
               originalText: detection.text,
               translatedText: partialText,
               position: { x: event.clientX, y: event.clientY },
@@ -381,7 +381,7 @@ export class HoverTranslationManager extends ResourceTracker {
           return;
         }
 
-        pageEventBus.emit('MOUSE_HOVER_TRANSLATION_READY', {
+        this._emitPageEvent('MOUSE_HOVER_TRANSLATION_READY', {
           originalText: detection.text,
           translatedText: translatedText,
           position: { x: event.clientX, y: event.clientY },
@@ -401,10 +401,37 @@ export class HoverTranslationManager extends ResourceTracker {
       }
 
       logger.error('Hover translation failed:', error);
-      pageEventBus.emit('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+      this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
     } finally {
       if (this.currentMessageId === messageId) {
         this.currentMessageId = null;
+      }
+    }
+  }
+
+  /**
+   * Emit a page event, with cross-frame support for iframes.
+   * @private
+   */
+  _emitPageEvent(type, data) {
+    // 1. Always emit locally for any listeners in the current frame
+    if (data !== undefined) {
+      pageEventBus.emit(type, data);
+    } else {
+      pageEventBus.emit(type);
+    }
+
+    // 2. If in an iframe, notify the top frame
+    if (window !== window.top) {
+      try {
+        window.top.postMessage({
+          source: 'translate-it-iframe',
+          type: type,
+          data: data,
+          timestamp: Date.now()
+        }, '*');
+      } catch (error) {
+        logger.debug('Failed to send hover event to top frame:', error);
       }
     }
   }
