@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { setActivePinia, createPinia } from 'pinia';
 import MouseHoverTooltip from './MouseHoverTooltip.vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
 
@@ -38,6 +39,7 @@ vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
 
 describe('MouseHoverTooltip', () => {
   beforeEach(() => {
+    setActivePinia(createPinia());
     vi.clearAllMocks();
   });
 
