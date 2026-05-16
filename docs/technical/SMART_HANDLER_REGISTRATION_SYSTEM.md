@@ -14,37 +14,43 @@ The **Smart Handler Registration System** is a feature-based exclusion system th
 
 ## Architecture Components
 
-### 1. InteractionCoordinator (`src/core/content-scripts/InteractionCoordinator.js`)
+### 1. Feature Configuration (`src/core/managers/content/FeatureConfig.js`)
+The **Single Source of Truth** for feature definitions. It maps every feature to its governing settings and defines custom enablement logic. This eliminates hardcoded logic across the system.
+
+```javascript
+export const FEATURE_CONFIG = {
+  mouseHover: {
+    settings: ['MOUSE_HOVER_TRANSLATION_ENABLED'],
+    settingKey: 'MOUSE_HOVER_TRANSLATION_ENABLED'
+  },
+  textSelection: {
+    settings: ['TRANSLATE_ON_TEXT_SELECTION', 'SHOW_DESKTOP_FAB', 'MOBILE_UI_MODE'],
+    isEnabled: (get) => { /* custom logic */ }
+  }
+};
+```
+
+### 2. InteractionCoordinator (`src/core/content-scripts/InteractionCoordinator.js`)
 The **InteractionCoordinator** acts as the system's "Gatekeeper." It manages lightweight global listeners (`mouseup`, `keydown`, `contextmenu`, `focusin`, `scroll`) and decides when to trigger the full loading of a feature.
 
 ```javascript
-class InteractionCoordinator {
   async sync() {
-    const isEnabled = settingsManager.isExtensionEnabled() && !this.isPageExcluded;
+    const isEnabled = settingsManager.isExtensionEnabled() && !(await checkUrlExclusionAsync());
 
-    // 1. Text Selection Listener
-    const canSelect = isEnabled && this.exclusionChecker.isFeatureEnabled('textSelection');
-    this._manageListener('textSelection', 'mouseup', this.handlers.textSelection, canSelect);
+    // Define listener requirements dynamically
+    const config = [
+      { key: 'textSelection', type: 'mouseup', handler: this.handlers.textSelection, allowed: isEnabled && await this.exclusionChecker.isFeatureAllowed('textSelection') },
+      // ...
+    ];
 
-    // 2. Keyboard (Shortcut OR Revert/ESC needed)
-    const canShortcut = isEnabled && (this.exclusionChecker.isFeatureEnabled('shortcut') || this.revertMightBeNeeded);
-    this._manageListener('shortcut', 'keydown', this.handlers.shortcut, canShortcut, window);
-
-    // 3. Text Field Focus Listener
-    const canTextFields = isEnabled && this.exclusionChecker.isFeatureEnabled('textFieldIcon');
-    this._manageListener('textFieldIcon', 'focusin', this.handlers.textFieldIcon, canTextFields);
-
-    // 4. Select Element Pre-load (Context Menu)
-    const canSelectElement = isEnabled && this.exclusionChecker.isFeatureEnabled('selectElement');
-    this._manageListener('selectElement', 'contextmenu', this.handlers.selectElement, canSelectElement);
+    config.forEach(item => this._manageListener(item.key, item.type, item.handler, item.allowed));
   }
-}
 ```
 
 **Key Responsibilities:**
-- Monitors `revertMightBeNeeded` flag to keep Escape key active after a translation.
-- Listens for `select-mode-activated` and `ELEMENT_TRANSLATIONS_AVAILABLE` via `PageEventBus` to prioritize ESC monitoring.
-- Manages lifecycle of 5+ global listeners based on real-time settings changes.
+- **Trigger-Only Role**: Detects potential interactions and triggers `loadFeature()` without knowing the internal business logic of the features.
+- **Dynamic Listener Sync**: Automatically attaches/detaches DOM listeners based on real-time permission changes.
+- **Context Awareness**: Manages different behaviors for Top Frames vs. IFrames while keeping the logic decoupled.
 
 ### 2. Lazy Feature Loader (`src/core/content-scripts/chunks/lazy-features.js`)
 Acts as a lean **Proxy Layer** for dynamic imports. It delegates all logical activation and permission checking to the `FeatureManager`, focusing only on retrieving and caching the returned feature instances.
