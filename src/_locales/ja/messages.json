@@ -594,7 +594,7 @@
     "message": "一定時間後"
   },
   "mouse_hover_timer_label": {
-    "message": "表示時間 (ms)"
+    "message": "表示時間:"
   },
   "mouse_hover_show_container_border_label": {
     "message": "コンテナの境界線を表示する"

@@ -414,7 +414,7 @@
     "message": "After Time"
   },
   "mouse_hover_timer_label": {
-    "message": "Display Time (ms)"
+    "message": "Display Time:"
   },
   "mouse_hover_show_container_border_label": {
     "message": "Show border around container"

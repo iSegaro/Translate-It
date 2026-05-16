@@ -559,46 +559,55 @@
             </div>
           </div>
 
-          <!-- Trigger -->
+          <div class="section-separator mini" />
+
+          <!-- Trigger & Delay -->
           <div class="horizontal-setting-row">
             <label class="setting-label">{{ t('mouse_hover_trigger_label') || 'Trigger' }}</label>
-            <BaseSelect
-              id="MOUSE_HOVER_TRIGGER"
-              v-model="mouseHoverTrigger"
-              :options="mouseHoverTriggerOptions"
-              :disabled="!extensionEnabled || !mouseHoverEnabled"
-              class="compact-select"
-            />
-          </div>
-
-          <!-- Delay -->
-          <div class="horizontal-setting-row">
-            <span 
-              class="setting-label"
-              :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-            >{{ t('mouse_hover_delay_label') || 'Hover Delay' }}:</span>
-            <div class="number-input-container inline-delay-input">
-              <input
-                id="MOUSE_HOVER_DELAY"
-                v-model.number="mouseHoverDelay"
-                type="number"
-                min="100"
-                max="5000"
-                step="100"
-                class="base-number-input compact-input"
+            <div class="setting-control-group">
+              <BaseSelect
+                id="MOUSE_HOVER_TRIGGER"
+                v-model="mouseHoverTrigger"
+                :options="mouseHoverTriggerOptions"
                 :disabled="!extensionEnabled || !mouseHoverEnabled"
+                class="compact-select"
+              />
+
+              <!-- Delay (Only shown for Immediate) -->
+              <div 
+                v-if="mouseHoverTrigger === 'hover'"
+                class="inline-control-wrapper"
               >
-              <span 
-                class="unit-label"
-                :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-              >ms</span>
+                <span 
+                  class="setting-label"
+                  :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+                >{{ t('mouse_hover_delay_label') || 'Hover Delay' }}:</span>
+                <div class="number-input-container inline-delay-input">
+                  <input
+                    id="MOUSE_HOVER_DELAY"
+                    v-model.number="mouseHoverDelay"
+                    type="number"
+                    min="100"
+                    max="5000"
+                    step="100"
+                    class="base-number-input compact-input"
+                    :disabled="!extensionEnabled || !mouseHoverEnabled"
+                  >
+                  <span 
+                    class="unit-label"
+                    :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+                  >ms</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Auto Close -->
-          <div class="horizontal-setting-row multi-select-row">
-            <div class="setting-item">
-              <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
+          <div class="section-separator mini" />
+
+          <!-- Auto Close & Display Time -->
+          <div class="horizontal-setting-row">
+            <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
+            <div class="setting-control-group">
               <BaseSelect
                 id="MOUSE_HOVER_AUTO_CLOSE"
                 v-model="mouseHoverAutoClose"
@@ -606,23 +615,29 @@
                 :disabled="!extensionEnabled || !mouseHoverEnabled"
                 class="compact-select"
               />
-            </div>
-            <div 
-              v-if="mouseHoverAutoClose === 'timer'"
-              class="setting-item"
-            >
-              <label class="setting-label">{{ t('mouse_hover_timer_label') || 'Display Time (ms)' }}</label>
-              <div class="number-input-container inline-delay-input">
-                <input
-                  id="MOUSE_HOVER_TIMER_DURATION"
-                  v-model.number="mouseHoverTimerDuration"
-                  type="number"
-                  min="1000"
-                  max="30000"
-                  step="500"
-                  class="base-number-input compact-input"
-                  :disabled="!extensionEnabled || !mouseHoverEnabled"
-                >
+
+              <!-- Display Time -->
+              <div 
+                v-if="mouseHoverAutoClose === 'timer'"
+                class="inline-control-wrapper"
+              >
+                <label class="setting-label">{{ t('mouse_hover_timer_label') || 'Display Time' }}</label>
+                <div class="number-input-container inline-delay-input">
+                  <input
+                    id="MOUSE_HOVER_TIMER_DURATION"
+                    v-model.number="mouseHoverTimerDuration"
+                    type="number"
+                    min="1000"
+                    max="30000"
+                    step="500"
+                    class="base-number-input compact-input"
+                    :disabled="!extensionEnabled || !mouseHoverEnabled"
+                  >
+                  <span 
+                    class="unit-label"
+                    :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
+                  >ms</span>
+                </div>
               </div>
             </div>
           </div>
