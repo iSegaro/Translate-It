@@ -41,11 +41,19 @@ vi.mock('@/shared/services/ElementDetectionService.js', () => ({
   }
 }));
 
+vi.mock('@/core/helpers.js', () => ({
+  isEditable: vi.fn(() => false)
+}));
+
+import { isEditable } from '@/core/helpers.js';
+
 describe('HoverTranslationManager', () => {
   let manager;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    isEditable.mockReset();
+    isEditable.mockReturnValue(false);
     vi.useFakeTimers();
     manager = new HoverTranslationManager();
     
@@ -144,6 +152,17 @@ describe('HoverTranslationManager', () => {
       vi.advanceTimersByTime(600);
       expect(HoverTextDetector.detect).toHaveBeenCalled();
     });
+
+    it('should skip detection if target is editable', async () => {
+      await manager.activate();
+      isEditable.mockReturnValue(true);
+
+      const event = { clientX: 10, clientY: 10, target: document.createElement('input'), ctrlKey: true };
+      manager.handleMouseMove(event);
+
+      vi.advanceTimersByTime(400);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
   });
 
   describe('handleKeyDown', () => {
@@ -160,6 +179,22 @@ describe('HoverTranslationManager', () => {
       
       vi.advanceTimersByTime(60); // Modifier trigger has 50ms delay
       expect(HoverTextDetector.detect).toHaveBeenCalled();
+    });
+
+    it('should NOT trigger translation if active element is editable', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
+        return def;
+      });
+      
+      isEditable.mockReturnValue(true);
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+      
+      manager.handleKeyDown({ ctrlKey: true });
+      
+      vi.advanceTimersByTime(60);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
     });
   });
 
