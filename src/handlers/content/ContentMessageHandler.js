@@ -50,6 +50,10 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = manager;
   }
 
+  setScreenCaptureManager(manager) {
+    this.screenCaptureManager = manager;
+  }
+
   setIFrameManager(manager) {
     this.iFrameManager = manager;
   }
@@ -183,6 +187,11 @@ export class ContentMessageHandler extends ResourceTracker {
   registerHandlers() {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
+    
+    // Screen capture handlers
+    this.registerHandler(MessageActions.START_SCREEN_CAPTURE, this.handleStartScreenCapture.bind(this));
+    this.registerHandler(MessageActions.SCREEN_CAPTURE_OCR_RESULT, this.handleScreenCaptureResult.bind(this));
+    
     this.registerHandler(MessageActions.TRANSLATION_RESULT_UPDATE, this.handleTranslationResult.bind(this));
     this.registerHandler(MessageActions.REVERT_SELECT_ELEMENT_MODE, this.handleRevertTranslation.bind(this));
 
@@ -352,6 +361,41 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
+  async handleStartScreenCapture(message) {
+    this.logger.info("ContentMessageHandler: START_SCREEN_CAPTURE received!");
+
+    try {
+      if (!this.screenCaptureManager) {
+        const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        const screenCaptureHandler = await loadFeature('screenCapture');
+        if (screenCaptureHandler) {
+          this.setScreenCaptureManager(screenCaptureHandler);
+        } else {
+          return { success: false, error: 'Screen capture feature blocked or failed to load' };
+        }
+      }
+
+      return await this.screenCaptureManager.handleStartScreenCapture(message);
+    } catch (error) {
+      this.logger.error("Screen capture start failed:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleScreenCaptureResult(message) {
+    this.logger.info("ContentMessageHandler: SCREEN_CAPTURE_OCR_RESULT received!");
+
+    try {
+      // Lazy load the coordinator
+      const { screenCaptureCoordinator } = await import('@/features/screen-capture/services/ScreenCaptureCoordinator.js');
+      await screenCaptureCoordinator.handleResult(message.data);
+    } catch (error) {
+      this.logger.error("Failed to handle capture result via coordinator:", error);
+    }
+
+    return { success: true };
+  }
+
   async handleStreamUpdate(message) {
     // Delegate to ContentScriptIntegration's streaming handler
     try {
@@ -459,6 +503,7 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
+      case TranslationMode.ScreenCapture:
         this.logger.info(`Forwarding result for ${translationMode} mode to WindowsManager`);
         if (window.windowsManagerInstance && window.windowsManagerInstance.translationHandler) {
           return window.windowsManagerInstance.translationHandler.handleTranslationResult(message);

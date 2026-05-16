@@ -43,6 +43,7 @@
 import './MobileFab.scss';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useMobileStore } from '@/store/modules/mobile.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
@@ -60,6 +61,10 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
 const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
+const settingsStore = useSettingsStore();
+
+const fabIdleOpacity = computed(() => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100);
+const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || '1');
 
 /**
  * MEMORY MANAGEMENT: Use the centralized ResourceTracker
@@ -251,13 +256,14 @@ const dynamicVars = computed(() => {
     currentOpacity = '0';
     pointerEvents = 'none';
   } else if (isFabIdle.value && !isFabDragging.value && !isHovering.value) {
-    currentOpacity = '0.2';
+    currentOpacity = fabIdleOpacity.value.toString();
   }
   
   const vars = {
     '--fab-y': `${fabPosition.value.y}px`,
     '--fab-opacity': currentOpacity,
-    '--fab-pointer-events': pointerEvents
+    '--fab-pointer-events': pointerEvents,
+    '--fab-scale': fabScale.value
   };
 
   if (isFabDragging.value && fabPosition.value.x !== null) {

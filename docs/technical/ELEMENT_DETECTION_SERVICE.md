@@ -1,20 +1,8 @@
-# Element Detection Service (2025)
+# Element Detection Service
 
 ## Overview
 
 The **Element Detection Service** is a centralized system for DOM element detection that eliminates hardcoded selectors and optimizes repetitive DOM queries across the extension. It provides a single source of truth for all element selectors and implements intelligent caching for performance optimization.
-
-**Architecture Status:** ✅ Complete (2025)
-
-## Problem Solved
-
-Before implementing this service, the codebase suffered from:
-
-1. **Hardcoded Selectors**: CSS selectors were scattered across multiple files
-2. **Repetitive DOM Queries**: Multiple `closest()` calls for the same elements
-3. **Maintenance Issues**: Adding/removing selectors required touching multiple files
-4. **Performance Issues**: No caching for repeated element lookups
-5. **Inconsistency**: Different components used slightly different selector patterns
 
 ## Architecture
 
@@ -262,33 +250,15 @@ const elements = ElementDetectionService.findElements(
 );
 ```
 
-## Migration Guide
-
-### From Hardcoded Selectors
-1. Identify all hardcoded selectors in your component
-2. Add them to appropriate category in ElementDetectionConfig.js
-3. Replace manual queries with service method calls
-4. Test functionality remains unchanged
-
-### From Multiple closest() Calls
-```javascript
-// Before
-if (element.closest(sel1) || element.closest(sel2) || element.closest(sel3)) { ... }
-
-// After
-if (ElementDetectionService.isCategoryElement(element)) { ... }
-```
-
 ## Testing
+
+The Element Detection Service provides comprehensive testing utilities.
 
 ### Unit Testing
 ```javascript
 // Mock service for testing
 jest.mock('@/shared/services/ElementDetectionService.js');
 ElementDetectionService.isUIElement.mockReturnValue(true);
-
-// Test component behavior
-expect(component.handleBlur()).not.toHaveBeenCalled();
 ```
 
 ### Integration Testing
@@ -299,42 +269,17 @@ element.className = 'translation-window';
 expect(ElementDetectionService.isTranslationElement(element)).toBe(true);
 ```
 
-## Future Enhancements
+## Core Files
 
-### Planned Features
-1. **Selector Performance Metrics**: Track query performance across selectors
-2. **Dynamic Selector Loading**: Load selectors based on active features
-3. **MutationObserver Integration**: Automatic cache invalidation on DOM changes
-4. **Selector Validation**: Validate selectors at build time
-
-### Optimization Opportunities
-1. **Query Batching**: Batch multiple element detections
-2. **Weak References**: Use WeakMap for cache to prevent memory leaks
-3. **Virtual DOM Support**: Integration with virtual DOM libraries
-
-## Files Modified
-
-### New Files
 - `src/shared/services/ElementDetectionConfig.js` - Centralized selector configuration
 - `src/shared/services/ElementDetectionService.js` - Element detection service
 
-### Updated Files
-- `src/features/text-field-interaction/handlers/TextFieldHandler.js`
-- `src/features/text-field-interaction/managers/TextFieldIconManager.js`
-- `src/features/windows/managers/interaction/ClickManager.js`
-- `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
-
 ## Benefits Summary
 
-1. **Maintainability**: Single place to manage all selectors
-2. **Performance**: Cached results and optimized queries
-3. **Consistency**: All components use the same detection logic
-4. **Testability**: Centralized logic is easier to unit test
-5. **Extensibility**: Easy to add new selector categories
-6. **Debugging**: Better logging and type information
+1. **Maintainability**: Single place to manage all selectors.
+2. **Performance**: Cached results and optimized queries.
+3. **Consistency**: All components use the same detection logic.
+4. **Testability**: Centralized logic is easier to unit test.
+5. **Extensibility**: Easy to add new selector categories.
 
 ---
-
-**Element Detection Service Status:** ✅ Active and Integrated
-
-The Element Detection Service represents a significant improvement in the extension's architecture, providing a clean, performant, and maintainable solution for DOM element detection across all components.

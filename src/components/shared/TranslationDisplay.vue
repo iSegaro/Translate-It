@@ -482,7 +482,7 @@ const renderedContent = computed(() => {
 
   if (props.enableMarkdown) {
     try {
-      const markdownElement = SimpleMarkdown.render(props.content);
+      const markdownElement = SimpleMarkdown.render(props.content, textDirection.value.dir);
       if (markdownElement) {
         // Return the outerHTML of the element instead of constructing a string with innerHTML
         // This is safer for the linter as it's a direct property of the rendered element

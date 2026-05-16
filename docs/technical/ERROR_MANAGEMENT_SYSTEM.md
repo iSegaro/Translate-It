@@ -93,7 +93,7 @@ To add a new error pattern (e.g., from a new Provider like Anthropic):
 | `ErrorDisplayStrategies.js` | Decides: Toast vs UI? Severity level? Retry allowed? |
 | `ErrorMessages.js` | **Localization (i18n)**. Repository for multi-language error messages. |
 | `ErrorHandler.js` | **Logic Controller**. Coordinates Matcher, Strategy, and Messages to deliver final UI output. |
-| `ExtensionContextManager.js` | **Context Shield**. Handles reloads, environment detection, and asset safety. |
+| `extensionContext.js` | **Context Shield**. Handles reloads, environment detection, and asset safety. |
 
 ## Stability & Resilience
 

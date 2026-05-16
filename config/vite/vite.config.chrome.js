@@ -21,22 +21,6 @@ function fixExtensionPaths() {
     await fs.ensureDir(outDir);
     await fs.ensureDir(resolve(outDir, 'src/html'));
     
-    // Copy offscreen files
-    const srcOffscreenJs = resolve(process.cwd(), 'src/html/offscreen.js');
-    const htmlOffscreenHtml = resolve(process.cwd(), 'src/html/offscreen.html');
-    
-    if (await fs.pathExists(srcOffscreenJs)) {
-      await fs.copy(srcOffscreenJs, resolve(outDir, 'src/html/offscreen.js'));
-      console.log('📄 Copied offscreen.js');
-    }
-    
-    if (await fs.pathExists(htmlOffscreenHtml)) {
-      await fs.copy(htmlOffscreenHtml, resolve(outDir, 'src/html/offscreen.html'));
-      console.log('📄 Copied offscreen.html');
-    } else {
-      console.log('⚠️ offscreen.html not found at:', htmlOffscreenHtml);
-    }
-
     // Icons are copied later in transformManifest, skip here to avoid duplication
   };
 
@@ -225,7 +209,7 @@ export default defineConfig({
     ...(baseConfig.plugins || []),
     fixExtensionPaths(),
     webExtension({
-      additionalInputs: ['src/core/content-scripts/index-iframe.js'],
+      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/offscreen.html'],
       manifest: async () => {
           const manifest = generateValidatedManifest('chrome');
           manifest.background = {
@@ -315,6 +299,15 @@ export default defineConfig({
         const polyfillDest = resolve(outDir, 'browser-polyfill.js');
         if (await fs.pathExists(polyfillSrc)) {
           await fs.copy(polyfillSrc, polyfillDest);
+        }
+
+        // Copy Tesseract assets
+        const tesseractSrc = resolve(srcDir, 'src/features/screen-capture/assets');
+        const tesseractDest = resolve(outDir, 'assets/ocr');
+        if (await fs.pathExists(tesseractSrc)) {
+          await fs.ensureDir(tesseractDest);
+          await fs.copy(tesseractSrc, tesseractDest);
+          console.log('✅ Copied Tesseract assets to assets/ocr/');
         }
         
         // HTML files are now handled by the fixExtensionPaths plugin

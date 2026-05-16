@@ -53,7 +53,8 @@ export function useWindowsManager() {
       targetLanguage: detail.targetLanguage || detail.to || detail.tl || 'auto',
       sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || 'auto',
       detectedSourceLanguage: detail.detectedSourceLanguage || null,
-      provider: detail.provider || ''
+      provider: detail.provider || '',
+      mode: detail.mode || null
     };
 
     if (existingWindowIndex >= 0) {
@@ -121,13 +122,15 @@ export function useWindowsManager() {
       updatedWindows[existingWindowIndex] = {
         ...existingWindow,
         ...detail,
-        translatedText: detail.translatedText || detail.initialTranslatedText || existingWindow.translatedText,
+        translatedText: typeof detail.translatedText !== 'undefined' ? detail.translatedText : 
+                       (typeof detail.initialTranslatedText !== 'undefined' ? detail.initialTranslatedText : existingWindow.translatedText),
         sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || existingWindow.sourceLanguage,
         detectedSourceLanguage: detail.detectedSourceLanguage || detail.sourceLanguage || existingWindow.detectedSourceLanguage,
         targetLanguage: detail.targetLanguage || detail.to || detail.tl || existingWindow.targetLanguage,
         initialSize: detail.initialSize || existingWindow.initialSize,
         isLoading: typeof detail.isLoading !== 'undefined' ? detail.isLoading : existingWindow.isLoading,
-        isStreaming: typeof detail.isStreaming !== 'undefined' ? detail.isStreaming : (existingWindow.isStreaming || false)
+        isStreaming: typeof detail.isStreaming !== 'undefined' ? detail.isStreaming : (existingWindow.isStreaming || false),
+        mode: detail.mode || existingWindow.mode || null
       };
       
       translationWindows.value = updatedWindows;

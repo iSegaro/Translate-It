@@ -7,6 +7,7 @@ export class MainFeatureLoader {
     this.contentScriptCore = contentScriptCore;
     this.initializeLogger = initializeLogger;
     this.featureLoadPromises = new Map();
+    this.logger = null;
 
     // Smart loading configuration
     this.LOAD_STRATEGIES = {
@@ -21,10 +22,25 @@ export class MainFeatureLoader {
     this.FEATURE_CATEGORIES = {
       CRITICAL: ['messaging', 'extensionContext'], // Core infrastructure
       ESSENTIAL: ['contentMessageHandler'], // Essential communication
-      LAZY_UI: ['vue', 'textSelection'], // UI & Selection (can be promoted)
-      INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation'], // On-demand heavy UI
+      LAZY_UI: ['vue', 'textSelection', 'mouseHover'], // UI & Selection (can be promoted)
+      INTERACTIVE: ['windowsManager', 'selectElement', 'pageTranslation', 'screenCapture'], // On-demand heavy UI
       ON_DEMAND: ['shortcut', 'textFieldIcon'] // Optional features
     };
+  }
+
+  /**
+   * Lazy load the logger instance.
+   * Note: This logger uses the 'Content' component level (LOG_COMPONENTS.CONTENT).
+   * To see these logs, ensure the 'Content' log level is set to INFO (2) or higher in Options.
+   */
+  async getLogger() {
+    if (this.logger) return this.logger;
+    try {
+      this.logger = await this.initializeLogger('MainFeatureLoader');
+      return this.logger;
+    } catch {
+      return console;
+    }
   }
 
   /**
@@ -32,7 +48,8 @@ export class MainFeatureLoader {
    */
   async promoteFeature(featureName) {
     if (process.env.NODE_ENV === 'development') {
-      console.debug(`[MainFeatureLoader] Promoting feature: ${featureName}`);
+      const logger = await this.getLogger();
+      logger.debug(`Promoting feature: ${featureName}`);
     }
     return this.loadFeature(featureName, 'INTERACTIVE');
   }
@@ -102,12 +119,14 @@ export class MainFeatureLoader {
         }
 
         if (this.contentScriptCore && this.contentScriptCore.loadFeature) {
+          const logger = await this.getLogger();
+          logger.info(`Loading feature: ${featureName} (${category})`);
           await this.contentScriptCore.loadFeature(featureName);
 
           if (process.env.NODE_ENV === 'development') {
-            const featureLogger = await this.initializeLogger();
-            featureLogger.debug(`[MainFeatureLoader] Loaded feature: ${featureName} (${category})`);
+            logger.debug(`Loaded feature: ${featureName} (${category})`);
           }
+          logger.info(`Successfully loaded feature: ${featureName}`);
         }
       } catch (error) {
         await this.handleLoadingError(featureName, category, error);
@@ -134,8 +153,8 @@ export class MainFeatureLoader {
       }
     } catch { /* ignore */ }
 
-    const errorLogger = await this.initializeLogger();
-    errorLogger.warn(`[MainFeatureLoader] Failed to load feature ${featureName}`, {
+    const errorLogger = await this.getLogger();
+    errorLogger.warn(`Failed to load feature ${featureName}`, {
       error: error.message || error,
       category,
       stack: error.stack

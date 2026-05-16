@@ -58,26 +58,33 @@ export class RevertShortcut {
       return { success: true, action: 'skipped_select_element_handling_esc' };
     }
 
-    // Priority 1: If SelectElementManager is active, let it handle ESC key
-    const selectElementManager = await getActiveSelectElementManager();
-    if (selectElementManager && selectElementManager.isActive) {
-      logger.debug('[RevertShortcut] SelectElementManager is active, skipping revert shortcut');
-      return { success: true, action: 'skipped_select_element_active' };
+    // Priority 0.5: If Screen Capture is active, cancel it
+    if (window.isScreenCaptureActive) {
+      logger.debug('[RevertShortcut] Screen Capture is active. Executing CANCEL action.');
+      try {
+        const { pageEventBus } = await import('@/core/PageEventBus.js');
+        pageEventBus.emit('cancel-screen-capture');
+        window.isScreenCaptureActive = false; // Optimistic clear
+        return { success: true, action: 'cancelled_screen_capture' };
+      } catch (error) {
+        logger.error('[RevertShortcut] Error cancelling screen capture:', error);
+      }
     }
 
-    // Priority 2: If translation is in progress, cancel it first
+    // Priority 1: If translation is in progress, cancel it first
     if (window.isTranslationInProgress) {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
 
       try {
         // Cancel via SelectElementManager
         const selectElementManager = await getActiveSelectElementManager();
-        if (selectElementManager && selectElementManager.translationOrchestrator) {
-          await selectElementManager.translationOrchestrator.cancelAllTranslations();
-          logger.debug('[RevertShortcut] Cancelled translations via SelectElementManager');
+        if (selectElementManager) {
+          // New API: Use deactivate with reason 'cancel' which internally calls domTranslatorAdapter.cancelTranslation()
+          await selectElementManager.deactivate({ reason: 'cancel', silent: false });
+          logger.debug('[RevertShortcut] Cancelled translations via SelectElementManager.deactivate()');
         }
 
-        // Also send cancellation to background
+        // Also send cancellation to background as a failsafe
         try {
           const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
           const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
@@ -102,6 +109,13 @@ export class RevertShortcut {
         window.isTranslationInProgress = false;
         return { success: false, action: 'cancellation_failed', error: error.message };
       }
+    }
+
+    // Priority 2: If SelectElementManager is in selection phase, let it handle ESC key
+    const selectElementManager = await getActiveSelectElementManager();
+    if (selectElementManager && selectElementManager.isActive) {
+      logger.debug('[RevertShortcut] SelectElementManager is in selection phase, skipping revert shortcut');
+      return { success: true, action: 'skipped_select_element_active' };
     }
 
     // Priority 3: If no active processes, revert completed translations

@@ -13,7 +13,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
-import { SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
+import { CONFIG, SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
 import { ref, computed, watchEffect } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
@@ -48,6 +48,8 @@ class SettingsManager {
       TRANSLATE_ON_TEXT_FIELDS: false,
       TRANSLATE_ON_TEXT_SELECTION: !isMobile,
       TRANSLATE_WITH_SELECT_ELEMENT: true,
+      ENABLE_SCREEN_CAPTURE: true,
+      OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
       REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
       selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
       ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
@@ -66,6 +68,9 @@ class SettingsManager {
       MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
       SHOW_DESKTOP_FAB: true,
       DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
+      WINDOW_IS_PINNED: false,
+      WINDOW_DOCK_MODE: 'none', // 'none', 'left', 'right'
+      WINDOW_DOCKED_WIDTH: 300,
       MOBILE_FAB_POSITION: { 
         side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
         y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
@@ -87,11 +92,21 @@ class SettingsManager {
       WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false,
       CONTEXT_MENU_VISIBILITY: {
         PAGE_CONTEXT_SELECT_ELEMENT: true,
+        PAGE_CONTEXT_SCREEN_CAPTURE: true,
         ACTION_CONTEXT_SELECT_ELEMENT: true,
+        ACTION_CONTEXT_SCREEN_CAPTURE: true,
         ACTION_CONTEXT_OPTIONS: true,
         ACTION_CONTEXT_SHORTCUTS: true,
         ACTION_CONTEXT_HELP: true
-      }
+      },
+      // Mouse on Hover Translation Settings
+      MOUSE_HOVER_TRANSLATION_ENABLED: false,
+      MOUSE_HOVER_SCOPE: 'sentence',
+      MOUSE_HOVER_TRIGGER: 'hover',
+      MOUSE_HOVER_DELAY: 500,
+      MOUSE_HOVER_AUTO_CLOSE: 'mouseleave',
+      MOUSE_HOVER_TIMER_DURATION: 3000,
+      MOUSE_HOVER_SHOW_CONTAINER_BORDER: true
     }
 
     logger.debug('SettingsManager singleton created')
@@ -498,7 +513,8 @@ class SettingsManager {
       'ENABLE_DICTIONARY',
       'ENHANCED_TRIPLE_CLICK_DRAG',
       'SHOW_DESKTOP_FAB',
-      'MOBILE_UI_MODE'
+      'MOBILE_UI_MODE',
+      'MOUSE_HOVER_TRANSLATION_ENABLED'
     ]
 
     for (const key of frequentlyAccessed) {

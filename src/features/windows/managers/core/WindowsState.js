@@ -19,6 +19,8 @@ export class WindowsState {
     this.isVisible = false;
     this.isIconMode = false;
     this.pendingTranslationWindow = false;
+    this.isPinned = false;
+    this.dockMode = 'none'; // 'none', 'left', 'right'
 
     // Translation states
     this.isTranslationCancelled = false;
@@ -68,6 +70,16 @@ export class WindowsState {
   setPendingTranslationWindow(pending) {
     this.pendingTranslationWindow = pending;
     this.logger.debug('Pending translation window', { pending });
+  }
+
+  setPinned(pinned) {
+    this.isPinned = pinned;
+    this.logger.debug('Window pinned state changed', { pinned });
+  }
+
+  setDockMode(mode) {
+    this.dockMode = mode;
+    this.logger.debug('Window dock mode changed', { mode });
   }
 
   // Translation management

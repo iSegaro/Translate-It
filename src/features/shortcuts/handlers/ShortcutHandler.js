@@ -544,6 +544,17 @@ export class ShortcutHandler extends ResourceTracker {
     return this.platform !== Platform.UNKNOWN;
   }
 
+  /**
+   * Handle keyboard event by delegating to ShortcutManager
+   * @param {KeyboardEvent} event - Keyboard event to handle
+   */
+  async handleKeyboardEvent(event) {
+    if (this.isActive && shortcutManager.initialized) {
+      return await shortcutManager.handleKeyboardEvent(event);
+    }
+    return false;
+  }
+
   // Static method to deactivate ALL instances (used when feature should be globally disabled)
   static async deactivateAllInstances() {
     // Set global disable flag to prevent new instances

@@ -7,18 +7,16 @@ The translation system handles translation requests from popup, sidepanel, and c
 ### Frontend Usage
 ```javascript
 // In Vue Components
-import { usePopupTranslation } from '@/composables/usePopupTranslation.js'
-// or
-import { useSidepanelTranslation } from '@/composables/useSidepanelTranslation.js'
+import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 
-const { triggerTranslation, isTranslating, translatedText } = usePopupTranslation()
+// For Popup
+const { triggerTranslation, isTranslating, translatedText } = useUnifiedTranslation('popup')
+
+// For Sidepanel
+const { triggerTranslation, isTranslating, translatedText } = useUnifiedTranslation('sidepanel')
 
 // Translate text
-await triggerTranslation({
-  text: 'Hello world',
-  sourceLang: 'auto',
-  targetLang: 'fa'
-})
+await triggerTranslation(sourceLang, targetLang)
 ```
 
 ### Message Flow
@@ -37,7 +35,7 @@ The translation system has been completely redesigned with a **Unified Translati
 **Core Components**:
 - **UnifiedTranslationService**: Central coordinator for all translation operations
 - **TranslationRequestTracker**: Manages request lifecycle and prevents duplicates
-- **TranslationResultDispatcher**: Intelligent result routing based on translation mode
+- **UnifiedResultDispatcher**: Intelligent result routing based on translation mode
 
 **Translation Modes**:
 - **Field Mode**: Direct response pattern for text field translations
@@ -50,7 +48,7 @@ The translation system has been completely redesigned with a **Unified Translati
 **File**: `src/features/translation/handlers/handleTranslate.js`
 - Entry point for ALL translation requests
 - Integrates with UnifiedTranslationService for centralized processing
-- Delegates to TranslationModeCoordinator for mode-specific handling
+- Delegates to UnifiedModeCoordinator for mode-specific handling
 
 ### Unified Translation Service
 **File**: `src/core/services/translation/UnifiedTranslationService.js`
@@ -66,25 +64,24 @@ The translation system has been completely redesigned with a **Unified Translati
 - **Element data recovery** for resilient field mode translations
 - **Automatic cleanup** of completed requests
 
-### Translation Result Dispatcher
-**File**: `src/core/services/translation/TranslationResultDispatcher.js`
+### Unified Result Dispatcher
+**File**: `src/core/services/translation/UnifiedResultDispatcher.js`
 - **Intelligent result routing** based on translation mode
 - **Direct response** for field mode translations
 - **Broadcast delivery** for select element streaming
 - **Tab-specific routing** for context isolation
 
 ### Vue Composables
-**Popup**: `src/composables/usePopupTranslation.js`
-**Sidepanel**: `src/composables/useSidepanelTranslation.js`
-- Reactive translation state management
-- Context-specific message filtering
-- Browser API integration
+**File**: `src/features/translation/composables/useUnifiedTranslation.js`
+- Unified reactive translation state management for both popup and sidepanel
+- Context-specific message filtering and error handling
+- Integrated with `useSettingsStore` for automatic language resolution
 
 ### Translation Engine
-**File**: `src/background/translation-engine.js`
+**File**: `src/features/translation/core/translation-engine.js`
 - Provider coordination and selection
-- Caching and history management
-- Cross-browser compatibility
+- Cache management via `StorageCore`
+- Intelligent provider waterfall logic
 
 ## Translation Flows
 
@@ -159,10 +156,10 @@ const result = await provider.translate(text, sourceLang, targetLang, mode)
 
 ## Context Separation
 
-### Problem Solved
-Previously, translation results appeared in both popup and sidepanel simultaneously.
+### Multi-Context Isolation
+The system ensures that translation results are routed only to the initiating context (Popup, Sidepanel, or Content Script). This prevents cross-component interference.
 
-### Solution
+### Implementation
 Context-based message filtering:
 ```javascript
 // Each component filters by context
@@ -272,10 +269,10 @@ if (!result.success && data.provider !== 'google-translate') {
 ### Core Files - Unified Translation Service (2025)
 - `src/core/services/translation/UnifiedTranslationService.js` - Central translation coordinator
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
-- `src/core/services/translation/TranslationResultDispatcher.js` - Intelligent result routing
+- `src/core/services/translation/UnifiedResultDispatcher.js` - Intelligent result routing
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
-- `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
-- `src/core/services/translation/TranslationEngine.js` - Provider coordination
+- `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processor
+- `src/features/translation/core/translation-engine.js` - Provider coordination
 
 ### Integration Files
 - `src/handlers/smartTranslationIntegration.js` - Field mode integration with element recovery

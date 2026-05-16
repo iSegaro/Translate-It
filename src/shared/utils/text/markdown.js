@@ -12,8 +12,21 @@ export const ExtractionStrategy = {
   CLEAN_DICT: 'clean_dict'   // Keep structure (labels) but strip markdown (Dictionary Copy)
 };
 
+/**
+ * Simple, secure markdown parser for basic formatting
+ */
 export class SimpleMarkdown {
-  static render(markdown) {
+  // --- Constants for Direction Detection ---
+  // Comprehensive RTL pattern covering Arabic, Persian, Hebrew, Urdu, etc.
+  static RTL_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  
+  // LTR Priority scripts: Latin, Greek, Cyrillic, and CJK (Chinese, Japanese, Korean)
+  static LTR_PRIORITY_REGEX = /[a-zA-Z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/;
+  
+  // Matches parenthesized RTL text at the start of a line (e.g., "(اسم)")
+  static PARENTHESIZED_RTL_START = new RegExp(`^\\s*\\([${SimpleMarkdown.RTL_REGEX.source.slice(1, -1)}\\s]+\\)`);
+
+  static render(markdown, preferredDir = "auto") {
     if (!markdown || typeof markdown !== "string") {
       return "";
     }
@@ -106,31 +119,37 @@ export class SimpleMarkdown {
       if (trimmed.startsWith("###### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h6");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(7), preferredDir));
         currentSection.textContent = trimmed.substring(7);
         listItems = [];
       } else if (trimmed.startsWith("##### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h5");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(6), preferredDir));
         currentSection.textContent = trimmed.substring(6);
         listItems = [];
       } else if (trimmed.startsWith("#### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h4");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(5), preferredDir));
         currentSection.textContent = trimmed.substring(5);
         listItems = [];
       } else if (trimmed.startsWith("### ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h3");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(4), preferredDir));
         currentSection.textContent = trimmed.substring(4);
         listItems = [];
       } else if (trimmed.startsWith("## ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h2");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(3), preferredDir));
         currentSection.textContent = trimmed.substring(3);
         listItems = [];
       } else if (trimmed.startsWith("# ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("h1");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed.substring(2), preferredDir));
         currentSection.textContent = trimmed.substring(2);
         listItems = [];
       }
@@ -139,10 +158,12 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "UL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ul");
+          currentSection.setAttribute("dir", preferredDir); // Use preferred direction
           listItems = [];
         }
         const li = document.createElement("li");
         const content = trimmed.replace(/^\s*([-*•])\s+/, '');
+        li.setAttribute("dir", this._detectDirection(content, preferredDir));
         li.appendChild(this._parseInline(content));
         listItems.push(li);
       }
@@ -151,16 +172,20 @@ export class SimpleMarkdown {
         if (!currentSection || currentSection.tagName !== "OL") {
           this._finishSection(container, currentSection, []);
           currentSection = document.createElement("ol");
+          currentSection.setAttribute("dir", preferredDir); // Use preferred direction
           listItems = [];
         }
         const li = document.createElement("li");
-        li.appendChild(this._parseInline(trimmed.replace(/^\d+\.\s/, "")));
+        const content = trimmed.replace(/^\d+\.\s/, "");
+        li.setAttribute("dir", this._detectDirection(content, preferredDir));
+        li.appendChild(this._parseInline(content));
         listItems.push(li);
       }
       // Code blocks
       else if (trimmed.startsWith("```")) {
         this._finishSection(container, currentSection, listItems);
         const codeBlock = document.createElement("pre");
+        codeBlock.setAttribute("dir", "ltr");
         const code = document.createElement("code");
 
         // Collect code content
@@ -189,7 +214,9 @@ export class SimpleMarkdown {
       else if (trimmed.startsWith("> ")) {
         this._finishSection(container, currentSection, listItems);
         currentSection = document.createElement("blockquote");
-        currentSection.appendChild(this._parseInline(trimmed.substring(2)));
+        const content = trimmed.substring(2);
+        currentSection.setAttribute("dir", this._detectDirection(content, preferredDir));
+        currentSection.appendChild(this._parseInline(content));
         listItems = [];
       }
       // Label formatting (e.g., "نوع: اسم" or "Definition: Noun")
@@ -199,6 +226,7 @@ export class SimpleMarkdown {
         
         // Create a new paragraph specifically for this label
         currentSection = document.createElement("p");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed, preferredDir));
         currentSection.appendChild(this._parseLabelLine(trimmed));
         listItems = [];
       }
@@ -213,6 +241,7 @@ export class SimpleMarkdown {
         // Always create a new paragraph for each non-empty line
         this._finishSection(container, currentSection, []);
         currentSection = document.createElement("p");
+        currentSection.setAttribute("dir", this._detectDirection(trimmed, preferredDir));
         listItems = [];
 
         currentSection.appendChild(this._parseInline(trimmed));
@@ -234,22 +263,70 @@ export class SimpleMarkdown {
     }
   }
 
+  /**
+   * Detects the best directionality for a piece of text.
+   * Prioritizes content over labels and handles mixed directionality.
+   * @param {string} text 
+   * @param {string} preferredDir - Fallback direction if mixed or empty
+   * @returns {string} "ltr", "rtl", or "auto"
+   */
+  static _detectDirection(text, preferredDir = "auto") {
+    if (!text || typeof text !== "string") return preferredDir;
+    
+    const trimmed = text.trim();
+    if (!trimmed) return preferredDir;
+    
+    // 1. If no RTL characters at all, it's definitely LTR
+    if (!this.RTL_REGEX.test(trimmed)) return "ltr";
+
+    // 2. If it's a label line (Label: Content), prioritize content direction
+    if (this._isLabelLine(trimmed)) {
+      const labelMatch = trimmed.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
+      if (labelMatch) {
+        const content = labelMatch[2].trim();
+        if (content) {
+          // Priority: If content has LTR characters, it should be LTR 
+          // despite potential RTL labels (covers dictionary case: "Noun: آزمایش")
+          if (this.LTR_PRIORITY_REGEX.test(content)) return "ltr";
+          // If content is purely RTL
+          if (this.RTL_REGEX.test(content)) return "rtl";
+        }
+      }
+    }
+
+    // 3. Handle specific patterns like "(Label) definition"
+    // e.g., "(اسم) test definition"
+    if (this.PARENTHESIZED_RTL_START.test(trimmed)) {
+      const remaining = trimmed.replace(this.PARENTHESIZED_RTL_START, "").trim();
+      // If there's LTR content after the RTL parenthesis, force LTR
+      if (/[a-zA-Z]/.test(remaining)) return "ltr";
+    }
+
+    // 4. Default to preferredDir for other mixed cases
+    return preferredDir;
+  }
+
   static _isLabelLine(text) {
     // Pattern to match label lines like:
     // - "**noun:** test, experiment" (markdown bold)
     // - "اسم: آزمایش" (regular labels)
     // - "- **Meaning**: آزمایش" (list item label)
+    // - "تعاریف (Definitions):" (label with no content after colon)
     const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
 
-    // 1. Check for markdown bold labels: **Label**: content
+    // 1. Check for markdown bold labels: **Label**: content (content is optional)
     // We look for ** at start, some characters, then a colon (either inside or outside the last **)
-    const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*)$/;
+    const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*|:)$/;
 
-    // 2. Check for regular labels: Label: content
-    // More strict pattern: label should be at start of line, followed by colon and content
-    const regularLabelPattern = /^[^:\s]+\s*:\s*.+$/;
+    // 2. Check for regular labels: Label: content (content is optional)
+    // More strict pattern: label should be at start of line, followed by colon
+    // Use negative lookahead to avoid matching URL protocols like https://
+    const regularLabelPattern = /^[^:\s]+\s*:(?!\/\/)\s*.*$/;
 
-    return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText);
+    // 3. Specifically allow lines ending in a colon (header-style labels)
+    const endsWithColonPattern = /^.*:$/;
+
+    return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText) || endsWithColonPattern.test(trimmedText);
   }
 
   static _parseLabelLine(text) {
@@ -257,8 +334,9 @@ export class SimpleMarkdown {
     
     // Robust regex to capture label and content regardless of bold marker position
     // Group 1: Label part (including possible ** markers)
-    // Group 2: Content part
-    const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+    // Group 2: Content part (optional)
+    // Use negative lookahead to avoid matching URL protocols like https://
+    const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
 
     if (!match) {
       span.appendChild(this._parseInline(text));
@@ -266,7 +344,7 @@ export class SimpleMarkdown {
     }
 
     const labelPart = match[1].trim();
-    const content = match[2].trim();
+    const content = match[2] ? match[2].trim() : "";
 
     // Create a bold element for the label and strip any markdown markers
     const labelElement = document.createElement("strong");
@@ -277,8 +355,10 @@ export class SimpleMarkdown {
 
     // Content after colon should NOT be parsed as markdown in dictionary context
     // to prevent nested formatting issues.
-    const textNode = document.createTextNode(content);
-    span.appendChild(textNode);
+    if (content) {
+      const textNode = document.createTextNode(content);
+      span.appendChild(textNode);
+    }
 
     return span;
   }
@@ -446,7 +526,7 @@ export class SimpleMarkdown {
     // Keep labels but strip markdown formatting
     if (strategy === ExtractionStrategy.CLEAN_DICT) {
       return lines.map(line => {
-        const match = line.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+        const match = line.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
         if (match) {
           return `${this.strip(match[1])}: ${this.strip(match[2])}`;
         }
@@ -462,16 +542,16 @@ export class SimpleMarkdown {
       const line = lines[0];
 
       // 1. Check for 'text before label' pattern: "translation**Label**:" or "translation Label:"
-      const beforeLabelMatch = line.match(/(.*?)\*\*.*?\*\*(\s*:\s*|:)/) || 
-                               line.match(/(.*?)[A-Za-z]+\s*:/) || 
-                               line.match(/(.*?)[؀-ۿ]+\s*:/);
+      const beforeLabelMatch = line.match(/(.*?)\*\*.*?\*\*(\s*:(?!\/\/)\s*|:(?!\/\/))/) || 
+                               line.match(/(.*?)[A-Za-z]+\s*:(?!\/\/)/) || 
+                               line.match(/(.*?)[؀-ۿ]+\s*:(?!\/\/)/);
       
       if (beforeLabelMatch && beforeLabelMatch[1].trim().length > 0) {
         return this.strip(beforeLabelMatch[1].trim());
       }
 
       // 2. Check for standard label start: "**Label**: content" or "Label: content"
-      const match = line.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:\s*(.*)$/);
+      const match = line.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:(?!\/\/)\s*(.*)$/);
       if (match && match[2].trim()) {
         if (this.strip(match[1]).length < 30) {
           return this.strip(match[2]);
@@ -493,7 +573,7 @@ export class SimpleMarkdown {
 
     // 2. Second pass (Fallback): If all lines were labels, take content from the first label line
     const firstLine = lines[0].replace(/^[-*•]\s*/, '').trim();
-    const match = firstLine.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:\s*(.*)$/);
+    const match = firstLine.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:(?!\/\/)\s*(.*)$/);
     if (match && match[2].trim()) {
       return this.strip(match[2]);
     }

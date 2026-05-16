@@ -157,12 +157,16 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
    */
   const handleShowNotification = async (detail) => {
     // Only process notifications if this frame is responsible for showing global UI
-    if (!shouldShowGlobalUI.value) return;
+    if (!shouldShowGlobalUI.value) {
+      logger.debug('Skipping notification: shouldShowGlobalUI is false');
+      return;
+    }
 
     const { id, message, type, duration, persistent } = detail;
 
     // Skip duplicate check for updates
     if (isDuplicateNotification(message, type) && !detail.isUpdate) {
+      logger.debug('Skipping notification: Duplicate detected');
       return;
     }
 
@@ -207,7 +211,7 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
    * @param {Object} detail - Dismissal details containing the ID
    */
   const handleDismissNotification = (detail) => {
-    logger.info('Received dismiss_notification event:', detail);
+    logger.debug('Received dismiss_notification event:', detail);
 
     // Prevent double dismissal
     if (window.translateItDismissedNotifications.has(detail.id)) {
@@ -239,7 +243,7 @@ export function useContentAppNotifications({ shouldShowGlobalUI, toastRTL, track
       tracker.addEventListener(pageEventBus, 'show-notification', handleShowNotification);
       tracker.addEventListener(pageEventBus, 'dismiss_notification', handleDismissNotification);
       tracker.addEventListener(pageEventBus, 'dismiss_all_notifications', () => {
-        logger.info('Received dismiss_all_notifications event');
+        logger.debug('Received dismiss_all_notifications event');
         toast.dismiss();
       });
     }

@@ -66,7 +66,7 @@ for (const key of allKeys) {
     const manifestPath = path.join(projectRoot, 'manifest.json');
     const extraPaths = fs.existsSync(manifestPath) ? manifestPath : '';
     
-    const command = `grep -r "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude-dir=tests --exclude-dir=__tests__ --exclude="*.test.js" --exclude="*.spec.js" || true`;
+    const command = `grep -rI "${key}" ${searchPaths} ${extraPaths} --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude-dir=tests --exclude-dir=__tests__ --exclude-dir=assets --exclude="*.test.js" --exclude="*.spec.js" --exclude="*.wasm" || true`;
     const result = execSync(command).toString();
     
     if (!result.trim()) {
@@ -93,7 +93,7 @@ if (unusedKeys.length === 0) {
     
     try {
       execSync(`node ${path.join(__dirname, 'sync-i18n.cjs')} --fix`, { stdio: 'inherit' });
-    } catch (e) {
+    } catch {
       console.error('❌ Failed to sync after check. Please run sync-i18n.cjs --fix manually.');
     }
   } else {

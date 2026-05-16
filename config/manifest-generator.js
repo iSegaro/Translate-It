@@ -59,11 +59,18 @@ export function generateManifest(browser = 'chrome') {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          'src/_locales/*',
+          '_locales/*',
           'docs/Changelog.md'
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
+      },
+      {
+        resources: [
+          'assets/ocr/*'
+        ],
+        matches: ['<all_urls>', 'file://*/*'],
+        use_dynamic_url: false
       }
     ],
     
@@ -191,7 +198,7 @@ function generateFirefoxManifest(baseManifest) {
 
     // Content Security Policy for Firefox with DOMPurify support
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self'; trusted-types default vue dompurify;"
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
     },
     
     // Action (popup) - similar to Chrome but with Firefox naming
@@ -252,8 +259,9 @@ function generateFirefoxManifest(baseManifest) {
           'styles/*.css',
           'src/styles/*.css',
           'js/*.js',
-          'src/_locales/*',
-          'docs/Changelog.md'
+          '_locales/*',
+          'docs/Changelog.md',
+          'assets/ocr/*'
         ],
         matches: ['<all_urls>', 'file://*/*']
         // Note: use_dynamic_url not supported in Firefox yet

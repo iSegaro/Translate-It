@@ -4,7 +4,7 @@
 
 The Text Actions system is an integrated solution for managing copy, paste, and TTS (Text-to-Speech) operations across the extension. This system consists of reusable Vue components and powerful composables.
 
-## 🏗️ Architecture
+## Architecture
 
 
 ```
@@ -26,7 +26,7 @@ src/composables/actions/
 
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Basic usage of ActionToolbar
 
@@ -147,7 +147,7 @@ const speak = async () => {
 
 ```
 
-## 📚 Component Reference
+## Component Reference
 
 ### ActionToolbar
 
@@ -193,7 +193,7 @@ This component features 5 internal states:
 * **Paused**: Playback paused (displays Resume icon).
 * **Error**: An error occurred (displays red error icon).
 
-## 🔧 Composable Reference
+## Composable Reference
 
 ### useTextActions
 
@@ -245,7 +245,7 @@ const options = {
 
 ```
 
-## 🎨 Styling
+## Styling
 
 ### CSS Classes
 
@@ -284,69 +284,7 @@ To override styles:
 
 ```
 
-## 🔄 Migration Guide
-
-### From TranslationInputField to ActionToolbar
-
-**Before:**
-
-```vue
-<TranslationInputField
-  v-model="text"
-  :copy-title="'Copy'"
-  :paste-title="'Paste'"
-  :tts-title="'Speak'"
-  @copy="handleCopy"
-/>
-
-```
-
-**After:**
-
-```vue
-<div class="input-container">
-  <textarea v-model="text" />
-  <ActionToolbar
-    :text="text"
-    :copy-title="'Copy'"
-    :paste-title="'Paste'"
-    :tts-title="'Speak'"
-    @text-copied="handleCopy"
-  />
-</div>
-
-```
-
-### From TranslationDisplay to ActionToolbar
-
-**Before:**
-
-```vue
-<TranslationDisplay
-  :content="result"
-  :show-copy-button="true"
-  :show-tts-button="true"
-  @copy="handleCopy"
-/>
-
-```
-
-**After:**
-
-```vue
-<div class="output-container">
-  <div class="content" v-html="result" />
-  <ActionToolbar
-    :text="result"
-    :mode="'output'"
-    :show-paste="false"
-    @text-copied="handleCopy"
-  />
-</div>
-
-```
-
-## 🧪 Testing
+## Testing
 
 ### Unit Tests
 
@@ -368,7 +306,6 @@ test('ActionToolbar renders correctly', () => {
   expect(wrapper.find('.paste-button').exists()).toBe(true)
   expect(wrapper.find('.tts-button').exists()).toBe(true)
 })
-
 ```
 
 ## 🚀 Performance

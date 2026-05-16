@@ -31,7 +31,8 @@ function getDefaultSettings() {
       [TranslationMode.Dictionary_Translation]: null,
       [TranslationMode.Popup_Translate]: null,
       [TranslationMode.Sidepanel_Translate]: null,
-      [TranslationMode.ScreenCapture]: null
+      [TranslationMode.ScreenCapture]: null,
+      [TranslationMode.MouseHover]: null
     },
     SOURCE_LANGUAGE: CONFIG.SOURCE_LANGUAGE || 'auto',
     TARGET_LANGUAGE: CONFIG.TARGET_LANGUAGE || 'en',
@@ -87,6 +88,11 @@ function getDefaultSettings() {
     TTS_AUTO_DETECT_ENABLED: CONFIG.TTS_AUTO_DETECT_ENABLED ?? true,
     SHOW_DESKTOP_FAB: CONFIG.SHOW_DESKTOP_FAB ?? true,
     SHOW_MOBILE_FAB: CONFIG.SHOW_MOBILE_FAB ?? true,
+    FAB_IDLE_OPACITY: CONFIG.FAB_IDLE_OPACITY ?? 20,
+    FAB_SIZE: CONFIG.FAB_SIZE || "1",
+    WINDOW_IS_PINNED: CONFIG.WINDOW_IS_PINNED ?? false,
+    WINDOW_DOCK_MODE: CONFIG.WINDOW_DOCK_MODE || 'none',
+    WINDOW_DOCKED_WIDTH: CONFIG.WINDOW_DOCKED_WIDTH || 300,
     TRANSLATE_ON_TEXT_FIELDS: CONFIG.TRANSLATE_ON_TEXT_FIELDS ?? false,
     ENABLE_SHORTCUT_FOR_TEXT_FIELDS: CONFIG.ENABLE_SHORTCUT_FOR_TEXT_FIELDS ?? true,
     TEXT_FIELD_SHORTCUT: CONFIG.TEXT_FIELD_SHORTCUT || 'Ctrl+/',
@@ -96,8 +102,14 @@ function getDefaultSettings() {
     REQUIRE_CTRL_FOR_TEXT_SELECTION: CONFIG.REQUIRE_CTRL_FOR_TEXT_SELECTION ?? false,
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
+    OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
     ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: CONFIG.ACTIVE_SELECTION_ICON_ON_TEXTFIELDS ?? true,
     ENHANCED_TRIPLE_CLICK_DRAG: CONFIG.ENHANCED_TRIPLE_CLICK_DRAG ?? false,
+    // Dictionary Display Settings
+    DICTIONARY_SHOW_PRONUNCIATION: CONFIG.DICTIONARY_SHOW_PRONUNCIATION ?? true,
+    DICTIONARY_SHOW_POS: CONFIG.DICTIONARY_SHOW_POS ?? true,
+    DICTIONARY_SHOW_DEFINITIONS: CONFIG.DICTIONARY_SHOW_DEFINITIONS ?? false,
+    DICTIONARY_SHOW_EXAMPLES: CONFIG.DICTIONARY_SHOW_EXAMPLES ?? false,
     // Character Limits
     POPUP_MAX_CHARS: CONFIG.POPUP_MAX_CHARS || 5000,
     SIDEPANEL_MAX_CHARS: CONFIG.SIDEPANEL_MAX_CHARS || 10000,
@@ -149,15 +161,26 @@ function getDefaultSettings() {
       [TranslationMode.Selection]: true,
       [TranslationMode.Page]: false,
       [TranslationMode.Dictionary_Translation]: true,
-      [TranslationMode.ScreenCapture]: true
+      [TranslationMode.ScreenCapture]: true,
+      [TranslationMode.MouseHover]: true
     },
     CONTEXT_MENU_VISIBILITY: CONFIG.CONTEXT_MENU_VISIBILITY || {
       PAGE_CONTEXT_SELECT_ELEMENT: true,
+      PAGE_CONTEXT_SCREEN_CAPTURE: true,
       ACTION_CONTEXT_SELECT_ELEMENT: true,
+      ACTION_CONTEXT_SCREEN_CAPTURE: true,
       ACTION_CONTEXT_OPTIONS: true,
       ACTION_CONTEXT_SHORTCUTS: true,
       ACTION_CONTEXT_HELP: true
     },
+    // --- Mouse on Hover Translation Settings ---
+    MOUSE_HOVER_TRANSLATION_ENABLED: CONFIG.MOUSE_HOVER_TRANSLATION_ENABLED ?? false,
+    MOUSE_HOVER_SCOPE: CONFIG.MOUSE_HOVER_SCOPE || 'container',
+    MOUSE_HOVER_TRIGGER: CONFIG.MOUSE_HOVER_TRIGGER || 'ctrl',
+    MOUSE_HOVER_DELAY: CONFIG.MOUSE_HOVER_DELAY || 500,
+    MOUSE_HOVER_AUTO_CLOSE: CONFIG.MOUSE_HOVER_AUTO_CLOSE || 'mouseleave',
+    MOUSE_HOVER_TIMER_DURATION: CONFIG.MOUSE_HOVER_TIMER_DURATION || 3000,
+    MOUSE_HOVER_SHOW_CONTAINER_BORDER: CONFIG.MOUSE_HOVER_SHOW_CONTAINER_BORDER ?? true,
     translationHistory: []
   };
 }
@@ -214,7 +237,8 @@ export const useSettingsStore = defineStore('settings', () => {
     const needsBulk = [
       TranslationMode.Page, 
       TranslationMode.Select_Element, 
-      TranslationMode.Field
+      TranslationMode.Field,
+      TranslationMode.MouseHover
     ].includes(mode);
 
     if (needsBulk && provider && !provider.features?.includes('bulk')) {
@@ -568,6 +592,8 @@ export const useSettingsStore = defineStore('settings', () => {
             isFeatureEnabled = isExtEnabled && settings.value.TRANSLATE_ON_TEXT_SELECTION;
           } else if (mode === TranslationMode.Page) {
             isFeatureEnabled = isExtEnabled && settings.value.WHOLE_PAGE_TRANSLATION_ENABLED;
+          } else if (mode === TranslationMode.MouseHover) {
+            isFeatureEnabled = isExtEnabled && settings.value.MOUSE_HOVER_TRANSLATION_ENABLED;
           } else if (mode === TranslationMode.ScreenCapture) {
             isFeatureEnabled = isExtEnabled && (settings.value.ENABLE_SCREEN_CAPTURE !== false);
           }
@@ -627,6 +653,27 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!fontFamily || fontFamily.toString().trim() === '') {
       const defaults = getDefaultSettings();
       settings.value.TRANSLATION_FONT_FAMILY = defaults.TRANSLATION_FONT_FAMILY;
+    }
+
+    // 8. Validate Mouse Hover Settings
+    const hoverDelay = settings.value.MOUSE_HOVER_DELAY;
+    if (hoverDelay !== undefined && (hoverDelay < 100 || hoverDelay > 5000)) {
+      if (settings.value.MOUSE_HOVER_TRANSLATION_ENABLED && settings.value.EXTENSION_ENABLED !== false) {
+        errors.push('validation_mouse_hover_delay_invalid');
+      } else {
+        const defaults = getDefaultSettings();
+        settings.value.MOUSE_HOVER_DELAY = defaults.MOUSE_HOVER_DELAY;
+      }
+    }
+
+    const hoverTimer = settings.value.MOUSE_HOVER_TIMER_DURATION;
+    if (hoverTimer !== undefined && (hoverTimer < 1000 || hoverTimer > 30000)) {
+      if (settings.value.MOUSE_HOVER_TRANSLATION_ENABLED && settings.value.EXTENSION_ENABLED !== false) {
+        errors.push('validation_mouse_hover_timer_invalid');
+      } else {
+        const defaults = getDefaultSettings();
+        settings.value.MOUSE_HOVER_TIMER_DURATION = defaults.MOUSE_HOVER_TIMER_DURATION;
+      }
     }
 
     if (errors.length > 0) {

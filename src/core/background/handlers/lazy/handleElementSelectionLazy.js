@@ -61,14 +61,14 @@ async function loadElementSelectionHandlers() {
 /**
  * Lazy handler for activateSelectElementMode action
  */
-export const handleActivateSelectElementModeLazy = async (message, sender) => {
+export const handleActivateSelectElementModeLazy = async (message, sender, sendResponse) => {
   try {
     logger.debug('activateSelectElementMode requested, loading handlers...');
 
     const { handleActivateSelectElementMode } = await loadElementSelectionHandlers();
 
     logger.debug('Delegating to handleActivateSelectElementMode');
-    return await handleActivateSelectElementMode(message, sender);
+    return await handleActivateSelectElementMode(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle activateSelectElementMode:', error);
     return {
@@ -84,14 +84,14 @@ export const handleActivateSelectElementModeLazy = async (message, sender) => {
 /**
  * Lazy handler for deactivateSelectElementMode action
  */
-export const handleDeactivateSelectElementModeLazy = async (message, sender) => {
+export const handleDeactivateSelectElementModeLazy = async (message, sender, sendResponse) => {
   try {
     logger.debug('deactivateSelectElementMode requested, loading handlers...');
 
     const { handleDeactivateSelectElementMode } = await loadElementSelectionHandlers();
 
     logger.debug('Delegating to handleDeactivateSelectElementMode');
-    return await handleDeactivateSelectElementMode(message, sender);
+    return await handleDeactivateSelectElementMode(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle deactivateSelectElementMode:', error);
     return {
@@ -107,14 +107,14 @@ export const handleDeactivateSelectElementModeLazy = async (message, sender) => 
 /**
  * Lazy handler for getSelectElementState action
  */
-export const handleGetSelectElementStateLazy = async (message, sender) => {
+export const handleGetSelectElementStateLazy = async (message, sender, sendResponse) => {
   try {
     logger.debug('getSelectElementState requested, loading handlers...');
 
     const { handleGetSelectElementState } = await loadElementSelectionHandlers();
 
     logger.debug('Delegating to handleGetSelectElementState');
-    return await handleGetSelectElementState(message, sender);
+    return await handleGetSelectElementState(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle getSelectElementState:', error);
     return {
@@ -130,14 +130,14 @@ export const handleGetSelectElementStateLazy = async (message, sender) => {
 /**
  * Lazy handler for setSelectElementState action
  */
-export const handleSetSelectElementStateLazy = async (message, sender) => {
+export const handleSetSelectElementStateLazy = async (message, sender, sendResponse) => {
   try {
     logger.debug('setSelectElementState requested, loading handlers...');
 
     const { handleSetSelectElementState } = await loadElementSelectionHandlers();
 
     logger.debug('Delegating to handleSetSelectElementState');
-    return await handleSetSelectElementState(message, sender);
+    return await handleSetSelectElementState(message, sender, sendResponse);
   } catch (error) {
     logger.error('Failed to handle setSelectElementState:', error);
     return {

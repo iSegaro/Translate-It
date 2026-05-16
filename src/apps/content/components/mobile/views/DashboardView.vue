@@ -38,6 +38,22 @@
         <span class="ti-m-action-label">{{ t('mobile_dashboard_select_label', 'Select') }}</span>
       </button>
 
+      <!-- Screen Capture Button -->
+      <button
+        v-if="allowedFeatures.screenCapture"
+        class="ti-m-action-btn"
+        @click="handleScreenCapture"
+      >
+        <div class="ti-m-icon-container ti-m-icon-screen-capture">
+          <img
+            :src="captureIcon"
+            :alt="t('mobile_dashboard_capture_label', 'Capture')"
+            class="ti-toolbar-icon"
+          >
+        </div>
+        <span class="ti-m-action-label">{{ t('mobile_dashboard_capture_label', 'Capture') }}</span>
+      </button>
+
       <!-- Manual Translation Button -->
       <button
         class="ti-m-action-btn"
@@ -180,6 +196,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import selectIcon from '@/icons/ui/select.png';
+import captureIcon from '@/icons/ui/capture.svg';
 import inputIcon from '@/icons/extension/extension_icon_128.svg';
 import settingsIcon from '@/icons/ui/settings.png';
 import revertIcon from '@/icons/ui/revert.png';
@@ -221,7 +238,8 @@ const handleBulkNotSupported = async () => {
 
 const allowedFeatures = ref({
   selectElement: true,
-  pageTranslation: true
+  pageTranslation: true,
+  screenCapture: true
 });
 
 const updateAllowedFeatures = async () => {
@@ -230,6 +248,7 @@ const updateAllowedFeatures = async () => {
     if (status.initialized) {
       allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
       allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+      allowedFeatures.value.screenCapture = status.features.screenCapture?.allowed ?? true;
       logger.debug('Mobile Dashboard allowed features updated', allowedFeatures.value);
     }
   } catch (err) {
@@ -302,6 +321,23 @@ const activateSelectElement = async () => {
     }
   }
 }
+
+const handleScreenCapture = async () => {
+  try {
+    logger.info('Screen Capture requested from Mobile Dashboard');
+    mobileStore.closeSheet();
+    await sendMessage({ 
+      action: MessageActions.START_SCREEN_CAPTURE 
+    });
+  } catch (err) {
+    if (ExtensionContextManager.isContextError(err)) {
+      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:screen-capture');
+    } else {
+      logger.error('Screen Capture handler failed:', err);
+    }
+  }
+}
+
 const goToInputView = () => {
   try {
     logger.debug('Navigating to Input View');

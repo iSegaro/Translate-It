@@ -268,6 +268,7 @@ import './DesktopFabMenu.scss';
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
 import IconSelectElement from '@/icons/ui/select.png';
 import IconTranslatePage from '@/icons/ui/whole-page.png';
+import IconScreenCapture from '@/icons/ui/capture.svg';
 import IconRevert from '@/icons/ui/revert.png';
 import IconRestore from '@/icons/ui/restore.png';
 import IconHourglass from '@/icons/ui/hourglass.png';
@@ -286,7 +287,8 @@ const exclusionChecker = ExclusionChecker.getInstance();
 
 const allowedFeatures = ref({
   selectElement: true,
-  pageTranslation: true
+  pageTranslation: true,
+  screenCapture: true
 });
 
 const updateAllowedFeatures = async () => {
@@ -294,6 +296,7 @@ const updateAllowedFeatures = async () => {
   if (status.initialized) {
     allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
     allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
+    allowedFeatures.value.screenCapture = status.features.screenCapture?.allowed ?? true;
     logger.debug('FAB allowed features updated', allowedFeatures.value);
   }
 };
@@ -309,9 +312,11 @@ const ANIMATION_CONFIG = {
   STANDARD_EASING: 'ease',
   IDLE_TIMEOUT: 500,
   LEAVE_DELAY: 400,
-  OPACITY_DIMMED: 0.2,
   OPACITY_FULL: 1
 };
+
+const fabIdleOpacity = computed(() => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100);
+const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || '1');
 
 const isMenuOpen = ref(false);
 const isFaded = ref(true);
@@ -487,6 +492,31 @@ const menuItems = computed(() => {
     });
   }
 
+  if (allowedFeatures.value.screenCapture) {
+    items.push({
+      id: 'screen_capture',
+      label: t('desktop_fab_screen_capture_label'),
+      icon: IconScreenCapture,
+      closeMenu: true,
+      action: async () => {
+        try {
+          await sendMessage({ 
+            action: MessageActions.START_SCREEN_CAPTURE 
+          });
+        } catch (err) {
+          if (ExtensionContextManager.isContextError(err)) {
+            ExtensionContextManager.handleContextError(err, 'desktop-fab:screen-capture');
+          } else {
+            await handleError(err, { 
+              context: 'desktop-fab:screen-capture',
+              showToast: true 
+            });
+          }
+        }
+      }
+    });
+  }
+
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
@@ -584,7 +614,7 @@ const containerStyle = computed(() => {
     opacityValue = 0;
     pointerEvents = 'none';
   } else if (isFaded.value && !isHovered.value && !isMenuOpen.value && !isDragging.value) {
-    opacityValue = ANIMATION_CONFIG.OPACITY_DIMMED; 
+    opacityValue = fabIdleOpacity.value; 
   }
 
   const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
@@ -601,7 +631,8 @@ const containerStyle = computed(() => {
   const style = {
     '--fab-opacity': opacityValue,
     '--fab-pointer-events': pointerEvents,
-    '--fab-transition': transitionStr
+    '--fab-transition': transitionStr,
+    '--fab-scale': fabScale.value
   };
 
   if (verticalPos.value === -1) {

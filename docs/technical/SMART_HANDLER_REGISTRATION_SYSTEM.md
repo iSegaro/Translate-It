@@ -14,59 +14,106 @@ The **Smart Handler Registration System** is a feature-based exclusion system th
 
 ## Architecture Components
 
-### 1. InteractionCoordinator (`src/core/content-scripts/InteractionCoordinator.js`)
-The **InteractionCoordinator** acts as the system's "Gatekeeper." It manages lightweight global listeners (`mouseup`, `keydown`, `contextmenu`) and decides when to trigger the full loading of a feature.
+### 1. Feature Configuration (`src/core/managers/content/FeatureConfig.js`)
+The **Single Source of Truth** for feature definitions. It maps every feature to its governing settings and defines custom enablement logic. This eliminates hardcoded logic across the system.
 
 ```javascript
-class InteractionCoordinator {
+export const FEATURE_CONFIG = {
+  mouseHover: {
+    settings: ['MOUSE_HOVER_TRANSLATION_ENABLED'],
+    settingKey: 'MOUSE_HOVER_TRANSLATION_ENABLED'
+  },
+  textSelection: {
+    settings: ['TRANSLATE_ON_TEXT_SELECTION', 'SHOW_DESKTOP_FAB', 'MOBILE_UI_MODE'],
+    isEnabled: (get) => { /* custom logic */ }
+  }
+};
+```
+
+### 2. InteractionCoordinator (`src/core/content-scripts/InteractionCoordinator.js`)
+The **InteractionCoordinator** acts as the system's "Gatekeeper." It manages lightweight global listeners (`mouseup`, `keydown`, `contextmenu`, `focusin`, `scroll`) and decides when to trigger the full loading of a feature.
+
+```javascript
   async sync() {
-    const isEnabled = settingsManager.isExtensionEnabled() && !this.isPageExcluded;
+    const isEnabled = settingsManager.isExtensionEnabled() && !(await checkUrlExclusionAsync());
 
-    // 1. Text Selection Listener
-    const canSelect = isEnabled && this.exclusionChecker.isFeatureEnabled('textSelection');
-    this._manageListener('textSelection', 'mouseup', this.handlers.textSelection, canSelect);
+    // Define listener requirements dynamically
+    const config = [
+      { key: 'textSelection', type: 'mouseup', handler: this.handlers.textSelection, allowed: isEnabled && await this.exclusionChecker.isFeatureAllowed('textSelection') },
+      // ...
+    ];
 
-    // 2. Keyboard (Shortcut OR Revert/ESC needed)
-    const canShortcut = isEnabled && (this.exclusionChecker.isFeatureEnabled('shortcut') || this.revertMightBeNeeded);
-    this._manageListener('shortcut', 'keydown', this.handlers.shortcut, canShortcut, window);
+    config.forEach(item => this._manageListener(item.key, item.type, item.handler, item.allowed));
+  }
+```
+
+**Key Responsibilities:**
+- **Trigger-Only Role**: Detects potential interactions and triggers `loadFeature()` without knowing the internal business logic of the features.
+- **Dynamic Listener Sync**: Automatically attaches/detaches DOM listeners based on real-time permission changes.
+- **Context Awareness**: Manages different behaviors for Top Frames vs. IFrames while keeping the logic decoupled.
+
+### 2. Lazy Feature Loader (`src/core/content-scripts/chunks/lazy-features.js`)
+Acts as a lean **Proxy Layer** for dynamic imports. It delegates all logical activation and permission checking to the `FeatureManager`, focusing only on retrieving and caching the returned feature instances.
+
+```javascript
+export async function loadFeature(featureName, force = false) {
+  const featureManager = FeatureManager.getInstance();
+  
+  // Delegates logical activation to FeatureManager
+  const handler = await featureManager.requestFeatureActivation(featureName, force);
+  
+  // Caches and returns the instance for backward compatibility
+  let instance = handler;
+  if (featureName === 'windowsManager') instance = handler.getWindowsManager();
+  // ...
+  return instance;
+}
+```
+
+### 3. FeatureManager (`src/core/managers/content/FeatureManager.js`)
+The **Single Source of Truth** for feature lifecycle and logical state. It manages not only the activation but also the tracking of *formally requested* features to ensure targeted re-evaluation during settings or URL changes.
+
+```javascript
+class FeatureManager extends ResourceTracker {
+  constructor() {
+    this.requestedFeatures = new Set(); // Tracks features requested by the Loader
+    this.activeFeatures = new Set();    // Tracks features currently running
+  }
+
+  /**
+   * Main entry point for activating features.
+   * Ensures permissions are checked before instantiation.
+   */
+  async requestFeatureActivation(featureName, force = false) {
+    this.requestedFeatures.add(featureName);
+    
+    const allowed = force || await this.shouldActivateFeature(featureName);
+    if (allowed) {
+      await this.activateFeature(featureName);
+    }
+    return this.getFeatureHandler(featureName);
+  }
+
+  /**
+   * Targeted Re-evaluation for SPAs and Settings Changes.
+   * Only re-evaluates features that have been requested, preventing premature activation.
+   */
+  async _processEvaluationQueue() {
+    const features = Array.from(this.requestedFeatures);
+    for (const feature of features) {
+      const shouldBeActive = await this.shouldActivateFeature(feature);
+      // ... activate or deactivate accordingly
+    }
   }
 }
 ```
 
 **Key Responsibilities:**
-- Monitors `revertMightBeNeeded` flag to keep Escape key active after a translation.
-- Listens for `select-mode-activated` to prioritize ESC monitoring.
-- Triggers `lazy-features.js` for actual code loading.
-
-### 2. Lazy Feature Loader (`src/core/content-scripts/chunks/lazy-features.js`)
-Handles the dynamic `import()` of feature modules. It now supports a **force** parameter to bypass setting-based exclusion for critical utility operations.
-
-```javascript
-export async function loadFeature(featureName, force = false) {
-  // ...
-  switch (featureName) {
-    case 'shortcut':
-      return await loadShortcutFeature(force); // force=true allows loading Revert logic even if shortcut is OFF
-  }
-}
-```
-
-### 3. FeatureManager (`src/core/managers/content/FeatureManager.js`)
-Central orchestrator for feature lifecycle. It ensures that when a feature is deactivated, all its resources (DOM elements, listeners) are cleaned up and the lazy-loading cache is invalidated.
-
-```javascript
-async deactivateFeature(featureName) {
-  const handler = this.featureHandlers.get(featureName);
-  if (handler) {
-    await handler.deactivate();
-    this.featureHandlers.delete(featureName);
-    
-    // Invalidate lazy cache
-    const { notifyFeatureDeactivated } = await import('./chunks/lazy-features.js');
-    notifyFeatureDeactivated(featureName);
-  }
-}
-```
+- **Logical Gatekeeper**: Checks `ExclusionChecker` before any dynamic import occurs.
+- **State Management**: Tracks which features should be active based on current context.
+- **Cleanup Orchestrator**: Ensures complete resource teardown and singleton destruction during deactivation.
+- **IFrame Support**: Automatically propagates activation and settings updates across all contexts.
+- **Self-Initialization**: Automatically sets up exclusion rules and listeners if a feature is requested before the manager is ready.
 
 ---
 
@@ -87,17 +134,17 @@ await interactionCoordinator.initialize();
 ### URL & Setting Mapping
 | Feature | Setting | Exclusion Rule | Trigger Event |
 | :--- | :--- | :--- | :--- |
-| `selectElement` | `TRANSLATE_WITH_SELECT_ELEMENT` | `ELEMENT_SELECTION_EXCLUDED_SITES` | `contextmenu` / FAB Click |
-| `textSelection` | `TRANSLATE_ON_TEXT_SELECTION` | `TRANSLATE_EXCLUDED_SITES` | `mouseup` (Selection) |
-| `textFieldIcon` | `ENABLE_SHORTCUT_FOR_TEXT_FIELDS` | `TEXT_FIELD_EXCLUDED_SITES` | `focusin` |
-| `shortcut` | `TRANSLATE_ON_TEXT_SELECTION` | `TRANSLATE_EXCLUDED_SITES` | `keydown` (Ctrl+/) |
+| `selectElement` | `TRANSLATE_WITH_SELECT_ELEMENT` | `EXCLUDED_SITES` | `contextmenu` / FAB Click |
+| `textSelection` | `TRANSLATE_ON_TEXT_SELECTION` | `EXCLUDED_SITES` | `mouseup` (Selection) |
+| `textFieldIcon` | `TRANSLATE_ON_TEXT_SELECTION` | `DEFAULT_EXCLUDED_TEXT_FIELDS_ICON` + `EXCLUDED_SITES` | `focusin` |
+| `shortcut` | `ENABLE_SHORTCUT_FOR_TEXT_FIELDS` | `EXCLUDED_SITES` | `keydown` (Ctrl+/) |
 
 ### Special Case: Revert (ESC)
 The Revert functionality is unique because it must work even if the user has disabled shortcuts.
 1. `SelectElementManager` or `ShortcutHandler` emits `ELEMENT_TRANSLATIONS_AVAILABLE`.
 2. `InteractionCoordinator` sets `revertMightBeNeeded = true`.
 3. Even if `shortcut` is disabled, `InteractionCoordinator` keeps the `keydown` listener active.
-4. On `Escape`, it calls `loadFeature('shortcut', true)` (Forced Load).
+4. On `Escape`, it calls `loadFeature('shortcut', true)` (Forced Load) to execute the Revert logic.
 
 ---
 

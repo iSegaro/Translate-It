@@ -1,343 +1,115 @@
-# StorageManager Documentation
+# Storage Management Guide (StorageCore)
 
 ## Overview
 
-StorageManager is a centralized storage management system for the Translate-It extension that provides unified API for browser extension storage with caching and event system support.
+**StorageCore** is a centralized storage management system for the Translate-It extension that provides a unified API for browser extension storage with intelligent caching and a robust event system. It replaces direct `browser.storage` calls to ensure performance, consistency, and reactive updates across all components.
 
 ## Features
 
-✅ **Unified Storage API** - Single interface for all storage operations  
-✅ **Intelligent Caching** - Automatic cache management with invalidation  
-✅ **Event System** - Reactive updates across components  
-✅ **Cross-browser Support** - Compatible with Chrome and Firefox  
-✅ **Error Handling** - Comprehensive error management  
-✅ **Performance Optimization** - Reduces storage API calls  
+**Unified Storage API** - Single interface for all storage operations (`get`, `set`, `remove`, `clear`).  
+**Intelligent Caching** - Built-in caching mechanism to reduce expensive browser API calls.  
+**Reactive Event System** - Emits events for storage changes, allowing components to stay in sync.  
+**Cross-browser Support** - Seamlessly handles Chrome (Manifest V3) and Firefox APIs.  
+**Error Resilience** - Integrated with the global Error Management System.  
+**Performance Optimized** - Optimized for high-frequency access in content scripts and background workers.
 
 ## Architecture
 
 ### Core Components
 
-1. **StorageManager Class** (`src/core/StorageManager.js`)
-   - Singleton storage manager with cache and events
-   - Automatic initialization and cleanup
-   - Promise-based API
+1. **StorageCore Class** (`src/shared/storage/core/StorageCore.js`)
+   - Singleton storage manager that inherits from `ResourceTracker`.
+   - Manages an internal cache and coordinates with the browser's storage API.
+   - Provides a localized event system for specific key changes (e.g., `change:key1`).
 
-2. **useStorage Composable** (`src/composables/useStorage.js`)
-   - Vue integration with reactive data
-   - Multiple usage patterns
-   - Lifecycle management
+2. **SecureStorage** (`src/shared/storage/core/SecureStorage.js`)
+   - Specialized layer for handling sensitive data like API keys.
+   - Ensures data integrity and provides an additional layer of protection.
 
-3. **Enhanced useBrowserAPI** (`src/composables/useBrowserAPI.js`)
-   - Updated to use StorageManager
-   - Backward compatible API
-   - Storage event handling
+3. **useStorage Composables** (`src/shared/storage/composables/`)
+   - **useStorage.js**: Vue integration for managing multiple reactive keys.
+   - **useStorageItem.js**: Simplified Vue integration for a single reactive storage item with auto-sync.
+
+4. **Vue Store Integration**
+   - Core stores like `useSettingsStore` (`src/features/settings/stores/settings.js`) use `StorageCore` internally for persistence.
 
 ## Usage Patterns
 
-### 1. Direct StorageManager Usage
+### 1. Direct StorageCore Usage (Background/Logic)
 
 ```javascript
-import storageManager from '@/core/StorageManager.js';
+import { storageManager } from '@/shared/storage/core/StorageCore.js';
 
-// Get data
-const data = await storageManager.get(['key1', 'key2']);
+// Get data (with defaults)
+const { theme, language } = await storageManager.get({
+  theme: 'auto',
+  language: 'en'
+});
 
 // Set data
-await storageManager.set({ key1: 'value1', key2: 'value2' });
+await storageManager.set({ theme: 'dark' });
 
-// Listen to changes
-storageManager.on('change:key1', ({ newValue, oldValue }) => {
-  console.log('Key1 changed:', newValue);
+// Listen to specific key changes
+storageManager.on('change:theme', ({ newValue, oldValue }) => {
+  console.log('Theme changed to:', newValue);
 });
 ```
 
-### 2. Vue Composable Usage
+### 2. Vue Composable Usage (UI)
 
-```javascript
-import { useStorage } from '@/composables/useStorage.js';
+```vue
+<script setup>
+import { useStorage } from '@/shared/storage/composables/useStorage.js';
+import { useStorageItem } from '@/shared/storage/composables/useStorageItem.js';
 
-// Multiple keys with reactive object
-const { data, isLoading, save, remove } = useStorage(['key1', 'key2']);
+// Multiple keys with reactive data object
+const { data, isLoading, save } = useStorage(['API_KEY', 'PROVIDER']);
 
-// Single key with auto-sync
-const { value } = useStorageItem('settings', {});
-```
-
-### 3. Vue Store Integration
-
-```javascript
-// Already integrated in enhanced-settings store
-import { useSettingsStore } from '@/store/core/settings.js';
-
-const settings = useSettingsStore();
-// All operations now use StorageManager internally
+// Single key with auto-sync and default value
+const { value: theme } = useStorageItem('theme', 'auto');
+</script>
 ```
 
 ## API Reference
 
-### StorageManager Methods
+### StorageCore Methods
 
 #### Basic Operations
-
-```javascript
-// Get values (with optional defaults and caching)
-await storageManager.get(keys, useCache = true)
-
-// Set values (with cache update)
-await storageManager.set(data, updateCache = true)
-
-// Remove values (with cache cleanup)
-await storageManager.remove(keys, updateCache = true)
-
-// Clear all storage
-await storageManager.clear(updateCache = true)
-```
-
-#### Cache Management
-
-```javascript
-// Get cached value (synchronous)
-const value = storageManager.getCached(key, defaultValue)
-
-// Check if cached
-const exists = storageManager.hasCached(key)
-
-// Invalidate cache
-storageManager.invalidateCache(['key1', 'key2'])
-
-// Clear all cache
-storageManager.clearCache()
-
-// Get cache statistics
-const stats = storageManager.getCacheStats()
-```
+- `get(keys, useCache = true)`: Retrieves values. Can accept a string, array of strings, or an object with defaults.
+- `set(data, updateCache = true)`: Saves values to storage and updates the cache.
+- `remove(keys, updateCache = true)`: Deletes specific keys.
+- `clear(updateCache = true)`: Wipes all extension storage.
 
 #### Event System
+- `on(eventName, callback)`: Subscribe to changes. Use `change:KEY_NAME` for specific keys.
+- `off(eventName, callback)`: Unsubscribe from changes.
+- `emit(eventName, data)`: Manages internal event propagation.
 
-```javascript
-// Listen to events
-storageManager.on('change', callback)
-storageManager.on('change:key', callback)
-storageManager.on('set', callback)
-storageManager.on('remove', callback)
-
-// Remove listeners
-storageManager.off('change', callback)
-```
-
-### useStorage Composable
-
-```javascript
-const {
-  data,        // Reactive data object
-  isLoading,   // Loading state
-  error,       // Error state
-  load,        // Manual load function
-  save,        // Save function
-  remove,      // Remove function
-  update,      // Update single key
-  getCached    // Get cached value
-} = useStorage(keys, options);
-```
-
-### useStorageItem Composable
-
-```javascript
-const {
-  value,       // Reactive value with auto-sync
-  isLoading,   // Loading state
-  error,       // Error state
-  save,        // Manual save
-  remove       // Remove item
-} = useStorageItem(key, defaultValue, options);
-```
-
-## Migration Guide
-
-### From Direct browser.storage Calls
-
-**Before:**
-```javascript
-// Old pattern
-const data = await browser.storage.local.get(['key1', 'key2']);
-await browser.storage.local.set({ key1: 'value1' });
-
-// Manual change listeners
-browser.storage.onChanged.addListener((changes) => {
-  // Handle changes
-});
-```
-
-**After:**
-```javascript
-// New pattern with StorageManager
-const data = await storageManager.get(['key1', 'key2']);
-await storageManager.set({ key1: 'value1' });
-
-// Event system
-storageManager.on('change:key1', ({ newValue }) => {
-  // Handle change
-});
-```
-
-### From useBrowserAPI Storage
-
-**Before:**
-```javascript
-const { safeStorageGet, safeStorageSet } = useBrowserAPI();
-const data = await safeStorageGet(['key1']);
-await safeStorageSet({ key1: 'value1' });
-```
-
-**After:**
-```javascript
-// API remains the same, but now uses StorageManager internally
-const { safeStorageGet, safeStorageSet } = useBrowserAPI();
-const data = await safeStorageGet(['key1']); // Uses StorageManager
-await safeStorageSet({ key1: 'value1' }); // Uses StorageManager
-```
+#### Cache Management
+- `getCached(key, defaultValue)`: Synchronous access to cached values.
+- `getCacheStats()`: Returns debugging information about cache size and state.
 
 ## Benefits
 
-### Performance Improvements
+### Performance
+- **Reduced Overhead**: Minimizes the number of asynchronous `browser.storage` calls via an in-memory cache.
+- **Batching**: Automatically handles batch operations for multiple keys.
 
-1. **Reduced API Calls** - Intelligent caching reduces browser.storage calls
-2. **Batch Operations** - Efficient bulk operations
-3. **Memory Management** - Automatic cache cleanup and garbage collection
+### Reliability
+- **Race Condition Prevention**: Centralized write operations ensure data consistency.
+- **Context Awareness**: Integrated with `ExtensionContextManager` to handle extension updates and reloads safely.
 
-### Developer Experience
-
-1. **Unified API** - Single interface for all storage operations
-2. **Type Safety** - Better TypeScript support (future enhancement)
-3. **Error Handling** - Consistent error management across the app
-4. **Debugging** - Cache statistics and detailed logging
-
-### Architecture Benefits
-
-1. **Centralized Logic** - All storage logic in one place
-2. **Event-Driven Updates** - Reactive components with automatic updates
-3. **Testing** - Easier unit testing with mocked storage
-4. **Maintenance** - Single point of control for storage changes
-
-## Examples
-
-### Settings Management
-
-```javascript
-// Load settings with defaults
-const settings = await storageManager.get({
-  theme: 'auto',
-  language: 'en',
-  enabled: true
-});
-
-// Update single setting
-await storageManager.set({ theme: 'dark' });
-
-// Listen for setting changes
-storageManager.on('change:theme', ({ newValue }) => {
-  document.body.className = `theme-${newValue}`;
-});
-```
-
-### Vue Component Integration
-
-```vue
-<script setup>
-import { useStorage } from '@/composables/useStorage.js';
-
-// Reactive settings object
-const { data: settings, save } = useStorage({
-  API_KEY: '',
-  PROVIDER: 'google',
-  ENABLED: true
-});
-
-// Auto-sync single value
-const { value: theme } = useStorageItem('theme', 'auto');
-
-// Save settings
-const saveSettings = async () => {
-  await save({
-    API_KEY: settings.API_KEY,
-    PROVIDER: settings.PROVIDER
-  });
-};
-</script>
-```
-
-### Background Service Integration
-
-```javascript
-// In background service
-import storageManager from '@/core/StorageManager.js';
-
-class TranslationService {
-  constructor() {
-    // Listen for API key changes
-    storageManager.on('change:API_KEY', ({ newValue }) => {
-      this.updateApiKey(newValue);
-    });
-  }
-
-  async getSettings() {
-    return await storageManager.get({
-      API_KEY: '',
-      PROVIDER: 'google',
-      SOURCE_LANG: 'auto',
-      TARGET_LANG: 'en'
-    });
-  }
-}
-```
-
-## Testing
-
-StorageManager includes comprehensive test coverage:
-
-```bash
-# Run StorageManager tests
-pnpm run test:vue:run
-
-# Tests include:
-# - Basic operations (get, set, remove, clear)
-# - Cache management
-# - Event system
-# - Error handling
-# - Cleanup and memory management
-```
-
-## Performance Monitoring
-
-```javascript
-// Get cache statistics for debugging
-const stats = storageManager.getCacheStats();
-console.log('Cache stats:', stats);
-// Output: { size: 10, keys: ['key1', 'key2', ...], isReady: true }
-
-// Monitor storage events
-storageManager.on('change', (data) => {
-  console.log('Storage changed:', data.key, data.newValue);
-});
-```
+### Maintainability
+- **Single Source of Truth**: All storage logic is encapsulated within `StorageCore`.
+- **Decoupled UI**: Vue components use composables that abstract away the complexity of storage listeners.
 
 ## Best Practices
 
-1. **Use Appropriate Pattern** - Choose between direct StorageManager, useStorage, or useStorageItem based on needs
-2. **Cache Management** - Let StorageManager handle cache automatically, manual invalidation only when needed
-3. **Event Cleanup** - Always cleanup event listeners in components (handled automatically in composables)
-4. **Error Handling** - Use try-catch blocks for storage operations
-5. **Default Values** - Always provide sensible defaults for storage operations
-
-## Future Enhancements
-
-- [ ] TypeScript support for better type safety
-- [ ] Storage quotas and limits management
-- [ ] Advanced caching strategies (LRU, TTL)
-- [ ] Storage compression for large data
-- [ ] Cross-tab synchronization improvements
-- [ ] Performance metrics and analytics
+1.  **Always Provide Defaults**: Use the object syntax in `get()` to ensure your code has sensible defaults.
+2.  **Prefer Composables in Vue**: Use `useStorage` or `useStorageItem` in components to ensure automatic cleanup of listeners.
+3.  **Use Specific Listeners**: Instead of listening to all changes, use `change:KEY_NAME` to improve performance.
+4.  **Sensitive Data**: Use the appropriate settings keys (e.g., `GEMINI_API_KEY`) which are handled with extra care by the system.
 
 ---
 
-This StorageManager system provides a solid foundation for centralized storage management while maintaining backward compatibility and improving performance across the extension.
+**Last Updated**: May 2026

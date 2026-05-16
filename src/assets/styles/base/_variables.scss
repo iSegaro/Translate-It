@@ -115,6 +115,7 @@
   
     // Component specific colors
   --accent-color: #1a73e8;
+  --accent-color-rgb: 26, 115, 232;
   --accent-color-alpha: rgb(26 115 232 / 10%);
   --placeholder-color: #9aa0a6;
   
@@ -165,7 +166,7 @@
   --bg-result-color-rgb: 14, 14, 14;
   --header-bg-color: #303741;
   --header-border-color: #5f6368;
-  --toolbar-link-color: #8ab4f8;
+  --toolbar-link-color: #60a5fa;
   --toolbar-link-hover-bg-color: #404040;
   --language-controls-bg-color: #303741;
   --language-controls-border-color: #5f6368;
@@ -175,25 +176,26 @@
   
   // Options page colors
   --tab-button-color: #bdc1c6;
-  --tab-button-active-color: #8ab4f8;
+  --tab-button-active-color: #3b82f6;
   --tab-button-active-bg: #303741;
   --tab-button-hover-bg: #3c4043;
-  --tab-button-active-border-color: #8ab4f8;
+  --tab-button-active-border-color: #3b82f6;
   --input-bg-color: #202124;
   --input-text-color: #e8eaed;
   --input-border-color: #5f6368;
-  --input-focus-border-color: #8ab4f8;
-  --input-focus-shadow-color: rgb(138 180 248 / 30%);
-  --button-bg-color: #1a73e8;
+  --input-focus-border-color: #3b82f6;
+  --input-focus-shadow-color: rgb(59 130 246 / 30%);
+  --button-bg-color: #3b82f6;
   --button-text-color: #fff;
-  --button-hover-bg-color: #185abc;
-  --link-color: #8ab4f8;
-  --link-hover-color: #d2e3fc;
+  --button-hover-bg-color: #2563eb;
+  --link-color: #60a5fa;
+  --link-hover-color: #93c5fd;
   --section-title-border: #5f6368;
   
   // Component specific colors
-  --accent-color: #8ab4f8;
-  --accent-color-alpha: rgb(138 180 248 / 20%);
+  --accent-color: #3b82f6;
+  --accent-color-rgb: 59, 130, 246;
+  --accent-color-alpha: rgb(59 130 246 / 20%);
   --placeholder-color: #888;
   
   // Icon filters
@@ -208,7 +210,7 @@
   --color-surface: #242d44; /* Ensure dark theme background is blue */
   --color-surface-alpha: rgb(30 31 34 / 85%); /* More neutral dark grey with higher opacity */
   --color-border-alpha: rgb(255 255 255 / 10%);
-  --color-primary-alpha: rgb(138 180 248 / 30%);
+  --color-primary-alpha: rgb(59 130 246 / 30%);
   --color-surface-shadow: rgb(255 255 255 / 10%);
   --color-background-hover: rgb(255 255 255 / 10%);
   --color-button-surface: rgb(32 33 36 / 95%);
@@ -223,14 +225,14 @@
   --color-background-soft: var(--sidebar-bg-color, #303741);
   --color-border: var(--border-color, #3c4043);
   --color-border-light: rgb(255 255 255 / 10%);
-  --color-primary: var(--link-color, #8ab4f8);
+  --color-primary: var(--button-bg-color, #3b82f6);
   --color-error: #ef5350;
   --color-error-bg: #160b0b;
   --color-error-text: #f4c7c7;
   --color-success: #66bb6a;
   --color-success-bg: #0c130d;
   --color-success-text: #cce8cd;
-  --color-info: #8ab4f8;
+  --color-info: #3b82f6;
   --color-code-block-bg: var(--bg-result-color, #0e0e0e);
   --color-code-inline-bg: var(--language-controls-bg-color, #303741);
 }
@@ -271,6 +273,7 @@ $border-radius-sm: 4px;
 $border-radius-base: 6px;
 $border-radius-md: 8px;
 $border-radius-lg: 12px;
+$border-radius-full: 9999px;
 $border-width: 1px;
 $border-style: solid;
 $border-color: var(--color-border);

@@ -1,3 +1,34 @@
+#### v1.16.0 – Released on May XX, 2026
+
+##### Added
+
+- Added [Mouse on Hover Translation](#/activation?highlight=activation_group_mouse_hover) for instant, frictionless translation by simply hovering over text or containers
+- Added customizable **Idle Opacity** and **Icon Size** for the [Quick Action Button (FAB)](#/activation?highlight=FAB_CUSTOMIZATION_SETTINGS)
+
+---
+
+#### v1.15.1 – Released on May 13, 2026
+
+##### Added
+
+- Added the ability to choose a translation provider for [OCR translations](#/ocr?highlight=OCR_PROVIDER_SELECTOR)
+- Improved dictionary results with more detailed information such as pronunciations, synonyms, definitions, and examples, along with new [Dictionary Display Options](#/languages?highlight=DICTIONARY_DISPLAY_OPTIONS) to customize which sections are displayed
+
+---
+
+#### v1.15.0 – Released on May 11, 2026
+
+##### Added
+
+- Added [Screen Capture (OCR)](#/ocr) to extract and translate text from any visual area, including images and videos, with full offline support ([#120](https://github.com/iSegaro/Translate-It/pull/120))
+- Added **Pin** and **Dock** capabilities with **Edge Snapping**: You can now pin the window to stay open or drag it to the screen edges to dock it as a persistent, resizable sidebar that updates instantly with new selections ([#121](https://github.com/iSegaro/Translate-It/pull/121))
+
+##### Changed
+
+- Improved overall performance and responsiveness
+
+---
+
 #### v1.14.1 – Released on May 09, 2026
 
 ##### Added

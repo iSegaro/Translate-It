@@ -32,7 +32,7 @@ const sourceFilesAndDirs = [
   "src",
   "package.json",
   "pnpm-lock.yaml",
-  "AGENT.md",
+  "AGENTS.md",
   "README.md",
 ];
 

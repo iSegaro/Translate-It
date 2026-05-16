@@ -32,22 +32,15 @@ The Text Selection system is a key component of the Translate-It extension, resp
 - Interacts with `WindowsManager`.
 - Supports iframe communication.
 
-#### 3. **TextSelectionHandler (Wrapper)**
-`src/features/text-selection/handlers/TextSelectionHandler.js`
-
-- Compatibility wrapper for `FeatureManager`.
-- Uses `SimpleTextSelectionHandler` in the background.
-- Maintains the old API for backward compatibility.
-
-#### 4. **useTextSelection (Vue Composable)**
+#### 3. **useTextSelection (Vue Composable)**
 `src/features/text-selection/composables/useTextSelection.js`
 
 - Vue composable for integration.
 - Reactive state management.
 - Simple interaction with `SimpleTextSelectionHandler`.
 
-#### 5. **FieldDetector**
-`src/utils/text/core/FieldDetector.js`
+#### 4. **TextFieldDetector**
+`src/features/text-field-interaction/utils/TextFieldDetector.js`
 
 - Detects field types using site handlers.
 - Determines the appropriate selection strategy.
@@ -71,22 +64,22 @@ document.addEventListener('selectionchange', () => {
 
 ```
 
-### 🎯 Icon Display Conditions:
+### Icon Display Conditions:
 
-1. **✅ Text is selected** (`selectedText.trim()`)
-2. **✅ Not currently dragging** (`!isDragging`)
-3. **✅ Not inside a text field** (`!isInTextField`)
-4. **✅ Ctrl key requirement** (if enabled)
-5. **✅ Select element mode is disabled** (`!selectModeActive`)
+1. **Text is selected** (`selectedText.trim()`)
+2. **Not currently dragging** (`!isDragging`)
+3. **Not inside a text field** (`!isInTextField`)
+4. **Ctrl key requirement** (if enabled)
+5. **Select element mode is disabled** (`!selectModeActive`)
 
-### 🔄 Separation of Concerns:
+### Separation of Concerns:
 
 * **Page Text Selection** → `SimpleTextSelectionHandler`
 * **Text Field Selection** → `TextFieldDoubleClickHandler` (Separate module)
 
 ## Simple Drag Prevention (Simplified Approach)
 
-### 🚀 Advantages of the New Approach
+### Advantages of the New Approach
 
 #### ❌ Legacy Method (Complex Drag Detection)
 
@@ -98,7 +91,7 @@ timeout management + complex state
 
 ```
 
-#### ✅ New Method (Simple Prevention)
+#### New Method (Simple Prevention)
 
 ```javascript
 // Highly simple and effective
@@ -108,7 +101,7 @@ mouseup → isDragging = false + process after delay
 
 ```
 
-### 🔧 Simple Implementation
+### Simple Implementation
 
 ```javascript
 class SimpleTextSelectionHandler {
@@ -147,7 +140,7 @@ class SimpleTextSelectionHandler {
 
 ## Event Flow
 
-### 📊 Event Flow (Simplified)
+### Event Flow (Simplified)
 
 ```mermaid
 graph TD
@@ -162,7 +155,7 @@ graph TD
 
 ```
 
-### 🎮 Various Scenarios
+### Various Scenarios
 
 #### 1. **Mouse Selection** (Drag-to-select)
 
@@ -193,7 +186,7 @@ double-click in text field → TextFieldDoubleClickHandler → show icon
 
 ## Text Field Integration (Separate Module)
 
-### 🔄 Decoupling Text Fields
+### Decoupling Text Fields
 
 Professional editors and text fields are now managed by a separate module:
 
@@ -227,7 +220,7 @@ class TextFieldDoubleClickHandler {
 * **Notion**: block-based detection
 * **WPS Office**: office suite detection
 
-### 🎯 Simplified Approach:
+### Simplified Approach:
 
 1. **Page content** → `SimpleTextSelectionHandler`
 2. **Text fields** → `TextFieldDoubleClickHandler`
@@ -235,7 +228,7 @@ class TextFieldDoubleClickHandler {
 
 ## Integration with Other Systems
 
-### 🔗 WindowsManager Integration
+### WindowsManager Integration
 
 ```javascript
 // TextSelectionManager → WindowsManager
@@ -248,7 +241,7 @@ await windowsManager.show('selection', {
 
 ```
 
-### 🔗 FeatureManager Integration
+### FeatureManager Integration
 
 ```javascript
 // FeatureManager → TextSelectionHandler
@@ -260,7 +253,7 @@ if (textSelectionHandler?.isActive) {
 
 ```
 
-### 🔗 IFrame Support
+### IFrame Support
 
 ```javascript
 // Cross-frame communication
@@ -278,7 +271,7 @@ if (window !== window.top) {
 
 ## Error Handling
 
-### 🛡️ Error Management
+### Error Management
 
 ```javascript
 try {
@@ -294,7 +287,7 @@ try {
 
 ```
 
-### 🔄 Context Safety
+### Context Safety
 
 ```javascript
 // Extension context validation
@@ -307,7 +300,7 @@ if (ExtensionContextManager.isContextError(error)) {
 
 ## Performance Optimization
 
-### ⚡ Optimizations
+### Optimizations
 
 #### 1. **Resource Tracking**
 
@@ -344,7 +337,7 @@ if (!this.isActive || !this.textSelectionManager) return;
 
 ## Testing and Debugging
 
-### 🔍 Debug Information
+### Debug Information
 
 ```javascript
 // Debug status
@@ -360,7 +353,7 @@ getStatus() {
 
 ```
 
-### 📊 Logging
+### Logging
 
 ```javascript
 // Structured logging
@@ -375,7 +368,7 @@ this.logger.debug('Selection detected', {
 
 ## Best Practices
 
-### ✅ Recommendations
+### Recommendations
 
 1. **Use Field Detection**: Always identify the field type.
 2. **Respect User Interaction**: Wait for the user to complete their selection.
@@ -425,7 +418,6 @@ this.logger.debug('Selection detected', {
 
 * **SimpleTextSelectionHandler**: `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
 * **SelectionManager**: `src/features/text-selection/core/SelectionManager.js`
-* **TextSelectionHandler (Wrapper)**: `src/features/text-selection/handlers/TextSelectionHandler.js`
 * **useTextSelection (Vue)**: `src/features/text-selection/composables/useTextSelection.js`
 
 ### Text Field Integration
@@ -434,23 +426,18 @@ this.logger.debug('Selection detected', {
 * **TextFieldDoubleClickHandler**: `src/features/text-field-interaction/handlers/TextFieldDoubleClickHandler.js`
 * **TextFieldIconManager**: `src/features/text-field-interaction/managers/TextFieldIconManager.js`
 
-### Legacy Files (Backup)
-
-* **TextSelectionManager.legacy.js**: Complex old implementation.
-* **TextSelectionHandler.legacy.js**: Complex old handler.
-
 ### Documentation
 
-* **WindowsManager**: `docs/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`
-* **Smart Handler Registration**: `docs/SMART_HANDLER_REGISTRATION_SYSTEM.md`
-* **Error Management**: `docs/ERROR_MANAGEMENT_SYSTEM.md`
+* **WindowsManager**: `docs/technical/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md`
+* **Smart Handler Registration**: `docs/technical/SMART_HANDLER_REGISTRATION_SYSTEM.md`
+* **Error Management**: `docs/technical/ERROR_MANAGEMENT_SYSTEM.md`
 
 ### Key Improvements (2025) - Simplification
 
-* ✅ **60-70% Code Reduction**: Eliminated unnecessary complexities.
-* ✅ **selectionchange-only**: Switched exclusively to `selectionchange` events.
-* ✅ **Simple Drag Prevention**: Replaced `pendingSelection` with simple `mousedown`/`mouseup`.
-* ✅ **Text Field Separation**: Fully decoupled text fields into an independent module.
-* ✅ **Performance Boost**: Higher efficiency with fewer race conditions.
-* ✅ **Maintainability**: Cleaner, more readable code.
-* ✅ **Cross-browser Reliability**: Improved compatibility across all major browsers.
+* **60-70% Code Reduction**: Eliminated unnecessary complexities.
+* **selectionchange-only**: Switched exclusively to `selectionchange` events.
+* **Simple Drag Prevention**: Replaced `pendingSelection` with simple `mousedown`/`mouseup`.
+* **Text Field Separation**: Fully decoupled text fields into an independent module.
+* **Performance Boost**: Higher efficiency with fewer race conditions.
+* **Maintainability**: Cleaner, more readable code.
+* **Cross-browser Reliability**: Improved compatibility across all major browsers.

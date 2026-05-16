@@ -246,7 +246,7 @@
     "message": "روش‌های ترجمه"
   },
   "prompt_tab_title": {
-    "message": "تنظیمات پرامپت"
+    "message": "تنظیمات پرامت"
   },
   "api_tab_title": {
     "message": "تنظیمات API"
@@ -256,6 +256,63 @@
   },
   "advance_tab_title": {
     "message": "پیش‌رفته"
+  },
+  "ocr_tab_title": {
+    "message": "تشخیص متن (OCR)"
+  },
+  "ocr_toggle_section_title": {
+    "message": "تنظیمات تشخیص متن"
+  },
+  "ocr_tab_desc": {
+    "message": "مدیریت زبان‌ها و تنظیمات تشخیص متن از روی تصویر (OCR)."
+  },
+  "ocr_enabled_label": {
+    "message": "فعال‌سازی استخراج متن (OCR)"
+  },
+  "ocr_enabled_desc": {
+    "message": "قابلیت استخراج متن از تصاویر و ترجمه آن را فعال می‌کند."
+  },
+  "ocr_context_menu_label": {
+    "message": "نمایش در منوی راست‌کلیک"
+  },
+  "ocr_context_menu_desc": {
+    "message": "اضافه کردن به منوی راست‌کلیک صفحات."
+  },
+  "ocr_languages_label": {
+    "message": "زبان‌های OCR"
+  },
+  "ocr_download_button": {
+    "message": "دانلود"
+  },
+  "ocr_delete_button": {
+    "message": "حذف"
+  },
+  "ocr_status_installed": {
+    "message": "نصب شده"
+  },
+  "ocr_status_not_installed": {
+    "message": "نصب نشده"
+  },
+  "ocr_auto_download_label": {
+    "message": "دانلود خودکار زبان‌های مورد نیاز"
+  },
+  "ocr_auto_download_desc": {
+    "message": "در صورت فعال بودن، هنگام شروع تصویربرداری اگر مدل زبان موجود نباشد، به طور خودکار دانلود می‌شود."
+  },
+  "ocr_cache_clear_button": {
+    "message": "پاکسازی حافظه OCR"
+  },
+  "ocr_cache_clear_desc": {
+    "message": "تمام مدل‌های زبان دانلود شده را برای آزادسازی فضا از حافظه داخلی حذف می‌کند."
+  },
+  "ocr_download_progress": {
+    "message": "در حال دانلود {lang}: {progress}%"
+  },
+  "ocr_download_success": {
+    "message": "مدل {lang} با موفقیت دانلود شد."
+  },
+  "ocr_download_error": {
+    "message": "خطا در دانلود مدل {lang}."
   },
   "tts_tab_title": {
     "message": "تبدیل متن به گفتار"
@@ -307,6 +364,60 @@
   },
   "activation_group_page_selection_title": {
     "message": "انتخاب در صفحه"
+  },
+  "activation_group_mouse_hover_title": {
+    "message": "ترجمه با حرکت موس (Hover)"
+  },
+  "mouse_hover_translation_enabled_label": {
+    "message": "فعال‌سازی ترجمه با حرکت موس"
+  },
+  "mouse_hover_translation_enabled_description": {
+    "message": "ترجمه خودکار متن هنگامی که موس را روی آن نگه می‌دارید."
+  },
+  "mouse_hover_scope_label": {
+    "message": "محدوده ترجمه"
+  },
+  "mouse_hover_scope_word": {
+    "message": "کلمه"
+  },
+  "mouse_hover_scope_sentence": {
+    "message": "جمله"
+  },
+  "mouse_hover_scope_container": {
+    "message": "کل بلاک (Container)"
+  },
+  "mouse_hover_trigger_label": {
+    "message": "نحوه فعال‌سازی"
+  },
+  "mouse_hover_trigger_hover": {
+    "message": "فقط مکث موس"
+  },
+  "mouse_hover_trigger_ctrl": {
+    "message": "Ctrl + مکث موس"
+  },
+  "mouse_hover_trigger_alt": {
+    "message": "Alt + مکث موس"
+  },
+  "mouse_hover_trigger_shift": {
+    "message": "Shift + مکث موس"
+  },
+  "mouse_hover_delay_label": {
+    "message": "زمان انتظار"
+  },
+  "mouse_hover_autoclose_label": {
+    "message": "نحوه بسته شدن"
+  },
+  "mouse_hover_autoclose_mouseleave": {
+    "message": "خروج موس از متن"
+  },
+  "mouse_hover_autoclose_timer": {
+    "message": "پس از زمان مشخص"
+  },
+  "mouse_hover_timer_label": {
+    "message": "زمان نمایش (میلی‌ثانیه)"
+  },
+  "mouse_hover_show_container_border_label": {
+    "message": "نمایش حاشیه دور بلاک متن"
   },
   "activation_group_dictionary_title": {
     "message": "حالت دیکشنری"
@@ -506,6 +617,9 @@
   "mobile_dashboard_history_label": {
     "message": "تاریخچه"
   },
+  "mobile_dashboard_capture_label": {
+    "message": "تصویربرداری"
+  },
   "mobile_selection_auto_label": {
     "message": "خودکار"
   },
@@ -592,6 +706,9 @@
   },
   "desktop_fab_select_element_label": {
     "message": "انتخاب المان"
+  },
+  "desktop_fab_screen_capture_label": {
+    "message": "تصویربرداری از صفحه"
   },
   "desktop_fab_translate_selection_label": {
     "message": "ترجمه متن انتخاب شده"
@@ -1224,7 +1341,10 @@
     "message": "بازگردانی (Esc کلید)"
   },
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
-    "message": "انتخاب المان با موس"
+    "message": "انتخاب المان"
+  },
+  "SIDEPANEL_SCREEN_CAPTURE_TOOLTIP": {
+    "message": "استخراج متن از تصویر (OCR)"
   },
   "SIDEPANEL_SOURCE_LANGUAGE_PLACEHOLDER_AUTO": {
     "message": "ورودی (خودکار)"
@@ -1410,7 +1530,7 @@
     "message": "تب در دسترس نیست."
   },
   "ERRORS_EMPTY_PROMPT": {
-    "message": "متن پرامپت خالی یا نامعتبر است."
+    "message": "متن پرامت خالی یا نامعتبر است."
   },
   "ERRORS_TEXT_TOO_LONG": {
     "message": "متن انتخاب شده بیش از حد طولانی است. لطفا بخش کوتاه‌تری را انتخاب کنید."
@@ -1497,19 +1617,19 @@
     "message": "بخش پیشرفته"
   },
   "prompt_source_help": {
-    "message": "زبان مبدا را برای پرامپت انتخاب کنید."
+    "message": "زبان مبدا را برای پرامت انتخاب کنید."
   },
   "prompt_target_help": {
-    "message": "زبان مقصد را برای پرامپت انتخاب کنید."
+    "message": "زبان مقصد را برای پرامت انتخاب کنید."
   },
   "prompt_text_help": {
     "message": "متنی که می‌خواهید ترجمه یا پردازش شود را وارد کنید."
   },
   "prompt_preview_button": {
-    "message": "پیش‌نمایش پرامپت‌های تولید شده"
+    "message": "پیش‌نمایش پرامت‌های تولید شده"
   },
   "prompt_preview_loading": {
-    "message": "در حال تولید پرامپت‌ها..."
+    "message": "در حال تولید پرامت‌ها..."
   },
   "prompt_preview_note": {
     "message": "این مثال‌ها نشان می‌دهند که الگوی شما در حالت‌های مختلف ترجمه چگونه استفاده می‌شود"
@@ -1522,6 +1642,24 @@
   },
   "appearance_section_title": {
     "message": "ظاهر"
+  },
+  "fab_idle_opacity_label": {
+    "message": "شفافیت آیکون"
+  },
+  "fab_size_label": {
+    "message": "اندازه آیکون"
+  },
+  "fab_size_small": {
+    "message": "کوچک"
+  },
+  "fab_size_default": {
+    "message": "پیش‌فرض"
+  },
+  "fab_size_large": {
+    "message": "بزرگ"
+  },
+  "fab_size_extra_large": {
+    "message": "خیلی بزرگ"
   },
   "font_settings_title": {
     "message": "تنظیمات فونت"
@@ -1647,10 +1785,10 @@
     "message": "کلید API باید حداقل ۱۰ کاراکتر باشد و بدون فاصله"
   },
   "validation_prompt_template_empty": {
-    "message": "الگوی پرامپت نمی‌تواند خالی باشد."
+    "message": "الگوی پرامت نمی‌تواند خالی باشد."
   },
   "validation_prompt_template_missing_placeholders": {
-    "message": "الگوی پرامپت باید شامل موارد زیر باشد: {placeholders}"
+    "message": "الگوی پرامت باید شامل موارد زیر باشد: {placeholders}"
   },
   "validation_invalid_domains": {
     "message": "دامینه‌های نامعتبر: {domains}"
@@ -1687,6 +1825,9 @@
   },
   "history_search_placeholder": {
     "message": "جستجو در تاریخچه..."
+  },
+  "search_placeholder": {
+    "message": "جستجو..."
   },
   "history_filter": {
     "message": "فیلتر"
@@ -1892,6 +2033,15 @@
   "window_translation_placeholder": {
     "message": "ترجمه اینجا نمایش داده می‌شود"
   },
+  "window_pin": {
+    "message": "ثابت کردن پنجره"
+  },
+  "window_unpin": {
+    "message": "آزاد کردن پنجره"
+  },
+  "window_cycle_dock": {
+    "message": "تغییر حالت چسبیدن (هیچکدام / چپ / راست)"
+  },
   "action_copy_text": {
     "message": "کپی متن"
   },
@@ -2011,6 +2161,9 @@
   },
   "bilingual_mode_selection_label": {
     "message": "انتخاب متن"
+  },
+  "bilingual_mode_mouse_hover_label": {
+    "message": "ترجمه با نگه داشتن ماوس"
   },
   "bilingual_mode_select_element_label": {
     "message": "انتخاب المان"
@@ -2183,6 +2336,15 @@
   "prompt_preview_desc_batch": {
     "message": "ترجمه دسته‌ای چندین المان یا کل صفحه وب در قالب JSON"
   },
+  "popup_screen_capture_title_icon": {
+    "message": "تصویربرداری از صفحه"
+  },
+  "popup_screen_capture_alt_icon": {
+    "message": "تصویربرداری"
+  },
+  "context_menu_screen_capture": {
+    "message": "تصویربرداری از صفحه"
+  },
   "prompt_preview_mode_screen_capture": {
     "message": "ترجمه از روی تصویر"
   },
@@ -2194,5 +2356,83 @@
   },
   "prompt_preview_desc_dictionary": {
     "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+  },
+  "screen_capture_label": {
+    "message": "ضبط"
+  },
+  "screen_capture_full_screen": {
+    "message": "صفحه کامل"
+  },
+  "screen_capture_ocr_language": {
+    "message": "زبان OCR"
+  },
+  "screen_capture_cancel": {
+    "message": "لغو"
+  },
+  "screen_capture_capturing": {
+    "message": "در حال ضبط..."
+  },
+  "screen_capture_status_extracting": {
+    "message": "در حال استخراج متن..."
+  },
+  "screen_capture_select_area": {
+    "message": "ناحیه‌ای را برای ضبط انتخاب کنید"
+  },
+  "screen_capture_drag_to_select": {
+    "message": "کلیک و درگ کنید تا ناحیه را انتخاب کنید"
+  },
+  "screen_capture_press_escape": {
+    "message": "برای لغو ESC را بزنید"
+  },
+  "screen_capture_press_enter": {
+    "message": "برای تأیید ENTER را بزنید"
+  },
+  "screen_capture_error": {
+    "message": "خطا در تصویربرداری"
+  },
+  "screen_capture_error_failed": {
+    "message": "تصویربرداری با شکست مواجه شد. لطفاً دوباره تلاش کنید."
+  },
+  "screen_capture_error_no_text": {
+    "message": "هیچ متنی در ناحیه انتخاب شده یافت نشد."
+  },
+  "screen_capture_error_model": {
+    "message": "خطا در بارگذاری مدل OCR. اتصال اینترنت را بررسی کنید."
+  },
+  "screen_capture_error_model_missing": {
+    "message": "مدل زبان نصب نشده است. لطفاً آن را از تنظیمات OCR دانلود کنید."
+  },
+  "screen_capture_missing_model_status": {
+    "message": "مدل زبان نصب نشده است. "
+  },
+  "screen_capture_missing_model_action": {
+    "message": "لطفا آن را از تنظیمات OCR دانلود کنید."
+  },
+  "screen_capture_retry": {
+    "message": "تلاش مجدد"
+  },
+  "dict_pronunciation": {
+    "message": "تلفظ"
+  },
+  "dict_definitions": {
+    "message": "تعاریف"
+  },
+  "dict_examples": {
+    "message": "مثال‌ها"
+  },
+  "dict_setting_display_options": {
+    "message": "گزینه‌های نمایش"
+  },
+  "dict_setting_show_pronunciation": {
+    "message": "نمایش تلفظ"
+  },
+  "dict_setting_show_pos": {
+    "message": "نمایش نقش کلمات (اسم، فعل و...)"
+  },
+  "dict_setting_show_definitions": {
+    "message": "نمایش تعاریف"
+  },
+  "dict_setting_show_examples": {
+    "message": "نمایش مثال‌ها"
   }
 }

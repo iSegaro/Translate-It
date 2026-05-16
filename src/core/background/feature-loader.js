@@ -87,72 +87,6 @@ export class FeatureLoader {
   }
 
   /**
-   * Load screen capture manager based on browser capabilities
-   * @returns {Promise<Object>} Screen capture manager instance
-   */
-  async loadScreenCaptureManager() {
-    const cacheKey = "screen-capture-manager";
-
-    if (this.loadedFeatures.has(cacheKey)) {
-      return this.loadedFeatures.get(cacheKey);
-    }
-
-    if (this.loadingPromises.has(cacheKey)) {
-      return this.loadingPromises.get(cacheKey);
-    }
-
-    const loadingPromise = this._loadScreenCaptureManagerImpl();
-    this.loadingPromises.set(cacheKey, loadingPromise);
-
-    try {
-      const manager = await loadingPromise;
-      this.loadedFeatures.set(cacheKey, manager);
-      this.loadingPromises.delete(cacheKey);
-      return manager;
-    } catch (error) {
-      this.loadingPromises.delete(cacheKey);
-      throw error;
-    }
-  }
-
-  /**
-   * Internal screen capture manager loading implementation
-   * @private
-   */
-  async _loadScreenCaptureManagerImpl() {
-    const capabilities =
-      browser.runtime.getManifest().incognito === "spanning"
-        ? { offscreen: true }
-        : { offscreen: false }; // Simplified capability detection
-    const browserName = browser.runtime.getURL("").startsWith("chrome")
-      ? "chrome"
-      : "firefox"; // Simplified browser detection
-
-    logger.info(`Loading screen capture manager for ${browserName}`);
-
-    try {
-      if (capabilities.offscreen && browser === "chrome") {
-        const { OffscreenCaptureManager } = await import(
-          "../managers/browser-specific/capture/CaptureOffscreen.js"
-        );
-        return new OffscreenCaptureManager();
-      } else {
-        const { ContentScriptCaptureManager } = await import(
-          "@/features/screen-capture/managers/capture-content.js"
-        );
-        return new ContentScriptCaptureManager();
-      }
-    } catch (error) {
-      logger.error("Failed to load screen capture manager:", error);
-      // Fallback to basic content script implementation
-      const { ContentScriptCaptureManager } = await import(
-        "@/features/screen-capture/managers/capture-content.js"
-      );
-      return new ContentScriptCaptureManager();
-    }
-  }
-
-  /**
    * Load context menu manager
    * @returns {Promise<Object>} Context menu manager instance
    */
@@ -203,18 +137,17 @@ export class FeatureLoader {
     const results = await Promise.allSettled([
       // TTS preloading removed - using unified GOOGLE_TTS_SPEAK system
       this.loadPanelManager(),
-      this.loadScreenCaptureManager(),
       this.loadContextMenuManager(),
     ]);
 
     const features = {
       tts: null,
       panel: null,
-      screenCapture: null,
+      screenCapture: { status: 'active', mode: 'unified' },
       contextMenu: null,
     };
 
-    const featureNames = ["tts", "panel", "screenCapture", "contextMenu"];
+    const featureNames = ["tts", "panel", "contextMenu"];
 
     results.forEach((result, index) => {
       const featureName = featureNames[index];

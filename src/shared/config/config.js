@@ -25,6 +25,7 @@ export const TranslationMode = {
   Mobile_Translate: MessageContexts.MOBILE_TRANSLATE,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+  MouseHover: 'mouse_hover', // Mouse on hover translation
   
   // Legacy aliases for backward compatibility
   LEGACY_FIELD: 'field',
@@ -233,6 +234,9 @@ export const CONFIG = {
   TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   SHOW_MOBILE_FAB: true, // نمایش دکمه دسترسی سریع در موبایل
+  WINDOW_IS_PINNED: false, // پنجره ترجمه پین شده باشد یا نه
+  WINDOW_DOCK_MODE: 'none', // حالت چسبیدن پنجره (none, left, right)
+  WINDOW_DOCKED_WIDTH: 300, // عرض پیش‌فرض پنجره در حالت چسبیده (باید بزرگتر از MIN_DOCKED_WIDTH باشد)
   DESKTOP_FAB_POSITION: { 
     side: 'right', 
     y: -1 
@@ -241,6 +245,8 @@ export const CONFIG = {
     side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
     y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
   }, // موقعیت دکمه شناور موبایل (سمت و ارتفاع)
+  FAB_IDLE_OPACITY: 20, // میزان شفافیت دکمه شناور در حالت بیکار (0-100)
+  FAB_SIZE: "1", // ضریب اندازه دکمه شناور (0.8, 1, 1.2, 1.5)
   TRANSLATE_ON_TEXT_FIELDS: false, // نمایش آیکون ترجمه در فیلدهای متنی
   ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true, // فعال کردن شورتکات Ctrl+/ برای فیلدهای متنی
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
@@ -249,10 +255,26 @@ export const CONFIG = {
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
+  OCR_DEFAULT_LANG: 'eng', // زبان پیش‌فرض OCR
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد
   MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO, // حالت رابط کاربری موبایل: auto, mobile, desktop
   MOBILE_PAGE_TRANSLATION_AUTO_CLOSE: false, // بستن خودکار شیت پس از شروع ترجمه صفحه در موبایل
+
+  // --- Mouse on Hover Translation Settings ---
+  MOUSE_HOVER_TRANSLATION_ENABLED: false, // فعال بودن ترجمه با حرکت موس
+  MOUSE_HOVER_SCOPE: 'container', // محدوده ترجمه: word, sentence, container
+  MOUSE_HOVER_TRIGGER: 'ctrl', // نحوه فعال‌سازی: hover, ctrl, alt, shift
+  MOUSE_HOVER_DELAY: 500, // زمان انتظار برای شروع ترجمه (میلی‌ثانیه)
+  MOUSE_HOVER_AUTO_CLOSE: 'mouseleave', // نحوه بسته شدن: mouseleave, timer
+  MOUSE_HOVER_TIMER_DURATION: 3000, // زمان نمایش تولتیپ در حالت timer (میلی‌ثانیه)
+  MOUSE_HOVER_SHOW_CONTAINER_BORDER: true, // نمایش حاشیه دور کانتینر در حالت container
+
+  // --- Dictionary Display Settings ---
+  DICTIONARY_SHOW_PRONUNCIATION: true,
+  DICTIONARY_SHOW_POS: true, // Parts of Speech (Noun, Verb, etc.)
+  DICTIONARY_SHOW_DEFINITIONS: false,
+  DICTIONARY_SHOW_EXAMPLES: false,
 
   // --- Versioning ---
   PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
@@ -271,9 +293,9 @@ export const CONFIG = {
     [TranslationMode.Selection]: true, // WindowsManager
     [TranslationMode.Page]: false,     // Default disabled for whole page to prevent checkerboarding
     [TranslationMode.Dictionary_Translation]: true,
-    [TranslationMode.ScreenCapture]: true
-  },
-
+    [TranslationMode.ScreenCapture]: true,
+    [TranslationMode.MouseHover]: true
+    },
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -316,7 +338,9 @@ export const CONFIG = {
   // --- UI & Styling ---
   CONTEXT_MENU_VISIBILITY: {
     PAGE_CONTEXT_SELECT_ELEMENT: true,    // نمایش در کلیک‌راست صفحات
+    PAGE_CONTEXT_SCREEN_CAPTURE: true,    // نمایش تصویربرداری در کلیک‌راست صفحات
     ACTION_CONTEXT_SELECT_ELEMENT: true,  // نمایش در منوی آیکون افزونه (Action)
+    ACTION_CONTEXT_SCREEN_CAPTURE: true,  // نمایش تصویربرداری در منوی آیکون
     ACTION_CONTEXT_OPTIONS: true,         // نمایش گزینه تنظیمات در منوی آیکون
     ACTION_CONTEXT_SHORTCUTS: true,       // نمایش میانبرهای کیبورد در منوی آیکون
     ACTION_CONTEXT_HELP: true             // نمایش راهنما در منوی آیکون
@@ -798,6 +822,22 @@ export const getTargetLanguageAsync = async () => {
 
 export const getEnableDictionaryAsync = async () => {
   return getSettingValueAsync("ENABLE_DICTIONARY", CONFIG.ENABLE_DICTIONARY);
+};
+
+export const getDictionaryShowPronunciationAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_PRONUNCIATION", CONFIG.DICTIONARY_SHOW_PRONUNCIATION);
+};
+
+export const getDictionaryShowPosAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_POS", CONFIG.DICTIONARY_SHOW_POS);
+};
+
+export const getDictionaryShowDefinitionsAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_DEFINITIONS", CONFIG.DICTIONARY_SHOW_DEFINITIONS);
+};
+
+export const getDictionaryShowExamplesAsync = async () => {
+  return getSettingValueAsync("DICTIONARY_SHOW_EXAMPLES", CONFIG.DICTIONARY_SHOW_EXAMPLES);
 };
 
 export const getMobileUiModeAsync = async () => {
@@ -1389,6 +1429,14 @@ export const getSidepanelMaxCharsAsync = async () => {
 
 export const getSelectionMaxCharsAsync = async () => {
   return getSettingValueAsync("SELECTION_MAX_CHARS", CONFIG.SELECTION_MAX_CHARS);
+};
+
+export const getFabIdleOpacityAsync = async () => {
+  return getSettingValueAsync("FAB_IDLE_OPACITY", CONFIG.FAB_IDLE_OPACITY);
+};
+
+export const getFabSizeAsync = async () => {
+  return getSettingValueAsync("FAB_SIZE", CONFIG.FAB_SIZE);
 };
 
 export const getSelectElementMaxCharsAsync = async () => {

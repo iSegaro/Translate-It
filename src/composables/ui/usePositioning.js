@@ -10,7 +10,9 @@ export function usePositioning(initialPosition, options = {}) {
     defaultWidth = 350,
     defaultHeight = 180,
     margin = 10,
-    enableDragging = false
+    enableDragging = false,
+    dockMode = 'none', // 'none', 'left', 'right'
+    dockedWidth = 350
   } = options;
   
 
@@ -18,13 +20,22 @@ export function usePositioning(initialPosition, options = {}) {
   const currentPosition = ref({ x: 0, y: 0 });
   const dragStartOffset = ref({ x: 0, y: 0 });
   const isDragging = ref(false);
+  const currentDockMode = ref(dockMode);
+  const currentDockedWidth = ref(dockedWidth);
 
   /**
    * Smart positioning: automatically find best position to keep window visible
    */
   function findSmartPosition(pos, width = defaultWidth, height = defaultHeight) {
-    const vw = window.innerWidth;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
     const vh = window.innerHeight;
+
+    if (currentDockMode.value === 'left') {
+      return { x: 0, y: 0 };
+    }
+    if (currentDockMode.value === 'right') {
+      return { x: vw - width, y: 0 };
+    }
 
     let x = pos.x ?? pos.left ?? 0;
     let y = pos.y ?? pos.top ?? 0;
@@ -108,12 +119,34 @@ export function usePositioning(initialPosition, options = {}) {
   }
 
   // Computed styles for positioning
-  const positionStyle = computed(() => ({
-    position: 'fixed',
-    left: `${currentPosition.value.x}px`,
-    top: `${currentPosition.value.y}px`,
-    zIndex: 2147483647
-  }));
+  const positionStyle = computed(() => {
+    return {
+      position: 'fixed',
+      left: `${currentPosition.value.x}px`,
+      top: `${currentPosition.value.y}px`,
+      // Width/Height handling is moved to components for better flexibility with loading states
+      zIndex: 2147483647
+    };
+  });
+
+  /**
+   * Update dock mode and refresh position
+   */
+  function updateDockMode(mode) {
+    currentDockMode.value = mode;
+    const width = (mode !== 'none') ? (currentDockedWidth.value || defaultWidth) : defaultWidth;
+    currentPosition.value = findSmartPosition(currentPosition.value, width);
+  }
+
+  /**
+   * Update docked width and refresh position
+   */
+  function updateDockedWidth(width) {
+    currentDockedWidth.value = width;
+    if (currentDockMode.value !== 'none') {
+      currentPosition.value = findSmartPosition(currentPosition.value, width);
+    }
+  }
 
   // Helper to get coordinates from mouse or touch event
   const getCoordinates = (event) => {
@@ -135,10 +168,49 @@ export function usePositioning(initialPosition, options = {}) {
     }
     
     const coords = getCoordinates(event);
-    const newX = coords.x - dragStartOffset.value.x;
-    const newY = coords.y - dragStartOffset.value.y;
+    const rawX = coords.x - dragStartOffset.value.x;
+    const rawY = coords.y - dragStartOffset.value.y;
     
-    currentPosition.value = clampToViewport({ x: newX, y: newY });
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const snapThreshold = 30; // Distance of POINTER to edge to trigger dock
+    const breakThreshold = 100; // Distance of POINTER from edge to trigger undock
+    
+    // Snapping Logic (Based on Pointer position)
+    if (currentDockMode.value === 'none') {
+      if (coords.x < snapThreshold) {
+        updateDockMode('left');
+        return;
+      } else if (coords.x > vw - snapThreshold) {
+        updateDockMode('right');
+        return;
+      }
+    } else {
+      // Breakaway Logic (Undocking - Based on Pointer position)
+      let shouldUndock = false;
+      if (currentDockMode.value === 'left' && coords.x > breakThreshold) {
+        shouldUndock = true;
+      } else if (currentDockMode.value === 'right' && coords.x < vw - breakThreshold) {
+        shouldUndock = true;
+      }
+      
+      if (shouldUndock) {
+        const previousMode = currentDockMode.value;
+        updateDockMode('none');
+        
+        // Adjust drag offset so the window center stays under the cursor when undocking
+        // This makes the transition feel smooth
+        if (previousMode === 'left') {
+          dragStartOffset.value.x = (currentDockedWidth.value || defaultWidth) / 2;
+        } else {
+          dragStartOffset.value.x = (currentDockedWidth.value || defaultWidth) / 2;
+        }
+      } else {
+        // If still docked, don't update position freely (docked state handles it)
+        return;
+      }
+    }
+    
+    currentPosition.value = clampToViewport({ x: rawX, y: rawY });
   };
 
   const stopDrag = () => {
@@ -209,6 +281,8 @@ export function usePositioning(initialPosition, options = {}) {
     // State
     currentPosition,
     isDragging,
+    currentDockMode,
+    currentDockedWidth,
     
     // Computed
     positionStyle,
@@ -217,6 +291,8 @@ export function usePositioning(initialPosition, options = {}) {
     updatePosition,
     initializePosition,
     clampToViewport,
+    updateDockMode,
+    updateDockedWidth,
     
     // Drag handlers (if enabled)
     ...dragHandlers,

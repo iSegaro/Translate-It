@@ -236,7 +236,9 @@ export class MessageRouter {
         relayed: !!originalEvent?.__translateItRelay,
         target: {
           tagName: originalEvent.target.tagName,
-          className: originalEvent.target.className?.substring(0, 50) || ''
+          className: (typeof originalEvent.target.className === 'string' 
+            ? originalEvent.target.className 
+            : originalEvent.target.getAttribute?.('class') || '').substring(0, 50)
         }
       };
 

@@ -22,8 +22,8 @@
   width: 100% !important;
   padding: 42px 10px 10px 10px !important; // فضای بیشتر برای تولبار
   border-radius: 8px !important;
-  font-family: inherit !important;
-  font-size: 14px !important;
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, 14px);
   resize: vertical !important;
   box-sizing: border-box !important;
   direction: ltr !important;
@@ -121,7 +121,7 @@
     min-height: 200px !important;
     max-height: 400px !important;
     padding: 48px 14px 12px 14px !important;
-    font-size: 15px !important;
+    font-size: var(--translation-font-size, 15px);
     line-height: 1.7 !important;
   }
 }

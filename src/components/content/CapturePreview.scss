@@ -4,6 +4,7 @@
   gap: 24px;
   max-height: 70vh;
   overflow-y: auto;
+  pointer-events: auto !important;
 }
 
 /* Preview section */
@@ -41,67 +42,30 @@
   font-weight: 500;
 }
 
-.preview-image-container {
-  position: relative;
+.preview-text-container {
   border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--color-background);
 }
 
-.preview-image {
+.extracted-text-area {
   width: 100%;
-  height: auto;
-  max-height: 400px;
-  object-fit: contain;
-  display: block;
-}
-
-.text-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-}
-
-.text-region {
-  position: absolute;
-  border: 2px solid rgba(33, 150, 243, 0.6);
-  background: rgba(33, 150, 243, 0.1);
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.2s ease;
-}
-
-.text-region:hover,
-.text-region.ti-active {
-  border-color: #2196f3;
-  background: rgba(33, 150, 243, 0.2);
-}
-
-.analysis-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.analysis-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #f3f3f3;
-  border-radius: 50%;
-  border-top: 3px solid #2196f3;
-  animation: spin 1s linear infinite;
+  padding: 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 120px;
+  outline: none;
+  
+  &::placeholder {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
 }
 
 /* Translation controls */
@@ -192,25 +156,6 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--color-text-muted);
-}
-
-.ocr-options {
-  display: flex;
-  gap: 16px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--color-text);
-}
-
-.checkbox {
-  width: 16px;
-  height: 16px;
 }
 
 /* Actions */

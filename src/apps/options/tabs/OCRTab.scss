@@ -1,0 +1,267 @@
+@use "@/assets/styles/base/variables" as *;
+
+.ocr-tab {
+  padding: 1rem;
+
+  .tab-header {
+    margin-bottom: 2rem;
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .tab-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+  }
+
+  /* Fieldset Header Actions alignment */
+  :deep(.base-fieldset__header-actions) {
+    .legend-actions-wrapper {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+
+      .legend-action-label {
+        font-size: $font-size-xs !important;
+        color: var(--color-text-secondary) !important;
+        white-space: nowrap !important;
+        font-weight: normal !important;
+
+        &.is-disabled {
+          opacity: 0.5 !important;
+        }
+      }
+
+      /* Adjust provider button to match ActivationTab compact style */
+      .ti-provider-button-container {
+        .ti-provider-button {
+          padding: 4px 8px !important;
+          height: 28px !important;
+          font-size: $font-size-xs !important;
+          background: var(--color-surface) !important;
+
+          .ti-api-provider-icon {
+            width: 14px !important;
+            height: 14px !important;
+          }
+
+          .dropdown-arrow {
+            width: 12px !important;
+            height: 12px !important;
+          }
+        }
+      }
+
+      .search-box {
+        max-width: 250px;
+        min-width: 150px;
+
+        .search-input {
+          width: 100%;
+          padding: 4px 8px;
+          border-radius: 6px;
+          border: 1px solid var(--border-color);
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          font-size: 0.85rem;
+          height: 28px;
+          transition: border-color 0.2s;
+
+          &:focus {
+            outline: none;
+            border-color: var(--accent-color);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+  }
+
+  .settings-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+
+    &.is-disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      filter: grayscale(0.5);
+    }
+  }
+
+  .setting-group {
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+
+    &:first-child {
+      margin-top: 0.5rem; /* Add space for header actions */
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    &.is-disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .setting-description {
+      display: block;
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 0;
+      padding-inline-start: 32px;
+    }
+  }
+
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+
+    .setting-info {
+      flex: 1;
+
+      label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        color: var(--text-primary);
+      }
+
+      p {
+        margin-bottom: 0;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+    }
+  }
+
+  .language-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1.25rem; /* Add space to prevent overlap with header search box */
+  }
+
+  .language-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+
+    &.installed {
+      border-color: var(--accent-color);
+      background: var(--bg-accent-subtle, rgba(var(--accent-color-rgb), 0.05));
+    }
+
+    .lang-info {
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+
+      .lang-name {
+        display: block;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+
+      .lang-status {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+    }
+
+    .lang-actions {
+      button {
+        width: auto;
+        min-width: 80px;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .btn-download {
+        background: var(--button-bg-color);
+        color: var(--button-text-color, white);
+        border: none;
+
+        &:hover:not(:disabled) {
+          background: var(--button-hover-bg-color);
+          filter: brightness(1.1);
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+
+      .btn-delete {
+        background: transparent;
+        color: var(--text-danger, #ff4d4f);
+        border: 1px solid var(--text-danger, #ff4d4f);
+
+        &:hover {
+          background: var(--text-danger, #ff4d4f);
+          color: white;
+        }
+      }
+    }
+  }
+
+  .danger-zone-fieldset {
+    border-color: var(--text-danger, #ff4d4f) !important;
+    
+    :deep(.base-fieldset__legend) {
+      color: var(--text-danger, #ff4d4f) !important;
+    }
+  }
+
+  .btn-danger {
+    background: var(--text-danger, #ff4d4f);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+  }
+}
+
+/* RTL Support */
+.rtl .ocr-tab {
+  .setting-item {
+    flex-direction: row;
+  }
+}

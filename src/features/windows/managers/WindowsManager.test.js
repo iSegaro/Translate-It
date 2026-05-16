@@ -121,7 +121,7 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
 vi.mock('@/shared/config/config.js', () => ({ 
   state: {}, 
   SelectionTranslationMode: { IMMEDIATE: 'immediate', ON_FAB_CLICK: 'onFabClick', ON_CLICK: 'onClick' },
-  TranslationMode: { Selection: 'selection', Dictionary: 'dictionary' }
+  TranslationMode: { Selection: 'selection', Dictionary: 'dictionary', ScreenCapture: 'capture' }
 }));
 
 vi.mock('@/shared/error-management/ErrorHandler.js');

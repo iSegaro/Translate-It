@@ -11,6 +11,10 @@
   pointer-events: none !important;
   display: block !important;
   overflow: visible !important;
+
+  &.capture-mode {
+    pointer-events: auto !important;
+  }
 }
 
 /* Individual components inside will override pointer events if needed (e.g., toaster, windows) */

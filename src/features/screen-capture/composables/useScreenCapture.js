@@ -17,6 +17,14 @@ export function useScreenCapture() {
   const capturedImage = ref(null);
   const error = ref(null);
 
+  // Store original style values for restoration
+  const originalStyles = ref({
+    bodyUserSelect: '',
+  });
+
+  // Track event listeners for cleanup
+  const activeListeners = ref(new Map());
+
   // Computed
   const hasSelection = computed(() => {
     return selectionRect.value.width > 10 && selectionRect.value.height > 10;
@@ -55,9 +63,14 @@ export function useScreenCapture() {
 
     error.value = null;
 
-    // Add event listeners for mouse move and up
+    // Save original userSelect value
+    originalStyles.value.bodyUserSelect = document.body.style.userSelect || '';
+
+    // Add event listeners for mouse move and up (track them for cleanup)
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
+    activeListeners.value.set('mousemove', { target: document, event: 'mousemove', handler: handleMouseMove });
+    activeListeners.value.set('mouseup', { target: document, event: 'mouseup', handler: handleMouseUp });
 
     // Prevent text selection during capture
     document.body.style.userSelect = "none";
@@ -77,12 +90,21 @@ export function useScreenCapture() {
   const handleMouseUp = () => {
     if (!isSelecting.value) return;
 
-    // Remove event listeners
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    // Remove event listeners using tracked references
+    const mouseMoveListener = activeListeners.value.get('mousemove');
+    const mouseUpListener = activeListeners.value.get('mouseup');
 
-    // Restore text selection
-    document.body.style.userSelect = "";
+    if (mouseMoveListener) {
+      document.removeEventListener(mouseMoveListener.event, mouseMoveListener.handler);
+      activeListeners.value.delete('mousemove');
+    }
+    if (mouseUpListener) {
+      document.removeEventListener(mouseUpListener.event, mouseUpListener.handler);
+      activeListeners.value.delete('mouseup');
+    }
+
+    // Restore text selection (but keep scroll locked until capture finished or cancelled)
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
 
     isSelecting.value = false;
   };
@@ -101,7 +123,7 @@ export function useScreenCapture() {
     };
   };
 
-  const confirmSelection = async () => {
+  const confirmSelection = async (options = {}) => {
     if (!hasSelection.value || isCapturing.value) return;
 
     try {
@@ -109,29 +131,44 @@ export function useScreenCapture() {
       error.value = null;
 
       // Get viewport coordinates for the selection
+      // Multiply by devicePixelRatio for accurate mapping to captureVisibleTab output
+      const dpr = window.devicePixelRatio || 1;
       const coordinates = {
-        x: normalizedRect.value.x,
-        y: normalizedRect.value.y,
-        width: normalizedRect.value.width,
-        height: normalizedRect.value.height,
+        x: Math.round(normalizedRect.value.x * dpr),
+        y: Math.round(normalizedRect.value.y * dpr),
+        width: Math.round(normalizedRect.value.width * dpr),
+        height: Math.round(normalizedRect.value.height * dpr),
       };
 
       // Capture the screen area
-      const response = await captureScreenArea(coordinates);
+      const response = await captureScreenArea(coordinates, options);
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
+
+        // Handle empty text as a specific "no-text" error condition
+        if (!response.data.text || response.data.text.trim().length === 0) {
+          throw new Error("no-text");
+        }
+
         return {
           imageData: response.data.imageData,
           coordinates: coordinates,
+          text: response.data.text,
         };
       } else {
-        throw new Error(response.error || "Failed to capture screen area");
+        // Map background error strings to internal error keys
+        const errorMsg = response.error || "";
+        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
+          throw new Error("model-error");
+        }
+        throw new Error(errorMsg || "capture-failed");
       }
-    } catch (err) {
-      logger.error("Screen capture error:", err);
-      error.value = err.message || "Failed to capture screen area";
+      } catch (err) {
+      logger.error("Capture area error:", err);
+      error.value = err.message;
       throw err;
+
     } finally {
       isCapturing.value = false;
     }
@@ -147,12 +184,14 @@ export function useScreenCapture() {
   };
 
   const cancelSelection = () => {
-    // Remove event listeners if active
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    // Remove all tracked event listeners
+    activeListeners.value.forEach((listener) => {
+      listener.target.removeEventListener(listener.event, listener.handler);
+    });
+    activeListeners.value.clear();
 
-    // Restore text selection
-    document.body.style.userSelect = "";
+    // Restore text selection and unlock scroll
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
 
     resetSelection();
   };
@@ -181,9 +220,11 @@ export function useScreenCapture() {
 
     error.value = null;
 
-    // Add touch event listeners
+    // Add touch event listeners (track them for cleanup)
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd);
+    activeListeners.value.set('touchmove', { target: document, event: 'touchmove', handler: handleTouchMove });
+    activeListeners.value.set('touchend', { target: document, event: 'touchend', handler: handleTouchEnd });
 
     event.preventDefault();
   };
@@ -201,33 +242,55 @@ export function useScreenCapture() {
   const handleTouchEnd = () => {
     if (!isSelecting.value) return;
 
-    // Remove touch event listeners
-    document.removeEventListener("touchmove", handleTouchMove);
-    document.removeEventListener("touchend", handleTouchEnd);
+    // Remove touch event listeners using tracked references
+    const touchMoveListener = activeListeners.value.get('touchmove');
+    const touchEndListener = activeListeners.value.get('touchend');
+
+    if (touchMoveListener) {
+      document.removeEventListener(touchMoveListener.event, touchMoveListener.handler);
+      activeListeners.value.delete('touchmove');
+    }
+    if (touchEndListener) {
+      document.removeEventListener(touchEndListener.event, touchEndListener.handler);
+      activeListeners.value.delete('touchend');
+    }
 
     isSelecting.value = false;
   };
 
   // Full screen capture (no selection needed)
-  const captureFullScreen = async () => {
+  const captureFullScreen = async (options = {}) => {
     try {
       isCapturing.value = true;
       error.value = null;
 
-      const response = await captureScreenArea();
+      // Pass null explicitly for full screen to avoid undefined issues in messaging
+      const response = await captureScreenArea(null, options);
 
       if (response.success) {
         capturedImage.value = response.data.imageData;
+        
+        // Handle empty text as a specific "no-text" error condition
+        if (!response.data.text || response.data.text.trim().length === 0) {
+          throw new Error("no-text");
+        }
+        
         return {
           imageData: response.data.imageData,
           coordinates: null, // Full screen
+          text: response.data.text,
         };
       } else {
-        throw new Error(response.error || "Failed to capture full screen");
+        // Map background error strings to internal error keys
+        const errorMsg = response.error || "";
+        if (errorMsg.includes("OCR engine failed") || errorMsg.includes("model")) {
+          throw new Error("model-error");
+        }
+        throw new Error(errorMsg || "capture-failed");
       }
     } catch (err) {
       logger.error("Full screen capture error:", err);
-      error.value = err.message || "Failed to capture full screen";
+      error.value = err.message;
       throw err;
     } finally {
       isCapturing.value = false;
@@ -273,11 +336,27 @@ export function useScreenCapture() {
   // Lifecycle management
   onMounted(() => {
     document.addEventListener("keydown", handleKeyDown);
+    activeListeners.value.set('keydown', { target: document, event: 'keydown', handler: handleKeyDown });
   });
 
   onUnmounted(() => {
     cancelSelection();
-    document.removeEventListener("keydown", handleKeyDown);
+
+    // Clean up keydown listener
+    const keydownListener = activeListeners.value.get('keydown');
+    if (keydownListener) {
+      document.removeEventListener(keydownListener.event, keydownListener.handler);
+      activeListeners.value.delete('keydown');
+    }
+
+    // Ensure all remaining listeners are cleaned up
+    activeListeners.value.forEach((listener) => {
+      listener.target.removeEventListener(listener.event, listener.handler);
+    });
+    activeListeners.value.clear();
+
+    // Ensure all styles are restored
+    document.body.style.userSelect = originalStyles.value.bodyUserSelect;
   });
 
   return {

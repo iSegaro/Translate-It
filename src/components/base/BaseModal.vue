@@ -1,49 +1,52 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
+  <!-- 
+    CRITICAL: Teleport to body is disabled in extension content scripts 
+    to keep the modal within the Shadow DOM isolation. 
+    Otherwise, it loses all its scoped styles.
+  -->
+  <Transition name="modal">
+    <div
+      v-if="modelValue"
+      class="modal-overlay"
+      @click="handleOverlayClick"
+    >
       <div
-        v-if="modelValue"
-        class="modal-overlay"
-        @click="handleOverlayClick"
+        class="modal-container"
+        :class="[`size-${size}`, { fullscreen }]"
+        @click.stop
       >
-        <div
-          class="modal-container"
-          :class="[`size-${size}`, { fullscreen }]"
-          @click.stop
+        <header
+          v-if="title || $slots.header"
+          class="modal-header"
         >
-          <header
-            v-if="title || $slots.header"
-            class="modal-header"
-          >
-            <slot name="header">
-              <h3 class="modal-title">
-                {{ title }}
-              </h3>
-            </slot>
-            <BaseButton
-              v-if="closable"
-              variant="ghost"
-              size="sm"
-              icon="close"
-              class="close-button"
-              @click="handleClose"
-            />
-          </header>
+          <slot name="header">
+            <h3 class="modal-title">
+              {{ title }}
+            </h3>
+          </slot>
+          <BaseButton
+            v-if="closable"
+            variant="ghost"
+            size="sm"
+            icon="close"
+            class="close-button"
+            @click="handleClose"
+          />
+        </header>
           
-          <div class="modal-body">
-            <slot />
-          </div>
-          
-          <footer
-            v-if="$slots.footer"
-            class="modal-footer"
-          >
-            <slot name="footer" />
-          </footer>
+        <div class="modal-body">
+          <slot />
         </div>
+          
+        <footer
+          v-if="$slots.footer"
+          class="modal-footer"
+        >
+          <slot name="footer" />
+        </footer>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -89,8 +92,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'close', 'open'])
 
-// Resource tracker for automatic cleanup
-const tracker = useResourceTracker('base-modal')
+// Resource tracker for automatic cleanup - Use a unique ID per instance to avoid cleanup collisions
+const tracker = useResourceTracker(`base-modal-${Math.random().toString(36).substr(2, 9)}`)
 
 const handleClose = () => {
   emit('update:modelValue', false)

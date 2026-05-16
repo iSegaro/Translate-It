@@ -1,0 +1,71 @@
+/* src/apps/content/components/MouseHoverTooltip.scss */
+/**
+ * MouseHoverTooltip Styles
+ * 
+ * ARCHITECTURE NOTE:
+ * This component uses Shadow DOM isolation. According to CSS_ARCHITECTURE.md:
+ * 1. !important is MANDATORY for all properties to ensure host page styles 
+ *    do not bleed into the isolated Shadow DOM UI.
+ * 2. Variables (var(--ti-...)) are used to maintain theme consistency.
+ * 3. translate3d is used for hardware-accelerated positioning.
+ */
+
+.ti-mouse-hover-tooltip {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 2147483647 !important;
+  pointer-events: auto !important; /* Allow interaction for scrolling */
+  max-width: 420px !important;
+  min-width: 120px !important;
+  background: var(--ti-bg-primary, #ffffff) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--ti-border-color, #e0e0e0) !important;
+  transition: opacity 0.2s ease-in-out !important;
+  transform: var(--tooltip-transform, none) !important;
+  overflow: hidden !important;
+}
+
+.ti-mouse-hover-display {
+  background: transparent !important;
+  padding: 4px !important;
+  border: none !important;
+  box-shadow: none !important;
+
+  :deep(.ti-translation-content) {
+    overflow-y: auto !important;
+    
+    /* Custom Scrollbar for better UX */
+    &::-webkit-scrollbar {
+      width: 6px !important;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent !important;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.1) !important;
+      border-radius: 10px !important;
+    }
+    &:hover::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2) !important;
+    }
+  }
+}
+
+:host-context(.theme-dark) {
+  .ti-mouse-hover-tooltip {
+    background: #2d2d2d !important;
+    border-color: #444444 !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  }
+  
+  .ti-mouse-hover-display :deep(.ti-translation-content) {
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+    &:hover::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2) !important;
+    }
+  }
+}

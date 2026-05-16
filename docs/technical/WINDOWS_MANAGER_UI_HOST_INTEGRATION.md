@@ -2,21 +2,31 @@
 
 ## Overview
 
-This document describes the successful migration of the WindowsManager system to use the centralized Vue.js UI Host architecture. The WindowsManager now communicates with the UI Host through event-based messaging instead of direct DOM manipulation.
+The **WindowsManager** system is built upon a centralized Vue.js UI Host architecture. It manages the lifecycle of translation windows and icons through event-based messaging with the UI Host, which resides within a secure Shadow DOM. This ensures complete CSS/JS isolation and a clear separation between business logic and UI rendering.
 
-## Architecture Changes
+## Architecture
 
-### Before Migration
-- WindowsManager directly manipulated DOM elements
-- Created and managed UI elements internally
-- Mixed business logic with UI rendering
-- No CSS/JS isolation from host webpage
+The system follows a strict **Decoupled Architecture**:
+- **WindowsManager**: Acts as the business logic orchestrator, managing state and coordinating events.
+- **Vue UI Host**: Handles all UI rendering and user interaction within the Shadow DOM.
+- **Event-Based Communication**: All interaction between the logic and UI layers occurs via `PageEventBus`.
+- **Shadow DOM Isolation**: Prevents host webpage styles from leaking into the extension UI and vice-versa.
 
-### After Migration
-- WindowsManager emits events for UI operations
-- Vue UI Host handles all UI rendering in Shadow DOM
-- Complete separation of concerns
-- Full CSS/JS isolation from host webpage
+## Architecture & Modularization
+
+To manage growing complexity (previously over 2000 lines), the `WindowsManager` has been refactored into a **Facade Pattern**. The main class now delegates specialized responsibilities to dedicated sub-managers.
+
+### 1. Internal Modular Structure
+- **`WindowsManager` (Facade)**: The primary entry point and singleton. It coordinates high-level operations and maintains the public API.
+- **`DisplayManager`**: Handles all UI presentation logic, including showing translation windows, icons, and mobile sheets. It manages the two-phase loading process.
+- **`DismissalManager`**: Manages the complex logic for dismissing UI elements, handling outside clicks, and coordinating text selection preservation.
+- **`EventCoordinator`**: Orchestrates event listeners for the `PageEventBus` and handles cross-frame messaging logic.
+
+### 2. Benefits of Modularization
+- **Single Responsibility**: Each sub-manager focuses on a specific domain (Display, Dismissal, or Events).
+- **Reduced Cognitive Load**: Files are now smaller and focused (~200-500 lines instead of 2000+).
+- **Testability**: Independent managers can be unit-tested more effectively.
+- **Safe Development**: Changes to dismissal logic are isolated from presentation logic, reducing the risk of regressions.
 
 ## Selection Coordinator Integration (2026)
 
@@ -28,12 +38,30 @@ The WindowsManager has been further decoupled from text selection detection. It 
 3.  **Reaction**: `WindowsManager` receives the event and independently decides whether to show its UI based on:
     - User settings (onClick vs Immediate).
     - Keyboard modifiers (Ctrl key requirement).
+    - **Existing Window State**: If a window is already **Pinned** or **Docked**, it performs an **In-place Update** (bypassing icon display).
     - URL exclusions.
 
-### Key Benefits of Decoupling
-- **Resilience**: The FAB and TTS systems work even if `WindowsManager` is disabled or fails.
-- **Simplification**: `WindowsState` no longer carries FAB-specific flags like `pendingFabTrigger`.
-- **Platform Parity**: Mobile and Desktop now follow the exact same event-driven flow.
+## Pin & Dock System
+
+The translation window now supports persistent states through Pinning and Docking.
+
+### 1. Pinned State
+- **Mechanism**: Prevents automatic dismissal when clicking outside the window or when the global selection is cleared.
+- **Implementation**: `ClickManager` and `WindowsManager` check `state.isPinned` before executing dismissal logic.
+- **Persistence**: Saved via `WINDOW_IS_PINNED` setting.
+
+### 2. Docking & Edge Snapping
+- **Dock Modes**: `none`, `left`, `right`.
+- **Edge Snapping**: Implemented in `usePositioning.js`. When dragging, if the **mouse pointer** reaches within 30px of the viewport edge, the window automatically docks.
+- **Breakaway Logic**: To undock, the user must drag the pointer 100px away from the edge.
+- **Viewport Accuracy**: Uses `document.documentElement.clientWidth` instead of `window.innerWidth` to account for browser scrollbars, ensuring the window is never hidden underneath them.
+- **Resizable Sidebar**: Docked windows take 100vh height and support width resizing via an interactive handle on the inner edge.
+
+### 3. Smart In-place Updates
+To improve performance and eliminate UI flicker, the system now updates existing windows instead of re-creating them:
+- **Trigger**: When a new selection occurs while a window is already visible and Pinned/Docked.
+- **Atomic Update**: Emits an `updateWindow` event with new `selectedText` and `isLoading: true`.
+- **Cancellation**: Automatically cancels any ongoing translation requests from the previous selection to prevent race conditions.
 
 ## Event-Based Communication
 
@@ -103,9 +131,10 @@ The WindowsManager has been further decoupled from text selection detection. It 
 - Better memory management with Vue's reactivity system
 
 ### 2. Maintainability
-- Clear separation between business logic and UI rendering
-- Consistent UI patterns across the extension
-- Easier debugging with centralized UI management
+- **Facade Architecture**: Logic is split into specialized sub-managers (`DisplayManager`, `DismissalManager`, `EventCoordinator`).
+- **Clear separation** between business logic and UI rendering.
+- **Consistent UI patterns** across the extension.
+- **Easier debugging** with centralized UI management and modular logic.
 
 ### 3. Isolation & Security
 - Complete CSS isolation through Shadow DOM
@@ -116,15 +145,6 @@ The WindowsManager has been further decoupled from text selection detection. It 
 - Consistent behavior across Chrome and Firefox
 - Better handling of iframe scenarios
 - Improved cross-frame communication
-
-## Migration Status
-
-
-### 🎯 Future Improvements
-- [ ] Enhanced accessibility features (ARIA attributes)
-- [ ] User-customizable UI themes
-- [ ] Advanced positioning algorithms (e.g., collision detection)
-- [ ] Performance optimizations for very high-frequency events
 
 ## Error Management Integration
 
@@ -210,41 +230,12 @@ pageEventBus.emit('translation-window-change-provider', {
 
 ## Testing
 
-### Manual Testing
-Run the test script in browser console:
-```javascript
-testWindowsManagerIntegration();
-```
-
-### Automated Testing
 The system supports:
 - Unit tests for event emission
 - Integration tests with Vue components
 - Cross-browser compatibility tests
 - Performance benchmarking
 
-## Backward Compatibility
-
-The migration maintains full backward compatibility:
-- Existing WindowsManager API remains unchanged
-- All external interfaces preserved
-- No breaking changes for consumers
-- Seamless transition for users
-
-## Performance Metrics
-
-### Before Migration
-- DOM manipulation: ~5ms per operation
-- Memory usage: Higher due to direct DOM references
-- Style recalculation: Frequent due to inline styles
-
-### After Migration (2025 CSS Architecture)
-- Event emission: <1ms per operation
-- Memory usage: Optimized through Vue's reactivity + CSS containment
-- Style recalculation: Minimal due to CSS Grid and modern layout methods
-- CSS Variables: Safe interpolation with fallback values
-- Performance: Enhanced through CSS containment and modern overflow handling
-
 ## Conclusion
 
-The WindowsManager integration with the Vue UI Host represents a significant architectural improvement that enhances performance, maintainability, and user experience while maintaining full backward compatibility with existing systems.
+The WindowsManager integration with the Vue UI Host represents a significant architectural improvement that enhances performance, maintainability, and user experience while maintaining a secure and isolated environment for the extension UI.

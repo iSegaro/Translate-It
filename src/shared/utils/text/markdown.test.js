@@ -2,6 +2,56 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SimpleMarkdown, ExtractionStrategy } from './markdown.js';
 
 describe('SimpleMarkdown', () => {
+  beforeEach(() => {
+    // Ensure document is available in test environment
+    if (typeof global.document === 'undefined' || !global.document.createElement) {
+      global.document = {
+        createElement: (tagName) => {
+          const element = {
+            tagName: tagName.toUpperCase(),
+            className: '',
+            textContent: '',
+            innerHTML: '',
+            childNodes: [],
+            style: {},
+            setAttribute: (name, value) => {
+              if (name === 'class') element.className = value;
+              element[name] = value;
+              element.attributes = element.attributes || {};
+              element.attributes[name] = value;
+            },
+            getAttribute: (name) => {
+              if (name === 'class') return element.className;
+              return element.attributes ? element.attributes[name] : null;
+            },
+            appendChild: (child) => {
+              element.childNodes.push(child);
+              return child;
+            },
+            querySelector: (selector) => {
+              // Simple mock for querySelector
+              return element.childNodes.find(c => 
+                c.tagName && c.tagName.toLowerCase() === selector.toLowerCase()
+              ) || null;
+            },
+            outerHTML: `<${tagName}></${tagName}>`
+          };
+
+          if (tagName === 'div') {
+            element.outerHTML = '<div class="simple-markdown"></div>';
+          }
+
+          return element;
+        },
+        createTextNode: (text) => ({
+          nodeType: 3,
+          textContent: text,
+          data: text
+        })
+      };
+    }
+  });
+
   describe('getCleanTranslation', () => {
     describe('Extraction Strategies', () => {
       const dictionaryInput = 'رزرو کردن\n\n- **فعل**: رزرو کردن، ذخیره کردن\n- **اسم**: رزرو، ذخیره‌گاه';
@@ -143,6 +193,31 @@ describe('SimpleMarkdown', () => {
     });
 
     describe('Edge Cases', () => {
+      it('should not identify URLs as labels', () => {
+        const input = 'https://google.com';
+        // In PRIMARY_ONLY strategy, it should return the URL itself if it's the only content
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('https://google.com');
+        
+        const input2 = 'Visit https://google.com for more info';
+        expect(SimpleMarkdown.getCleanTranslation(input2)).toBe('Visit https://google.com for more info');
+      });
+
+      it('should handle Https with capitalization correctly', () => {
+        const input = 'Https://example.com';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('Https://example.com');
+      });
+
+      it('should also handle http (non-s) correctly', () => {
+        const input = 'http://example.com';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('http://example.com');
+      });
+
+      it('should still handle Source: URL correctly as a label', () => {
+        const input = 'Source: https://google.com';
+        // It should identify "Source:" as a label and return the content after it
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('https://google.com');
+      });
+
       it('should handle empty input', () => {
         expect(SimpleMarkdown.getCleanTranslation('')).toBe('');
         expect(SimpleMarkdown.getCleanTranslation(null)).toBe('');
@@ -351,19 +426,6 @@ describe('SimpleMarkdown', () => {
   });
 
   describe('htmlToPlainText', () => {
-    beforeEach(() => {
-      // Ensure document is available in test environment
-      if (typeof document === 'undefined') {
-        global.document = {
-          createElement: () => ({
-            innerHTML: '',
-            textContent: '',
-            innerText: ''
-          })
-        };
-      }
-    });
-
     it('should extract text from simple HTML', () => {
       const html = '<div>Hello world</div>';
       expect(SimpleMarkdown.htmlToPlainText(html)).toBe('Hello world');
@@ -427,39 +489,6 @@ describe('SimpleMarkdown', () => {
   });
 
   describe('render', () => {
-    beforeEach(() => {
-      // Ensure document is available in test environment
-      if (typeof document === 'undefined') {
-        global.document = {
-          createElement: (tagName) => {
-            const element = {
-              tagName: tagName.toUpperCase(),
-              className: '',
-              textContent: '',
-              innerHTML: '',
-              childNodes: [],
-              style: {},
-              setAttribute: () => {},
-              getAttribute: () => null,
-              appendChild: (child) => element.childNodes.push(child),
-              outerHTML: `<${tagName}></${tagName}>`
-            };
-
-            if (tagName === 'div') {
-              element.outerHTML = '<div class="simple-markdown"></div>';
-            }
-
-            return element;
-          },
-          createTextNode: (text) => ({
-            nodeType: 3,
-            textContent: text,
-            data: text
-          })
-        };
-      }
-    });
-
     it('should return empty container for empty input', () => {
       const result = SimpleMarkdown.render('');
       // Current implementation returns empty string for empty input
@@ -548,6 +577,13 @@ describe('SimpleMarkdown', () => {
       expect(result).toBeTruthy();
     });
 
+    it('should not render URLs as labels', () => {
+      const result = SimpleMarkdown.render('https://google.com');
+      // If it were a label, it would have a <strong> element for 'https'
+      const strong = result.querySelector('strong');
+      expect(strong).toBeNull();
+    });
+
     it('should render label lines correctly', () => {
       const result = SimpleMarkdown.render('**Noun**: test, experiment');
       expect(result).toBeTruthy();
@@ -615,6 +651,31 @@ describe('SimpleMarkdown', () => {
       expect(stripped).not.toContain(']');
       expect(stripped).not.toContain('(');
       expect(stripped).not.toContain(')');
+    });
+  });
+
+  describe('Preferred Direction', () => {
+    it('should use preferredDir as fallback for mixed content', () => {
+      const mixedText = 'Test ترجمه';
+      // Without preferredDir, it might default to ltr because it starts with English
+      const rendered = SimpleMarkdown.render(mixedText, 'rtl');
+      // rendered is a div.simple-markdown containing a p
+      const p = rendered.querySelector('p');
+      expect(p.getAttribute('dir')).toBe('rtl');
+    });
+
+    it('should correctly detect RTL for mixed content with trailing URL', () => {
+      const text = 'صفحه نمایش بزرگ پلاسما KDE یک دسکتاپ جایگزین SteamOS است که اکنون برای آزمایش در نسخه بتا پلاسما 6.7 در دسترس است. https://tpu.me/z6qr';
+      const rendered = SimpleMarkdown.render(text, 'rtl');
+      const p = rendered.querySelector('p');
+      expect(p.getAttribute('dir')).toBe('rtl');
+    });
+
+    it('should still detect pure LTR even if preferredDir is RTL', () => {
+      const pureLtr = 'Pure English text';
+      const rendered = SimpleMarkdown.render(pureLtr, 'rtl');
+      const p = rendered.querySelector('p');
+      expect(p.getAttribute('dir')).toBe('ltr');
     });
   });
 

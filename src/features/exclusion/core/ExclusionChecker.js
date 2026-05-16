@@ -5,9 +5,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { FEATURE_CONFIG, RELEVANT_FEATURE_SETTINGS, ALL_FEATURES } from '@/core/managers/content/FeatureConfig.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.EXCLUSION, 'ExclusionChecker');
 
@@ -92,32 +91,13 @@ export class ExclusionChecker {
    */
   setupSettingsListeners() {
     try {
-      // Listen for feature-specific setting changes
-      const featureSettings = [
-        'TRANSLATE_WITH_SELECT_ELEMENT',
-        'TRANSLATE_ON_TEXT_SELECTION',
-        'TRANSLATE_ON_TEXT_FIELDS',
-        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-        'SHOW_DESKTOP_FAB',
-        'EXTENSION_ENABLED',
-        'WHOLE_PAGE_TRANSLATION_ENABLED'
-      ];
-
-      featureSettings.forEach(setting => {
+      RELEVANT_FEATURE_SETTINGS.forEach(setting => {
         this.settingsListeners.push(
           settingsManager.onChange(setting, () => {
             this.refreshFeaturesOnSettingsChange();
           }, 'exclusion-checker')
         );
       });
-
-      // Listen for EXCLUDED_SITES changes
-      this.settingsListeners.push(
-        settingsManager.onChange('EXCLUDED_SITES', () => {
-          this.refreshFeaturesOnSettingsChange();
-        }, 'exclusion-checker')
-      );
-
     } catch (error) {
       logger.error('Failed to setup settings listeners:', error);
     }
@@ -149,7 +129,7 @@ export class ExclusionChecker {
       // Feature-specific setting check
       const featureEnabled = this.isFeatureEnabled(featureName);
       if (!featureEnabled) {
-        logger.debug(`Feature ${featureName} blocked: feature setting disabled`);
+        logger.debug(`Feature ${featureName} blocked: feature setting disabled (check isFeatureEnabled)`);
         return false;
       }
 
@@ -177,40 +157,24 @@ export class ExclusionChecker {
   }
 
   isFeatureEnabled(featureName) {
-    // Core features that are always enabled
-    if (featureName === 'contentMessageHandler') {
-      return true;
+    const config = FEATURE_CONFIG[featureName];
+    if (!config) {
+      logger.debug(`Feature ${featureName} hit default case in isFeatureEnabled (false)`);
+      return false;
     }
 
-    const isFabEnabled = settingsManager.get('SHOW_DESKTOP_FAB', true);
-    const isTextSelectionEnabled = settingsManager.get('TRANSLATE_ON_TEXT_SELECTION', true);
-    
-    // Check if we are in mobile mode (manually forced or auto-detected)
-    const mobileMode = settingsManager.get('MOBILE_UI_MODE', MOBILE_CONSTANTS.UI_MODE.AUTO);
-    const isMobileUI = mobileMode === MOBILE_CONSTANTS.UI_MODE.MOBILE || 
-                      (mobileMode === MOBILE_CONSTANTS.UI_MODE.AUTO && deviceDetector.shouldEnableMobileUI());
+    if (config.alwaysEnabled) return true;
 
-    // Feature-specific activation logic
-    switch (featureName) {
-      case 'textSelection':
-      case 'windowsManager':
-        return isTextSelectionEnabled || isFabEnabled || isMobileUI;
-
-      case 'selectElement':
-        return settingsManager.get('TRANSLATE_WITH_SELECT_ELEMENT', true);
-
-      case 'textFieldIcon':
-        return isTextSelectionEnabled;
-
-      case 'shortcut':
-        return settingsManager.get('ENABLE_SHORTCUT_FOR_TEXT_FIELDS', true);
-
-      case 'pageTranslation':
-        return settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
-
-      default:
-        return false;
+    // Use custom logic if provided, otherwise fallback to simple settingKey check
+    if (typeof config.isEnabled === 'function') {
+      return config.isEnabled(settingsManager.get.bind(settingsManager));
     }
+
+    if (config.settingKey) {
+      return settingsManager.get(config.settingKey, true);
+    }
+
+    return false;
   }
 
   async isUrlExcludedForFeature(featureName) {
@@ -234,7 +198,6 @@ export class ExclusionChecker {
       await this.initialize();
     }
 
-    const features = ['contentMessageHandler', 'selectElement', 'textSelection', 'textFieldIcon', 'shortcut', 'windowsManager', 'pageTranslation'];
     const isExtensionEnabled = settingsManager.get('EXTENSION_ENABLED', true);
     const status = {
       initialized: true,
@@ -243,7 +206,7 @@ export class ExclusionChecker {
       features: {}
     };
 
-    for (const feature of features) {
+    for (const feature of ALL_FEATURES) {
       const featureEnabled = this.isFeatureEnabled(feature);
       const urlExcluded = await this.isUrlExcludedForFeature(feature);
       status.features[feature] = {

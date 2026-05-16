@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from "vue";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { useMessaging } from "@/shared/messaging/composables/useMessaging.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -25,8 +26,11 @@ export function useExtensionAPI() {
 
   const sendMessage = async (action, data = {}) => {
     try {
+      // Create a standardized message object
+      const message = messaging.createMessage(action, data);
+      
       // Use simplified messaging system for better reliability
-      const response = await messaging.sendMessage(action, data);
+      const response = await messaging.sendMessage(message);
 
       if (!response?.success) {
         throw new Error(response?.error || "Unknown error");
@@ -178,37 +182,37 @@ export function useExtensionAPI() {
 
   // Provider-specific methods
   const testProviderConnection = async (provider, config) => {
-    return await sendMessage("TEST_PROVIDER_CONNECTION", { provider, config });
+    return await sendMessage(MessageActions.TEST_PROVIDER_CONNECTION, { provider, config });
   };
 
   const saveProviderConfig = async (provider, config) => {
-    return await sendMessage("SAVE_PROVIDER_CONFIG", { provider, ...config });
+    return await sendMessage(MessageActions.UPDATE_PROVIDER_CONFIG, { provider, ...config });
   };
 
   const getProviderConfig = async (provider) => {
-    return await sendMessage("GET_PROVIDER_CONFIG", { provider });
+    return await sendMessage(MessageActions.GET_PROVIDER_CONFIG, { provider });
   };
 
   const getProviderStatus = async (provider) => {
-    return await sendMessage("GET_PROVIDER_STATUS", { provider });
+    return await sendMessage(MessageActions.GET_PROVIDER_STATUS, { provider });
   };
 
   // Translation methods
   const translateText = async (text, options = {}) => {
-    return await sendMessage("TRANSLATE_TEXT", { text, ...options });
+    return await sendMessage(MessageActions.TRANSLATE_TEXT, { text, ...options });
   };
 
   const translateImage = async (imageData, options = {}) => {
-    return await sendMessage("TRANSLATE_IMAGE", { imageData, ...options });
+    return await sendMessage(MessageActions.TRANSLATE_IMAGE, { imageData, ...options });
   };
 
   // Screen capture methods
   const startScreenCapture = async () => {
-    return await sendMessage("START_SCREEN_CAPTURE");
+    return await sendMessage(MessageActions.START_SCREEN_CAPTURE);
   };
 
-  const captureScreenArea = async (coordinates) => {
-    return await sendMessage("CAPTURE_SCREEN_AREA", { coordinates });
+  const captureScreenArea = async (coordinates, options = {}) => {
+    return await sendMessage(MessageActions.CAPTURE_SCREEN_AREA, { coordinates, ...options });
   };
 
   // Content script integration

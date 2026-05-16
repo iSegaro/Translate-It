@@ -406,6 +406,26 @@
         width: 100% !important;
         box-sizing: border-box !important;
       }
+
+      .dictionary-display-options {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xs;
+        padding-top: $spacing-sm;
+        border-top: 1px solid var(--color-border-light, #eee);
+
+        .checkbox-list-vertical {
+          display: flex;
+          flex-direction: column;
+          gap: $spacing-xs;
+          margin-top: $spacing-xs;
+        }
+
+        &.is-disabled {
+          opacity: 0.6;
+          pointer-events: none;
+        }
+      }
     }
 
     .checkbox-area {

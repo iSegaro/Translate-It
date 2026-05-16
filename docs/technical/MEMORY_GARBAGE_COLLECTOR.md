@@ -27,14 +27,14 @@ The **Memory Garbage Collector** is an advanced memory management system designe
 
 ## Key Features
 
-- ✅ **Multi-Event System Support**: Handles DOM, Browser APIs, and custom event systems
-- ✅ **Automatic Resource Tracking**: Tracks timers, event listeners, caches, and custom resources
-- ✅ **Critical Protection System**: Prevents cleanup of essential resources during garbage collection
-- ✅ **Smart Cleanup**: Environment-aware cleanup for service workers and content scripts
-- ✅ **Memory Monitoring**: Real-time memory usage tracking and leak detection
-- ✅ **TTL-Based Caching**: Intelligent cache management with automatic expiration
-- ✅ **Group-Based Cleanup**: Batch cleanup of related resources
-- ✅ **Cross-Environment Compatibility**: Works in Browser, Node.js, and Service Workers
+- **Multi-Event System Support**: Handles DOM, Browser APIs, and custom event systems
+- **Automatic Resource Tracking**: Tracks timers, event listeners, caches, and custom resources
+- **Critical Protection System**: Prevents cleanup of essential resources during garbage collection
+- **Smart Cleanup**: Environment-aware cleanup for service workers and content scripts
+- **Memory Monitoring**: Real-time memory usage tracking and leak detection
+- **TTL-Based Caching**: Intelligent cache management with automatic expiration
+- **Group-Based Cleanup**: Batch cleanup of related resources
+- **Cross-Environment Compatibility**: Works in Browser, Node.js, and Service Workers
 
 ## Architecture
 
@@ -98,6 +98,7 @@ The central coordinator that manages all resources and provides cleanup function
 - `trackEventListener(element, event, handler, groupId, options)` - Track event listeners with critical protection
 - `trackCache(cache, options, groupId)` - Track cache instances
 - `cleanupGroup(groupId)` - Cleanup resources by group
+- `clearGroupTimers(groupId)` - Clear only timers and intervals for a specific group
 - `getMemoryStats()` - Get memory usage statistics
 
 **Critical Protection:**
@@ -113,6 +114,9 @@ A mixin class that provides convenient methods for tracking resources in other c
 - `addEventListener(element, event, handler, options)` - Universal event listener tracking with critical support
 - `trackTimeout(callback, delay)` - Track timeouts
 - `trackInterval(callback, delay)` - Track intervals
+- `setTimeout(callback, delay)` - Alias for `trackTimeout` (standard JS ergonomics)
+- `setInterval(callback, delay)` - Alias for `trackInterval` (standard JS ergonomics)
+- `clearAllTimers()` - Clear only active timeouts and intervals for this tracker
 - `trackResource(id, cleanupFn, options)` - Track custom resources with critical protection
 - `trackCache(cache, options)` - Track cache instances
 - `cleanup()` - Cleanup all tracked resources (respects critical flags)
@@ -310,16 +314,20 @@ class WindowsManager extends ResourceTracker {
 // ActionbarIconManager.js
 import ResourceTracker from '@/core/memory/ResourceTracker.js'
 
-class ActionbarIconManager extends ResourceTracker {
+class ActionbarIconManager {
   constructor(storageManager) {
-    super('actionbar-icon-manager')
+    this.resourceTracker = new ResourceTracker('actionbar-icon-manager')
     this.storage = storageManager
     this.init()
   }
 
   init() {
-    // Listen to storage changes (custom event system)
-    this.addEventListener(this.storage, 'change', this.updateIcon)
+    // Listen to storage changes (custom event system) via internal tracker
+    this.resourceTracker.addEventListener(this.storage, 'change', this.updateIcon)
+  }
+
+  destroy() {
+    this.resourceTracker.destroy()
   }
 }
 ```
@@ -328,16 +336,16 @@ class ActionbarIconManager extends ResourceTracker {
 
 The `useResourceTracker` is a Vue 3 Composition API composable that provides automatic memory management for Vue components. It eliminates the need for manual cleanup by integrating with Vue's lifecycle hooks.
 
-### 🚀 Key Features
+### Key Features
 
-- ✅ **Automatic Cleanup**: No manual cleanup required - uses `onUnmounted`
-- ✅ **Critical Protection Support**: Mark essential resources as critical
-- ✅ **Vue Integration**: Native Vue 3 Composition API support
-- ✅ **Zero Memory Leaks**: Prevents memory leaks in Vue components
-- ✅ **Simple API**: Drop-in replacement for manual ResourceTracker usage
-- ✅ **Performance Optimized**: Minimal overhead with centralized cleanup
+- **Automatic Cleanup**: No manual cleanup required - uses `onBeforeUnmount`
+- **Critical Protection Support**: Mark essential resources as critical
+- **Vue Integration**: Native Vue 3 Composition API support
+- **Zero Memory Leaks**: Prevents memory leaks in Vue components
+- **Simple API**: Drop-in replacement for manual ResourceTracker usage
+- **Performance Optimized**: Minimal overhead with centralized cleanup
 
-### 📦 Installation & Usage
+### Installation & Usage
 
 #### 1. Import the composable
 
@@ -381,7 +389,7 @@ tracker.trackResource('my-api-connection', () => {
 })
 ```
 
-### 🎯 Complete Example
+### Complete Example
 
 ```vue
 <template>
@@ -417,11 +425,11 @@ const addListener = () => {
 }
 
 // No manual cleanup needed!
-// Everything is handled automatically by Vue's onUnmounted
+// Everything is handled automatically by Vue's onBeforeUnmount
 </script>
 ```
 
-### 🔧 API Reference
+### API Reference
 
 #### `useResourceTracker(groupId)`
 
@@ -449,24 +457,37 @@ tracker.addEventListener(document, 'mousedown', handleMouseDown, { critical: tru
 tracker.addEventListener(document, 'dblclick', handleDoubleClick, { capture: true, critical: true })
 ```
 
-##### `trackTimeout(callback, delay)`
+##### `trackTimeout(callback, delay)` / `setTimeout(callback, delay)`
 
-Add timeout with automatic cleanup.
+Add timeout with automatic cleanup. `setTimeout` is an ergonomic alias.
 
 ```javascript
-const timerId = tracker.trackTimeout(() => {
+// Using alias (Recommended)
+const timerId = tracker.setTimeout(() => {
   console.log('Done!')
+}, 1000)
+
+// Using standard method
+tracker.trackTimeout(() => { /* ... */ }, 1000)
+```
+
+##### `trackInterval(callback, delay)` / `setInterval(callback, delay)`
+
+Add interval with automatic cleanup. `setInterval` is an ergonomic alias.
+
+```javascript
+const intervalId = tracker.setInterval(() => {
+  console.log('Tick!')
 }, 1000)
 ```
 
-##### `trackInterval(callback, delay)`
+##### `clearAllTimers()`
 
-Add interval with automatic cleanup.
+Clear all active timeouts and intervals associated with this tracker instance. Useful for resetting state without removing event listeners.
 
 ```javascript
-const intervalId = tracker.trackInterval(() => {
-  console.log('Tick!')
-}, 1000)
+// Clear all timers (e.g., when a tooltip is about to be reshown)
+tracker.clearAllTimers()
 ```
 
 ##### `trackResource(id, cleanupFn, options?)`
@@ -495,52 +516,28 @@ const cache = new SmartCache({ maxSize: 100 })
 tracker.trackCache(cache)
 ```
 
-### 🔄 Migration from Manual ResourceTracker
+### Automatic Cleanup in Vue Components
 
-#### ❌ Old Approach (Manual Cleanup)
-
-```vue
-<script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import ResourceTracker from '@/core/memory/ResourceTracker'
-
-const tracker = new ResourceTracker('my-component')
-
-// Manual cleanup required
-onUnmounted(() => {
-  tracker.cleanup() // Easy to forget = memory leak!
-})
-</script>
-```
-
-#### ✅ New Approach (Automatic Cleanup)
+The system provides a specialized composable for automatic resource tracking within Vue components.
 
 ```vue
 <script setup>
 import { useResourceTracker } from '@/composables/core/useResourceTracker'
 
 const tracker = useResourceTracker('my-component')
-// No manual cleanup needed!
+// No manual cleanup needed! The tracker automatically cleans up when the component is unmounted.
 </script>
 ```
 
-### 📋 Migration Checklist
-
-When migrating from ResourceTracker to useResourceTracker:
-
-- [ ] Change import statement
-- [ ] Replace `new ResourceTracker()` with `useResourceTracker()`
-- [ ] Remove `onUnmounted` and manual `cleanup()` calls
-- [ ] Test that everything works correctly
-
-### 🚨 Important Notes
+### Important Notes
 
 1. **Vue Components Only**: Use only in Vue components, not in regular classes
 2. **Unique Group IDs**: Use unique IDs for each component
 3. **Automatic Cleanup**: Never call manual cleanup
-4. **Performance**: Very low overhead
+4. **Ergonomic Aliases**: Prefer `setTimeout` and `setInterval` for better readability
+5. **Granular Cleanup**: Use `clearAllTimers()` for safe state resets
 
-### 🔗 Integration with Other Systems
+### Integration with Other Systems
 
 - **ResourceTracker**: Base class for resource management
 - **SmartCache**: Intelligent caching with TTL
@@ -635,6 +632,13 @@ describe('ResourceTracker', () => {
 
     tracker.cleanup()
     expect(mockElement.removeEventListener).toHaveBeenCalled()
+  })
+
+  it('should clear only timers with clearAllTimers', () => {
+    const tracker = new ResourceTracker('test')
+    tracker.setTimeout(() => {}, 1000)
+    tracker.clearAllTimers()
+    // Timers are cleared but tracker stays active
   })
 })
 ```
@@ -779,6 +783,7 @@ window.addEventListener('beforeunload', () => {
 3. **Cleanup on Destroy**: Always call cleanup() when components are destroyed
 4. **Monitor Memory Usage**: Regularly check memory statistics
 5. **Handle Custom Events**: Use the universal addEventListener for all event types
+6. **Prefer Ergonomic Timer Methods**: Use `setTimeout` and `setInterval` for cleaner code
 
 ## Related Systems
 
@@ -795,13 +800,15 @@ window.addEventListener('beforeunload', () => {
 - `trackEventListener(element, event, handler, groupId?, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?, groupId?)`
 - `cleanupGroup(groupId)` - Respects critical protection
+- `clearGroupTimers(groupId)` - Clear only timers/intervals in a group
 - `cleanupResource(resourceId)` - Skips critical resources
 - `getMemoryStats()`
 
 ### ResourceTracker API
 - `addEventListener(element, event, handler, options?)` - Options: `{ critical: boolean, ...DOMOptions }`
-- `trackTimeout(callback, delay)`
-- `trackInterval(callback, delay)`
+- `trackTimeout(callback, delay)` / `setTimeout(callback, delay)`
+- `trackInterval(callback, delay)` / `setInterval(callback, delay)`
+- `clearAllTimers()` - Clear only active timeouts and intervals
 - `trackResource(id, cleanupFn, options?)` - Options: `{ isCritical: boolean }`
 - `trackCache(cache, options?)`
 - `cleanup()` - Respects critical protection
@@ -816,5 +823,4 @@ window.addEventListener('beforeunload', () => {
 
 ---
 
-*For implementation details, see the source code in `src/core/memory/`*</content>
-<parameter name="filePath">/home/amir/Works/Translate-It/Vue/docs/MEMORY_GARBAGE_COLLECTOR.md
+*For implementation details, see the source code in `src/core/memory/`*

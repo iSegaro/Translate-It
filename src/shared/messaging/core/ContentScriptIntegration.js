@@ -93,21 +93,44 @@ export class ContentScriptIntegration {
       await this.initialize();
     }
 
+    const { messageId } = message;
+    
+    // Auto-register handler if not already registered and we have a messageId
+    // This ensures streaming messages are processed and coordinateTranslation can complete
+    const autoRegistered = messageId && !this.streamingHandler.activeHandlers.has(messageId);
+    if (autoRegistered) {
+      logger.debug(`Auto-registering streaming handler for: ${messageId}`);
+      this.registerTranslationRequest(messageId);
+    }
+
     logger.debug(`Sending translation request through coordinator:`, {
-      messageId: message.messageId,
+      messageId: messageId,
       action: message.action,
       context: message.context
     });
 
     try {
-      return await unifiedTranslationCoordinator.coordinateTranslation(message, options);
+      const response = await unifiedTranslationCoordinator.coordinateTranslation(message, options);
+      
+      // Flatten response if it's a successful streaming result to ensure translatedText is at top level
+      if (response && response.success && response.data && (response.type === 'stream_end' || response.type === 'translation_result')) {
+        return { ...response.data, ...response };
+      }
+      
+      return response;
     } catch (error) {
       if (isCancellationError(error)) {
-        logger.debug(`Translation request cancelled:`, message.messageId);
+        logger.debug(`Translation request cancelled:`, messageId);
       } else {
         logger.debug(`Translation request failed:`, error);
       }
       throw error;
+    } finally {
+      // If we auto-registered, clean up to avoid memory leaks
+      // (Normal handlers clean themselves up on STREAM_END, but this is a safety net)
+      if (autoRegistered) {
+        this.streamingHandler.cancelHandler(messageId);
+      }
     }
   }
 

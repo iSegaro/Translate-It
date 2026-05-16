@@ -168,72 +168,6 @@
   }
 }
 
-.whole-page-trigger-group {
-  margin-top: 0 !important;
-  margin-bottom: $spacing-xl !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-
-  .trigger-modes-container, .delay-setting-container {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: $spacing-sm $spacing-md !important;
-    margin-bottom: $spacing-sm !important;
-    width: 100% !important;
-
-    &.trigger-modes-container {
-      margin-bottom: $spacing-xl !important;
-    }
-    
-    .delay-label {
-      font-size: $font-size-sm !important;
-      font-weight: 500 !important;
-      color: var(--color-text) !important;
-      max-width: 100% !important;
-      margin-top: 0 !important;
-      &.is-disabled { opacity: 0.6 !important; }
-      flex: none !important;
-      min-width: 0 !important;
-      align-self: center !important;
-    }
-    
-    .radio-group-horizontal {
-      display: flex !important;
-      flex-wrap: wrap !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: $spacing-md 48px !important;
-      flex: none !important;
-      min-width: 0 !important;
-
-      .base-radio {
-        width: auto !important;
-        min-width: max-content !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
-        gap: 4px !important;
-
-        .radio-label, .radio-label-content {
-          padding-inline: 12px !important;
-        }
-      }
-    }
-
-    &.delay-setting-container {
-      justify-content: flex-start !important;
-      gap: $spacing-sm !important;
-    }
-  }
-
-  .setting-description {
-    text-align: start !important;
-    padding-inline-start: 0 !important;
-    width: 100% !important;
-  }
-}
-
 .number-input-container {
   display: flex !important;
   align-items: center !important;
@@ -259,6 +193,162 @@
   .unit-label {
     font-size: 0.9em !important;
     color: var(--color-text-secondary) !important;
+  }
+}
+
+.horizontal-setting-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: $spacing-md !important;
+  margin-bottom: $spacing-sm !important;
+  width: 100% !important;
+
+  .setting-label {
+    font-size: $font-size-sm !important;
+    font-weight: 500 !important;
+    color: var(--color-text) !important;
+    min-width: 150px !important;
+    margin-top: 0 !important;
+    flex: 0 0 auto !important;
+    align-self: center !important;
+
+    &.is-disabled {
+      opacity: 0.6 !important;
+    }
+
+    @media (max-width: #{$breakpoint-md}) {
+      min-width: 0 !important;
+      width: 100% !important;
+      margin-bottom: $spacing-xs !important;
+    }
+  }
+
+  .compact-select {
+    flex: 0 0 auto !important;
+    width: 180px !important;
+    height: 32px !important;
+
+    @media (max-width: #{$breakpoint-md}) {
+      width: 100% !important;
+      flex: 1 1 auto !important;
+    }
+  }
+
+  .setting-control-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: $spacing-xl !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    flex-wrap: wrap !important; // Allow wrapping on mobile
+
+    @media (max-width: #{$breakpoint-md}) {
+      width: 100% !important;
+      gap: $spacing-sm !important;
+    }
+
+    .inline-checkbox-wrapper {
+      display: flex !important;
+      align-items: center !important;
+      min-width: 0 !important;
+      flex: 1 !important;
+
+      @media (max-width: #{$breakpoint-md}) {
+        width: 100% !important;
+        flex: none !important;
+      }
+
+      .ti-checkbox, .base-checkbox {
+        width: auto !important;
+        white-space: normal !important; // Allow label text to wrap
+        
+        .checkbox-label {
+          font-size: $font-size-sm !important;
+          color: var(--color-text-secondary) !important;
+        }
+      }
+    }
+  }
+
+  /* Support for side-by-side sub-items like Auto-close + Timer */
+  &.multi-select-row {
+    gap: $spacing-xl !important;
+
+    @media (max-width: #{$breakpoint-md}) {
+      gap: $spacing-md !important;
+    }
+
+    .setting-item {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: $spacing-md !important;
+      flex: 0 1 auto !important;
+      min-width: 0 !important;
+
+      @media (max-width: #{$breakpoint-md}) {
+        width: 100% !important;
+        justify-content: space-between !important;
+        flex: 1 1 100% !important;
+      }
+
+      &:not(:first-child) .setting-label {
+        min-width: auto !important;
+      }
+
+      .compact-select {
+        width: 180px !important;
+        flex: 0 0 auto !important;
+      }
+    }
+  }
+}
+
+.whole-page-trigger-group {
+  margin-top: 0 !important;
+  margin-bottom: $spacing-xl !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  .trigger-modes-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: $spacing-sm $spacing-md !important;
+    margin-bottom: $spacing-xl !important;
+    width: 100% !important;
+    
+    .radio-group-horizontal {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: $spacing-md 48px !important;
+      flex: none !important;
+      min-width: 0 !important;
+
+      .base-radio {
+        width: auto !important;
+        min-width: max-content !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        gap: 4px !important;
+
+        .radio-label, .radio-label-content {
+          padding-inline: 12px !important;
+        }
+      }
+    }
+  }
+
+  .setting-description {
+    text-align: start !important;
+    padding-inline-start: 0 !important;
+    width: 100% !important;
   }
 }
 
@@ -338,7 +428,7 @@
     overflow: visible !important;
   }
 
-  .sub-options-inner {
+    .sub-options-inner {
     min-height: 0 !important;
     padding-inline-start: $spacing-lg !important;
     padding-inline-end: $spacing-md !important;
@@ -349,6 +439,62 @@
     display: flex !important;
     flex-direction: column !important;
     gap: $spacing-sm !important;
+&.fab-appearance-options {
+  padding-top: $spacing-md !important;
+  padding-bottom: $spacing-md !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: $spacing-xl !important;
+
+  .separator-v {
+    width: 1px !important;
+    height: 32px !important;
+    background-color: var(--color-border) !important;
+    flex-shrink: 0 !important;
+    opacity: 0.8 !important;
+
+    @media (max-width: #{$breakpoint-md}) {
+      display: none !important;
+    }
+  }
+
+  .fab-appearance-item {    display: flex !important;
+    flex-direction: column !important;
+    gap: $spacing-xs !important;
+    flex: 1 1 0 !important;
+    min-width: 180px !important;
+
+    &.size-item {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: $spacing-md !important;
+
+      .setting-label {
+        font-size: $font-size-sm !important;
+        font-weight: 500 !important;
+        color: var(--color-text) !important;
+        margin-bottom: 0 !important;
+        white-space: nowrap !important;
+        flex: 0 0 auto !important;
+      }
+
+      .compact-select {
+        flex: 1 !important;
+        width: auto !important;
+        height: 32px !important;
+      }
+    }
+
+    &.opacity-item {
+      .ti-range-wrapper {
+        margin-bottom: 0 !important;
+      }
+    }
+  }
+}
   }
   
   .radio-group {

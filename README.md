@@ -1,5 +1,5 @@
 # Translate It!
-> Smart Translation Assistant - Web Extension
+> The Ultimate Translation Ecosystem for Modern Web Browsers.
 
 <p align="center">
   <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
@@ -19,7 +19,8 @@
 <div align="center">
   <strong>
     • English | 
-    • <a href="./docs/README_FARSI.md">فارسی</a>
+    • <a href="./docs/README_FARSI.md">فارسی</a> | 
+    • <a href="./docs/README_JAPANESE.md">日本語</a>
   </strong>
 </div>
 
@@ -29,69 +30,143 @@
   <img src="./docs/Images/Options.jpg" alt="Translate It Extension" height="400" />
 </p>
 
-**Translate It!** is a lightweight, efficient personal tool for translating text on websites and form fields. It offers a fast and seamless experience with multiple AI-powered providers.
+**Translate It** is not just a translator; it's a high-performance, modular ecosystem designed to bridge the language gap across any device. Engineered with a "zero-pressure" philosophy, it is optimized to run seamlessly in modern browsers without taxing system resources or bloating RAM, even when dozens of tabs are active. Built with **Vue.js 3** and powered by **10+ Providers**, it offers a surgical approach to web translation with a focus on privacy, speed, and cost-efficiency.
+
+<br>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <b>Watch Demo on YouTube</b>
+  </a>
+  <br>
+  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+    <img src="./docs/Images/Windows.png" alt="Watch the video" width="560" />
+  </a>
+</p>
+
+---
+
+## Why Translate It?
+
+- **Privacy First:** OCR and core processes happen locally. Your data stays in your browser.
+- **AI-Powered:** Support for Gemini, OpenAI, DeepSeek and more.
+- **Cost-Efficient:** Save up to **70% on AI tokens** with the unique Economy Mode.
+- **Zero-Pressure Engineering:** Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
+- **Platform Agnostic:** Seamless experience from **Desktop Chrome** to **Android Firefox**.
 
 ---
 
 ## Key Features
 
-- **Text Selection:** Instant translation box or icon appears right where you select text.
-- **Mobile Support:** A native-like, thumb-friendly **In-Page Bottom Sheet** optimized for mobile browsers (Firefox Android, Kiwi, Lemur) and touchscreen devices with smooth touch gestures and multi-view support.
-- **Desktop FAB Menu:** A persistent, draggable floating action button on desktop for quick access to core features like "Select Element" and "Page Translation" without opening the popup.
-- **Select Element:** Click any part of the page (e.g., paragraph, button) to translate it entirely.
-- **Whole Page Translation:** Automatically translate all text content on the current page with smart lazy-loading to optimize performance and API costs.
-- **In-Field Translation:** Press `Ctrl + /` to instantly translate content inside text fields before sending.
-- **Advanced Popup & Sidepanel:** Multi-accent pronunciation, dictionary support, and translation history.
-- **Audio Playback:** High-quality pronunciation for words and sentences.
-- **Smart Dictionary:** Definitions, synonyms, and usage examples for selected words.
+### 1. Advanced Translation Engines
+- **Progressive Streaming Engine:** Don't wait for large translations! The system splits long texts into optimized segments and renders them in real-time as they arrive, providing a fluid and responsive experience across all providers.
+- **10+ Providers:** Switch between advanced AI models (LLMs) and traditional providers (Google, Microsoft, DeepL) instantly.
+
+<br>
+
+### 2. Surgical Element Translation (Point-and-Click)
+- **Visual Highlight:** Activate the mode and hover over any paragraph, button, or menu to see a real-time orange highlight. Click to translate that specific element instantly.
+- **Layout Preservation:** Translate text directly inside the website's structure. Your page layout remains 100% intact.
+- **Hover Preview:** Need to see the source? Simply hover over any translated element to see the original text in a surgical tooltip.
+<!-- ELEMENT_SELECTION_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 3. Smart Whole-Page Translation (Lazy-Loading)
+- **Infinite Scrolling Support:** Automatically detects and translates new content as you scroll down. Perfect for social media and long-form articles.
+- **Dual Execution Modes:** 
+  - **Fluid Mode:** Translates content in real-time as it enters the viewport.
+  - **On-Stop Mode:** Waits for you to finish scrolling before initiating translation, saving API costs and reducing visual noise.
+<!-- WHOLE_PAGE_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 4. Screen Capture & OCR (Anything-to-Text)
+- **Visual Translation:** Capture and translate text from images, videos, PDFs, or any non-selectable web area.
+- **Offline Engine:** Powered by Tesseract.js with local model caching for "True Offline" privacy.
+<!-- OCR_SCREENSHOT_PLACEHOLDER -->
+
+<br>
+
+### 5. Smart Optimization Slider (Economy vs. Turbo)
+Take full control over your API costs and UI speed with **Optimization Levels (1-5)**:
+- **Economy Mode (Level 1):** Packs 70% more text per request. Perfect for saving AI tokens and preventing IP bans on traditional providers.
+- **Turbo Mode (Level 5):** Maximizes concurrency for the fastest possible UI response.
+<!-- OPTIMIZATION_SLIDER_PLACEHOLDER -->
+
+<br>
+
+### 6. Cross-Platform Ergonomics
+- **Mobile Bottom Sheet:** A native-like, thumb-friendly interface for mobile browsers (Firefox Android, Kiwi, Lemur) with gesture support.
+- **Desktop/Mobile FAB Menu:** A draggable, persistent floating action button for instant access to OCR, Page Translation, Element Mode, and rapid feature toggles (like instant TTS or direct-translation mode).
+
+<br>
+
+### 7. Mouse on Hover (Instant Glance)
+- **Glance-to-Translate:** Move your mouse over any text while holding a modifier key (like Ctrl) to see an instant translation in a non-intrusive tooltip.
+- **Smart Scoping:** Choose your focus: translate a single **Word**, a full **Sentence**, or the entire **Container** block automatically.
+
+---
+
+## Features at a Glance
+
+| Feature | Description |
+| :--- | :--- |
+| **Text Selection** | Instant translation icon/box right where you select text. |
+| **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
+| **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
+| **Mouse Hover** | Instant translation tooltip triggered by moving mouse over text (supports Word/Sentence/Container scopes). |
+| **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
+| **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
+| **Smart Dictionary** | Definitions, synonyms, and usage examples with multi-accent TTS. |
+| **History & Export** | Keep track of your translations and export them for later use. |
+| **Resource Tracker** | Advanced memory management to keep your browser fast. |
 
 ---
 
 ## Getting Started
 
 ### 1. Installation
-The easiest way is to install via the official stores:
+Install via the official stores for the best experience:
 
 <p align="center">
   <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="60" />
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="50" />
   </a>
   <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="60" />
+    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="50" />
   </a>
 </p>
 
-*For manual installation, see our [Installation Guide](./docs/guides/INSTALLATION.md).*
+*For manual installation, see the [Installation Guide](./docs/guides/INSTALLATION.md).*
 
-### 2. Configure Providers
-Most providers require an API key (e.g., Gemini, OpenAI, DeepSeek). 
-- Learn how to get and set up keys in the [**API Configuration Guide**](./docs/guides/API_GUIDE.md).
-- *Free providers like Google, Microsoft and Yandex,  are available out of the box.*
+### 2. Configuration
+Most AI providers require an API key. 
+- Follow the [**API Configuration Guide**](./docs/guides/API_GUIDE.md) to set up Gemini, OpenAI, etc.
+- *Free providers like Google and Yandex work out of the box.*
 
-### 3. Usage & Shortcuts
-- Check out the [**User Guide**](./docs/guides/USAGE.md) for detailed instructions and keyboard shortcuts.
+### 3. Mastering Shortcuts
+Maximize your productivity with the [**User Guide**](./docs/guides/USAGE.md).
 
 ---
 
-## 🛠 Development & Contributing
+## Developer & Contributing
 
-We welcome contributions! To set up the project locally and start developing:
-- Read the [**CONTRIBUTING.md**](./docs/guides/CONTRIBUTING.md) for setup and build instructions.
-- Follow the [**Localization Guide**](./docs/guides/LOCALIZATION_GUIDE.md) to add or update translations.
-- Explore the [**Architecture Overview**](./docs/technical/ARCHITECTURE.md) to understand the project structure.
+We follow a **Feature-Based Architecture** using Vue 3, Pinia, and Vite.
+- **Architecture:** Explore [ARCHITECTURE.md](./docs/technical/ARCHITECTURE.md) to understand the modular system.
+- **Contributing:** Read [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md) for local setup instructions.
+- **Localization:** Help us reach more people by following the [Localization Guide](./docs/guides/LOCALIZATION_GUIDE.md).
 
 ---
 
 ## Contributors
-
 - [**Mohammad**](https://x.com/M_Khani65/)
 - [**iSegar0**](https://x.com/iSegar0/)
 
 ---
 
 ## License
-
-This project is licensed under the **MIT License**.
+Licensed under the **MIT License**.
 
 ---
 

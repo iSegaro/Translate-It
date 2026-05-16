@@ -357,38 +357,49 @@ $font-size-base: 14px;
 }
 ```
 
-## Migration Patterns
+## Implementation Patterns
 
-### From SFC Internal Styles
+### Standard Component Styling
+For components rendered in the Shadow DOM (Content Scripts), use a matching SCSS file in the same directory as the Vue component.
+
+**MyComponent.vue:**
 ```vue
-<!-- ❌ Before (MyComponent.vue) -->
-<template><div class="ti-item" /></template>
-<style scoped>.ti-item { color: red; }</style>
-
-<!-- ✅ After (MyComponent.vue) -->
-<template><div class="ti-item" /></template>
-<!-- No style block here -->
-
-<!-- ✅ After (MyComponent.scss in same folder) -->
-.ti-item { color: #ff0000 !important; } // Use Hex code and ti- prefix
+<template>
+  <div class="ti-my-component">
+    <span class="ti-label">Hello World</span>
+  </div>
+</template>
 ```
 
-### From Legacy Inline JS
-```vue
-<!-- ❌ Before (Inline Hacks) -->
-<template>
-  <div :style="`background: ${settingsStore.isDark ? '#222' : '#fff'} !important;`" />
-</template>
-
-<!-- ✅ After (Component-Adjacent SCSS) -->
-<template>
-  <div class="ti-component" />
-</template>
-
-/* In MyComponent.scss */
-.ti-component {
-  background: var(--bg-color, #ffffff) !important;
+**MyComponent.scss:**
+```scss
+.ti-my-component {
+  display: flex !important;
+  background: var(--ti-bg-main, #ffffff) !important;
+  
+  .ti-label {
+    color: #ff0000 !important; // Using hex code as per standards
+    font-weight: 600 !important;
+  }
 }
+```
+
+### Dynamic Styling with CSS Variables
+Avoid inline styles for static properties. Instead, use CSS variables defined in SCSS or themed via the design system.
+
+**Correct Pattern:**
+```vue
+<template>
+  <div class="ti-themed-box" />
+</template>
+
+<style lang="scss">
+/* In adjacent SCSS file */
+.ti-themed-box {
+  background: var(--ti-theme-bg, #ffffff) !important;
+  border-radius: #{css-var('radius-md', 8px)} !important;
+}
+</style>
 ```
 
 ## Testing and Validation

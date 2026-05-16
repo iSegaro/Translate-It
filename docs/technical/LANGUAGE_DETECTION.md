@@ -10,7 +10,7 @@ The i18n lazy-loading layer is only a consumer of detection results. It does not
 
 ---
 
-## 🏗 Architecture & Flow
+## Architecture & Flow
 
 The system follows a **Hierarchical Priority Flow**. Before invoking internal detection layers, it checks for inherited metadata and handles text direction context.
 
@@ -203,5 +203,5 @@ const { textDirectionStyle } = useTextDirection(text, langCode);
 -   **`src/features/translation/providers/LanguageSwappingService.js`**: Consumer for bilingual swapping.
 
 ---
-**Last Updated**: April 27, 2026
+**Last Updated**: May 2026
 

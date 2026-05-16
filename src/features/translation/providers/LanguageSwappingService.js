@@ -29,15 +29,16 @@ export class LanguageSwappingService {
   }
 
   static async applyLanguageSwapping(text, sourceLang, targetLang, originalSourceLang = 'English', options = {}) {
-    const { providerName = 'LanguageSwapping', mode } = options;
+    const { providerName = 'LanguageSwapping', mode, originalMode } = options;
 
     try {
       const bilingualEnabled = await getBilingualTranslationEnabledAsync();
       const bilingualModes = await getBilingualTranslationModesAsync();
 
-      // CRITICAL FIX: Only enable bilingual if mode is explicitly set to true
-      // getBilingualTranslationModesAsync already falls back to CONFIG defaults if not in storage
-      const isModeEnabled = mode ? (bilingualModes[mode] === true) : true;
+      // Check the switch for the CURRENT mode and the ORIGINAL mode
+      // If we're in Dictionary mode but came from MouseHover, we must respect the MouseHover switch
+      const effectiveMode = originalMode || mode;
+      const isModeEnabled = effectiveMode ? (bilingualModes[effectiveMode] === true) : true;
 
       // If bilingual is disabled for this mode/globally, skip detection and return original languages
       if (!bilingualEnabled || !isModeEnabled) {

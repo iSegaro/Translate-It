@@ -6,6 +6,8 @@
   width: 100%;
   background-color: var(--bg-color);
   color: var(--text-color);
+  font-family: var(--translation-font-family, inherit);
+  font-size: var(--translation-font-size, inherit);
 }
 
 .enhanced-version-toggle {
