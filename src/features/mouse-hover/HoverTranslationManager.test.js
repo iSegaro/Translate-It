@@ -61,7 +61,7 @@ describe('HoverTranslationManager', () => {
     settingsManager.get.mockImplementation((key, def) => {
       if (key === 'MOUSE_HOVER_AUTO_CLOSE') return 'mouseleave';
       if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
-      if (key === 'MOUSE_HOVER_DELAY') return 300;
+      if (key === 'MOUSE_HOVER_DELAY') return 500;
       return def;
     });
   });
