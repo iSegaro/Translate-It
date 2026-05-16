@@ -6,22 +6,23 @@ The **Mouse on Hover** system provides a highly responsive, "zero-click" transla
 
 ## Architecture
 
-The system follows the **Autonomous Feature Pattern**, isolating logic from the core while integrating deeply with the extension's translation and messaging layers.
+The system follows the **Autonomous Feature Pattern**, isolating logic from the core while integrating deeply with the extension's translation and messaging layers. It uses an **Event-Driven & Streaming** model for high responsiveness.
 
 ```
 Mouse Move / Key Down → HoverTranslationManager (Orchestrator)
      ↓
      ├─→ Rectangle Cache (Hit-test optimization)
-     ├─→ HoverTextDetector (Text extraction: Word/Sentence/Container)
+     ├─→ Request Cancellation (Prevent race conditions)
+     ├─→ HoverTextDetector (Text extraction)
      │       ↓
-     ├─→ ContentScriptIntegration (Action: TRANSLATE)
+     ├─→ ContentScriptIntegration (Action: TRANSLATE + Stream Registration)
      │       ↓ (Background)
-     │   Translation Engine → Provider System
+     │   Translation Engine → Provider System (Streaming)
      │       ↓
      ├─→ PageEventBus (Event: MOUSE_HOVER_TRANSLATION_READY)
-     │       ↓
+     │       ↓ (Progressive Updates)
      └─→ MouseHoverTooltip.vue (Shadow DOM UI)
-             └─→ TranslationDisplay.vue (Markdown, RTL, Fonts)
+             └─→ Flicker-free Progressive Rendering
 ```
 
 ## Core Components
@@ -32,7 +33,8 @@ The **Central Coordinator** managing the feature lifecycle and interaction logic
 **Responsibilities:**
 - Event Orchestration: Listens to global `mousemove`, `mouseleave`, and `keydown` events.
 - Trigger Validation: Checks if the configured trigger (e.g., Ctrl + Hover) is met.
-- State Management: Tracks the currently hovered text, active borders, and tooltip status.
+- **Request Management**: Automatically cancels previous translation requests when a new hover is triggered to prevent race conditions.
+- **Streaming Coordination**: Registers handlers for streaming updates via `ContentScriptIntegration`.
 - Optimization: Implements a "Rectangle Cache" to skip expensive DOM lookups when the mouse stays within the same text block.
 
 **Key Methods:**
@@ -41,7 +43,7 @@ The **Central Coordinator** managing the feature lifecycle and interaction logic
 | `activate()` / `deactivate()` | Lifecycle control via `FeatureManager` |
 | `handleMouseMove(event)` | Main entry point for detection with debouncing |
 | `handleKeyDown(event)` | Support for modifier-key triggers (e.g., press Ctrl while hovering) |
-| `_processHover(event)` | Orchestrates detection, border application, and translation request |
+| `_processHover(event)` | Orchestrates detection, cancellation, streaming registration, and translation |
 | `_removeBorder()` | Safely restores the original style of highlighted containers |
 
 ### 2. HoverTextDetector.js
@@ -60,6 +62,8 @@ The **Intelligence Engine** for text extraction. It uses precise browser APIs to
 The **UI Component** rendered inside the extension's Shadow DOM host.
 
 **Features:**
+- **Flicker-free Updates**: Implements logic to update existing tooltips during streaming without closing/reopening, ensuring a smooth visual experience.
+- **Streaming Support**: Reactive handling of `isStreaming` state to manage auto-close timers only after full completion.
 - **Component Reuse**: Wraps `TranslationDisplay.vue` to leverage standardized Markdown rendering, RTL/LTR detection, and user-configured font styles.
 - **Intelligent Positioning**: Automatically calculates space; shows the tooltip above the cursor by default and "flips" to the bottom if there isn't enough space at the top of the viewport.
 - **Interactive Scrolling**: Uses `pointer-events: auto` and `max-height` constraints to allow users to scroll through long translations (especially in 'Container' mode) without covering the whole screen.
@@ -87,11 +91,12 @@ Behavior is fully customizable via the **Activation Tab** in the Options Page:
 ## Feature Lifecycle
 
 1. **Detection**: User hovers/presses modifier. `HoverTextDetector` finds text.
-2. **Request**: `HoverTranslationManager` sends a `TRANSLATE` request to the background.
-3. **Response**: Background returns translated text + detected direction.
-4. **Display**: `MouseHoverTooltip` receives the event and renders.
-5. **Interaction**: User can scroll the tooltip or move the mouse away to close.
-6. **Cleanup**: `ResourceTracker` ensures all listeners are removed when the feature is toggled off.
+2. **Registration**: `HoverTranslationManager` cancels old requests and registers a new streaming handler via `ContentScriptIntegration`.
+3. **Request**: Sends a `TRANSLATE` request to the background.
+4. **Streaming Response**: Background returns progressive text chunks.
+5. **Progressive Display**: `MouseHoverTooltip` receives events and updates the UI in real-time without flickering.
+6. **Completion**: Once the stream ends, the result is finalized and auto-close timers (if enabled) are started.
+7. **Cleanup**: `ResourceTracker` ensures all listeners are removed when the feature is toggled off.
 
 ## Integration Points
 
