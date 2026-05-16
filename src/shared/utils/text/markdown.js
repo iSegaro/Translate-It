@@ -281,7 +281,7 @@ export class SimpleMarkdown {
 
     // 2. If it's a label line (Label: Content), prioritize content direction
     if (this._isLabelLine(trimmed)) {
-      const labelMatch = trimmed.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+      const labelMatch = trimmed.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
       if (labelMatch) {
         const content = labelMatch[2].trim();
         if (content) {
@@ -320,7 +320,8 @@ export class SimpleMarkdown {
 
     // 2. Check for regular labels: Label: content (content is optional)
     // More strict pattern: label should be at start of line, followed by colon
-    const regularLabelPattern = /^[^:\s]+\s*:\s*.*$/;
+    // Use negative lookahead to avoid matching URL protocols like https://
+    const regularLabelPattern = /^[^:\s]+\s*:(?!\/\/)\s*.*$/;
 
     // 3. Specifically allow lines ending in a colon (header-style labels)
     const endsWithColonPattern = /^.*:$/;
@@ -334,7 +335,8 @@ export class SimpleMarkdown {
     // Robust regex to capture label and content regardless of bold marker position
     // Group 1: Label part (including possible ** markers)
     // Group 2: Content part (optional)
-    const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+    // Use negative lookahead to avoid matching URL protocols like https://
+    const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
 
     if (!match) {
       span.appendChild(this._parseInline(text));
@@ -524,7 +526,7 @@ export class SimpleMarkdown {
     // Keep labels but strip markdown formatting
     if (strategy === ExtractionStrategy.CLEAN_DICT) {
       return lines.map(line => {
-        const match = line.match(/^(\*\*.*?\*\*|[^:]+)\s*:\s*(.*)$/);
+        const match = line.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
         if (match) {
           return `${this.strip(match[1])}: ${this.strip(match[2])}`;
         }
@@ -540,16 +542,16 @@ export class SimpleMarkdown {
       const line = lines[0];
 
       // 1. Check for 'text before label' pattern: "translation**Label**:" or "translation Label:"
-      const beforeLabelMatch = line.match(/(.*?)\*\*.*?\*\*(\s*:\s*|:)/) || 
-                               line.match(/(.*?)[A-Za-z]+\s*:/) || 
-                               line.match(/(.*?)[؀-ۿ]+\s*:/);
+      const beforeLabelMatch = line.match(/(.*?)\*\*.*?\*\*(\s*:(?!\/\/)\s*|:(?!\/\/))/) || 
+                               line.match(/(.*?)[A-Za-z]+\s*:(?!\/\/)/) || 
+                               line.match(/(.*?)[؀-ۿ]+\s*:(?!\/\/)/);
       
       if (beforeLabelMatch && beforeLabelMatch[1].trim().length > 0) {
         return this.strip(beforeLabelMatch[1].trim());
       }
 
       // 2. Check for standard label start: "**Label**: content" or "Label: content"
-      const match = line.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:\s*(.*)$/);
+      const match = line.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:(?!\/\/)\s*(.*)$/);
       if (match && match[2].trim()) {
         if (this.strip(match[1]).length < 30) {
           return this.strip(match[2]);
@@ -571,7 +573,7 @@ export class SimpleMarkdown {
 
     // 2. Second pass (Fallback): If all lines were labels, take content from the first label line
     const firstLine = lines[0].replace(/^[-*•]\s*/, '').trim();
-    const match = firstLine.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:\s*(.*)$/);
+    const match = firstLine.match(/^(\*\*.*?\*\*|[^:\s]+)\s*:(?!\/\/)\s*(.*)$/);
     if (match && match[2].trim()) {
       return this.strip(match[2]);
     }
