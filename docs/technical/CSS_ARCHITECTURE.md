@@ -203,8 +203,9 @@ The extension uses specific entry points to manage the boundary between the exte
   - Cursor changes (`cursor: crosshair`) when in "Select Element" mode.
   - Element highlighting (Outlines) during selection.
   - Translation direction support for translated text injected into the page.
-- **Injection**: Injected into the host page's `<head>` via a `<style>` or `<link>` tag.
-- **Constraint**: Keep it minimal to avoid interfering with the host website's layout.
+- **Injection**: **MANUAL INJECTION REQUIRED.** These styles are not automatically loaded. They must be explicitly injected by the relevant feature manager during activation using `contentCore.injectMainDOMStyles(styles, id)`.
+- **Constraint**: Keep it minimal. 
+- **Best Practice**: For new features requiring Main DOM styles (e.g., highlighting, custom overlays), create a dedicated `.scss` file within the feature's directory (e.g., `MyFeatureHighlight.scss`) and inject it programmatically. This ensures **Feature Autonomy** and prevents bloating the shared `content-main-dom.scss` file.
 
 ### Core SCSS Files
 
