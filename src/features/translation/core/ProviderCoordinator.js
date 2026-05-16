@@ -228,7 +228,9 @@ export class ProviderCoordinator {
       };
     } catch (error) {
       const errorType = matchErrorToType(error);
-      const isTransient = isTransientError(error) || isTransientError(errorType);
+      
+      // Treat UNKNOWN errors from Error instances as transient to trigger retries/proper failure reporting
+      const isTransient = isTransientError(error) || isTransientError(errorType) || (errorType === ErrorTypes.UNKNOWN && error instanceof Error);
       
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
@@ -236,8 +238,19 @@ export class ProviderCoordinator {
         logger.debug(`[Coordinator] Execution failed for ${providerName}:`, error.message);
       }
 
+      // Throw if it's a recognized fatal/transient error or a generic system Error
       if (isFatalError(error) || isTransient) throw error;
-      return Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
+      
+      // Wrap fallback in a standard result object to avoid destructuring errors in the engine
+      const fallbackResult = Array.isArray(text) ? text.map(t => typeof t === 'object' ? (t.t || t.text) : t) : text;
+      return {
+        success: true,
+        translatedText: fallbackResult,
+        provider: providerName,
+        sourceLanguage: processedSourceLang,
+        targetLanguage: processedTargetLang,
+        isFallback: true
+      };
     }
   }
 

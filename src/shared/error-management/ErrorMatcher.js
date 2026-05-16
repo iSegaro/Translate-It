@@ -296,17 +296,13 @@ export function matchErrorToType(rawOrError = "") {
   // Normalize input to a lowercase string for message-based matching
   let msg = "";
   try {
+    // CRITICAL: Include error name in the matched string to catch TypeErrors, etc.
     const rawMsg = !rawOrError ? "" : 
-                   (rawOrError instanceof Error ? rawOrError.message : 
+                   (rawOrError instanceof Error ? `${rawOrError.name}: ${rawOrError.message}` : 
                    (typeof rawOrError === 'string' ? rawOrError : 
                    (typeof rawOrError.message === 'string' ? rawOrError.message : 
                    (rawOrError.code || rawOrError.status || ""))));
     
-    const trimmedRaw = String(rawMsg || "").trim();
-    if (trimmedRaw && Object.values(ErrorTypes).includes(trimmedRaw)) {
-      return trimmedRaw;
-    }
-
     msg = String(rawMsg || "").toLowerCase().trim();
   } catch {
     msg = "unknown error";
@@ -315,7 +311,8 @@ export function matchErrorToType(rawOrError = "") {
   // Priority 3: Technical fallbacks
   if (typeof rawOrError === "string") {
     const rawKey = rawOrError.trim();
-    if (Object.values(ErrorTypes).includes(rawKey)) {
+    // Manual check for ErrorTypes since static properties are non-enumerable
+    if (Object.keys(ErrorTypes).includes(rawKey)) {
       return rawKey;
     }
   }
@@ -338,6 +335,8 @@ export function matchErrorToType(rawOrError = "") {
 
   // JavaScript / System errors
   if (msg.includes("typeerror") || msg.includes("referenceerror") || msg.includes("syntaxerror")) {
+    // Special case for DeepL/Fetch header errors (often caused by invalid API key characters)
+    if (msg.includes("iso-8859-1") || msg.includes("headers")) return ErrorTypes.API_KEY_INVALID;
     return ErrorTypes.TRANSLATION_ERROR;
   }
 
@@ -404,6 +403,16 @@ export function matchErrorToType(rawOrError = "") {
       msg.includes("listener indicated an asynchronous response")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
+
+  // Final fallback: If we still don't have a match but the error object HAD an explicit type, use it.
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
+    return rawOrError.type;
+  }
+
+  // For Error instances, return TRANSLATION_ERROR instead of UNKNOWN to ensure they are at least treated as transient
+  if (rawOrError instanceof Error) {
+    return ErrorTypes.TRANSLATION_ERROR;
+  }
 
   return ErrorTypes.UNKNOWN;
 }
