@@ -17,6 +17,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager
 // Constants for magic numbers
 const MOUSE_MOVEMENT_THRESHOLD = 2; // pixels
 const MODIFIER_TRIGGER_DELAY = 50; // ms
+const COORDINATE_TOLERANCE = 10; // pixels - buffer to handle line-height gaps and jitter
 
 /**
  * HoverTranslationManager - Manages "Mouse on Hover" translation logic
@@ -115,11 +116,26 @@ export class HoverTranslationManager extends ResourceTracker {
     
     this.lastPosition = { x: event.clientX, y: event.clientY };
 
+    // 1. PROACTIVE CHECK: If we have an active rectangle, check if we've left it.
+    // This MUST run before any modifier or editable checks to ensure the tooltip
+    // closes correctly when moving away, even if the trigger key is released.
+    if (this.currentRect && settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') === 'mouseleave') {
+      const tolerance = COORDINATE_TOLERANCE;
+      const isStillInside = (
+        event.clientX >= this.currentRect.left - tolerance &&
+        event.clientX <= this.currentRect.right + tolerance &&
+        event.clientY >= this.currentRect.top - tolerance &&
+        event.clientY <= this.currentRect.bottom + tolerance
+      );
+
+      if (!isStillInside) {
+        this._handleMouseOut();
+      }
+    }
+
     // Skip if mouse is over extension UI elements (like the tooltip itself)
     if (ElementDetectionService.getInstance().isUIElement(event.target)) {
       this._cancelPendingHover();
-      // DO NOT call _handleMouseOut here, as we want to keep the tooltip open
-      // while the user is interacting with it (e.g., scrolling).
       return;
     }
 
@@ -135,27 +151,13 @@ export class HoverTranslationManager extends ResourceTracker {
     // Check modifier key if required
     if (trigger !== 'hover' && !this._isModifierPressed(event, trigger)) {
       this._cancelPendingHover();
-      this._handleMouseOut();
-      return;
-    }
-
-    // Proactive check: If we're already showing a tooltip or have a detected area, 
-    // check if we've left the bounds to improve responsiveness.
-    if (this.currentRect && settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') === 'mouseleave') {
-      const isStillInside = (
-        event.clientX >= this.currentRect.left &&
-        event.clientX <= this.currentRect.right &&
-        event.clientY >= this.currentRect.top &&
-        event.clientY <= this.currentRect.bottom
-      );
-
-      if (isStillInside) {
-        // We are still within the same word/sentence area, NO NEED to recalculate anything
-        return;
-      }
       
-      // We left the previously detected rectangle
-      this._handleMouseOut();
+      // If we don't have a tooltip, we can stop here. 
+      // If we DO have one, we let it stay until the coordinate check above or mouseleave closes it.
+      if (!this.currentRect) {
+        this._handleMouseOut();
+      }
+      return;
     }
 
     this._cancelPendingHover();
@@ -238,26 +240,42 @@ export class HoverTranslationManager extends ResourceTracker {
     const scope = settingsManager.get('MOUSE_HOVER_SCOPE', 'sentence');
     const detection = HoverTextDetector.detect(event.clientX, event.clientY, scope);
 
-    if (!detection) {
-      logger.debug('No text detected at cursor position during processing');
-      // If we've moved to empty space, ensure tooltip is hidden
-      this._handleMouseOut();
-      return;
-    }
+    if (!detection || !detection.text) {
+      // If we are over a "dead zone", we only close if we are actually outside the tolerance 
+      // of our last valid rectangle. This prevents flickering in gaps.
+      if (this.currentRect) {
+        const tolerance = COORDINATE_TOLERANCE;
+        const isStillInside = (
+          event.clientX >= this.currentRect.left - tolerance &&
+          event.clientX <= this.currentRect.right + tolerance &&
+          event.clientY >= this.currentRect.top - tolerance &&
+          event.clientY <= this.currentRect.bottom + tolerance
+        );
+        if (isStillInside) return;
+      }
 
-    if (!detection.text) {
       this._handleMouseOut();
       return;
     }
 
     if (detection.text === this.currentText) {
-      logger.debug('Detected text is the same as current, skipping');
+      // Refresh rectangle cache based on scope
+      this.currentRect = scope === 'container' 
+        ? detection.element.getBoundingClientRect()
+        : detection.rect;
       return;
     }
 
     logger.info(`Hover translation triggered for: "${detection.text.substring(0, 50)}..."`);
     this.currentText = detection.text;
-    this.currentRect = detection.rect; // Cache the rectangle for future movement checks
+    
+    // Cache rectangle based on scope:
+    // - Word/Sentence: Use specific text rectangle for responsive closing.
+    // - Container: Use block container rectangle for stable viewing of large blocks.
+    this.currentRect = scope === 'container' 
+      ? detection.element.getBoundingClientRect()
+      : detection.rect;
+
     const element = detection.element;
 
     // Clean up any previous border before applying new one
@@ -274,11 +292,22 @@ export class HoverTranslationManager extends ResourceTracker {
     // Use ResourceTracker to manage the element's mouseleave listener
     // This ensures cleanup if multiple hovers happen quickly or if the feature is deactivated
     const leaveHandler = (leaveEvent) => {
-      // If we're moving into a UI element (like the tooltip), don't close
-      if (leaveEvent.relatedTarget && ElementDetectionService.getInstance().isUIElement(leaveEvent.relatedTarget)) {
+      const relatedTarget = leaveEvent.relatedTarget;
+      const elementDetection = ElementDetectionService.getInstance();
+
+      // 1. If we're moving into a UI element (like the tooltip), don't close
+      if (relatedTarget && elementDetection.isUIElement(relatedTarget)) {
         return;
       }
 
+      // 2. If we are leaving the element but moving into another part of the same container
+      // (e.g. moving between nested spans), keep it open.
+      if (relatedTarget && element.contains(relatedTarget)) {
+        return;
+      }
+
+      // 3. Since 'element' is now always a stable block container (from HoverTextDetector),
+      // we can trust its 'mouseleave' event to signal a clear exit from the text block.
       this._removeBorder();
       this.handleMouseLeave();
     };
