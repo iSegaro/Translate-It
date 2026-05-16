@@ -54,6 +54,12 @@ export class HoverTextDetector {
         break;
     }
 
+    // Ensure we always return the most stable block container for the element property,
+    // while keeping the rect specific to the detection scope (word/sentence/container).
+    if (result && result.element) {
+      result.element = this._getClosestBlockContainer(result.element);
+    }
+
     // Hit-test: Ensure the mouse is actually over the bounding box of the detected text
     // with a small tolerance for better UX.
     // Also verify using elementFromPoint to handle potential CSS transforms correctly.
@@ -229,6 +235,17 @@ export class HoverTextDetector {
       element: container,
       rect: container.getBoundingClientRect()
     };
+  }
+
+  /**
+   * Helper to find the nearest meaningful block container.
+   * Helps in providing stable event targets.
+   * @private
+   */
+  static _getClosestBlockContainer(element) {
+    if (!element) return null;
+    const blockSelectors = 'p, div, li, h1, h2, h3, h4, h5, h6, article, section, blockquote, td, th';
+    return element.closest(blockSelectors) || element;
   }
 
   /**
