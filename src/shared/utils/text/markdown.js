@@ -324,7 +324,8 @@ export class SimpleMarkdown {
     const regularLabelPattern = /^[^:\s]+\s*:(?!\/\/)\s*.*$/;
 
     // 3. Specifically allow lines ending in a colon (header-style labels)
-    const endsWithColonPattern = /^.*:$/;
+    // Limit to 40 characters to avoid matching long sentences that happen to end in a colon
+    const endsWithColonPattern = /^.{1,40}:$/;
 
     return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText) || endsWithColonPattern.test(trimmedText);
   }

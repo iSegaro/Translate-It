@@ -171,6 +171,11 @@ describe('SimpleMarkdown', () => {
     });
 
     describe('Pure Label Lines', () => {
+      it('should not identify long sentences ending with a colon as a label', () => {
+        const input = 'دونالد ترامپ، رئیس‌جمهور ایالات متحده درباره آخرین پیشنهاد ایران:';
+        expect(SimpleMarkdown._isLabelLine(input)).toBe(false);
+      });
+
       it('should extract content after pure bold label', () => {
         const input = '**Noun**: test, experiment';
         expect(SimpleMarkdown.getCleanTranslation(input)).toBe('test, experiment');
