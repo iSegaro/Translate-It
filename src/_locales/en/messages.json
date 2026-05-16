@@ -1085,6 +1085,15 @@
   "security_warning_question": {
     "message": "Do you want to continue without password protection?"
   },
+  "export_success": {
+    "message": "Settings exported successfully!"
+  },
+  "export_error_generic": {
+    "message": "Failed to export settings."
+  },
+  "import_error_no_file": {
+    "message": "Please select a file to import."
+  },
   "save_settings_button": {
     "message": "Save Settings"
   },

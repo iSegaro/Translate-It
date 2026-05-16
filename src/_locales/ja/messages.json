@@ -1085,6 +1085,15 @@
   "security_warning_question": {
     "message": "パスワード保護なしで続行しますか？"
   },
+  "export_success": {
+    "message": "設定が正常にエクスポートされました！"
+  },
+  "export_error_generic": {
+    "message": "設定のエクスポートに失敗しました。"
+  },
+  "import_error_no_file": {
+    "message": "インポートするファイルを選択してください。"
+  },
   "save_settings_button": {
     "message": "設定を保存"
   },
