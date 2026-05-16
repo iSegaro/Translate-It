@@ -227,8 +227,17 @@ export class HoverTranslationManager extends ResourceTracker {
   _removeBorder() {
     if (this.borderedElement) {
       this.borderedElement.style.outline = this.originalOutline || '';
+      this.borderedElement.style.outlineOffset = this.originalOutlineOffset || '';
+      this.borderedElement.style.boxShadow = this.originalBoxShadow || '';
+      this.borderedElement.style.transition = this.originalTransition || '';
+      this.borderedElement.style.borderRadius = this.originalBorderRadius || '';
+      
       this.borderedElement = null;
       this.originalOutline = null;
+      this.originalOutlineOffset = null;
+      this.originalBoxShadow = null;
+      this.originalTransition = null;
+      this.originalBorderRadius = null;
     }
   }
 
@@ -285,8 +294,17 @@ export class HoverTranslationManager extends ResourceTracker {
     if (scope === 'container' && settingsManager.get('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)) {
       this.borderedElement = element;
       this.originalOutline = element.style.outline;
-      element.style.outline = '2px solid var(--ti-primary-color, #4285f4)';
-      element.style.outlineOffset = '2px';
+      this.originalOutlineOffset = element.style.outlineOffset;
+      this.originalBoxShadow = element.style.boxShadow;
+      this.originalTransition = element.style.transition;
+      this.originalBorderRadius = element.style.borderRadius;
+
+      // Professional, subtle and rounded look with "breathing space"
+      element.style.outline = '1.5px solid var(--ti-primary-color, #4285f4)';
+      element.style.outlineOffset = '6px';
+      element.style.borderRadius = '8px'; // Rounded corners for a modern feel
+      element.style.boxShadow = '0 0 10px rgba(66, 133, 244, 0.15)';
+      element.style.transition = 'outline 0.2s ease, box-shadow 0.2s ease, outline-offset 0.2s ease, border-radius 0.2s ease';
     }
 
     // Use ResourceTracker to manage the element's mouseleave listener
