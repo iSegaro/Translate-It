@@ -130,6 +130,9 @@ export class HoverTranslationManager extends ResourceTracker {
 
       if (!isStillInside) {
         this._handleMouseOut();
+      } else {
+        // Optimization: If we are still inside the active area, skip new detection
+        return;
       }
     }
 
