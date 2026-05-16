@@ -5,6 +5,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { RELEVANT_FEATURE_SETTINGS } from './FeatureConfig.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'FeatureManager');
 
@@ -387,22 +388,8 @@ export class FeatureManager extends ResourceTracker {
 
   setupSettingsListener() {
     try {
-      const relevantSettings = [
-        'EXTENSION_ENABLED',
-        'TRANSLATE_WITH_SELECT_ELEMENT',
-        'TRANSLATE_ON_TEXT_SELECTION',
-        'TRANSLATE_ON_TEXT_FIELDS',
-        'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-        'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
-        'SHOW_DESKTOP_FAB',
-        'MOBILE_UI_MODE',
-        'EXCLUDED_SITES',
-        'ENABLE_SCREEN_CAPTURE',
-        'MOUSE_HOVER_TRANSLATION_ENABLED'
-      ];
-      
       this.settingsListener = async (data) => {
-        if (relevantSettings.includes(data.key)) {
+        if (RELEVANT_FEATURE_SETTINGS.includes(data.key)) {
           logger.debug(`Settings change detected: ${data.key} = ${data.newValue}`);
           await this.handleSettingsChange(data.key, data.newValue);
         }
