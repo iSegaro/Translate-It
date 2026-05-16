@@ -29,8 +29,10 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
 
 vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
   contentScriptIntegration: {
-    sendTranslationRequest: vi.fn()
-  }
+    sendTranslationRequest: vi.fn(),
+    cancelTranslationRequest: vi.fn()
+  },
+  registerTranslation: vi.fn()
 }));
 
 vi.mock('@/shared/services/ElementDetectionService.js', () => ({
@@ -61,7 +63,7 @@ describe('HoverTranslationManager', () => {
     settingsManager.get.mockImplementation((key, def) => {
       if (key === 'MOUSE_HOVER_AUTO_CLOSE') return 'mouseleave';
       if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
-      if (key === 'MOUSE_HOVER_DELAY') return 500;
+      if (key === 'MOUSE_HOVER_DELAY') return 300;
       return def;
     });
   });

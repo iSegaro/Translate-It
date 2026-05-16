@@ -140,7 +140,7 @@ export class TranslationEngine {
     }
 
     // 5. Standard execution via ProviderCoordinator
-    const result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
+    let result = await providerInstance.translate(text, sourceLanguage, targetLanguage, {
       mode: mode,
       originalMode: originalMode, // Pass original mode for bilingual/swap logic
       uiContext: uiContext, // Pass UI context (popup, sidepanel, etc.)
@@ -152,6 +152,11 @@ export class TranslationEngine {
       engine: this,
       sender: sender
     });
+
+    // CRITICAL: Defensive check if coordinator returned a raw string (fallback case)
+    if (typeof result === 'string') {
+      result = { translatedText: result, success: true };
+    }
 
     // Extract values from the unified coordinator response
     const { translatedText, detectedLanguage, targetLanguage: finalTargetLanguage, sourceLanguage: finalSourceLanguage } = result;

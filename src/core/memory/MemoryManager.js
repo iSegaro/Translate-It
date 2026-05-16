@@ -155,7 +155,8 @@ class MemoryManager {
 
     // DOM elements - check if Element is available (browser environment)
     if (typeof Element !== 'undefined' && element instanceof Element) {
-      return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${element.className.split(' ')[0]}` : ''}`
+      const className = typeof element.className === 'string' ? element.className : element.getAttribute('class') || '';
+      return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${className ? `.${className.split(' ')[0]}` : ''}`
     }
 
     // Window

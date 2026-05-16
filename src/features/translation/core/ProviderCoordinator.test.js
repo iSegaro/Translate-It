@@ -149,7 +149,8 @@ describe('ProviderCoordinator', () => {
         mockProvider, 'Original Text', 'en', 'fa'
       );
 
-      expect(result).toBe('Original Text');
+      expect(result.translatedText).toBe('Original Text');
+      expect(result.isFallback).toBe(true);
     });
 
     it('should throw immediately if provider fails with a fatal error', async () => {

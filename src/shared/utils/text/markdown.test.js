@@ -193,6 +193,31 @@ describe('SimpleMarkdown', () => {
     });
 
     describe('Edge Cases', () => {
+      it('should not identify URLs as labels', () => {
+        const input = 'https://google.com';
+        // In PRIMARY_ONLY strategy, it should return the URL itself if it's the only content
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('https://google.com');
+        
+        const input2 = 'Visit https://google.com for more info';
+        expect(SimpleMarkdown.getCleanTranslation(input2)).toBe('Visit https://google.com for more info');
+      });
+
+      it('should handle Https with capitalization correctly', () => {
+        const input = 'Https://example.com';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('Https://example.com');
+      });
+
+      it('should also handle http (non-s) correctly', () => {
+        const input = 'http://example.com';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('http://example.com');
+      });
+
+      it('should still handle Source: URL correctly as a label', () => {
+        const input = 'Source: https://google.com';
+        // It should identify "Source:" as a label and return the content after it
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('https://google.com');
+      });
+
       it('should handle empty input', () => {
         expect(SimpleMarkdown.getCleanTranslation('')).toBe('');
         expect(SimpleMarkdown.getCleanTranslation(null)).toBe('');
@@ -550,6 +575,13 @@ describe('SimpleMarkdown', () => {
     it('should render horizontal rules', () => {
       const result = SimpleMarkdown.render('---');
       expect(result).toBeTruthy();
+    });
+
+    it('should not render URLs as labels', () => {
+      const result = SimpleMarkdown.render('https://google.com');
+      // If it were a label, it would have a <strong> element for 'https'
+      const strong = result.querySelector('strong');
+      expect(strong).toBeNull();
     });
 
     it('should render label lines correctly', () => {
