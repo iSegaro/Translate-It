@@ -100,7 +100,7 @@ class InteractionCoordinator {
       
       // Load UI and Selection logic
       if (this.isTopFrame) await loadFeature('windowsManager');
-      const handler = await loadFeature('textSelection');
+      await loadFeature('textSelection');
       
       // If in iframe, notify top frame (handled within selectionManager usually, but kept for safety)
       if (!this.isTopFrame) {
