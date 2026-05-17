@@ -251,9 +251,8 @@ export async function sendRegularMessage(message, options = {}) {
     const errorType = matchErrorToType(error);
 
     if (!silent) {
-      logger.debug(`Message error: ${message.action} (${errorType})`, { 
-        msg: (error && typeof error.message === 'string') ? error.message : 'No message' 
-      });
+      const errorMsg = (error && typeof error.message === 'string') ? error.message : 'No message';
+      logger.debug(`Message error: ${message.action} (${errorType}) - ${errorMsg}`);
     }
 
     if (isSilentError(errorType)) throw error;

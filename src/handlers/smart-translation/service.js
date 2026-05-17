@@ -59,9 +59,18 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
 
     storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId);
 
-    window.pendingTranslationDismissTimeout = resourceTracker.trackTimeout(() => {
+    window.pendingTranslationDismissTimeout = resourceTracker.trackTimeout(async () => {
       logger.debug('Translation request timeout reached');
       if (currentToastId) notificationManager.dismiss(currentToastId);
+
+      // Notify the user via the centralized ErrorHandler
+      const timeoutError = new Error('Translation request timed out');
+      timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+      await ErrorHandler.getInstance().handle(timeoutError, { 
+        context: 'text-field-timeout', 
+        showToast: true 
+      }).catch(() => {});
+
       clearPendingNotificationData('translation-timeout');
       clearPendingTranslationData(currentToastId);
     }, TRANSLATION_TIMEOUT);
@@ -113,7 +122,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     if (isCancellationError(err)) {
       logger.debug('Text field translation request cancelled:', err.message);
     } else {
-      logger.error('Text field translation request failed:', err);
+      // Standard error handling via the Golden Chain architecture
       await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
     }
     
@@ -157,7 +166,7 @@ export async function applyTranslationToTextField(translatedText, originalText, 
       return await processTranslationToTextFieldInternal(translatedText, originalText, translationMode, toastId, messageId);
     }
   } catch (error) {
-    logger.error('Error in applyTranslationToTextField', error);
+    logger.warn('Error in applyTranslationToTextField:', error.message || error);
     if (messageId) activeProcessing.delete(messageId);
     return { applied: false, mode: 'error', error: error.message };
   }
@@ -260,8 +269,9 @@ async function copyToClipboard(text, toastId) {
     const errorMessage = await getTranslationString("STATUS_SMART_TRANSLATE_COPY_ERROR") || "خطا در کپی کردن متن";
     if (toastId) notificationManager.update(toastId, errorMessage, { type: 'error', duration: 4000 });
     else notificationManager.show(errorMessage, 'error');
-    const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-    await sendMessage({ action: MessageActions.HANDLE_ERROR, data: { error, context: 'smartTranslation-clipboard' } }).catch(()=>{});
+    
+    // Centralized error handling
+    await ErrorHandler.getInstance().handle(error, { context: 'smartTranslation-clipboard', showToast: false }).catch(()=>{});
   }
 }
 

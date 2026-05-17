@@ -56,7 +56,7 @@ export class UnifiedTranslationCoordinator {
     } catch (error) {
       const errorType = matchErrorToType(error);
       if (errorType !== ErrorTypes.USER_CANCELLED) {
-        logger.debug(`Translation coordination failed for ${message.messageId}: ${error.message}`);
+        logger.debug(`Translation coordination failed for ${message.messageId}: ${error.message || errorType}`);
       }
       throw error;
     }
@@ -134,10 +134,11 @@ export class UnifiedTranslationCoordinator {
           onError: (error) => {
             // Log cancellation as debug instead of error using proper error management
             const errorType = matchErrorToType(error);
+            const msg = error?.message || errorType;
             if (errorType === ErrorTypes.USER_CANCELLED) {
-              logger.debug(`Streaming cancelled: ${messageId}`, error);
+              logger.debug(`Streaming cancelled: ${messageId} - ${msg}`);
             } else {
-              logger.debug(`Streaming error: ${messageId}`, error);
+              logger.debug(`Streaming error: ${messageId} - ${msg}`);
             }
           },
           maxProgressTimeout: streamingTimeouts.progressTimeout,
@@ -192,7 +193,7 @@ export class UnifiedTranslationCoordinator {
           streamingTimeoutManager.cancelStreaming(messageId, cancelReason);
         } catch (cancelError) {
           // Log cancellation errors as debug to avoid adding noise to console
-          logger.debug('Error during streaming cancellation (handled gracefully):', cancelError);
+          logger.debug(`Error during streaming cancellation (handled gracefully): ${cancelError.message || cancelError}`);
         }
       }
 

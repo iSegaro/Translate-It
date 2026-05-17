@@ -15,6 +15,8 @@ import { isEditable } from '@/core/helpers.js';
 // Import CSS as inline string
 import hoverStyles from './HoverHighlight.scss?inline';
 
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
 // Constants for magic numbers
@@ -400,7 +402,12 @@ export class HoverTranslationManager extends ResourceTracker {
         return;
       }
 
-      logger.error('Hover translation failed:', error);
+      // Standard error handling via the Golden Chain architecture
+      ErrorHandler.getInstance().handle(error, {
+        context: 'hover',
+        showToast: true
+      }).catch(() => {});
+
       this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
     } finally {
       if (this.currentMessageId === messageId) {

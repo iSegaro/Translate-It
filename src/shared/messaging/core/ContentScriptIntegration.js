@@ -120,9 +120,9 @@ export class ContentScriptIntegration {
       return response;
     } catch (error) {
       if (isCancellationError(error)) {
-        logger.debug(`Translation request cancelled:`, messageId);
+        logger.debug(`Translation request cancelled: ${messageId}`);
       } else {
-        logger.debug(`Translation request failed:`, error);
+        logger.debug(`Translation request failed: ${error.message || error}`);
       }
       throw error;
     } finally {
