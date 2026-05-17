@@ -49,15 +49,11 @@ export class ErrorHandler {
   }
 
   async handle(err, meta = {}) {
-    if (this.handling) return err;
-    
     // SECOND LAYER: If context is already invalidated, exit immediately and silently
     if (!ExtensionContextManager.isValidSync()) {
       return err;
     }
 
-    this.handling = true;
-    
     try {
       // Prioritize explicit type from meta for suppression and display logic
       const type = meta.type || matchErrorToType(err);
@@ -183,7 +179,11 @@ export class ErrorHandler {
       
       // Logging
       if (this.debugMode && !shouldSuppressConsole(type)) {
-        const logLevel = (enhancedMeta.showToast || enhancedMeta.showInUI) ? 'error' : 'debug';
+        let logLevel = 'debug';
+        if (enhancedMeta.showToast || enhancedMeta.showInUI) {
+          logLevel = getErrorToastType(type) === 'warning' ? 'warn' : 'error';
+        }
+        
         const logPrefix = `[${type}]${enhancedMeta.context ? ` (${enhancedMeta.context})` : ''}`;
         logger[logLevel](logPrefix, err);
       }
@@ -208,7 +208,7 @@ export class ErrorHandler {
       
       return err;
     } finally {
-      this.handling = false;
+      // Logic removed
     }
   }
 

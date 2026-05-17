@@ -253,8 +253,7 @@ export const ProviderRequestEngine = {
         
         const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
         const isDeepL400 = provider.providerName === ProviderNames.DEEPL_TRANSLATE && response.status === 400;
-        const isServerError = response.status >= 500 && response.status < 600;
-        const logLevel = (isDeepL400 || !isServerError) ? 'warn' : 'error';
+        const logLevel = 'warn'; // Providers only warn, upper layers handle errors
         
         let sanitizedUrl = url;
         try {

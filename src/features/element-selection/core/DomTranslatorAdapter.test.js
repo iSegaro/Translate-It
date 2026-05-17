@@ -172,7 +172,8 @@ describe('DomTranslatorAdapter', () => {
 
       await expect(adapter.translateElement(testElement)).rejects.toThrow('Network error');
       
-      expect(errorHandlerMock.handle).toHaveBeenCalled();
+      // ErrorHandler should NOT be called in this layer (Single Red Log Policy)
+      expect(errorHandlerMock.handle).not.toHaveBeenCalled();
     });
 
     it('should throw error if no translatable text found', async () => {

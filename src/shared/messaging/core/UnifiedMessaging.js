@@ -7,7 +7,6 @@ import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.j
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
@@ -72,7 +71,7 @@ function getTimeoutForAction(action, context = null) {
   
   // Higher timeout for generic translations to allow for AI model latency and queuing
   if (action === 'TRANSLATE' || action === 'TRANSLATE_SELECTION' || action === 'TRANSLATE_TEXT') {
-    return 120000;
+    return 180000;
   }
 
   return (action && OPERATION_TIMEOUTS[action]) || OPERATION_TIMEOUTS.DEFAULT || 8000;
@@ -84,14 +83,6 @@ function createTimeout(ms, action) {
     timeoutId = setTimeout(() => {
       const timeoutError = new Error(`Operation '${action || 'unknown'}' timed out after ${ms}ms`);
       timeoutError.type = ErrorTypes.OPERATION_TIMEOUT;
-
-      if (ExtensionContextManager.isValidSync()) {
-        ErrorHandler.getInstance().handle(timeoutError, {
-          context: 'unified-messaging-timeout',
-          action: action,
-          showToast: false
-        }).catch(() => {});
-      }
 
       reject(timeoutError);
     }, ms);
@@ -251,18 +242,11 @@ export async function sendRegularMessage(message, options = {}) {
     const errorType = matchErrorToType(error);
 
     if (!silent) {
-      logger.debug(`Message error: ${message.action} (${errorType})`, { 
-        msg: (error && typeof error.message === 'string') ? error.message : 'No message' 
-      });
+      const errorMsg = (error && typeof error.message === 'string') ? error.message : 'No message';
+      logger.debug(`Message error: ${message.action} (${errorType}) - ${errorMsg}`);
     }
 
     if (isSilentError(errorType)) throw error;
-
-    await ErrorHandler.getInstance().handle(error, {
-      context: 'UnifiedMessaging',
-      action: message.action,
-      showToast: false
-    }).catch(() => {});
 
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, `UnifiedMessaging.${message.action}`);

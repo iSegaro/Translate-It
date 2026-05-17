@@ -75,6 +75,19 @@ export const ErrorDisplayStrategies = {
     supportSettings: true
   },
 
+  // Smart Translation contexts (Shortcut & Icon)
+  'shortcut-field-translation': {
+    showToast: true,
+    showInUI: false,
+    errorLevel: 'detailed'
+  },
+
+  'text-field-icon-execution': {
+    showToast: true,
+    showInUI: false,
+    errorLevel: 'detailed'
+  },
+
   // Background/service context - toast notifications
   background: {
     showToast: true,
@@ -169,6 +182,8 @@ export function getErrorToastType(errorType) {
     ErrorTypes.TEXT_EMPTY,
     ErrorTypes.TEXT_TOO_LONG,
     ErrorTypes.PROMPT_INVALID,
+    ErrorTypes.TRANSLATION_TIMEOUT,
+    ErrorTypes.OPERATION_TIMEOUT,
     // Critical config errors are shown as warnings to suggest user action
     ErrorTypes.API_KEY_MISSING,
     ErrorTypes.API_KEY_INVALID,

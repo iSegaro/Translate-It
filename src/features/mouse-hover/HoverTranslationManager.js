@@ -15,6 +15,8 @@ import { isEditable } from '@/core/helpers.js';
 // Import CSS as inline string
 import hoverStyles from './HoverHighlight.scss?inline';
 
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager');
 
 // Constants for magic numbers
@@ -388,24 +390,35 @@ export class HoverTranslationManager extends ResourceTracker {
           direction: direction,
           isStreaming: false
         });
+
+        this.currentMessageId = null;
       }
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
+        if (this.currentMessageId === messageId) this.currentMessageId = null;
         logger.debug('Hover translation skipped: Extension context invalidated');
         return;
       }
 
       // Ignore intentional cancellations
-      if (error.message === 'Handler cancelled' || error.type === 'HANDLER_CANCELLED' || error.isCancelled) {
+      if (error.message === 'Handler cancelled' || 
+          error.type === 'HANDLER_CANCELLED' || 
+          error.type === 'USER_CANCELLED' || 
+          error.isCancelled) {
         return;
       }
 
-      logger.error('Hover translation failed:', error);
-      this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
-    } finally {
       if (this.currentMessageId === messageId) {
         this.currentMessageId = null;
       }
+
+      // Standard error handling via the Golden Chain architecture
+      ErrorHandler.getInstance().handle(error, {
+        context: 'hover',
+        showToast: false
+      }).catch(() => {});
+
+      this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
     }
   }
 
@@ -455,6 +468,11 @@ export class HoverTranslationManager extends ResourceTracker {
     if (this.hoverTimer) {
       this.clearTimer(this.hoverTimer);
       this.hoverTimer = null;
+    }
+
+    if (this.currentMessageId) {
+      contentScriptIntegration.cancelTranslationRequest(this.currentMessageId, 'Hover cancelled by user');
+      this.currentMessageId = null;
     }
   }
 

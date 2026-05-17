@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies
+vi.mock('@/shared/logging/logConstants.js', () => ({
+  LOG_COMPONENTS: {
+    ELEMENT_SELECTION: 'ElementSelection'
+  }
+}));
+
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
     debug: vi.fn(),
@@ -33,8 +39,32 @@ vi.mock('@/core/extensionContext.js', () => ({
     isValidSync: vi.fn(() => true)
   }
 }));
+vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
+  ErrorHandler: {
+    getInstance: vi.fn(() => ({
+      handle: vi.fn(() => Promise.resolve())
+    }))
+  }
+}));
 
-vi.mock('@/shared/error-management/ErrorMatcher.js');
+vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
+  isFatalError: vi.fn(() => false),
+  isCancellationError: vi.fn(() => false)
+}));
+
+vi.mock('@/shared/constants/ui.js', () => ({
+  NOTIFICATION_TIME: {
+    WARNING_PROVIDER: 3000
+  }
+}));
+
+vi.mock('@/shared/constants/translation.js', () => ({
+  TRANSLATION_STATUS: {
+    TRANSLATING: 'translating',
+    COMPLETED: 'completed',
+    ERROR: 'error'
+  }
+}));
 
 vi.mock('@/shared/config/config.js', () => ({
   getSettingsAsync: vi.fn(() => Promise.resolve({})),
@@ -147,7 +177,15 @@ vi.mock('@/core/memory/ResourceTracker.js', () => ({
 
 vi.mock('@/features/translation/providers/ProviderConstants.js', () => ({
   ProviderRegistryIds: {
-    GOOGLE: 'google'
+    GOOGLE: 'google',
+    GOOGLE_V2: 'googlev2'
+  },
+  ProviderNames: {
+    GOOGLE_TRANSLATE: 'GoogleTranslate',
+    GOOGLE_TRANSLATE_V2: 'GoogleTranslateV2'
+  },
+  ProviderTypes: {
+    TRANSLATE: 'translate'
   }
 }));
 

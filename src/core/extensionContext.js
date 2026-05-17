@@ -504,15 +504,19 @@ export class ExtensionContextManager {
    * Safe wrapper for browser.runtime.sendMessage calls.
    * Handles dynamic import of UnifiedMessaging to prevent circular dependencies.
    */
-  static async safeSendMessage(message, context = "messaging") {
+  static async safeSendMessage(message, options = {}, context = "messaging") {
+    // Handle overload where context is second argument
+    const actualOptions = typeof options === 'string' ? {} : options;
+    const actualContext = typeof options === 'string' ? options : context;
+
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
         const { sendMessage } =
           await import("@/shared/messaging/core/UnifiedMessaging.js");
-        return await sendMessage(msg);
+        return await sendMessage(msg, actualOptions);
       },
       {
-        context: `sendMessage-${context}`,
+        context: `sendMessage-${actualContext}`,
         fallbackValue: null,
         validateAsync: false,
       },
