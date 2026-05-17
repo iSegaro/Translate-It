@@ -7,7 +7,6 @@ import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.j
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
