@@ -398,7 +398,10 @@ export class HoverTranslationManager extends ResourceTracker {
       }
 
       // Ignore intentional cancellations
-      if (error.message === 'Handler cancelled' || error.type === 'HANDLER_CANCELLED' || error.isCancelled) {
+      if (error.message === 'Handler cancelled' || 
+          error.type === 'HANDLER_CANCELLED' || 
+          error.type === 'USER_CANCELLED' || 
+          error.isCancelled) {
         return;
       }
 
