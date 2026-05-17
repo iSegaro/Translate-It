@@ -1787,6 +1787,9 @@
   "validation_api_key_empty": {
     "message": "کلید API برای {provider} نمی‌تواند خالی باشد."
   },
+  "validation_provider_config_empty": {
+    "message": "تنظیمات {provider} نمی‌تواند خالی باشد."
+  },
   "validation_api_key_too_short": {
     "message": "کلید API به نظر خیلی کوتاه می‌آید."
   },

@@ -1787,6 +1787,9 @@
   "validation_api_key_empty": {
     "message": "API key for {provider} cannot be empty."
   },
+  "validation_provider_config_empty": {
+    "message": "Configuration for {provider} cannot be empty."
+  },
   "validation_api_key_too_short": {
     "message": "API key appears to be too short."
   },

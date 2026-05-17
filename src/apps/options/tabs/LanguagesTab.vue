@@ -690,7 +690,12 @@ const validationError = computed(() => {
   if (validationErrorKey.value === 'PROVIDER_CONFIG_ERROR') {
     const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings)
     if (missingKey) {
-      return t('validation_api_key_empty', { provider: selectedProviderInfo.value?.name || selectedProvider.value }) || 'Provider not configured'
+      // Use generic config error if it's a URL or Model, otherwise use API key error
+      const errorKey = (missingKey.includes('URL') || missingKey.includes('MODEL')) 
+        ? 'validation_provider_config_empty' 
+        : 'validation_api_key_empty';
+        
+      return t(errorKey, { provider: selectedProviderInfo.value?.name || selectedProvider.value }) || 'Provider not configured'
     }
     return ''
   }
