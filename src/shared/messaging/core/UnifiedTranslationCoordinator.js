@@ -344,10 +344,10 @@ export class UnifiedTranslationCoordinator {
 
     if (isSelectElementMode) {
       // Select Element mode needs much longer timeouts due to batching and API delays.
-      // We align this with the 90s system timeout but scale it with segments.
-      const baseTimeout = Math.max(90000, segmentCount * 6000); // 6s per segment, min 90s
-      initialTimeout = customTimeout || Math.min(600000, baseTimeout + (segmentCount * 5000)); // Up to 10 minutes
-      progressTimeout = Math.max(90000, segmentCount * 3000); // At least 90s between progress updates
+      // We align this with the system retries (2x60s) but add a generous buffer for network overhead.
+      const baseTimeout = Math.max(180000, segmentCount * 6000); // 6s per segment, min 180s
+      initialTimeout = customTimeout || Math.min(900000, baseTimeout + (segmentCount * 5000)); // Up to 15 minutes
+      progressTimeout = Math.max(160000, segmentCount * 3000); // At least 160s between progress updates
       gracePeriod = Math.min(300000, segmentCount * 10000); // Up to 5 minutes grace period
     } else {
       // Standard timeouts for regular translation

@@ -313,16 +313,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const type = matchErrorToType(error);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 
-      if (!isCancellation && !error.alreadyHandled) {
-        this.logger.debug('Handling translation error and showing toast', error);
-        
-        await this.errorHandler.handle(error, {
-          context: 'select-element',
-          component: 'DomTranslatorAdapter',
-          showToast: true,
-          forceToast: true 
-        });
-        error.alreadyHandled = true; 
+      if (!isCancellation) {
+        this.logger.debug('Translation error in DomTranslatorAdapter:', error.message || error);
       }
 
       if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error });

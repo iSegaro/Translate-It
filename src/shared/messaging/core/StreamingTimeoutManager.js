@@ -383,15 +383,6 @@ export class StreamingTimeoutManager {
       logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }
 
-    // Use centralized error handling for progress timeout errors
-    ErrorHandler.getInstance().handle(timeoutError, {
-      context: 'streaming-progress-timeout',
-      messageId: messageId,
-      showToast: false // Timeout errors are handled by the streaming system
-    }).catch(handlerError => {
-      logger.warn(`ErrorHandler failed to handle progress timeout:`, handlerError);
-    });
-
     this.errorStreaming(messageId, timeoutError);
   }
 
@@ -430,15 +421,6 @@ export class StreamingTimeoutManager {
     } catch (error) {
       logger.warn(`Error in timeout callback for ${messageId}:`, error);
     }
-
-    // Use centralized error handling for timeout errors
-    ErrorHandler.getInstance().handle(timeoutError, {
-      context: 'streaming-final-timeout',
-      messageId: messageId,
-      showToast: false // Timeout errors are handled by the streaming system
-    }).catch(handlerError => {
-      logger.warn(`ErrorHandler failed to handle final timeout:`, handlerError);
-    });
 
     this.errorStreaming(messageId, timeoutError);
   }

@@ -8,6 +8,7 @@ import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
@@ -522,6 +523,8 @@ class SelectElementManager extends ResourceTracker {
         this.logger.debug('Select Element translation cancelled:', error.message);
       } else {
         this.logger.warn('Select Element translation failed:', error);
+        // Delegate to centralized error handler to show notification
+        ErrorHandler.getInstance().handle(error, { context: 'select-element', showToast: true }).catch(() => {});
       }
       
       if (ExtensionContextManager.isContextError(error)) {
