@@ -66,6 +66,7 @@ export const CONFIG = {
   APP_NAME: "Translate It",
   // --- Core Settings ---
   DEBUG_MODE: false,
+  HIDDEN_PROVIDERS: [],
   COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",
@@ -132,7 +133,7 @@ export const CONFIG = {
   YANDEX_DETECT_URL: "https://translate.yandex.net/api/v1/tr.json/detect",
   MICROSOFT_EDGE_AUTH_URL: "https://edge.microsoft.com/translate/auth",
   MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
-  LINGVA_API_URL: "https://lingva.ml",
+  LINGVA_API_URL: "",
   WEBAI_API_URL: "",
   WEBAI_API_MODEL: "",
   OPENAI_API_KEY: "",
@@ -1449,4 +1450,8 @@ export const getWholePageMaxCharsAsync = async () => {
 
 export const getWholePageAiMaxCharsAsync = async () => {
   return getSettingValueAsync("WHOLE_PAGE_AI_MAX_CHARS", CONFIG.WHOLE_PAGE_AI_MAX_CHARS);
+};
+
+export const getHiddenProvidersAsync = async () => {
+  return getSettingValueAsync("HIDDEN_PROVIDERS", CONFIG.HIDDEN_PROVIDERS);
 };

@@ -912,13 +912,16 @@
     "message": "آدرس API"
   },
   "lingva_api_url_placeholder": {
-    "message": "آدرس API لینگوا را وارد کنید (مانند https://lingva.ml)"
+    "message": "آدرس API لینگوا را وارد کنید"
   },
   "lingva_api_url_info": {
     "message": "شما می‌توانید از نمونه‌های عمومی لینگوا استفاده کنید یا خودتان آن را میزبانی کنید."
   },
   "lingva_instances_link": {
-    "message": "مشاهده نمونه‌های عمومی لینگوا."
+    "message": "یافتن نمونه‌های عمومی لینگوا."
+  },
+  "show_provider_in_list_label": {
+    "message": "نمایش در لیست سرویس‌دهندگان"
   },
   "openai_api_settings_title": {
     "message": "تنظیمات OpenAI"
@@ -1786,6 +1789,9 @@
   },
   "validation_api_key_empty": {
     "message": "کلید API برای {provider} نمی‌تواند خالی باشد."
+  },
+  "validation_provider_config_empty": {
+    "message": "تنظیمات {provider} نمی‌تواند خالی باشد."
   },
   "validation_api_key_too_short": {
     "message": "کلید API به نظر خیلی کوتاه می‌آید."

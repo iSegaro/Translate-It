@@ -912,13 +912,16 @@
     "message": "API URL"
   },
   "lingva_api_url_placeholder": {
-    "message": "Lingva APIのURLを入力してください（例：https://lingva.ml）"
+    "message": "Lingva APIのURLを入力してください"
   },
   "lingva_api_url_info": {
     "message": "公開されているLingvaインスタンスを使用するか、独自のインスタンスをホストできます。"
   },
   "lingva_instances_link": {
     "message": "公開されているLingvaインスタンスを探す。"
+  },
+  "show_provider_in_list_label": {
+    "message": "プロバイダーリストに表示する"
   },
   "openai_api_settings_title": {
     "message": "OpenAI 設定"
@@ -1786,6 +1789,9 @@
   },
   "validation_api_key_empty": {
     "message": "{provider} のAPIキーを入力してください。"
+  },
+  "validation_provider_config_empty": {
+    "message": "{provider} の設定を空にすることはできません。"
   },
   "validation_api_key_too_short": {
     "message": "APIキーが短すぎます。"

@@ -44,8 +44,11 @@ async function getApiProviders(settings = {}) {
     const isDebug = settings.DEBUG_MODE ?? await getDebugModeAsync();
 
     // Get available providers with dynamic debug mode override
+    const hiddenProviders = settings.HIDDEN_PROVIDERS || [];
     let availableProviders = providerRegistry.getAllAvailable().filter(p => {
       if (p.id === 'mock' && !isDebug) return false;
+      // Filter out hidden providers unless it's the currently selected one
+      if (hiddenProviders.includes(p.id) && p.id !== settings.TRANSLATION_API) return false;
       return true;
     });
 

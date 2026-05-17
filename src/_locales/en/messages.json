@@ -912,13 +912,16 @@
     "message": "API URL"
   },
   "lingva_api_url_placeholder": {
-    "message": "Enter Lingva API URL (e.g., https://lingva.ml)"
+    "message": "Enter Lingva API URL"
   },
   "lingva_api_url_info": {
     "message": "You can use public Lingva instances or host your own."
   },
   "lingva_instances_link": {
     "message": "Find public Lingva instances."
+  },
+  "show_provider_in_list_label": {
+    "message": "Show in provider list"
   },
   "openai_api_settings_title": {
     "message": "OpenAI Settings"
@@ -1786,6 +1789,9 @@
   },
   "validation_api_key_empty": {
     "message": "API key for {provider} cannot be empty."
+  },
+  "validation_provider_config_empty": {
+    "message": "Configuration for {provider} cannot be empty."
   },
   "validation_api_key_too_short": {
     "message": "API key appears to be too short."
