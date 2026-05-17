@@ -912,7 +912,7 @@
     "message": "API URL"
   },
   "lingva_api_url_placeholder": {
-    "message": "Lingva APIのURLを入力してください（例：https://lingva.ml）"
+    "message": "Lingva APIのURLを入力してください"
   },
   "lingva_api_url_info": {
     "message": "公開されているLingvaインスタンスを使用するか、独自のインスタンスをホストできます。"

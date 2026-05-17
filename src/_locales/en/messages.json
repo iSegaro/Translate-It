@@ -912,7 +912,7 @@
     "message": "API URL"
   },
   "lingva_api_url_placeholder": {
-    "message": "Enter Lingva API URL (e.g., https://lingva.ml)"
+    "message": "Enter Lingva API URL"
   },
   "lingva_api_url_info": {
     "message": "You can use public Lingva instances or host your own."

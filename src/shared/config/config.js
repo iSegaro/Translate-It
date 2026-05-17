@@ -132,7 +132,7 @@ export const CONFIG = {
   YANDEX_DETECT_URL: "https://translate.yandex.net/api/v1/tr.json/detect",
   MICROSOFT_EDGE_AUTH_URL: "https://edge.microsoft.com/translate/auth",
   MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
-  LINGVA_API_URL: "https://lingva.ml",
+  LINGVA_API_URL: "",
   WEBAI_API_URL: "",
   WEBAI_API_MODEL: "",
   OPENAI_API_KEY: "",

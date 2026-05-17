@@ -912,7 +912,7 @@
     "message": "آدرس API"
   },
   "lingva_api_url_placeholder": {
-    "message": "آدرس API لینگوا را وارد کنید (مانند https://lingva.ml)"
+    "message": "آدرس API لینگوا را وارد کنید"
   },
   "lingva_api_url_info": {
     "message": "شما می‌توانید از نمونه‌های عمومی لینگوا استفاده کنید یا خودتان آن را میزبانی کنید."

@@ -19,7 +19,7 @@
       <BaseInput
         id="LINGVA_API_URL"
         v-model="lingvaApiUrl"
-        :placeholder="t('lingva_api_url_placeholder') || 'Enter Lingva API URL (e.g., https://lingva.ml)'"
+        :placeholder="t('lingva_api_url_placeholder') || 'Enter Lingva API URL'"
         class="api-url-input"
         dir="ltr"
       />
@@ -42,7 +42,7 @@ const settingsStore = useSettingsStore()
 const lingvaApiUrl = computed({
   get: () => settingsStore.settings?.LINGVA_API_URL || CONFIG.LINGVA_API_URL,
   set: (value) => {
-    const finalValue = value.trim() === '' ? CONFIG.LINGVA_API_URL : value
+    const finalValue = value.trim()
     settingsStore.updateSettingLocally('LINGVA_API_URL', finalValue)
   }
 })
