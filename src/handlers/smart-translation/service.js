@@ -14,7 +14,16 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 
 import { resourceTracker, processedMessageIds, activeProcessing, successfullyCompletedToastIds } from './state.js';
-import { storePendingTranslationData, getPendingTranslationData, clearPendingTranslationData, clearPendingNotificationData, pendingTranslationByToastId } from './dataStore.js';
+import { 
+  storePendingTranslationData, 
+  getPendingTranslationData, 
+  clearPendingTranslationData, 
+  clearPendingNotificationData, 
+  pendingTranslationByToastId,
+  abortExistingRequest,
+  registerAbortController,
+  activeAbortControllers
+} from './dataStore.js';
 import { isEditableElement, recoverTargetElement } from './elementHelper.js';
 import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
@@ -39,11 +48,23 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
+  // Abort any existing request for this target element and capture its data
+  const abortedData = abortExistingRequest(target);
+  
   const mode = TranslationMode.Field;
   const platform = detectPlatform(target);
   const timestamp = Date.now();
   let currentToastId = toastId;
+  
+  // Reuse existing toast ID if we're replacing a previous request
+  if (!currentToastId && abortedData && abortedData.toastId) {
+    currentToastId = abortedData.toastId;
+    logger.debug('Reusing existing toast ID for replacement request', { toastId: currentToastId });
+  }
+
   let timerId = null;
+  let myData = null;
+  const abortController = new AbortController();
 
   try {
     const currentProvider = await getEffectiveProviderAsync(TranslationMode.Field);
@@ -55,9 +76,17 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
     if (!currentToastId) {
       currentToastId = localNotificationManager.showStatus(translatingMessage, { id: `status-${Date.now()}` });
+    } else {
+      // If we are reusing a toast, we MUST clear its "completed" status 
+      // so the new result isn't blocked by applyTranslationToTextField
+      successfullyCompletedToastIds.delete(currentToastId);
+
+      // Ensure the reused toast still shows the translating message
+      localNotificationManager.update(currentToastId, translatingMessage, { type: 'status', persistent: true });
     }
 
-    storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId);
+    myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId);
+    registerAbortController(target, abortController);
 
     // Create a catchable timeout promise
     const timeoutPromise = new Promise((_, reject) => {
@@ -67,6 +96,15 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
         timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
         reject(timeoutError);
       }, TRANSLATION_TIMEOUT);
+    });
+
+    // Create an abort promise
+    const abortPromise = new Promise((_, reject) => {
+      abortController.signal.addEventListener('abort', () => {
+        const abortError = new Error('Translation request aborted by user');
+        abortError.type = ErrorTypes.USER_CANCELLED;
+        reject(abortError);
+      });
     });
 
     const translationMessage = MessageFormat.create(
@@ -82,14 +120,15 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       messageId
     );
     
-    // Race between the message and the timeout
+    // Race between the message, the timeout, and the abort signal
     const messageResult = await Promise.race([
       ExtensionContextManager.safeSendMessage(
         translationMessage, 
         { forceRegular: true, silent: true }, 
         'text-field-translation'
       ),
-      timeoutPromise
+      timeoutPromise,
+      abortPromise
     ]);
 
     if (timerId) {
@@ -128,11 +167,20 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   } catch (err) {
     if (timerId) resourceTracker.clearTimer(timerId);
     
+    // Check if THIS specific request was aborted for replacement using our local reference
+    const isAbortedForReplacement = myData && myData.abortedForReplacement === true;
+
     if (isCancellationError(err)) {
       logger.debug('Text field translation request cancelled:', err.message);
+      
+      // If this request is being replaced, do NOT dismiss the toast and do NOT re-throw
+      if (isAbortedForReplacement) {
+        logger.debug('Silent cancellation for replacement - keeping toast alive');
+        return; 
+      }
     } 
     
-    if (currentToastId) {
+    if (currentToastId && !isAbortedForReplacement) {
        localNotificationManager.dismiss(currentToastId);
        // Small delay to ensure status toast dismissal is processed
        await new Promise(r => setTimeout(r, 10));
@@ -141,6 +189,13 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     clearPendingTranslationData(currentToastId);
     clearPendingNotificationData('error');
     throw err;
+  } finally {
+    if (timerId) resourceTracker.clearTimer(timerId);
+    
+    // Only cleanup the controller if it's still OURS (hasn't been replaced by a newer request)
+    if (target && activeAbortControllers.get(target) === abortController) {
+      activeAbortControllers.delete(target);
+    }
   }
 }
 

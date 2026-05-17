@@ -13,8 +13,45 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationData
 // Store pending translation data - WeakMap is more resilient to cleanup
 export const pendingTranslationData = new WeakMap();
 
+// Track active AbortControllers for elements to allow cancellation of previous requests
+export const activeAbortControllers = new WeakMap();
+
 // Reference with toast ID as fallback
 export const pendingTranslationByToastId = new Map();
+
+/**
+ * Register an AbortController for a target element
+ * @param {HTMLElement} target - The target element
+ * @param {AbortController} controller - The controller to register
+ */
+export function registerAbortController(target, controller) {
+  if (!target) return;
+  activeAbortControllers.set(target, controller);
+}
+
+/**
+ * Abort and remove a controller for a target element
+ * @param {HTMLElement} target - The target element
+ * @param {string} reason - Optional reason for aborting
+ * @returns {Object|null} The data of the aborted request, if any
+ */
+export function abortExistingRequest(target, reason = 'New request started') {
+  if (!target) return null;
+  
+  const controller = activeAbortControllers.get(target);
+  if (controller) {
+    const data = pendingTranslationData.get(target);
+    if (data) {
+      data.abortedForReplacement = true;
+    }
+    
+    logger.debug('Aborting existing translation request for element', { reason });
+    controller.abort(reason);
+    activeAbortControllers.delete(target);
+    return data;
+  }
+  return null;
+}
 
 /**
  * Clear pending notification data and timeout
@@ -106,6 +143,8 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   window.pendingTranslationToastId = toastId;
 
   logger.debug('Stored pending translation data', { targetId, targetSelector, toastId, messageId });
+  
+  return data;
 }
 
 /**
