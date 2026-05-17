@@ -390,9 +390,12 @@ export class HoverTranslationManager extends ResourceTracker {
           direction: direction,
           isStreaming: false
         });
+
+        this.currentMessageId = null;
       }
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
+        if (this.currentMessageId === messageId) this.currentMessageId = null;
         logger.debug('Hover translation skipped: Extension context invalidated');
         return;
       }
@@ -405,6 +408,10 @@ export class HoverTranslationManager extends ResourceTracker {
         return;
       }
 
+      if (this.currentMessageId === messageId) {
+        this.currentMessageId = null;
+      }
+
       // Standard error handling via the Golden Chain architecture
       ErrorHandler.getInstance().handle(error, {
         context: 'hover',
@@ -412,10 +419,6 @@ export class HoverTranslationManager extends ResourceTracker {
       }).catch(() => {});
 
       this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
-    } finally {
-      if (this.currentMessageId === messageId) {
-        this.currentMessageId = null;
-      }
     }
   }
 
@@ -465,6 +468,11 @@ export class HoverTranslationManager extends ResourceTracker {
     if (this.hoverTimer) {
       this.clearTimer(this.hoverTimer);
       this.hoverTimer = null;
+    }
+
+    if (this.currentMessageId) {
+      contentScriptIntegration.cancelTranslationRequest(this.currentMessageId, 'Hover cancelled by user');
+      this.currentMessageId = null;
     }
   }
 
