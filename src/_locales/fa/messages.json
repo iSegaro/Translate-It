@@ -921,7 +921,7 @@
     "message": "یافتن نمونه‌های عمومی لینگوا."
   },
   "show_provider_in_list_label": {
-    "message": "نمایش در لیست پرووایدرها"
+    "message": "نمایش در لیست سرویس‌دهندگان"
   },
   "openai_api_settings_title": {
     "message": "تنظیمات OpenAI"
