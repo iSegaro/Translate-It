@@ -108,6 +108,12 @@ export class TextFieldIconManager extends ResourceTracker {
       this.cleanupElement(iconData.targetElement);
     } catch (error) {
       this.logger.error('Failed to execute translation:', error);
+      
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      ErrorHandler.getInstance().handle(error, {
+        context: 'text-field-icon-execution',
+        showToast: true
+      }).catch(() => {});
     }
   }
 

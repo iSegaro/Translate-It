@@ -1,7 +1,6 @@
 /**
  * Service orchestrator for Smart Translation Integration
  */
-import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -63,16 +62,12 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       logger.debug('Translation request timeout reached');
       if (currentToastId) notificationManager.dismiss(currentToastId);
 
-      // Notify the user via the centralized ErrorHandler
-      const timeoutError = new Error('Translation request timed out');
-      timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
-      await ErrorHandler.getInstance().handle(timeoutError, { 
-        context: 'text-field-timeout', 
-        showToast: true 
-      }).catch(() => {});
-
       clearPendingNotificationData('translation-timeout');
       clearPendingTranslationData(currentToastId);
+      
+      const timeoutError = new Error('Translation request timed out');
+      timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+      throw timeoutError;
     }, TRANSLATION_TIMEOUT);
 
     const translationMessage = MessageFormat.create(
@@ -115,20 +110,18 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
       clearPendingNotificationData('error-response');
       clearPendingTranslationData(currentToastId);
       if (messageResult.error) {
-        await ErrorHandler.getInstance().handle(messageResult.error, { context: 'text-field-response', showToast: true });
+        throw messageResult.error;
       }
     }
   } catch (err) {
     if (isCancellationError(err)) {
       logger.debug('Text field translation request cancelled:', err.message);
-    } else {
-      // Standard error handling via the Golden Chain architecture
-      await ErrorHandler.getInstance().handle(err, { context: 'text-field-request', showToast: true });
-    }
+    } 
     
     if (currentToastId) notificationManager.dismiss(currentToastId);
     clearPendingTranslationData(currentToastId);
     clearPendingNotificationData('error');
+    throw err;
   }
 }
 
@@ -253,7 +246,6 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
       pendingTranslationByToastId.get(toastId).processing = false;
     }
     if (toastId) notificationManager.dismiss(toastId);
-    await ErrorHandler.getInstance().handle(error, { context: 'text-field-application', type: ErrorTypes.TRANSLATION_FAILED, showToast: true });
     clearPendingTranslationData(toastId);
     throw error;
   }
@@ -270,8 +262,7 @@ async function copyToClipboard(text, toastId) {
     if (toastId) notificationManager.update(toastId, errorMessage, { type: 'error', duration: 4000 });
     else notificationManager.show(errorMessage, 'error');
     
-    // Centralized error handling
-    await ErrorHandler.getInstance().handle(error, { context: 'smartTranslation-clipboard', showToast: false }).catch(()=>{});
+    throw error;
   }
 }
 

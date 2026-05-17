@@ -464,6 +464,12 @@ export class ShortcutHandler extends ResourceTracker {
       });
     } catch (error) {
       logger.error('Error triggering text field translation via shortcut:', error);
+      
+      const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+      ErrorHandler.getInstance().handle(error, {
+        context: 'shortcut-field-translation',
+        showToast: true
+      }).catch(() => {});
     }
   }
 

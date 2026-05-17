@@ -351,9 +351,9 @@ export class UnifiedTranslationCoordinator {
       gracePeriod = Math.min(300000, segmentCount * 10000); // Up to 5 minutes grace period
     } else {
       // Standard timeouts for regular translation
-      const baseTimeout = Math.max(60000, segmentCount * 5000); // 5s per segment, min 60s
+      const baseTimeout = Math.max(180000, segmentCount * 5000); // 5s per segment, min 180s
       initialTimeout = customTimeout || Math.min(300000, baseTimeout + (segmentCount * 2000)); // Up to 5 minutes
-      progressTimeout = Math.max(60000, segmentCount * 2000); // At least 1 minute between progress
+      progressTimeout = Math.max(160000, segmentCount * 2000); // At least 160s between progress updates
       gracePeriod = Math.min(120000, segmentCount * 5000); // Up to 2 minutes grace period
     }
 

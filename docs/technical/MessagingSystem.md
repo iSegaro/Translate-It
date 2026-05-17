@@ -101,8 +101,8 @@ UnifiedMessaging automatically applies appropriate timeouts based on action comp
 - UI and settings operations
 
 **Medium Actions** (2-minute timeout):
-- `TRANSLATE`, `TRANSLATE_SELECTION` - 120000ms (to allow for AI model latency)
-- `TRANSLATE_TEXT` - 120000ms
+- `TRANSLATE`, `TRANSLATE_SELECTION` - 180000ms (to allow for AI model latency and background retries)
+- `TRANSLATE_TEXT` - 180000ms
 - `TEST_PROVIDER` - 8000ms
 - Translation operations
 
