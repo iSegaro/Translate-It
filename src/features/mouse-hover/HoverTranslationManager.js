@@ -408,7 +408,7 @@ export class HoverTranslationManager extends ResourceTracker {
       // Standard error handling via the Golden Chain architecture
       ErrorHandler.getInstance().handle(error, {
         context: 'hover',
-        showToast: true
+        showToast: false
       }).catch(() => {});
 
       this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
