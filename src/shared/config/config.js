@@ -66,6 +66,7 @@ export const CONFIG = {
   APP_NAME: "Translate It",
   // --- Core Settings ---
   DEBUG_MODE: false,
+  HIDDEN_PROVIDERS: [],
   COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",
@@ -1449,4 +1450,8 @@ export const getWholePageMaxCharsAsync = async () => {
 
 export const getWholePageAiMaxCharsAsync = async () => {
   return getSettingValueAsync("WHOLE_PAGE_AI_MAX_CHARS", CONFIG.WHOLE_PAGE_AI_MAX_CHARS);
+};
+
+export const getHiddenProvidersAsync = async () => {
+  return getSettingValueAsync("HIDDEN_PROVIDERS", CONFIG.HIDDEN_PROVIDERS);
 };

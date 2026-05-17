@@ -82,6 +82,7 @@
                   v-model="selectedProvider" 
                   mode="button"
                   :is-global="false"
+                  ignore-hidden
                 />
               </div>
             </div>
@@ -159,6 +160,15 @@
                       </div>
 
                       <component :is="providerSettingsComponent" />
+
+                      <div class="section-separator mini" />
+
+                      <div class="setting-group vertical provider-visibility-group">
+                        <BaseCheckbox
+                          v-model="showInList"
+                          :label="t('show_provider_in_list_label') || 'Show in provider list'"
+                        />
+                      </div>
                     </div>
                   </Transition>
                 </div>
@@ -205,6 +215,7 @@
                     allow-default
                     required-feature="dictionary"
                     :disabled="!enableDictionary"
+                    ignore-hidden
                   />
                 </div>
                 <p class="setting-description">
@@ -404,6 +415,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, PROVIDER_LANGUAGE_PAIRS, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { useProviderVisibility } from '../composables/useProviderVisibility.js'
 
 // Components
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
@@ -472,6 +484,9 @@ const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GO
     }
   }
 })
+
+// Provider Visibility logic
+const { showInList } = useProviderVisibility(selectedProvider)
 const aiContextEnabled = createSetting('SMART_CONTEXT_TRANSLATION_ENABLED', true)
 const aiHistoryEnabled = createSetting('AI_CONVERSATION_HISTORY_ENABLED', true)
 

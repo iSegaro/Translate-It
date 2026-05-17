@@ -313,6 +313,25 @@
         display: inline !important;
       }
     }
+    .provider-visibility-group {
+      margin-top: $spacing-md !important;
+      padding-top: $spacing-md !important;
+      border-top: 1px solid var(--color-border-light);
+      width: 100% !important;
+
+      :deep(.base-checkbox) {
+        background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02));
+        padding: $spacing-sm $spacing-md;
+        border-radius: $border-radius-base;
+        border: 1px solid var(--color-border-light);
+        transition: all $transition-base;
+        
+        &:hover {
+          background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.04));
+          border-color: var(--color-primary-alpha);
+        }
+      }
+    }
   }
 
   .provider-settings {

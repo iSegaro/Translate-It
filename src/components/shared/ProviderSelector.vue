@@ -542,6 +542,10 @@ const props = defineProps({
   onlyConfigured: {
     type: Boolean,
     default: false
+  },
+  ignoreHidden: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -681,11 +685,19 @@ const availableProviders = computed(() => {
   // Pass current debug mode state to allow/hide mock provider dynamically
   const debugMode = settingsStore.settings?.DEBUG_MODE || false;
   const providersFromRegistry = getProvidersForDropdown(debugMode);
+  const hiddenProviders = settingsStore.settings?.HIDDEN_PROVIDERS || [];
   
   // Filter by required feature if provided
   let filteredRegistry = props.requiredFeature 
     ? providersFromRegistry.filter(p => p.features?.includes(props.requiredFeature))
     : providersFromRegistry;
+
+  // Filter out hidden providers (but always show currently selected even if hidden)
+  if (!props.ignoreHidden) {
+    filteredRegistry = filteredRegistry.filter(p => {
+      return !hiddenProviders.includes(p.id) || currentProvider.value === p.id;
+    });
+  }
 
   // Filter by configuration status if requested
   if (props.onlyConfigured) {
