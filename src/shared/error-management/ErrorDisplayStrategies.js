@@ -75,6 +75,19 @@ export const ErrorDisplayStrategies = {
     supportSettings: true
   },
 
+  // Smart Translation contexts (Shortcut & Icon)
+  'shortcut-field-translation': {
+    showToast: true,
+    showInUI: false,
+    errorLevel: 'detailed'
+  },
+
+  'text-field-icon-execution': {
+    showToast: true,
+    showInUI: false,
+    errorLevel: 'detailed'
+  },
+
   // Background/service context - toast notifications
   background: {
     showToast: true,
