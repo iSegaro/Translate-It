@@ -163,7 +163,10 @@
 
                       <div class="section-separator mini" />
 
-                      <div class="setting-group vertical provider-visibility-group">
+                      <div 
+                        id="HIDDEN_PROVIDERS_CHECKBOX" 
+                        class="setting-group vertical provider-visibility-group"
+                      >
                         <BaseCheckbox
                           v-model="showInList"
                           :label="t('show_provider_in_list_label') || 'Show in provider list'"
