@@ -1,607 +1,247 @@
 @use "@/assets/styles/base/variables" as *;
 
-/* 
-  Activation Tab - Main Container
-*/
 .activation-tab {
   max-width: 100% !important;
   width: 100% !important;
-  display: block !important;
 
-  .setting-group {
-    margin-bottom: 0 !important; /* Fieldset handles the bottom space */
-    gap: 0 !important; /* Use margins on items for more control */
+  h2 {
+    margin-bottom: $spacing-xl;
+  }
 
-    // Only add margin if there's a previous setting-group
-    & + .setting-group {
-      margin-top: $spacing-lg !important;
+  .setting-group.extension-enabled-group {
+    margin-bottom: $spacing-xl;
+    background: var(--color-surface);
+    padding: $spacing-lg;
+    border-radius: $border-radius-lg;
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    box-sizing: border-box;
+    width: 100%;
+
+    .setting-description {
+      margin-top: 0;
+      padding-inline-start: 32px;
+    }
+  }
+
+  /* Feature Card Layout */
+  .feature-card {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-lg;
+    padding: $spacing-lg;
+    margin-bottom: $spacing-lg;
+    transition: all $transition-base;
+    box-shadow: $shadow-sm;
+    box-sizing: border-box;
+    width: 100%;
+
+    &.is-enabled {
+      border-color: var(--color-primary-alpha);
+      background: var(--color-surface);
+      box-shadow: $shadow-md;
     }
 
-    // Special spacing for the main toggle at the top
-    &.extension-enabled-group {
-      margin-bottom: $spacing-xl !important;
+    &:hover {
+      border-color: var(--color-text-secondary);
+    }
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: $spacing-md;
+  }
+
+  .card-title-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    .title-with-icon {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+
+      .card-icon {
+        font-size: 20px;
+      }
+
+      h3 {
+        margin: 0;
+        font-size: $font-size-base;
+        font-weight: $font-weight-bold;
+        color: var(--color-text);
+      }
+    }
+
+    .card-description {
+      margin: 0;
+      font-size: $font-size-sm;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+  }
+
+  .card-actions {
+    flex-shrink: 0;
+  }
+
+  .card-content {
+    margin-top: $spacing-md;
+    border-top: 1px solid var(--color-border-light);
+    padding-top: $spacing-md;
+  }
+
+  /* Advanced Settings Accordion */
+  .advanced-settings-accordion {
+    :deep(.ti-accordion-header) {
+      font-size: $font-size-xs !important;
+      color: var(--color-text-secondary) !important;
+      font-weight: $font-weight-medium !important;
+      padding: $spacing-xs 0 !important;
+      background: transparent !important;
+      border: none !important;
+
+      &:hover {
+        color: var(--color-primary) !important;
+      }
+    }
+
+    .advanced-content {
+      padding: $spacing-md $spacing-lg;
+      background: var(--color-background-alt, rgba(0, 0, 0, 0.02));
+      border-radius: $border-radius-md;
+      margin-top: $spacing-xs;
+    }
+  }
+
+  /* Setting Rows */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+    width: 100%;
+    margin-bottom: $spacing-md;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    &.horizontal {
+      .setting-label {
+        flex: 1;
+        margin-bottom: 0;
+      }
+    }
+
+    &.vertical {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $spacing-xs;
+    }
+  }
+
+  .setting-label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--color-text);
+  }
+
+  .setting-control {
+    flex-shrink: 0;
+  }
+
+  .compact-select {
+    width: 180px;
+    height: 32px;
+  }
+
+  .radio-group {
+    display: flex;
+    gap: $spacing-md;
+    flex-wrap: wrap;
+
+    &.horizontal {
+      align-items: center;
+    }
+  }
+
+  .number-input-container {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+
+    .base-number-input {
+      width: 80px;
+      padding: 4px 8px;
+      border-radius: $border-radius-sm;
+      border: 1px solid var(--color-border);
+      background: var(--color-background);
+      text-align: center;
+    }
+
+    .unit-label {
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
     }
   }
 
   .section-separator {
+    height: 1px;
+    background: var(--color-border-light);
+    margin: $spacing-md 0;
+    border: none;
+
     &.mini {
-      height: 1px !important;
-      background-color: var(--color-border) !important;
-      margin: $spacing-md 0 !important;
-      opacity: 0.6 !important;
-      width: 100% !important;
-      border: none !important;
+      margin: $spacing-sm 0;
+      opacity: 0.5;
     }
   }
 
-  .base-fieldset {
-    max-width: 100% !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-    margin-right: 0 !important;
-    margin-left: 0 !important;
-  }
-
-  /* 
-    The base components (BaseCheckbox, BaseRadio) now handle their own 
-    internal alignment and centering globally.
-  */
-  .ti-checkbox, 
-  .base-radio, 
-  .base-checkbox {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
+  .mt-md { margin-top: $spacing-md !important; }
+  .mt-sm { margin-top: $spacing-sm !important; }
+  .mb-md { margin-bottom: $spacing-md !important; }
 }
 
-/* 
-  RTL Adjustments 
-*/
+/* RTL Support */
 .rtl .activation-tab {
-  .ti-checkbox, .base-radio, .base-checkbox {
-    flex-direction: row !important;
-  }
-
-  .fab-mode-select-wrapper .compact-select {
-    background-position: left 6px center !important;
+  .setting-description {
+    padding-inline-start: 32px;
   }
 }
 
-.setting-row {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: $spacing-md !important;
-  width: 100% !important;
-  flex-wrap: wrap !important;
-  box-sizing: border-box !important;
-
-  .ti-checkbox, .base-radio {
-    flex: 1 1 200px !important;
-  }
-
-  .setting-label {
-    font-weight: 600 !important;
-    color: var(--color-text) !important;
-    min-width: 150px !important;
-  }
-
-  .label-wrapper {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 !important;
-    min-width: 0 !important;
-    gap: 0 !important;
-
-    .setting-label {
-      min-width: 0 !important;
-      margin-bottom: 0 !important;
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .activation-tab {
+    .card-header {
+      flex-direction: row;
+      align-items: center;
     }
 
-    .setting-description {
-      padding-inline-start: 0 !important;
-      margin-top: 2px !important;
-    }
-  }
+    .setting-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: $spacing-sm;
 
-  .configure-shortcut-button {
-    // No top margin here as it will be handled by the wrapper's alignment
-  }
-
-  .shortcut-picker-animated-wrapper {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-end !important;
-    overflow: hidden !important;
-    max-width: 0 !important;
-    opacity: 0 !important;
-    transform: translateX(-10px) scale(0.95) !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    pointer-events: none !important;
-    flex-shrink: 0 !important;
-
-    &:has(.configure-shortcut-button) {
-      margin-top: 14px !important;
-    }
-
-    &.open {
-      max-width: 220px !important;
-      width: 100% !important;
-      opacity: 1 !important;
-      transform: translateX(0) scale(1) !important;
-      pointer-events: auto !important;
-      margin-inline-start: $spacing-sm !important;
-      overflow: visible !important;
-      flex-shrink: 1 !important;
-    }
-  }
-
-  .fab-mode-select-wrapper {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-end !important;
-    overflow: hidden !important;
-    max-width: 0 !important;
-    opacity: 0 !important;
-    transform: translateX(-10px) scale(0.95) !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    pointer-events: none !important;
-    flex-shrink: 0 !important;
-
-    &.open {
-      max-width: 160px !important;
-      width: 100% !important;
-      opacity: 1 !important;
-      transform: translateX(0) scale(1) !important;
-      pointer-events: auto !important;
-      margin-inline-start: $spacing-sm !important;
-      overflow: visible !important;
-      flex-shrink: 1 !important;
+      &.horizontal {
+        .setting-control {
+          margin-top: $spacing-xs;
+        }
+      }
     }
 
     .compact-select {
-      height: 32px !important;
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
-      padding-inline-start: $spacing-sm !important;
-      padding-inline-end: 28px !important;
-      font-size: $font-size-sm !important;
-      background-color: var(--color-background-alt, var(--color-surface)) !important;
-      background-position: right 6px center !important;
-      background-size: 1.2em 1.2em !important;
-      width: auto !important;
-      min-width: 120px !important;
-      border: 1px solid var(--color-border) !important;
-      border-radius: $border-radius-base !important;
-    }
-  }
-}
-
-.number-input-container {
-  display: flex !important;
-  align-items: center !important;
-  gap: $spacing-xs !important;
-
-  .base-number-input {
-    width: 80px !important;
-    padding: 6px 10px !important;
-    border-radius: $border-radius-sm !important;
-    border: 1px solid var(--color-border) !important;
-    background-color: var(--color-surface) !important;
-    color: var(--color-text) !important;
-    outline: none !important;
-
-    &.compact-input {
-      width: 65px !important;
-      padding: 3px 6px !important;
-      height: 26px !important;
-      text-align: center !important;
-    }
-  }
-
-  .unit-label {
-    font-size: 0.9em !important;
-    color: var(--color-text-secondary) !important;
-  }
-}
-
-.horizontal-setting-row {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: $spacing-md !important;
-  margin-bottom: $spacing-sm !important;
-  width: 100% !important;
-
-  .setting-label {
-    font-size: $font-size-sm !important;
-    font-weight: 500 !important;
-    color: var(--color-text) !important;
-    min-width: 150px !important;
-    margin-top: 0 !important;
-    flex: 0 0 auto !important;
-    align-self: center !important;
-
-    &.is-disabled {
-      opacity: 0.6 !important;
+      width: 100%;
     }
 
-    @media (max-width: #{$breakpoint-md}) {
-      min-width: 0 !important;
-      width: 100% !important;
-      margin-bottom: $spacing-xs !important;
-    }
-  }
-
-  .compact-select {
-    flex: 0 0 auto !important;
-    width: 180px !important;
-    height: 32px !important;
-
-    @media (max-width: #{$breakpoint-md}) {
-      width: 100% !important;
-      flex: 1 1 auto !important;
-    }
-  }
-
-  .setting-control-group {
-    display: flex !important;
-    align-items: center !important;
-    gap: $spacing-xl !important;
-    flex: 1 !important;
-    min-width: 0 !important;
-    flex-wrap: wrap !important; // Allow wrapping on mobile
-
-    @media (max-width: #{$breakpoint-md}) {
-      width: 100% !important;
-      gap: $spacing-sm !important;
-    }
-
-    .inline-checkbox-wrapper,
-    .inline-control-wrapper {
-      display: flex !important;
-      align-items: center !important;
-      min-width: max-content !important;
-      flex: 1 !important;
-      gap: $spacing-md !important;
-
-      .setting-label {
-        min-width: 110px !important;
-        width: auto !important;
-        margin-bottom: 0 !important;
-        white-space: nowrap !important;
-        font-size: $font-size-sm !important;
-      }
-
-      @media (max-width: #{$breakpoint-md}) {
-        width: 100% !important;
-        flex: none !important;
-        justify-content: space-between !important;
-
-        .setting-label {
-          min-width: auto !important;
-        }
-      }
-    }
-
-    .inline-checkbox-wrapper {
-
-      .ti-checkbox, .base-checkbox {
-        width: auto !important;
-        white-space: normal !important; // Allow label text to wrap
-        
-        .checkbox-label {
-          font-size: $font-size-sm !important;
-          color: var(--color-text-secondary) !important;
-        }
-      }
-    }
-  }
-
-  /* Support for side-by-side sub-items like Auto-close + Timer */
-  &.multi-select-row {
-    gap: $spacing-xl !important;
-
-    @media (max-width: #{$breakpoint-md}) {
-      gap: $spacing-md !important;
-    }
-
-    .setting-item {
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      justify-content: flex-start !important;
-      gap: $spacing-md !important;
-      flex: 0 1 auto !important;
-      min-width: 0 !important;
-
-      @media (max-width: #{$breakpoint-md}) {
-        width: 100% !important;
-        justify-content: space-between !important;
-        flex: 1 1 100% !important;
-      }
-
-      .compact-select {
-        width: 180px !important;
-        flex: 0 0 auto !important;
-      }
-    }
-  }
-}
-
-.whole-page-trigger-group {
-  margin-top: 0 !important;
-  margin-bottom: $spacing-xl !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-
-  .trigger-modes-container {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: $spacing-sm $spacing-md !important;
-    margin-bottom: $spacing-xl !important;
-    width: 100% !important;
-    
-    .radio-group-horizontal {
-      display: flex !important;
-      flex-wrap: wrap !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: $spacing-md 48px !important;
-      flex: none !important;
-      min-width: 0 !important;
-
-      .base-radio {
-        width: auto !important;
-        min-width: max-content !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
-        gap: 4px !important;
-
-        .radio-label, .radio-label-content {
-          padding-inline: 12px !important;
-        }
-      }
-    }
-  }
-
-  .setting-description {
-    text-align: start !important;
-    padding-inline-start: 0 !important;
-    width: 100% !important;
-  }
-}
-
-.setting-description {
-  padding-inline-start: 32px !important;
-  margin-top: $spacing-xs !important;
-  max-width: 100% !important;
-  display: block !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-  box-sizing: border-box !important;
-  color: var(--color-text-secondary) !important;
-  font-size: $font-size-sm !important;
-}
-
-// Ensure ProviderSelector in legend looks good
-.base-fieldset__header-actions {
-  .legend-actions-wrapper {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-
-    .legend-action-label {
-      font-size: $font-size-xs !important;
-      color: var(--color-text-secondary) !important;
-      white-space: nowrap !important;
-      font-weight: normal !important;
-
-      &.is-disabled {
-        opacity: 0.5 !important;
-      }
-    }
-  }
-
-  .ti-provider-button-container {
-    .ti-provider-button {
-      padding: 4px 8px !important;
-      height: 28px !important;
-      font-size: $font-size-xs !important;
-      background: var(--color-surface) !important;
-      
-      .ti-api-provider-icon {
-        width: 14px !important;
-        height: 14px !important;
-      }
-      
-      .dropdown-arrow {
-        width: 12px !important;
-        height: 12px !important;
-      }
-    }
-  }
-}
-
-.sub-options-group {
-  display: grid !important;
-  grid-template-rows: 0fr !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  opacity: 0 !important;
-  overflow: hidden !important;
-  margin-inline-start: $spacing-md !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  border-inline-start: 2px solid transparent !important;
-  width: auto !important;
-
-  &.open {
-    grid-template-rows: 1fr !important;
-    opacity: 1 !important;
-    margin-top: $spacing-md !important;
-    margin-bottom: 0 !important;
-    border-inline-start-color: var(--color-border) !important;
-  }
-
-  // Allow highlight spotlight to overflow the container without being clipped
-  &:has(.is-highlighting) {
-    overflow: visible !important;
-  }
-
-    .sub-options-inner {
-    min-height: 0 !important;
-    padding-inline-start: $spacing-lg !important;
-    padding-inline-end: $spacing-md !important;
-    padding-top: $spacing-xs !important;
-    padding-bottom: $spacing-sm !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: $spacing-sm !important;
-&.fab-appearance-options {
-  padding-top: $spacing-md !important;
-  padding-bottom: $spacing-md !important;
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  align-items: flex-end !important;
-  gap: $spacing-xl !important;
-
-  .separator-v {
-    width: 1px !important;
-    height: 32px !important;
-    background-color: var(--color-border) !important;
-    flex-shrink: 0 !important;
-    opacity: 0.8 !important;
-
-    @media (max-width: #{$breakpoint-md}) {
-      display: none !important;
-    }
-  }
-
-  .fab-appearance-item {    display: flex !important;
-    flex-direction: column !important;
-    gap: $spacing-xs !important;
-    flex: 1 1 0 !important;
-    min-width: 180px !important;
-
-    &.size-item {
-      flex-direction: row !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: $spacing-md !important;
-
-      .setting-label {
-        font-size: $font-size-sm !important;
-        font-weight: 500 !important;
-        color: var(--color-text) !important;
-        margin-bottom: 0 !important;
-        white-space: nowrap !important;
-        flex: 0 0 auto !important;
-      }
-
-      .compact-select {
-        flex: 1 !important;
-        width: auto !important;
-        height: 32px !important;
-      }
-    }
-
-    &.opacity-item {
-      .ti-range-wrapper {
-        margin-bottom: 0 !important;
-      }
-    }
-  }
-}
-  }
-  
-  .radio-group {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: $spacing-xl !important;
-    margin-bottom: $spacing-xl !important;
-    flex-wrap: wrap !important;
-    width: 100% !important;
-
-    .base-radio {
-      width: auto !important;
-      max-width: none !important;
-    }
-  }
-}
-
-// Mobile responsive overrides
-@media (max-width: #{$breakpoint-md}) {
-  .activation-tab {
-    .base-fieldset {
-      padding: $spacing-sm !important;
-    }
-  }
-
-  .setting-row {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: $spacing-sm !important;
-
-    .ti-checkbox, .base-radio {
-      flex: 0 0 auto !important;
-    }
-
-    &.fab-setting-row {
-      flex-direction: row !important;
-      flex-wrap: nowrap !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: $spacing-sm !important;
-
-      .ti-checkbox {
-        flex: 1 !important;
-        min-width: 0 !important;
-      }
-
-      .fab-mode-select-wrapper {
-        margin-inline-start: 0 !important;
-        flex-shrink: 0 !important;
-
-        &.open {
-          max-width: 140px !important;
-        }
-
-        .compact-select {
-          min-width: 100px !important;
-          height: 30px !important;
-          font-size: $font-size-xs !important;
-        }
-      }
-    }
-  }
-
-  .setting-description {
-    padding-inline-start: 0 !important;
-  }
-  
-  .sub-options-group {
-    padding-inline-start: $spacing-base !important;
-    margin-inline-start: $spacing-sm !important;
-    .radio-group {
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: $spacing-sm $spacing-xl !important;
-    }
-
-    .configure-shortcut-button {
-      align-self: center !important;
+    .advanced-content {
+      padding: $spacing-md;
     }
   }
 }

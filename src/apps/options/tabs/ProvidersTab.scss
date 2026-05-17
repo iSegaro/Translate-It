@@ -1,99 +1,6 @@
 @use "@/assets/styles/base/variables" as *;
 
-.languages-tab {
-  // Center the main language selectors
-  .languages-selectors-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: $spacing-md;
-    margin: $spacing-lg auto $spacing-xl;
-    max-width: 500px; // Reasonable width for centering
-    width: 100%;
-    
-    .setting-group {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-
-      label {
-        text-align: center;
-        margin-bottom: $spacing-xs;
-      }
-    }
-
-    .smart-language-fallback-note {
-      font-size: $font-size-xs;
-      color: var(--color-text-secondary);
-      text-align: center;
-      margin-top: $spacing-sm;
-      line-height: 1.5;
-      opacity: 0.8;
-      max-width: 420px;
-    }
-
-    .provider-selection-group {
-      margin-top: $spacing-md;
-      
-      :deep(.ti-provider-button-container) {
-        width: 100%;
-        max-width: 300px;
-        margin: 0 auto;
-      }
-    }
-
-    .provider-config-warning {
-      display: flex;
-      align-items: center;
-      gap: $spacing-md;
-      background: var(--color-warning-alpha, rgba(255, 152, 0, 0.1));
-      border: 1px solid var(--color-warning, #ff9800);
-      border-radius: $border-radius-md;
-      padding: $spacing-sm $spacing-lg;
-      margin-top: $spacing-md;
-      width: 100%;
-      max-width: 420px;
-      box-sizing: border-box;
-
-      .warning-icon {
-        font-size: 18px;
-        color: var(--color-warning, #ff9800);
-      }
-
-      .warning-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: $spacing-xs;
-
-        p {
-          font-size: $font-size-xs;
-          color: var(--color-text);
-          margin: 0;
-          line-height: 1.4;
-        }
-
-        .configure-btn {
-          background: var(--color-warning, #ff9800);
-          color: white;
-          border: none;
-          border-radius: $border-radius-sm;
-          padding: 4px 10px;
-          font-size: 11px;
-          font-weight: $font-weight-bold;
-          cursor: pointer;
-          width: fit-content;
-          transition: filter 0.2s;
-
-          &:hover {
-            filter: brightness(1.1);
-          }
-        }
-      }
-    }
-  }
-
+.providers-tab {
   // CRITICAL FIX: Allow dropdowns to overflow the tab container
   :global(.tab-content-container) {
     overflow: visible !important;
@@ -409,14 +316,8 @@
     }
   }
 
-  // --- Dropdown Clipping Fixes ---
-  // Allow the tab container to show overflowing content (e.g., ProviderSelector menus)
-  :global(.tab-content-container) {
-    overflow: visible !important;
-  }
-
   // Ensure accordions allow content to overflow when open while maintaining animations
-  .api-settings-accordion, .bilingual-setting, .dictionary-mode-setting, .language-pref-setting, .ai-optimization-setting {
+  .api-settings-accordion, .ai-optimization-setting {
     position: relative;
     
     &.is-open {
@@ -430,139 +331,6 @@
 
       .body-inner {
         overflow: visible !important;
-      }
-    }
-  }
-
-  // --- Specific style for Bilingual & Dictionary Setting ---
-  .bilingual-setting, .dictionary-mode-setting {
-    margin-top: $spacing-md;
-
-    .dictionary-content-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: $spacing-sm;
-      width: 100%;
-      // Standard indentation to match visual hierarchy
-      padding-inline-start: 32px; 
-      padding-inline-end: 56px; 
-      box-sizing: border-box;
-
-      .dictionary-provider-group {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        width: 100% !important;
-
-        label {
-          flex: 1 !important;
-          width: auto !important;
-          margin: 0 !important;
-          white-space: nowrap;
-        }
-
-        :deep(.ti-provider-button-container) {
-          flex: 0 0 200px !important;
-          width: 200px !important;
-          margin: 0 !important;
-          // Only the container of the absolute dropdown needs to allow overflow
-          overflow: visible !important; 
-
-          .ti-provider-button {
-            height: 32px !important;
-            padding: 0 10px !important;
-          }
-        }
-      }
-
-      .setting-description {
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        margin-inline-start: 0 !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-      }
-
-      .dictionary-display-options {
-        display: flex;
-        flex-direction: column;
-        gap: $spacing-xs;
-        padding-top: $spacing-sm;
-        border-top: 1px solid var(--color-border-light, #eee);
-
-        .checkbox-list-vertical {
-          display: flex;
-          flex-direction: column;
-          gap: $spacing-xs;
-          margin-top: $spacing-xs;
-        }
-
-        &.is-disabled {
-          opacity: 0.6;
-          pointer-events: none;
-        }
-      }
-    }
-
-    .checkbox-area {
-      display: flex;
-      align-items: center; 
-      gap: 12px;
-      flex: 1;
-      
-      :deep(.bilingual-main-checkbox), :deep(.dictionary-main-checkbox) {
-        width: auto !important;
-        margin: 0 !important;
-        
-        .ti-checkbox {
-          padding: 0 !important;
-        }
-      }
-
-      .accordion-title-text {
-        cursor: pointer;
-        user-select: none;
-        padding: 4px 0;
-        transition: color $transition-base;
-        line-height: 1; 
-        transform: translateY(1px); 
-
-        &.active {
-          color: var(--color-primary);
-        }
-      }
-    }
-
-    .bilingual-modes-list {
-      display: flex;
-      flex-direction: column;
-      gap: $spacing-xs;
-      padding-inline-start: 32px; 
-      margin-top: $spacing-sm;
-    }
-  }
-
-  // --- Language Detection Preferences ---
-  .language-pref-setting {
-    margin-top: $spacing-md;
-    
-    .language-pref-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: $spacing-sm;
-      padding-inline-start: 32px; 
-
-      .pref-label {
-        font-size: $font-size-sm;
-        color: var(--color-text);
-      }
-
-      .pref-select {
-        width: 180px;
       }
     }
   }
@@ -598,97 +366,10 @@
     }
   }
 
-  .validation-error {
-    margin: $spacing-xs 0 $spacing-lg 0 !important;
-    padding: $spacing-sm $spacing-md;
-    background-color: var(--color-error-alpha);
-    color: var(--color-error);
-    border-radius: $border-radius-base;
-    font-size: $font-size-sm;
-    border-inline-start: 4px solid var(--color-error);
-    max-width: 420px;
-    display: flex !important;
-    align-items: center !important;
-    gap: $spacing-sm !important;
-    box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.1);
-
-    .error-icon {
-      font-size: 14px;
-      line-height: 1;
-    }
-
-    .error-message {
-      font-weight: $font-weight-medium;
-      line-height: 1.4;
-    }
-  }
-
-  /* 
-    Fade-Slide Transition for errors and other elements
-  */
-  .fade-slide-enter-active,
-  .fade-slide-leave-active {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .fade-slide-enter-from {
-    opacity: 0;
-  }
-
-  .fade-slide-leave-to {
-    opacity: 0;
-  }
-
-  .smart-language-info-banner {
-    margin: $spacing-lg 28px $spacing-sm;
-    padding: $spacing-md $spacing-lg;
-    background: var(--color-background-alt, rgba(var(--color-primary-rgb), 0.05));
-    border: 1px solid var(--color-primary-alpha, rgba(var(--color-primary-rgb), 0.1));
-    border-radius: $border-radius-lg;
-    display: flex;
-    align-items: center;
-    gap: $spacing-md;
-
-    & + .languages-selectors-container {
-      margin-top: 0;
-    }
-
-    .banner-content {
-      h3 {
-        font-size: $font-size-base;
-        font-weight: $font-weight-bold;
-        margin-bottom: 4px;
-        color: var(--color-primary);
-      }
-
-      p {
-        font-size: $font-size-sm;
-        color: var(--color-text-secondary);
-        line-height: 1.5;
-        margin: 0;
-      }
-    }
-  }
-
-  // API Info inside provider settings
-  .api-info {
-    margin-bottom: $spacing-lg;
-    
-    h3 {
-      font-size: $font-size-lg;
-      margin-bottom: $spacing-xs;
-      color: var(--color-text);
-    }
-  }
-
   // --- Common alignment for all top-level setting groups ---
   .settings-container > .setting-group,
   .settings-container > .section-separator,
-  .settings-container > .validation-error,
   .api-settings-accordion :deep(.ti-accordion-header),
-  .bilingual-setting :deep(.ti-accordion-header),
-  .dictionary-mode-setting :deep(.ti-accordion-header),
-  .language-pref-setting :deep(.ti-accordion-header),
   .ai-optimization-setting :deep(.ti-accordion-header),
   .accordion-inner {
     margin-inline-start: 28px !important;
@@ -710,28 +391,6 @@
         margin-top: $spacing-xs;
       }
     }
-
-    &:not(.vertical) {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-start;
-      gap: $spacing-lg;
-
-      label {
-        flex: 0 0 220px;
-        width: 220px;
-        font-weight: $font-weight-medium;
-        margin-bottom: 0;
-        white-space: nowrap;
-      }
-
-      .language-dropdown,
-      .ti-provider-button-container {
-        flex: 0 0 200px;
-        width: 200px;
-        min-width: 200px;
-      }
-    }
   }
 
   .accordion-inner {
@@ -740,8 +399,6 @@
     overflow: visible !important; 
 
     .setting-group,
-    .setting-group,
-    .language-pref-row,
     .optimization-control-area,
     .provider-settings-container,
     .api-settings-section,
@@ -757,13 +414,10 @@
 
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
-  .languages-tab {
+  .providers-tab {
     .settings-container > .setting-group,
     .settings-container > .section-separator,
     .api-settings-accordion :deep(.ti-accordion-header),
-    .bilingual-setting :deep(.ti-accordion-header),
-    .dictionary-mode-setting :deep(.ti-accordion-header),
-    .language-pref-setting :deep(.ti-accordion-header),
     .ai-optimization-setting :deep(.ti-accordion-header),
     .accordion-inner {
       margin-inline-start: 0 !important;
@@ -774,69 +428,9 @@
       padding-inline-start: 0 !important;
     }
 
-    .setting-group:not(.vertical) {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      gap: $spacing-xs !important;
-
-      label {
-        width: 100% !important;
-        flex: none !important;
-        white-space: normal !important;
-      }
-
-      .language-dropdown,
-      .ti-provider-button-container {
-        width: 100% !important;
-        flex: none !important;
-        min-width: 0 !important;
-      }
-    }
-
-    .language-pref-row {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      gap: $spacing-xs !important;
-      margin-inline-start: 0 !important;
-      padding-inline-start: 0 !important; 
-      width: 100% !important;
-
-      .pref-label {
-        width: 100% !important;
-        flex: none !important;
-      }
-
-      .pref-select {
-        width: 100% !important;
-        flex: none !important;
-      }
-    }
-
     .ai-optimization-setting {
       .setting-group {
         padding-inline-start: 0 !important; 
-      }
-    }
-
-    .dictionary-mode-setting {
-      .dictionary-content-wrapper {
-        padding-inline-end: $spacing-md !important; 
-        
-        .dictionary-provider-group {
-          flex-direction: row !important; 
-          justify-content: space-between !important;
-          align-items: center !important;
-
-          label {
-            width: auto !important;
-            flex: 1 !important;
-          }
-
-          :deep(.ti-provider-button-container) {
-            width: 200px !important; 
-            flex: 0 0 200px !important;
-          }
-        }
       }
     }
   }

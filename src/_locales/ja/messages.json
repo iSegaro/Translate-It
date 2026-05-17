@@ -239,6 +239,30 @@
   "languages_tab_title": {
     "message": "言語"
   },
+  "providers_tab_title": {
+    "message": "サービス"
+  },
+  "configure_service_button": {
+    "message": "サービスを設定 ⚙️"
+  },
+  "provider_config_required_api": {
+    "message": "このサービス（{provider}）はAPIキーの設定が必要です。"
+  },
+  "provider_config_required_url": {
+    "message": "このサービス（{provider}）はサーバーURLの設定が必要です。"
+  },
+  "provider_config_required_generic": {
+    "message": "このサービス（{provider}）は設定が必要です。"
+  },
+  "advanced_settings_label": {
+    "message": "詳細設定"
+  },
+  "mobile_ui_mode_label": {
+    "message": "UIモード"
+  },
+  "shortcuts_label": {
+    "message": "キーボードショートカット"
+  },
   "appearance_tab_title": {
     "message": "外観"
   },

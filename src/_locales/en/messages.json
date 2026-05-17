@@ -239,6 +239,30 @@
   "languages_tab_title": {
     "message": "Languages"
   },
+  "providers_tab_title": {
+    "message": "Providers"
+  },
+  "configure_service_button": {
+    "message": "Configure Service ⚙️"
+  },
+  "provider_config_required_api": {
+    "message": "This service ({provider}) requires an API Key."
+  },
+  "provider_config_required_url": {
+    "message": "This service ({provider}) requires a Server URL."
+  },
+  "provider_config_required_generic": {
+    "message": "This service ({provider}) requires configuration."
+  },
+  "advanced_settings_label": {
+    "message": "Advanced Settings"
+  },
+  "mobile_ui_mode_label": {
+    "message": "UI Mode"
+  },
+  "shortcuts_label": {
+    "message": "Keyboard Shortcuts"
+  },
   "appearance_tab_title": {
     "message": "Appearance"
   },

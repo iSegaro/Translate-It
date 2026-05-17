@@ -43,6 +43,35 @@
             />
           </div>
 
+          <div class="setting-group provider-selection-group">
+            <label>{{ t('translation_api_label') || 'Primary Service' }}</label>
+            <ProviderSelector 
+              v-model="selectedProvider" 
+              mode="button"
+              :is-global="false"
+              ignore-hidden
+            />
+          </div>
+
+          <!-- Configuration Warning -->
+          <Transition name="fade-slide">
+            <div 
+              v-if="missingSetting" 
+              class="provider-config-warning"
+            >
+              <span class="warning-icon">⚠️</span>
+              <div class="warning-content">
+                <p>{{ missingSettingWarning }}</p>
+                <button 
+                  class="configure-btn"
+                  @click="navigateToProviderSettings"
+                >
+                  {{ t('configure_service_button') || 'Configure Service ⚙️' }}
+                </button>
+              </div>
+            </div>
+          </Transition>
+
           <p 
             v-if="isAutoLanguageProvider" 
             class="smart-language-fallback-note"
@@ -52,133 +81,6 @@
         </div>
 
         <div class="section-separator" />
-
-        <!-- Validation errors -->
-        <Transition name="fade-slide">
-          <div
-            v-if="validationError"
-            class="validation-error"
-          >
-            <span class="error-icon">⚠️</span>
-            <span class="error-message">{{ validationError }}</span>
-          </div>
-        </Transition>
-
-        <!-- API Settings Accordion -->
-        <BaseAccordion
-          id="TRANSLATION_API"
-          :is-open="activeAccordion === 'api'"
-          item-class="api-settings-accordion"
-          @toggle="toggleAccordion('api')"
-        >
-          <template #header>
-            <div class="accordion-header-layout">
-              <span>{{ t('translation_api_label') || 'Service' }}</span>
-              <div 
-                class="header-selector-wrapper"
-                @click.stop
-              >
-                <ProviderSelector 
-                  v-model="selectedProvider" 
-                  mode="button"
-                  :is-global="false"
-                  ignore-hidden
-                />
-              </div>
-            </div>
-          </template>
-
-          <template #content>
-            <div class="accordion-inner">
-              <div class="api-settings-section">
-                <div class="provider-settings-container">
-                  <Transition name="fade-slide">
-                    <div 
-                      :key="selectedProvider"
-                      class="provider-settings"
-                    >
-                      <!-- Optimization Level Section -->
-                      <template v-if="!isAutoLanguageProvider">
-                        <div 
-                          id="OPTIMIZATION_LEVELS_SECTION"
-                          class="optimization-control-area"
-                        >
-                          <div class="opt-control-group">
-                            <div class="label-with-value">
-                              <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                              <span
-                                class="level-badge"
-                                :class="'level-' + currentOptimizationLevel"
-                              >
-                                {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                              </span>
-                            </div>
-                          
-                            <div class="slider-wrapper">
-                              <input 
-                                v-model.number="currentOptimizationLevel" 
-                                type="range" 
-                                min="1" 
-                                max="5"
-                                class="ti-range-slider"
-                              >
-                              <div class="slider-labels">
-                                <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                                <span
-                                  class="slider-tick"
-                                  @click="currentOptimizationLevel = 2"
-                                >|</span>
-                                <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                                <span
-                                  class="slider-tick"
-                                  @click="currentOptimizationLevel = 4"
-                                >|</span>
-                                <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
-                              </div>
-                            </div>
-                          
-                            <p class="opt-description">
-                              {{ isAIProvider 
-                                ? t('optimization_description_ai') 
-                                : t('optimization_description_traditional') 
-                              }}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div class="section-separator mini" />
-                      </template>
-
-                      <div
-                        v-if="selectedProviderInfo && !providerSettingsComponent"
-                        class="api-info"
-                      >
-                        <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.name }}</h3>
-                        <p class="setting-description">
-                          {{ t(selectedProviderInfo.descriptionKey) }}
-                        </p>
-                      </div>
-
-                      <component :is="providerSettingsComponent" />
-
-                      <div class="section-separator mini" />
-
-                      <div 
-                        id="HIDDEN_PROVIDERS_CHECKBOX" 
-                        class="setting-group vertical provider-visibility-group"
-                      >
-                        <BaseCheckbox
-                          v-model="showInList"
-                          :label="t('show_provider_in_list_label') || 'Show in provider list'"
-                        />
-                      </div>
-                    </div>
-                  </Transition>
-                </div>
-              </div>
-            </div>
-          </template>
-        </BaseAccordion>
 
         <!-- Dictionary Mode -->
         <BaseAccordion
@@ -306,97 +208,6 @@
           </template>
         </BaseAccordion>
 
-        <!-- Language Detection Preferences -->
-        <BaseAccordion
-          id="DETECTION_SECTION"
-          :is-open="activeAccordion === 'detection'"
-          item-class="language-pref-setting"
-          @toggle="toggleAccordion('detection')"
-        >
-          <template #header>
-            <span>{{ t('language_detection_label') || 'Language Detection Preferences' }}</span>
-          </template>
-
-          <template #content>
-            <div class="accordion-inner">
-              <p class="setting-description mb-md">
-                {{ t('language_detection_preferences_description') }}
-              </p>
-
-              <div class="language-pref-row">
-                <label class="pref-label">{{ t('latin_script_priority_label') }}:</label>
-                <BaseSelect
-                  v-model="latinScriptPreference"
-                  :options="latinScriptOptions"
-                  class="pref-select"
-                />
-              </div>
-
-              <div class="language-pref-row">
-                <label class="pref-label">{{ t('arabic_script_priority_label') }}:</label>
-                <BaseSelect
-                  v-model="arabicScriptPreference"
-                  :options="arabicScriptOptions"
-                  class="pref-select"
-                />
-              </div>
-
-              <div class="language-pref-row">
-                <label class="pref-label">{{ t('chinese_script_priority_label') }}:</label>
-                <BaseSelect
-                  v-model="chineseScriptPreference"
-                  :options="chineseScriptOptions"
-                  class="pref-select"
-                />
-              </div>
-
-              <div class="language-pref-row">
-                <label class="pref-label">{{ t('devanagari_script_priority_label') }}:</label>
-                <BaseSelect
-                  v-model="devanagariScriptPreference"
-                  :options="devanagariScriptOptions"
-                  class="pref-select"
-                />
-              </div>
-            </div>
-          </template>
-        </BaseAccordion>
-
-        <!-- AI Optimization -->
-        <BaseAccordion
-          id="AI_OPT_SECTION"
-          :is-open="activeAccordion === 'ai'"
-          item-class="ai-optimization-setting"
-          @toggle="toggleAccordion('ai')"
-        >
-          <template #header>
-            <span>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
-          </template>
-
-          <template #content>
-            <div class="accordion-inner">
-              <div class="setting-group vertical">
-                <BaseCheckbox
-                  v-model="aiContextEnabled"
-                  :label="t('ai_context_translation_label')"
-                />
-                <p class="setting-description mb-md">
-                  {{ t('ai_context_translation_description') }}
-                </p>
-              </div>
-
-              <div class="setting-group vertical">
-                <BaseCheckbox
-                  v-model="aiHistoryEnabled"
-                  :label="t('ai_conversation_history_label')"
-                />
-                <p class="setting-description mb-md">
-                  {{ t('ai_conversation_history_description') }}
-                </p>
-              </div>
-            </div>
-          </template>
-        </BaseAccordion>
       </template>
     </div>
   </section>
@@ -405,6 +216,7 @@
 <script setup>
 import './LanguagesTab.scss'
 import { ref, onMounted, onUnmounted, watch, computed, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -418,7 +230,6 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, PROVIDER_LANGUAGE_PAIRS, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
-import { useProviderVisibility } from '../composables/useProviderVisibility.js'
 
 // Components
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
@@ -429,6 +240,7 @@ import BaseAccordion from '@/components/base/BaseAccordion.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
 const settingsStore = useSettingsStore()
+const router = useRouter()
 const { t } = useUnifiedI18n()
 const { highlightElement } = useHighlightManager()
 const { createSetting, createProviderSetting } = useTabSettings(settingsStore, logger)
@@ -471,36 +283,45 @@ const bilingualTranslation = createSetting('BILINGUAL_TRANSLATION', false, {
   }
 })
 
-const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2, {
-  onChanged: (newProvider) => {
-    // Check if the selected provider needs configuration
-    const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
-    
-    if (missingKey) {
-      logger.debug(`[LanguagesTab] Provider ${newProvider} is missing setting: ${missingKey}. Opening API accordion.`);
-      activeAccordion.value = 'api';
-      
-      // Delay to allow accordion animation to start/finish before highlighting
-      setTimeout(() => {
-        highlightElement(missingKey);
-      }, 400);
-    }
+const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2)
+
+const missingSetting = computed(() => {
+  // 1. Check primary provider
+  const primaryMissing = getFirstMissingSetting(selectedProvider.value, settingsStore.settings)
+  if (primaryMissing) return primaryMissing
+
+  // 2. Check dictionary provider if enabled
+  if (enableDictionary.value) {
+    const dictProvider = dictionaryProvider.value === 'default' ? selectedProvider.value : dictionaryProvider.value
+    return getFirstMissingSetting(dictProvider, settingsStore.settings)
   }
+
+  return null
 })
 
-// Provider Visibility logic
-const { showInList } = useProviderVisibility(selectedProvider)
-const aiContextEnabled = createSetting('SMART_CONTEXT_TRANSLATION_ENABLED', true)
-const aiHistoryEnabled = createSetting('AI_CONVERSATION_HISTORY_ENABLED', true)
-
-const currentOptimizationLevel = computed({
-  get: () => settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS?.[selectedProvider.value] || settingsStore.settings?.OPTIMIZATION_LEVEL || 3,
-  set: (val) => {
-    const providerLevels = { ...(settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS || {}) }
-    providerLevels[selectedProvider.value] = val
-    settingsStore.updateSettingLocally('PROVIDER_OPTIMIZATION_LEVELS', providerLevels)
+const missingSettingWarning = computed(() => {
+  if (!missingSetting.value) return ''
+  
+  const key = missingSetting.value
+  const providerName = selectedProviderInfo.value?.displayName || selectedProvider.value
+  
+  if (key.includes('URL')) {
+    return t('provider_config_required_url', { provider: providerName })
+  } else if (key.includes('API')) {
+    return t('provider_config_required_api', { provider: providerName })
   }
+  
+  return t('provider_config_required_generic', { provider: providerName })
 })
+
+const navigateToProviderSettings = () => {
+  if (missingSetting.value) {
+    router.push({ 
+      name: 'providers', 
+      query: { highlight: missingSetting.value } 
+    })
+  }
+}
 
 // --- Bilingual Logic ---
 
@@ -524,23 +345,6 @@ const updateBilingualMode = (mode, value) => {
   settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', newModes)
 }
 
-// --- Script Detection Preferences ---
-
-const createScriptSetting = (script, def) => computed({
-  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.[script] || def,
-  set: (val) => {
-    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) }
-    preferences[script] = val
-    logger.debug(`📝 Script preference [${script}] changed:`, val)
-    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
-  }
-})
-
-const arabicScriptPreference = createScriptSetting('arabic-script', 'fa')
-const chineseScriptPreference = createScriptSetting('chinese-script', 'zh-cn')
-const devanagariScriptPreference = createScriptSetting('devanagari-script', 'hi')
-const latinScriptPreference = createScriptSetting('latin-script', 'none')
-
 // --- Dictionary Logic ---
 const enableDictionary = createSetting('ENABLE_DICTIONARY', true)
 const dictionaryProvider = createProviderSetting(TranslationMode.Dictionary_Translation)
@@ -553,48 +357,11 @@ const showPos = createSetting('DICTIONARY_SHOW_POS', true)
 const showDefinitions = createSetting('DICTIONARY_SHOW_DEFINITIONS', false)
 const showExamples = createSetting('DICTIONARY_SHOW_EXAMPLES', false)
 
-const arabicScriptOptions = computed(() => [
-  { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },
-  { value: 'ar', label: t('arabic_language_name') },
-  { value: 'ur', label: t('urdu_language_name') },
-  { value: 'ps', label: t('pashto_language_name') }
-])
-
-const chineseScriptOptions = computed(() => [
-  { value: 'zh-cn', label: `${t('chinese_simplified_name')} (${t('default_label')})` },
-  { value: 'zh-tw', label: t('chinese_traditional_name') },
-  { value: 'lzh', label: t('chinese_classical_name') },
-  { value: 'yue', label: t('chinese_cantonese_name') }
-])
-
-const devanagariScriptOptions = computed(() => [
-  { value: 'hi', label: `${t('hindi_language_name')} (${t('default_label')})` },
-  { value: 'mr', label: t('marathi_language_name') },
-  { value: 'ne', label: t('nepali_language_name') }
-])
-
-const latinScriptOptions = computed(() => [
-  { value: 'none', label: `${t('latin_priority_none_label')} (${t('default_label')})` },
-  { value: 'en', label: t('english_language_name') },
-  { value: 'fr', label: t('french_language_name') },
-  { value: 'es', label: t('spanish_language_name') },
-  { value: 'de', label: t('german_language_name') },
-  { value: 'it', label: t('italian_language_name') },
-  { value: 'pt', label: t('portuguese_language_name') },
-  { value: 'tr', label: t('turkish_language_name') },
-  { value: 'nl', label: t('dutch_language_name') }
-])
-
 // --- Provider & Language Logic ---
 
 const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value))
 const isAutoLanguageProvider = computed(() => selectedProviderInfo.value?.features?.includes('autoLanguage'))
 const selectedProviderInfo = computed(() => findProviderById(selectedProvider.value))
-const providerSettingsComponent = computed(() => {
-  const p = selectedProvider.value
-  const map = { gemini: 'Gemini', deepl: 'DeepL', browser: 'Browser', webai: 'WebAI', lingva: 'Lingva', openai: 'OpenAI', openrouter: 'OpenRouter', deepseek: 'Deepseek', custom: 'Custom' }
-  return map[p] ? defineAsyncComponent(() => import(`@/components/feature/api-settings/${map[p]}ApiSettings.vue`)) : null
-})
 
 const getFilteredLanguages = (type) => {
   const provider = selectedProvider.value
@@ -713,7 +480,7 @@ const validationError = computed(() => {
         ? 'validation_provider_config_empty' 
         : 'validation_api_key_empty';
         
-      return t(errorKey, { provider: selectedProviderInfo.value?.name || selectedProvider.value }) || 'Provider not configured'
+      return t(errorKey, { provider: selectedProviderInfo.value?.displayName || selectedProvider.value }) || 'Provider not configured'
     }
     return ''
   }

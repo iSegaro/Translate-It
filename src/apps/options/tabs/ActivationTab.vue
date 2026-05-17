@@ -14,575 +14,570 @@
     </div>
 
     <!-- Desktop FAB Menu -->
-    <BaseFieldset 
-      id="FIELDSET_FAB"
-      :legend="t('activation_group_fab_title') || 'Quick Action Button (FAB)'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': showDesktopFab }"
     >
-      <div class="setting-group">
-        <div class="setting-row fab-setting-row">
-          <BaseCheckbox
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">🔘</span>
+            <h3>{{ t('activation_group_fab_title') || 'Quick Action Button (FAB)' }}</h3>
+          </div>
+          <p class="card-description">{{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}</p>
+        </div>
+        <div class="card-actions">
+          <BaseToggle 
             id="SHOW_DESKTOP_FAB"
             v-model="showDesktopFab"
             :disabled="!extensionEnabled"
-            :label="t('show_desktop_fab_label') || 'Show Desktop Quick Action Button (FAB)'"
           />
-          <div 
-            class="fab-mode-select-wrapper"
-            :class="{ open: showDesktopFab }"
-          >
-            <BaseSelect
-              v-model="mobileUiMode"
-              :options="mobileModeOptions"
-              :disabled="!extensionEnabled || !showDesktopFab"
-              class="compact-select"
-            />
-          </div>
         </div>
-        <span class="setting-description">
-          {{ t('show_desktop_fab_description') || 'Display a floating action button on desktop to quickly access tools like Translate Page and Select Element.' }}
-        </span>
       </div>
 
-      <div 
-        class="sub-options-group"
-        :class="{ open: showDesktopFab }"
-      >
+      <Transition name="fade-slide">
         <div 
-          id="FAB_CUSTOMIZATION_SETTINGS"
-          class="sub-options-inner fab-appearance-options"
+          v-if="showDesktopFab" 
+          class="card-content"
         >
-          <div class="fab-appearance-item opacity-item">
-            <BaseRange
-              id="FAB_IDLE_OPACITY"
-              v-model="fabIdleOpacity"
-              :label="t('fab_idle_opacity_label') || 'Idle Fade Opacity'"
-              value-suffix="%"
-              min="0"
-              max="100"
-              :disabled="!extensionEnabled || !showDesktopFab"
-            />
-          </div>
+          <BaseAccordion
+            :id="'ADVANCED_FAB'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
+          >
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('mobile_ui_mode_label') || 'UI Mode' }}</label>
+                <BaseSelect
+                  v-model="mobileUiMode"
+                  :options="mobileModeOptions"
+                  :disabled="!extensionEnabled"
+                  class="compact-select"
+                />
+              </div>
 
-          <div class="separator-v" />
+              <div class="section-separator mini" />
 
-          <div class="fab-appearance-item size-item">
-            <label class="setting-label">{{ t('fab_size_label') || 'Icon Size' }}</label>
-            <BaseSelect
-              id="FAB_SIZE"
-              v-model="fabSize"
-              :options="fabSizeOptions"
-              :disabled="!extensionEnabled || !showDesktopFab"
-              class="compact-select"
-            />
-          </div>
+              <div class="fab-appearance-grid">
+                <div class="fab-appearance-item opacity-item">
+                  <BaseRange
+                    id="FAB_IDLE_OPACITY"
+                    v-model="fabIdleOpacity"
+                    :label="t('fab_idle_opacity_label') || 'Idle Fade Opacity'"
+                    value-suffix="%"
+                    min="0"
+                    max="100"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+
+                <div class="fab-appearance-item size-item">
+                  <label class="setting-label">{{ t('fab_size_label') || 'Icon Size' }}</label>
+                  <BaseSelect
+                    id="FAB_SIZE"
+                    v-model="fabSize"
+                    :options="fabSizeOptions"
+                    :disabled="!extensionEnabled"
+                    class="compact-select"
+                  />
+                </div>
+              </div>
+            </div>
+          </BaseAccordion>
         </div>
-      </div>
-    </BaseFieldset>
+      </Transition>
+    </div>
 
     <!-- Text Field Translation -->
-    <BaseFieldset 
-      id="activation_group_text_fields"
-      :legend="t('activation_group_text_fields_title') || 'Text Field Translation'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': translateOnTextFields || enableShortcutForTextFields }"
     >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="fieldProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
-          />
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">⌨️</span>
+            <h3>{{ t('activation_group_text_fields_title') || 'Text Field Translation' }}</h3>
+          </div>
+          <p class="card-description">{{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields.' }}</p>
         </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateOnTextFields"
-          :disabled="!extensionEnabled"
-          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
-        />
-        <span class="setting-description">
-          {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
-        </span>
-      </div>
-
-      <div class="setting-group">
-        <div class="setting-row">
-          <BaseCheckbox
-            v-model="enableShortcutForTextFields"
+        <div class="card-actions">
+          <BaseToggle 
+            v-model="translateOnTextFields"
             :disabled="!extensionEnabled"
-            :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
           />
-          <div 
-            class="shortcut-picker-animated-wrapper"
-            :class="{ open: enableShortcutForTextFields }"
-          >
-            <ShortcutPicker
-              v-model="textFieldShortcut"
-              :disabled="!extensionEnabled"
-              :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
-              class="inline-picker"
-            />
-          </div>
         </div>
-        <span
-          v-if="!enableShortcutForTextFields"
-          class="setting-description"
+      </div>
+
+      <Transition name="fade-slide">
+        <div 
+          v-if="translateOnTextFields || enableShortcutForTextFields" 
+          class="card-content"
         >
-          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using a keyboard shortcut to trigger translation when inside a text field.' }}
-        </span>
-      </div>
+          <BaseAccordion
+            :id="'ADVANCED_TEXT_FIELD'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
+          >
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('provider_label') }}</label>
+                <div class="setting-control">
+                  <ProviderSelector
+                    v-model="fieldProvider"
+                    allow-default
+                    mode="button"
+                    required-feature="bulk"
+                    only-configured
+                    :is-global="false"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
 
-      <!-- Text Field Mode Options -->
-      <div 
-        class="sub-options-group"
-        :class="{ open: translateOnTextFields || enableShortcutForTextFields }"
-      >
-        <div class="sub-options-inner">
-          <div class="radio-group">
-            <BaseRadio
-              v-model="textFieldMode"
-              value="replace"
-              name="textFieldMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
-            />
-            <BaseRadio
-              v-model="textFieldMode"
-              value="copy"
-              name="textFieldMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
-            />
-          </div>
+              <div class="section-separator mini" />
 
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox 
-              v-model="replaceOnSpecialSites" 
-              :disabled="!extensionEnabled || textFieldMode !== 'copy'"
-              :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
-            />
-          </div>
+              <div class="setting-group">
+                <div class="setting-row">
+                  <BaseCheckbox
+                    v-model="enableShortcutForTextFields"
+                    :disabled="!extensionEnabled"
+                    :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
+                  />
+                  <div 
+                    class="shortcut-picker-animated-wrapper"
+                    :class="{ open: enableShortcutForTextFields }"
+                  >
+                    <ShortcutPicker
+                      v-model="textFieldShortcut"
+                      :disabled="!extensionEnabled"
+                      :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
+                      class="inline-picker"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="radio-group horizontal">
+                <BaseRadio
+                  v-model="textFieldMode"
+                  value="replace"
+                  name="textFieldMode"
+                  :disabled="!extensionEnabled"
+                  :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
+                />
+                <BaseRadio
+                  v-model="textFieldMode"
+                  value="copy"
+                  name="textFieldMode"
+                  :disabled="!extensionEnabled"
+                  :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
+                />
+              </div>
+
+              <div class="setting-group mt-md">
+                <BaseCheckbox 
+                  v-model="replaceOnSpecialSites" 
+                  :disabled="!extensionEnabled || textFieldMode !== 'copy'"
+                  :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
+                />
+              </div>
+            </div>
+          </BaseAccordion>
         </div>
-      </div>
-    </BaseFieldset>
+      </Transition>
+    </div>
 
     <!-- Select Element -->
-    <BaseFieldset 
-      id="activation_group_select_element"
-      :legend="t('activation_group_select_element_title') || 'Select Element'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': translateWithSelectElement }"
     >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="selectElementProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || !translateWithSelectElement"
-          />
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">🖱️</span>
+            <h3>{{ t('activation_group_select_element_title') || 'Select Element' }}</h3>
+          </div>
+          <p class="card-description">{{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method.' }}</p>
         </div>
-      </template>
-      <div class="setting-group">
-        <div class="setting-row">
-          <BaseCheckbox
+        <div class="card-actions">
+          <BaseToggle 
             v-model="translateWithSelectElement"
             :disabled="!extensionEnabled"
-            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
           />
-          <div 
-            id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
-            class="shortcut-picker-animated-wrapper"
-            :class="{ open: translateWithSelectElement }"
-          >
-            <ConfigureShortcutButton
-              command-name="SELECT-ELEMENT-COMMAND"
-              :disabled="!extensionEnabled"
-            />
-          </div>
-        </div>
-        <span class="setting-description">
-          {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
-        </span>
-      </div>
-
-      <!-- Select Element Sub-Options -->
-      <div 
-        class="sub-options-group"
-        :class="{ open: translateWithSelectElement }"
-      >
-        <div class="sub-options-inner">
-          <div
-            id="SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER"
-            class="setting-group sub-setting-group"
-          >
-            <BaseCheckbox
-              v-model="selectElementShowOriginal"
-              :disabled="!extensionEnabled"
-              :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
-            />
-            <span class="setting-description">
-              {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
-            </span>
-          </div>
-
-          <div
-            id="PAGE_CONTEXT_SELECT_ELEMENT"
-            class="setting-group sub-setting-group"
-          >
-            <BaseCheckbox
-              v-model="showSelectElementInContextMenu"
-              :disabled="!extensionEnabled"
-              :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
-            />
-            <span class="setting-description">
-              {{ t('show_select_element_in_context_menu_description') || 'Display the \'Select Element\' option in the browser\'s right-click context menu.' }}
-            </span>
-          </div>
         </div>
       </div>
-    </BaseFieldset>
+
+      <Transition name="fade-slide">
+        <div 
+          v-if="translateWithSelectElement" 
+          class="card-content"
+        >
+          <BaseAccordion
+            :id="'ADVANCED_SELECT_ELEMENT'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
+          >
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('provider_label') }}</label>
+                <div class="setting-control">
+                  <ProviderSelector
+                    v-model="selectElementProvider"
+                    allow-default
+                    mode="button"
+                    required-feature="bulk"
+                    only-configured
+                    :is-global="false"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('shortcuts_label') || 'Shortcut' }}</label>
+                <div 
+                  id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
+                  class="setting-control"
+                >
+                  <ConfigureShortcutButton
+                    command-name="SELECT-ELEMENT-COMMAND"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="selectElementShowOriginal"
+                  :disabled="!extensionEnabled"
+                  :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
+                />
+                <BaseCheckbox
+                  v-model="showSelectElementInContextMenu"
+                  :disabled="!extensionEnabled"
+                  :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
+                />
+              </div>
+            </div>
+          </BaseAccordion>
+        </div>
+      </Transition>
+    </div>
 
     <!-- On-Page Selection -->
-    <BaseFieldset 
-      id="activation_group_page_selection"
-      :legend="t('activation_group_page_selection_title') || 'On-Page Selection'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': translateOnTextSelection }"
     >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !translateOnTextSelection }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="selectionProvider"
-            allow-default
-            mode="button"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || !translateOnTextSelection"
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">🎯</span>
+            <h3>{{ t('activation_group_page_selection_title') || 'On-Page Selection' }}</h3>
+          </div>
+          <p class="card-description">{{ t('translate_on_text_selection_description') || 'Allow triggering translation automatically or via icon after selecting text.' }}</p>
+        </div>
+        <div class="card-actions">
+          <BaseToggle 
+            v-model="translateOnTextSelection"
+            :disabled="!extensionEnabled"
           />
         </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateOnTextSelection"
-          :disabled="!extensionEnabled"
-          :label="t('translate_on_text_selection_label') || 'Enable translation on text selection'"
-        />
-        <span class="setting-description">
-          {{ t('translate_on_text_selection_description') || 'Allow triggering translation automatically or via shortcut after selecting text on the page.' }}
-        </span>
       </div>
 
-      <!-- Selection Mode Options -->
-      <div 
-        class="sub-options-group"
-        :class="{ open: translateOnTextSelection }"
-      >
-        <div class="sub-options-inner">
-          <div class="radio-group">
-            <BaseRadio
-              v-model="selectionTranslationMode"
-              :value="SelectionTranslationMode.IMMEDIATE"
-              name="selectionTranslationMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_selection_mode_immediate') || 'Immediately'"
-            />
-            <BaseRadio
-              v-model="selectionTranslationMode"
-              :value="SelectionTranslationMode.ON_CLICK"
-              name="selectionTranslationMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_selection_mode_onclick') || 'Show Icon'"
-            />
-            <BaseRadio
-              v-model="selectionTranslationMode"
-              :value="SelectionTranslationMode.ON_FAB_CLICK"
-              name="selectionTranslationMode"
-              :disabled="!extensionEnabled || !showDesktopFab"
-              :label="t('options_selection_mode_onfabclick') || 'FAB'"
-            />
-          </div>
+      <Transition name="fade-slide">
+        <div 
+          v-if="translateOnTextSelection" 
+          class="card-content"
+        >
+          <BaseAccordion
+            :id="'ADVANCED_SELECTION'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
+          >
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('provider_label') }}</label>
+                <div class="setting-control">
+                  <ProviderSelector
+                    v-model="selectionProvider"
+                    allow-default
+                    mode="button"
+                    only-configured
+                    :is-global="false"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
 
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="requireCtrlForTextSelection"
-              :disabled="!extensionEnabled || selectionTranslationMode !== SelectionTranslationMode.IMMEDIATE"
-              :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
-            />
-          </div>
+              <div class="section-separator mini" />
 
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="activeSelectionIconOnTextfields"
-              :disabled="!extensionEnabled"
-              :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
-            />
-            <span class="setting-description">
-              {{ t('active_selection_icon_on_textfields_description') || 'Show translation icon when selecting text inside text fields (input, textarea).' }}
-            </span>
-          </div>
+              <div class="radio-group horizontal">
+                <BaseRadio
+                  v-model="selectionTranslationMode"
+                  :value="SelectionTranslationMode.IMMEDIATE"
+                  name="selectionTranslationMode"
+                  :disabled="!extensionEnabled"
+                  :label="t('options_selection_mode_immediate') || 'Immediately'"
+                />
+                <BaseRadio
+                  v-model="selectionTranslationMode"
+                  :value="SelectionTranslationMode.ON_CLICK"
+                  name="selectionTranslationMode"
+                  :disabled="!extensionEnabled"
+                  :label="t('options_selection_mode_onclick') || 'Show Icon'"
+                />
+                <BaseRadio
+                  v-model="selectionTranslationMode"
+                  :value="SelectionTranslationMode.ON_FAB_CLICK"
+                  name="selectionTranslationMode"
+                  :disabled="!extensionEnabled || !showDesktopFab"
+                  :label="t('options_selection_mode_onfabclick') || 'FAB'"
+                />
+              </div>
 
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="enhancedTripleClickDrag"
-              :disabled="!extensionEnabled"
-              :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
-            />
-            <span class="setting-description">
-              {{ t('enhanced_triple_click_drag_description') || 'When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs.' }}
-            </span>
-          </div>
+              <div class="section-separator mini" />
+
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="requireCtrlForTextSelection"
+                  :disabled="!extensionEnabled || selectionTranslationMode !== SelectionTranslationMode.IMMEDIATE"
+                  :label="t('require_ctrl_for_text_selection_label') || 'Require Ctrl key for text selection translation'"
+                />
+                <BaseCheckbox
+                  v-model="activeSelectionIconOnTextfields"
+                  :disabled="!extensionEnabled"
+                  :label="t('active_selection_icon_on_textfields_label') || 'Active Selection Icon on Textfields'"
+                />
+                <BaseCheckbox
+                  v-model="enhancedTripleClickDrag"
+                  :disabled="!extensionEnabled"
+                  :label="t('enhanced_triple_click_drag_label') || 'Enhanced Triple-Click + Drag Support'"
+                />
+              </div>
+            </div>
+          </BaseAccordion>
         </div>
-      </div>
-    </BaseFieldset>
+      </Transition>
+    </div>
 
     <!-- Whole Page Translation -->
-    <BaseFieldset 
-      id="FIELDSET_WHOLE_PAGE"
-      :legend="t('whole_page_translation_section_title') || 'Whole Page Translation'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': wholePageEnabled }"
     >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !wholePageEnabled }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="pageProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || !wholePageEnabled"
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">🌐</span>
+            <h3>{{ t('whole_page_translation_section_title') || 'Whole Page Translation' }}</h3>
+          </div>
+          <p class="card-description">{{ t('whole_page_translation_enabled_description') || 'Allow translating the entire web page content while maintaining the layout.' }}</p>
+        </div>
+        <div class="card-actions">
+          <BaseToggle 
+            v-model="wholePageEnabled"
+            :disabled="!extensionEnabled"
           />
         </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          id="WHOLE_PAGE_TRANSLATION_ENABLED"
-          v-model="wholePageEnabled"
-          :disabled="!extensionEnabled"
-          :label="t('whole_page_translation_enabled_label') || 'Enable Whole Page Translation'"
-        />
-        <span class="setting-description">
-          {{ t('whole_page_translation_enabled_description') || 'Allow translating the entire web page content while maintaining the layout.' }}
-        </span>
       </div>
 
-      <div
-        class="sub-options-group"
-        :class="{ open: wholePageEnabled }"
-      >
-        <div class="sub-options-inner">
-          <div 
-            id="WHOLE_PAGE_TRIGGER_MODE"
-            class="setting-group sub-setting-group whole-page-trigger-group"
+      <Transition name="fade-slide">
+        <div 
+          v-if="wholePageEnabled" 
+          class="card-content"
+        >
+          <BaseAccordion
+            :id="'ADVANCED_WHOLE_PAGE'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
           >
-            <div class="trigger-modes-container">
-              <div class="radio-group-horizontal">
-                <BaseRadio
-                  v-model="wholePageTranslateAfterScrollStop"
-                  :value="true"
-                  name="wholePageTrigger"
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('provider_label') }}</label>
+                <div class="setting-control">
+                  <ProviderSelector
+                    v-model="pageProvider"
+                    allow-default
+                    mode="button"
+                    required-feature="bulk"
+                    only-configured
+                    :is-global="false"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="setting-group vertical">
+                <div class="radio-group horizontal mb-md">
+                  <BaseRadio
+                    v-model="wholePageTranslateAfterScrollStop"
+                    :value="true"
+                    name="wholePageTrigger"
+                    :disabled="!extensionEnabled"
+                    :label="t('whole_page_trigger_on_stop') || 'On Scroll Stop'"
+                  />
+                  <BaseRadio
+                    v-model="wholePageTranslateAfterScrollStop"
+                    :value="false"
+                    name="wholePageTrigger"
+                    :disabled="!extensionEnabled"
+                    :label="t('whole_page_trigger_fluid') || 'During Scroll'"
+                  />
+                </div>
+
+                <div class="setting-row horizontal">
+                  <label class="setting-label">{{ t('whole_page_delay_label') || 'Translation Delay' }}</label>
+                  <div class="number-input-container">
+                    <input
+                      v-model.number="wholePageScrollStopDelay"
+                      type="number"
+                      min="100"
+                      max="5000"
+                      step="100"
+                      class="base-number-input compact-input"
+                      :disabled="!extensionEnabled"
+                    >
+                    <span class="unit-label">ms</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="wholePageShowOriginal"
                   :disabled="!extensionEnabled"
-                  :label="t('whole_page_trigger_on_stop') || 'On Scroll Stop'"
+                  :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
                 />
-                <BaseRadio
-                  v-model="wholePageTranslateAfterScrollStop"
-                  :value="false"
-                  name="wholePageTrigger"
+                <BaseCheckbox
+                  v-model="wholePageLazyLoading"
                   :disabled="!extensionEnabled"
-                  :label="t('whole_page_trigger_fluid') || 'During Scroll'"
+                  :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
+                />
+                <BaseCheckbox
+                  v-model="wholePageAutoTranslate"
+                  :disabled="!extensionEnabled"
+                  :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content'"
+                />
+                <BaseCheckbox
+                  v-model="wholePageTokenWarningEnabled"
+                  :disabled="!extensionEnabled"
+                  :label="t('whole_page_token_warning_label') || 'Show token usage warning'"
                 />
               </div>
             </div>
-
-            <div class="delay-setting-container">
-              <span 
-                class="delay-label"
-                :class="{ 'is-disabled': !extensionEnabled }"
-              >{{ t('whole_page_delay_label') || 'Translation Delay' }}:</span>
-              <div class="number-input-container inline-delay-input">
-                <input
-                  v-model.number="wholePageScrollStopDelay"
-                  type="number"
-                  min="100"
-                  max="5000"
-                  step="100"
-                  class="base-number-input compact-input"
-                  :disabled="!extensionEnabled"
-                >
-                <span 
-                  class="unit-label"
-                  :class="{ 'is-disabled': !extensionEnabled }"
-                >{{ t('whole_page_scroll_stop_delay_unit') || 'ms' }}</span>
-              </div>
-            </div>
-            <span class="setting-description">
-              {{ wholePageTranslateAfterScrollStop 
-                ? (t('whole_page_translate_after_scroll_stop_description') || 'Only trigger translation when you stop scrolling.')
-                : (t('whole_page_translate_fluid_description') || 'Translate continuously with a slight delay during scrolling.') 
-              }}
-            </span>
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageShowOriginal"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_show_original_on_hover_label') || 'Show original on hover'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over translated content.' }}
-            </span>
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageLazyLoading"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_lazy_loading_label') || 'Lazy Loading (Performance)'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_lazy_loading_description') || 'Only translate parts of the page that are visible or near the viewport.' }}
-            </span>
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox
-              v-model="wholePageAutoTranslate"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_auto_translate_on_dom_changes_label') || 'Auto-translate new content (Infinite Scroll)'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_auto_translate_on_dom_changes_description') || 'Automatically detect and translate new content as it appears.' }}
-            </span>
-          </div>
-
-          <div 
-            id="WHOLE_PAGE_TOKEN_WARNING_HIDDEN"
-            class="setting-group sub-setting-group"
-          >
-            <BaseCheckbox
-              v-model="wholePageTokenWarningEnabled"
-              :disabled="!extensionEnabled"
-              :label="t('whole_page_token_warning_label') || 'Show token usage warning'"
-            />
-            <span class="setting-description">
-              {{ t('whole_page_token_warning_description') || 'Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL).' }}
-            </span>
-          </div>
+          </BaseAccordion>
         </div>
-      </div>
-    </BaseFieldset>
+      </Transition>
+    </div>
 
     <!-- Mouse on Hover Translation -->
-    <BaseFieldset 
-      id="activation_group_mouse_hover"
-      :legend="t('activation_group_mouse_hover_title') || 'Mouse on Hover Translation'"
+    <div 
+      class="feature-card"
+      :class="{ 'is-enabled': mouseHoverEnabled }"
     >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="mouseHoverProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || !mouseHoverEnabled"
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="title-with-icon">
+            <span class="card-icon">🖱️</span>
+            <h3>{{ t('activation_group_mouse_hover_title') || 'Mouse on Hover Translation' }}</h3>
+          </div>
+          <p class="card-description">{{ t('mouse_hover_translation_enabled_description') || 'Automatically translate text when you hover over it.' }}</p>
+        </div>
+        <div class="card-actions">
+          <BaseToggle 
+            v-model="mouseHoverEnabled"
+            :disabled="!extensionEnabled"
           />
         </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          id="MOUSE_HOVER_TRANSLATION_ENABLED"
-          v-model="mouseHoverEnabled"
-          :disabled="!extensionEnabled"
-          :label="t('mouse_hover_translation_enabled_label') || 'Enable Mouse on Hover Translation'"
-        />
-        <span class="setting-description">
-          {{ t('mouse_hover_translation_enabled_description') || 'Automatically translate text when you hover over it.' }}
-        </span>
       </div>
 
-      <div 
-        class="sub-options-group"
-        :class="{ open: mouseHoverEnabled }"
-      >
-        <div class="sub-options-inner">
-          <!-- Scope -->
-          <div class="horizontal-setting-row">
-            <label class="setting-label">{{ t('mouse_hover_scope_label') || 'Translation Scope' }}</label>
-            <div class="setting-control-group">
-              <BaseSelect
-                id="MOUSE_HOVER_SCOPE"
-                v-model="mouseHoverScope"
-                :options="mouseHoverScopeOptions"
-                :disabled="!extensionEnabled || !mouseHoverEnabled"
-                class="compact-select"
-              />
+      <Transition name="fade-slide">
+        <div 
+          v-if="mouseHoverEnabled" 
+          class="card-content"
+        >
+          <BaseAccordion
+            :id="'ADVANCED_MOUSE_HOVER'"
+            :legend="t('advanced_settings_label') || 'Advanced Settings'"
+            class="advanced-settings-accordion"
+          >
+            <div class="advanced-content">
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('provider_label') }}</label>
+                <div class="setting-control">
+                  <ProviderSelector
+                    v-model="mouseHoverProvider"
+                    allow-default
+                    mode="button"
+                    required-feature="bulk"
+                    only-configured
+                    :is-global="false"
+                    :disabled="!extensionEnabled"
+                  />
+                </div>
+              </div>
+
+              <div class="section-separator mini" />
+
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('mouse_hover_scope_label') || 'Translation Scope' }}</label>
+                <div class="setting-control">
+                  <BaseSelect
+                    id="MOUSE_HOVER_SCOPE"
+                    v-model="mouseHoverScope"
+                    :options="mouseHoverScopeOptions"
+                    :disabled="!extensionEnabled"
+                    class="compact-select"
+                  />
+                </div>
+              </div>
+
               <div 
                 v-if="mouseHoverScope === 'container'"
-                class="inline-checkbox-wrapper"
+                class="setting-group vertical mt-sm"
               >
                 <BaseCheckbox
                   id="MOUSE_HOVER_SHOW_CONTAINER_BORDER"
                   v-model="mouseHoverShowBorder"
-                  :disabled="!extensionEnabled || !mouseHoverEnabled"
+                  :disabled="!extensionEnabled"
                   :label="t('mouse_hover_show_container_border_label') || 'Show border around container'"
                 />
               </div>
-            </div>
-          </div>
 
-          <div class="section-separator mini" />
+              <div class="section-separator mini" />
 
-          <!-- Trigger & Delay -->
-          <div class="horizontal-setting-row">
-            <label class="setting-label">{{ t('mouse_hover_trigger_label') || 'Trigger' }}</label>
-            <div class="setting-control-group">
-              <BaseSelect
-                id="MOUSE_HOVER_TRIGGER"
-                v-model="mouseHoverTrigger"
-                :options="mouseHoverTriggerOptions"
-                :disabled="!extensionEnabled || !mouseHoverEnabled"
-                class="compact-select"
-              />
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('mouse_hover_trigger_label') || 'Trigger' }}</label>
+                <div class="setting-control">
+                  <BaseSelect
+                    id="MOUSE_HOVER_TRIGGER"
+                    v-model="mouseHoverTrigger"
+                    :options="mouseHoverTriggerOptions"
+                    :disabled="!extensionEnabled"
+                    class="compact-select"
+                  />
+                </div>
+              </div>
 
-              <!-- Delay (Only shown for Immediate) -->
               <div 
                 v-if="mouseHoverTrigger === 'hover'"
-                class="inline-control-wrapper"
+                class="setting-row horizontal mt-sm"
               >
-                <span 
-                  class="setting-label"
-                  :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-                >{{ t('mouse_hover_delay_label') || 'Hover Delay' }}:</span>
-                <div class="number-input-container inline-delay-input">
+                <label class="setting-label">{{ t('mouse_hover_delay_label') || 'Hover Delay' }}</label>
+                <div class="number-input-container">
                   <input
                     id="MOUSE_HOVER_DELAY"
                     v-model.number="mouseHoverDelay"
@@ -591,38 +586,33 @@
                     max="5000"
                     step="100"
                     class="base-number-input compact-input"
-                    :disabled="!extensionEnabled || !mouseHoverEnabled"
+                    :disabled="!extensionEnabled"
                   >
-                  <span 
-                    class="unit-label"
-                    :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-                  >ms</span>
+                  <span class="unit-label">ms</span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div class="section-separator mini" />
+              <div class="section-separator mini" />
 
-          <!-- Auto Close & Display Time -->
-          <div class="horizontal-setting-row">
-            <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
-            <div class="setting-control-group">
-              <BaseSelect
-                id="MOUSE_HOVER_AUTO_CLOSE"
-                v-model="mouseHoverAutoClose"
-                :options="mouseHoverAutoCloseOptions"
-                :disabled="!extensionEnabled || !mouseHoverEnabled"
-                class="compact-select"
-              />
+              <div class="setting-row horizontal">
+                <label class="setting-label">{{ t('mouse_hover_autoclose_label') || 'Auto-Close Tooltip' }}</label>
+                <div class="setting-control">
+                  <BaseSelect
+                    id="MOUSE_HOVER_AUTO_CLOSE"
+                    v-model="mouseHoverAutoClose"
+                    :options="mouseHoverAutoCloseOptions"
+                    :disabled="!extensionEnabled"
+                    class="compact-select"
+                  />
+                </div>
+              </div>
 
-              <!-- Display Time -->
               <div 
                 v-if="mouseHoverAutoClose === 'timer'"
-                class="inline-control-wrapper"
+                class="setting-row horizontal mt-sm"
               >
                 <label class="setting-label">{{ t('mouse_hover_timer_label') || 'Display Time' }}</label>
-                <div class="number-input-container inline-delay-input">
+                <div class="number-input-container">
                   <input
                     id="MOUSE_HOVER_TIMER_DURATION"
                     v-model.number="mouseHoverTimerDuration"
@@ -631,19 +621,16 @@
                     max="30000"
                     step="500"
                     class="base-number-input compact-input"
-                    :disabled="!extensionEnabled || !mouseHoverEnabled"
+                    :disabled="!extensionEnabled"
                   >
-                  <span 
-                    class="unit-label"
-                    :class="{ 'is-disabled': !extensionEnabled || !mouseHoverEnabled }"
-                  >ms</span>
+                  <span class="unit-label">ms</span>
                 </div>
               </div>
             </div>
-          </div>
+          </BaseAccordion>
         </div>
-      </div>
-    </BaseFieldset>
+      </Transition>
+    </div>
   </section>
 </template>
 
@@ -661,6 +648,7 @@ import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseToggle from '@/components/base/BaseToggle.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseRange from '@/components/base/BaseRange.vue'

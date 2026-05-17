@@ -50,6 +50,7 @@ const router = useRouter()
 // Navigation items, labels are reactive to language changes
 const navigationItems = ref([
   { name: 'languages', labelKey: 'languages_tab_title' },
+  { name: 'providers', labelKey: 'providers_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'tts', labelKey: 'tts_tab_title' },
   { name: 'ocr', labelKey: 'ocr_tab_title' },

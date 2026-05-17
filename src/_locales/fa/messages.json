@@ -239,6 +239,30 @@
   "languages_tab_title": {
     "message": "زبان‌ها"
   },
+  "providers_tab_title": {
+    "message": "سرویس‌ها"
+  },
+  "configure_service_button": {
+    "message": "تنظیم سرویس ⚙️"
+  },
+  "provider_config_required_api": {
+    "message": "این سرویس ({provider}) نیاز به کلید API دارد."
+  },
+  "provider_config_required_url": {
+    "message": "این سرویس ({provider}) نیاز به آدرس سرور (URL) دارد."
+  },
+  "provider_config_required_generic": {
+    "message": "این سرویس ({provider}) نیاز به تنظیمات دارد."
+  },
+  "advanced_settings_label": {
+    "message": "تنظیمات پیشرفته"
+  },
+  "mobile_ui_mode_label": {
+    "message": "حالت رابط کاربری"
+  },
+  "shortcuts_label": {
+    "message": "میانبرهای کیبورد"
+  },
   "appearance_tab_title": {
     "message": "ظاهر"
   },
