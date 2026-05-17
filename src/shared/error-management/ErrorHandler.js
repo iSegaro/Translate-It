@@ -183,7 +183,11 @@ export class ErrorHandler {
       
       // Logging
       if (this.debugMode && !shouldSuppressConsole(type)) {
-        const logLevel = (enhancedMeta.showToast || enhancedMeta.showInUI) ? 'error' : 'debug';
+        let logLevel = 'debug';
+        if (enhancedMeta.showToast || enhancedMeta.showInUI) {
+          logLevel = getErrorToastType(type) === 'warning' ? 'warn' : 'error';
+        }
+        
         const logPrefix = `[${type}]${enhancedMeta.context ? ` (${enhancedMeta.context})` : ''}`;
         logger[logLevel](logPrefix, err);
       }

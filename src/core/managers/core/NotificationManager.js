@@ -46,7 +46,7 @@ export default class NotificationManager extends ResourceTracker {
       actions: options.actions || []
     };
 
-    const logLevel = type === 'error' ? 'error' : 'info';
+    const logLevel = type === 'error' ? 'error' : (type === 'warning' ? 'warn' : 'info');
     this.logger[logLevel](`[Notification] Showing ${type} notification: ${message}`);
     
     pageEventBus.emit('show-notification', detail);
