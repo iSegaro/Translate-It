@@ -4,6 +4,7 @@
 
 - Added [Mouse on Hover Translation](#/activation?highlight=activation_group_mouse_hover) for instant, frictionless translation by simply hovering over text or containers
 - Added customizable **Idle Opacity** and **Icon Size** for the [Quick Action Button (FAB)](#/activation?highlight=FAB_CUSTOMIZATION_SETTINGS)
+- Added an option to [hide translation providers](#/languages?highlight=HIDDEN_PROVIDERS_CHECKBOX) you don’t use to keep the interface cleaner
 
 ---
 
