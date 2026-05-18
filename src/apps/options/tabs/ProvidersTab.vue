@@ -113,7 +113,6 @@ import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, watch } fr
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { useTabSettings } from '../composables/useTabSettings.js'
 import { findProviderById, getProviderManifest } from '@/features/translation/providers/ProviderManifest.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
@@ -131,7 +130,6 @@ const settingsStore = useSettingsStore()
 const route = useRoute()
 const { t } = useUnifiedI18n()
 const { checkAndHighlight, highlightElement } = useHighlightManager()
-const { createSetting } = useTabSettings(settingsStore, logger)
 
 // Local selection (does NOT update global TRANSLATION_API)
 const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)

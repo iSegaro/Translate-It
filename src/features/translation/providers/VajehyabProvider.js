@@ -191,10 +191,10 @@ export class VajehyabProvider extends BaseProvider {
       .replace(/<p>/gi, ' ')
       .replace(/<[^>]+>/g, '')
       // Convert poetry separators to newlines
-      .replace(/◻/g, '\n')
-      .replace(/︎/g, '\n')
+      .replace(/\u25FB/g, '\n')
+      .replace(/\uFE0E/g, '\n')
       // Remove zero-width characters
-      .replace(/[​-‍⁠﻿]/g, '');
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
 
     // Split by &lang; separator
     const sections = cleaned.split('&lang;');

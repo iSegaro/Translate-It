@@ -313,7 +313,6 @@
             </div>
           </template>
         </BaseAccordion>
-
       </template>
     </div>
   </section>
