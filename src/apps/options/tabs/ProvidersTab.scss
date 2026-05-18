@@ -18,9 +18,36 @@
     max-width: 100% !important;
   }
 
-  // API Settings Section
+  .primary-service-selection {
+    margin-top: $spacing-lg;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: $spacing-lg;
+
+    label {
+      flex: 0 0 220px;
+      width: 220px;
+      font-weight: $font-weight-medium;
+      margin-bottom: 0;
+      white-space: nowrap;
+    }
+
+    .selector-wrapper {
+      flex: 0 0 200px;
+      width: 200px;
+      min-width: 200px;
+
+      :deep(.ti-provider-button-container) {
+        width: 100%;
+        max-width: 200px;
+      }
+    }
+  }
+
   .api-settings-section {
-    margin-top: 0;
+    margin-top: $spacing-md;
     width: 100%;
     box-sizing: border-box;
 
@@ -111,36 +138,6 @@
         line-height: 1.4;
         margin-top: 2px;
         opacity: 0.8;
-      }
-    }
-  }
-
-  .api-settings-accordion {
-    :deep(.ti-accordion-header) {
-      font-weight: $font-weight-bold;
-    }
-
-    .accordion-header-layout {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      padding-inline-end: $spacing-md;
-      box-sizing: border-box;
-
-      .header-selector-wrapper {
-        flex: 0 0 200px;
-        width: 200px;
-        font-weight: $font-weight-normal;
-
-        :deep(.ti-provider-button-container) {
-          max-width: 200px !important;
-          
-          .ti-provider-button {
-            height: 32px !important;
-            padding: 0 10px !important;
-          }
-        }
       }
     }
   }
@@ -316,63 +313,11 @@
     }
   }
 
-  // Ensure accordions allow content to overflow when open while maintaining animations
-  .api-settings-accordion, .ai-optimization-setting {
-    position: relative;
-    
-    &.is-open {
-      z-index: 100; // Stay above subsequent accordions when open
-      overflow: visible;
-
-      .accordion-body {
-        // Keep display: grid (from base) for smooth height transition, but allow overflow
-        overflow: visible !important;
-      }
-
-      .body-inner {
-        overflow: visible !important;
-      }
-    }
-  }
-
-  // AI Optimization
-  .ai-optimization-setting {
-    margin-top: $spacing-md;
-
-    .setting-group {
-      padding-inline-start: 32px; 
-    }
-  }
-
-  .section-separator {
-    height: 1px;
-    background-color: var(--color-border-light, #eee);
-    margin: $spacing-xl 0;
-
-    &.mini {
-      margin: $spacing-md 0;
-      opacity: 0.5;
-    }
-  }
-
-  .setting-description {
-    font-size: $font-size-sm;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-    margin: 0 0 $spacing-xs 0;
-
-    &.mb-md {
-      margin-bottom: $spacing-md;
-    }
-  }
-
   // --- Common alignment for all top-level setting groups ---
   .settings-container > .setting-group,
   .settings-container > .section-separator,
-  .api-settings-accordion :deep(.ti-accordion-header),
-  .ai-optimization-setting :deep(.ti-accordion-header),
-  .accordion-inner {
-    margin-inline-start: 28px !important;
+  .api-settings-section,
+  .primary-service-selection {
     width: auto !important;
     box-sizing: border-box !important;
   }
@@ -392,24 +337,6 @@
       }
     }
   }
-
-  .accordion-inner {
-    padding: $spacing-sm 0 $spacing-md 0 !important;
-    display: block !important;
-    overflow: visible !important; 
-
-    .setting-group,
-    .optimization-control-area,
-    .provider-settings-container,
-    .api-settings-section,
-    .provider-settings,
-    .setting-description {
-      margin-inline-start: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      box-sizing: border-box !important;
-    }
-  }
 }
 
 // Mobile responsive
@@ -417,21 +344,9 @@
   .providers-tab {
     .settings-container > .setting-group,
     .settings-container > .section-separator,
-    .api-settings-accordion :deep(.ti-accordion-header),
-    .ai-optimization-setting :deep(.ti-accordion-header),
-    .accordion-inner {
-      margin-inline-start: 0 !important;
+    .api-settings-section,
+    .primary-service-selection {
       width: 100% !important;
-    }
-    
-    .accordion-inner {
-      padding-inline-start: 0 !important;
-    }
-
-    .ai-optimization-setting {
-      .setting-group {
-        padding-inline-start: 0 !important; 
-      }
     }
   }
 }

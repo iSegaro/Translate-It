@@ -3,121 +3,103 @@
     <div class="settings-container">
       <h2>{{ t('providers_tab_title') || 'Service Settings' }}</h2>
 
-      <!-- API Settings Accordion -->
-      <BaseAccordion
-        id="TRANSLATION_API"
-        :is-open="activeAccordion === 'api'"
-        item-class="api-settings-accordion"
-        @toggle="toggleAccordion('api')"
-      >
-        <template #header>
-          <div class="accordion-header-layout">
-            <span>{{ t('translation_api_label') || 'Service' }}</span>
+      <!-- Service Selection -->
+      <div class="setting-group primary-service-selection">
+        <label>{{ t('translation_api_label') || 'Primary Service' }}</label>
+        <div class="selector-wrapper">
+          <ProviderSelector 
+            v-model="selectedProvider" 
+            mode="button"
+            :is-global="false"
+            ignore-hidden
+          />
+        </div>
+      </div>
+
+      <div class="api-settings-section">
+        <div class="provider-settings-container">
+          <Transition name="fade-slide">
             <div 
-              class="header-selector-wrapper"
-              @click.stop
+              :key="selectedProvider"
+              class="provider-settings"
             >
-              <ProviderSelector 
-                v-model="selectedProvider" 
-                mode="button"
-                :is-global="false"
-                ignore-hidden
-              />
-            </div>
-          </div>
-        </template>
-
-        <template #content>
-          <div class="accordion-inner">
-            <div class="api-settings-section">
-              <div class="provider-settings-container">
-                <Transition name="fade-slide">
-                  <div 
-                    :key="selectedProvider"
-                    class="provider-settings"
-                  >
-                    <!-- Optimization Level Section -->
-                    <template v-if="!isAutoLanguageProvider">
-                      <div 
-                        id="OPTIMIZATION_LEVELS_SECTION"
-                        class="optimization-control-area"
+              <!-- Optimization Level Section -->
+              <template v-if="!isAutoLanguageProvider">
+                <div 
+                  id="OPTIMIZATION_LEVELS_SECTION"
+                  class="optimization-control-area"
+                >
+                  <div class="opt-control-group">
+                    <div class="label-with-value">
+                      <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
+                      <span
+                        class="level-badge"
+                        :class="'level-' + currentOptimizationLevel"
                       >
-                        <div class="opt-control-group">
-                          <div class="label-with-value">
-                            <label class="opt-label">{{ t('optimization_level_label') || 'Translation Strategy (Speed vs. Cost)' }}</label>
-                            <span
-                              class="level-badge"
-                              :class="'level-' + currentOptimizationLevel"
-                            >
-                              {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
-                            </span>
-                          </div>
-                        
-                          <div class="slider-wrapper">
-                            <input 
-                              v-model.number="currentOptimizationLevel" 
-                              type="range" 
-                              min="1" 
-                              max="5"
-                              class="ti-range-slider"
-                            >
-                            <div class="slider-labels">
-                              <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
-                              <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 2"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
-                              <span
-                                class="slider-tick"
-                                @click="currentOptimizationLevel = 4"
-                              >|</span>
-                              <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
-                            </div>
-                          </div>
-                        
-                          <p class="opt-description">
-                            {{ isAIProvider 
-                              ? t('optimization_description_ai') 
-                              : t('optimization_description_traditional') 
-                            }}
-                          </p>
-                        </div>
+                        {{ t('optimization_level_' + currentOptimizationLevel) || 'Level ' + currentOptimizationLevel }}
+                      </span>
+                    </div>
+                  
+                    <div class="slider-wrapper">
+                      <input 
+                        v-model.number="currentOptimizationLevel" 
+                        type="range" 
+                        min="1" 
+                        max="5"
+                        class="ti-range-slider"
+                      >
+                      <div class="slider-labels">
+                        <span @click="currentOptimizationLevel = 1">{{ isAIProvider ? t('opt_economy') || 'Economy' : t('opt_stable') || 'Stable' }}</span>
+                        <span
+                          class="slider-tick"
+                          @click="currentOptimizationLevel = 2"
+                        >|</span>
+                        <span @click="currentOptimizationLevel = 3">{{ t('opt_balanced') || 'Balanced' }}</span>
+                        <span
+                          class="slider-tick"
+                          @click="currentOptimizationLevel = 4"
+                        >|</span>
+                        <span @click="currentOptimizationLevel = 5">{{ isAIProvider ? t('opt_turbo') || 'Turbo' : t('opt_fast') || 'Fast' }}</span>
                       </div>
-
-                      <div class="section-separator mini" />
-                    </template>
-
-                    <div
-                      v-if="selectedProviderInfo && !providerSettingsComponent"
-                      class="api-info"
-                    >
-                      <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.displayName }}</h3>
-                      <p class="setting-description">
-                        {{ t(selectedProviderInfo.descriptionKey) }}
-                      </p>
                     </div>
-
-                    <component :is="providerSettingsComponent" />
-
-                    
-
-                    <div 
-                      id="HIDDEN_PROVIDERS_CHECKBOX" 
-                      class="setting-group vertical provider-visibility-group"
-                    >
-                      <BaseCheckbox
-                        v-model="showInList"
-                        :label="t('show_provider_in_list_label') || 'Show in provider list'"
-                      />
-                    </div>
+                  
+                    <p class="opt-description">
+                      {{ isAIProvider 
+                        ? t('optimization_description_ai') 
+                        : t('optimization_description_traditional') 
+                      }}
+                    </p>
                   </div>
-                </Transition>
+                </div>
+
+                <div class="section-separator mini" />
+              </template>
+
+              <div
+                v-if="selectedProviderInfo && !providerSettingsComponent"
+                class="api-info"
+              >
+                <h3>{{ t(selectedProviderInfo.titleKey) || selectedProviderInfo.displayName }}</h3>
+                <p class="setting-description">
+                  {{ t(selectedProviderInfo.descriptionKey) }}
+                </p>
+              </div>
+
+              <component :is="providerSettingsComponent" />
+
+              <div 
+                id="HIDDEN_PROVIDERS_CHECKBOX" 
+                class="setting-group vertical provider-visibility-group"
+              >
+                <BaseCheckbox
+                  v-model="showInList"
+                  :label="t('show_provider_in_list_label') || 'Show in provider list'"
+                />
               </div>
             </div>
-          </div>
-        </template>
-      </BaseAccordion>
+          </Transition>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -140,7 +122,6 @@ import { useProviderVisibility } from '../composables/useProviderVisibility.js'
 // Components
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
-import BaseAccordion from '@/components/base/BaseAccordion.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProvidersTab')
 const settingsStore = useSettingsStore()
@@ -148,10 +129,6 @@ const route = useRoute()
 const { t } = useUnifiedI18n()
 const { checkAndHighlight, highlightElement } = useHighlightManager()
 const { createSetting } = useTabSettings(settingsStore, logger)
-
-// State
-const activeAccordion = ref('api') // Open API accordion by default in this tab
-const toggleAccordion = (name) => { activeAccordion.value = activeAccordion.value === name ? null : name }
 
 // Local selection (does NOT update global TRANSLATION_API)
 const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)
@@ -161,7 +138,6 @@ watch(selectedProvider, (newProvider) => {
   logger.debug(`[ProvidersTab] Local provider changed to ${newProvider}`);
   const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
   if (missingKey) {
-    activeAccordion.value = 'api';
     setTimeout(() => {
       highlightElement(missingKey);
     }, 400);
@@ -170,10 +146,6 @@ watch(selectedProvider, (newProvider) => {
 
 // Global reveal listener for highlighting
 onMounted(async () => {
-  window.addEventListener('options-reveal-accordion', (e) => {
-    activeAccordion.value = e.detail;
-  });
-
   // Detect provider from highlight parameter if it exists
   const highlightKey = route.query.highlight;
   if (highlightKey) {
@@ -213,7 +185,6 @@ const handleValidationFeedback = (e) => {
   const { field } = e.detail || {};
   
   if (field === 'provider' || (field && field.includes('API'))) {
-    activeAccordion.value = 'api';
     setTimeout(() => {
       highlightElement(field || 'TRANSLATION_API');
     }, 400);
