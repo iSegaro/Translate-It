@@ -156,7 +156,9 @@ onMounted(async () => {
   }
 
   // Handle highlighting logic
-  await checkAndHighlight();
+  setTimeout(async () => {
+    await checkAndHighlight();
+  }, 100);
 })
 
 // Provider Visibility logic
