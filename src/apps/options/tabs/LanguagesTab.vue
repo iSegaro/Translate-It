@@ -687,13 +687,7 @@ const handleValidationFeedback = (e) => {
   validateLanguages(true);
 
   // Focus and highlight logic
-  const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings);
-  if (field === missingKey || field === 'provider') {
-    activeAccordion.value = 'api';
-    setTimeout(() => {
-      highlightElement(missingKey || 'TRANSLATION_API');
-    }, 400);
-  } else if (field === 'languages') {
+  if (field === 'languages') {
     highlightElement('SOURCE_LANGUAGE');
   }
 };
