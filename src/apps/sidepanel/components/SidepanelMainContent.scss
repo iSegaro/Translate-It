@@ -71,7 +71,7 @@
   padding: 0 8px;
 }
 
-.language-selector-row :deep(.language-controls) {
+.language-selector-row :deep(.ti-language-controls) {
   width: 100%;
   max-width: calc(100% - 16px);
   display: flex !important;
@@ -86,7 +86,7 @@
   flex-wrap: nowrap !important;
 }
 
-.language-selector-row :deep(.language-select) {
+.language-selector-row :deep(.ti-language-select) {
   flex: 1 1 auto !important;
   min-width: 70px;
   max-width: 120px !important;
@@ -98,12 +98,12 @@
 }
 
 /* In wide layout, make language selects slightly smaller to make room for Translate button */
-.language-controls--wide .language-selector-row :deep(.language-select) {
+.language-controls--wide .language-selector-row :deep(.ti-language-select) {
   max-width: 100px !important;
   min-width: 65px;
 }
 
-.language-selector-row :deep(.swap-button) {
+.language-selector-row :deep(.ti-swap-button) {
   flex: 0 0 32px !important;
   width: 32px;
   height: 32px;
@@ -120,7 +120,7 @@
   box-sizing: border-box !important;
 }
 
-.language-selector-row :deep(.swap-button img) {
+.language-selector-row :deep(.ti-swap-button img) {
   opacity: 1 !important;
   visibility: visible !important;
   display: block !important;
