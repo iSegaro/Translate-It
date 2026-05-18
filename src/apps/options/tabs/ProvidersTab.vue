@@ -118,42 +118,6 @@
           </div>
         </template>
       </BaseAccordion>
-
-      <!-- AI Optimization -->
-      <BaseAccordion
-        id="AI_OPT_SECTION"
-        :is-open="activeAccordion === 'ai'"
-        item-class="ai-optimization-setting"
-        @toggle="toggleAccordion('ai')"
-      >
-        <template #header>
-          <span>{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
-        </template>
-
-        <template #content>
-          <div class="accordion-inner">
-            <div class="setting-group vertical">
-              <BaseCheckbox
-                v-model="aiContextEnabled"
-                :label="t('ai_context_translation_label')"
-              />
-              <p class="setting-description mb-md">
-                {{ t('ai_context_translation_description') }}
-              </p>
-            </div>
-
-            <div class="setting-group vertical">
-              <BaseCheckbox
-                v-model="aiHistoryEnabled"
-                :label="t('ai_conversation_history_label')"
-              />
-              <p class="setting-description mb-md">
-                {{ t('ai_conversation_history_description') }}
-              </p>
-            </div>
-          </div>
-        </template>
-      </BaseAccordion>
     </div>
   </section>
 </template>
@@ -225,8 +189,6 @@ onMounted(async () => {
 
 // Provider Visibility logic
 const { showInList } = useProviderVisibility(selectedProvider)
-const aiContextEnabled = createSetting('SMART_CONTEXT_TRANSLATION_ENABLED', true)
-const aiHistoryEnabled = createSetting('AI_CONVERSATION_HISTORY_ENABLED', true)
 
 const currentOptimizationLevel = computed({
   get: () => settingsStore.settings?.PROVIDER_OPTIMIZATION_LEVELS?.[selectedProvider.value] || settingsStore.settings?.OPTIMIZATION_LEVEL || 3,

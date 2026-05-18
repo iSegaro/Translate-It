@@ -208,6 +208,42 @@
           </template>
         </BaseAccordion>
 
+        <!-- AI Optimization -->
+        <BaseAccordion
+          id="AI_OPT_SECTION"
+          :is-open="activeAccordion === 'ai'"
+          item-class="ai-optimization-setting"
+          @toggle="toggleAccordion('ai')"
+        >
+          <template #header>
+            <span class="accordion-title-text">{{ t('ai_optimization_section_title') || 'AI Optimization' }}</span>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="aiContextEnabled"
+                  :label="t('ai_context_translation_label')"
+                />
+                <p class="setting-description mb-md">
+                  {{ t('ai_context_translation_description') }}
+                </p>
+              </div>
+
+              <div class="setting-group vertical">
+                <BaseCheckbox
+                  v-model="aiHistoryEnabled"
+                  :label="t('ai_conversation_history_label')"
+                />
+                <p class="setting-description mb-md">
+                  {{ t('ai_conversation_history_description') }}
+                </p>
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+
       </template>
     </div>
   </section>
@@ -215,7 +251,7 @@
 
 <script setup>
 import './LanguagesTab.scss'
-import { ref, onMounted, onUnmounted, watch, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -235,7 +271,6 @@ import { useHighlightManager } from '../composables/useHighlightManager.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseAccordion from '@/components/base/BaseAccordion.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
@@ -250,6 +285,10 @@ const { allLanguages, loadLanguages, isLoaded } = useLanguages()
 // State
 const activeAccordion = ref(null)
 const toggleAccordion = (name) => { activeAccordion.value = activeAccordion.value === name ? null : name }
+
+// AI Optimization logic
+const aiContextEnabled = createSetting('SMART_CONTEXT_TRANSLATION_ENABLED', true)
+const aiHistoryEnabled = createSetting('AI_CONVERSATION_HISTORY_ENABLED', true)
 
 // Global reveal listener for highlighting
 onMounted(() => {
