@@ -100,7 +100,7 @@
 
                     <component :is="providerSettingsComponent" />
 
-                    <div class="section-separator mini" />
+                    
 
                     <div 
                       id="HIDDEN_PROVIDERS_CHECKBOX" 
