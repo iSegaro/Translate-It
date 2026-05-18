@@ -568,17 +568,21 @@
     .language-pref-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       margin-bottom: $spacing-sm;
       padding-inline-start: 32px; 
+      gap: $spacing-md;
 
       .pref-label {
         font-size: $font-size-sm;
         color: var(--color-text);
+        flex: 0 0 160px; // Fixed width for alignment
       }
 
       .pref-select {
-        width: 180px;
+        flex: 1;
+        max-width: 220px;
+        min-width: 0;
       }
     }
   }
