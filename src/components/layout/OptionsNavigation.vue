@@ -50,6 +50,7 @@ const router = useRouter()
 // Navigation items, labels are reactive to language changes
 const navigationItems = ref([
   { name: 'languages', labelKey: 'languages_tab_title' },
+  { name: 'providers', labelKey: 'providers_tab_title' },
   { name: 'activation', labelKey: 'activation_tab_title' },
   { name: 'tts', labelKey: 'tts_tab_title' },
   { name: 'ocr', labelKey: 'ocr_tab_title' },
@@ -85,12 +86,12 @@ const saveAllSettings = async () => {
     const missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
     
     if (missingKey) {
-      // Redirect to languages tab with highlight parameter if not already there
+      // Redirect to providers tab with highlight parameter if not already there
       const currentRoute = router.currentRoute.value.name
-      if (currentRoute !== 'languages') {
-        await router.push({ name: 'languages', query: { highlight: missingKey } })
+      if (currentRoute !== 'providers') {
+        await router.push({ name: 'providers', query: { highlight: missingKey } })
       } else {
-        // Already on languages tab, just dispatch the event
+        // Already on providers tab, just dispatch the event
         window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
           detail: { field: missingKey } 
         }))

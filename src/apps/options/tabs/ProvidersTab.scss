@@ -1,0 +1,371 @@
+@use "@/assets/styles/base/variables" as *;
+
+.providers-tab {
+  // CRITICAL FIX: Allow dropdowns to overflow the tab container
+  :global(.tab-content-container) {
+    overflow: visible !important;
+  }
+
+  .settings-container {
+    max-width: 100%;
+    width: 100%;
+    overflow: visible !important;
+  }
+
+  // Base components (BaseCheckbox, BaseRadio) handle their own internal alignment
+  :deep(.ti-checkbox), :deep(.base-radio), :deep(.base-checkbox) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .primary-service-selection {
+    margin-top: $spacing-lg;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: $spacing-lg;
+
+    label {
+      flex: 0 0 220px;
+      width: 220px;
+      font-weight: $font-weight-medium;
+      margin-bottom: 0;
+      white-space: nowrap;
+    }
+
+    .selector-wrapper {
+      flex: 0 0 200px;
+      width: 200px;
+      min-width: 200px;
+
+      :deep(.ti-provider-button-container) {
+        width: 100%;
+        max-width: 200px;
+      }
+    }
+  }
+
+  .api-settings-section {
+    margin-top: $spacing-md;
+    width: 100%;
+    box-sizing: border-box;
+
+    .optimization-control-area {
+      margin-bottom: $spacing-md;
+      background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.03));
+      padding: $spacing-sm $spacing-md;
+      border-radius: $border-radius-md;
+      border: 1px solid var(--color-border-light);
+      box-sizing: border-box;
+      width: 100%;
+      max-width: var(--input-max-width, 100%);
+
+      .opt-control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+      }
+
+      .label-with-value {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-sm;
+
+        .opt-label {
+          font-weight: $font-weight-semibold;
+          font-size: 12px;
+          color: var(--color-text-secondary);
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+      }
+
+      .level-badge {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: $font-weight-bold;
+        padding: 1px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        
+        &.level-1 { background-color: var(--color-surface); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+        &.level-2 { background-color: #d1fae5; color: #065f46; }
+        &.level-3 { background-color: #dbeafe; color: #1e40af; }
+        &.level-4 { background-color: #ede9fe; color: #5b21b6; }
+        &.level-5 { background-color: #fee2e2; color: #991b1b; }
+      }
+
+      .slider-wrapper {
+        padding: 2px 0;
+        width: 100%;
+
+        .ti-range-slider {
+          width: 100%;
+          height: 4px;
+          cursor: pointer;
+          accent-color: var(--color-primary);
+        }
+      }
+
+      .slider-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        font-weight: $font-weight-medium;
+        color: var(--color-text-secondary);
+        margin-top: 2px;
+        
+        span {
+          cursor: pointer;
+          transition: color $transition-fast;
+          &:hover { color: var(--color-primary); }
+        }
+
+        .slider-tick {
+          color: var(--color-border);
+          opacity: 0.5;
+          cursor: default;
+        }
+      }
+
+      .opt-description {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        line-height: 1.4;
+        margin-top: 2px;
+        opacity: 0.8;
+      }
+    }
+  }
+
+  .provider-settings-container {
+    margin-top: $spacing-lg;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    box-sizing: border-box;
+
+    // Reset any internal padding that might come from provider-specific containers
+    .gemini-settings,
+    .openai-settings,
+    .deepl-settings,
+    .openrouter-settings,
+    .deepseek-settings,
+    .custom-settings {
+      padding: 0 !important;
+      margin: 0 !important;
+      display: block;
+      width: 100%;
+    }
+
+    // Force vertical layout for settings inside providers
+    .setting-group,
+    .optimization-control-area {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-xl !important; // Increased margin for better separation between groups
+    }
+
+    .setting-group.vertical {
+      width: 100% !important;
+
+      > * {
+        width: 100% !important;
+        max-width: var(--input-max-width, 100%) !important;
+        flex: none !important;
+
+        &:not(.ti-checkbox):not(.base-checkbox):not(.label-with-toggle) {
+          display: block !important;
+        }
+      }
+
+      .ti-input-wrapper,
+      .ti-select-wrapper,
+      .ti-input,
+      .ti-select,
+      .base-input,
+      .base-select,
+      .api-key-input-wrapper {
+        width: 100% !important;
+        max-width: var(--input-max-width, 100%) !important;
+      }
+    }
+
+    .setting-group {
+      // Label with toggle (like API Key) should ALWAYS be a flex row
+      .label-with-toggle {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        max-width: var(--input-max-width, 100%) !important;
+        margin-bottom: 2px !important;
+
+        label {
+          width: auto !important;
+          flex: 1 !important;
+          margin: 0 !important;
+          display: inline-block !important;
+        }
+      }
+
+      // Dropdowns and inputs inside providers should be consistent
+      .tier-select,
+      .formality-select,
+      .model-select,
+      .api-url-input,
+      .api-key-input-wrapper,
+      :deep(.ti-input-wrapper),
+      :deep(.ti-input),
+      :deep(.ti-select),
+      :deep(.base-input),
+      :deep(.base-select) {
+        width: 100% !important;
+        max-width: var(--input-max-width, 100%) !important;
+        flex: none !important;
+        margin-bottom: $spacing-xs;
+      }
+
+      // Special styling for deepl-checkbox container to match dropdown width visually
+      .deepl-checkbox {
+        padding: $spacing-sm !important;
+        background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02)) !important;
+        border: 1px solid var(--color-border-light, var(--color-border)) !important;
+        border-radius: $border-radius-base !important;
+        box-sizing: border-box !important;
+        min-height: 38px !important;
+        width: 100% !important;
+        max-width: var(--input-max-width, 100%) !important;
+      }
+
+      // Improve description styling for better hierarchy
+      .setting-description {
+        margin-top: 0 !important;
+        font-size: $font-size-xs !important;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        max-width: var(--input-max-width, 100%);
+        display: block;
+      }
+    }
+
+    // Keep api-key-info horizontally aligned as it contains text and links
+    .setting-group.api-key-info {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: $spacing-xs !important;
+      margin-bottom: $spacing-sm !important;
+      width: 100% !important;
+
+      > * {
+        width: auto !important;
+        max-width: none !important;
+        display: inline !important;
+        margin: 0 !important;
+      }
+
+      .setting-description {
+        margin: 0 !important;
+        display: inline !important;
+      }
+    }
+    .provider-visibility-group {
+      margin-top: $spacing-md !important;
+      padding-top: $spacing-md !important;
+      border-top: 1px solid var(--color-border-light);
+      width: 100% !important;
+
+      :deep(.base-checkbox) {
+        background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02));
+        padding: $spacing-sm $spacing-md;
+        border-radius: $border-radius-base;
+        border: 1px solid var(--color-border-light);
+        transition: all $transition-base;
+        
+        &:hover {
+          background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.04));
+          border-color: var(--color-primary-alpha);
+        }
+      }
+    }
+  }
+
+  .provider-settings {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: block;
+    overflow: visible;
+
+    h3 {
+      font-size: $font-size-base;
+      font-weight: $font-weight-bold;
+      margin-bottom: $spacing-sm;
+      color: var(--color-text);
+    }
+  }
+
+  /* 
+    Professional Fade-Slide Transition 
+    Used for switching provider settings smoothly
+  */
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .fade-slide-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  // --- Common alignment for all top-level setting groups ---
+  .settings-container > .setting-group,
+  .settings-container > .section-separator,
+  .api-settings-section,
+  .primary-service-selection {
+    width: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .setting-group {
+    display: flex;
+    margin-bottom: $spacing-md;
+    width: 100%;
+
+    &.vertical {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $spacing-xs;
+
+      .setting-description {
+        margin-top: $spacing-xs;
+      }
+    }
+  }
+}
+
+// Mobile responsive
+@media (max-width: #{$breakpoint-md}) {
+  .providers-tab {
+    .settings-container > .setting-group,
+    .settings-container > .section-separator,
+    .api-settings-section,
+    .primary-service-selection {
+      width: 100% !important;
+    }
+  }
+}

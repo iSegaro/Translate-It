@@ -5,9 +5,10 @@
   .languages-selectors-container {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: $spacing-md;
-    margin: $spacing-lg auto $spacing-xl;
+    margin-top: $spacing-lg;
+    margin-bottom: $spacing-xl;
     max-width: 500px; // Reasonable width for centering
     width: 100%;
     
@@ -18,7 +19,7 @@
       align-items: stretch;
 
       label {
-        text-align: center;
+        text-align: start;
         margin-bottom: $spacing-xs;
       }
     }
@@ -31,6 +32,81 @@
       line-height: 1.5;
       opacity: 0.8;
       max-width: 420px;
+    }
+
+    .provider-selection-group {
+      margin-top: $spacing-md;
+      
+      :deep(.ti-provider-button-container) {
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+      }
+    }
+
+    .provider-config-warning {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+      background: var(--color-warning-alpha, rgba(255, 152, 0, 0.05));
+      border: 1px solid rgba(255, 152, 0, 0.2);
+      border-inline-start: 4px solid var(--color-warning, #ff9800);
+      border-radius: $border-radius-md;
+      padding: $spacing-sm $spacing-lg;
+      margin-top: $spacing-md;
+      width: 100%;
+      max-width: 420px;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.05);
+
+      .warning-icon {
+        font-size: 16px;
+        color: var(--color-warning, #ff9800);
+        opacity: 0.9;
+      }
+
+      .warning-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-sm;
+
+        p {
+          font-size: 11.5px;
+          color: var(--color-text);
+          margin: 0;
+          line-height: 1.4;
+          font-weight: $font-weight-medium;
+        }
+
+        .configure-btn {
+          background: transparent;
+          color: var(--color-warning, #ff9800);
+          border: 1.5px solid var(--color-warning, #ff9800);
+          border-radius: $border-radius-base;
+          padding: 4px 14px;
+          font-size: 11px;
+          font-weight: $font-weight-bold;
+          cursor: pointer;
+          width: fit-content;
+          transition: all $transition-fast;
+          display: flex;
+          align-items: center;
+          gap: $spacing-xs;
+          text-transform: none;
+          letter-spacing: 0.3px;
+
+          &:hover {
+            background: var(--color-warning, #ff9800);
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 152, 0, 0.2);
+          }
+
+          &:active {
+            transform: translateY(1px);
+          }
+        }
+      }
     }
   }
 
@@ -492,17 +568,21 @@
     .language-pref-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       margin-bottom: $spacing-sm;
       padding-inline-start: 32px; 
+      gap: $spacing-md;
 
       .pref-label {
         font-size: $font-size-sm;
         color: var(--color-text);
+        flex: 0 0 160px; // Fixed width for alignment
       }
 
       .pref-select {
-        width: 180px;
+        flex: 1;
+        max-width: 220px;
+        min-width: 0;
       }
     }
   }
@@ -622,6 +702,7 @@
   }
 
   // --- Common alignment for all top-level setting groups ---
+  .languages-selectors-container,
   .settings-container > .setting-group,
   .settings-container > .section-separator,
   .settings-container > .validation-error,
@@ -698,6 +779,7 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .languages-tab {
+    .languages-selectors-container,
     .settings-container > .setting-group,
     .settings-container > .section-separator,
     .api-settings-accordion :deep(.ti-accordion-header),

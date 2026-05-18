@@ -239,6 +239,30 @@
   "languages_tab_title": {
     "message": "言語"
   },
+  "providers_tab_title": {
+    "message": "サービス"
+  },
+  "configure_service_button": {
+    "message": "サービスを設定 ⚙️"
+  },
+  "provider_config_required_api": {
+    "message": "このサービス（{provider}）はAPIキーの設定が必要です。"
+  },
+  "provider_config_required_url": {
+    "message": "このサービス（{provider}）はサーバーURLの設定が必要です。"
+  },
+  "provider_config_required_generic": {
+    "message": "このサービス（{provider}）は設定が必要です。"
+  },
+  "advanced_settings_label": {
+    "message": "詳細設定"
+  },
+  "mobile_ui_mode_label": {
+    "message": "UIモード"
+  },
+  "shortcuts_label": {
+    "message": "キーボードショートカット"
+  },
   "appearance_tab_title": {
     "message": "外観"
   },
@@ -2241,7 +2265,7 @@
     "message": "言語検出"
   },
   "language_detection_preferences_description": {
-    "message": "共有スクリプトの優先言語を設定します。この設定は、「自動検出」モードにおいてどの言語を優先的に識別するかを決定します（例：類似した言語の中からペルシア語を正しく検出するため）。"
+    "message": "共有スクリプトの優先言語を設定します。この設定は、「自動検出」モードにおいてどの言語を優先的に識別するかを決定します（例：他のラテン系言語から英語を正しく検出するため）。"
   },
   "arabic_script_priority_label": {
     "message": "アラビア文字の優先"
