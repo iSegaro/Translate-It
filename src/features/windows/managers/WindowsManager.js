@@ -90,7 +90,7 @@ export class WindowsManager extends ResourceTracker {
     this.dismissalManager = new DismissalManager(this, deps);
     this.eventCoordinator = new EventCoordinator(this, deps);
 
-    this._initialize();
+    this._initPromise = this._initialize();
   }
 
   async _initialize() {
@@ -100,6 +100,16 @@ export class WindowsManager extends ResourceTracker {
       this.logger.info('WindowsManager Facade initialized successfully');
     } catch (error) {
       this.logger.warn('Failed to initialize WindowsManager (non-critical):', error.message);
+    }
+  }
+
+  /**
+   * Ensure the WindowsManager is fully initialized and listeners are attached.
+   * Useful when the feature is lazy-loaded to avoid race conditions.
+   */
+  async ensureInitialized() {
+    if (this._initPromise) {
+      await this._initPromise;
     }
   }
 

@@ -89,6 +89,10 @@ export class WindowsManagerHandler extends ResourceTracker {
       // Create WindowsManager instance with its own TranslationHandler
       const translationHandler = new WindowsTranslationHandler();
       this.windowsManager = WindowsManager.getInstance({ translationHandler });
+      
+      // Crucial: Wait for async initialization (theme loading, event setup) to finish
+      // to avoid race conditions when the feature is lazy-loaded (e.g., from OCR)
+      await this.windowsManager.ensureInitialized();
 
       // Store globally for compatibility with existing TextSelectionManager code
       if (!window.windowsManagerInstance) {
