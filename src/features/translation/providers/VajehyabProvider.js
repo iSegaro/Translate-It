@@ -79,7 +79,7 @@ export class VajehyabProvider extends BaseProvider {
 
       if (!result || !result.hit || Object.keys(result.hit).length === 0) {
         logger.debug(`[Vajehyab] Word not found: "${targetWord}"`);
-        const notFoundMsg = (await getTranslationString('vajehyab_word_not_found')) || `Word not found in Vajehyab dictionary`;
+        const notFoundMsg = (await getTranslationString('vajehyab_word_not_found')) || `(Word not found in Vajehyab dictionary)`;
         return texts.map((t, idx) => idx === 0 ? notFoundMsg : t);
       }
 
@@ -103,8 +103,7 @@ export class VajehyabProvider extends BaseProvider {
    */
   _formatDictionaryResponse(hit) {
     const title = hit.title || "";
-    const kind = hit.kind ? `*${hit.kind}*` : "";
-    
+
     // Decode HTML entities in pronunciation (e.g., &#39; -> ')
     let pronunciation = hit.pronunciation || "";
     if (pronunciation) {
@@ -115,6 +114,19 @@ export class VajehyabProvider extends BaseProvider {
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>');
       pronunciation = ` [${pronunciation}]`;
+    }
+
+    // kind field may include pronunciation bracket, extract only the kind type
+    // e.g., "(صفت) [پهلوی: drust]" -> extract just the kind if it's a simple pattern
+    let kind = "";
+    if (hit.kind) {
+      // If kind contains bracket pronunciation, use it as-is (don't add markdown)
+      // If it's a simple word like "صفت", add italic formatting
+      if (!hit.kind.includes('[')) {
+        kind = `*${hit.kind}*`;
+      } else {
+        kind = hit.kind;
+      }
     }
 
     let description = hit.description || "";
@@ -150,21 +162,98 @@ export class VajehyabProvider extends BaseProvider {
     };
     const sourceName = slugMap[hit.dictionarySlug] || hit.dictionarySlug || "واژه‌یاب";
 
-    // Clean up HTML tags while preserving basic structure
-    description = description
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<p>/gi, '')
-      .replace(/<[^>]+>/g, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+    // Parse Vajehyab description using structured approach
+    // Structure: "main definition &lang; label: [params] content &lang; label: [params] = &lang; ..."
+    const parsed = this._parseVajehyabDescription(description);
+    description = this._formatParsedDescription(parsed);
 
     // Build the Markdown format response
     let markdown = `### ${title}${pronunciation}\n`;
     if (kind) markdown += `${kind}\n`;
     markdown += `\n---\n\n`;
-    markdown += `**معنی (${sourceName}):**\n${description}`;
+    markdown += `**معنی (${sourceName})**:\n${description}`;
 
     return markdown;
+  }
+
+  /**
+   * Parse Vajehyab description into structured data.
+   * Structure: "main definition &lang; label: [params] content &lang; label: [params] = &lang; ..."
+   * @param {string} description - Raw description from API
+   * @returns {Object} { mainDef: string, wordForms: Array<{label, content}> }
+   * @private
+   */
+  _parseVajehyabDescription(description) {
+    // Clean HTML tags and artifacts
+    let cleaned = description
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/p>/gi, ' ')
+      .replace(/<p>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      // Convert poetry separators to newlines
+      .replace(/◻/g, '\n')
+      .replace(/︎/g, '\n')
+      // Remove zero-width characters
+      .replace(/[​-‍⁠﻿]/g, '');
+
+    // Split by &lang; separator
+    const sections = cleaned.split('&lang;');
+
+    // First section is the main definition
+    const mainDef = sections[0].trim();
+
+    // Parse remaining sections as word forms
+    const wordForms = [];
+    for (let i = 1; i < sections.length; i++) {
+      const section = sections[i].trim();
+      if (!section) continue;
+
+      // Parse "label: content" format
+      const colonIndex = section.indexOf(':');
+      if (colonIndex === -1) {
+        // No colon found, treat entire section as content with empty label
+        wordForms.push({ label: '', content: section });
+        continue;
+      }
+
+      const label = section.slice(0, colonIndex).trim();
+      const content = section.slice(colonIndex + 1).trim();
+
+      // Check if content is empty after bracketed params
+      // Pattern: "[params] =" or "[params]=" or just "="
+      if (/^\[[^\]]+\]\s*=\s*$/.test(content) || /^=\s*$/.test(content)) {
+        // Empty content, skip this section
+        continue;
+      }
+
+      wordForms.push({ label, content });
+    }
+
+    return { mainDef, wordForms };
+  }
+
+  /**
+   * Format parsed description to Markdown.
+   * @param {Object} parsed - Result from _parseVajehyabDescription
+   * @returns {string} Markdown formatted description
+   * @private
+   */
+  _formatParsedDescription(parsed) {
+    const { mainDef, wordForms } = parsed;
+
+    // Start with main definition
+    let markdown = mainDef;
+
+    // Add each word form as a section
+    for (const form of wordForms) {
+      markdown += '\n\n';
+      if (form.label) {
+        markdown += `**${form.label}**:\n`;
+      }
+      markdown += form.content;
+    }
+
+    // Clean up multiple empty lines
+    return markdown.replace(/\n{3,}/g, '\n\n').trim();
   }
 }

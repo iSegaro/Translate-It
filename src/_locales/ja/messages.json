@@ -189,7 +189,7 @@
     "message": "多言語ペルシャ語辞書。単一の単語に最適です。APIキーは不要です。"
   },
   "vajehyab_word_not_found": {
-    "message": "Vajehyab辞書に単語が見つかりませんでした"
+    "message": "(Vajehyab辞書に単語が見つかりませんでした)"
   },
   "provider_does_not_support_bulk": {
     "message": "このプロバイダーは、ページ翻訳または要素選択モードをサポートしていません。"

@@ -189,7 +189,7 @@
     "message": "Multilingual Persian dictionary. Best for single words. No API key required."
   },
   "vajehyab_word_not_found": {
-    "message": "Word not found in Vajehyab dictionary"
+    "message": "(Word not found in Vajehyab dictionary)"
   },
   "provider_does_not_support_bulk": {
     "message": "This provider does not support Page Translate and Select Element translation."

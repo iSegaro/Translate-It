@@ -176,6 +176,16 @@ describe('SimpleMarkdown', () => {
         expect(SimpleMarkdown._isLabelLine(input)).toBe(false);
       });
 
+      it('should not identify short regular sentences ending with a colon as a label', () => {
+        const input = 'امروز از خیام بگیم:';
+        expect(SimpleMarkdown._isLabelLine(input)).toBe(false);
+      });
+
+      it('should identify multi-word labels with content', () => {
+        expect(SimpleMarkdown._isLabelLine('Part of speech: Noun')).toBe(true);
+        expect(SimpleMarkdown._isLabelLine('Translations for Persian: آزمایش')).toBe(true);
+      });
+
       it('should extract content after pure bold label', () => {
         const input = '**Noun**: test, experiment';
         expect(SimpleMarkdown.getCleanTranslation(input)).toBe('test, experiment');
