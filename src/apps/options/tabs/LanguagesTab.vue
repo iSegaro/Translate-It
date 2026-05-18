@@ -80,8 +80,6 @@
           </p>
         </div>
 
-        <div class="section-separator" />
-
         <!-- Dictionary Mode -->
         <BaseAccordion
           id="DICTIONARY_SECTION"
