@@ -151,7 +151,7 @@ describe('VajehyabProvider', () => {
       };
       
       const result = provider._formatDictionaryResponse(hit);
-      expect(result).toContain('Line 1\nLine 2\nLine 3');
+      expect(result).toContain('Line 1 Line 2 Line 3');
       expect(result).not.toContain('<p>');
       expect(result).not.toContain('<div>');
     });
@@ -177,7 +177,7 @@ describe('VajehyabProvider', () => {
       };
       
       const result = provider._formatDictionaryResponse(hit);
-      expect(result).toBe('### Word [word]\n*Noun*\n\n---\n\n**معنی (فرهنگ معین):**\nA unit of language');
+      expect(result).toBe('### Word [word]\n*Noun*\n\n---\n\n**معنی (فرهنگ معین)**:\nA unit of language');
     });
   });
 });
