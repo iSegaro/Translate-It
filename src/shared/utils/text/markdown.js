@@ -26,7 +26,7 @@ export class SimpleMarkdown {
   // Matches parenthesized RTL text at the start of a line (e.g., "(اسم)")
   static PARENTHESIZED_RTL_START = new RegExp(`^\\s*\\([${SimpleMarkdown.RTL_REGEX.source.slice(1, -1)}\\s]+\\)`);
 
-  static render(markdown, preferredDir = "auto") {
+  static render(markdown, preferredDir = "auto", options = { enableLabelFormatting: true }) {
     if (!markdown || typeof markdown !== "string") {
       return "";
     }
@@ -38,7 +38,7 @@ export class SimpleMarkdown {
     // Check if the text is in the "traditional provider" format:
     // - Single line (no newlines at all)
     // - Has "**" pattern followed by text and ":"
-    if (!markdown.includes('\n')) {
+    if (options.enableLabelFormatting && !markdown.includes('\n')) {
       const asteriskIndex = markdown.indexOf('**');
 
       if (asteriskIndex > 0) {
@@ -220,7 +220,7 @@ export class SimpleMarkdown {
         listItems = [];
       }
       // Label formatting (e.g., "نوع: اسم" or "Definition: Noun")
-      else if (this._isLabelLine(trimmed)) {
+      else if (options.enableLabelFormatting && this._isLabelLine(trimmed)) {
         // Always finish current section before starting a label line
         this._finishSection(container, currentSection, listItems);
         
@@ -318,14 +318,15 @@ export class SimpleMarkdown {
     // We look for ** at start, some characters, then a colon (either inside or outside the last **)
     const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*|:)$/;
 
-    // 2. Check for regular labels: Label: content (content is optional)
-    // More strict pattern: label should be at start of line, followed by colon
+    // 2. Check for regular labels with content: Label: Content
+    // Allow spaces in label but require content after colon. 
+    // Limit label length to 30 to avoid matching sentences.
     // Use negative lookahead to avoid matching URL protocols like https://
-    const regularLabelPattern = /^[^:\s]+\s*:(?!\/\/)\s*.*$/;
+    const regularLabelPattern = /^[^:]{1,30}:(?!\/\/)\s*\S+.*$/;
 
     // 3. Specifically allow lines ending in a colon (header-style labels)
-    // Limit to 40 characters to avoid matching long sentences that happen to end in a colon
-    const endsWithColonPattern = /^.{1,40}:$/;
+    // Limit to 3 words (2 spaces) and 30 characters to avoid matching sentences.
+    const endsWithColonPattern = /^[^: ]+( [^: ]+){0,2}:$/;
 
     return markdownLabelPattern.test(trimmedText) || regularLabelPattern.test(trimmedText) || endsWithColonPattern.test(trimmedText);
   }
