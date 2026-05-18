@@ -2265,7 +2265,7 @@
     "message": "Language Detection"
   },
   "language_detection_preferences_description": {
-    "message": "Set the priority language for shared scripts. This determines which language is preferred during 'Auto-detect' mode (e.g., to correctly distinguish Persian from similar languages)."
+    "message": "Set the priority language for shared scripts. This determines which language is preferred during 'Auto-detect' mode (e.g., to correctly distinguish English from other Latin languages)."
   },
   "arabic_script_priority_label": {
     "message": "Arabic Script Priority"
