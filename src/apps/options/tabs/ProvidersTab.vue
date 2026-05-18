@@ -18,7 +18,10 @@
 
       <div class="api-settings-section">
         <div class="provider-settings-container">
-          <Transition name="fade-slide">
+          <Transition 
+            name="fade-slide" 
+            mode="out-in"
+          >
             <div 
               :key="selectedProvider"
               class="provider-settings"
