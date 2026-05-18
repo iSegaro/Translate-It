@@ -208,6 +208,67 @@
           </template>
         </BaseAccordion>
 
+        <!-- Language Detection Preferences -->
+        <BaseAccordion
+          id="DETECTION_SECTION"
+          :is-open="activeAccordion === 'detection'"
+          item-class="language-pref-setting"
+          @toggle="toggleAccordion('detection')"
+        >
+          <template #header>
+            <span 
+              class="accordion-title-text"
+              :class="{ active: activeAccordion === 'detection' }"
+            >
+              {{ t('language_detection_label') || 'Language Detection Preferences' }}
+            </span>
+          </template>
+
+          <template #content>
+            <div class="accordion-inner">
+              <p class="setting-description mb-md">
+                {{ t('language_detection_preferences_description') }}
+              </p>
+
+              <div class="language-pref-row">
+                <label class="pref-label">{{ t('latin_script_priority_label') }}:</label>
+                <BaseSelect
+                  v-model="latinScriptPreference"
+                  :options="latinScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">{{ t('arabic_script_priority_label') }}:</label>
+                <BaseSelect
+                  v-model="arabicScriptPreference"
+                  :options="arabicScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">{{ t('chinese_script_priority_label') }}:</label>
+                <BaseSelect
+                  v-model="chineseScriptPreference"
+                  :options="chineseScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+
+              <div class="language-pref-row">
+                <label class="pref-label">{{ t('devanagari_script_priority_label') }}:</label>
+                <BaseSelect
+                  v-model="devanagariScriptPreference"
+                  :options="devanagariScriptOptions"
+                  class="pref-select"
+                />
+              </div>
+            </div>
+          </template>
+        </BaseAccordion>
+
         <!-- AI Optimization -->
         <BaseAccordion
           id="AI_OPT_SECTION"
@@ -271,6 +332,7 @@ import { useHighlightManager } from '../composables/useHighlightManager.js'
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseAccordion from '@/components/base/BaseAccordion.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguagesTab')
@@ -383,6 +445,55 @@ const updateBilingualMode = (mode, value) => {
   }
   settingsStore.updateSettingLocally('BILINGUAL_TRANSLATION_MODES', newModes)
 }
+
+// --- Script Detection Preferences ---
+
+const createScriptSetting = (script, def) => computed({
+  get: () => settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES?.[script] || def,
+  set: (val) => {
+    const preferences = { ...(settingsStore.settings?.LANGUAGE_DETECTION_PREFERENCES || {}) }
+    preferences[script] = val
+    logger.debug(`📝 Script preference [${script}] changed:`, val)
+    settingsStore.updateSettingLocally('LANGUAGE_DETECTION_PREFERENCES', preferences)
+  }
+})
+
+const arabicScriptPreference = createScriptSetting('arabic-script', 'fa')
+const chineseScriptPreference = createScriptSetting('chinese-script', 'zh-cn')
+const devanagariScriptPreference = createScriptSetting('devanagari-script', 'hi')
+const latinScriptPreference = createScriptSetting('latin-script', 'none')
+
+const arabicScriptOptions = computed(() => [
+  { value: 'fa', label: `${t('persian_language_name')} (${t('default_label')})` },
+  { value: 'ar', label: t('arabic_language_name') },
+  { value: 'ur', label: t('urdu_language_name') },
+  { value: 'ps', label: t('pashto_language_name') }
+])
+
+const chineseScriptOptions = computed(() => [
+  { value: 'zh-cn', label: `${t('chinese_simplified_name')} (${t('default_label')})` },
+  { value: 'zh-tw', label: t('chinese_traditional_name') },
+  { value: 'lzh', label: t('chinese_classical_name') },
+  { value: 'yue', label: t('chinese_cantonese_name') }
+])
+
+const devanagariScriptOptions = computed(() => [
+  { value: 'hi', label: `${t('hindi_language_name')} (${t('default_label')})` },
+  { value: 'mr', label: t('marathi_language_name') },
+  { value: 'ne', label: t('nepali_language_name') }
+])
+
+const latinScriptOptions = computed(() => [
+  { value: 'none', label: `${t('latin_priority_none_label')} (${t('default_label')})` },
+  { value: 'en', label: t('english_language_name') },
+  { value: 'fr', label: t('french_language_name') },
+  { value: 'es', label: t('spanish_language_name') },
+  { value: 'de', label: t('german_language_name') },
+  { value: 'it', label: t('italian_language_name') },
+  { value: 'pt', label: t('portuguese_language_name') },
+  { value: 'tr', label: t('turkish_language_name') },
+  { value: 'nl', label: t('dutch_language_name') }
+])
 
 // --- Dictionary Logic ---
 const enableDictionary = createSetting('ENABLE_DICTIONARY', true)
