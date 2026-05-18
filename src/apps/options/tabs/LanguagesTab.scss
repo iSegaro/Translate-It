@@ -5,9 +5,10 @@
   .languages-selectors-container {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: $spacing-md;
-    margin: $spacing-lg auto $spacing-xl;
+    margin-top: $spacing-lg;
+    margin-bottom: $spacing-xl;
     max-width: 500px; // Reasonable width for centering
     width: 100%;
     
@@ -18,7 +19,7 @@
       align-items: stretch;
 
       label {
-        text-align: center;
+        text-align: start;
         margin-bottom: $spacing-xs;
       }
     }
@@ -682,6 +683,7 @@
   }
 
   // --- Common alignment for all top-level setting groups ---
+  .languages-selectors-container,
   .settings-container > .setting-group,
   .settings-container > .section-separator,
   .settings-container > .validation-error,
@@ -758,6 +760,7 @@
 // Mobile responsive
 @media (max-width: #{$breakpoint-md}) {
   .languages-tab {
+    .languages-selectors-container,
     .settings-container > .setting-group,
     .settings-container > .section-separator,
     .api-settings-accordion :deep(.ti-accordion-header),
