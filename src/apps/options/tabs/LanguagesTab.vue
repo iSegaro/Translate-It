@@ -53,6 +53,17 @@
             />
           </div>
 
+          <!-- Validation Error (e.g., Same Source/Target Language) -->
+          <Transition name="fade-slide">
+            <div 
+              v-if="validationError && validationErrorKey !== 'PROVIDER_CONFIG_ERROR'" 
+              class="validation-error"
+            >
+              <span class="error-icon">⛔</span>
+              <span class="error-message">{{ validationError }}</span>
+            </div>
+          </Transition>
+
           <!-- Configuration Warning -->
           <Transition name="fade-slide">
             <div 
