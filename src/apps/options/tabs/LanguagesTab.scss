@@ -48,47 +48,62 @@
       display: flex;
       align-items: center;
       gap: $spacing-md;
-      background: var(--color-warning-alpha, rgba(255, 152, 0, 0.1));
-      border: 1px solid var(--color-warning, #ff9800);
+      background: var(--color-warning-alpha, rgba(255, 152, 0, 0.05));
+      border: 1px solid rgba(255, 152, 0, 0.2);
+      border-inline-start: 4px solid var(--color-warning, #ff9800);
       border-radius: $border-radius-md;
       padding: $spacing-sm $spacing-lg;
       margin-top: $spacing-md;
       width: 100%;
       max-width: 420px;
       box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(255, 152, 0, 0.05);
 
       .warning-icon {
-        font-size: 18px;
+        font-size: 16px;
         color: var(--color-warning, #ff9800);
+        opacity: 0.9;
       }
 
       .warning-content {
         flex: 1;
         display: flex;
         flex-direction: column;
-        gap: $spacing-xs;
+        gap: $spacing-sm;
 
         p {
-          font-size: $font-size-xs;
+          font-size: 11.5px;
           color: var(--color-text);
           margin: 0;
           line-height: 1.4;
+          font-weight: $font-weight-medium;
         }
 
         .configure-btn {
-          background: var(--color-warning, #ff9800);
-          color: white;
-          border: none;
-          border-radius: $border-radius-sm;
-          padding: 4px 10px;
+          background: transparent;
+          color: var(--color-warning, #ff9800);
+          border: 1.5px solid var(--color-warning, #ff9800);
+          border-radius: $border-radius-base;
+          padding: 4px 14px;
           font-size: 11px;
           font-weight: $font-weight-bold;
           cursor: pointer;
           width: fit-content;
-          transition: filter 0.2s;
+          transition: all $transition-fast;
+          display: flex;
+          align-items: center;
+          gap: $spacing-xs;
+          text-transform: none;
+          letter-spacing: 0.3px;
 
           &:hover {
-            filter: brightness(1.1);
+            background: var(--color-warning, #ff9800);
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 152, 0, 0.2);
+          }
+
+          &:active {
+            transform: translateY(1px);
           }
         }
       }
