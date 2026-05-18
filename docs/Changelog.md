@@ -4,7 +4,7 @@
 
 - Added [Mouse on Hover Translation](#/activation?highlight=activation_group_mouse_hover) for instant, frictionless translation by simply hovering over text or containers
 - Added customizable **Idle Opacity** and **Icon Size** for the [Quick Action Button (FAB)](#/activation?highlight=FAB_CUSTOMIZATION_SETTINGS)
-- Added an option to [hide translation providers](#/languages?highlight=HIDDEN_PROVIDERS_CHECKBOX) you don’t use to keep the interface cleaner
+- Added an option to [hide translation providers](#/providers?highlight=HIDDEN_PROVIDERS_CHECKBOX) you don’t use to keep the interface cleaner
 
 ---
 
@@ -133,7 +133,7 @@
 
 - Added a persistent, vertically draggable [Desktop FAB (Floating Action Button)](#/activation?highlight=FIELDSET_FAB) for quick access to `Select Element` and `Page Translation` with smart-fading and real-time status tracking
 - Added comprehensive `Mobile & Touchscreen Support` featuring a native-like `In-Page Bottom Sheet` architecture with smooth gesture controls (swipe-to-expand/dismiss) for mobile browsers (Firefox Android, Kiwi, Lemur)
-- Added [Optimization Levels](#/languages?highlight=OPTIMIZATION_LEVELS_SECTION) to fine-tune translation strategies between speed and cost (Economy, Balanced, Turbo/Fast) for both AI and traditional providers
+- Added [Optimization Levels](#/providers?highlight=OPTIMIZATION_LEVELS_SECTION) to fine-tune translation strategies between speed and cost (Economy, Balanced, Turbo/Fast) for both AI and traditional providers
 - Added [Microsoft Edge TTS (Neural)](#/tts?highlight=TTS_ENGINE_SECTION) engine support for high-quality, natural-sounding speech synthesis
 - Added advanced [Text-to-Speech Settings](#/tts?highlight=TTS_SETTINGS_SECTION), including Smart Language Detection and automatic fallback to similar languages (e.g., Arabic for Persian)
 - Added [Bilingual Translation](#/languages?highlight=BILINGUAL_SECTION) (Swap Language) support across all translation modes (Selection, Field, Select Element, Page) with independent toggles
@@ -179,7 +179,7 @@
 
 ##### Added
 
-- Added [Multiple API Keys Support](#/languages) for all API-based providers. You can now enter multiple API keys per provider (one per line), and the extension will automatically failover to the next key if one reaches its quota limit or becomes invalid. Working keys are automatically promoted to the top for better performance. Use the "Test Keys" button to validate all keys at once.
+- Added [Multiple API Keys Support](#/providers) for all API-based providers. You can now enter multiple API keys per provider (one per line), and the extension will automatically failover to the next key if one reaches its quota limit or becomes invalid. Working keys are automatically promoted to the top for better performance. Use the "Test Keys" button to validate all keys at once.
 
 ##### Fixed
 
@@ -201,7 +201,7 @@
 
 ##### Changed
 
-- Merged `API Settings` tab into [Languages](#/languages) tab for better UX
+- Merged `API Settings` tab into [Providers](#/providers) tab for better UX
 
 ---
 
@@ -286,7 +286,7 @@
 
 ##### Added
 
-- Added example URL text below the API URL field in [Options page > Custom API](#/languages) settings for better user guidance
+- Added example URL text below the API URL field in [Options page > Custom API](#/providers) settings for better user guidance
 
 ---
 
