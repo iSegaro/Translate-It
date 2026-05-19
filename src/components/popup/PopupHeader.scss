@@ -24,9 +24,9 @@
   .ti-header-spacer { order: 2 !important; flex: 1 1 auto !important; }
   .ti-switch { order: 3 !important; }
   .ti-btn-settings { order: 4 !important; }
-  .ti-btn-capture { order: 5 !important; }
-  .ti-btn-revert { order: 6 !important; }
-  .ti-btn-clear { order: 7 !important; }
+  .ti-btn-mouse-hover { order: 5 !important; }
+  .ti-btn-capture { order: 6 !important; }
+  .ti-btn-revert { order: 7 !important; }
   .ti-btn-select { order: 8 !important; }
   .ti-btn-sidepanel { order: 9 !important; }
 
@@ -49,6 +49,10 @@
     &:hover {
       background-color: rgba(0, 0, 0, 0.08) !important;
       transform: translateY(-1px) !important;
+    }
+
+    &.ti-active {
+      background-color: rgba(0, 0, 0, 0.12) !important;
     }
 
     &:active {
@@ -84,12 +88,16 @@
       background-color: #424242 !important;
     }
 
+    .ti-toolbar-button.ti-active {
+      background-color: #555555 !important;
+    }
+
     /* Whiten utility icons in dark mode */
     .ti-btn-settings img,
     .ti-btn-capture img,
     .ti-btn-revert img,
-    .ti-btn-clear img,
     .ti-btn-select img,
+    .ti-btn-mouse-hover img,
     .ti-btn-sidepanel img,
     .ti-toolbar-icon {
       filter: brightness(0) invert(1) !important;

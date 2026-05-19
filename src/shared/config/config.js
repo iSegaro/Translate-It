@@ -270,6 +270,7 @@ export const CONFIG = {
   MOUSE_HOVER_AUTO_CLOSE: 'mouseleave', // نحوه بسته شدن: mouseleave, timer
   MOUSE_HOVER_TIMER_DURATION: 3000, // زمان نمایش تولتیپ در حالت timer (میلی‌ثانیه)
   MOUSE_HOVER_SHOW_CONTAINER_BORDER: true, // نمایش حاشیه دور کانتینر در حالت container
+  SHOW_MOUSE_HOVER_IN_FAB: true, // نمایش گزینه فعال‌سازی ترجمه با ماوس در منوی FAB دسکتاپ
 
   // --- Dictionary Display Settings ---
   DICTIONARY_SHOW_PRONUNCIATION: true,
@@ -1063,6 +1064,13 @@ export const getShowMobileFabAsync = async () => {
   return getSettingValueAsync(
     "SHOW_MOBILE_FAB",
     CONFIG.SHOW_MOBILE_FAB
+  );
+};
+
+export const getShowMouseHoverInFabAsync = async () => {
+  return getSettingValueAsync(
+    "SHOW_MOUSE_HOVER_IN_FAB",
+    CONFIG.SHOW_MOUSE_HOVER_IN_FAB
   );
 };
 

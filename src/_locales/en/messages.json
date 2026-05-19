@@ -443,6 +443,18 @@
   "mouse_hover_show_container_border_label": {
     "message": "Show border around container"
   },
+  "mouse_hover_enable_label": {
+    "message": "Enable Mouse on Hover"
+  },
+  "mouse_hover_disable_label": {
+    "message": "Disable Mouse on Hover"
+  },
+  "show_mouse_hover_in_fab_label": {
+    "message": "Show in Desktop FAB menu"
+  },
+  "show_mouse_hover_in_fab_description": {
+    "message": "Allow enabling or disabling Mouse on Hover translation directly from the Desktop floating button menu."
+  },
   "activation_group_dictionary_title": {
     "message": "Dictionary Mode"
   },

@@ -101,9 +101,53 @@
   flex-shrink: 0 !important;
 }
 
-.popup-content-container .language-controls > :last-child {
+/* The middle element (LanguageSelector) should take the remaining space */
+.popup-content-container .language-controls > .ti-language-controls {
   flex: 1 !important;
   min-width: 0 !important;
+}
+
+.ti-btn-min-clear {
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  opacity: 0.6 !important;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    opacity: 1 !important;
+  }
+
+  img {
+    width: 14px !important;
+    height: 14px !important;
+    object-fit: contain !important;
+  }
+
+  /* Standard Dark Mode override using the project's architectural pattern */
+  @at-root :global(.ti-dark-mode) &, 
+           :global(.theme-dark) & {
+    opacity: 0.8 !important;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.15) !important;
+      opacity: 1 !important;
+    }
+
+    .ti-toolbar-icon {
+      filter: brightness(0) invert(1) !important;
+      opacity: 1 !important;
+    }
+  }
 }
 
 /* Maintain single row even on small screens for the main popup controls */

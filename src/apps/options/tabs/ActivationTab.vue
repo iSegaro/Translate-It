@@ -534,6 +534,21 @@
         :class="{ open: mouseHoverEnabled }"
       >
         <div class="sub-options-inner">
+          <!-- FAB Toggle -->
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox
+              id="SHOW_MOUSE_HOVER_IN_FAB"
+              v-model="showMouseHoverInFab"
+              :disabled="!extensionEnabled || !mouseHoverEnabled"
+              :label="t('show_mouse_hover_in_fab_label') || 'Show in Desktop FAB menu'"
+            />
+            <span class="setting-description">
+              {{ t('show_mouse_hover_in_fab_description') || 'Allow enabling or disabling Mouse on Hover translation directly from the Desktop floating button menu.' }}
+            </span>
+          </div>
+
+          <div class="section-separator mini" />
+
           <!-- Scope -->
           <div class="horizontal-setting-row">
             <label class="setting-label">{{ t('mouse_hover_scope_label') || 'Translation Scope' }}</label>
@@ -762,6 +777,7 @@ const mouseHoverDelay = createSetting('MOUSE_HOVER_DELAY', 500)
 const mouseHoverAutoClose = createSetting('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave')
 const mouseHoverTimerDuration = createSetting('MOUSE_HOVER_TIMER_DURATION', 3000)
 const mouseHoverShowBorder = createSetting('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)
+const showMouseHoverInFab = createSetting('SHOW_MOUSE_HOVER_IN_FAB', true)
 
 const mouseHoverScopeOptions = computed(() => [
   { value: 'word', label: t('mouse_hover_scope_word') || 'Word' },

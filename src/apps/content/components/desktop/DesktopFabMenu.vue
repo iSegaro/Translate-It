@@ -256,6 +256,7 @@ import { getDesktopFabPositionAsync, TranslationMode, SelectionTranslationMode }
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
+import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js';
 import useFabSelection from '@/apps/content/composables/useFabSelection.js';
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
@@ -274,6 +275,7 @@ import IconRestore from '@/icons/ui/restore.png';
 import IconHourglass from '@/icons/ui/hourglass.png';
 import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
+import IconMouseHover from '@/icons/ui/mouse-hover.png';
 import IconTTS from '@/icons/ui/speaker.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
@@ -283,6 +285,7 @@ const { t } = useUnifiedI18n();
 const { handleError } = useErrorHandler();
 const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
+const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
 
 const allowedFeatures = ref({
@@ -453,6 +456,20 @@ const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.P
 
 const menuItems = computed(() => {
   const items = [];
+
+  // Mouse Hover Toggle
+  if (settingsStore.settings?.SHOW_MOUSE_HOVER_IN_FAB !== false) {
+    items.push({
+      id: 'mouse_hover_toggle',
+      label: isMouseHoverEnabled.value 
+        ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') 
+        : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس'),
+      icon: IconMouseHover,
+      closeMenu: false,
+      action: () => toggleMouseHover()
+    });
+  }
+
   if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
     items.push({
       id: 'translate_selection',

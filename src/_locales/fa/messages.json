@@ -441,7 +441,19 @@
     "message": "زمان نمایش:"
   },
   "mouse_hover_show_container_border_label": {
-    "message": "نمایش حاشیه دور بلاک متن"
+    "message": "نمایش حاشیه دور نگهدارنده متن"
+  },
+  "mouse_hover_enable_label": {
+    "message": "فعال‌سازی ترجمه با ماوس"
+  },
+  "mouse_hover_disable_label": {
+    "message": "غیرفعال‌سازی ترجمه با ماوس"
+  },
+  "show_mouse_hover_in_fab_label": {
+    "message": "نمایش در منوی FAB دسکتاپ"
+  },
+  "show_mouse_hover_in_fab_description": {
+    "message": "امکان فعال یا غیرفعال کردن ترجمه با ماوس به صورت مستقیم از منوی دکمه شناور دسکتاپ."
   },
   "activation_group_dictionary_title": {
     "message": "حالت دیکشنری"
