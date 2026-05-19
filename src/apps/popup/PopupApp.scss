@@ -132,14 +132,21 @@
     height: 14px !important;
     object-fit: contain !important;
   }
-}
 
-:global(.theme-dark) .ti-btn-min-clear {
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-  }
-  img {
-    filter: brightness(0) invert(1) !important;
+  /* Standard Dark Mode override using the project's architectural pattern */
+  @at-root :global(.ti-dark-mode) &, 
+           :global(.theme-dark) & {
+    opacity: 0.8 !important;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.15) !important;
+      opacity: 1 !important;
+    }
+
+    .ti-toolbar-icon {
+      filter: brightness(0) invert(1) !important;
+      opacity: 1 !important;
+    }
   }
 }
 

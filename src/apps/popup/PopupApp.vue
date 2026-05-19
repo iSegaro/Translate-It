@@ -75,6 +75,7 @@
             >
               <img
                 :src="browser.runtime.getURL('icons/ui/clear.png')"
+                class="ti-toolbar-icon"
                 alt="Clear"
               >
             </button>
