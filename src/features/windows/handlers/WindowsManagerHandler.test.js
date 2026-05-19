@@ -15,6 +15,7 @@ vi.mock('@/shared/logging/logger.js', () => ({
 vi.mock('@/features/windows/managers/WindowsManager.js', () => {
   const mockInstance = {
     dismiss: vi.fn().mockResolvedValue(),
+    ensureInitialized: vi.fn().mockResolvedValue(),
     state: { isVisible: false, isIconMode: false }
   };
   return {
