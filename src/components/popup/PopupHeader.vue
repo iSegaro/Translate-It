@@ -47,16 +47,6 @@
       @click="handleRevert"
     />
 
-    <!-- 5. Clear Fields -->
-    <IconButton
-      icon="clear.png"
-      :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
-      :alt="t('popup_clear_storage_alt_icon') || 'Clear Fields'"
-      type="toolbar"
-      class="ti-btn-clear"
-      @click="handleClearStorage"
-    />
-
     <!-- 6. Screen Capture -->
     <IconButton
       v-if="isScreenCaptureEnabled"
@@ -248,11 +238,6 @@ const handleScreenCapture = async () => {
   } catch (error) {
     await handleError(error, 'PopupHeader-screenCapture')
   }
-}
-
-const handleClearStorage = () => {
-  const event = new CustomEvent('clear-storage')
-  document.dispatchEvent(event)
 }
 
 const handleRevert = async () => {

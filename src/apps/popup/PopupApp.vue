@@ -66,6 +66,18 @@
               :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
               :auto-detect-label="'Auto-Detect'"
             />
+
+            <!-- Clear Button: Minimized clear fields button -->
+            <button
+              class="ti-btn-min-clear"
+              :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
+              @click="handleClearFields"
+            >
+              <img
+                :src="browser.runtime.getURL('icons/ui/clear.png')"
+                alt="Clear"
+              >
+            </button>
           </div>
         </div>
         
@@ -188,6 +200,18 @@ const handleCancel = () => {
   if (activeForm && typeof activeForm.cancelTranslation === 'function') {
     activeForm.cancelTranslation();
   }
+}
+
+/**
+ * Handle clear fields request
+ */
+const handleClearFields = async () => {
+  logger.debug('Clearing fields via minimized button');
+  await clearTranslation();
+  
+  // Also dispatch global event if other components rely on it
+  const event = new CustomEvent('clear-storage');
+  document.dispatchEvent(event);
 }
 
 /**

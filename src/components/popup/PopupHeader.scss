@@ -24,12 +24,11 @@
   .ti-header-spacer { order: 2 !important; flex: 1 1 auto !important; }
   .ti-switch { order: 3 !important; }
   .ti-btn-settings { order: 4 !important; }
-  .ti-btn-capture { order: 5 !important; }
-  .ti-btn-revert { order: 6 !important; }
-  .ti-btn-clear { order: 7 !important; }
+  .ti-btn-mouse-hover { order: 5 !important; }
+  .ti-btn-capture { order: 6 !important; }
+  .ti-btn-revert { order: 7 !important; }
   .ti-btn-select { order: 8 !important; }
-  .ti-btn-mouse-hover { order: 9 !important; }
-  .ti-btn-sidepanel { order: 10 !important; }
+  .ti-btn-sidepanel { order: 9 !important; }
 
   /* Toolbar Buttons Base Style */
   .ti-toolbar-button {
@@ -97,7 +96,6 @@
     .ti-btn-settings img,
     .ti-btn-capture img,
     .ti-btn-revert img,
-    .ti-btn-clear img,
     .ti-btn-select img,
     .ti-btn-mouse-hover img,
     .ti-btn-sidepanel img,
