@@ -629,6 +629,12 @@
   "mouse_hover_disable_label": {
     "message": "マウスホバー翻訳を無効にする"
   },
+  "show_mouse_hover_in_fab_label": {
+    "message": "デスクトップFABメニューに表示"
+  },
+  "show_mouse_hover_in_fab_description": {
+    "message": "デスクトップのフローティングボタンメニューから直接マウスホバー翻訳の有効/無効を切り替えられるようにします。"
+  },
   "mobile_dashboard_page_label": {
     "message": "ページ"
   },

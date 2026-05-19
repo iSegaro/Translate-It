@@ -458,15 +458,17 @@ const menuItems = computed(() => {
   const items = [];
 
   // Mouse Hover Toggle
-  items.push({
-    id: 'mouse_hover_toggle',
-    label: isMouseHoverEnabled.value 
-      ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') 
-      : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس'),
-    icon: IconMouseHover,
-    closeMenu: false,
-    action: () => toggleMouseHover()
-  });
+  if (settingsStore.settings?.SHOW_MOUSE_HOVER_IN_FAB !== false) {
+    items.push({
+      id: 'mouse_hover_toggle',
+      label: isMouseHoverEnabled.value 
+        ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') 
+        : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس'),
+      icon: IconMouseHover,
+      closeMenu: false,
+      action: () => toggleMouseHover()
+    });
+  }
 
   if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
     items.push({

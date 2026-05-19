@@ -449,6 +449,12 @@
   "mouse_hover_disable_label": {
     "message": "Disable Mouse on Hover"
   },
+  "show_mouse_hover_in_fab_label": {
+    "message": "Show in Desktop FAB menu"
+  },
+  "show_mouse_hover_in_fab_description": {
+    "message": "Allow enabling or disabling Mouse on Hover translation directly from the Desktop floating button menu."
+  },
   "activation_group_dictionary_title": {
     "message": "Dictionary Mode"
   },
