@@ -441,7 +441,13 @@
     "message": "زمان نمایش:"
   },
   "mouse_hover_show_container_border_label": {
-    "message": "نمایش حاشیه دور بلاک متن"
+    "message": "نمایش حاشیه دور نگهدارنده متن"
+  },
+  "mouse_hover_enable_label": {
+    "message": "فعال‌سازی ترجمه با ماوس"
+  },
+  "mouse_hover_disable_label": {
+    "message": "غیرفعال‌سازی ترجمه با ماوس"
   },
   "activation_group_dictionary_title": {
     "message": "حالت دیکشنری"

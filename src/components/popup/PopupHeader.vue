@@ -81,6 +81,17 @@
       @click="handleSelectElement"
     />
 
+    <!-- 8. Mouse Hover Toggle -->
+    <IconButton
+      icon="mouse-hover.png"
+      :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+      :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+      type="toolbar"
+      :active="isMouseHoverEnabled"
+      class="ti-btn-mouse-hover"
+      @click="toggleMouseHover"
+    />
+
     <!-- 7. Open Sidepanel (Rightmost) -->
     <IconButton
       v-if="!IsMobile"
@@ -96,6 +107,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
+import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -145,6 +157,7 @@ const {
   isSelectModeActive,
   toggleSelectElement
 } = useSelectElementTranslation()
+const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle()
 const { handleError } = useErrorHandler()
 const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const { t } = useUnifiedI18n()

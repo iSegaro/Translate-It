@@ -443,6 +443,12 @@
   "mouse_hover_show_container_border_label": {
     "message": "Show border around container"
   },
+  "mouse_hover_enable_label": {
+    "message": "Enable Mouse on Hover"
+  },
+  "mouse_hover_disable_label": {
+    "message": "Disable Mouse on Hover"
+  },
   "activation_group_dictionary_title": {
     "message": "Dictionary Mode"
   },

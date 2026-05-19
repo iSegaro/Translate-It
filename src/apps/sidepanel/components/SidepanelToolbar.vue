@@ -34,6 +34,22 @@
         >
       </button>
 
+      <!-- Mouse Hover Button -->
+      <button
+        class="toolbar-button"
+        :class="{ 'ti-active': isMouseHoverEnabled }"
+        :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        @click="toggleMouseHover"
+        @keydown.enter.prevent="toggleMouseHover"
+        @keydown.space.prevent="toggleMouseHover"
+      >
+        <img
+          :src="mouseHoverIcon"
+          alt="Mouse Hover"
+          class="toolbar-icon"
+        >
+      </button>
+
       <!-- Page Translation Button -->
       <div 
         v-if="isWholePageEnabled"
@@ -111,6 +127,7 @@
 import './SidepanelToolbar.scss'
 import { computed } from 'vue';
 import { useSelectElementTranslation, useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js';
+import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
 import { useUI } from '@/composables/ui/useUI.js';
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
@@ -168,6 +185,7 @@ const translationStore = useTranslationStore();
 const { t } = useUnifiedI18n()
 const { showVisualFeedback } = useUI()
 const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivating } = useSelectElementTranslation()
+const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle()
 const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
 
@@ -219,6 +237,7 @@ const isScreenCaptureEnabled = computed(() => {
 // Icon URLs using runtime.getURL
 const selectIcon = browser.runtime.getURL('icons/ui/select.png')
 const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
+const mouseHoverIcon = browser.runtime.getURL('icons/ui/mouse-hover.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
 
