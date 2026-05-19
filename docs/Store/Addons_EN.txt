@@ -3,7 +3,7 @@
 Stop switching tabs. Start translating smarter with the most advanced, privacy-focused AI translation ecosystem for your browser.
 
 Tired of clunky translators that break page layouts or hit rate limits?
-**Translate It!** brings a high-performance, modular translation engine directly into your workflow whether you're reading research papers, chatting, or browsing complex web apps.
+**Translate It!** is engineered with a "zero-pressure" philosophy, optimized to run seamlessly without taxing system resources or bloating RAM—even with dozens of tabs active. It brings a high-performance, modular translation engine directly into your workflow, providing a surgical and fluid experience for research, chatting, or browsing.
 
 ---
 
@@ -22,6 +22,7 @@ Tired of clunky translators that break page layouts or hit rate limits?
 - **Screen Capture (Visual Translation):** Highlight any area on your screen—even inside videos or images to extract and translate text instantly.
 - **Element Mode:** Click any UI element to translate it inline while keeping the layout intact.
 - **Whole Page Translation:** Auto-translate entire webpages with smart lazy-loading and infinite scroll support. Perfect for long articles or social media feeds.
+- **Mouse Hover (Instant Glance):** Hover over any text while holding a modifier key (like Ctrl) to see an instant translation in a sleek tooltip. Supports Word, Sentence, and Container scopes.
 - **Desktop/Mobile FAB:** A multipurpose, draggable floating hub that gives you instant access to OCR, Page Translation, and Element Mode.
 - **Translate While Typing (Ctrl + /):** Type in any field and translate your message before hitting send. Perfect for international messaging.
 - **Mobile Ergonomics:** Enjoy a native-like experience on mobile browsers (Firefox Android/Kiwi) with our thumb-friendly bottom sheet.

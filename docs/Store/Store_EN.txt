@@ -3,38 +3,39 @@ Translate It! - The Ultimate Translation Toolkit
 No more switching tabs. Translate smarter with the most advanced and secure intelligent translation ecosystem.
 
 Tired of clunky translators that break page layouts or hit rate limits?
-Translate It! brings a high performance, modular translation engine directly into your workflow whether you're reading research papers, chatting, or browsing complex web apps.
+Translate It! is engineered with a "zero-pressure" philosophy, optimized to run seamlessly without taxing system resources or bloating RAM—even with dozens of tabs active. It brings a high-performance, modular translation engine directly into your workflow, providing a surgical and fluid experience for research, chatting, or browsing.
 
 ---
 
 ✓ Why Choose Translate It?
 
-* 10+ AI & Standard Providers: Choose between Gemini, OpenAI, DeepL, Microsoft and more.
-* 70% Token Savings: Use our unique Economy Mode to pack more text into every request, slashing your AI API costs.
-* Zero-Pressure Engineering: Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
-* Privacy First OCR: Translate text from images, videos, and PDFs using our Offline OCR engine. Your visual data never leaves your browser.
-* Progressive Streaming: Don't wait! Large paragraphs are rendered in real-time as they arrive, providing a fluid, zero lag experience.
+- 10+ AI & Standard Providers: Choose between Gemini, OpenAI, DeepL, Microsoft and more.
+- 70% Token Savings: Use our unique Economy Mode to pack more text into every request, slashing your AI API costs.
+- Zero-Pressure Engineering: Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
+- Privacy First OCR: Translate text from images, videos, and PDFs using our Offline OCR engine. Your visual data never leaves your browser.
+- Progressive Streaming: Don't wait! Large paragraphs are rendered in real-time as they arrive, providing a fluid, zero lag experience.
 
 ---
 
 ✓ Key Features at Your Fingertips
 
-* Instant Selection: Select text and get a clean translation box right where you are.
-* Screen Capture (Visual Translation): Highlight any area on your screen—even inside videos or images to extract and translate text instantly.
-* Element Mode: Click any UI element to translate it inline while keeping the layout intact.
-* Whole Page Translation: Auto-translate entire web-pages with smart lazy-loading and infinite scroll support. Perfect for long articles or social media feeds.
-* Desktop/Mobile FAB: A multipurpose, drag-gable floating hub that gives you instant access to OCR, Page Translation, and Element Mode.
-* Translate While Typing (Ctrl + /): Type in any field and translate your message before hitting send. Perfect for international messaging.
-* Mobile Ergonomics: Enjoy a native-like experience on mobile browsers (Firefox Android/Kiwi) with our thumb-friendly bottom sheet.
-* Turbo vs. Economy Slider: Take full control! Choose Turbo Mode for lightning-fast UI or Economy Mode for maximum stability and cost-efficiency.
+- Instant Selection: Select text and get a clean translation box right where you are.
+- Screen Capture (Visual Translation): Highlight any area on your screen—even inside videos or images to extract and translate text instantly.
+- Element Mode: Click any UI element to translate it inline while keeping the layout intact.
+- Whole Page Translation: Auto-translate entire web-pages with smart lazy-loading and infinite scroll support. Perfect for long articles or social media feeds.
+- Mouse Hover (Instant Glance): Hover over any text while holding a modifier key (like Ctrl) to see an instant translation in a sleek tooltip. Supports Word, Sentence, and Container scopes.
+- Desktop/Mobile FAB: A multipurpose, drag-gable floating hub that gives you instant access to OCR, Page Translation, and Element Mode.
+- Translate While Typing (Ctrl + /): Type in any field and translate your message before hitting send. Perfect for international messaging.
+- Mobile Ergonomics: Enjoy a native-like experience on mobile browsers (Firefox Android/Kiwi) with our thumb-friendly bottom sheet.
+- Turbo vs. Economy Slider: Take full control! Choose Turbo Mode for lightning-fast UI or Economy Mode for maximum stability and cost-efficiency.
 
 ---
 
 ✓ Pro Tools for Power Users
 
-* Smart Dictionary: See definitions, synonyms, and usage examples for any word.
-* Text to Speech: Listen to translations in high-quality audio.
-* History & Export: Keep track of your translations and export them whenever you need.
+- Smart Dictionary: See definitions, synonyms, and usage examples for any word.
+- Text to Speech: Listen to translations in high-quality audio.
+- History & Export: Keep track of your translations and export them whenever you need.
 
 ---
 
@@ -46,9 +47,9 @@ Includes 100+ languages: English, Farsi (Persian), Japanese, French, German, Chi
 
 ✓ Security & Open Source
 
-* No Tracking: We don't store or share your data.
-* Direct Connection: Your text goes directly from your browser to the API of your choice.
-* Open Source: Fully transparent development on GitHub.
+- No Tracking: We don't store or share your data.
+- Direct Connection: Your text goes directly from your browser to the API of your choice.
+- Open Source: Fully transparent development on GitHub.
 
 https://github.com/iSegaro/Translate-It
 
