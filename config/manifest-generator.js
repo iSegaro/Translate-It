@@ -120,9 +120,7 @@ function generateChromeManifest(baseManifest) {
     // Chrome-specific permissions
     permissions: [
       ...baseManifest.permissions,
-      'tts',
       'offscreen',
-      'proxy',
       'contextMenus',
       'sidePanel'
     ],
