@@ -2543,13 +2543,7 @@
   "subtitle_try_again_btn": {
     "message": "Try Again"
   },
-  "source_language_label": {
-    "message": "Source Language"
-  },
-  "target_language_label": {
-    "message": "Target Language"
-  },
-  "provider_label": {
-    "message": "Provider"
+  "subtitle_languages_label": {
+    "message": "Translation Languages"
   }
 }

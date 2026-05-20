@@ -2543,13 +2543,7 @@
   "subtitle_try_again_btn": {
     "message": "تلاش مجدد"
   },
-  "source_language_label": {
-    "message": "زبان مبدأ"
-  },
-  "target_language_label": {
-    "message": "زبان مقصد"
-  },
-  "provider_label": {
-    "message": "سرویس‌دهنده"
+  "subtitle_languages_label": {
+    "message": "زبان‌های ترجمه"
   }
 }

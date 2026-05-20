@@ -27,13 +27,13 @@
           
           <div v-if="fileContent" class="config-card fade-in">
             <div class="config-grid">
-              <div class="config-item">
-                <label>{{ t('source_language_label', 'Source Language') }}</label>
-                <LanguageSelector v-model="config.sourceLang" mode="source" />
-              </div>
-              <div class="config-item">
-                <label>{{ t('target_language_label', 'Target Language') }}</label>
-                <LanguageSelector v-model="config.targetLang" mode="target" />
+              <div class="config-item language-pair">
+                <label>{{ t('subtitle_languages_label', 'Translation Languages') }}</label>
+                <LanguageSelector 
+                  v-model:source-language="config.sourceLang" 
+                  v-model:target-language="config.targetLang" 
+                  :provider="config.providerId"
+                />
               </div>
               <div class="config-item">
                 <label>{{ t('provider_label', 'Provider') }}</label>
@@ -243,6 +243,14 @@ onUnmounted(() => {
       margin-bottom: 2rem;
 
       .config-item {
+        &.language-pair {
+          grid-column: span 2;
+          
+          @media (max-width: 600px) {
+            grid-column: span 1;
+          }
+        }
+
         label {
           display: block;
           font-size: 0.85rem;
