@@ -284,3 +284,54 @@
     text-align: right;
   }
 }
+
+a.subtitle-link-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  
+  .subtitle-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    transition: transform var(--transition-base);
+  }
+
+  .subtitle-label {
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    /* Translate optical baseline tweak if needed, usually line-height 1 fixes it */
+    transform: translateY(1px); 
+  }
+
+  &:hover {
+    color: var(--color-primary);
+    
+    .subtitle-icon {
+      transform: scale(1.1);
+    }
+  }
+}
+
+/* Adjust for mobile header mode */
+@media (max-width: 1024px) {
+  a.subtitle-link-section {
+    padding: var(--spacing-sm);
+    
+    .subtitle-label {
+      display: none; /* Hide text to save space on small screens */
+    }
+    
+    .subtitle-icon {
+      width: 26px;
+      height: 26px;
+    }
+  }
+}

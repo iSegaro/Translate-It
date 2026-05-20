@@ -42,6 +42,15 @@
         </div>
       </div>
 
+      <a 
+        href="subtitle.html" 
+        target="_blank" 
+        class="sidebar-section subtitle-link-section"
+      >
+        <img src="@/icons/ui/subtitle.png" class="subtitle-icon" alt="Subtitle" />
+        <span class="subtitle-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
+      </a>
+
       <div class="sidebar-footer">
         <a
           :href="REPO_URLS.GITHUB_MAIN"
@@ -88,6 +97,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { REPO_URLS } from '@/shared/constants/core.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
+import { Icon as VIcon } from '@iconify/vue'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar')
