@@ -109,12 +109,18 @@ export class SubtitleTranslationCoordinator {
   async _processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options) {
     const job = this.activeJobs.get(jobId);
     const tokenRegistry = new Map();
-    
+
+    // Build batch-level context for DeepL (dialogue continuity across batch boundaries)
+    const isDeepLProvider = providerId?.toLowerCase().includes('deepl');
+    const batchContext = isDeepLProvider
+      ? SubtitleContextBuilder.buildBatchContext(batch, job.cues, 2)
+      : null;
+
     // 1. Protect & Prepare Payload
     const translationItems = batch.map(cue => {
       const { text: protectedText, tokens } = subtitleTextProtector.protect(cue.text);
       tokenRegistry.set(cue.id, tokens);
-      
+
       return {
         id: cue.id,
         text: protectedText,
@@ -136,7 +142,9 @@ export class SubtitleTranslationCoordinator {
         providerId,
         mode: TranslationMode.Subtitle,
         promptTemplate: SUBTITLE_PROMPT_TEMPLATES.SYSTEM,
-        instruction: SUBTITLE_PROMPT_TEMPLATES.BATCH_INSTRUCTION
+        instruction: SUBTITLE_PROMPT_TEMPLATES.BATCH_INSTRUCTION,
+        // Add batch-level context for DeepL (dialogue continuity)
+        contextMetadata: batchContext ? { dialogueContext: batchContext } : null
       }, MessageContexts.TRANSLATION_SERVICE);
 
       const response = await unifiedTranslationService.handleTranslationRequest(message, { internal: true });

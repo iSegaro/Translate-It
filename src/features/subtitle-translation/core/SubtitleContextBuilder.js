@@ -35,4 +35,35 @@ export class SubtitleContextBuilder {
     }
     return contextStr.trim();
   }
+
+  /**
+   * Builds dialogue context for an entire batch to pass to DeepL.
+   * DeepL's context parameter applies to the whole batch, not per-item.
+   * @param {Array} batch - Cues in current batch
+   * @param {Array} allCues - All cues in the subtitle file
+   * @param {number} previousCueCount - Number of cues from previous batch to include as context
+   * @returns {string} Compact dialogue context string (max ~800 chars for DeepL's 1024 limit)
+   */
+  static buildBatchContext(batch, allCues, previousCueCount = 3) {
+    if (!batch || batch.length === 0) return '';
+
+    const firstCue = batch[0];
+    const firstCueIndex = allCues.findIndex(c => c.id === firstCue.id);
+
+    if (firstCueIndex === -1) return '';
+
+    // Get cues before this batch for continuity
+    const contextStart = Math.max(0, firstCueIndex - previousCueCount);
+    const previousCues = allCues.slice(contextStart, firstCueIndex).map(c => c.text);
+
+    if (previousCues.length === 0) return '';
+
+    // Format as subtitle dialogue snippet, limit to ~800 chars (DeepL's context limit is 1024)
+    let dialogueContext = `Subtitle dialogue: ${previousCues.join(' | ')}`;
+    if (dialogueContext.length > 800) {
+      dialogueContext = dialogueContext.substring(0, 800) + '...';
+    }
+
+    return dialogueContext;
+  }
 }

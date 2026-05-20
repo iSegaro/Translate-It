@@ -174,14 +174,19 @@ export const AIConversationHelper = {
       getAIConversationHistoryEnabledAsync()
     ]);
 
-    // 1. Structural Context (Site Title, Section Heading)
+    // 1. Subtitle Context (Dialogue continuity for subtitle translation)
+    if (contextEnabled && contextMetadata?.dialogueContext) {
+      contextParts.push(contextMetadata.dialogueContext);
+    }
+
+    // 2. Structural Context (Site Title, Section Heading)
     if (contextEnabled && contextMetadata) {
       if (contextMetadata.pageTitle) contextParts.push(`Site: ${contextMetadata.pageTitle}`);
       if (contextMetadata.heading) contextParts.push(`Section: ${contextMetadata.heading}`);
       if (contextMetadata.role) contextParts.push(`Context: ${contextMetadata.role}`);
     }
 
-    // 2. Compact History (Last full turn: User + Assistant)
+    // 3. Compact History (Last full turn: User + Assistant)
     // History is only included for Select Element to maintain style/consistency
     if (historyEnabled && sessionId && translateMode === TranslationMode.Select_Element) {
       const charLimit = TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.DEEPL;
