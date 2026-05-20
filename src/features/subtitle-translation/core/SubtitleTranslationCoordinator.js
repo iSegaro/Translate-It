@@ -43,6 +43,17 @@ export class SubtitleTranslationCoordinator {
     logger.info(`Starting subtitle job ${jobId} for ${filename} using ${providerId}`);
 
     try {
+      // 0. Reset Provider State (Circuit Breaker) before starting a new job
+      // This ensures a fresh start if the user tries again after an error
+      const providerInstance = await unifiedTranslationService.translationEngine.getProvider(providerId);
+      if (providerInstance) {
+        // Clear Circuit Breaker if it's open for this provider
+        if (providerInstance.rateLimitManager && typeof providerInstance.rateLimitManager.resetCircuitBreaker === 'function') {
+          providerInstance.rateLimitManager.resetCircuitBreaker();
+          logger.debug(`Reset circuit breaker for ${providerId}`);
+        }
+      }
+
       // 1. Parse
       const adapter = SubtitleParserFactory.getAdapter(filename);
       const { cues } = adapter.parse(content);
@@ -75,6 +86,9 @@ export class SubtitleTranslationCoordinator {
         // while still allowing the user to download partially translated progress.
         if (result && result.isFatal) {
           logger.warn(`Stopping job ${jobId} due to fatal error. Rescuing progress...`);
+          if (job.progressTracker) {
+            job.progressTracker.setTerminalError(result.error || 'Fatal translation error occurred');
+          }
           break;
         }
       }
@@ -160,7 +174,11 @@ export class SubtitleTranslationCoordinator {
       });
       job.progressTracker.update(batch);
 
-      return { success: false, isFatal };
+      return { 
+        success: false, 
+        isFatal, 
+        error: error.message 
+      };
     }
   }
 
@@ -189,6 +207,11 @@ export class SubtitleTranslationCoordinator {
   _notifyComplete(jobId) {
     const job = this.activeJobs.get(jobId);
     if (!job) return;
+
+    // Ensure progress reaches 100% by marking unprocessed cues as skipped
+    if (job.progressTracker) {
+      job.progressTracker.finalize();
+    }
 
     // Serialize final content
     const translatedContent = job.adapter.serialize(job.cues);

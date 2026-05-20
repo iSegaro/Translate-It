@@ -8,6 +8,14 @@ export class SubtitleProgressTracker {
     this.failedCount = 0;
     this.skippedCount = 0;
     this.startTime = Date.now();
+    this.terminalError = null;
+  }
+
+  /**
+   * Sets a terminal error message that caused the job to stop prematurely.
+   */
+  setTerminalError(error) {
+    this.terminalError = error;
   }
 
   update(results) {
@@ -36,7 +44,20 @@ export class SubtitleProgressTracker {
       skipped: this.skippedCount,
       percent: Math.round(percent),
       etaMs: Math.round(etaMs),
-      elapsedMs: elapsed
+      elapsedMs: elapsed,
+      terminalError: this.terminalError
     };
+  }
+
+  /**
+   * Finalizes the tracker, marking any remaining cues as skipped.
+   * Useful for partial completions due to fatal errors or cancellation.
+   */
+  finalize() {
+    const processed = this.translatedCount + this.failedCount + this.skippedCount;
+    const remaining = this.totalCues - processed;
+    if (remaining > 0) {
+      this.skippedCount += remaining;
+    }
   }
 }

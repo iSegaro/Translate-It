@@ -20,6 +20,17 @@
       </div>
     </div>
 
+    <div 
+      v-if="progress.terminalError"
+      class="terminal-error-alert fade-in"
+    >
+      <v-icon icon="mdi:alert-circle" class="error-icon" />
+      <div class="error-content">
+        <span class="error-title">{{ t('subtitle_terminal_error', 'Stopped due to error') }}</span>
+        <span class="error-msg">{{ progress.terminalError }}</span>
+      </div>
+    </div>
+
     <div class="stats-grid">
       <div class="stat-item">
         <div class="stat-value">
@@ -47,7 +58,7 @@
       </div>
       <div class="stat-item">
         <div class="stat-value">
-          {{ progress.processed }} / {{ progress.total }}
+          {{ progress.translated }} / {{ progress.total }}
         </div>
         <div class="stat-label">
           {{ t('subtitle_total', 'Total Cues') }}
@@ -58,6 +69,7 @@
 </template>
 
 <script setup>
+import { Icon as VIcon } from '@iconify/vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 const { t } = useUnifiedI18n();
 
@@ -106,6 +118,42 @@ const formatTime = (ms) => {
       font-size: 1.5rem;
       font-weight: 700;
       color: var(--primary-color, #6366f1);
+    }
+  }
+
+  .terminal-error-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+
+    .error-icon {
+      font-size: 1.25rem;
+      color: var(--error-color, #ef4444);
+      margin-top: 0.1rem;
+    }
+
+    .error-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+
+      .error-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--error-color, #ef4444);
+        text-transform: uppercase;
+      }
+
+      .error-msg {
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        line-height: 1.4;
+      }
     }
   }
 

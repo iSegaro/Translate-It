@@ -100,13 +100,14 @@
           >
             <button
               class="primary-btn success"
-              @click="downloadResult(currentFile.name)"
+              @click="handleDownload(currentFile.name)"
             >
               <v-icon icon="mdi:download" />
               {{ t('subtitle_download_btn', 'Download Translated Subtitles') }}
             </button>
             <button
-              class="secondary-btn"
+              v-if="isDownloaded"
+              class="secondary-btn fade-in"
               @click="reset"
             >
               <v-icon icon="mdi:refresh" />
@@ -168,6 +169,7 @@ const tracker = useResourceTracker('subtitle-app');
 
 const isDark = computed(() => settingsStore.isDarkTheme);
 const fileContent = ref('');
+const isDownloaded = ref(false);
 
 const {
   status,
@@ -176,9 +178,17 @@ const {
   currentFile,
   startTranslation,
   cancelTranslation,
-  downloadResult,
+  downloadResult: downloadResultOriginal,
   cleanup
 } = useSubtitleTranslation();
+
+/**
+ * Enhanced download handler to track state.
+ */
+const handleDownload = (filename) => {
+  downloadResultOriginal(filename);
+  isDownloaded.value = true;
+};
 
 const config = reactive({
   sourceLanguage: 'auto',
@@ -245,6 +255,7 @@ const reset = () => {
   status.value = 'idle';
   currentFile.value = null;
   fileContent.value = '';
+  isDownloaded.value = false;
 };
 
 onUnmounted(() => {
