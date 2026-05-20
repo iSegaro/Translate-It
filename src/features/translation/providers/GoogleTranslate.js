@@ -178,7 +178,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
             }
           }
 
-          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && chunkTexts[i].trim());
+          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
           if (hasEmpty) {
             const joinedResult = data[0].map(segment => segment[0]).join('');
             return { translatedText: joinedResult, candidateText: "" };
