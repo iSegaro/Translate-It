@@ -37,6 +37,14 @@ vi.mock('@/core/memory/ResourceTracker.js', () => {
   };
 });
 
+vi.mock('@/features/translation/providers/utils/TraditionalTextProcessor.js', () => ({
+  getTextInfo: vi.fn((item) => {
+    if (typeof item === 'string') return { text: item, length: item.length };
+    const text = item?.t || item?.text || '';
+    return { text: String(text), length: String(text).length };
+  })
+}));
+
 describe('StreamingManager', () => {
   let streamingManager;
   let MessageActions;
