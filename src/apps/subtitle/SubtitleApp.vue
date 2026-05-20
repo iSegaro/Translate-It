@@ -16,13 +16,7 @@
       </div>
       
       <div class="header-actions">
-        <button 
-          class="icon-btn" 
-          :title="t('theme_toggle_title', 'Toggle Theme')"
-          @click="toggleTheme"
-        >
-          <v-icon :icon="isDark ? 'mdi:white-balance-sunny' : 'mdi:moon-waning-crescent'" />
-        </button>
+        <ThemeSelector />
       </div>
     </header>
 
@@ -175,6 +169,7 @@ import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { useSubtitleTranslation } from '@/features/subtitle-translation/composables/useSubtitleTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
+import ThemeSelector from '@/apps/options/components/ThemeSelector.vue';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { applyTheme } from '@/utils/ui/theme.js';
@@ -219,20 +214,7 @@ const config = reactive({
   options: { useContext: true }
 });
 
-/**
- * Toggle the theme settings store preference and broadcast it globally.
- */
-const toggleTheme = () => {
-  const nextTheme = settingsStore.isDarkTheme ? 'light' : 'dark';
-  settingsStore.updateSettingAndPersist('THEME', nextTheme);
-  
-  browser.runtime.sendMessage({
-    action: 'THEME_CHANGED',
-    payload: { theme: nextTheme }
-  }).catch(error => {
-    logger.debug('Could not send THEME_CHANGED message from Subtitle:', error.message);
-  });
-};
+// (Theme toggle handled by ThemeSelector component)
 
 onMounted(async () => {
   try {
