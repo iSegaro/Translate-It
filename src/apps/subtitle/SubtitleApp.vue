@@ -10,7 +10,11 @@
       </div>
       
       <div class="header-actions">
-        <button class="icon-btn" @click="isDark = !isDark">
+        <button 
+          class="icon-btn" 
+          :title="t('theme_toggle_title', 'Toggle Theme')"
+          @click="toggleTheme"
+        >
           <v-icon :icon="isDark ? 'mdi:white-balance-sunny' : 'mdi:moon-waning-crescent'" />
         </button>
       </div>
@@ -100,17 +104,28 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { Icon as VIcon } from '@iconify/vue';
+import browser from 'webextension-polyfill';
 import SubtitleFileDropzone from '@/features/subtitle-translation/components/SubtitleFileDropzone.vue';
 import SubtitleProgressPanel from '@/features/subtitle-translation/components/SubtitleProgressPanel.vue';
 import LanguageSelector from '@/components/shared/LanguageSelector.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { useSubtitleTranslation } from '@/features/subtitle-translation/composables/useSubtitleTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
+import { applyTheme } from '@/utils/ui/theme.js';
+import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
+// --- Initialization & Setup ---
+const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleApp');
 const { t } = useUnifiedI18n();
-const isDark = ref(true);
+const settingsStore = useSettingsStore();
+const tracker = useResourceTracker('subtitle-app');
+
+const isDark = computed(() => settingsStore.isDarkTheme);
 const fileContent = ref('');
 
 const {
@@ -129,6 +144,48 @@ const config = reactive({
   targetLanguage: 'en',
   providerId: 'Gemini',
   options: { useContext: true }
+});
+
+/**
+ * Toggle the theme settings store preference and broadcast it globally.
+ */
+const toggleTheme = () => {
+  const nextTheme = settingsStore.isDarkTheme ? 'light' : 'dark';
+  settingsStore.updateSettingAndPersist('THEME', nextTheme);
+  
+  browser.runtime.sendMessage({
+    action: 'THEME_CHANGED',
+    payload: { theme: nextTheme }
+  }).catch(error => {
+    logger.debug('Could not send THEME_CHANGED message from Subtitle:', error.message);
+  });
+};
+
+onMounted(async () => {
+  try {
+    // Load existing settings and initialize the theme
+    await settingsStore.loadSettings();
+    applyTheme(settingsStore.settings.THEME);
+    
+    // Listen for theme changes from other options/extension pages
+    tracker.addEventListener(browser.runtime.onMessage, 'addListener', (message) => {
+      if (message && message.action === 'THEME_CHANGED') {
+        if (message.payload?.theme) {
+          applyTheme(message.payload.theme);
+        }
+      }
+    });
+
+    // Listen for system theme changes in auto mode
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    tracker.addEventListener(mediaQuery, 'change', () => {
+      if (settingsStore.settings.THEME === 'auto') {
+        applyTheme('auto');
+      }
+    });
+  } catch (err) {
+    logger.error('Failed to initialize settings/theme in SubtitleApp:', err);
+  }
 });
 
 const handleFileLoaded = (content) => {
@@ -160,16 +217,38 @@ onUnmounted(() => {
   --primary-glow: rgba(99, 102, 241, 0.15);
   --success-color: #10b981;
   --error-color: #ef4444;
+  
+  /* Light theme default colors */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --bg-header: rgba(248, 250, 252, 0.8);
+  --logo-text-gradient-start: #0f172a;
+  --logo-text-gradient-end: #475569;
+  --btn-secondary-bg: rgba(0, 0, 0, 0.03);
+  --btn-secondary-bg-hover: rgba(0, 0, 0, 0.06);
+  --bg-glass: rgba(0, 0, 0, 0.02);
+  --bg-glass-hover: rgba(0, 0, 0, 0.04);
+  --progress-track-bg: rgba(0, 0, 0, 0.05);
+}
+
+/* Dark theme overrides */
+:root.theme-dark, .theme-dark, .is-dark {
   --bg-app: #0f172a;
   --bg-card: rgba(30, 41, 59, 0.7);
   --border-color: rgba(255, 255, 255, 0.1);
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-}
-
-.is-dark {
-  background-color: var(--bg-app);
-  color: var(--text-primary);
+  --bg-header: rgba(15, 23, 42, 0.8);
+  --logo-text-gradient-start: #ffffff;
+  --logo-text-gradient-end: #94a3b8;
+  --btn-secondary-bg: rgba(255, 255, 255, 0.05);
+  --btn-secondary-bg-hover: rgba(255, 255, 255, 0.1);
+  --bg-glass: rgba(255, 255, 255, 0.03);
+  --bg-glass-hover: rgba(255, 255, 255, 0.05);
+  --progress-track-bg: rgba(255, 255, 255, 0.1);
 }
 
 .subtitle-app {
@@ -178,6 +257,8 @@ onUnmounted(() => {
   flex-direction: column;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   transition: background-color 0.3s ease;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
 
   .app-header {
     padding: 1.5rem 2rem;
@@ -185,7 +266,7 @@ onUnmounted(() => {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
-    background: rgba(15, 23, 42, 0.8);
+    background: var(--bg-header);
     backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
@@ -206,7 +287,7 @@ onUnmounted(() => {
           font-size: 1.25rem;
           margin: 0;
           font-weight: 700;
-          background: linear-gradient(90deg, #fff, #94a3b8);
+          background: linear-gradient(90deg, var(--logo-text-gradient-start), var(--logo-text-gradient-end));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
@@ -234,7 +315,12 @@ onUnmounted(() => {
     border-radius: 20px;
     padding: 2rem;
     margin-top: 1rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+
+    :root.theme-dark &, .theme-dark &, .is-dark & {
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
 
     .config-grid {
       display: grid;
@@ -309,7 +395,7 @@ onUnmounted(() => {
   .secondary-btn {
     padding: 0.85rem 2rem;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--btn-secondary-bg);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     font-weight: 600;
@@ -320,7 +406,31 @@ onUnmounted(() => {
     transition: all 0.2s ease;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--btn-secondary-bg-hover);
+    }
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--btn-secondary-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1.25rem;
+
+    &:hover {
+      background: var(--btn-secondary-bg-hover);
+      transform: scale(1.05);
+    }
+    
+    &:active {
+      transform: scale(0.95);
     }
   }
 

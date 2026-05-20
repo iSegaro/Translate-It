@@ -94,7 +94,7 @@ const formatTime = (ms) => {
   .progress-bar-container {
     width: 100%;
     height: 12px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--progress-track-bg, rgba(255, 255, 255, 0.1));
     border-radius: 6px;
     overflow: hidden;
     margin-bottom: 1.5rem;
