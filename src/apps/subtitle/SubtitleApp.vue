@@ -53,7 +53,10 @@
               </div>
               <div class="config-item">
                 <label>{{ t('provider_label', 'Provider') }}</label>
-                <ProviderSelector v-model="config.providerId" />
+                <ProviderSelector 
+                  v-model="config.providerId" 
+                  placement="up"
+                />
               </div>
             </div>
 
