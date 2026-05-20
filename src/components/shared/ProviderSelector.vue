@@ -784,7 +784,13 @@ const currentProviderName = computed(() => {
     return isDefaultInvalid.value ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
   }
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
-  return provider?.name || 'Google Translate'
+  
+  if (!provider) {
+    logger.warn('[ProviderSelector] Unknown provider ID:', currentProvider.value);
+    return currentProvider.value || 'Unknown';
+  }
+  
+  return provider.name;
 })
 
 /**
