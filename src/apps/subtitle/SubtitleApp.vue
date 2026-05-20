@@ -342,7 +342,7 @@ onUnmounted(() => {
     backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 50;
 
     .logo {
       display: flex;
@@ -389,6 +389,12 @@ onUnmounted(() => {
     margin-top: 1rem;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+
+    &:focus-within {
+      z-index: 101;
+    }
 
     :root.theme-dark &, .theme-dark &, .is-dark & {
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
