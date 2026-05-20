@@ -45,11 +45,12 @@
             <div class="config-grid">
               <div class="config-item language-pair">
                 <label>{{ t('subtitle_languages_label', 'Translation Languages') }}</label>
-                <LanguageSelector 
-                  v-model:source-language="config.sourceLanguage" 
-                  v-model:target-language="config.targetLanguage" 
+                <LanguageSelector
+                  v-model:source-language="config.sourceLanguage"
+                  v-model:target-language="config.targetLanguage"
                   :provider="config.providerId"
                   :allow-auto="false"
+                  :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
                 />
               </div>
               <div class="config-item">
