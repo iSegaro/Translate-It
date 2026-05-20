@@ -30,8 +30,8 @@
               <div class="config-item language-pair">
                 <label>{{ t('subtitle_languages_label', 'Translation Languages') }}</label>
                 <LanguageSelector 
-                  v-model:source-language="config.sourceLang" 
-                  v-model:target-language="config.targetLang" 
+                  v-model:source-language="config.sourceLanguage" 
+                  v-model:target-language="config.targetLanguage" 
                   :provider="config.providerId"
                 />
               </div>
@@ -125,8 +125,8 @@ const {
 } = useSubtitleTranslation();
 
 const config = reactive({
-  sourceLang: 'auto',
-  targetLang: 'en',
+  sourceLanguage: 'auto',
+  targetLanguage: 'en',
   providerId: 'Gemini',
   options: { useContext: true }
 });
@@ -136,7 +136,7 @@ const handleFileLoaded = (content) => {
 };
 
 const canTranslate = computed(() => {
-  return fileContent.value && config.targetLang && config.providerId;
+  return fileContent.value && config.targetLanguage && config.providerId;
 });
 
 const startJob = () => {

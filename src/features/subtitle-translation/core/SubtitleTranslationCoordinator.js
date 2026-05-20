@@ -33,8 +33,8 @@ export class SubtitleTranslationCoordinator {
       jobId, 
       content, 
       filename, 
-      sourceLang, 
-      targetLang, 
+      sourceLanguage, 
+      targetLanguage, 
       providerId,
       options = {} 
     } = payload;
@@ -65,7 +65,7 @@ export class SubtitleTranslationCoordinator {
         if (!job || job.status === 'cancelled') break;
 
         const batch = batches[i];
-        await this._processBatch(jobId, batch, sourceLang, targetLang, providerId, options);
+        await this._processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options);
         
         // Notify progress
         this._notifyProgress(jobId);
@@ -84,7 +84,7 @@ export class SubtitleTranslationCoordinator {
    * Processes a single batch of cues.
    * @private
    */
-  async _processBatch(jobId, batch, sourceLang, targetLang, providerId, options) {
+  async _processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options) {
     const job = this.activeJobs.get(jobId);
     const tokenRegistry = new Map();
     
@@ -109,8 +109,8 @@ export class SubtitleTranslationCoordinator {
       // to avoid messaging overhead and potential "No response" errors.
       const message = MessageFormat.create(MessageActions.BATCH_TRANSLATE, {
         items: translationItems,
-        sourceLang,
-        targetLang,
+        sourceLanguage,
+        targetLanguage,
         providerId,
         mode: TranslationMode.Subtitle,
         promptTemplate: SUBTITLE_PROMPT_TEMPLATES.SYSTEM,

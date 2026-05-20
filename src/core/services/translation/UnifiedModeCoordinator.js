@@ -183,7 +183,11 @@ export class UnifiedModeCoordinator {
    */
   async processSubtitleTranslation(request, { translationEngine }) {
     const { messageId, data } = request;
-    const { items, provider, sourceLanguage, targetLanguage, priority } = data;
+    const { items, provider, priority } = data;
+    
+    // Robust language extraction
+    const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
+    const targetLanguage = data.targetLanguage || data.targetLang;
 
     if (!items || !Array.isArray(items)) throw new Error('No items provided for subtitle translation');
     

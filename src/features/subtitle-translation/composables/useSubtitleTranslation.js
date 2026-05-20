@@ -73,8 +73,8 @@ export function useSubtitleTranslation() {
           jobId: jobId.value,
           content: fileContent,
           filename,
-          sourceLang: config.sourceLang,
-          targetLang: config.targetLang,
+          sourceLanguage: config.sourceLanguage,
+          targetLanguage: config.targetLanguage,
           providerId: config.providerId,
           options: config.options
         }
