@@ -5,7 +5,9 @@
         <h3>{{ status === 'completed' ? t('subtitle_complete', 'Translation Complete') : t('subtitle_translating', 'Translating...') }}</h3>
         <span class="filename">{{ filename }}</span>
       </div>
-      <div class="percentage">{{ progress.percent }}%</div>
+      <div class="percentage">
+        {{ progress.percent }}%
+      </div>
     </div>
 
     <div class="progress-bar-container">
@@ -14,26 +16,42 @@
         :style="{ width: progress.percent + '%' }"
         :class="{ 'is-complete': status === 'completed' }"
       >
-        <div class="progress-shine"></div>
+        <div class="progress-shine" />
       </div>
     </div>
 
     <div class="stats-grid">
       <div class="stat-item">
-        <div class="stat-value">{{ progress.translated }}</div>
-        <div class="stat-label">{{ t('subtitle_translated', 'Translated') }}</div>
+        <div class="stat-value">
+          {{ progress.translated }}
+        </div>
+        <div class="stat-label">
+          {{ t('subtitle_translated', 'Translated') }}
+        </div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ progress.failed }}</div>
-        <div class="stat-label">{{ t('subtitle_failed', 'Failed') }}</div>
+        <div class="stat-value">
+          {{ progress.failed }}
+        </div>
+        <div class="stat-label">
+          {{ t('subtitle_failed', 'Failed') }}
+        </div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ formatTime(progress.etaMs) }}</div>
-        <div class="stat-label">{{ t('subtitle_remaining', 'Remaining') }}</div>
+        <div class="stat-value">
+          {{ formatTime(progress.etaMs) }}
+        </div>
+        <div class="stat-label">
+          {{ t('subtitle_remaining', 'Remaining') }}
+        </div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ progress.processed }} / {{ progress.total }}</div>
-        <div class="stat-label">{{ t('subtitle_total', 'Total Cues') }}</div>
+        <div class="stat-value">
+          {{ progress.processed }} / {{ progress.total }}
+        </div>
+        <div class="stat-label">
+          {{ t('subtitle_total', 'Total Cues') }}
+        </div>
       </div>
     </div>
   </div>

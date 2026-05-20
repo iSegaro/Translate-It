@@ -8,24 +8,30 @@
     @click="$refs.fileInput.click()"
   >
     <input 
-      type="file" 
       ref="fileInput" 
+      type="file" 
       class="hidden-input" 
       accept=".srt,.vtt,.ass"
       @change="handleFileSelect"
-    />
+    >
     
     <div class="dropzone-content">
       <div class="icon-wrapper">
         <v-icon :icon="modelValue ? 'mdi:file-check-outline' : 'mdi:cloud-upload-outline'" />
       </div>
       
-      <div v-if="!modelValue" class="text-content">
+      <div
+        v-if="!modelValue"
+        class="text-content"
+      >
         <h3>{{ t('subtitle_drop_title', 'Drop your subtitle file here') }}</h3>
         <p>{{ t('subtitle_drop_hint', 'Supports .srt, .vtt, .ass') }}</p>
       </div>
       
-      <div v-else class="file-info">
+      <div
+        v-else
+        class="file-info"
+      >
         <h3>{{ modelValue.name }}</h3>
         <p>{{ formatSize(modelValue.size) }}</p>
       </div>
@@ -36,7 +42,7 @@
     </div>
 
     <!-- Animated background element -->
-    <div class="dropzone-glow"></div>
+    <div class="dropzone-glow" />
   </div>
 </template>
 

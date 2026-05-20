@@ -1,8 +1,14 @@
 <template>
-  <div class="subtitle-app" :class="{ 'is-dark': isDark }">
+  <div
+    class="subtitle-app"
+    :class="{ 'is-dark': isDark }"
+  >
     <header class="app-header">
       <div class="logo">
-        <v-icon icon="mdi:closed-caption-outline" class="logo-icon" />
+        <v-icon
+          icon="mdi:closed-caption-outline"
+          class="logo-icon"
+        />
         <div class="logo-text">
           <h1>{{ t('subtitle_app_title', 'Subtitle Translator') }}</h1>
           <span>{{ t('subtitle_app_powered_by', 'Powered by Translate It') }}</span>
@@ -23,13 +29,19 @@
     <main class="app-content">
       <div class="container">
         <!-- Step 1: Upload -->
-        <section v-if="status === 'idle'" class="step-upload">
+        <section
+          v-if="status === 'idle'"
+          class="step-upload"
+        >
           <SubtitleFileDropzone 
             v-model="currentFile" 
             @file-loaded="handleFileLoaded" 
           />
           
-          <div v-if="fileContent" class="config-card fade-in">
+          <div
+            v-if="fileContent"
+            class="config-card fade-in"
+          >
             <div class="config-grid">
               <div class="config-item language-pair">
                 <label>{{ t('subtitle_languages_label', 'Translation Languages') }}</label>
@@ -59,26 +71,44 @@
         </section>
 
         <!-- Step 2: Translating -->
-        <section v-if="status === 'translating' || status === 'completed'" class="step-progress">
+        <section
+          v-if="status === 'translating' || status === 'completed'"
+          class="step-progress"
+        >
           <SubtitleProgressPanel 
             :progress="progress" 
             :status="status" 
             :filename="currentFile?.name" 
           />
 
-          <div v-if="status === 'translating'" class="actions">
-            <button class="secondary-btn" @click="cancelTranslation">
+          <div
+            v-if="status === 'translating'"
+            class="actions"
+          >
+            <button
+              class="secondary-btn"
+              @click="cancelTranslation"
+            >
               <v-icon icon="mdi:close" />
               {{ t('subtitle_cancel_btn', 'Cancel Job') }}
             </button>
           </div>
 
-          <div v-if="status === 'completed'" class="complete-actions fade-in">
-            <button class="primary-btn success" @click="downloadResult(currentFile.name)">
+          <div
+            v-if="status === 'completed'"
+            class="complete-actions fade-in"
+          >
+            <button
+              class="primary-btn success"
+              @click="downloadResult(currentFile.name)"
+            >
               <v-icon icon="mdi:download" />
               {{ t('subtitle_download_btn', 'Download Translated Subtitles') }}
             </button>
-            <button class="secondary-btn" @click="reset">
+            <button
+              class="secondary-btn"
+              @click="reset"
+            >
               <v-icon icon="mdi:refresh" />
               {{ t('subtitle_another_file_btn', 'Translate Another File') }}
             </button>
@@ -86,12 +116,23 @@
         </section>
 
         <!-- Error State -->
-        <section v-if="status === 'error'" class="step-error fade-in">
+        <section
+          v-if="status === 'error'"
+          class="step-error fade-in"
+        >
           <div class="error-card">
-            <v-icon icon="mdi:alert-circle-outline" class="error-icon" />
+            <v-icon
+              icon="mdi:alert-circle-outline"
+              class="error-icon"
+            />
             <h3>{{ t('subtitle_error_title', 'Oops! Something went wrong') }}</h3>
             <p>{{ error }}</p>
-            <button class="primary-btn" @click="status = 'idle'">{{ t('subtitle_try_again_btn', 'Try Again') }}</button>
+            <button
+              class="primary-btn"
+              @click="status = 'idle'"
+            >
+              {{ t('subtitle_try_again_btn', 'Try Again') }}
+            </button>
           </div>
         </section>
       </div>
