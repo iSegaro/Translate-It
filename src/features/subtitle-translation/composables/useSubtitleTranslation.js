@@ -19,6 +19,7 @@ export function useSubtitleTranslation() {
   const translatedContent = ref('');
   const error = ref(null);
   const currentFile = ref(null);
+  const cues = ref([]);
 
   // Subscribe to background updates
   const unsubscribe = MessagingBus.subscribe(MessageContexts.SUBTITLE_TRANSLATION, (message) => {
@@ -30,12 +31,33 @@ export function useSubtitleTranslation() {
       case MessageActions.SUBTITLE_TRANSLATE_PROGRESS:
         Object.assign(progress, data.progress);
         status.value = 'translating';
+        
+        // Update cues with translated text from the batch
+        if (data.updatedCues && Array.isArray(data.updatedCues)) {
+          data.updatedCues.forEach(updated => {
+            const cue = cues.value.find(c => c.id === updated.id);
+            if (cue) {
+              cue.translatedText = updated.translatedText;
+              cue.status = updated.status;
+            }
+          });
+        }
         break;
 
       case MessageActions.SUBTITLE_TRANSLATE_COMPLETE:
         status.value = 'completed';
         translatedContent.value = data.content;
         Object.assign(progress, data.stats);
+        
+        // Final status update for any remaining cues if needed
+        // (Coordinator handles serialization, but we want UI to reflect completion)
+        if (progress.percent === 100) {
+          cues.value.forEach(cue => {
+            if (cue.status === 'pending' || cue.status === 'translating') {
+              cue.status = 'skipped';
+            }
+          });
+        }
         break;
 
       case MessageActions.SUBTITLE_TRANSLATE_ERROR:
@@ -114,6 +136,7 @@ export function useSubtitleTranslation() {
     progress,
     error,
     currentFile,
+    cues,
     translatedContent,
     startTranslation,
     cancelTranslation,

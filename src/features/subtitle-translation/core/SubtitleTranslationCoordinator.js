@@ -80,7 +80,7 @@ export class SubtitleTranslationCoordinator {
         const result = await this._processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options);
         
         // Notify progress
-        this._notifyProgress(jobId);
+        this._notifyProgress(jobId, result.updatedCues);
 
         // Fail fast on fatal errors (e.g., Invalid API Key) to prevent wasteful retries
         // while still allowing the user to download partially translated progress.
@@ -162,7 +162,7 @@ export class SubtitleTranslationCoordinator {
       // 4. Update Progress
       job.progressTracker.update(validatedCues);
 
-      return { success: true, isFatal: false };
+      return { success: true, isFatal: false, updatedCues: validatedCues };
       
     } catch (error) {
       const isFatal = ErrorMatcher.isFatal(error);
@@ -177,7 +177,8 @@ export class SubtitleTranslationCoordinator {
       return { 
         success: false, 
         isFatal, 
-        error: error.message 
+        error: error.message,
+        updatedCues: batch
       };
     }
   }
@@ -190,7 +191,7 @@ export class SubtitleTranslationCoordinator {
     }
   }
 
-  _notifyProgress(jobId) {
+  _notifyProgress(jobId, updatedCues = []) {
     const job = this.activeJobs.get(jobId);
     if (!job) return;
 
@@ -199,7 +200,12 @@ export class SubtitleTranslationCoordinator {
       action: MessageActions.SUBTITLE_TRANSLATE_PROGRESS,
       payload: {
         jobId,
-        progress: job.progressTracker.getProgress()
+        progress: job.progressTracker.getProgress(),
+        updatedCues: updatedCues.map(c => ({
+          id: c.id,
+          translatedText: c.translatedText,
+          status: c.status
+        }))
       }
     });
   }

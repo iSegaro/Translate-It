@@ -2552,6 +2552,18 @@
   "subtitle_languages_label": {
     "message": "Translation Languages"
   },
+  "subtitle_encoding_label": {
+    "message": "Encoding"
+  },
+  "subtitle_preview_label": {
+    "message": "Preview (First 100 cues)"
+  },
+  "subtitle_live_view_label": {
+    "message": "Live Translation View"
+  },
+  "subtitle_error": {
+    "message": "Error"
+  },
   "popup_subtitle_alt_icon": {
     "message": "Subtitle Translator"
   },

@@ -73,6 +73,11 @@
                 {{ t('subtitle_start_btn', 'Start Translation') }}
               </button>
             </div>
+
+            <div v-if="cues.length > 0" class="preview-section">
+              <label class="section-label">{{ t('subtitle_preview_label', 'Preview (First 100 cues)') }}</label>
+              <SubtitleViewer :cues="cues.slice(0, 100)" :item-height="80" />
+            </div>
           </div>
         </section>
 
@@ -86,6 +91,11 @@
             :status="status" 
             :filename="currentFile?.name" 
           />
+
+          <div class="live-view-section">
+            <label class="section-label">{{ t('subtitle_live_view_label', 'Live Translation View') }}</label>
+            <SubtitleViewer :cues="cues" :item-height="80" />
+          </div>
 
           <div
             v-if="status === 'translating'"
@@ -157,6 +167,8 @@ import { Icon as VIcon } from '@iconify/vue';
 import browser from 'webextension-polyfill';
 import SubtitleFileDropzone from '@/features/subtitle-translation/components/SubtitleFileDropzone.vue';
 import SubtitleProgressPanel from '@/features/subtitle-translation/components/SubtitleProgressPanel.vue';
+import SubtitleViewer from '@/features/subtitle-translation/components/SubtitleViewer.vue';
+import { SubtitleParserFactory } from '@/features/subtitle-translation/parsers/SubtitleParserFactory.js';
 import LanguageSelector from '@/components/shared/LanguageSelector.vue';
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { useSubtitleTranslation } from '@/features/subtitle-translation/composables/useSubtitleTranslation.js';
@@ -184,6 +196,7 @@ const {
   progress,
   error,
   currentFile,
+  cues,
   startTranslation,
   cancelTranslation,
   downloadResult: downloadResultOriginal,
@@ -264,6 +277,16 @@ onMounted(async () => {
 
 const handleFileLoaded = (content) => {
   fileContent.value = content;
+  
+  if (content && currentFile.value) {
+    try {
+      const adapter = SubtitleParserFactory.getAdapter(currentFile.value.name);
+      const { cues: parsedCues } = adapter.parse(content);
+      cues.value = parsedCues;
+    } catch (err) {
+      logger.error('Failed to parse subtitle for preview:', err);
+    }
+  }
 };
 
 const canTranslate = computed(() => {
@@ -284,6 +307,7 @@ const reset = () => {
   status.value = 'idle';
   currentFile.value = null;
   fileContent.value = '';
+  cues.value = [];
   isDownloaded.value = false;
 };
 
@@ -402,9 +426,24 @@ onUnmounted(() => {
     padding: 3rem 1rem;
 
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
     }
+  }
+
+  .section-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .preview-section, .live-view-section {
+    margin-top: 2rem;
+    animation: fadeIn 0.5s ease-out forwards;
   }
 
   .config-card {

@@ -34,6 +34,19 @@
       >
         <h3>{{ modelValue.name }}</h3>
         <p>{{ formatSize(modelValue.size) }}</p>
+
+        <div class="encoding-wrapper" @click.stop>
+          <label for="encoding-select">{{ t('subtitle_encoding_label', 'Encoding') }}</label>
+          <select 
+            id="encoding-select" 
+            v-model="selectedEncoding"
+            @change="reprocessFile"
+          >
+            <option v-for="enc in encodings" :key="enc.value" :value="enc.value">
+              {{ enc.label }}
+            </option>
+          </select>
+        </div>
       </div>
       
       <button class="select-button">
@@ -53,13 +66,23 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const { t } = useUnifiedI18n();
 
-defineProps({
+const props = defineProps({
   modelValue: { type: [File, null], default: null }
 });
 
 const emit = defineEmits(['update:modelValue', 'file-loaded']);
 
 const isDragging = ref(false);
+const selectedEncoding = ref('UTF-8');
+
+const encodings = [
+  { label: 'UTF-8', value: 'UTF-8' },
+  { label: 'Windows-1256 (Persian/Arabic)', value: 'windows-1256' },
+  { label: 'ISO-8859-1 (Western)', value: 'iso-8859-1' },
+  { label: 'Windows-1252 (Western)', value: 'windows-1252' },
+  { label: 'UTF-16LE', value: 'utf-16le' },
+  { label: 'UTF-16BE', value: 'utf-16be' }
+];
 
 const handleDrop = (e) => {
   isDragging.value = false;
@@ -77,9 +100,23 @@ const processFile = (file) => {
   
   const reader = new FileReader();
   reader.onload = (e) => {
-    emit('file-loaded', e.target.result);
+    const buffer = e.target.result;
+    try {
+      const decoder = new TextDecoder(selectedEncoding.value);
+      const text = decoder.decode(buffer);
+      emit('file-loaded', text);
+    } catch (err) {
+      console.error('Decoding failed:', err);
+      // Fallback or notify user
+    }
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
+};
+
+const reprocessFile = () => {
+  if (props.modelValue) {
+    processFile(props.modelValue);
+  }
 };
 
 const formatSize = (bytes) => {
@@ -152,17 +189,56 @@ const formatSize = (bytes) => {
       color: var(--text-secondary, rgba(255, 255, 255, 0.6));
     }
 
-    h3 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: var(--text-primary, #fff);
-    }
+    .file-info {
+      h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary, #fff);
+      }
 
-    p {
-      font-size: 0.9rem;
-      color: var(--text-secondary, rgba(255, 255, 255, 0.6));
-      margin-bottom: 1.5rem;
+      p {
+        font-size: 0.9rem;
+        color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+        margin-bottom: 1rem;
+      }
+
+      .encoding-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        background: rgba(0, 0, 0, 0.1);
+        padding: 0.75rem;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+
+        label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-secondary);
+        }
+
+        select {
+          background: var(--bg-card);
+          color: var(--text-primary);
+          border: 1px solid var(--border-color);
+          padding: 0.4rem 0.8rem;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          cursor: pointer;
+          outline: none;
+          width: 100%;
+          max-width: 240px;
+
+          &:focus {
+            border-color: var(--primary-color);
+          }
+        }
+      }
     }
 
     .select-button {

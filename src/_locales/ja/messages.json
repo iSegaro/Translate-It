@@ -2552,6 +2552,18 @@
   "subtitle_languages_label": {
     "message": "翻訳言語"
   },
+  "subtitle_encoding_label": {
+    "message": "エンコーディング"
+  },
+  "subtitle_preview_label": {
+    "message": "プレビュー（最初の100件）"
+  },
+  "subtitle_live_view_label": {
+    "message": "ライブ翻訳ビュー"
+  },
+  "subtitle_error": {
+    "message": "エラー"
+  },
   "popup_subtitle_alt_icon": {
     "message": "字幕翻訳"
   },

@@ -15,26 +15,21 @@ export class SrtAdapter {
     const warnings = [];
     
     // Normalize line endings and split by potential empty lines (resilient to 1 or more newlines)
-    const rawBlocks = content.split(/\r?\n\r?\n/);
+    // We use a regex that matches one or more blank lines (optionally containing spaces)
+    const rawBlocks = content.split(/\r?\n\s*\r?\n/);
     
     let cueIndex = 1;
     for (const block of rawBlocks) {
       const trimmedBlock = block.trim();
       if (!trimmedBlock) continue;
 
-      const lines = trimmedBlock.split(/\r?\n/);
-      if (lines.length < 2) {
-        warnings.push(`Malformed block at index ${cueIndex}: insufficient lines.`);
-        continue;
-      }
-
-      // Line 1: Index (optional but standard)
-      // Line 2: Timestamp (00:00:01,000 --> 00:00:04,000)
-      // Line 3+: Text
+      const lines = trimmedBlock.split(/\r?\n/).map(l => l.trim());
       
+      // Look for the timestamp line (e.g. 00:00:01,000 --> 00:00:04,000)
+      // Standard SRT uses --> but we'll be slightly more flexible
       let timestampLineIndex = -1;
       for (let i = 0; i < Math.min(lines.length, 3); i++) {
-        if (lines[i].includes('-->')) {
+        if (lines[i].includes('-->') || /^(\d{2}:\d{2}:\d{2})/.test(lines[i])) {
           timestampLineIndex = i;
           break;
         }
@@ -49,11 +44,22 @@ export class SrtAdapter {
       const textLines = lines.slice(timestampLineIndex + 1);
       const text = textLines.join('\n').trim();
 
-      const [startStr, endStr] = timestampLine.split('-->').map(s => s.trim());
-      
-      if (!startStr || !endStr) {
-        warnings.push(`Invalid timestamp format: ${timestampLine}`);
-        continue;
+      // If text is empty, it might be a malformed block
+      if (!text && block.length > 50) {
+          // Check if the timestamp line was actually the index line
+          // (some files have extra empty lines)
+          continue; 
+      }
+
+      let startStr = '';
+      let endStr = '';
+
+      if (timestampLine.includes('-->')) {
+        [startStr, endStr] = timestampLine.split('-->').map(s => s.trim());
+      } else {
+        // Fallback for malformed timestamps
+        startStr = timestampLine.substring(0, 12).trim();
+        endStr = '';
       }
 
       cues.push({
