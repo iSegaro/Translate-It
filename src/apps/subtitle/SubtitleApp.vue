@@ -1,7 +1,7 @@
 <template>
   <div
     class="subtitle-app"
-    :class="{ 'is-dark': isDark }"
+    :class="{ 'is-dark': isDark, 'is-rtl': t('IsRTL') === 'true' }"
   >
     <header class="app-header">
       <div class="logo">
@@ -311,6 +311,23 @@ onUnmounted(() => {
   transition: background-color 0.3s ease;
   background-color: var(--bg-app);
   color: var(--text-primary);
+
+  &.is-rtl {
+    direction: rtl;
+    text-align: right;
+
+    .config-card .config-grid .config-item label {
+      text-align: right;
+    }
+
+    .primary-btn, .secondary-btn {
+      flex-direction: row-reverse;
+    }
+    
+    .logo-text {
+      text-align: right;
+    }
+  }
 
   .app-header {
     padding: 1.5rem 2rem;

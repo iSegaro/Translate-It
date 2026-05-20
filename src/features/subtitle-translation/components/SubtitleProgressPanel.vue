@@ -1,5 +1,8 @@
 <template>
-  <div class="progress-panel">
+  <div 
+    class="progress-panel"
+    :class="{ 'is-rtl': t('IsRTL') === 'true' }"
+  >
     <div class="header">
       <div class="title">
         <h3>{{ status === 'completed' ? t('subtitle_complete', 'Translation Complete') : t('subtitle_translating', 'Translating...') }}</h3>
@@ -95,6 +98,20 @@ const formatTime = (ms) => {
   border-radius: 16px;
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
   margin-bottom: 2rem;
+
+  &.is-rtl {
+    direction: rtl;
+    text-align: right;
+
+    .header .title {
+      text-align: right;
+    }
+
+    .terminal-error-alert {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+  }
 
   .header {
     display: flex;
