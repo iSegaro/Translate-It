@@ -5,8 +5,10 @@
 
 export class SubtitleTextProtector {
   constructor() {
-    this.tokenPrefix = '[[SUB_';
-    this.tokenSuffix = ']]';
+    // Use a token format that is less likely to be modified by translation providers
+    // The format @@SUB_...@@ is more robust than [[...]] which providers may interpret as markup
+    this.tokenPrefix = '@@SUB_';
+    this.tokenSuffix = '@@';
   }
 
   /**

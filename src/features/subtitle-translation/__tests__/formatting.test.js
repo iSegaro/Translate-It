@@ -8,7 +8,7 @@ describe('SubtitleTextProtector', () => {
     const text = 'Hello <i>World</i> and <b>Friends</b>';
     const { text: protectedText, tokens } = protector.protect(text);
     
-    expect(protectedText).toContain('[[SUB_TAG_');
+    expect(protectedText).toContain('@@SUB_TAG_');
     expect(tokens.size).toBe(4);
     
     const restored = protector.restore(protectedText, tokens);
@@ -19,9 +19,9 @@ describe('SubtitleTextProtector', () => {
     const text = '{\\an8}Top centered text';
     const { text: protectedText, tokens } = protector.protect(text);
     
-    expect(protectedText).toContain('[[SUB_STY_');
+    expect(protectedText).toContain('@@SUB_STY_');
     expect(tokens.size).toBe(1);
-    expect(tokens.get('[[SUB_STY_0]]')).toBe('{\\an8}');
+    expect(tokens.get('@@SUB_STY_0@@')).toBe('{\\an8}');
     
     const restored = protector.restore(protectedText, tokens);
     expect(restored).toBe(text);
@@ -31,7 +31,7 @@ describe('SubtitleTextProtector', () => {
     const text = 'Line 1\nLine 2';
     const { text: protectedText, tokens } = protector.protect(text);
     
-    expect(protectedText).toContain('[[SUB_NL_');
+    expect(protectedText).toContain('@@SUB_NL_');
     expect(tokens.size).toBe(1);
     
     const restored = protector.restore(protectedText, tokens);
@@ -52,7 +52,7 @@ describe('SubtitleTextProtector', () => {
     const text = '{\\pos(10,20)}Positioned text';
     const { text: protectedText, tokens } = protector.protect(text);
     
-    expect(tokens.get('[[SUB_STY_0]]')).toBe('{\\pos(10,20)}');
+    expect(tokens.get('@@SUB_STY_0@@')).toBe('{\\pos(10,20)}');
     
     const restored = protector.restore(protectedText, tokens);
     expect(restored).toBe(text);
