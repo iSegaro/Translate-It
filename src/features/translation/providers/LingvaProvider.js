@@ -1,6 +1,6 @@
 import { BaseTranslateProvider } from "./BaseTranslateProvider.js";
 import { ProviderNames } from "./ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
@@ -58,9 +58,9 @@ export class LingvaProvider extends BaseTranslateProvider {
     logger.debug(`[Lingva] Translating chunk ${chunkIndex + 1}/${totalChunks} (${segmentCount} segments, attempt ${retryAttempt + 1})`);
 
     // Filter and join texts using the standard delimiter
-    // Extract text from objects (Select Element) to prevent crashes
+    // Extract text from objects (Subtitle cues, Select Element) to prevent crashes
     const validTexts = chunkTexts.map(t => {
-      const text = typeof t === 'object' ? (t.t || t.text || "") : (t || "");
+      const text = getTextInfo(t).text;
       return String(text).replace(/\//g, ' ');
     });
     const joinedText = validTexts.join(LingvaProvider.TEXT_DELIMITER);
@@ -76,7 +76,7 @@ export class LingvaProvider extends BaseTranslateProvider {
 
     const url = `${apiPath}/api/v1/${sl}/${tl}/${encodeURIComponent(textToTranslate)}`;
       
-    const originalCharCount = TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts);
+    const originalCharCount = chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0);
 
     const result = await this._executeRequest({
       url,

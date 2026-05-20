@@ -11,7 +11,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TraditionalTextProce
 /**
  * Helper to safely get text content and length from various input types
  */
-const getTextInfo = (item) => {
+export const getTextInfo = (item) => {
   if (typeof item === 'string') return { text: item, length: item.length };
   if (item && typeof item === 'object') {
     const text = item.t || item.text || '';

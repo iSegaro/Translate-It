@@ -10,7 +10,7 @@ import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/con
 import { streamingManager } from "@/features/translation/core/StreamingManager.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { getProviderBatching } from "@/features/translation/core/ProviderConfigurations.js";
@@ -113,7 +113,7 @@ export class BaseTranslateProvider extends BaseProvider {
         if (abortController) abortController.sessionId = sessionId;
 
         const chunkResponse = await this._executeWithRateLimit(
-          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0) }),
+          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0) }),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
@@ -168,7 +168,7 @@ export class BaseTranslateProvider extends BaseProvider {
       const chunkContext = `${context}-chunk-${i + 1}/${chunks.length}`;
 
       if (abortController) abortController.sessionId = sessionId;
-      const originalCharCount = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
+      const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
       const chunkResponse = await this._executeWithRateLimit(
         (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),

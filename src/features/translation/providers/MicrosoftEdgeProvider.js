@@ -2,7 +2,7 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { 
@@ -151,7 +151,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
       url.searchParams.set("includeSentenceLength", "true");
 
       // Microsoft Edge expects array of objects: [{ "Text": "..." }, ...]
-      const body = chunkTexts.map(text => ({ Text: text }));
+      // We use getTextInfo to extract text from objects (Subtitle cues, Select Element)
+      const body = chunkTexts.map(item => ({ Text: getTextInfo(item).text }));
 
       return await this._executeRequest({
         url: url.toString(),
@@ -186,9 +187,9 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
         },
         context: 'edge-translate-chunk',
         abortController,
-        charCount: this._calculateTraditionalCharCount(chunkTexts),
+        charCount: chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts)
+        originalCharCount: options.originalCharCount || chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0)
       });
     };
 

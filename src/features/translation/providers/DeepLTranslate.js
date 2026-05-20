@@ -18,6 +18,7 @@ import {
   PROVIDER_LANGUAGE_MAPPINGS
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
@@ -213,7 +214,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     );
 
     // Filter out empty or whitespace-only texts (DeepL rejects them)
-    const validTexts = chunkTexts.filter(text => text && text.trim().length > 0);
+    // Use getTextInfo to extract text from objects (Subtitle cues, Select Element)
+    const validTexts = chunkTexts
+      .map(item => getTextInfo(item).text)
+      .filter(text => text && text.trim().length > 0);
 
     if (validTexts.length === 0) {
       logger.warn('[DeepL] No valid texts to translate after filtering');
@@ -386,7 +390,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       hasContext: !!richContext
     });
 
-    const originalCharCount = this._calculateTraditionalCharCount(chunkTexts);
+    const originalCharCount = chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0);
 
     try {
       const result = await this._executeRequest({
@@ -460,7 +464,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           let validIndex = 0;
 
           for (let i = 0; i < chunkTexts.length; i++) {
-            const text = chunkTexts[i];
+            const text = getTextInfo(chunkTexts[i]).text;
             if (text && text.trim().length > 0) {
               // This text was translated - use restored translation
               result.push(restoredTranslations[validIndex] || '');
@@ -475,7 +479,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
-        charCount: this._calculateTraditionalCharCount(validTexts),
+        charCount: validTexts.join('').length,
         sessionId: options.sessionId,
         originalCharCount: options.originalCharCount || originalCharCount
       });
@@ -492,7 +496,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
         logger.error('[DeepL] XML corruption detected, falling back to original text for this chunk');
-        return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
+        return chunkTexts.map(t => getTextInfo(t).text);
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
@@ -506,9 +510,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         // Run both halves in parallel for better performance during fallback
         const [firstResult, secondResult] = await Promise.all([
           this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => firstHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t)),
+            .catch(() => firstHalf.map(t => getTextInfo(t).text)),
           this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => secondHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t))
+            .catch(() => secondHalf.map(t => getTextInfo(t).text))
         ]);
 
         return [...firstResult, ...secondResult];
@@ -520,7 +524,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         const results = [];
         for (const text of chunkTexts) {
-          const originalText = typeof text === 'object' ? (text.t || text.text || "") : (text || "");
+          const originalText = getTextInfo(text).text;
           if (!originalText || originalText.trim().length === 0) {
             results.push('');
             continue;

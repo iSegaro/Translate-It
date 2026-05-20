@@ -2,7 +2,7 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
@@ -98,7 +98,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     const client = isStableClient ? 'gtx' : 't';
     const tkk = GOOGLE_TKK;
     
-    const combinedText = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const combinedText = chunkTexts
+      .map(item => getTextInfo(item).text)
+      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const tk = isStableClient ? null : this._generateToken(combinedText, tkk);
 
     const sl = this._getLangCode(sourceLang);
@@ -250,7 +252,9 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
     }
 
     // Return translated text. Coordinator will handle robust splitting for multiple segments.
-    const finalResult = responseObj?.translatedText || chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const finalResult = responseObj?.translatedText || chunkTexts
+      .map(item => getTextInfo(item).text)
+      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
     if (finalResult) {
       logger.info(`[GoogleV2] Translation completed successfully`);
