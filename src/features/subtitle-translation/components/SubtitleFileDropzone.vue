@@ -242,6 +242,7 @@ const formatSize = (bytes) => {
     }
 
     .select-button {
+      margin-top: 1rem;
       padding: 0.75rem 1.5rem;
       border-radius: 12px;
       background: var(--primary-color, #6366f1);
