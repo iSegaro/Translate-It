@@ -197,7 +197,7 @@ const handleDownload = (filename) => {
 const config = reactive({
   sourceLanguage: '',
   targetLanguage: 'en',
-  providerId: 'Gemini',
+  providerId: settingsStore.settings.TRANSLATION_API || 'googlev2',
   options: { useContext: true }
 });
 
@@ -221,6 +221,11 @@ onMounted(async () => {
     // Load existing settings and initialize the theme
     await settingsStore.loadSettings();
     applyTheme(settingsStore.settings.THEME);
+
+    // Sync provider with settings
+    if (settingsStore.settings.TRANSLATION_API) {
+      config.providerId = settingsStore.settings.TRANSLATION_API;
+    }
     
     // Listen for theme changes from other options/extension pages
     tracker.addEventListener(browser.runtime.onMessage, 'addListener', (message) => {
