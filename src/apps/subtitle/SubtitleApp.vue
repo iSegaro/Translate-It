@@ -253,7 +253,13 @@ const handleFileLoaded = (content) => {
 };
 
 const canTranslate = computed(() => {
-  return fileContent.value && config.sourceLanguage && config.targetLanguage && config.providerId;
+  return (
+    fileContent.value && 
+    config.sourceLanguage && 
+    config.targetLanguage && 
+    config.providerId && 
+    config.sourceLanguage !== config.targetLanguage
+  );
 });
 
 const startJob = () => {
