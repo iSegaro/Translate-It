@@ -2485,5 +2485,71 @@
   },
   "dict_setting_show_examples": {
     "message": "例文を表示"
+  },
+  "subtitle_drop_title": {
+    "message": "ここに字幕ファイルをドロップしてください"
+  },
+  "subtitle_drop_hint": {
+    "message": ".srt, .vtt, .ass 形式に対応しています"
+  },
+  "subtitle_select_file": {
+    "message": "ファイルを選択"
+  },
+  "subtitle_change_file": {
+    "message": "ファイルを変更"
+  },
+  "subtitle_start_btn": {
+    "message": "翻訳を開始"
+  },
+  "subtitle_translating": {
+    "message": "翻訳中..."
+  },
+  "subtitle_translated": {
+    "message": "翻訳済み"
+  },
+  "subtitle_failed": {
+    "message": "失敗"
+  },
+  "subtitle_remaining": {
+    "message": "残り時間"
+  },
+  "subtitle_total": {
+    "message": "総キュー数"
+  },
+  "subtitle_cancel_btn": {
+    "message": "キャンセル"
+  },
+  "subtitle_app_title": {
+    "message": "字幕翻訳"
+  },
+  "subtitle_app_powered_by": {
+    "message": "Translate It 提供"
+  },
+  "subtitle_download_btn": {
+    "message": "翻訳済み字幕をダウンロード"
+  },
+  "subtitle_another_file_btn": {
+    "message": "別のファイルを翻訳"
+  },
+  "app_copyright": {
+    "message": "© 2026 Translate It. All rights reserved."
+  },
+  "subtitle_complete": {
+    "message": "翻訳が完了しました"
+  },
+  "subtitle_error_title": {
+    "message": "エラーが発生しました"
+  },
+  "subtitle_try_again_btn": {
+    "message": "再試行"
+  },
+  "source_language_label": {
+    "message": "原文言語"
+  },
+  "target_language_label": {
+    "message": "翻訳先言語"
+  },
+  "provider_label": {
+    "message": "プロバイダー"
   }
 }

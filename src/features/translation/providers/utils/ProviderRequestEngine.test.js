@@ -31,7 +31,14 @@ vi.mock('../../core/TranslationStatsManager.js', () => ({
 
 // Mock browser compatibility to avoid real navigator/UA calls
 vi.mock('@/utils/browser/compatibility.js', () => ({
-  getBrowserInfoSync: vi.fn(() => ({ isFirefox: false, isMobile: false }))
+  getBrowserInfoSync: vi.fn(() => ({ isFirefox: false, isMobile: false })),
+  detectOS: vi.fn(() => 'LINUX'),
+  OS_PLATFORMS: {
+    MAC: 'MAC',
+    WINDOWS: 'WINDOWS',
+    LINUX: 'LINUX',
+    UNKNOWN: 'UNKNOWN'
+  }
 }));
 
 import { ProviderRequestEngine } from './ProviderRequestEngine.js';

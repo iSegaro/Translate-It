@@ -28,13 +28,22 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-vi.mock('@/core/extensionContext.js', () => ({
-  default: {
+vi.mock('@/core/extensionContext.js', () => {
+  const mock = {
     isValidSync: vi.fn().mockReturnValue(true),
     isContextError: vi.fn().mockReturnValue(false),
-    handleContextError: vi.fn()
-  }
-}));
+    handleContextError: vi.fn(),
+    safeSendMessage: vi.fn().mockResolvedValue({ success: true }),
+    isExtensionContextValid: vi.fn().mockReturnValue(true),
+  };
+  return {
+    default: mock,
+    isValidSync: mock.isValidSync,
+    isContextError: mock.isContextError,
+    handleContextError: mock.handleContextError,
+    isExtensionContextValid: mock.isExtensionContextValid,
+  };
+});
 
 vi.mock('./UnifiedTranslationCoordinator.js', () => ({
   unifiedTranslationCoordinator: {

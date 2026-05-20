@@ -2485,5 +2485,71 @@
   },
   "dict_setting_show_examples": {
     "message": "Show Examples"
+  },
+  "subtitle_drop_title": {
+    "message": "Drop your subtitle file here"
+  },
+  "subtitle_drop_hint": {
+    "message": "Supports .srt, .vtt, .ass"
+  },
+  "subtitle_select_file": {
+    "message": "Select File"
+  },
+  "subtitle_change_file": {
+    "message": "Change File"
+  },
+  "subtitle_start_btn": {
+    "message": "Start Translation"
+  },
+  "subtitle_translating": {
+    "message": "Translating..."
+  },
+  "subtitle_translated": {
+    "message": "Translated"
+  },
+  "subtitle_failed": {
+    "message": "Failed"
+  },
+  "subtitle_remaining": {
+    "message": "Remaining"
+  },
+  "subtitle_total": {
+    "message": "Total Cues"
+  },
+  "subtitle_cancel_btn": {
+    "message": "Cancel Job"
+  },
+  "subtitle_app_title": {
+    "message": "Subtitle Translator"
+  },
+  "subtitle_app_powered_by": {
+    "message": "Powered by Translate It"
+  },
+  "subtitle_download_btn": {
+    "message": "Download Translated Subtitles"
+  },
+  "subtitle_another_file_btn": {
+    "message": "Translate Another File"
+  },
+  "app_copyright": {
+    "message": "Translate It. All rights reserved."
+  },
+  "subtitle_complete": {
+    "message": "Translation Complete"
+  },
+  "subtitle_error_title": {
+    "message": "Oops! Something went wrong"
+  },
+  "subtitle_try_again_btn": {
+    "message": "Try Again"
+  },
+  "source_language_label": {
+    "message": "Source Language"
+  },
+  "target_language_label": {
+    "message": "Target Language"
+  },
+  "provider_label": {
+    "message": "Provider"
   }
 }

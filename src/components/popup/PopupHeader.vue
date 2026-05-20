@@ -26,16 +26,20 @@
     </label>
 
     <!-- 3. Settings -->
-    <IconButton
-      icon="settings.png"
-      :alt="t('popup_settings_alt_icon') || 'Settings'"
-      :title="t('popup_settings_title_icon') || 'تنظیمات'"
-      type="toolbar"
-      class="ti-btn-settings"
       @click="handleOpenSettings"
     />
+
+    <!-- 4. Subtitle Translator -->
+    <IconButton
+      icon="subtitle.png"
+      :alt="t('popup_subtitle_alt_icon') || 'Subtitle Translator'"
+      :title="t('popup_subtitle_title_icon') || 'ترجمه زیرنویس'"
+      type="toolbar"
+      class="ti-btn-subtitle"
+      @click="handleOpenSubtitlePage"
+    />
     
-    <!-- 4. Revert -->
+    <!-- 5. Revert -->
     <IconButton
       v-if="isSelectElementEnabled"
       icon="revert.png"
@@ -264,6 +268,17 @@ const handleOpenSettings = async () => {
     window.close()
   } catch (error) {
     await handleError(error, 'PopupHeader-openSettings')
+  }
+}
+
+const handleOpenSubtitlePage = async () => {
+  try {
+    await browser.tabs.create({
+      url: browser.runtime.getURL('src/html/subtitle.html')
+    })
+    window.close()
+  } catch (error) {
+    await handleError(error, 'PopupHeader-openSubtitlePage')
   }
 }
 

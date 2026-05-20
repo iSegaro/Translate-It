@@ -26,6 +26,7 @@ export const TranslationMode = {
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
   MouseHover: 'mouse_hover', // Mouse on hover translation
+  Subtitle: MessageContexts.SUBTITLE_TRANSLATION,
   
   // Legacy aliases for backward compatibility
   LEGACY_FIELD: 'field',

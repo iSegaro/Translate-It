@@ -22,6 +22,7 @@ import {
 import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/constants/core.js";
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { registerTranslation, handleMessage as routeMessage } from "@/shared/messaging/core/ContentScriptIntegration.js";
+import { sendMessage as sendUnifiedMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
 
@@ -93,8 +94,7 @@ export function useUnifiedTranslation(context = 'popup') {
     logger.info(`[${context}] Cancelling translation: ${currentMessageId.value}`);
     
     try {
-      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-      await sendMessage({
+      await sendUnifiedMessage({
         action: MessageActions.CANCEL_TRANSLATION,
         data: { messageId: currentMessageId.value }
       });
@@ -356,10 +356,9 @@ export function useUnifiedTranslation(context = 'popup') {
         pendingRequests.value.add(messageId);
       }
 
-      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
       const timeoutOptions = context === 'sidepanel' ? { totalTimeout: 20000, retries: 1 } : {};
       
-      const response = await sendMessage(requestData, timeoutOptions);
+      const response = await sendUnifiedMessage(requestData, timeoutOptions);
 
       logger.debug(`[${context}] Response received:`, response);
 

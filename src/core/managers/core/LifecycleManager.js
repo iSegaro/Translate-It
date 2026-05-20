@@ -206,7 +206,11 @@ class LifecycleManager {
 
       // Vue Bridge handlers - Lazy loaded for better performance
       'CREATE_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
-      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy
+      'DESTROY_VUE_MICRO_APP': Handlers.handleVueBridgeLazy,
+
+      // Subtitle translation handlers
+      [MessageActions.SUBTITLE_TRANSLATE]: Handlers.handleSubtitleTranslation,
+      [MessageActions.SUBTITLE_TRANSLATE_CANCEL]: Handlers.handleSubtitleTranslation
     };
     
     // Add browser-specific handlers

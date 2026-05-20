@@ -40,3 +40,6 @@ export * from "./sidepanel/handleOpenSidePanel.js";
 
 // Vue integration handlers - Lazy loaded for better performance
 export * from "./lazy/handleVueIntegrationLazy.js";
+
+// Subtitle translation handlers
+export * from "./subtitle/handleSubtitleTranslation.js";

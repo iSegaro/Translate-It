@@ -44,6 +44,28 @@ vi.mock('webextension-polyfill', () => ({
   ...chromeMock
 }));
 
+// ExtensionContextManager global mock removed to rely on real implementation 
+// which is now safe due to circular dependency fixes.
+
+// Mock contextCore
+vi.mock('@/core/contextCore.js', () => ({
+  isValidSync: vi.fn().mockReturnValue(true),
+  isContextError: vi.fn().mockReturnValue(false),
+  getActiveEnvironment: vi.fn().mockReturnValue('background'),
+  contextState: {
+    isInvalidated: false,
+    notificationShown: false
+  },
+  ENVIRONMENTS: {
+    BACKGROUND: "background",
+    CONTENT: "content",
+    POPUP: "popup",
+    SIDEPANEL: "sidepanel",
+    OPTIONS: "options",
+    OFFSCREEN: "offscreen",
+  }
+}));
+
 // Mock import.meta.env
 globalThis.import = {
   meta: {

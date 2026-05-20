@@ -7,6 +7,14 @@ import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
+import { 
+  contextState, 
+  isValidSync as coreIsValidSync, 
+  isContextError as coreIsContextError,
+  ENVIRONMENTS as CORE_ENVIRONMENTS,
+  getActiveEnvironment as coreGetActiveEnvironment
+} from "./contextCore.js";
+// import { sendMessage as unifiedSendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, "ExtensionContext");
 const notificationManager = new NotificationManager();
@@ -20,27 +28,13 @@ export class ExtensionContextManager {
   /**
    * Centralized environment constants for the extension execution contexts.
    */
-  static ENVIRONMENTS = {
-    BACKGROUND: "background",
-    CONTENT: "content",
-    POPUP: "popup",
-    SIDEPANEL: "sidepanel",
-    OPTIONS: "options",
-    OFFSCREEN: "offscreen",
-  };
+  static ENVIRONMENTS = CORE_ENVIRONMENTS;
 
-  /**
-   * Internal flag to track if the extension context has been invalidated globally.
-   * Once set to true, the system stops attempting to use extension APIs to avoid red logs.
-   * @private
-   */
-  static _isContextInvalidated = false;
+  static get _isContextInvalidated() { return contextState.isInvalidated; }
+  static set _isContextInvalidated(val) { contextState.isInvalidated = val; }
 
-  /**
-   * Flag to ensure the context invalidation notification is only shown once per page session.
-   * @private
-   */
-  static _contextNotificationShown = false;
+  static get _contextNotificationShown() { return contextState.notificationShown; }
+  static set _contextNotificationShown(val) { contextState.notificationShown = val; }
 
   /**
    * Cached base URL of the extension (e.g., chrome-extension://[id]/).
@@ -75,35 +69,7 @@ export class ExtensionContextManager {
    * @returns {string} One of ENVIRONMENTS values
    */
   static getActiveEnvironment() {
-    // 1. Service Worker / Background (No document)
-    if (typeof document === "undefined") {
-      return ExtensionContextManager.ENVIRONMENTS.BACKGROUND;
-    }
-
-    const url = globalThis.location?.href || "";
-    const protocol = globalThis.location?.protocol || "";
-
-    // 2. Extension internal pages
-    // Supports Chrome/Edge (chrome-extension:), Firefox (moz-extension:), Safari (safari-extension:)
-    const isExtensionProtocol =
-      protocol.endsWith("-extension:") || protocol === "extension:";
-
-    if (isExtensionProtocol) {
-      if (url.includes("popup.html"))
-        return ExtensionContextManager.ENVIRONMENTS.POPUP;
-      if (url.includes("sidepanel.html"))
-        return ExtensionContextManager.ENVIRONMENTS.SIDEPANEL;
-      if (url.includes("options.html"))
-        return ExtensionContextManager.ENVIRONMENTS.OPTIONS;
-      if (url.includes("offscreen.html"))
-        return ExtensionContextManager.ENVIRONMENTS.OFFSCREEN;
-
-      // Fallback for other internal pages or MV2 background pages
-      return ExtensionContextManager.ENVIRONMENTS.BACKGROUND;
-    }
-
-    // 3. Content Scripts (Injected into web pages)
-    return ExtensionContextManager.ENVIRONMENTS.CONTENT;
+    return coreGetActiveEnvironment();
   }
 
   /**
@@ -165,31 +131,7 @@ export class ExtensionContextManager {
    * @returns {boolean} True if extension context is valid
    */
   static isValidSync() {
-    if (ExtensionContextManager._isContextInvalidated) return false;
-    try {
-      if (!browser || !browser.runtime) {
-        ExtensionContextManager._isContextInvalidated = true;
-        return false;
-      }
-
-      // Test if getURL works and doesn't return the invalid marker
-      const url = browser.runtime.getURL("test");
-      if (url && url.includes("://invalid/")) {
-        ExtensionContextManager._isContextInvalidated = true;
-        return false;
-      }
-
-      // Verify extension ID is still present (crucial for Firefox)
-      if (!browser.runtime.id) {
-        ExtensionContextManager._isContextInvalidated = true;
-        return false;
-      }
-
-      return true;
-    } catch {
-      ExtensionContextManager._isContextInvalidated = true;
-      return false;
-    }
+    return coreIsValidSync();
   }
 
   /**
@@ -213,11 +155,7 @@ export class ExtensionContextManager {
    * @returns {boolean}
    */
   static isContextError(error) {
-    const errorType = matchErrorToType(error);
-    return (
-      errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED ||
-      errorType === ErrorTypes.CONTEXT
-    );
+    return coreIsContextError(error);
   }
 
   /**
@@ -511,8 +449,7 @@ export class ExtensionContextManager {
 
     return ExtensionContextManager.createSafeWrapper(
       async (msg) => {
-        const { sendMessage } =
-          await import("@/shared/messaging/core/UnifiedMessaging.js");
+        const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
         return await sendMessage(msg, actualOptions);
       },
       {

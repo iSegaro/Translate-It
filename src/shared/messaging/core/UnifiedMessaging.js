@@ -2,6 +2,7 @@
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+// import { isValidSync, isContextError } from '@/core/contextCore.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
@@ -247,7 +248,7 @@ export async function sendRegularMessage(message, options = {}) {
     }
 
     if (isSilentError(errorType)) throw error;
-
+    
     if (ExtensionContextManager.isContextError(error)) {
       ExtensionContextManager.handleContextError(error, `UnifiedMessaging.${message.action}`);
     }

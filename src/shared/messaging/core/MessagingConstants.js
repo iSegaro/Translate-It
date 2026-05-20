@@ -24,6 +24,7 @@ export class MessageContexts {
   static TTS_MANAGER_BACKGROUND = "tts-manager-background";
   static API_PROVIDER = "api-provider";
   static TRANSLATION_SERVICE = "translation-service";
+  static SUBTITLE_TRANSLATION = "subtitle-translation";
 }
 
 /**
