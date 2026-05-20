@@ -128,10 +128,13 @@ export class SubtitleTranslationCoordinator {
       const response = await unifiedTranslationService.handleTranslationRequest(message, { internal: true });
 
       if (!response.success) {
-        // Create an error object from the response to check for fatality
-        const error = new Error(response.error || 'Translation failed');
-        error.type = response.type;
-        error.statusCode = response.statusCode;
+        // UnifiedTranslationService returns error details inside a response.error object
+        const errorInfo = response.error && typeof response.error === 'object' ? response.error : { message: response.error };
+        
+        const error = new Error(errorInfo.message || 'Translation failed');
+        error.type = errorInfo.type || errorInfo.errorType || response.type;
+        error.statusCode = errorInfo.statusCode || errorInfo.status || response.statusCode;
+        error.providerName = providerId;
         throw error;
       }
 
