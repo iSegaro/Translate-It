@@ -2543,6 +2543,9 @@
   "subtitle_try_again_btn": {
     "message": "再試行"
   },
+  "subtitle_terminal_error": {
+    "message": "エラーにより停止しました"
+  },
   "subtitle_languages_label": {
     "message": "翻訳言語"
   },

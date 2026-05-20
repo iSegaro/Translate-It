@@ -2543,6 +2543,9 @@
   "subtitle_try_again_btn": {
     "message": "تلاش مجدد"
   },
+  "subtitle_terminal_error": {
+    "message": "متوقف شده به دلیل خطا"
+  },
   "subtitle_languages_label": {
     "message": "زبان‌های ترجمه"
   },
