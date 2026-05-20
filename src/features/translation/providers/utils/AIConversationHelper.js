@@ -228,6 +228,11 @@ export const AIConversationHelper = {
       getAIContextTranslationEnabledAsync()
     ]);
 
+    // Flatten contextMetadata if it's nested (compatibility with Select Element context passing)
+    const metadata = contextMetadata?.contextMetadata 
+      ? { ...contextMetadata, ...contextMetadata.contextMetadata } 
+      : contextMetadata;
+
     const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js');
     const { getSourceLanguageAsync } = await import('@/shared/config/config.js');
     
@@ -264,9 +269,9 @@ export const AIConversationHelper = {
     if (shouldUseBatchPrompt) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
 
-      // Prioritize custom prompt template from contextMetadata (Subtitle mode)
-      if (contextMetadata?.promptTemplate) {
-        promptTemplate = contextMetadata.promptTemplate;
+      // Prioritize custom prompt template from metadata (Subtitle mode)
+      if (metadata?.promptTemplate) {
+        promptTemplate = metadata.promptTemplate;
       } else if (sourceLang === 'auto') {
         promptTemplate = useFollowup
           ? await getPromptBASEAIFollowupAutoAsync()
@@ -288,9 +293,9 @@ export const AIConversationHelper = {
 
     // Resolve instructions from template even for AI batch prompts
     let promptInstructions;
-    if (contextMetadata?.instruction) {
-      // Prioritize custom instructions from contextMetadata (Subtitle mode)
-      promptInstructions = contextMetadata.instruction
+    if (metadata?.instruction) {
+      // Prioritize custom instructions from metadata (Subtitle mode)
+      promptInstructions = metadata.instruction
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName);
     } else {
@@ -373,8 +378,8 @@ export const AIConversationHelper = {
                                 translateMode === TranslationMode.Page ||
                                 translateMode === TranslationMode.Selection;
 
-    if (contextMetadata && contextEnabled && contextSupportedMode) {
-      finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
+    if (metadata && contextEnabled && contextSupportedMode) {
+      finalSystemPrompt += `\nContext: Page: "${metadata.pageTitle || 'Unknown'}", Section: "${metadata.heading || 'Main'}", Role: "${metadata.role || 'Content'}".`;
     }
 
     // Replace text placeholder according to project standard $_{TEXT} with global regex
