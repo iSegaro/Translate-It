@@ -29,6 +29,7 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
+import { safeSendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({
@@ -58,6 +59,11 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/shared/error-management/ErrorMatcher.js');
+
+vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
+  safeSendMessage: vi.fn(() => Promise.resolve({ success: true })),
+  sendRegularMessage: vi.fn(() => Promise.resolve({ success: true })),
+}));
 
 vi.mock('@/config.js', () => ({
   getTranslationApiAsync: vi.fn(async () => 'google'),
@@ -143,14 +149,14 @@ describe('PageTranslationScheduler', () => {
         targetLanguage: 'fa'
       });
 
-      ExtensionContextManager.safeSendMessage.mockResolvedValue({
+      safeSendMessage.mockResolvedValue({
         success: true,
         translatedText: JSON.stringify(['سلام'])
       });
 
       await scheduler.flush();
 
-      expect(ExtensionContextManager.safeSendMessage).toHaveBeenCalled();
+      expect(safeSendMessage).toHaveBeenCalled();
       expect(mockItem.resolve).toHaveBeenCalledWith('سلام');
       expect(scheduler.translatedCount).toBe(1);
     });
@@ -162,7 +168,7 @@ describe('PageTranslationScheduler', () => {
       PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
       vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
 
-      ExtensionContextManager.safeSendMessage.mockResolvedValue({
+      safeSendMessage.mockResolvedValue({
         success: false,
         error: 'Rate limit'
       });
@@ -186,7 +192,7 @@ describe('PageTranslationScheduler', () => {
       });
 
       vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
-      ExtensionContextManager.safeSendMessage.mockResolvedValue({
+      safeSendMessage.mockResolvedValue({
         success: true,
         translatedText: JSON.stringify(['صف'])
       });
@@ -206,7 +212,7 @@ describe('PageTranslationScheduler', () => {
       PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
       vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
       
-      ExtensionContextManager.safeSendMessage.mockResolvedValue({
+      safeSendMessage.mockResolvedValue({
         success: false,
         error: 'Fatal',
         isFatal: true,
@@ -229,7 +235,7 @@ describe('PageTranslationScheduler', () => {
       PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
       vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
 
-      ExtensionContextManager.safeSendMessage.mockImplementation(async () => {
+      safeSendMessage.mockImplementation(async () => {
         scheduler.sessionContext = { id: 'ctx2' };
         return { success: true, translatedText: JSON.stringify(['جدید']) };
       });
