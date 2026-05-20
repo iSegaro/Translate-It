@@ -35,16 +35,6 @@
       @click="handleOpenSettings"
     />
 
-    <!-- 4. Subtitle Translator -->
-    <IconButton
-      icon="subtitle.png"
-      :alt="t('popup_subtitle_alt_icon') || 'Subtitle Translator'"
-      :title="t('popup_subtitle_title_icon') || 'ترجمه زیرنویس'"
-      type="toolbar"
-      class="ti-btn-subtitle"
-      @click="handleOpenSubtitlePage"
-    />
-    
     <!-- 5. Revert -->
     <IconButton
       v-if="isSelectElementEnabled"
@@ -274,17 +264,6 @@ const handleOpenSettings = async () => {
     window.close()
   } catch (error) {
     await handleError(error, 'PopupHeader-openSettings')
-  }
-}
-
-const handleOpenSubtitlePage = async () => {
-  try {
-    await browser.tabs.create({
-      url: browser.runtime.getURL('src/html/subtitle.html')
-    })
-    window.close()
-  } catch (error) {
-    await handleError(error, 'PopupHeader-openSubtitlePage')
   }
 }
 
