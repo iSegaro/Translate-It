@@ -28,6 +28,8 @@ class StorageCore extends ResourceTracker {
     }); // Critical storage cache with centralized timing
     this.listeners = new Map(); // event_name -> Set of callbacks
     this._isReady = false;
+    this._useInMemoryStorage = false;
+    this._inMemoryData = {};
     this._readyPromise = null;
     this._changeListener = null;
     this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
@@ -77,19 +79,26 @@ class StorageCore extends ResourceTracker {
   }
 
   async _initialize() {
-    // Test browser storage availability
-    if (!browser?.storage?.local) {
-      throw new Error("Browser storage API not available");
+    try {
+      // Test browser storage availability
+      if (!browser?.storage?.local) {
+        throw new Error("Browser storage API not available");
+      }
+
+      // Test storage access
+      await browser.storage.local.get(["__storage_test__"]);
+
+      // Setup change listener for cache invalidation
+      this._setupChangeListener();
+
+      this._isReady = true;
+      this.logger.info('Storage core initialized successfully');
+    } catch (error) {
+      this.logger.warn('Standard browser storage not available, falling back to in-memory storage:', error.message);
+      this._useInMemoryStorage = true;
+      this._inMemoryData = {};
+      this._isReady = true;
     }
-
-    // Test storage access
-    await browser.storage.local.get(["__storage_test__"]);
-
-    // Setup change listener for cache invalidation
-    this._setupChangeListener();
-
-    this._isReady = true;
-    this.logger.info('Storage core initialized successfully');
   }
 
   /**
@@ -205,6 +214,22 @@ class StorageCore extends ResourceTracker {
         }
       }
 
+      // Handle in-memory fallback
+      if (this._useInMemoryStorage) {
+        const result = {};
+        if (keyList === null) {
+          Object.assign(result, defaultValues, this._inMemoryData);
+        } else {
+          for (const key of keyList) {
+            const val = key in this._inMemoryData ? this._inMemoryData[key] : defaultValues[key];
+            if (val !== undefined) {
+              result[key] = val;
+            }
+          }
+        }
+        return result;
+      }
+
       // Check cache first if requested
       if (useCache && keyList) {
         // Ensure cache availability
@@ -253,8 +278,8 @@ class StorageCore extends ResourceTracker {
     } catch (error) {
       // StorageCore should not handle its own errors via ErrorHandler
       // to avoid circular dependencies. We check if it's a context error.
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'storage-core-get');
+      if (isContextError(error)) {
+        handleContextError(error, 'storage-core-get');
       } else {
         logger.error('StorageCore-get error:', error);
       }
@@ -309,6 +334,23 @@ class StorageCore extends ResourceTracker {
     try {
       // Convert Vue reactive objects to plain objects
       const plainData = this._convertToPlainObject(data);
+
+      if (this._useInMemoryStorage) {
+        for (const [key, value] of Object.entries(plainData)) {
+          this._inMemoryData[key] = value;
+          if (updateCache) {
+            this._ensureCache();
+            this.cache.set(key, value);
+          }
+        }
+        // Emit events
+        for (const key of Object.keys(plainData)) {
+          this._emit("set", { key, value: plainData[key] });
+          this._emit(`set:${key}`, { value: plainData[key] });
+        }
+        return;
+      }
+
       await browser.storage.local.set(plainData);
 
       // Update cache if requested (use plain data)
@@ -330,8 +372,8 @@ class StorageCore extends ResourceTracker {
       // Set operation completed - logged at TRACE level for detailed debugging
       // this.logger.debug(`Set ${Object.keys(plainData).length} key(s)`);
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'storage-core-set');
+      if (isContextError(error)) {
+        handleContextError(error, 'storage-core-set');
       } else {
         this.logger.error('Set operation failed', error);
       }
@@ -351,6 +393,21 @@ class StorageCore extends ResourceTracker {
     const keyList = Array.isArray(keys) ? keys : [keys];
 
     try {
+      if (this._useInMemoryStorage) {
+        for (const key of keyList) {
+          delete this._inMemoryData[key];
+          if (updateCache) {
+            this.cache.delete(key);
+          }
+        }
+        // Emit remove events
+        for (const key of keyList) {
+          this._emit("remove", { key });
+          this._emit(`remove:${key}`, {});
+        }
+        return;
+      }
+
       await browser.storage.local.remove(keyList);
 
       // Update cache if requested
@@ -369,8 +426,8 @@ class StorageCore extends ResourceTracker {
       // Remove operation completed - logged at TRACE level for detailed debugging
       // this.logger.debug(`Removed ${keyList.length} key(s)`);
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'storage-core-remove');
+      if (isContextError(error)) {
+        handleContextError(error, 'storage-core-remove');
       } else {
         this.logger.error('Remove operation failed', error);
       }
@@ -387,6 +444,15 @@ class StorageCore extends ResourceTracker {
     await this._ensureReady();
 
     try {
+      if (this._useInMemoryStorage) {
+        this._inMemoryData = {};
+        if (updateCache) {
+          this.cache.clear();
+        }
+        this._emit("clear", {});
+        return;
+      }
+
       await browser.storage.local.clear();
 
       if (updateCache) {
@@ -397,8 +463,8 @@ class StorageCore extends ResourceTracker {
       // Storage cleared - logged at TRACE level for detailed debugging
       // this.logger.debug('Storage cleared');
     } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'storage-core-clear');
+      if (isContextError(error)) {
+        handleContextError(error, 'storage-core-clear');
       } else {
         this.logger.error('Clear operation failed', error);
       }
@@ -529,8 +595,8 @@ class StorageCore extends ResourceTracker {
         try {
           callback(data);
         } catch (error) {
-          if (ExtensionContextManager.isContextError(error)) {
-            ExtensionContextManager.handleContextError(error, `storage-core-emit-${event}`);
+          if (isContextError(error)) {
+            handleContextError(error, `storage-core-emit-${event}`);
           } else {
             this.logger.error(`Event listener error for '${event}'`, error);
           }
