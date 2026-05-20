@@ -57,6 +57,7 @@
                 <ProviderSelector 
                   v-model="config.providerId" 
                   placement="up"
+                  required-feature="subtitle"
                 />
               </div>
             </div>
@@ -160,6 +161,7 @@ import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import { useSubtitleTranslation } from '@/features/subtitle-translation/composables/useSubtitleTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { applyTheme } from '@/utils/ui/theme.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -222,9 +224,16 @@ onMounted(async () => {
     await settingsStore.loadSettings();
     applyTheme(settingsStore.settings.THEME);
 
-    // Sync provider with settings
-    if (settingsStore.settings.TRANSLATION_API) {
-      config.providerId = settingsStore.settings.TRANSLATION_API;
+    // Sync provider with settings - Ensure it supports subtitles
+    const defaultProviderId = settingsStore.settings.TRANSLATION_API || 'googlev2';
+    const provider = findProviderById(defaultProviderId);
+    
+    if (provider && provider.features?.includes('subtitle')) {
+      config.providerId = defaultProviderId;
+    } else {
+      // Fallback to Google Translate if default doesn't support subtitles
+      config.providerId = 'googlev2';
+      logger.info('Default provider does not support subtitles, falling back to Google Translate V2');
     }
     
     // Listen for theme changes from other options/extension pages
