@@ -53,7 +53,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const { t } = useUnifiedI18n();
 
-const props = defineProps({
+defineProps({
   modelValue: { type: [File, null], default: null }
 });
 

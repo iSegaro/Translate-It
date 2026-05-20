@@ -59,7 +59,6 @@ export function handleContextError(error, context = "unknown", options = {}) {
   const {
     silent = true,
     fallbackAction = null,
-    operationId = null,
   } = options;
 
   // Mark globally as invalidated if it's a context error
@@ -103,7 +102,11 @@ export function handleContextError(error, context = "unknown", options = {}) {
       if (browser?.notifications?.create) {
         const notificationId = "extension-context-error";
         let iconUrl = "";
-        try { iconUrl = browser.runtime.getURL("icons/extension/extension_icon_128.png"); } catch { }
+        try { 
+          iconUrl = browser.runtime.getURL("icons/extension/extension_icon_128.png"); 
+        } catch {
+          // Fallback to empty if context is invalidated
+        }
 
         const notificationOptions = {
           type: "basic",
@@ -124,7 +127,11 @@ export function handleContextError(error, context = "unknown", options = {}) {
         });
 
         setTimeout(() => {
-          try { browser.notifications.clear(notificationId); } catch { }
+          try { 
+            browser.notifications.clear(notificationId); 
+          } catch {
+            // Ignore clearing errors
+          }
         }, 5000);
       }
     } catch {
@@ -134,7 +141,11 @@ export function handleContextError(error, context = "unknown", options = {}) {
 
   // Execute optional fallback logic
   if (fallbackAction && typeof fallbackAction === "function") {
-    try { fallbackAction(); } catch { }
+    try { 
+      fallbackAction(); 
+    } catch {
+      // Ignore fallback errors
+    }
   }
 
   return { handled: true, silent };

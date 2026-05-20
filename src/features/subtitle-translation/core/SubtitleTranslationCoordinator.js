@@ -44,7 +44,7 @@ export class SubtitleTranslationCoordinator {
     try {
       // 1. Parse
       const adapter = SubtitleParserFactory.getAdapter(filename);
-      const { cues, metadata, warnings } = adapter.parse(content);
+      const { cues } = adapter.parse(content);
       
       if (cues.length === 0) throw new Error('No valid subtitle cues found in file.');
 
@@ -122,7 +122,7 @@ export class SubtitleTranslationCoordinator {
       if (!response.success) throw new Error(response.error || 'Translation failed');
 
       // 3. Validate & Restore
-      const { validatedCues, errors } = SubtitleValidationService.validateAndRestore(
+      const { validatedCues } = SubtitleValidationService.validateAndRestore(
         batch, 
         response.results, 
         tokenRegistry

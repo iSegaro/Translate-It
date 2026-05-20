@@ -101,7 +101,7 @@ export class SrtAdapter {
   timestampToMs(timestamp) {
     const match = timestamp.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
     if (!match) return 0;
-    const [_, h, m, s, ms] = match;
+    const [, h, m, s, ms] = match;
     return (parseInt(h) * 3600000) + (parseInt(m) * 60000) + (parseInt(s) * 1000) + parseInt(ms);
   }
 }

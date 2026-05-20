@@ -2,10 +2,8 @@
 // Centralized Extension Context Management
 
 import browser from "webextension-polyfill";
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import NotificationManager from "@/core/managers/core/NotificationManager.js";
 import { 
   contextState, 
   isValidSync as coreIsValidSync, 
@@ -16,7 +14,6 @@ import {
 import { handleContextError as coreHandleContextError } from "./contextErrorHandler.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, "ExtensionContext");
-const notificationManager = new NotificationManager();
 
 /**
  * Centralized manager for extension context validation and error handling.

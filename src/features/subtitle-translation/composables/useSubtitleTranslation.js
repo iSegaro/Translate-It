@@ -1,11 +1,7 @@
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'useSubtitleTranslation');
 
 export function useSubtitleTranslation() {
   const jobId = ref(`job-${Date.now()}`);

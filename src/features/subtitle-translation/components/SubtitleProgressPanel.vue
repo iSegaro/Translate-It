@@ -61,7 +61,7 @@
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 const { t } = useUnifiedI18n();
 
-const props = defineProps({
+defineProps({
   progress: { type: Object, required: true },
   status: { type: String, required: true },
   filename: { type: String, default: '' }
