@@ -14,6 +14,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleCoordinator');
 
@@ -65,13 +66,20 @@ export class SubtitleTranslationCoordinator {
         if (!job || job.status === 'cancelled') break;
 
         const batch = batches[i];
-        await this._processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options);
+        const result = await this._processBatch(jobId, batch, sourceLanguage, targetLanguage, providerId, options);
         
         // Notify progress
         this._notifyProgress(jobId);
+
+        // Fail fast on fatal errors (e.g., Invalid API Key) to prevent wasteful retries
+        // while still allowing the user to download partially translated progress.
+        if (result && result.isFatal) {
+          logger.warn(`Stopping job ${jobId} due to fatal error. Rescuing progress...`);
+          break;
+        }
       }
 
-      // 5. Complete
+      // 5. Complete (even if partial due to fatal error or cancel)
       this._notifyComplete(jobId);
 
     } catch (error) {
@@ -119,7 +127,13 @@ export class SubtitleTranslationCoordinator {
 
       const response = await unifiedTranslationService.handleTranslationRequest(message, { internal: true });
 
-      if (!response.success) throw new Error(response.error || 'Translation failed');
+      if (!response.success) {
+        // Create an error object from the response to check for fatality
+        const error = new Error(response.error || 'Translation failed');
+        error.type = response.type;
+        error.statusCode = response.statusCode;
+        throw error;
+      }
 
       // 3. Validate & Restore
       const { validatedCues } = SubtitleValidationService.validateAndRestore(
@@ -130,11 +144,20 @@ export class SubtitleTranslationCoordinator {
 
       // 4. Update Progress
       job.progressTracker.update(validatedCues);
+
+      return { success: true, isFatal: false };
       
     } catch (error) {
-      logger.error(`Batch processing failed for job ${jobId}:`, error);
-      batch.forEach(cue => { cue.status = 'failed'; cue.warnings.push(error.message); });
+      const isFatal = ErrorMatcher.isFatal(error);
+      logger.error(`Batch processing failed for job ${jobId} (isFatal: ${isFatal}):`, error);
+      
+      batch.forEach(cue => { 
+        cue.status = 'failed'; 
+        cue.warnings.push(error.message); 
+      });
       job.progressTracker.update(batch);
+
+      return { success: false, isFatal };
     }
   }
 
