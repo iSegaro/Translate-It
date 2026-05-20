@@ -7,7 +7,7 @@ import {
   getYandexTranslateUrlAsync
 } from "@/shared/config/config.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";

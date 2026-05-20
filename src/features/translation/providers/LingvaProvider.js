@@ -1,6 +1,6 @@
 import { BaseTranslateProvider } from "./BaseTranslateProvider.js";
 import { ProviderNames } from "./ProviderConstants.js";
-import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";

@@ -2,7 +2,7 @@ import { BaseTranslateProvider } from "@/features/translation/providers/BaseTran
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { 

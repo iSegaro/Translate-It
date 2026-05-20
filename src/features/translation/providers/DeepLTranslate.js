@@ -18,7 +18,7 @@ import {
   PROVIDER_LANGUAGE_MAPPINGS
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
