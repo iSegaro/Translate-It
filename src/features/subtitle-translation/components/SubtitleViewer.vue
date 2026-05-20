@@ -11,21 +11,32 @@
         :class="[`status-${item.data.status}`]"
         :style="{ height: `${itemHeight}px` }"
       >
-        <div class="cue-index">{{ item.data.index }}</div>
+        <div class="cue-index">
+          {{ item.data.index }}
+        </div>
         
         <div class="cue-content-wrapper">
           <div class="cue-column original">
-            <div class="cue-time">{{ item.data.startTime }}</div>
-            <div class="cue-text">{{ item.data.text }}</div>
+            <div class="cue-time">
+              {{ item.data.startTime }}
+            </div>
+            <div class="cue-text">
+              {{ item.data.text }}
+            </div>
           </div>
           
           <div class="cue-column translated">
             <template v-if="item.data.status === 'translated'">
-              <div class="cue-text">{{ item.data.translatedText }}</div>
+              <div class="cue-text">
+                {{ item.data.translatedText }}
+              </div>
             </template>
             <template v-else-if="item.data.status === 'translating'">
               <div class="cue-loading">
-                <v-icon icon="mdi:loading" class="spin" />
+                <v-icon
+                  icon="mdi:loading"
+                  class="spin"
+                />
                 <span>{{ t('subtitle_translating', 'Translating...') }}</span>
               </div>
             </template>
@@ -36,7 +47,9 @@
               </div>
             </template>
             <template v-else>
-              <div class="cue-placeholder">...</div>
+              <div class="cue-placeholder">
+                ...
+              </div>
             </template>
           </div>
         </div>

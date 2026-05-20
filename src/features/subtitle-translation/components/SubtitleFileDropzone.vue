@@ -35,14 +35,21 @@
         <h3>{{ modelValue.name }}</h3>
         <p>{{ formatSize(modelValue.size) }}</p>
 
-        <div class="encoding-wrapper" @click.stop>
+        <div
+          class="encoding-wrapper"
+          @click.stop
+        >
           <label for="encoding-select">{{ t('subtitle_encoding_label', 'Encoding') }}</label>
           <select 
             id="encoding-select" 
             v-model="selectedEncoding"
             @change="reprocessFile"
           >
-            <option v-for="enc in encodings" :key="enc.value" :value="enc.value">
+            <option
+              v-for="enc in encodings"
+              :key="enc.value"
+              :value="enc.value"
+            >
               {{ enc.label }}
             </option>
           </select>

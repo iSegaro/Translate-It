@@ -69,9 +69,15 @@
               </button>
             </div>
 
-            <div v-if="cues.length > 0" class="preview-section">
+            <div
+              v-if="cues.length > 0"
+              class="preview-section"
+            >
               <label class="section-label">{{ t('subtitle_preview_label', 'Preview (First 100 cues)') }}</label>
-              <SubtitleViewer :cues="cues.slice(0, 100)" :item-height="80" />
+              <SubtitleViewer
+                :cues="cues.slice(0, 100)"
+                :item-height="80"
+              />
             </div>
           </div>
         </section>
@@ -110,7 +116,10 @@
 
           <div class="live-view-section">
             <label class="section-label">{{ t('subtitle_live_view_label', 'Live Translation View') }}</label>
-            <SubtitleViewer :cues="cues" :item-height="80" />
+            <SubtitleViewer
+              :cues="cues"
+              :item-height="80"
+            />
           </div>
 
           <div

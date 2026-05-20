@@ -27,7 +27,10 @@
       v-if="progress.terminalError"
       class="terminal-error-alert fade-in"
     >
-      <v-icon icon="mdi:alert-circle" class="error-icon" />
+      <v-icon
+        icon="mdi:alert-circle"
+        class="error-icon"
+      />
       <div class="error-content">
         <span class="error-title">{{ t('subtitle_terminal_error', 'Stopped due to error') }}</span>
         <span class="error-msg">{{ progress.terminalError }}</span>
