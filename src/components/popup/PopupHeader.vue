@@ -26,6 +26,12 @@
     </label>
 
     <!-- 3. Settings -->
+    <IconButton
+      icon="settings.png"
+      :alt="t('popup_settings_alt_icon') || 'Settings'"
+      :title="t('popup_settings_title_icon') || 'تنظیمات'"
+      type="toolbar"
+      class="ti-btn-settings"
       @click="handleOpenSettings"
     />
 

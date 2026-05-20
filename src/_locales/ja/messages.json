@@ -2545,5 +2545,11 @@
   },
   "subtitle_languages_label": {
     "message": "翻訳言語"
+  },
+  "popup_subtitle_alt_icon": {
+    "message": "字幕翻訳"
+  },
+  "popup_subtitle_title_icon": {
+    "message": "字幕翻訳"
   }
 }

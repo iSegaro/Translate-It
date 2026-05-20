@@ -2545,5 +2545,11 @@
   },
   "subtitle_languages_label": {
     "message": "Translation Languages"
+  },
+  "popup_subtitle_alt_icon": {
+    "message": "Subtitle Translator"
+  },
+  "popup_subtitle_title_icon": {
+    "message": "Subtitle Translator"
   }
 }
