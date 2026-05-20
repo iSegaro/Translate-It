@@ -183,7 +183,7 @@ export class UnifiedModeCoordinator {
    */
   async processSubtitleTranslation(request, { translationEngine }) {
     const { messageId, data } = request;
-    const { items, provider, priority } = data;
+    const { items, provider, priority, promptTemplate, instruction } = data;
     
     // Robust language extraction
     const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
@@ -191,23 +191,26 @@ export class UnifiedModeCoordinator {
 
     if (!items || !Array.isArray(items)) throw new Error('No items provided for subtitle translation');
     
-    const segments = items.map(item => typeof item === 'string' ? item : (item.text || ''));
-    const totalOriginalChars = segments.reduce((sum, t) => sum + (t?.length || 0), 0);
+    // Pass the full items (with id, text, context) to the provider coordinator
+    // This ensures AI providers can use per-cue context and maintain ID mapping
+    const totalOriginalChars = items.reduce((sum, item) => sum + (typeof item === 'string' ? item.length : (item.text?.length || 0)), 0);
 
     const providerInstance = await translationEngine.getProvider(provider);
     if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
 
-    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, segments[0]?.substring(0, 100) || '', 'subtitle');
+    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, (items[0]?.text || items[0] || '').substring(0, 100), 'subtitle');
 
     try {
       const sessionId = request.sessionId || data.sessionId || messageId;
       
-      const response = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
+      const response = await providerInstance.translate(items, sourceLanguage || 'auto', targetLanguage, {
         mode: TranslationMode.Subtitle,
         abortController,
         messageId,
         sessionId,
         priority,
+        promptTemplate,
+        instruction,
         rawJsonPayload: true 
       });
 
@@ -221,7 +224,7 @@ export class UnifiedModeCoordinator {
       // Map back to original structure
       const finalResults = items.map((item, idx) => ({
         id: item.id,
-        text: resultsArray[idx] !== undefined ? resultsArray[idx] : (typeof item === 'string' ? item : item.text)
+        text: resultsArray[idx] !== undefined ? (typeof resultsArray[idx] === 'object' ? resultsArray[idx].text : resultsArray[idx]) : (typeof item === 'string' ? item : item.text)
       }));
 
       return {

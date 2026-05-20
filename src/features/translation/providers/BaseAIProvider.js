@@ -227,7 +227,7 @@ export class BaseAIProvider extends BaseProvider {
    * Sends segments in multiple batches for real-time updates
    * @protected
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} segments`);
 
     // Ensure streaming is initialized in the central manager
@@ -249,7 +249,7 @@ export class BaseAIProvider extends BaseProvider {
     const canStream = messageId && AIStreamManager.isStreamActive(messageId);
     if (!canStream) {
       logger.debug(`[${this.providerName}] Streaming not active for ${messageId}, falling back to standard batch`);
-      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, null, expectedFormat, priority);
+      return this._translateBatch(texts, sourceLang, targetLang, translateMode, abortController, engine, messageId, sessionId, options, expectedFormat, priority);
     }
 
     // Get batching configuration
@@ -297,7 +297,7 @@ export class BaseAIProvider extends BaseProvider {
           engine,
           messageId,
           sessionId,
-          null,
+          options,
           expectedFormat,
           priority
         );
