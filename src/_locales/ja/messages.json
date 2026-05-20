@@ -2546,6 +2546,9 @@
   "subtitle_terminal_error": {
     "message": "エラーにより停止しました"
   },
+  "select_language_placeholder": {
+    "message": "言語を選択"
+  },
   "subtitle_languages_label": {
     "message": "翻訳言語"
   },

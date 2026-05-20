@@ -49,6 +49,7 @@
                   v-model:source-language="config.sourceLanguage" 
                   v-model:target-language="config.targetLanguage" 
                   :provider="config.providerId"
+                  :allow-auto="false"
                 />
               </div>
               <div class="config-item">
@@ -194,7 +195,7 @@ const handleDownload = (filename) => {
 };
 
 const config = reactive({
-  sourceLanguage: 'auto',
+  sourceLanguage: '',
   targetLanguage: 'en',
   providerId: 'Gemini',
   options: { useContext: true }
@@ -247,7 +248,7 @@ const handleFileLoaded = (content) => {
 };
 
 const canTranslate = computed(() => {
-  return fileContent.value && config.targetLanguage && config.providerId;
+  return fileContent.value && config.sourceLanguage && config.targetLanguage && config.providerId;
 });
 
 const startJob = () => {

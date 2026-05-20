@@ -2546,6 +2546,9 @@
   "subtitle_terminal_error": {
     "message": "Stopped due to error"
   },
+  "select_language_placeholder": {
+    "message": "Select Language"
+  },
   "subtitle_languages_label": {
     "message": "Translation Languages"
   },

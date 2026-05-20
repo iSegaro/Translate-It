@@ -50,7 +50,14 @@
         @click="handleDropdownClick"
       >
         <option 
-          v-if="hasAutoDetect"
+          v-if="!sourceLanguage" 
+          value="" 
+          disabled
+        >
+          {{ t('select_language_placeholder') || 'Select Language' }}
+        </option>
+        <option 
+          v-if="hasAutoDetect && allowAuto"
           value="auto"
         >
           {{ autoDetectLabel }}
@@ -94,6 +101,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import browser from 'webextension-polyfill'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -108,6 +116,12 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import './LanguageSelector.scss'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguageSelector')
+
+// Composables
+const { t } = useUnifiedI18n()
+const languages = useLanguages()
+const { handleError } = useErrorHandler()
+const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // Props
 const props = defineProps({
@@ -167,6 +181,10 @@ const props = defineProps({
   lastKeyword: {
     type: String,
     default: ''
+  },
+  allowAuto: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -176,11 +194,6 @@ const emit = defineEmits([
   'update:targetLanguage',
   'swap-languages'
 ])
-
-// Composables
-const languages = useLanguages()
-const { handleError } = useErrorHandler()
-const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
 
 // Computed
 const sourceLanguage = computed({

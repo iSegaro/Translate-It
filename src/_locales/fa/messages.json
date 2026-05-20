@@ -2546,6 +2546,9 @@
   "subtitle_terminal_error": {
     "message": "متوقف شده به دلیل خطا"
   },
+  "select_language_placeholder": {
+    "message": "انتخاب زبان"
+  },
   "subtitle_languages_label": {
     "message": "زبان‌های ترجمه"
   },
