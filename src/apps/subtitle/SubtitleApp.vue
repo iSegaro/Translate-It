@@ -58,6 +58,7 @@
                   v-model="config.providerId" 
                   placement="up"
                   required-feature="subtitle"
+                  only-configured
                 />
               </div>
             </div>
@@ -162,6 +163,7 @@ import { useSubtitleTranslation } from '@/features/subtitle-translation/composab
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { applyTheme } from '@/utils/ui/theme.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -224,16 +226,19 @@ onMounted(async () => {
     await settingsStore.loadSettings();
     applyTheme(settingsStore.settings.THEME);
 
-    // Sync provider with settings - Ensure it supports subtitles
+    // Sync provider with settings - Ensure it supports subtitles and is configured
     const defaultProviderId = settingsStore.settings.TRANSLATION_API || 'googlev2';
     const provider = findProviderById(defaultProviderId);
     
-    if (provider && provider.features?.includes('subtitle')) {
+    const isSubtitleCapable = provider && provider.features?.includes('subtitle');
+    const isConfigured = isProviderConfigured(defaultProviderId, settingsStore.settings);
+
+    if (isSubtitleCapable && isConfigured) {
       config.providerId = defaultProviderId;
     } else {
-      // Fallback to Google Translate if default doesn't support subtitles
+      // Fallback to Google Translate if default doesn't support subtitles or isn't configured
       config.providerId = 'googlev2';
-      logger.info('Default provider does not support subtitles, falling back to Google Translate V2');
+      logger.info('Default provider is incompatible or not configured for subtitles, falling back to Google Translate V2');
     }
     
     // Listen for theme changes from other options/extension pages
