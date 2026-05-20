@@ -37,6 +37,14 @@ export class SubtitleTextProtector {
       return token;
     });
 
+    // 3. Protect SRT/ASS style tags (e.g., {\an8}, {\i1})
+    // These tags are enclosed in curly braces
+    protectedText = protectedText.replace(/\{[^}]+\}/g, (match) => {
+      const token = `${this.tokenPrefix}STY_${tokenCounter++}${this.tokenSuffix}`;
+      tokens.set(token, match);
+      return token;
+    });
+
     return { text: protectedText, tokens };
   }
 
