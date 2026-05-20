@@ -86,29 +86,11 @@
           v-if="status === 'translating' || status === 'completed'"
           class="step-progress"
         >
-          <SubtitleProgressPanel 
-            :progress="progress" 
-            :status="status" 
-            :filename="currentFile?.name" 
+          <SubtitleProgressPanel
+            :progress="progress"
+            :status="status"
+            :filename="currentFile?.name"
           />
-
-          <div class="live-view-section">
-            <label class="section-label">{{ t('subtitle_live_view_label', 'Live Translation View') }}</label>
-            <SubtitleViewer :cues="cues" :item-height="80" />
-          </div>
-
-          <div
-            v-if="status === 'translating'"
-            class="actions"
-          >
-            <button
-              class="secondary-btn"
-              @click="cancelTranslation"
-            >
-              <v-icon icon="mdi:close" />
-              {{ t('subtitle_cancel_btn', 'Cancel Job') }}
-            </button>
-          </div>
 
           <div
             v-if="status === 'completed'"
@@ -128,6 +110,24 @@
             >
               <v-icon icon="mdi:refresh" />
               {{ t('subtitle_another_file_btn', 'Translate Another File') }}
+            </button>
+          </div>
+
+          <div class="live-view-section">
+            <label class="section-label">{{ t('subtitle_live_view_label', 'Live Translation View') }}</label>
+            <SubtitleViewer :cues="cues" :item-height="80" />
+          </div>
+
+          <div
+            v-if="status === 'translating'"
+            class="actions"
+          >
+            <button
+              class="secondary-btn"
+              @click="cancelTranslation"
+            >
+              <v-icon icon="mdi:close" />
+              {{ t('subtitle_cancel_btn', 'Cancel Job') }}
             </button>
           </div>
         </section>
