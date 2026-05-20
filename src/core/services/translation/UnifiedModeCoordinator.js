@@ -44,6 +44,8 @@ export class UnifiedModeCoordinator {
         return await this.processFieldTranslation(request, { translationEngine });
       case TranslationMode.Page:
         return await this.processPageTranslation(request, { translationEngine });
+      case TranslationMode.Subtitle:
+        return await this.processSubtitleTranslation(request, { translationEngine });
       case TranslationMode.Select_Element:
         return await this.processSelectElementTranslation(request, { translationEngine });
       default:
@@ -173,5 +175,62 @@ export class UnifiedModeCoordinator {
       context: request.context || 'content',
       data: request.data
     }, request.sender);
+  }
+
+  /**
+   * Specialized handler for Subtitle Translation (Batch processing).
+   * Similar to Page translation but optimized for Subtitle cues.
+   */
+  async processSubtitleTranslation(request, { translationEngine }) {
+    const { messageId, data } = request;
+    const { items, provider, sourceLanguage, targetLanguage, priority } = data;
+
+    if (!items || !Array.isArray(items)) throw new Error('No items provided for subtitle translation');
+    
+    const segments = items.map(item => typeof item === 'string' ? item : (item.text || ''));
+    const totalOriginalChars = segments.reduce((sum, t) => sum + (t?.length || 0), 0);
+
+    const providerInstance = await translationEngine.getProvider(provider);
+    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
+
+    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, segments[0]?.substring(0, 100) || '', 'subtitle');
+
+    try {
+      const sessionId = request.sessionId || data.sessionId || messageId;
+      
+      const response = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
+        mode: TranslationMode.Subtitle,
+        abortController,
+        messageId,
+        sessionId,
+        priority,
+        rawJsonPayload: true 
+      });
+
+      // Extract translated results
+      const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 
+        ? response.translatedText 
+        : response;
+
+      const resultsArray = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];
+      
+      // Map back to original structure
+      const finalResults = items.map((item, idx) => ({
+        id: item.id,
+        text: resultsArray[idx] !== undefined ? resultsArray[idx] : (typeof item === 'string' ? item : item.text)
+      }));
+
+      return {
+        success: true,
+        results: finalResults, // SubtitleCoordinator expects 'results'
+        actualCharCount: totalOriginalChars,
+        originalCharCount: totalOriginalChars
+      };
+    } catch (error) {
+      logger.error(`[UnifiedCoordinator] Subtitle batch failed:`, error);
+      throw error;
+    } finally {
+      translationEngine.lifecycleRegistry.unregisterRequest(messageId);
+    }
   }
 }

@@ -161,7 +161,7 @@ export async function sendRegularMessage(message, options = {}) {
           const cancelError = new Error(ErrorTypes.USER_CANCELLED);
           cancelError.type = ErrorTypes.USER_CANCELLED;
           reject(cancelError);
-        } else if (window.selectElementHandlingESC === true) {
+        } else if (typeof window !== 'undefined' && window.selectElementHandlingESC === true) {
           if (cancellationInterval) clearInterval(cancellationInterval);
           const cancelError = new Error('Translation cancelled by user ESC');
           cancelError.type = 'USER_CANCELLED';

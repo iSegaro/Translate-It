@@ -12,6 +12,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
+import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleCoordinator');
 
@@ -103,20 +105,19 @@ export class SubtitleTranslationCoordinator {
 
     try {
       // 2. Request Translation via Unified Service
-      // We use the background messaging bus to talk to UnifiedTranslationService
-      const response = await MessagingBus.sendToBackground({
-        context: MessageContexts.TRANSLATION_SERVICE,
-        action: MessageActions.TRANSLATE_BATCH,
-        payload: {
-          items: translationItems,
-          sourceLang,
-          targetLang,
-          providerId,
-          mode: TranslationMode.Subtitle,
-          promptTemplate: SUBTITLE_PROMPT_TEMPLATES.SYSTEM,
-          instruction: SUBTITLE_PROMPT_TEMPLATES.BATCH_INSTRUCTION
-        }
-      });
+      // If we are in the background context (which we should be), call the service directly
+      // to avoid messaging overhead and potential "No response" errors.
+      const message = MessageFormat.create(MessageActions.BATCH_TRANSLATE, {
+        items: translationItems,
+        sourceLang,
+        targetLang,
+        providerId,
+        mode: TranslationMode.Subtitle,
+        promptTemplate: SUBTITLE_PROMPT_TEMPLATES.SYSTEM,
+        instruction: SUBTITLE_PROMPT_TEMPLATES.BATCH_INSTRUCTION
+      }, MessageContexts.TRANSLATION_SERVICE);
+
+      const response = await unifiedTranslationService.handleTranslationRequest(message, { internal: true });
 
       if (!response.success) throw new Error(response.error || 'Translation failed');
 

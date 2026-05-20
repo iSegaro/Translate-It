@@ -19,6 +19,11 @@ export class SubtitleValidationService {
     const validatedCues = [];
     const errors = [];
 
+    if (!Array.isArray(translatedResults)) {
+      logger.error('Invalid translatedResults format: expected array', translatedResults);
+      return { validatedCues: originalCues, errors: [{ type: 'INVALID_FORMAT', message: 'Translation engine returned invalid data format.' }] };
+    }
+
     if (originalCues.length !== translatedResults.length) {
       errors.push({
         type: 'COUNT_MISMATCH',
@@ -28,7 +33,12 @@ export class SubtitleValidationService {
     }
 
     originalCues.forEach((cue, idx) => {
-      const rawTranslation = translatedResults[idx];
+      let rawTranslation = translatedResults[idx];
+      
+      // Handle both raw string results and object results { id, text }
+      if (rawTranslation && typeof rawTranslation === 'object' && rawTranslation.text !== undefined) {
+        rawTranslation = rawTranslation.text;
+      }
       
       if (!rawTranslation) {
         cue.status = 'failed';

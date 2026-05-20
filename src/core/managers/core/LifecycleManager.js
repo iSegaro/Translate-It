@@ -143,6 +143,7 @@ class LifecycleManager {
       [MessageActions.CANCEL_SESSION]: Handlers.handleCancelSessionLazy,
       [MessageActions.TRANSLATION_RESULT_UPDATE]: Handlers.handleTranslationResultLazy,
       'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
+      [MessageActions.BATCH_TRANSLATE]: Handlers.handleBatchTranslateLazy,
 
       // TTS handlers - Lazy loaded for better performance
       [MessageActions.GOOGLE_TTS_SPEAK]: Handlers.handleTTSSpeakLazy,

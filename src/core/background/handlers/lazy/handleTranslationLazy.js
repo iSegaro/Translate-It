@@ -86,3 +86,15 @@ export async function handleCheckTranslationStatusLazy(message, sender, sendResp
         return { success: false, error: 'Failed to load translation status check functionality' };
     }
 }
+
+export async function handleBatchTranslateLazy(message, sender, sendResponse) {
+    try {
+        logger.info('Loading BatchTranslate handler');
+        const { handleBatchTranslate } = await import('@/features/translation/handlers/handleBatchTranslate.js');
+        logger.debug('BatchTranslate handler loaded successfully');
+        return handleBatchTranslate(message, sender, sendResponse);
+    } catch (error) {
+        logger.error('Failed to load BatchTranslate handler:', error);
+        return { success: false, error: 'Failed to load batch translation functionality' };
+    }
+}
