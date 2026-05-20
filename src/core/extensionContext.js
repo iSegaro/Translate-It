@@ -3,7 +3,6 @@
 
 import browser from "webextension-polyfill";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
@@ -14,7 +13,7 @@ import {
   ENVIRONMENTS as CORE_ENVIRONMENTS,
   getActiveEnvironment as coreGetActiveEnvironment
 } from "./contextCore.js";
-// import { sendMessage as unifiedSendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { handleContextError as coreHandleContextError } from "./contextErrorHandler.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, "ExtensionContext");
 const notificationManager = new NotificationManager();
@@ -23,6 +22,9 @@ const notificationManager = new NotificationManager();
  * Centralized manager for extension context validation and error handling.
  * Provides unified logic for detecting environment, validating context,
  * and handling context-related errors across all browser platforms.
+ * 
+ * This class acts as a high-level Facade over contextCore and contextErrorHandler
+ * to provide a consistent API for the rest of the application.
  */
 export class ExtensionContextManager {
   /**
@@ -30,22 +32,23 @@ export class ExtensionContextManager {
    */
   static ENVIRONMENTS = CORE_ENVIRONMENTS;
 
+  /** @private Internal flag for context invalidation */
   static get _isContextInvalidated() { return contextState.isInvalidated; }
   static set _isContextInvalidated(val) { contextState.isInvalidated = val; }
 
+  /** @private Internal flag for notification tracking */
   static get _contextNotificationShown() { return contextState.notificationShown; }
   static set _contextNotificationShown(val) { contextState.notificationShown = val; }
 
   /**
    * Cached base URL of the extension (e.g., chrome-extension://[id]/).
-   * Initialized once during script startup to provide a fallback for resource loading.
+   * Used as a fallback when browser.runtime.getURL fails during invalidation.
    * @private
    */
   static _cachedBaseUrl = (() => {
     try {
       if (
-        typeof browser !== "undefined" &&
-        browser.runtime &&
+        browser?.runtime?.getURL &&
         typeof browser.runtime.getURL === "function"
       ) {
         return browser.runtime.getURL("");
@@ -56,24 +59,20 @@ export class ExtensionContextManager {
     return "";
   })();
 
-  /**
-   * Generic fallback icon (Base64 SVG) to show when extension context is invalidated
-   * and resources cannot be loaded from the extension package.
-   */
+  /** Fallback icon used when extension context is invalidated and assets cannot be loaded */
   static GENERIC_FALLBACK_ICON =
     "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNjY2MiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCI+PC9jaXJjbGU+PGxpbmUgeDE9IjIiIHkxPSIxMiIgeDI9IjIyIiB5Mj0iMTIiPjwvbGluZT48cGF0aCBkPSJNMTIgMmExNS4zIDE1LjMgMCAwIDEgNCAxMGExNS4zIDE1LjMgMCAwIDEtNCAxMGExNS4zIDE1LjMgMCAwIDEtNC0xMGExNS4zIDE1LjMgMCAwIDEgNC0xMHoiPjwvcGF0aD48L3N2Zz4=";
 
   /**
-   * Auto-detect the current execution environment.
-   * Robust cross-browser detection (Chrome, Firefox, Safari, Edge).
-   * @returns {string} One of ENVIRONMENTS values
+   * Detects and returns the current execution environment.
+   * @returns {string} One of ExtensionContextManager.ENVIRONMENTS
    */
   static getActiveEnvironment() {
     return coreGetActiveEnvironment();
   }
 
   /**
-   * Check if the current environment is a content script.
+   * Checks if the current context is a content script.
    * @returns {boolean}
    */
   static isContentScript() {
@@ -81,29 +80,27 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Check if the current environment is the background script / service worker.
+   * Checks if the current context is the background service worker.
    * @returns {boolean}
    */
   static isBackground() {
     return ExtensionContextManager.getActiveEnvironment() === ExtensionContextManager.ENVIRONMENTS.BACKGROUND;
   }
 
-  /**
-   * Static state for tracking user-cancelled operations across the app.
-   */
+  /** Registry of operations cancelled by the user to prevent further processing */
   static userCancelledOperations = new Set();
 
   /**
-   * Mark an operation as user-cancelled.
-   * @param {string} operationId - Unique identifier for the operation
+   * Marks an operation as cancelled.
+   * @param {string} operationId 
    */
   static markUserCancelled(operationId) {
     ExtensionContextManager.userCancelledOperations.add(operationId);
   }
 
   /**
-   * Check if an operation was cancelled by the user.
-   * @param {string} operationId - Unique identifier
+   * Checks if an operation has been cancelled.
+   * @param {string} operationId 
    * @returns {boolean}
    */
   static isUserCancelled(operationId) {
@@ -111,37 +108,33 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Clear user cancellation for an operation.
-   * @param {string} operationId
+   * Clears a cancellation record.
+   * @param {string} operationId 
    */
   static clearUserCancelled(operationId) {
     ExtensionContextManager.userCancelledOperations.delete(operationId);
   }
 
-  /**
-   * Clear all tracked user cancellations.
-   */
+  /** Clears all cancellation records */
   static clearAllUserCancellations() {
     ExtensionContextManager.userCancelledOperations.clear();
   }
 
   /**
-   * Synchronous extension context validation (fast check).
-   * Verifies if the extension environment is still reachable.
-   * @returns {boolean} True if extension context is valid
+   * Synchronously checks if the extension context is still valid.
+   * @returns {boolean}
    */
   static isValidSync() {
     return coreIsValidSync();
   }
 
   /**
-   * Asynchronous extension context validation (comprehensive check).
-   * @returns {Promise<boolean>} True if extension context is valid
+   * Asynchronously checks if the extension context and required APIs are available.
+   * @returns {Promise<boolean>}
    */
   static async isValidAsync() {
     try {
       if (!ExtensionContextManager.isValidSync()) return false;
-      // Comprehensive check verifying both runtime and storage accessibility
       return !!(browser?.runtime?.id && browser?.storage?.local);
     } catch {
       ExtensionContextManager._isContextInvalidated = true;
@@ -150,8 +143,8 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Check if an error is related to extension context invalidation or closed channels.
-   * @param {Error|string} error - The error to check
+   * Determines if a given error is caused by extension context invalidation.
+   * @param {Error|string} error 
    * @returns {boolean}
    */
   static isContextError(error) {
@@ -159,200 +152,25 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Get a technical reason for why the context error occurred.
-   * @param {Error|string} error
-   * @returns {string} Short reason string
-   */
-  static getContextErrorReason(error) {
-    const msg = error?.message || error;
-
-    if (msg.includes("extension context invalidated"))
-      return "Extension reloaded";
-    if (msg.includes("message channel closed")) return "Message channel closed";
-    if (msg.includes("receiving end does not exist"))
-      return "Background script unavailable";
-    if (msg.includes("page moved to cache")) return "Page cached by browser";
-    if (msg.includes("could not establish connection"))
-      return "Connection failed";
-    if (msg.includes("message port closed")) return "Message port closed";
-
-    return "Unknown context issue";
-  }
-
-  /**
-   * Get a human-readable message for context errors to show to the user.
-   * @param {string} type - Error type from ErrorTypes
-   * @returns {string} User-friendly message
-   */
-  static getContextErrorMessage(type) {
-    if (type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
-      return "Extension was reloaded or updated. Please refresh the page.";
-    }
-    return "The extension context is currently unavailable. This often happens after an update.";
-  }
-
-  /**
-   * Handle context errors with appropriate logging and internal state management.
-   * Automatically silences logs if the error is an expected lifecycle event.
-   * @param {Error|string} error - The caught error
-   * @param {string} context - The module/action name where it occurred
-   * @param {Object} options - Handling options (silent, fallbackAction, operationId)
+   * Handles context-related errors by logging and notifying the user.
+   * @param {Error|string} error - The error to handle
+   * @param {string} [context="unknown"] - Description of where the error occurred
+   * @param {Object} [options={}] - Additional handling options
    */
   static handleContextError(error, context = "unknown", options = {}) {
-    const {
-      silent = true,
-      fallbackAction = null,
-      operationId = null,
-    } = options;
-
-    // Set global invalidation flag to trigger silent fallbacks everywhere
-    if (ExtensionContextManager.isContextError(error)) {
-      ExtensionContextManager._isContextInvalidated = true;
-    }
-
-    const message = error?.message || error;
-    const reason = ExtensionContextManager.getContextErrorReason(error);
-    const env = ExtensionContextManager.getActiveEnvironment();
-
-    // Special handling for user-cancelled tasks
-    if (operationId && ExtensionContextManager.isUserCancelled(operationId)) {
-      logger.info(`Operation cancelled by user in ${env}:${context}`);
-      ExtensionContextManager.clearUserCancelled(operationId);
-      return;
-    }
-
-    // Always log context errors at DEBUG level to avoid console noise
-    logger.debug(`Extension context error in ${env}:${context}`, {
-      env,
-      context,
-      reason,
-      originalError: message,
-    });
-
-    // Show a user-friendly toast if we are in a content script (UI visible to user)
-    // and this is a genuine context invalidation error.
-    if (
-      env === ExtensionContextManager.ENVIRONMENTS.CONTENT &&
-      ExtensionContextManager.isContextError(error)
-    ) {
-      // Prevent showing multiple duplicate notifications for the same invalidation event
-      if (ExtensionContextManager._contextNotificationShown)
-        return { handled: true, silent };
-      ExtensionContextManager._contextNotificationShown = true;
-
-      // Reset the flag after the toast duration (plus a small buffer)
-      // to allow showing it again if the user interacts again.
-      setTimeout(() => {
-        ExtensionContextManager._contextNotificationShown = false;
-      }, 5000);
-
-      // Use NotificationManager for standardized toast notifications
-      notificationManager.show(
-        ExtensionContextManager.getContextErrorMessage(
-          ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
-        ),
-        "warning",
-        5000,
-        {
-          id: "extension-update-warning",
-          persistent: false,
-        },
-      );
-    }
-
-    // If we are in BACKGROUND context, use system notifications (browser.notifications)
-    // to inform the user about connection issues, inspired by InstallHandler.js pattern.
-    if (
-      env === ExtensionContextManager.ENVIRONMENTS.BACKGROUND &&
-      ExtensionContextManager.isContextError(error)
-    ) {
-      // Prevent showing multiple duplicate notifications
-      if (ExtensionContextManager._contextNotificationShown)
-        return { handled: true, silent };
-      ExtensionContextManager._contextNotificationShown = true;
-
-      // Reset the flag after a delay to allow showing it again if the user interacts
-      setTimeout(() => {
-        ExtensionContextManager._contextNotificationShown = false;
-      }, 5000);
-
-      try {
-        if (
-          typeof browser !== "undefined" &&
-          browser.notifications &&
-          typeof browser.notifications.create === "function"
-        ) {
-          const notificationId = "extension-context-error";
-
-          // Use a plain extension URL for the icon.
-          // browser.notifications.create does NOT support Base64/Data URIs.
-          let iconUrl = "";
-          try {
-            iconUrl = browser.runtime.getURL(
-              "icons/extension/extension_icon_128.png",
-            );
-          } catch {
-            /* ignore icon if getURL fails */
-          }
-
-          const notificationOptions = {
-            type: "basic",
-            title: "Translate It - Reload Page",
-            message: ExtensionContextManager.getContextErrorMessage(
-              ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
-            ),
-            priority: 2,
-          };
-
-          // Only add icon if it's a valid extension resource URL (not Base64)
-          if (iconUrl && !iconUrl.includes("data:")) {
-            notificationOptions.iconUrl = iconUrl;
-          }
-
-          // Follow InstallHandler.js pattern: Clear previous notification with same ID first
-          browser.notifications
-            .clear(notificationId)
-            .then(() => {
-              browser.notifications.create(notificationId, notificationOptions);
-            })
-            .catch(() => {
-              // Fallback create if clear fails
-              browser.notifications.create(notificationId, notificationOptions);
-            });
-
-          // Automatically dismiss after 7 seconds to keep it clean
-          setTimeout(() => {
-            try {
-              browser.notifications.clear(notificationId);
-            } catch {
-              /* ignore */
-            }
-          }, 5000);
-        }
-      } catch {
-        // System notifications might fail if the background context itself is being torn down
-        logger.debug(
-          "Could not show system notification for background context error",
-        );
-      }
-    }
-
-    if (fallbackAction && typeof fallbackAction === "function") {
-      try {
-        fallbackAction();
-      } catch {
-        /* ignore */
-      }
-    }
-
-    return { handled: true, silent };
+    return coreHandleContextError(error, context, options);
   }
 
   /**
-   * Create a safe wrapper for context-sensitive asynchronous operations.
-   * @param {Function} operation - Function to wrap
-   * @param {Object} options - Wrapper configuration
-   * @returns {Function} Wrapped function
+   * Creates a safe wrapper for any asynchronous operation.
+   * Checks context validity before execution and handles context errors automatically.
+   * 
+   * @param {Function} operation - The async function to wrap
+   * @param {Object} [options={}] - Configuration options
+   * @param {string} [options.context="operation"] - Name of the operation for logging
+   * @param {any} [options.fallbackValue=null] - Value to return if context is invalid
+   * @param {boolean} [options.validateAsync=false] - Whether to use async validation
+   * @returns {Function} The wrapped safe operation
    */
   static createSafeWrapper(operation, options = {}) {
     const {
@@ -368,10 +186,7 @@ export class ExtensionContextManager {
           : ExtensionContextManager.isValidSync();
 
         if (!isValid) {
-          ExtensionContextManager.handleContextError(
-            "Invalid context",
-            context,
-          );
+          ExtensionContextManager.handleContextError("Invalid context", context);
           return fallbackValue;
         }
 
@@ -387,87 +202,45 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Safe wrapper for browser.runtime.getURL to avoid context invalidation errors.
-   * Returns a Base64 placeholder if extension resources are unreachable.
-   * @param {string} path - Resource path within the extension
-   * @param {string} fallback - Optional specific fallback URL
-   * @returns {string} Valid URL or Base64 data URI
+   * Safely retrieves an extension URL.
+   * Handles cases where the extension has been updated/reloaded.
+   * 
+   * @param {string} path - Relative path within the extension
+   * @param {string} [fallback=""] - Fallback URL if retrieval fails
+   * @returns {string} The full extension URL or fallback
    */
   static safeGetURL(path, fallback = "") {
-    const isFallbackSafe =
-      fallback && (fallback.startsWith("data:") || fallback.startsWith("http"));
-
-    // Fast-exit if context is already known to be invalidated
+    const isFallbackSafe = fallback && (fallback.startsWith("data:") || fallback.startsWith("http"));
     if (ExtensionContextManager._isContextInvalidated) {
-      return isFallbackSafe
-        ? fallback
-        : ExtensionContextManager.GENERIC_FALLBACK_ICON;
+      return isFallbackSafe ? fallback : ExtensionContextManager.GENERIC_FALLBACK_ICON;
     }
 
     try {
-      if (
-        typeof browser !== "undefined" &&
-        browser.runtime &&
-        typeof browser.runtime.getURL === "function"
-      ) {
+      if (browser?.runtime?.getURL) {
         const url = browser.runtime.getURL(path);
-        // Detect Chrome's invalid marker
-        if (url && !url.includes("://invalid/")) {
-          return url;
-        } else {
-          ExtensionContextManager._isContextInvalidated = true;
-        }
+        if (url && !url.includes("://invalid/")) return url;
+        ExtensionContextManager._isContextInvalidated = true;
       }
     } catch {
       ExtensionContextManager._isContextInvalidated = true;
     }
 
-    // Attempt to use cached base URL if runtime API is dead but we have the ID from startup
-    if (
-      !ExtensionContextManager._isContextInvalidated &&
-      ExtensionContextManager._cachedBaseUrl &&
-      !ExtensionContextManager._cachedBaseUrl.includes("://invalid/")
-    ) {
+    if (!ExtensionContextManager._isContextInvalidated && ExtensionContextManager._cachedBaseUrl) {
       const cleanPath = path.startsWith("/") ? path.substring(1) : path;
       return ExtensionContextManager._cachedBaseUrl + cleanPath;
     }
 
-    // Return Base64 or absolute fallback to avoid network errors
-    return isFallbackSafe
-      ? fallback
-      : ExtensionContextManager.GENERIC_FALLBACK_ICON;
+    return isFallbackSafe ? fallback : ExtensionContextManager.GENERIC_FALLBACK_ICON;
   }
 
   /**
-   * Safe wrapper for browser.runtime.sendMessage calls.
-   * Handles dynamic import of UnifiedMessaging to prevent circular dependencies.
+   * Safely executes an i18n operation.
+   * @param {Function} i18nOperation 
+   * @param {string} [context="i18n"] 
+   * @param {any} [fallbackValue=null] 
+   * @returns {Promise<any>}
    */
-  static async safeSendMessage(message, options = {}, context = "messaging") {
-    // Handle overload where context is second argument
-    const actualOptions = typeof options === 'string' ? {} : options;
-    const actualContext = typeof options === 'string' ? options : context;
-
-    return ExtensionContextManager.createSafeWrapper(
-      async (msg) => {
-        const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
-        return await sendMessage(msg, actualOptions);
-      },
-      {
-        context: `sendMessage-${actualContext}`,
-        fallbackValue: null,
-        validateAsync: false,
-      },
-    )(message);
-  }
-
-  /**
-   * Safe wrapper for internationalization (i18n) operations.
-   */
-  static async safeI18nOperation(
-    i18nOperation,
-    context = "i18n",
-    fallbackValue = null,
-  ) {
+  static async safeI18nOperation(i18nOperation, context = "i18n", fallbackValue = null) {
     return ExtensionContextManager.createSafeWrapper(i18nOperation, {
       context: `i18n-${context}`,
       fallbackValue,
@@ -476,13 +249,13 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Safe wrapper for storage operations.
+   * Safely executes a storage operation.
+   * @param {Function} storageOperation 
+   * @param {string} [context="storage"] 
+   * @param {any} [fallbackValue=null] 
+   * @returns {Promise<any>}
    */
-  static async safeStorageOperation(
-    storageOperation,
-    context = "storage",
-    fallbackValue = null,
-  ) {
+  static async safeStorageOperation(storageOperation, context = "storage", fallbackValue = null) {
     return ExtensionContextManager.createSafeWrapper(storageOperation, {
       context: `storage-${context}`,
       fallbackValue,
@@ -491,37 +264,40 @@ export class ExtensionContextManager {
   }
 
   /**
-   * Handle browser.runtime.lastError with centralized management.
-   * @param {string} context - Source context
-   * @returns {Object|null} Handling result
+   * Standardized handler for browser.runtime.lastError.
+   * Correctly identifies context-related errors and suppresses them after notification.
+   * 
+   * @param {string} [context="unknown"] 
+   * @returns {Object|null} Result object {handledSilently, isContextError} or null
    */
   static handleRuntimeLastError(context = "unknown") {
-    // Safely check for lastError existence
     const lastError = (browser.runtime && browser.runtime.lastError) ? browser.runtime.lastError : null;
     if (!lastError) return null;
 
-    const errorMessage = lastError.message;
-    const errorType = matchErrorToType(errorMessage);
-    const isContextError =
-      errorType === ErrorTypes.CONTEXT ||
-      errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+    const errorMessage = lastError.message || "";
+    // Manual check to avoid circular dependency with ErrorMatcher
+    const isContext = 
+      errorMessage.includes("extension context invalidated") ||
+      errorMessage.includes("message channel closed") ||
+      errorMessage.includes("receiving end does not exist") ||
+      errorMessage.includes("could not establish connection") ||
+      errorMessage.includes("message port closed");
 
-    if (isContextError) {
+    if (isContext) {
       ExtensionContextManager.handleContextError(errorMessage, context);
-      void browser.runtime?.lastError; // Clear the error safely
+      void browser.runtime?.lastError;
       return { handledSilently: true, isContextError: true };
     } else {
       logger.warn(`[${context}] Runtime lastError:`, errorMessage);
-      void browser.runtime?.lastError; // Clear the error safely
+      void browser.runtime?.lastError;
       return { handledSilently: false, isContextError: false };
     }
   }
 }
 
-// Convenience exports for clean imports in other modules
+/** Named exports for functional usage */
 export const isExtensionContextValid = ExtensionContextManager.isValidSync;
-export const isExtensionContextValidAsync =
-  ExtensionContextManager.isValidAsync;
+export const isExtensionContextValidAsync = ExtensionContextManager.isValidAsync;
 export const isContextError = ExtensionContextManager.isContextError;
 export const handleContextError = ExtensionContextManager.handleContextError;
 

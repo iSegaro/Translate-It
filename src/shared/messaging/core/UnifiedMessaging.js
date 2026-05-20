@@ -2,8 +2,8 @@
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-// import { isValidSync, isContextError } from '@/core/contextCore.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
+import { isValidSync, isContextError } from '@/core/contextCore.js';
+import { handleContextError } from '@/core/contextErrorHandler.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { isFatalError, matchErrorToType, isSilentError } from '@/shared/error-management/ErrorMatcher.js';
@@ -138,7 +138,7 @@ export async function sendRegularMessage(message, options = {}) {
   const actionTimeout = customTimeout || getTimeoutForAction(message.action, message.context || message.data);
 
   try {
-    if (!ExtensionContextManager.isValidSync()) {
+    if (!isValidSync()) {
       const contextError = new Error('Extension context invalidated');
       contextError.type = 'EXTENSION_CONTEXT_INVALIDATED';
       throw contextError;
@@ -249,8 +249,14 @@ export async function sendRegularMessage(message, options = {}) {
 
     if (isSilentError(errorType)) throw error;
     
-    if (ExtensionContextManager.isContextError(error)) {
-      ExtensionContextManager.handleContextError(error, `UnifiedMessaging.${message.action}`);
+    if (isContextError(error)) {
+      handleContextError(error, `UnifiedMessaging.${message.action}`);
+      
+      return { 
+        success: false, 
+        error: `Context error: ${error.message || error}`,
+        isContextInvalidated: true 
+      };
     }
 
     throw error;
@@ -262,3 +268,29 @@ function isTranslationAction(action) {
 }
 
 export default { sendMessage, sendRegularMessage };
+/**
+ * Safe wrapper for sendMessage that checks context validity before sending.
+ * @param {Object} message - Message to send
+ * @param {Object|string} options - Sending options or context string
+ * @param {string} context - Context name for error reporting
+ * @returns {Promise<any>}
+ */
+export async function safeSendMessage(message, options = {}, context = "messaging") {
+  const actualOptions = typeof options === 'string' ? {} : options;
+  const actualContext = typeof options === 'string' ? options : context;
+
+  if (!isValidSync()) {
+    handleContextError(new Error('Extension context invalidated'), `safeSendMessage-${actualContext}`);
+    return null;
+  }
+
+  try {
+    return await sendMessage(message, actualOptions);
+  } catch (error) {
+    if (isContextError(error)) {
+      handleContextError(error, `safeSendMessage-${actualContext}`);
+      return null;
+    }
+    throw error;
+  }
+}

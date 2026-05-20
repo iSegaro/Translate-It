@@ -15,7 +15,8 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'StorageCore');
 import SmartCache from '@/core/memory/SmartCache.js';
 import { MEMORY_TIMING } from '@/core/memory/constants.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
+import { isContextError } from '@/core/contextCore.js';
+import { handleContextError } from '@/core/contextErrorHandler.js';
 
 class StorageCore extends ResourceTracker {
   constructor() {
@@ -54,9 +55,9 @@ class StorageCore extends ResourceTracker {
         return; // Success
       } catch (error) {
         // Use centralized context error detection
-        const isContextError = ExtensionContextManager.isContextError(error);
+        const contextError = isContextError(error);
 
-        if (isContextError && attempt < maxRetries) {
+        if (contextError && attempt < maxRetries) {
           // Context error during extension reload - retry with backoff
           this.logger.debug(`Storage initialization attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -65,8 +66,8 @@ class StorageCore extends ResourceTracker {
         }
 
         // Final attempt or non-retryable error
-        if (isContextError) {
-          ExtensionContextManager.handleContextError(error, 'storage:init');
+        if (contextError) {
+          handleContextError(error, 'storage:init');
         } else {
           this.logger.error('Initialization failed', error);
         }

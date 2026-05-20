@@ -2,8 +2,6 @@
 // Core context validation logic without dependencies to prevent circular imports
 
 import browser from "webextension-polyfill";
-import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
-import { matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 
 /**
  * Internal state for context invalidation, shared across modules.
@@ -45,14 +43,19 @@ export function isValidSync() {
 
 /**
  * Check if an error is context-related.
+ * Manual implementation to avoid circular dependency with ErrorMatcher.
  * @param {Error|string} error 
  * @returns {boolean}
  */
 export function isContextError(error) {
-  const errorType = matchErrorToType(error);
+  const message = (error?.message || error || "").toLowerCase();
+  
   return (
-    errorType === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED ||
-    errorType === ErrorTypes.CONTEXT
+    message.includes("extension context invalidated") ||
+    message.includes("message channel closed") ||
+    message.includes("receiving end does not exist") ||
+    message.includes("could not establish connection") ||
+    message.includes("message port closed")
   );
 }
 
