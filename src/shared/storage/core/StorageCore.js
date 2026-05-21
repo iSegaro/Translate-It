@@ -94,7 +94,7 @@ class StorageCore extends ResourceTracker {
       this._isReady = true;
       this.logger.info('Storage core initialized successfully');
     } catch (error) {
-      this.logger.warn('Standard browser storage not available, falling back to in-memory storage:', error.message);
+      this.logger.debug('Standard browser storage not available, falling back to in-memory storage:', error.message);
       this._useInMemoryStorage = true;
       this._inMemoryData = {};
       this._isReady = true;
