@@ -1,11 +1,14 @@
 // src/features/text-field-interaction/strategies/WhatsAppStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay} from "@/core/helpers.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'WhatsAppStrategy');
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'WhatsAppStrategy');
 
 export default class WhatsAppStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -70,10 +73,7 @@ export default class WhatsAppStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
-    if (!translatedText) {
-      return false;
-    }
-    if (!element) {
+    if (!translatedText || !element) {
       return false;
     }
 
@@ -82,16 +82,15 @@ export default class WhatsAppStrategy extends PlatformStrategy {
         element,
         elementIsConnected: element.isConnected,
         elementHasAttribute: element.hasAttribute('contenteditable'),
-        elementClassName: element.className,
-        translatedText
+        translatedText: translatedText.substring(0, 50) + '...'
       });
 
       const SELECTORS = '[role="textbox"], .copyable-text.selectable-text, [contenteditable="true"]';
 
-      await delay(100);
+      await smartDelay(100);
 
       // Find WhatsApp field using multiple approaches
-      let whatsappField =
+      const whatsappField =
         this.findField(element, SELECTORS) ||
         this.getWhatsAppField(element) ||
         document.querySelector('[aria-label="Type a message"], [aria-label^="Type to"], [aria-label="Search input textbox"]');
@@ -99,46 +98,32 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       logger.debug('WhatsApp field detection result', {
         hasField: !!whatsappField,
         fieldTag: whatsappField?.tagName,
-        fieldAriaLabel: whatsappField?.getAttribute('aria-label'),
-        fieldClassList: whatsappField?.className
+        fieldAriaLabel: whatsappField?.getAttribute('aria-label')
       });
 
       // Validate the field
       if (!this.validateField(whatsappField)) {
-        logger.debug('فیلد واتساپ نامعتبر است یا یافت نشد', {
-          hasField: !!whatsappField,
-          fieldTag: whatsappField?.tagName,
-          isConnected: whatsappField?.isConnected,
-          isContentEditable: whatsappField?.isContentEditable
-        });
+        logger.debug('فیلد واتساپ نامعتبر است یا یافت نشد');
         return false;
       }
 
       // Double-check it's still a WhatsApp element
-      const isWhatsAppField = this.isWhatsAppElement(whatsappField);
-      if (!isWhatsAppField) {
-        logger.debug('Element is not a WhatsApp field', {
-          element: whatsappField,
-          ariaLabel: whatsappField.getAttribute('aria-label')
-        });
+      if (!this.isWhatsAppElement(whatsappField)) {
+        logger.debug('Element is not a WhatsApp field');
         return false;
       }
 
-      // اعمال فوکوس با تنظیمات ایمن
-      await this.safeFocus(whatsappField);
-
+      // اعمال فیدبک بصری
       await this.applyVisualFeedback(whatsappField);
 
-      // انتخاب تمام محتوا با استفاده از Selection API
-      await this.selectAllContent(whatsappField);
+      // استفاده از جایگزینی هوشمند متن (جایگزین تمام متدهای قبلی)
+      const success = await smartTextReplacement(whatsappField, translatedText);
 
-      // پیست محتوا با شبیه‌سازی کامل
-      await this.simulatePaste(whatsappField, translatedText);
+      if (success) {
+        logger.debug('WhatsApp field updated successfully using smartTextReplacement');
+      }
 
-      // به روزرسانی state واتس‌اپ
-      this.triggerStateUpdate(whatsappField);
-
-      return true;
+      return success;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.PARSE_INPUT,
@@ -161,81 +146,6 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       });
     }
     return "";
-
-    // try {
-    //   const whatsappField = target?.closest?.(
-    //     '[role="textbox"], .copyable-text.selectable-text'
-    //   );
-
-    //   if (!whatsappField || !this.validateField(whatsappField)) return "";
-
-    //   return whatsappField.innerText?.trim?.() || "";
-    //     // } catch {
-    //   this.errorHandler.handle(error, {
-    //     type: ErrorTypes.UI,
-    //     context: "whatsapp-strategy-extractText",
-    //   });
-    //   return "";
-    // }
-  }
-
-  async safeFocus(element) {
-    element.focus({ preventScroll: true });
-    await delay(100);
-    return element;
-  }
-
-  async selectAllContent(element) {
-    try {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      await delay(100);
-      return element;
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.PARSE_INPUT,
-        context: "whatsapp-strategy-selectAllContent",
-      });
-    }
-  }
-
-  async simulatePaste(element, text) {
-    if (!element || text === undefined || text === null) return;
-
-    try {
-      // 1. Trim the text to remove leading/trailing whitespace, including newlines.
-      let trimmedText = text.trim();
-
-      // 2. Collapse multiple consecutive newlines into single newlines.
-      trimmedText = trimmedText.replace(/\n{2,}/g, "\n");
-
-      // 3. Convert newlines to <br> for HTML representation.
-      const htmlText = trimmedText.replace(/\n/g, "<br>");
-
-      // 4. Create DataTransfer object.
-      const dt = new DataTransfer();
-      dt.setData("text/plain", trimmedText); // Use trimmedText for plain text
-      dt.setData("text/html", htmlText); // Use htmlText for HTML
-
-      // 5. Create and dispatch the paste event.
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      element.dispatchEvent(pasteEvent);
-
-      // 6. Add a small delay for event processing.
-      await delay(50);
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.PARSE_INPUT,
-        context: "whatsapp-strategy-simulatePaste",
-      });
-    }
   }
 
   validateField(element) {
@@ -243,15 +153,6 @@ export default class WhatsAppStrategy extends PlatformStrategy {
       element &&
       element.isConnected &&
       (this.isInputField(element) || this.isContentEditable(element))
-    );
-  }
-
-  triggerStateUpdate(element) {
-    element.dispatchEvent(
-      new InputEvent("input", {
-        bubbles: true,
-        composed: true,
-      }),
     );
   }
 }

@@ -2,14 +2,16 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay} from "@/core/helpers.js";
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'TwitterStrategy');
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'TwitterStrategy');
 
 export default class TwitterStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
-
     this.errorHandler = errorHandler;
   }
 
@@ -31,92 +33,12 @@ export default class TwitterStrategy extends PlatformStrategy {
     }
   }
 
-  clearTweetField(tweetField) {
-    if (!tweetField) return;
-    try {
-      tweetField.focus();
-      
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(tweetField);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      
-      if (document.queryCommandSupported && document.queryCommandSupported('delete')) {
-        document.execCommand('delete', false, null);
-      } else {
-        selection.deleteContents();
-      }
-      
-      if (tweetField.textContent && tweetField.textContent.trim()) {
-        tweetField.textContent = '';
-      }
-      
-      tweetField.dispatchEvent(new Event('input', { bubbles: true }));
-      tweetField.dispatchEvent(new Event('change', { bubbles: true }));
-      
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "twitter-strategy-clearTweetField",
-      });
-    }
-  }
-
-  async pasteText(tweetField, text) {
-    if (!tweetField || typeof text !== "string") return;
-    try {
-      const trimmedText = text.trim();
-      tweetField.focus();
-      await delay(30);
-
-      if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
-        const success = document.execCommand('insertText', false, trimmedText);
-        if (success) {
-          await delay(50);
-          this.setCursorToEnd(tweetField);
-          return;
-        }
-      }
-      
-      try {
-        const selection = window.getSelection();
-        const range = selection.getRangeAt(0) || document.createRange();
-        
-        range.deleteContents();
-        
-        const textNode = document.createTextNode(trimmedText);
-        range.insertNode(textNode);
-        
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-            } catch {
-        tweetField.textContent = trimmedText;
-      }
-
-      tweetField.dispatchEvent(new Event('input', { bubbles: true }));
-      tweetField.dispatchEvent(new Event('change', { bubbles: true }));
-
-      await delay(50);
-      this.setCursorToEnd(tweetField);
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "twitter-strategy-pasteText",
-      });
-      throw error;
-    }
-  }
-
-  setCursorToEnd(tweetField) {
-    if (!tweetField) return;
+  setCursorToEnd(field) {
+    if (!field) return;
     try {
       const selection = window.getSelection();
       const range = document.createRange();
-      range.selectNodeContents(tweetField);
+      range.selectNodeContents(field);
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
@@ -129,6 +51,10 @@ export default class TwitterStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
+    if (!translatedText || !element) {
+      return false;
+    }
+
     try {
       const searchInput = document.querySelector(
         '[data-testid="SearchBox_Search_Input"]',
@@ -140,33 +66,28 @@ export default class TwitterStrategy extends PlatformStrategy {
         return true;
       }
 
+      let field = null;
+
       if (this.isDMElement(element)) {
-        const dmField = element.closest('[data-testid="dmComposerTextInput"]');
-        if (dmField) {
-          dmField.focus();
-          await this.applyVisualFeedback(dmField);
-          this.clearTweetField(dmField);
-          await delay(50);
-          await this.pasteText(dmField, translatedText);
-          return true;
-        }
+        field = element.closest('[data-testid="dmComposerTextInput"]');
+      } else if (this.isTwitterElement(element)) {
+        field = element.closest('[data-testid="tweetTextarea_0"]');
       }
 
-      if (this.isTwitterElement(element)) {
-        const tweetField = element.closest('[data-testid="tweetTextarea_0"]');
-        if (tweetField) {
-          tweetField.focus();
-          
-          await this.applyVisualFeedback(tweetField);
-          
-          this.clearTweetField(tweetField);
-          await delay(50);
-          
-          await this.pasteText(tweetField, translatedText);
+      if (field) {
+        field.focus();
+        await this.applyVisualFeedback(field);
+        
+        await smartDelay(50);
+        
+        // استفاده از جایگزینی هوشمند متن (جایگزین clearTweetField و pasteText)
+        const success = await smartTextReplacement(field, translatedText);
 
-          logger.init('Tweet field updated successfully.');
-          return true;
+        if (success) {
+          this.setCursorToEnd(field);
+          logger.init('Twitter field updated successfully.');
         }
+        return success;
       }
 
       logger.error('No specific element matched. Update failed.');
@@ -204,10 +125,7 @@ export default class TwitterStrategy extends PlatformStrategy {
     if (!el) {
       return false;
     }
-
-    const result = el.tagName === "INPUT" || el.tagName === "TEXTAREA";
-
-    return result;
+    return el.tagName === "INPUT" || el.tagName === "TEXTAREA";
   }
 
   validateField(field) {
@@ -229,14 +147,10 @@ export default class TwitterStrategy extends PlatformStrategy {
       }
 
       if (typeof element.querySelector === "function") {
-        const field = element.querySelector(selector);
-
-        return field;
+        return element.querySelector(selector);
       }
 
-      const field = document.querySelector(selector);
-
-      return field;
+      return document.querySelector(selector);
     } catch {
       return null;
     }

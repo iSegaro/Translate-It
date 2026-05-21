@@ -1,11 +1,14 @@
 // src/features/text-field-interaction/strategies/MediumStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay} from "@/core/helpers.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'MediumStrategy');
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'MediumStrategy');
 
 export default class MediumStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -21,7 +24,7 @@ export default class MediumStrategy extends PlatformStrategy {
   isMediumElement(target) {
     return !!(
       target.closest('[role="textbox"]') ||
-      target.closest('[data-testid="editor-container"]') // اضافه کردن شناسه جدید
+      target.closest('[data-testid="editor-container"]')
     );
   }
 
@@ -47,36 +50,32 @@ export default class MediumStrategy extends PlatformStrategy {
 
   /**
    * به‌روزرسانی فیلد متنی مدیوم با پشتیبانی از انتخاب متن
-   * - برای input/textarea: جایگزینی مستقیم یا انتخاب شده
-   * - برای contenteditable: جایگزینی هوشمند با حفظ انتخاب
    */
   async updateElement(element, translatedText) {
+    if (!translatedText || !element) {
+      return false;
+    }
+
     try {
-      // 1. برای input/textarea
+      // 1. برای input/textarea (مثلاً جستجو)
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
         const hasSelection = this._hasTextSelection(element);
+        const selectionStart = hasSelection ? element.selectionStart : null;
+        const selectionEnd = hasSelection ? element.selectionEnd : null;
 
-        if (hasSelection) {
-          // جایگزینی فقط متن انتخاب شده
-          const start = element.selectionStart;
-          const end = element.selectionEnd;
-          const value = element.value;
-          const newValue =
-            value.substring(0, start) + translatedText + value.substring(end);
-          element.value = newValue;
-
-          // تنظیم موقعیت کرسر
-          const newCursorPosition = start + translatedText.length;
-          element.setSelectionRange(newCursorPosition, newCursorPosition);
-        } else {
-          // جایگزینی کل محتوا
-          element.value = translatedText;
-        }
-
-        element.dispatchEvent(new Event("input", { bubbles: true }));
-        element.dispatchEvent(new Event("change", { bubbles: true }));
         await this.applyVisualFeedback(element);
-        return true;
+        const success = await smartTextReplacement(
+          element,
+          translatedText,
+          selectionStart,
+          selectionEnd
+        );
+        
+        if (success) {
+          await smartDelay(100);
+          logger.debug('Medium input/textarea updated successfully');
+        }
+        return success;
       }
 
       // 2. برای فیلدهای contenteditable مدیوم
@@ -85,34 +84,22 @@ export default class MediumStrategy extends PlatformStrategy {
         return false;
       }
 
-      await this.safeFocus(mediumField);
+      mediumField.focus();
+      await smartDelay(50);
+      
       const hasSelection = this._hasTextSelection(mediumField);
 
       if (hasSelection) {
-        // جایگزینی متن انتخاب شده
-        const selection = window.getSelection();
-        if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
-          const textNode = document.createTextNode(translatedText);
-          range.insertNode(textNode);
-
-          // پاک کردن انتخاب
-          selection.removeAllRanges();
-
-          // ارسال رویدادهای لازم
-          this.triggerStateUpdate(mediumField);
-          await this.applyVisualFeedback(mediumField);
-          return true;
-        }
+        // جایگزینی متن انتخاب شده با استفاده از سیستم یکپارچه
+        await this.applyVisualFeedback(mediumField);
+        return await smartTextReplacement(mediumField, translatedText);
       } else {
-        // جایگزینی سطر فعلی
+        // جایگزینی سطر فعلی (رفتار خاص مدیوم برای حفظ پاراگراف‌ها)
         const success = await this.replaceCurrentLine(
           mediumField,
           translatedText,
         );
         if (success) {
-          this.triggerStateUpdate(mediumField);
           await this.applyVisualFeedback(mediumField);
           return true;
         }
@@ -134,37 +121,19 @@ export default class MediumStrategy extends PlatformStrategy {
 
       // اگر input یا textarea باشد
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-        // بررسی انتخاب متن در input/textarea
         if (target.selectionStart !== target.selectionEnd) {
-          const selectedText = target.value
-            .substring(target.selectionStart, target.selectionEnd)
-            .trim();
-          if (selectedText) {
-            return selectedText;
-          }
+          return target.value.substring(target.selectionStart, target.selectionEnd).trim();
         }
         return target?.value?.trim?.() || "";
       }
 
-      // تلاش برای یافتن فیلد معتبر مدیوم
       const mediumField = this.findMediumTextField(target);
       if (!mediumField) return "";
 
-      // بررسی انتخاب متن در contenteditable
       if (mediumField.isContentEditable) {
         const selection = window.getSelection();
-        if (
-          selection &&
-          !selection.isCollapsed &&
-          selection.toString().trim().length > 0
-        ) {
-          // بررسی اینکه انتخاب در داخل همین المان است
-          if (mediumField.contains(selection.anchorNode)) {
-            const selectedText = selection.toString().trim();
-            if (selectedText) {
-              return selectedText;
-            }
-          }
+        if (selection && !selection.isCollapsed && mediumField.contains(selection.anchorNode)) {
+          return selection.toString().trim();
         }
       }
 
@@ -179,129 +148,47 @@ export default class MediumStrategy extends PlatformStrategy {
     }
   }
 
-  async safeFocus(element) {
-    try {
-      if (!element.isConnected) {
-        return null;
-      }
-
-      element.focus({ preventScroll: true });
-      await delay(150); // افزایش تاخیر برای اطمینان
-
-      // بررسی وضعیت فوکوس
-      if (document.activeElement !== element) {
-        element.focus({ preventScroll: true });
-        await delay(100);
-      }
-
-      return element;
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "medium-strategy-safeFocus",
-      });
-    }
-  }
-
-  async selectAllContent(element) {
-    document.execCommand("selectAll");
-    await delay(100);
-    return element;
-  }
-
-  async simulatePaste(element, text) {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
-
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
-
-    element.dispatchEvent(pasteEvent);
-    await delay(50);
-  }
-
   /**
-   * پیدا کردن فیلد متن مدیوم با الگوریتم پیشرفته
+   * پیدا کردن فیلد متن مدیوم
    */
   findMediumTextField(startElement) {
-    // جستجو در سلسله مراتب والدین
     let currentElement = startElement;
     for (let i = 0; i < 5; i++) {
-      // حداکثر 5 سطح بالاتر
       if (!currentElement) break;
-
       const candidate = currentElement.closest(
         '[role="textbox"][contenteditable="true"], [data-testid="editor-container"]',
       );
       if (candidate) return candidate;
-
       currentElement = currentElement.parentElement;
     }
-
-    // جستجوی جایگزین در صورت عدم یافتن
     return document.querySelector(
       '[role="textbox"][contenteditable="true"], [data-testid="editor-container"]',
     );
   }
 
   /**
-   * استخراج سطر فعلی (پاراگراف فعلی) بجای کل محتوا
+   * استخراج سطر فعلی (پاراگراف فعلی)
    */
   extractCurrentLine(element) {
     try {
       const selection = window.getSelection();
-
-      // اگر cursor در المان وجود دارد
-      if (
-        selection &&
-        selection.rangeCount > 0 &&
-        element.contains(selection.anchorNode)
-      ) {
-        // یافتن نزدیک‌ترین div یا p به cursor
+      if (selection && selection.rangeCount > 0 && element.contains(selection.anchorNode)) {
         let currentNode = selection.anchorNode;
-
-        // اگر text node است، به parent برو
         if (currentNode.nodeType === Node.TEXT_NODE) {
           currentNode = currentNode.parentElement;
         }
 
-        // پیدا کردن نزدیک‌ترین div یا p
         while (currentNode && currentNode !== element) {
           if (currentNode.tagName === "DIV" || currentNode.tagName === "P") {
-            const text = currentNode.innerText?.trim();
-            if (text) {
-              logger.debug('Found current line:', text.substring(0, 50),
-              );
-              return text;
-            }
-            break;
+            return currentNode.innerText?.trim() || "";
           }
           currentNode = currentNode.parentElement;
         }
       }
 
-      // fallback: اولین div یا p غیرخالی
       const firstParagraph = element.querySelector("div, p");
-      if (firstParagraph) {
-        const text = firstParagraph.innerText?.trim();
-        if (text) {
-          logger.debug('Using first paragraph:', text.substring(0, 50),
-          );
-          return text;
-        }
-      }
-
-      // آخرین fallback: کل محتوا
-      const fullText = element.innerText?.trim();
-      logger.debug('Using full content as fallback:', fullText?.substring(0, 50),
-      );
-      return fullText || "";
+      return firstParagraph?.innerText?.trim() || element.innerText?.trim() || "";
     } catch (error) {
-      logger.error('extractCurrentLine error:', error);
       return element.innerText?.trim() || "";
     }
   }
@@ -313,64 +200,31 @@ export default class MediumStrategy extends PlatformStrategy {
     try {
       const selection = window.getSelection();
 
-      // اگر cursor در المان وجود دارد
-      if (
-        selection &&
-        selection.rangeCount > 0 &&
-        element.contains(selection.anchorNode)
-      ) {
-        // یافتن نزدیک‌ترین div یا p به cursor
+      if (selection && selection.rangeCount > 0 && element.contains(selection.anchorNode)) {
         let currentNode = selection.anchorNode;
-
-        // اگر text node است، به parent برو
         if (currentNode.nodeType === Node.TEXT_NODE) {
           currentNode = currentNode.parentElement;
         }
 
-        // پیدا کردن نزدیک‌ترین div یا p
         while (currentNode && currentNode !== element) {
           if (currentNode.tagName === "DIV" || currentNode.tagName === "P") {
-            // جایگزینی فقط این پاراگراف
-            currentNode.innerText = translatedText;
-
-            // قرار دادن cursor در انتهای متن
-            const range = document.createRange();
-            range.selectNodeContents(currentNode);
-            range.collapse(false); // به انتها
-            selection.removeAllRanges();
-            selection.addRange(range);
-
-            logger.init('Current line replaced successfully');
-            return true;
+            // استفاده از سیستم جایگزینی هوشمند روی همان پاراگراف
+            const success = await smartTextReplacement(currentNode, translatedText);
+            if (success) {
+              logger.debug('Current line replaced successfully using smartTextReplacement');
+              return true;
+            }
+            break;
           }
           currentNode = currentNode.parentElement;
         }
       }
 
-      // fallback: اولین div یا p را جایگزین کن
-      const firstParagraph = element.querySelector("div, p");
-      if (firstParagraph) {
-        firstParagraph.innerText = translatedText;
-        logger.debug('First paragraph replaced as fallback');
-        return true;
-      }
-
-      // آخرین fallback: کل المان
-      element.innerText = translatedText;
-      logger.debug('Full element replaced as final fallback');
-      return true;
+      // fallback: استفاده از سیستم جایگزینی روی کل فیلد اگر سطر پیدا نشد
+      return await smartTextReplacement(element, translatedText);
     } catch (error) {
       logger.error('replaceCurrentLine error:', error);
       return false;
     }
-  }
-
-  triggerStateUpdate(element) {
-    element.dispatchEvent(
-      new InputEvent("input", {
-        bubbles: true,
-        composed: true,
-      }),
-    );
   }
 }

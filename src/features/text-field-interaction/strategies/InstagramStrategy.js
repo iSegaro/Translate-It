@@ -1,8 +1,14 @@
 // src/features/text-field-interaction/strategies/InstagramStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "@/core/helpers.js";
-import { filterXSS } from "xss";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
+
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'InstagramStrategy');
 
 export default class InstagramStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -22,93 +28,35 @@ export default class InstagramStrategy extends PlatformStrategy {
   }
 
   async updateElement(element, translatedText) {
+    if (!translatedText || !element) {
+      return false;
+    }
+
     try {
-      // بررسی اگر المان، فیلد متنی دایرکت مسیج باشد
-      if (this.isDirectMessageInputField(element)) {
-        await this.clearContent(element);
-        await this.pasteText(element, translatedText);
-        this.triggerStateUpdate(element);
-        await this.applyVisualFeedback(element);
-      } else if (element.isContentEditable) {
-        const trustedHTML = filterXSS(translatedText, {
-          whiteList: {
-            br: [],
-          },
-          stripIgnoreTag: true,
-          stripIgnoreTagBody: ["script", "style"],
-          onIgnoreTagAttr: function (name, value) {
-            // Block javascript: and data: URLs
-            if (name === "href" || name === "src") {
-              if (value.match(/^(javascript|data|vbscript):/i)) {
-                return "";
-              }
-            }
-            return false;
-          },
-        });
+      logger.debug('InstagramStrategy.updateElement called', {
+        tagName: element.tagName,
+        isContentEditable: element.isContentEditable,
+        textLength: translatedText.length
+      });
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(trustedHTML, "text/html");
+      // اعمال فیدبک بصری قبل از جایگزینی
+      await this.applyVisualFeedback(element);
 
-        element.textContent = "";
-        Array.from(doc.body.childNodes).forEach((node) => {
-          element.appendChild(node);
-        });
+      // استفاده از جایگزینی هوشمند متن که تمام حالت‌های اینستاگرام (دایرکت، کامنت و ...) را مدیریت می‌کند
+      const success = await smartTextReplacement(element, translatedText);
 
+      if (success) {
         this.applyTextDirection(element, translatedText);
-        await this.applyVisualFeedback(element);
-      } else {
-        element.value = translatedText;
-        this.applyTextDirection(element, translatedText);
-        await this.applyVisualFeedback(element);
+        await smartDelay(100);
       }
 
-      return true;
+      return success;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "instagram-strategy-updateElement",
       });
       return false;
-    }
-  }
-
-  async clearContent(element) {
-    if (!element) return;
-
-    try {
-      await this.safeFocus(element); // فوکوس کردن روی المان
-      await this.selectAllContent(element); // انتخاب تمام محتوا
-      await this.simulatePaste(element, ""); // پیست کردن متن خالی برای پاک کردن
-      await delay(50); // کمی تاخیر برای پردازش
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "instagram-strategy-clearContent",
-      });
-    }
-  }
-
-  async pasteText(target, text) {
-    if (!target) return;
-
-    try {
-      const dt = new DataTransfer();
-      dt.setData("text/plain", text);
-      dt.setData("text/html", text.replace(/\n/g, "<br>"));
-
-      const pasteEvent = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt,
-      });
-      target.dispatchEvent(pasteEvent);
-      await delay(50); // کمی تاخیر برای پردازش رویداد
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "instagram-strategy-pasteText",
-      });
     }
   }
 
@@ -135,59 +83,5 @@ export default class InstagramStrategy extends PlatformStrategy {
       });
       return "";
     }
-  }
-
-  async safeFocus(element) {
-    try {
-      element.focus({ preventScroll: true });
-      await delay(100);
-      return element;
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "instagram-strategy-safeFocus",
-      });
-    }
-  }
-
-  async selectAllContent(element) {
-    try {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      await delay(100);
-    } catch (error) {
-      this.errorHandler.handle(error, {
-        type: ErrorTypes.UI,
-        context: "instagram-strategy-selectAllContent",
-      });
-    }
-    return element;
-  }
-
-  async simulatePaste(element, text) {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    dt.setData("text/html", text.replace(/\n/g, "<br>"));
-
-    const pasteEvent = new ClipboardEvent("paste", {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dt,
-    });
-
-    element.dispatchEvent(pasteEvent);
-    await delay(50);
-  }
-
-  triggerStateUpdate(element) {
-    element.dispatchEvent(
-      new InputEvent("input", {
-        bubbles: true,
-        composed: true,
-      }),
-    );
   }
 }

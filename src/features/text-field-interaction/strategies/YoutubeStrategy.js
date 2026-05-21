@@ -3,14 +3,12 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'YoutubeStrategy');
-
-import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
 } from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'YoutubeStrategy');
 
 export default class YoutubeStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -22,10 +20,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
     if (!target || target.tagName !== "INPUT") {
       return false;
     }
-    return (
-      // target.getAttribute("name") === "search_query" ||
-      target.getAttribute("id") === "end"
-    );
+    return target.getAttribute("id") === "end";
   }
 
   extractText(target) {
@@ -54,87 +49,27 @@ export default class YoutubeStrategy extends PlatformStrategy {
       });
       return "";
     }
-
-    // try {
-    //   if (!target || !target.isConnected) return "";
-
-    //   if (target.isContentEditable) {
-    //     return target.innerText?.trim?.() || "";
-    //   }
-
-    //   return target.value || target.textContent?.trim?.() || "";
-    //     // } catch {
-    //   this.errorHandler.handle(error, {
-    //     type: ErrorTypes.UI,
-    //     context: "youtube-strategy-extractText",
-    //     element: target?.tagName,
-    //   });
-    //   return "";
-    // }
   }
 
   async updateElement(element, translatedText) {
+    if (!translatedText || !element || !element.isConnected) {
+      return false;
+    }
+
     try {
-      if (!element || !element.isConnected) {
-        logger.debug('عنصر معتبر برای به‌روزرسانی وجود ندارد');
-        return false;
+      // اعمال فیدبک بصری
+      await this.applyVisualFeedback(element);
+
+      // استفاده از جایگزینی هوشمند متن (سیستم یکپارچه و بهینه)
+      const success = await smartTextReplacement(element, translatedText);
+
+      if (success) {
+        this.applyTextDirection(element, translatedText);
+        await smartDelay(100);
+        logger.debug('Youtube field updated successfully using smartTextReplacement');
       }
 
-      if (translatedText !== undefined && translatedText !== null) {
-        // استفاده از smart replacement برای سازگاری بهتر با فریم‌ورک‌ها
-        const success = await smartTextReplacement(element, translatedText);
-
-        if (success) {
-          await this.applyVisualFeedback(element);
-          this.applyTextDirection(element, translatedText);
-
-          // تاخیر هوشمند برای اطمینان از پردازش کامل
-          await smartDelay(200);
-
-          logger.init('Smart replacement completed successfully');
-        } else {
-          // fallback به روش قدیمی
-          logger.debug('Falling back to legacy replacement method');
-
-          if (element.isContentEditable) {
-            // برای عناصر contentEditable از <br> استفاده کنید
-            const htmlText = translatedText.replace(/\n/g, "<br>");
-            const trustedHTML = filterXSS(htmlText, {
-              whiteList: {
-                br: [],
-              },
-              stripIgnoreTag: true,
-              stripIgnoreTagBody: ["script", "style"],
-              onIgnoreTagAttr: function (tag, name, value) {
-                // Block javascript: and data: URLs
-                if (name === "href" || name === "src") {
-                  if (value.match(/^(javascript|data|vbscript):/i)) {
-                    return "";
-                  }
-                }
-                return false;
-              },
-            });
-
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(trustedHTML, "text/html");
-
-            element.textContent = "";
-            Array.from(doc.body.childNodes).forEach((node) => {
-              element.appendChild(node);
-            });
-
-            await this.applyVisualFeedback(element);
-            this.applyTextDirection(element, htmlText);
-          } else {
-            // برای input و textarea از \n استفاده کنید
-            element.value = translatedText;
-            await this.applyVisualFeedback(element);
-            this.applyTextDirection(element, translatedText);
-          }
-        }
-      }
-      return true;
+      return success;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -147,10 +82,7 @@ export default class YoutubeStrategy extends PlatformStrategy {
 
   async clearContent(element) {
     try {
-      if (!element || !element.isConnected) {
-        // throw new Error("عنصر معتبر برای پاک‌سازی وجود ندارد");
-        return;
-      }
+      if (!element || !element.isConnected) return;
 
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
         element.value = "";
@@ -160,12 +92,11 @@ export default class YoutubeStrategy extends PlatformStrategy {
 
       await this.applyVisualFeedback(element);
     } catch (error) {
-      const handlerError = this.errorHandler.handle(error, {
+      this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
         context: "youtube-strategy-clearContent",
         element: element?.tagName,
       });
-      throw handlerError;
     }
   }
 }

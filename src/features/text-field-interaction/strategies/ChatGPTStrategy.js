@@ -3,7 +3,14 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { CONFIG } from "@/shared/config/config.js";
-import { filterXSS } from "xss";
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import {
+  smartTextReplacement,
+  smartDelay,
+} from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
+
+const logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'ChatGPTStrategy');
 
 export default class ChatGPTStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
@@ -23,15 +30,6 @@ export default class ChatGPTStrategy extends PlatformStrategy {
     try {
       const shortcutsModal = document.querySelector(".absolute .inset-0");
       if (shortcutsModal) {
-        // const escapeEvent = new KeyboardEvent("keydown", {
-        //   key: "Escape",
-        //   code: "Escape",
-        //   keyCode: 27,
-        //   which: 27,
-        //   bubbles: true,
-        //   cancelable: true,
-        // });
-        // shortcutsModal.dispatchEvent(escapeEvent);
         return "";
       }
 
@@ -58,58 +56,37 @@ export default class ChatGPTStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translated) {
+  async updateElement(element, translatedText) {
+    if (!translatedText || !element) {
+      return false;
+    }
+
     try {
+      logger.debug('ChatGPTStrategy.updateElement called', {
+        tagName: element.tagName,
+        textLength: translatedText.length
+      });
+
       /**
        * Detect Keyboard Shortcus Guide Modal ("absolute inset-0")
        */
       const shortcutsModal = document.querySelector(".absolute .inset-0");
       if (shortcutsModal) {
-        // const escapeEvent = new KeyboardEvent("keydown", {
-        //   key: "Escape",
-        //   code: "Escape",
-        //   keyCode: 27,
-        //   which: 27,
-        //   bubbles: true,
-        //   cancelable: true,
-        // });
-        // shortcutsModal.dispatchEvent(escapeEvent);
         return false;
       }
 
-      // Get browser utils from factory
-      const { setCursorToEnd } = await utilsFactory.getBrowserUtils();
-
-      const htmlWithBreaks = translated.replace(/\n/g, "<br>");
-      const sanitized = filterXSS(htmlWithBreaks, {
-        whiteList: {
-          br: [],
-        },
-        stripIgnoreTag: true,
-        stripIgnoreTagBody: ["script", "style"],
-        onIgnoreTagAttr: function (name, value) {
-          // Block javascript: and data: URLs
-          if (name === "href" || name === "src") {
-            if (value.match(/^(javascript|data|vbscript):/i)) {
-              return "";
-            }
-          }
-          return false;
-        },
-      });
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitized, "text/html");
-
-      element.textContent = "";
-      Array.from(doc.body.childNodes).forEach((node) => {
-        element.appendChild(node);
-      });
-
-      this.applyBaseStyling(element, translated);
-      setCursorToEnd(element);
+      // اعمال فیدبک بصری
       await this.applyVisualFeedback(element);
-      return true;
+
+      // استفاده از جایگزینی هوشمند متن (جایگزین دستی appendChild و filterXSS)
+      const success = await smartTextReplacement(element, translatedText);
+
+      if (success) {
+        this.applyBaseStyling(element, translatedText);
+        await smartDelay(100);
+      }
+
+      return success;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
@@ -122,7 +99,6 @@ export default class ChatGPTStrategy extends PlatformStrategy {
   applyBaseStyling(element, translatedText) {
     // بررسی جهت متن و اعمال استایل
     if (!element || !element.style || typeof element.style !== 'object') {
-      // Fallback: use CSS classes if style is not available
       if (element && element.classList) {
         const isRtl = CONFIG.RTL_REGEX.test(translatedText);
         element.classList.add(isRtl ? 'ti-rtl-text' : 'ti-ltr-text');
