@@ -493,6 +493,34 @@ onUnmounted(() => {
       align-items: center;
       gap: 1rem;
 
+      .theme-selector-container {
+        width: auto;
+        padding: 0;
+
+        .theme-cycle-btn {
+          min-width: auto;
+          padding: 0;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          justify-content: center;
+          background: var(--btn-secondary-bg);
+          border: 1px solid var(--border-color);
+
+          &:hover {
+            background: var(--btn-secondary-bg-hover);
+          }
+
+          .theme-btn-label {
+            display: none;
+          }
+          
+          .icon-wrapper {
+            margin: 0;
+          }
+        }
+      }
+
       .report-link {
         display: flex;
         align-items: center;
