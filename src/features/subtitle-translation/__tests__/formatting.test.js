@@ -57,4 +57,20 @@ describe('SubtitleTextProtector', () => {
     const restored = protector.restore(protectedText, tokens);
     expect(restored).toBe(text);
   });
+
+  it('should restore tokens mangled by translation providers (e.g. Yandex)', () => {
+    const text = 'Line 1\n<i>Italic</i>\n{\\an8}Style';
+    const { text: protectedText, tokens } = protector.protect(text);
+    
+    // Simulate Yandex/other provider mangling by adding spaces in and around tokens
+    const mangledText = protectedText
+      .replace('@@SUB_NL_0@@', '@@SUB_NL_0 @ @')
+      .replace('@@SUB_TAG_1@@', '@@ SUB_TAG_1 @ @')
+      .replace('@@SUB_TAG_2@@', '@ @ SUB_TAG_2@ @')
+      .replace('@@SUB_NL_3@@', '@@SUB_NL_ 3 @@') // space before number
+      .replace('@@SUB_STY_4@@', '@@ SUB_STY_4@@');
+      
+    const restored = protector.restore(mangledText, tokens);
+    expect(restored).toBe(text);
+  });
 });
