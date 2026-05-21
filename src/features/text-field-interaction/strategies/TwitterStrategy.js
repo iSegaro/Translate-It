@@ -27,7 +27,10 @@ export default class TwitterStrategy extends PlatformStrategy {
   isDMElement(target) {
     if (!target || !(target instanceof Element)) return false;
     try {
-      return !!target.closest('[data-testid="dmComposerTextInput"]');
+      return !!(
+        target.closest('[data-testid="dmComposerTextInput"]') || 
+        (target.getAttribute('role') === 'textbox' && target.closest('[data-testid="DM_Inline_Composer"]'))
+      );
     } catch {
       return false;
     }
@@ -56,22 +59,33 @@ export default class TwitterStrategy extends PlatformStrategy {
     }
 
     try {
-      const searchInput = document.querySelector(
-        '[data-testid="SearchBox_Search_Input"]',
+      // شناسایی انواع فیلدهای جستجو (جستجوی کل یا جستجوی DM)
+      const isSearchInput = element.tagName === 'INPUT' && (
+        element.getAttribute('data-testid') === 'SearchBox_Search_Input' ||
+        element.placeholder === 'Search' ||
+        element.parentElement?.querySelector('[data-testid="dm-search-close"]')
       );
-      if (searchInput && element.contains(searchInput)) {
-        await this.applyVisualFeedback(searchInput);
-        searchInput.value = translatedText;
-        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+      if (isSearchInput) {
+        await this.applyVisualFeedback(element);
+        element.value = translatedText;
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
         return true;
       }
 
       let field = null;
 
       if (this.isDMElement(element)) {
-        field = element.closest('[data-testid="dmComposerTextInput"]');
+        field = element.closest('[data-testid="dmComposerTextInput"]') || 
+               (element.getAttribute('role') === 'textbox' ? element : null);
       } else if (this.isTwitterElement(element)) {
         field = element.closest('[data-testid="tweetTextarea_0"]');
+      }
+
+      // Fallback: If no specific field found but the element itself looks like a Twitter editor or a standard input
+      if (!field && element && (element.isContentEditable || element.tagName === 'TEXTAREA' || element.tagName === 'INPUT')) {
+        field = element;
       }
 
       if (field) {
@@ -80,8 +94,10 @@ export default class TwitterStrategy extends PlatformStrategy {
         
         await smartDelay(50);
         
-        if (this.isTwitterElement(element)) {
-          // هک برای Draft.js توییتر: انتخاب کل
+        const isDraftJS = this.isTwitterElement(element) || this.isDMElement(element);
+        
+        if (isDraftJS) {
+          // هک برای Draft.js توییتر (توییت و DM): انتخاب کل
           // به جای حذف جداگانه، اجازه می‌دهیم insertText خودش جایگزین کند تا State ادیتور به هم نریزد
           document.execCommand('selectAll', false, null);
           await smartDelay(20);
@@ -92,8 +108,7 @@ export default class TwitterStrategy extends PlatformStrategy {
 
         if (success) {
           // برای توییتر/Draft.js، فقط اگر لازم بود مکان‌نما را تنظیم می‌کنیم
-          // زیرا execCommand خودش مکان‌نما را در جای درست قرار می‌دهد
-          if (!this.isTwitterElement(element)) {
+          if (!isDraftJS) {
             this.setCursorToEnd(field);
           } else {
             // برای توییتر، اجبار به بروزرسانی State با ارسال رویداد input
@@ -119,12 +134,14 @@ export default class TwitterStrategy extends PlatformStrategy {
 
   extractText(target) {
     try {
-      const searchInput = target.closest(
-        '[data-testid="SearchBox_Search_Input"]',
-      );
+      if (!target) return "";
+
+      const searchInput = target.closest('input[data-testid="SearchBox_Search_Input"]') || 
+                         (target.tagName === 'INPUT' && (target.placeholder === 'Search' || target.parentElement?.querySelector('[data-testid="dm-search-close"]')) ? target : null);
       if (searchInput) return searchInput.value.trim();
 
-      const dmField = target.closest('[data-testid="dmComposerTextInput"]');
+      const dmField = target.closest('[data-testid="dmComposerTextInput"]') || 
+                     (target.getAttribute('role') === 'textbox' && target.closest('[data-testid="DM_Inline_Composer"]') ? target : null);
       if (dmField) return dmField.textContent.trim();
 
       const tweetField = target.closest('[data-testid="tweetTextarea_0"]');
