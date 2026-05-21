@@ -27,9 +27,12 @@ It implements a progressive batching translation model designed to handle large 
                    │                     │                        │   (Optimized character limit chunks)
                    │                     │       4. Context       ├─→ SubtitleContextBuilder
                    │                     │                        │   (Coherence across dialogues)
-                   ├─────────────────────┼───────────────────────→│
-                   │                     │       5. Translate     ├─→ UnifiedTranslationService
-                   │                     │                        │   (Generic translation request)
+                   ├─────────────────────┼──────────────────────→│
+                   │                     │  UnifiedModeCoordinator   │
+                   │                     │  (_processGenericBatch)   │
+                   │                     │           │               │
+                   │                     │       5. Translate     ├──┴─→ UnifiedTranslationService
+                   │                     │                        │     (Generic translation request)
                    │                     │                        │
                    │                     │       6. Track Progress├─→ SubtitleProgressTracker
                    │                     │                        │   (Dynamic ETA & statistcs)
@@ -79,11 +82,28 @@ The **Background Orchestrator**. It owns the lifecycle of a subtitle translation
     4.  Runs validations on the subtitle format and limits using `SubtitleValidationService`.
     5.  Extracts and masks style tags (e.g., `<i>`, `<b>`, `<font>`) via `SubtitleTextProtector` to safeguard formatting.
     6.  Resolves target provider batch limits with `SubtitleProviderLimitsResolver` and uses `SubtitleBatchPlanner` to chunk the protected cues into optimal batches.
-    7.  Optionally injects conversational dialogue context using `SubtitleContextBuilder` (including DeepL-specific batch context) to ensure flow coherence.
-    8.  Submits chunks to `UnifiedTranslationService` using dedicated subtitle AI prompt templates.
-    9.  Monitors results, updates `SubtitleProgressTracker`, and broadcasts progress messages (including translated text) to the UI.
-    10. **Fatal Error Rescue**: If a terminal error occurs (e.g., invalid API key), it stops the job but allows the user to download the partial progress.
-    11. Re-injects protected tags, serializes the translated cues back into the original format, and reports job completion.
+    7.  Optionally injects conversational dialogue context using `SubtitleContextBuilder`.
+    8.  **Unified Delegation**: Hands over the batch processing to `UnifiedModeCoordinator._processGenericBatch`. This ensures standardized error handling, retry logic, and provider state management.
+    9.  **Stability Guard**: Each batch is wrapped in a `Promise.race` with a **300,000ms (5-minute)** timeout to prevent background hangs.
+    10. **Signal Monitoring**: Listens to `AbortController` signals to immediately halt operations if a user cancels the job.
+    11. Monitors results, updates `SubtitleProgressTracker`, and broadcasts progress messages (including translated text) to the UI.
+    12. **Fatal Error Rescue**: If a terminal error occurs (e.g., invalid API key), it stops the job but allows the user to download the partial progress.
+    13. Re-injects protected tags, serializes the translated cues back into the original format, and reports job completion.
+
+---
+
+## Stability & Resiliency
+
+To ensure the extension remains stable during heavy background operations, the following measures are implemented:
+
+### 1. Timeout Management
+All translation batches are subject to a **5-minute hard timeout** (`BATCH_TIMEOUT_MS`). This prevents "Zombie Jobs" from consuming background resources indefinitely if a provider becomes unresponsive or the network hangs.
+
+### 2. Abortable Operations
+The system uses the `AbortController` API. When a user clicks "Cancel" in the UI, a signal is propagated through the Coordinator down to the `UnifiedModeCoordinator`, which immediately stops further batch processing and rejects pending promises.
+
+### 3. Progressive Output
+Instead of waiting for the entire file to finish, the system streams translated cues back to the UI in real-time. This reduces the risk of data loss; even if the browser crashes, the UI often has a significantly updated state.
 
 ---
 

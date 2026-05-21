@@ -12,6 +12,8 @@ User Click → SelectElementManager
      ├─→ ElementSelector (highlighting & target detection)
      ├─→ DomTranslatorAdapter (orchestration & UID-based mapping)
      │       ↓ (Unified Messaging)
+     │   UnifiedModeCoordinator (Background: Routing & Strategy)
+     │       ↓
      │   Optimized JSON Handler (Background: Intelligent Batching & Streaming)
      │       ↓
      │   Translation Provider System (AI or Traditional)
@@ -57,16 +59,25 @@ The **Content-Side Orchestrator**. It prepares the DOM for translation and maps 
 - **Context Injection**: Extracts `contextMetadata` (page title, preceding headings) to improve AI translation quality.
 - **BIDI Marks**: Automatically injects Unicode BIDI marks (RLM/LRM) during re-insertion to prevent mixed-direction layout corruption.
 
-### 4. OptimizedJsonHandler.js (Background)
+### 4. UnifiedModeCoordinator.js (Background)
+The **Strategic Router**. It receives the message from the bus and determines the translation priority and processing strategy.
+
+**Responsibilities:**
+- **Priority Management**: Assigns `LOW` priority to Select Element requests to ensure they don't block interactive popup/sidepanel translations.
+- **Delegation**: Forwards the request to the `TranslationEngine` which utilizes the `OptimizedJsonHandler`.
+- **Mode-Specific Adapters**: Standardizes data formats before passing them to background managers.
+
+### 5. OptimizedJsonHandler.js (Background)
 The **Translation Engine** for Select Element. It manages the complexity of API calls and data flow.
 
 **Responsibilities:**
 - **Intelligent Batching**: Groups text nodes by their block-level parent (`P`, `DIV`, `ARTICLE`) to preserve semantic context.
 - **Adaptive Execution**: Switches between sequential and parallel requests based on provider rate limits.
 - **Streaming Pipeline**: Streams translated results back to the content script in real-time as batches complete.
+- **Stability Guard**: Leverages background timeouts (5-minute limit) to prevent resource leaks during long-running page translations.
 - **Provider Agnostic**: Handles both JSON-capable AI providers and traditional delimited-string providers (via `TranslationSegmentMapper`).
 
-### 5. DomTranslatorUtils.js
+### 6. DomTranslatorUtils.js
 Low-level DOM utility for text extraction and analysis.
 
 **Key Functions:**
@@ -202,20 +213,21 @@ Behavioral settings for Select Element are managed via the [Options Page](./OPTI
 src/features/element-selection/
 ├── SelectElementManager.js              # Central lifecycle manager
 ├── SelectElementNotificationManager.js  # Toast UI and control buttons
+├── ElementSelectionFactory.js           # Creational logic for the system
 │
 ├── core/                                
 │   ├── DomTranslatorAdapter.js          # DOM mapping & protocol management
 │   ├── DomTranslatorUtils.js            # Structural analysis & extraction
 │   ├── ElementSelector.js               # Visual selection & filtering
-│   ├── DomTranslatorState.js            # Translation history & revert logic
+│   └── DomTranslatorState.js            # Translation history & revert logic
+│
+├── handlers/                            
+│   ├── handleActivateSelectElementMode.js
 │   └── selectElementStateManager.js     # Mode state (active/inactive)
 │
-├── utils/                               
-│   ├── elementHelpers.js                # Validation & DOM walking
-│   └── timeoutCalculator.js             # Dynamic provider timeouts
-│
-├── handlers/                            # Message & event handlers
-    └── handleActivateSelectElementMode.js
+└── utils/                               
+    ├── elementHelpers.js                # Validation & DOM walking
+    └── timeoutCalculator.js             # Dynamic provider timeouts
 
 src/features/shared/hover-preview/       # SHARED FEATURE
 ├── HoverPreviewManager.js               # Tooltip logic (shared with Whole Page)
