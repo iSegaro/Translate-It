@@ -234,7 +234,7 @@ async function focusOrCreateTab(url) {
         let urlPath = "";
         try {
           urlPath = new URL(url).pathname.replace(/^\//, '');
-        } catch (e) {
+        } catch {
           urlPath = url; // Fallback
         }
         
@@ -251,7 +251,7 @@ async function focusOrCreateTab(url) {
     let urlPath = "";
     try {
       urlPath = new URL(url).pathname.replace(/^\//, '');
-    } catch (e) {
+    } catch {
       urlPath = url;
     }
     

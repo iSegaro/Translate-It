@@ -48,7 +48,11 @@
         class="sidebar-section subtitle-link-section"
         @click.prevent="openSubtitlePage"
       >
-        <img src="@/icons/ui/subtitle.png" class="subtitle-icon" alt="Subtitle" />
+        <img
+          src="@/icons/ui/subtitle.png"
+          class="subtitle-icon"
+          alt="Subtitle"
+        >
         <span class="subtitle-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
       </a>
 
@@ -99,7 +103,6 @@ import { REPO_URLS } from '@/shared/constants/core.js'
 import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
-import { Icon as VIcon } from '@iconify/vue'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar')
