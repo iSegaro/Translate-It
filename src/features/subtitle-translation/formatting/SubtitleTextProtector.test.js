@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SubtitleTextProtector } from '../formatting/SubtitleTextProtector.js';
+import { SubtitleTextProtector } from './SubtitleTextProtector.js';
 
 describe('SubtitleTextProtector', () => {
   const protector = new SubtitleTextProtector();
