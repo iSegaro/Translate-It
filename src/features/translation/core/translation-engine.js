@@ -12,7 +12,6 @@ import {
   getSourceLanguageAsync, 
   getTargetLanguageAsync, 
   TranslationMode,
-  getEnableDictionaryAsync,
   getPopupMaxCharsAsync,
   getSidepanelMaxCharsAsync,
   getSelectionMaxCharsAsync,
@@ -20,7 +19,7 @@ import {
 } from "@/shared/config/config.js";
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
+import { resolveTranslationMode } from "../utils/translationModeHelper.js";
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
 import { TranslationHistoryManager } from "./managers/TranslationHistoryManager.js";
 import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
@@ -179,59 +178,8 @@ export class TranslationEngine {
     };
   }
 
-  /**
-   * Internal helper to resolve actual translation mode based on provider capabilities and settings.
-   * Implements "Universal Dictionary Upgrade" for single words in appropriate UI contexts.
-   * @private
-   */
   async _resolveTranslationMode(data, providerClass) {
-    let { mode, text } = data;
-
-    // 1. Explicitly check if dictionary is disabled globally or locally
-    const isDictionaryForbidden = data.enableDictionary === false || 
-                                 (data.options && data.options.enableDictionary === false);
-    
-    // 2. Structural/Bulk modes that MUST NOT be upgraded to dictionary
-    const structuralModes = [
-      TranslationMode.Select_Element, 
-      TranslationMode.Page, 
-      TranslationMode.Field
-    ];
-
-    if (structuralModes.includes(mode)) {
-      return mode; // Never upgrade structural modes
-    }
-
-    // 3. Whitelist of modes eligible for dictionary upgrade
-    const eligibleModes = [
-      TranslationMode.Selection,
-      TranslationMode.MouseHover,
-      TranslationMode.Popup_Translate,
-      TranslationMode.Sidepanel_Translate,
-      TranslationMode.Mobile_Translate
-    ];
-
-    // 4. Perform the upgrade check
-    if (!isDictionaryForbidden && eligibleModes.includes(mode)) {
-      const isDictionaryEnabled = await getEnableDictionaryAsync();
-      
-      if (isDictionaryEnabled && isSingleWordOrShortPhrase(text)) {
-        if (providerClass?.supportsDictionary) {
-          logger.debug(`[TranslationEngine] Upgrading ${mode} to dictionary mode for single word.`);
-          return TranslationMode.Dictionary_Translation;
-        } else {
-          logger.debug(`[TranslationEngine] Single word detected, but provider does not support dictionary. Staying in ${mode}.`);
-        }
-      }
-    }
-
-    // 5. Downgrade if explicit dictionary mode is requested but not supported
-    if (mode === TranslationMode.Dictionary_Translation && !providerClass?.supportsDictionary) {
-      logger.debug(`[TranslationEngine] Provider does not support dictionary mode. Downgrading to selection mode.`);
-      return TranslationMode.Selection;
-    }
-
-    return mode;
+    return await resolveTranslationMode(data, providerClass);
   }
 
   /**

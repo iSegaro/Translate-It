@@ -62,6 +62,47 @@ function migrateModeProviderKeys(currentSettings, updates, migrationLog) {
 }
 
 /**
+ * Migrate BILINGUAL_TRANSLATION_MODES keys from old format to new format
+ */
+function migrateBilingualModeKeys(currentSettings, updates, migrationLog) {
+  if (!currentSettings.BILINGUAL_TRANSLATION_MODES) return;
+
+  const modes = { ...currentSettings.BILINGUAL_TRANSLATION_MODES };
+  let changed = false;
+
+  const MAPPING = {
+    'select_element': TranslationMode.Select_Element,
+    'popup_translate': TranslationMode.Popup_Translate,
+    'sidepanel_translate': TranslationMode.Sidepanel_Translate,
+    'screen_capture': TranslationMode.ScreenCapture,
+    'screen-capture': TranslationMode.ScreenCapture,
+    'selection': TranslationMode.Selection,
+    'field': TranslationMode.Field,
+    'page': TranslationMode.Page,
+    'dictionary': TranslationMode.Dictionary_Translation
+  };
+
+  Object.entries(MAPPING).forEach(([oldKey, newKey]) => {
+    if (oldKey in modes && modes[oldKey] !== undefined && modes[oldKey] !== null) {
+      if (!(newKey in modes) || modes[newKey] === null) {
+        modes[newKey] = modes[oldKey];
+        migrationLog.push(`Migrated BILINGUAL_TRANSLATION_MODES.${oldKey} to ${newKey}`);
+        changed = true;
+      }
+      delete modes[oldKey];
+      changed = true;
+    } else if (oldKey in modes) {
+      delete modes[oldKey];
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    updates.BILINGUAL_TRANSLATION_MODES = modes;
+  }
+}
+
+/**
  * Main migration function - handles all settings updates
  */
 function runMainMigration(currentSettings) {
@@ -70,6 +111,9 @@ function runMainMigration(currentSettings) {
 
   // Migrate Mode Provider keys first to ensure new structure is used
   migrateModeProviderKeys(currentSettings, updates, migrationLog);
+  
+  // Migrate Bilingual Mode keys
+  migrateBilingualModeKeys(currentSettings, updates, migrationLog);
 
   // 1. List of settings that should NOT be auto-migrated (User sensitive data)
   const DO_NOT_MIGRATE = [

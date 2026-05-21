@@ -20,6 +20,7 @@ import { UnifiedResultDispatcher } from './UnifiedResultDispatcher.js';
 import { UnifiedModeCoordinator } from './UnifiedModeCoordinator.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { isEligibleForDictionaryUpgrade } from '@/features/translation/utils/translationModeHelper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -49,21 +50,24 @@ export class UnifiedTranslationService {
    * @private
    */
   async _resolveEffectiveProvider(data, context) {
-    const uiContexts = [
-      MessageContexts.POPUP, MessageContexts.SIDEPANEL, MessageContexts.SELECT_ELEMENT,
-      MessageContexts.PAGE_TRANSLATION_BATCH, MessageContexts.CONTENT, MessageContexts.MOBILE_TRANSLATE
-    ];
-    
-    if (uiContexts.includes(context) && data.provider) return data.provider;
-
     const modeProviders = await getModeProvidersAsync();
     const modeSpecificProvider = modeProviders ? modeProviders[data.mode] : null;
 
+    // 1. Prioritize mode-specific provider if explicitly configured (not 'default')
     if (modeSpecificProvider && modeSpecificProvider !== 'default') {
       logger.debug(`Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
       return modeSpecificProvider;
     }
 
+    const uiContexts = [
+      MessageContexts.POPUP, MessageContexts.SIDEPANEL, MessageContexts.SELECT_ELEMENT,
+      MessageContexts.PAGE_TRANSLATION_BATCH, MessageContexts.CONTENT, MessageContexts.MOBILE_TRANSLATE
+    ];
+    
+    // 2. Use UI-provided provider as fallback
+    if (uiContexts.includes(context) && data.provider) return data.provider;
+
+    // 3. Global default
     return data.provider || await getTranslationApiAsync();
   }
 
@@ -75,7 +79,16 @@ export class UnifiedTranslationService {
     logger.debug(`[UnifiedTranslationService] Received request: ${messageId}, context: ${context}, sessionId: ${data?.sessionId}`);
 
     if (data) {
-      data.provider = await this._resolveEffectiveProvider(data, context);
+      // --- Universal Dictionary Upgrade Detection ---
+      // We check for single words here to resolve the correct mode-specific provider
+      // before passing the request to the engine.
+      let effectiveMode = data.mode || TranslationMode.Selection;
+      if (await isEligibleForDictionaryUpgrade(data.text, effectiveMode, data)) {
+        logger.debug(`[UnifiedTranslationService] Detected single word, using dictionary mode for provider resolution.`);
+        effectiveMode = TranslationMode.Dictionary_Translation;
+      }
+
+      data.provider = await this._resolveEffectiveProvider({ ...data, mode: effectiveMode }, context);
     }
 
     // Calculate estimated characters for limit validation

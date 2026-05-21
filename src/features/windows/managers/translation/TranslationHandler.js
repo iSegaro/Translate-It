@@ -141,6 +141,8 @@ export class TranslationHandler {
               translatedText: finalText,
               sourceLanguage: data.sourceLanguage || data.detectedSourceLanguage,
               targetLanguage: data.targetLanguage,
+              provider: data.provider,
+              mode: data.mode,
               success: true
             });
           },
@@ -204,8 +206,8 @@ export class TranslationHandler {
             translatedText: response.translatedText,
             sourceLanguage: response.sourceLanguage || response.detectedSourceLanguage || payload.from,
             targetLanguage: response.targetLanguage || payload.to,
-            provider: payload.provider,
-            mode: payload.mode
+            provider: response.provider || payload.provider,
+            mode: response.mode || payload.mode
           };
         }
 
@@ -215,8 +217,8 @@ export class TranslationHandler {
         
         return {
           ...finalResult,
-          provider: payload.provider,
-          mode: payload.mode
+          provider: finalResult.provider || payload.provider,
+          mode: finalResult.mode || payload.mode
         };
 
       } catch (error) {
@@ -277,7 +279,9 @@ export class TranslationHandler {
       request.resolve({
         translatedText: message.data.translatedText,
         sourceLanguage: message.data.sourceLanguage || message.data.detectedSourceLanguage,
-        targetLanguage: message.data.targetLanguage
+        targetLanguage: message.data.targetLanguage,
+        provider: message.data.provider,
+        mode: message.data.mode
       });
       this._cleanupRequest(messageId);
       return true;

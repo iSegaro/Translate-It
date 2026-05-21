@@ -54,11 +54,10 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
       const selection = window.getSelection();
 
       if (hasSelection && selection && !selection.isCollapsed) {
-        // اگر انتخاب دارد، حذف سپس درج
-        const deleteResult = document.execCommand("delete", false);
-        await smartDelay(10);
+        // جایگزینی مستقیم انتخاب با متن جدید
+        // فراخوانی delete قبل از insertText باعث ایجاد مراحل جداگانه در Undo و به هم ریختن State فریم‌ورک‌هایی مثل React می‌شود
         const insertResult = document.execCommand("insertText", false, text);
-        if (deleteResult && insertResult) {
+        if (insertResult) {
           logger.init('execCommand succeeded for contentEditable with selection');
           await smartDelay(50);
           return true;
@@ -71,13 +70,9 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         selection.addRange(range);
         await smartDelay(10);
 
-        // حذف محتوای انتخاب شده
-        const deleteResult = document.execCommand("delete", false);
-        await smartDelay(10);
-
-        // درج متن جدید
+        // جایگزینی کل محتوا
         const insertResult = document.execCommand("insertText", false, text);
-        if (deleteResult && insertResult) {
+        if (insertResult) {
           logger.init('execCommand succeeded for contentEditable full replacement');
           await smartDelay(50);
           return true;

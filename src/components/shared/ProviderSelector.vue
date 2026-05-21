@@ -733,11 +733,17 @@ const availableProviders = computed(() => {
     
     const isCurrentlyDefault = currentProvider.value === 'default';
 
-    if ((defaultSupportsFeature && isDefaultConfigured) || isCurrentlyDefault) {
+    // We show "Default" if:
+    // 1. allowDefault is true (outer if) AND
+    // 2. It's either configured, currently selected, or we just want to allow selecting it (always true if allowDefault is true)
+    if (isDefaultConfigured || isCurrentlyDefault || props.allowDefault) {
+      const baseName = t('provider_default') || 'Default';
+      const displayName = !defaultSupportsFeature ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
+
       return [
         { 
           id: 'default', 
-          name: t('provider_default') || 'Default', 
+          name: displayName, 
           icon: defaultProvider?.icon || 'providers/google.svg' 
         },
         ...mappedProviders

@@ -6,7 +6,7 @@ import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
 import { TranslationMode, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from "@/shared/config/config.js";
-import { detectOS as detectPlatform } from "@/utils/browser/compatibility.js";
+import { detectSite } from "@/utils/browser/compatibility.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -54,7 +54,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
   const abortedData = abortExistingRequest(target);
   
   const mode = TranslationMode.Field;
-  const platform = detectPlatform(target);
+  const platform = detectSite();
   const timestamp = Date.now();
   let currentToastId = toastId;
   
@@ -279,7 +279,7 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const pendingData = getPendingTranslationData(document.activeElement, toastId);
     let target = pendingData?.target || document.activeElement;
     const mode = pendingData?.mode || translationMode;
-    const platform = detectPlatform(target);
+    const platform = detectSite();
     const selectionRange = pendingData?.selectionRange || null;
     const tabId = pendingData?.tabId || null;
 

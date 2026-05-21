@@ -39,6 +39,8 @@ class UtilsFactory {
       ...compatibilityUtils,
       detectPlatform: compatibilityUtils.detectOS,
       Platform: compatibilityUtils.OS_PLATFORMS,
+      detectSite: compatibilityUtils.detectSite,
+      Site: compatibilityUtils.SITE_PLATFORMS,
     };
 
     this.loadedModules.set("browser", {

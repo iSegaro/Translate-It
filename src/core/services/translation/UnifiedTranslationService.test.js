@@ -40,6 +40,10 @@ vi.mock('./UnifiedModeCoordinator.js', () => ({
   })
 }));
 
+vi.mock('../../../features/translation/utils/translationModeHelper.js', () => ({
+  isEligibleForDictionaryUpgrade: vi.fn().mockResolvedValue(false)
+}));
+
 vi.mock('../../../shared/config/config.js', () => ({
   TranslationMode: {
     Field: 'field',

@@ -21,6 +21,44 @@ export const OS_PLATFORMS = {
 };
 
 /**
+ * Site Platforms Constants (Websites with special handling)
+ */
+export const SITE_PLATFORMS = {
+  Twitter: 'twitter',
+  WhatsApp: 'whatsapp',
+  Instagram: 'instagram',
+  Telegram: 'telegram',
+  Medium: 'medium',
+  ChatGPT: 'chatgpt',
+  Youtube: 'youtube',
+  Discord: 'discord',
+  Default: 'default'
+};
+
+/**
+ * Detect current site platform based on hostname
+ * @returns {string} One of SITE_PLATFORMS
+ */
+export function detectSite() {
+  if (typeof window === 'undefined' || !window.location || !window.location.hostname) {
+    return SITE_PLATFORMS.Default;
+  }
+  
+  const hostname = window.location.hostname.toLowerCase();
+  
+  if (hostname.includes('twitter.com') || hostname.includes('x.com')) return SITE_PLATFORMS.Twitter;
+  if (hostname.includes('whatsapp.com')) return SITE_PLATFORMS.WhatsApp;
+  if (hostname.includes('instagram.com')) return SITE_PLATFORMS.Instagram;
+  if (hostname.includes('web.telegram.org') || hostname.includes('t.me')) return SITE_PLATFORMS.Telegram;
+  if (hostname.includes('medium.com')) return SITE_PLATFORMS.Medium;
+  if (hostname.includes('chatgpt.com') || hostname.includes('openai.com')) return SITE_PLATFORMS.ChatGPT;
+  if (hostname.includes('youtube.com')) return SITE_PLATFORMS.Youtube;
+  if (hostname.includes('discord.com')) return SITE_PLATFORMS.Discord;
+  
+  return SITE_PLATFORMS.Default;
+}
+
+/**
  * Modern browser detection without deprecated APIs
  * Detect if we're running in Firefox
  */

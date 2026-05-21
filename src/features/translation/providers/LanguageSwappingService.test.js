@@ -22,7 +22,10 @@ vi.mock("@/shared/config/config.js", () => ({
   getBilingualTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
   getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({ selection: true, popup: true })),
   TranslationMode: {
-    Dictionary_Translation: 'dictionary'
+    Dictionary_Translation: 'dictionary',
+    Field: 'content',
+    Selection: 'selection',
+    Popup_Translate: 'popup'
   }
 }));
 
@@ -51,7 +54,7 @@ describe('LanguageSwappingService', () => {
       getCanonicalCode.mockImplementation(l => l === 'fa' ? 'fa' : l);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام دنیا', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
+        'سلام دنیا', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
       );
 
       // Expected: Swap to Farsi -> English
@@ -66,7 +69,7 @@ describe('LanguageSwappingService', () => {
       LanguageDetectionService.detect.mockResolvedValue('en');
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'Hello World', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
+        'Hello World', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
       );
 
       // Expected: Keep Auto -> Farsi
@@ -74,19 +77,38 @@ describe('LanguageSwappingService', () => {
       expect(tgt).toBe('fa');
     });
 
-    it('should NOT swap when source is NOT auto (explicit choice)', async () => {
+    it('should swap when source is NOT auto if bilingual mode is active', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
       
       // Setup: Text is Farsi, Target is Farsi, BUT Source is explicitly English
       LanguageDetectionService.detect.mockResolvedValue('fa');
+      getCanonicalCode.mockImplementation(l => l);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', 'en', 'fa', 'en', 'fa', { mode: 'selection' }
+        'سلام', 'en', 'fa', 'en', { mode: 'selection' }
       );
 
-      // Expected: Keep English -> Farsi (respect user choice)
-      expect(src).toBe('en');
-      expect(tgt).toBe('fa');
+      // Expected: SWAP to Farsi -> English even if source was explicit
+      expect(src).toBe('fa');
+      expect(tgt).toBe('en');
+    });
+
+    it('should handle legacy "field" mode key for backward compatibility', async () => {
+      const { getBilingualTranslationModesAsync } = await import("@/shared/config/config.js");
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      
+      // Setup: BILINGUAL_TRANSLATION_MODES only contains 'field' (legacy) but NOT 'content' (new)
+      getBilingualTranslationModesAsync.mockResolvedValue({ 'field': true });
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'auto', 'fa', 'en', { mode: 'content' } // TranslationMode.Field is 'content'
+      );
+
+      // Expected: Should still swap because it falls back to 'field' key
+      expect(src).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should NOT swap when bilingual feature is disabled', async () => {
@@ -94,7 +116,7 @@ describe('LanguageSwappingService', () => {
       getBilingualTranslationEnabledAsync.mockResolvedValue(false);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', AUTO_DETECT_VALUE, 'fa', 'en', 'fa', { mode: 'selection' }
+        'سلام', AUTO_DETECT_VALUE, 'fa', 'en', { mode: 'selection' }
       );
 
       expect(src).toBe(AUTO_DETECT_VALUE);
@@ -104,19 +126,68 @@ describe('LanguageSwappingService', () => {
     it('should fallback to English if originalSourceLang is auto and swap occurs', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
-      const { getBilingualTranslationEnabledAsync } = await import("@/shared/config/config.js");
+      const { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } = await import("@/shared/config/config.js");
       
-      // Ensure bilingual is enabled for this specific test
+      // Setup
       getBilingualTranslationEnabledAsync.mockResolvedValue(true);
+      getBilingualTranslationModesAsync.mockResolvedValue({ selection: true });
       LanguageDetectionService.detect.mockResolvedValue('fa');
       getCanonicalCode.mockImplementation(l => l);
 
       const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
-        'سلام', 'auto', 'fa', 'auto', 'fa', { mode: 'selection' }
+        'سلام', 'auto', 'fa', 'auto', { mode: 'selection' }
       );
 
       expect(src).toBe('fa');
       expect(tgt).toBe('en');
+    });
+
+    it('should swap to Farsi when detected text is English and target is English', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+      
+      LanguageDetectionService.detect.mockResolvedValue('en');
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'Hello', 'auto', 'en', 'auto', { mode: 'selection' }
+      );
+
+      // Expected: en -> fa (Smart fallback to Farsi for English input)
+      expect(src).toBe('en');
+      expect(tgt).toBe('fa');
+    });
+
+    it('should respect user manual source language as the new target after swapping', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      
+      // Setup: User set Source=German (de), Target=Farsi (fa). 
+      // User types Farsi -> System should swap to Farsi -> German.
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'de', 'fa', 'de', { mode: 'selection' }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('de'); // Should use 'de' instead of default 'en'
+    });
+
+    it('should ALWAYS swap in Dictionary mode if detected matches target, even if bilingual is disabled for that mode', async () => {
+      const { getBilingualTranslationModesAsync } = await import("@/shared/config/config.js");
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      
+      // Setup: Bilingual is DISABLED for dictionary mode in settings
+      getBilingualTranslationModesAsync.mockResolvedValue({ 'dictionary': false });
+      LanguageDetectionService.detect.mockResolvedValue('en');
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'book', 'auto', 'en', 'en', { mode: 'dictionary' }
+      );
+
+      // Expected: Still swaps because Dictionary mode requires it to get definitions
+      expect(src).toBe('en');
+      expect(tgt).toBe('fa');
     });
 
     it('should return original languages if detection fails', async () => {

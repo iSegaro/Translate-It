@@ -2,10 +2,8 @@
 
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { delay } from "@/core/helpers.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
-import { filterXSS } from "xss";
 import {
   smartTextReplacement,
   smartDelay,
@@ -15,7 +13,7 @@ export default class DefaultStrategy extends PlatformStrategy {
   constructor(notifier, errorHandler) {
     super(notifier);
     this.errorHandler = errorHandler;
-  this.logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'DefaultStrategy');
+    this.logger = getScopedLogger(LOG_COMPONENTS.TEXT_FIELD_INTERACTION, 'DefaultStrategy');
   }
 
   /**
@@ -120,124 +118,48 @@ export default class DefaultStrategy extends PlatformStrategy {
 
   async updateElement(element, translatedText) {
     try {
-      if (translatedText !== undefined && translatedText !== null) {
-        this.logger.debug('Starting updateElement', {
-          tagName: element?.tagName,
-          isContentEditable: element?.isContentEditable,
-          textLength: translatedText.length,
-        });
-
-        await this.applyVisualFeedback(element);
-
-        // بررسی وجود انتخاب متن
-        const hasSelection = this._hasTextSelection(element);
-
-        // تعیین محدوده انتخاب در صورت وجود
-        let selectionStart = null;
-        let selectionEnd = null;
-
-        if (hasSelection) {
-          if (element.isContentEditable) {
-            // برای contentEditable از selection API استفاده می‌کنیم
-            const selection = window.getSelection();
-            if (selection && !selection.isCollapsed) {
-              // استفاده از smart replacement
-              const success = smartTextReplacement(element, translatedText);
-              if (success) {
-                this.applyTextDirection(element, translatedText);
-                await smartDelay(200);
-                return true;
-              }
-            }
-          } else {
-            // برای input/textarea
-            selectionStart = element.selectionStart;
-            selectionEnd = element.selectionEnd;
-          }
-        }
-
-        // استفاده از smart replacement (بهبود یافته با universalTextInsertion)
-        const success = await smartTextReplacement(
-          element,
-          translatedText,
-          selectionStart,
-          selectionEnd,
-        );
-        this.logger.debug('Smart replacement completed', { success });
-
-        if (success) {
-          this.applyTextDirection(element, translatedText);
-          await smartDelay(200);
-          this.logger.info('Update completed successfully');
-          return true;
-        } else {
-          // fallback به روش قدیمی
-          if (element.isContentEditable) {
-            if (hasSelection) {
-              // جایگزینی فقط متن انتخاب شده
-              const selection = window.getSelection();
-              if (selection && !selection.isCollapsed) {
-                selection.deleteContents();
-                const textNode = document.createTextNode(translatedText);
-                selection.getRangeAt(0).insertNode(textNode);
-                selection.removeAllRanges();
-              }
-            } else {
-              // جایگزینی کل محتوا
-              const htmlText = translatedText.replace(/\n/g, "<br>");
-              const trustedHTML = filterXSS(htmlText, {
-                whiteList: {
-                  br: [],
-                },
-                stripIgnoreTag: true,
-                stripIgnoreTagBody: ["script", "style"],
-                onIgnoreTagAttr: function (name, value) {
-                  // Block javascript: and data: URLs
-                  if (name === "href" || name === "src") {
-                    if (value.match(/^(javascript|data|vbscript):/i)) {
-                      return "";
-                    }
-                  }
-                  return false;
-                },
-              });
-
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(trustedHTML, "text/html");
-
-              element.textContent = "";
-              Array.from(doc.body.childNodes).forEach((node) => {
-                element.appendChild(node);
-              });
-            }
-            this.applyTextDirection(element, translatedText);
-          } else {
-            if (hasSelection) {
-              // جایگزینی فقط متن انتخاب شده در input/textarea
-              const start = element.selectionStart;
-              const end = element.selectionEnd;
-              const value = element.value;
-              const newValue =
-                value.substring(0, start) +
-                translatedText +
-                value.substring(end);
-              element.value = newValue;
-
-              // تنظیم موقعیت کرسر
-              const newCursorPosition = start + translatedText.length;
-              element.setSelectionRange(newCursorPosition, newCursorPosition);
-            } else {
-              // جایگزینی کل محتوا
-              element.value = translatedText;
-            }
-            this.applyTextDirection(element, translatedText);
-          }
-
-          await delay(500);
-        }
-
-        return true;
+      if (translatedText === undefined || translatedText === null) {
+        return false;
       }
+
+      this.logger.debug('Starting updateElement', {
+        tagName: element?.tagName,
+        isContentEditable: element?.isContentEditable,
+        textLength: translatedText.length,
+      });
+
+      await this.applyVisualFeedback(element);
+
+      // بررسی وجود انتخاب متن
+      const hasSelection = this._hasTextSelection(element);
+
+      // تعیین محدوده انتخاب در صورت وجود
+      let selectionStart = null;
+      let selectionEnd = null;
+
+      if (hasSelection && !element.isContentEditable) {
+        // برای input/textarea محدوده را می‌گیریم (برای contentEditable توسط Selection API مدیریت می‌شود)
+        selectionStart = element.selectionStart;
+        selectionEnd = element.selectionEnd;
+      }
+
+      // استفاده از جایگزینی هوشمند متن (سیستم یکپارچه با تمام Fallbackها)
+      const success = await smartTextReplacement(
+        element,
+        translatedText,
+        selectionStart,
+        selectionEnd,
+      );
+
+      this.logger.debug('Smart replacement completed', { success });
+
+      if (success) {
+        this.applyTextDirection(element, translatedText);
+        await smartDelay(200);
+        this.logger.info('Update completed successfully');
+      }
+
+      return success;
     } catch (error) {
       this.errorHandler.handle(error, {
         type: ErrorTypes.UI,
