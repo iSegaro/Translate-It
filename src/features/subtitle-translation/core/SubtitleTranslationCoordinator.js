@@ -133,8 +133,11 @@ export class SubtitleTranslationCoordinator {
 
     try {
       // 2. Request Translation via Unified Service
-      // If we are in the background context (which we should be), call the service directly
-      // to avoid messaging overhead and potential "No response" errors.
+      const job = this.activeJobs.get(jobId);
+      if (!job || job.status === 'cancelled') {
+        throw new Error('Job cancelled before batch request');
+      }
+
       const message = MessageFormat.create(MessageActions.BATCH_TRANSLATE, {
         items: translationItems,
         sourceLanguage,
@@ -147,7 +150,21 @@ export class SubtitleTranslationCoordinator {
         contextMetadata: batchContext ? { dialogueContext: batchContext } : null
       }, MessageContexts.TRANSLATION_SERVICE);
 
-      const response = await unifiedTranslationService.handleTranslationRequest(message, { internal: true });
+      // Timeout Protection (5 minutes) for the batch request
+      const BATCH_TIMEOUT_MS = 300000;
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+          timeoutError.type = 'TIMEOUT';
+          reject(timeoutError);
+        }, BATCH_TIMEOUT_MS);
+      });
+
+      // Execute request with timeout protection
+      const response = await Promise.race([
+        unifiedTranslationService.handleTranslationRequest(message, { internal: true }),
+        timeoutPromise
+      ]);
 
       if (!response.success) {
         // UnifiedTranslationService returns error details inside a response.error object
@@ -178,7 +195,9 @@ export class SubtitleTranslationCoordinator {
       
       batch.forEach(cue => { 
         cue.status = 'failed'; 
-        cue.warnings.push(error.message); 
+        if (Array.isArray(cue.warnings)) {
+          cue.warnings.push(error.message);
+        }
       });
       job.progressTracker.update(batch);
 

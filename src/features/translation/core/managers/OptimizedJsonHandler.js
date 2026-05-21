@@ -104,20 +104,36 @@ export class OptimizedJsonHandler {
           const charsBefore = statsBefore ? statsBefore.chars : 0;
           const originalCharsBefore = statsBefore ? statsBefore.originalChars : 0;
 
-          const translatedBatchResponse = await self._performBatchCall(
-            providerInstance, 
-            batch, 
-            detectedSourceLanguage, // Use potentially updated detectedSourceLanguage
-            targetLanguage, 
-            mode, 
-            abortController, 
-            messageId, 
-            sessionId, 
-            options?.contextMetadata, 
-            options?.contextSummary,
-            engine,
-            sender
-          );
+          // Timeout Protection (5 minutes) for each batch call
+          const BATCH_TIMEOUT_MS = 300000;
+          const timeoutPromise = new Promise((_, reject) => {
+            const timeoutId = setTimeout(() => {
+              const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+              timeoutError.type = 'TIMEOUT';
+              reject(timeoutError);
+            }, BATCH_TIMEOUT_MS);
+            
+            // Link timeout cleanup to abort signal
+            abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+          });
+
+          const translatedBatchResponse = await Promise.race([
+            self._performBatchCall(
+              providerInstance, 
+              batch, 
+              detectedSourceLanguage, 
+              targetLanguage, 
+              mode, 
+              abortController, 
+              messageId, 
+              sessionId, 
+              options?.contextMetadata, 
+              options?.contextSummary,
+              engine,
+              sender
+            ),
+            timeoutPromise
+          ]);
 
           checkCancellation();
 
