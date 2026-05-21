@@ -7,6 +7,7 @@ export class MessageActions {
   static GET_INFO = 'getInfo';
   static HANDLE_ERROR = 'handleError';
   static OPEN_OPTIONS_PAGE = 'openOptionsPage';
+  static FOCUS_OR_CREATE_TAB = 'focusOrCreateTab';
   
   // Translation actions
   static TRANSLATE = 'TRANSLATE';

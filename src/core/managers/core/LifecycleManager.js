@@ -124,6 +124,8 @@ class LifecycleManager {
       'ping': Handlers.handlePingLazy,
       [MessageActions.OPEN_OPTIONS_PAGE]: Handlers.handleOpenOptionsPageLazy,
       'openURL': Handlers.handleOpenURLLazy,
+      [MessageActions.FOCUS_OR_CREATE_TAB]: Handlers.handleFocusOrCreateTabLazy,
+      [MessageActions.UPDATE_CONTEXT_MENU]: Handlers.handleRefreshContextMenusLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,

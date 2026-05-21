@@ -150,6 +150,15 @@ export function useExtensionAPI() {
     }
   };
 
+  const focusOrCreateTab = async (urlPath) => {
+    try {
+      return await sendMessage(MessageActions.FOCUS_OR_CREATE_TAB, { urlPath });
+    } catch (error) {
+      logger.error(`Failed to focus or create tab for ${urlPath}:`, error);
+      throw error;
+    }
+  };
+
   const createNotification = async (options) => {
     try {
       const api = getbrowserAPI();
@@ -274,6 +283,7 @@ export function useExtensionAPI() {
     getCurrentTab,
     openOptionsPage,
     openSidepanel,
+    focusOrCreateTab,
     captureVisibleTab,
     executeScript,
     injectContentScript,
