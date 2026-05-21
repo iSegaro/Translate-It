@@ -40,7 +40,9 @@ export const SITE_PLATFORMS = {
  * @returns {string} One of SITE_PLATFORMS
  */
 export function detectSite() {
-  if (typeof window === 'undefined') return SITE_PLATFORMS.Default;
+  if (typeof window === 'undefined' || !window.location || !window.location.hostname) {
+    return SITE_PLATFORMS.Default;
+  }
   
   const hostname = window.location.hostname.toLowerCase();
   
