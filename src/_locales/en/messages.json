@@ -371,6 +371,9 @@
   "import_success": {
     "message": "Settings imported successfully."
   },
+  "import_confirm_message": {
+    "message": "⚠️ WARNING: Importing settings will completely overwrite your current configurations and reload the page.\n\nDo you want to continue?"
+  },
   "prompt_reset_button": {
     "message": "Reset"
   },

@@ -1124,6 +1124,12 @@
   "security_warning_question": {
     "message": "パスワード保護なしで続行しますか？"
   },
+  "import_success": {
+    "message": "設定が正常にインポートされました。"
+  },
+  "import_confirm_message": {
+    "message": "⚠️ 警告: 設定をインポートすると、現在の設定が完全に上書きされ、ページが再読み込みされます。\n\n続行しますか？"
+  },
   "export_success": {
     "message": "設定が正常にエクスポートされました！"
   },

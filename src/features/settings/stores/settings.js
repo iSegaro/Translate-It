@@ -485,6 +485,28 @@ export const useSettingsStore = defineStore('settings', () => {
   const importSettings = async (importData, password = '') => {
     try {
       logger.info('[Import] Starting');
+
+      // Validate that importData is a valid JSON object and contains Translate-It signatures
+      if (!importData || typeof importData !== 'object' || Array.isArray(importData)) {
+        throw new Error('invalid_settings_format');
+      }
+
+      const VALID_SIGNATURE_KEYS = [
+        'TRANSLATION_API',
+        'THEME',
+        'SOURCE_LANGUAGE',
+        'TARGET_LANGUAGE',
+        'SHOW_DESKTOP_FAB',
+        '_exported'
+      ];
+
+      const hasSignature = VALID_SIGNATURE_KEYS.some(key => Object.prototype.hasOwnProperty.call(importData, key)) || 
+                           (importData._hasEncryptedKeys && importData._secureKeys);
+
+      if (!hasSignature) {
+        throw new Error('invalid_settings_format');
+      }
+
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
 
       // 1. Merge imported settings with default settings to ensure no missing keys
