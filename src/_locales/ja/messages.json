@@ -2496,7 +2496,7 @@
     "message": "ここに字幕ファイルをドロップしてください"
   },
   "subtitle_drop_hint": {
-    "message": ".srt, .vtt, .ass 形式に対応しています"
+    "message": ".srt 形式に対応しています"
   },
   "subtitle_select_file": {
     "message": "ファイルを選択"

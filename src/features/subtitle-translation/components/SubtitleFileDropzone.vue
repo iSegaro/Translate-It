@@ -11,7 +11,7 @@
       ref="fileInput" 
       type="file" 
       class="hidden-input" 
-      accept=".srt,.vtt,.ass"
+      accept=".srt"
       @change="handleFileSelect"
     >
     
@@ -25,7 +25,7 @@
         class="text-content"
       >
         <h3>{{ t('subtitle_drop_title', 'Drop your subtitle file here') }}</h3>
-        <p>{{ t('subtitle_drop_hint', 'Supports .srt, .vtt, .ass') }}</p>
+        <p>{{ t('subtitle_drop_hint', 'Supports .srt') }}</p>
       </div>
       
       <div

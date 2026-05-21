@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Subtitle Translation system is a standalone, robust, and extensible tool designed to translate subtitle files (such as `.srt`) into different target languages while fully preserving subtitle formats, timestamps, and style tags. 
+The Subtitle Translation system is a standalone, robust, and extensible tool designed to translate subtitle files (specifically `.srt`) into different target languages while fully preserving subtitle formats, timestamps, and style tags. 
 
 It implements a progressive batching translation model designed to handle large subtitle files seamlessly. It leverages the extension's unified provider translation infrastructure but remains entirely decoupled from other translation flows (like whole page or element selection) to ensure clean separation of concerns and optimal performance.
 

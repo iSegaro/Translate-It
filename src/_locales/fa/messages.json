@@ -2493,7 +2493,7 @@
     "message": "فایل زیرنویس خود را اینجا رها کنید"
   },
   "subtitle_drop_hint": {
-    "message": "پشتیبانی از فرمت‌های .srt, .vtt, .ass"
+    "message": "پشتیبانی از فرمت .srt"
   },
   "subtitle_select_file": {
     "message": "انتخاب فایل"

@@ -2493,7 +2493,7 @@
     "message": "Drop your subtitle file here"
   },
   "subtitle_drop_hint": {
-    "message": "Supports .srt, .vtt, .ass"
+    "message": "Supports .srt"
   },
   "subtitle_select_file": {
     "message": "Select File"

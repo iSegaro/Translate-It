@@ -16,15 +16,8 @@ export class SubtitleParserFactory {
     switch (normalizedFormat) {
       case 'srt':
         return new SrtAdapter();
-      case 'vtt':
-        // WebVTT is similar to SRT, could use a VttAdapter later
-        // For MVP, if user forces SRT on VTT it might partially work, but better to be explicit.
-        throw new Error('WebVTT (.vtt) support is coming soon.');
-      case 'ass':
-      case 'ssa':
-        throw new Error('Advanced Substation Alpha (.ass) support is coming soon.');
       default:
-        throw new Error(`Unsupported subtitle format: ${normalizedFormat}`);
+        throw new Error(`Unsupported subtitle format: ${normalizedFormat}. Only .srt files are supported.`);
     }
   }
 }
