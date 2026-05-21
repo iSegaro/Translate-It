@@ -42,10 +42,19 @@ export class SubtitleTranslationCoordinator {
 
     logger.info(`Starting subtitle job ${jobId} for ${filename} using ${providerId}`);
 
+    // Ensure translation engine is available (Lazy Init for Background Service Worker)
+    if (!unifiedTranslationService.translationEngine) {
+      unifiedTranslationService.translationEngine = unifiedTranslationService.translationEngine || globalThis.backgroundService?.translationEngine;
+      unifiedTranslationService.backgroundService = unifiedTranslationService.backgroundService || globalThis.backgroundService;
+    }
+
     try {
       // 0. Reset Provider State (Circuit Breaker) before starting a new job
       // This ensures a fresh start if the user tries again after an error
-      const providerInstance = await unifiedTranslationService.translationEngine.getProvider(providerId);
+      const translationEngine = unifiedTranslationService.translationEngine;
+      if (!translationEngine) throw new Error('Translation engine not initialized');
+
+      const providerInstance = await translationEngine.getProvider(providerId);
       if (providerInstance) {
         // Clear Circuit Breaker if it's open for this provider
         if (providerInstance.rateLimitManager && typeof providerInstance.rateLimitManager.resetCircuitBreaker === 'function') {
