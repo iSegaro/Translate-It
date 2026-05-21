@@ -77,6 +77,8 @@
               <SubtitleViewer
                 :cues="cues.slice(0, 100)"
                 :item-height="80"
+                :source-language="config.sourceLanguage"
+                :target-language="config.targetLanguage"
               />
             </div>
           </div>
@@ -119,6 +121,8 @@
             <SubtitleViewer
               :cues="cues"
               :item-height="80"
+              :source-language="config.sourceLanguage"
+              :target-language="config.targetLanguage"
             />
           </div>
 

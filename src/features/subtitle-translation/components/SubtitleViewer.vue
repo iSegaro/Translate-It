@@ -16,7 +16,10 @@
         </div>
         
         <div class="cue-content-wrapper">
-          <div class="cue-column original">
+          <div 
+            class="cue-column original"
+            :dir="getOriginalDirection(item.data.text)"
+          >
             <div class="cue-time">
               {{ item.data.startTime }}
             </div>
@@ -25,7 +28,10 @@
             </div>
           </div>
           
-          <div class="cue-column translated">
+          <div 
+            class="cue-column translated"
+            :dir="getTranslatedDirection(item.data.translatedText)"
+          >
             <template v-if="item.data.status === 'translated'">
               <div class="cue-text">
                 {{ item.data.translatedText }}
@@ -63,12 +69,15 @@ import { computed } from 'vue';
 import { useVirtualList } from '@vueuse/core';
 import { Icon as VIcon } from '@iconify/vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 
 const { t } = useUnifiedI18n();
 
 const props = defineProps({
   cues: { type: Array, required: true },
-  itemHeight: { type: Number, default: 80 }
+  itemHeight: { type: Number, default: 80 },
+  sourceLanguage: { type: String, default: '' },
+  targetLanguage: { type: String, default: '' }
 });
 
 const { list, containerProps, wrapperProps } = useVirtualList(
@@ -78,6 +87,21 @@ const { list, containerProps, wrapperProps } = useVirtualList(
     overscan: 10
   }
 );
+
+/**
+ * Dynamically gets the text direction of the original subtitle cue.
+ */
+const getOriginalDirection = (text) => {
+  return LanguageDetectionService.getDirection(text, props.sourceLanguage);
+};
+
+/**
+ * Dynamically gets the text direction of the translated subtitle cue.
+ */
+const getTranslatedDirection = (text) => {
+  if (!text) return 'ltr';
+  return LanguageDetectionService.getDirection(text, props.targetLanguage);
+};
 </script>
 
 <style lang="scss" scoped>
