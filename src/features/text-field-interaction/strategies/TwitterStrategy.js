@@ -80,11 +80,26 @@ export default class TwitterStrategy extends PlatformStrategy {
         
         await smartDelay(50);
         
+        if (this.isTwitterElement(element)) {
+          // هک برای Draft.js توییتر: انتخاب کل
+          // به جای حذف جداگانه، اجازه می‌دهیم insertText خودش جایگزین کند تا State ادیتور به هم نریزد
+          document.execCommand('selectAll', false, null);
+          await smartDelay(20);
+        }
+
         // استفاده از جایگزینی هوشمند متن (جایگزین clearTweetField و pasteText)
         const success = await smartTextReplacement(field, translatedText);
 
         if (success) {
-          this.setCursorToEnd(field);
+          // برای توییتر/Draft.js، فقط اگر لازم بود مکان‌نما را تنظیم می‌کنیم
+          // زیرا execCommand خودش مکان‌نما را در جای درست قرار می‌دهد
+          if (!this.isTwitterElement(element)) {
+            this.setCursorToEnd(field);
+          } else {
+            // برای توییتر، اجبار به بروزرسانی State با ارسال رویداد input
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          
           logger.init('Twitter field updated successfully.');
         }
         return success;

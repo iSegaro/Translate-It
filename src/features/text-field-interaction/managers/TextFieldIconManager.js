@@ -395,10 +395,10 @@ export class TextFieldIconManager extends ResourceTracker {
    */
   async applyPlatformFiltering(element) {
     // Get browser utils from factory
-    const { detectPlatform, Platform } = await utilsFactory.getBrowserUtils();
+    const { detectSite, Site } = await utilsFactory.getBrowserUtils();
 
     // YouTube platform-specific handling
-    if (detectPlatform() === Platform.Youtube) {
+    if (detectSite() === Site.Youtube) {
       const youtubeStrategy = this.strategies?.["youtube"];
 
       // Skip processing for recognized special fields on YouTube (search query, etc.)
