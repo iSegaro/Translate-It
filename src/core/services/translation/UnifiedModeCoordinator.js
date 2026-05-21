@@ -21,23 +21,7 @@ export class UnifiedModeCoordinator {
   async processRequest(request, { translationEngine }) {
     const { mode } = request;
     request.status = RequestStatus.PROCESSING;
-
-    const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
-    let priority = TranslationPriority.NORMAL;
-
-    // Mapping priorities to modes
-    const highPriorityModes = new Set([
-      TranslationMode.Field, TranslationMode.Selection, TranslationMode.Dictionary_Translation,
-      TranslationMode.Popup_Translate, TranslationMode.Sidepanel_Translate, TranslationMode.Mobile_Translate,
-    ]);
-    
-    if (highPriorityModes.has(mode)) {
-      priority = TranslationPriority.HIGH;
-    } else if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
-      priority = TranslationPriority.LOW;
-    }
-
-    request.data.priority = priority;
+    request.data.priority = await this._resolvePriority(mode);
 
     switch (mode) {
       case TranslationMode.Field:
@@ -51,6 +35,30 @@ export class UnifiedModeCoordinator {
       default:
         return await this.processStandardTranslation(request, { translationEngine });
     }
+  }
+
+  /**
+   * Resolve translation priority based on UI mode.
+   * @private
+   */
+  async _resolvePriority(mode) {
+    const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
+    
+    // Mapping priorities to modes
+    const highPriorityModes = new Set([
+      TranslationMode.Field, TranslationMode.Selection, TranslationMode.Dictionary_Translation,
+      TranslationMode.Popup_Translate, TranslationMode.Sidepanel_Translate, TranslationMode.Mobile_Translate,
+    ]);
+    
+    if (highPriorityModes.has(mode)) {
+      return TranslationPriority.HIGH;
+    }
+    
+    if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
+      return TranslationPriority.LOW;
+    }
+
+    return TranslationPriority.NORMAL;
   }
 
   /**
@@ -193,6 +201,8 @@ export class UnifiedModeCoordinator {
     const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
 
+    let timeoutId;
+
     try {
       const sessionId = request.sessionId || data.sessionId || messageId;
       
@@ -204,7 +214,7 @@ export class UnifiedModeCoordinator {
       // Timeout Protection (5 minutes) for each batch call
       const BATCH_TIMEOUT_MS = 300000;
       const timeoutPromise = new Promise((_, reject) => {
-        const timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(() => {
           const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
           timeoutError.type = 'TIMEOUT';
           reject(timeoutError);
@@ -262,6 +272,7 @@ export class UnifiedModeCoordinator {
       logger.error(`[UnifiedCoordinator] ${mode} batch failed:`, error);
       throw error;
     } finally {
+      clearTimeout(timeoutId);
       translationEngine.lifecycleRegistry.unregisterRequest(messageId);
     }
   }
