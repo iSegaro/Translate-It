@@ -69,31 +69,44 @@ class MessageHandler {
     const handler = this.handlers.get(action);
 
     if (handler) {
-      const result = handler(normalizedMessage, sender, sendResponse);
+      let responseSent = false;
+      let responseValue = undefined;
+      const wrappedSendResponse = (response) => {
+        if (responseSent) return;
+        responseSent = true;
+        responseValue = response;
+        try {
+          if (sendResponse) {
+            sendResponse(response);
+          }
+        } catch (e) {
+          logger.error('Error in wrapped sendResponse:', e);
+        }
+      };
+
+      const result = handler(normalizedMessage, sender, wrappedSendResponse);
 
       if (result instanceof Promise) {
-        // Store the sendResponse function to be called when the promise resolves
-        this.pendingResponses.set(messageId, sendResponse);
-        result
-          .then(response => {
-            this._sendResponse(messageId, response);
-          })
-          .catch(error => {
-            logger.error(`Error in promise-based handler for ${action}:`, error);
-            const errorResponse = MessageFormat.createErrorResponse(error, messageId);
-            this._sendResponse(messageId, errorResponse);
-          });
-        // Return true to indicate that the response will be sent asynchronously
-        return true;
+        // Return the promise itself to browser.onMessage listener (webextension-polyfill)
+        // This is the standard, reliable way to handle async messaging across both Firefox and Chrome.
+        return result.then(resolvedValue => {
+          if (responseSent) {
+            return responseValue;
+          }
+          return resolvedValue;
+        }).catch(error => {
+          logger.error(`Error in promise-based handler for ${action}:`, error);
+          return MessageFormat.createErrorResponse(error, messageId);
+        });
       } else if (result === true) {
-        // Handler indicates it will send response asynchronously
+        // Handler indicates it will send response asynchronously (e.g. legacy/sync handlers)
         logger.debug(`Async response handler for ${action}`);
         return true;
       } else {
         logger.debug(`Synchronous handler for ${action}. Sending response immediately.`);
         try {
           if (sendResponse && result !== undefined) {
-            sendResponse(result);
+            wrappedSendResponse(result);
           }
         } catch (error) {
           logger.error(`Failed to send synchronous response for ${action}:`, error);

@@ -84,7 +84,7 @@ export function useSubtitleTranslation() {
     });
 
     try {
-      await MessagingBus.sendToBackground({
+      const response = await MessagingBus.sendToBackground({
         context: MessageContexts.SUBTITLE_TRANSLATION,
         action: MessageActions.SUBTITLE_TRANSLATE,
         payload: {
@@ -94,9 +94,13 @@ export function useSubtitleTranslation() {
           sourceLanguage: config.sourceLanguage,
           targetLanguage: config.targetLanguage,
           providerId: config.providerId,
-          options: config.options
+          options: config.options ? JSON.parse(JSON.stringify(config.options)) : undefined
         }
       });
+
+      if (response && response.success === false) {
+        throw new Error(response.error || 'Failed to start subtitle translation');
+      }
     } catch (err) {
       status.value = 'error';
       error.value = err.message;

@@ -67,12 +67,12 @@ describe('MessageHandler', () => {
         sendResponse
       );
 
-      expect(result).toBe(true); // Indicates async response
+      expect(result instanceof Promise).toBe(true); // Indicates async response via Promise
       
       // Wait for the promise in handler to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+      const response = await result;
       
-      expect(sendResponse).toHaveBeenCalledWith({ success: true, data: 'async' });
+      expect(response).toEqual({ success: true, data: 'async' });
     });
 
     it('should handle handlers that return true for manual async response', () => {
