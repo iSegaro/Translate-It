@@ -2569,5 +2569,8 @@
   },
   "popup_subtitle_title_icon": {
     "message": "Subtitle Translator"
+  },
+  "open_subtitle_translator": {
+    "message": "Subtitle Translator"
   }
 }

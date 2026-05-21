@@ -2569,5 +2569,8 @@
   },
   "popup_subtitle_title_icon": {
     "message": "字幕翻訳"
+  },
+  "open_subtitle_translator": {
+    "message": "字幕翻訳"
   }
 }
