@@ -16,8 +16,19 @@
       </div>
       
       <div class="header-actions">
+        <a
+          v-if="status === 'completed'"
+          :href="reportUrl"
+          target="_blank"
+          class="report-link fade-in"
+          :title="t('subtitle_report_issue', 'Report issue in the translation of this subtitle file')"
+        >
+          <v-icon icon="mdi:github" />
+          <span class="report-label">{{ t('subtitle_report_issue', 'Report Issue') }}</span>
+        </a>
         <ThemeSelector />
       </div>
+
     </header>
 
     <main class="app-content">
@@ -323,6 +334,39 @@ const canTranslate = computed(() => {
   );
 });
 
+/**
+ * Generates a pre-filled GitHub issue URL for reporting subtitle issues.
+ * Includes structured template with technical metadata.
+ */
+const reportUrl = computed(() => {
+  const baseUrl = 'https://github.com/iSegaro/Translate-It/issues/new';
+  const fileName = currentFile.value?.name || 'unknown.srt';
+  const source = config.sourceLanguage || 'auto';
+  const target = config.targetLanguage;
+  const provider = config.providerId;
+  
+  // Get technical metadata
+  const manifest = browser.runtime.getManifest();
+  const version = manifest.version;
+  const userAgent = navigator.userAgent;
+  const browserName = userAgent.includes('Firefox') ? 'Firefox' : 'Chrome/Edge';
+
+  const title = encodeURIComponent(`[Subtitle Issue] ${fileName} (${source} -> ${target})`);
+  
+  const body = encodeURIComponent(
+    `### 🔍 Technical Details\n` +
+    `- **Extension Version:** ${version}\n` +
+    `- **Browser:** ${browserName}\n` +
+    `- **File Name:** ${fileName}\n` +
+    `- **Language Pair:** ${source} -> ${target}\n` +
+    `- **Provider:** ${provider}\n\n` +
+    `### Description\n` +
+    `${t('subtitle_report_description_placeholder', '[Please describe the issue with formatting or translation here. Please drag and drop your problematic .srt file into this issue to help us investigate.]')}`
+  );
+
+  return `${baseUrl}?title=${title}&body=${body}`;
+});
+
 const startJob = () => {
   startTranslation(fileContent.value, currentFile.value.name, config);
 };
@@ -440,6 +484,40 @@ onUnmounted(() => {
         span {
           font-size: 0.75rem;
           color: var(--text-secondary);
+        }
+      }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+
+      .report-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        background: var(--btn-secondary-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+
+        &:hover {
+          background: var(--btn-secondary-bg-hover);
+          transform: translateY(-1px);
+        }
+
+        .report-label {
+          @media (max-width: 800px) {
+            display: none;
+          }
         }
       }
     }

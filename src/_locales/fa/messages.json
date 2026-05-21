@@ -2498,6 +2498,12 @@
   "subtitle_select_file": {
     "message": "انتخاب فایل"
   },
+  "subtitle_report_issue": {
+    "message": "گزارش مشکل در ترجمه این فایل زیرنویس"
+  },
+  "subtitle_report_description_placeholder": {
+    "message": "[لطفا مشکل در فرمت یا ترجمه را اینجا توضیح دهید. همچنین لطفا فایل .srt مشکل‌دار خود را برای بررسی بیشتر در این کادر رها کنید (Drag & Drop).]"
+  },
   "subtitle_change_file": {
     "message": "تغییر فایل"
   },

@@ -2501,6 +2501,12 @@
   "subtitle_select_file": {
     "message": "ファイルを選択"
   },
+  "subtitle_report_issue": {
+    "message": "この字幕ファイルの翻訳に関する問題を報告する"
+  },
+  "subtitle_report_description_placeholder": {
+    "message": "[ここで翻訳やフォーマットの問題について説明してください。調査に役立てるため、問題のある.srtファイルをここにドラッグ＆ドロップしてください。]"
+  },
   "subtitle_change_file": {
     "message": "ファイルを変更"
   },

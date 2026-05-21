@@ -2498,6 +2498,12 @@
   "subtitle_select_file": {
     "message": "Select File"
   },
+  "subtitle_report_issue": {
+    "message": "Report issue in the translation of this subtitle file"
+  },
+  "subtitle_report_description_placeholder": {
+    "message": "[Please describe the issue with formatting or translation here. Please drag and drop your problematic .srt file into this issue to help us investigate.]"
+  },
   "subtitle_change_file": {
     "message": "Change File"
   },
