@@ -32,6 +32,9 @@
             class="cue-column translated"
             :dir="getTranslatedDirection(item.data.translatedText)"
           >
+            <div class="cue-time">
+              {{ item.data.startTime }}
+            </div>
             <template v-if="item.data.status === 'translated'">
               <div class="cue-text">
                 {{ item.data.translatedText }}
