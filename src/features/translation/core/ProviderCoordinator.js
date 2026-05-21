@@ -396,7 +396,8 @@ export class ProviderCoordinator {
         options.abortController || (engine ? engine.getAbortController(messageId) : null),
         priority,
         sessionId,
-        options.expectedFormat
+        options.expectedFormat,
+        options // Pass the full options object to support custom prompts and metadata
       );
     }
 

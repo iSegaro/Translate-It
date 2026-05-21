@@ -34,8 +34,8 @@
       class="ti-btn-settings"
       @click="handleOpenSettings"
     />
-    
-    <!-- 4. Revert -->
+
+    <!-- 5. Revert -->
     <IconButton
       v-if="isSelectElementEnabled"
       icon="revert.png"

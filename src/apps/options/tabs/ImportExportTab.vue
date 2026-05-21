@@ -47,7 +47,7 @@
         </div>
         
         <div
-          v-if="showPasswordField"
+          v-if="selectedFile && showPasswordField"
           class="setting-group vertical"
         >
           <label class="setting-label">{{ t('import_password_label') || '🔑 Import Password Required' }}</label>
@@ -59,6 +59,23 @@
               class="import-password-input"
               @keydown.enter="importSettings"
             />
+            <BaseButton
+              :loading="isImporting"
+              variant="primary"
+              class="import-button"
+              @click="importSettings"
+            >
+              <span class="button-icon">📥</span>
+              {{ t('import_settings_button') || 'Import Settings' }}
+            </BaseButton>
+          </div>
+        </div>
+
+        <div
+          v-else-if="selectedFile && !showPasswordField"
+          class="setting-group vertical"
+        >
+          <div class="import-controls-row">
             <BaseButton
               :loading="isImporting"
               variant="primary"
@@ -120,9 +137,11 @@ const exportSettings = async () => {
   
   try {
     const settings = await settingsStore.loadSettings()
-    
-    // Show warning if no password provided
-    if (!exportPassword.value.trim()) {
+    const apiKeys = secureStorage.extractApiKeys(settings)
+    const hasKeys = Object.values(apiKeys).some(val => val && val.trim() !== '')
+
+    // Show warning if no password provided and active API keys exist
+    if (!exportPassword.value.trim() && hasKeys) {
       const warningTitle = t('security_warning_title') || '⚠️ SECURITY WARNING ⚠️'
       const warningMessage = t('security_warning_message') || 
         'You are about to export your settings WITHOUT password protection.\nYour API keys will be saved in PLAIN TEXT and readable by anyone.\n\n🔒 For security, it\'s STRONGLY recommended to use a password.'
@@ -139,9 +158,9 @@ const exportSettings = async () => {
       }
     }
     
-    const exportData = await secureStorage.prepareForExport(
-      settings,
-      exportPassword.value.trim() || null
+    // Call the settings store action instead of bypassing it
+    const exportData = await settingsStore.exportSettings(
+      exportPassword.value.trim()
     )
     
     const timestamp = new Date().toISOString().slice(0, 10)
@@ -193,7 +212,6 @@ const handleFileSelect = async (event) => {
   selectedFile.value = file
   const hasEncryption = await checkFileEncryption(file)
   showPasswordField.value = hasEncryption
-  if (!hasEncryption) setTimeout(() => importSettings(), 500)
 }
 
 // Import settings
@@ -201,6 +219,20 @@ const importSettings = async () => {
   if (!selectedFile.value) {
     statusType.value = 'error'
     statusMessage.value = t('import_error_no_file') || 'Please select a file to import'
+    return
+  }
+
+  // Ask for confirmation to prevent accidental overwrites
+  const proceed = window.confirm(
+    t('import_confirm_message') || 
+    '⚠️ WARNING: Importing settings will completely overwrite your current configurations and reload the page.\n\nDo you want to continue?'
+  )
+  
+  if (!proceed) {
+    if (importFileInput.value) importFileInput.value.value = ''
+    selectedFile.value = null
+    showPasswordField.value = false
+    importPassword.value = ''
     return
   }
   
@@ -222,7 +254,16 @@ const importSettings = async () => {
     
   } catch (error) {
     statusType.value = 'error'
-    statusMessage.value = error.message.includes('password') ? t('import_error_password') : (t('import_error_generic') || 'Import failed')
+    
+    // Check if error is related to invalid format signature
+    if (error.message.includes('format')) {
+      statusMessage.value = t('import_error_format') || 'Invalid settings file format'
+    } else if (error.message.includes('password')) {
+      statusMessage.value = t('import_error_password') || 'Incorrect password'
+    } else {
+      statusMessage.value = t('import_error_generic') || 'Import failed'
+    }
+    
     importPassword.value = ''
     setTimeout(() => { statusMessage.value = '' }, 4000)
   } finally {

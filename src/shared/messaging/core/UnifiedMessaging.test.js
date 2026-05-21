@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sendMessage, sendRegularMessage } from './UnifiedMessaging.js';
 import browser from 'webextension-polyfill';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import * as contextCore from '@/core/contextCore.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -28,13 +29,34 @@ vi.mock('webextension-polyfill', () => ({
   }
 }));
 
-vi.mock('@/core/extensionContext.js', () => ({
-  default: {
-    isValidSync: vi.fn().mockReturnValue(true),
-    isContextError: vi.fn().mockReturnValue(false),
-    handleContextError: vi.fn()
+vi.mock('@/core/contextCore.js', () => ({
+  isValidSync: vi.fn().mockReturnValue(true),
+  isContextError: vi.fn().mockReturnValue(false),
+  contextState: { isInvalidated: false, notificationShown: false },
+  getActiveEnvironment: vi.fn().mockReturnValue('popup'),
+  ENVIRONMENTS: {
+    BACKGROUND: 'background',
+    CONTENT: 'content',
+    POPUP: 'popup',
+    SIDEPANEL: 'sidepanel',
+    OPTIONS: 'options',
+    OFFSCREEN: 'offscreen'
   }
 }));
+
+vi.mock('@/core/extensionContext.js', () => {
+  const mock = {
+    isValidSync: vi.fn().mockReturnValue(true),
+    isContextError: vi.fn().mockReturnValue(false),
+    handleContextError: vi.fn(),
+    safeSendMessage: vi.fn().mockResolvedValue({ success: true }),
+    isExtensionContextValid: vi.fn().mockReturnValue(true),
+  };
+  return {
+    default: mock,
+    ...mock
+  };
+});
 
 vi.mock('./UnifiedTranslationCoordinator.js', () => ({
   unifiedTranslationCoordinator: {
@@ -63,6 +85,7 @@ describe('UnifiedMessaging', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    contextCore.isValidSync.mockReturnValue(true);
     ExtensionContextManager.isValidSync.mockReturnValue(true);
   });
 
@@ -101,7 +124,7 @@ describe('UnifiedMessaging', () => {
     });
 
     it('should throw if extension context is invalidated', async () => {
-      ExtensionContextManager.isValidSync.mockReturnValue(false);
+      contextCore.isValidSync.mockReturnValue(false);
       const message = { action: 'PING' };
 
       await expect(sendRegularMessage(message)).rejects.toThrow('Extension context invalidated');

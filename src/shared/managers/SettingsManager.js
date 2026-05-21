@@ -552,7 +552,7 @@ class SettingsManager {
     const browserAPI = typeof browser !== "undefined" ? browser : chrome;
 
     if (!browserAPI?.storage || !browserAPI.storage.onChanged) {
-      logger.warn('Storage API not available, cannot setup storage listener')
+      logger.debug('Storage API not available, cannot setup storage listener')
       return
     }
 

@@ -21,29 +21,15 @@ export class UnifiedModeCoordinator {
   async processRequest(request, { translationEngine }) {
     const { mode } = request;
     request.status = RequestStatus.PROCESSING;
-
-    const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
-    let priority = TranslationPriority.NORMAL;
-
-    // Mapping priorities to modes
-    const highPriorityModes = new Set([
-      TranslationMode.Field, TranslationMode.Selection, TranslationMode.Dictionary_Translation,
-      TranslationMode.Popup_Translate, TranslationMode.Sidepanel_Translate, TranslationMode.Mobile_Translate,
-    ]);
-    
-    if (highPriorityModes.has(mode)) {
-      priority = TranslationPriority.HIGH;
-    } else if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
-      priority = TranslationPriority.LOW;
-    }
-
-    request.data.priority = priority;
+    request.data.priority = await this._resolvePriority(mode);
 
     switch (mode) {
       case TranslationMode.Field:
         return await this.processFieldTranslation(request, { translationEngine });
       case TranslationMode.Page:
         return await this.processPageTranslation(request, { translationEngine });
+      case TranslationMode.Subtitle:
+        return await this.processSubtitleTranslation(request, { translationEngine });
       case TranslationMode.Select_Element:
         return await this.processSelectElementTranslation(request, { translationEngine });
       default:
@@ -52,85 +38,71 @@ export class UnifiedModeCoordinator {
   }
 
   /**
+   * Resolve translation priority based on UI mode.
+   * @private
+   */
+  async _resolvePriority(mode) {
+    const { TranslationPriority } = await import('@/features/translation/core/RateLimitManager.js');
+    
+    // Mapping priorities to modes
+    const highPriorityModes = new Set([
+      TranslationMode.Field, TranslationMode.Selection, TranslationMode.Dictionary_Translation,
+      TranslationMode.Popup_Translate, TranslationMode.Sidepanel_Translate, TranslationMode.Mobile_Translate,
+    ]);
+    
+    if (highPriorityModes.has(mode)) {
+      return TranslationPriority.HIGH;
+    }
+    
+    if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
+      return TranslationPriority.LOW;
+    }
+
+    return TranslationPriority.NORMAL;
+  }
+
+  /**
    * Specialized handler for Whole Page Translation (Batch processing).
    * Now simplified to delegate orchestration to ProviderCoordinator.
    */
-  async processPageTranslation(request, { translationEngine }) {
-    const { messageId, data } = request;
-    const { text, provider, sourceLanguage, targetLanguage, priority } = data;
-
-    if (!text) throw new Error('No text provided for translation');
-
-    // Parse incoming segments
-    const segments = typeof text === 'string' ? JSON.parse(text).map(item => item.text || item) : text.map(item => item.text || item);
-    const totalOriginalChars = segments.reduce((sum, t) => sum + (t?.length || 0), 0);
-
-    const providerInstance = await translationEngine.getProvider(provider);
-    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
-
-    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', 'page');
-
-    try {
-      const sessionId = request.sessionId || data.sessionId || messageId;
-      
-      // Execute the whole array via Provider (Coordinator will handle chunking internally)
-      const response = await providerInstance.translate(segments, sourceLanguage || 'auto', targetLanguage, {
-        mode: TranslationMode.Page,
-        abortController,
-        messageId,
-        sessionId,
-        priority,
-        rawJsonPayload: true // Treat as handled structure
-      });
-
-      // Extract the actual translated content from the unified response
-      const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 
-        ? response.translatedText 
-        : response;
-
-      // Ensure we have an array of results that matches the input length
-      const results = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];
-      
-      const finalResults = segments.map((original, idx) => ({
-        text: results[idx] !== undefined ? results[idx] : original
-      }));
-
-      return {
-        success: true,
-        translatedText: JSON.stringify(finalResults),
-        actualCharCount: totalOriginalChars,
-        originalCharCount: totalOriginalChars,
-        error: null
-      };
-    } catch (error) {
-      const { isFatalError, matchErrorToType, isCancellationError } = await import('@/shared/error-management/ErrorMatcher.js');
-      const errorType = matchErrorToType(error);
-      const isFatal = isFatalError(error);
-
-      // Log the specific failure - Use debug for cancellations, warn for actual errors
-      if (isCancellationError(error)) {
-        logger.debug(`[UnifiedCoordinator] Page translation cancelled: ${error.message}`);
-      } else {
-        logger.warn(`[UnifiedCoordinator] Page chunk failed (${isFatal ? 'FATAL' : 'TRANSIENT'}): ${error.message}`);
-      }
-      
-      const fallbackResults = segments.map(s => ({ text: s }));
-      
-      // We return success: true to keep already translated content on the page,
-      // but we pass error details so the Scheduler can trigger user notifications for FATAL errors.
-      return {
-        success: true, 
-        translatedText: JSON.stringify(fallbackResults),
-        actualCharCount: 0,
-        originalCharCount: totalOriginalChars,
-        hasError: true,
-        error: error.message,
-        errorType: errorType,
-        isFatal: isFatal
-      };
-    } finally {
-      translationEngine.lifecycleRegistry.unregisterRequest(messageId);
+  async processPageTranslation(request, deps) {
+    const { data } = request;
+    
+    // Explicitly check for missing text to match legacy error message
+    if (!data.text) {
+      throw new Error('No text provided for translation');
     }
+
+    const items = typeof data.text === 'string' ? JSON.parse(data.text) : data.text;
+    
+    const result = await this._processGenericBatch(request, deps, {
+      mode: TranslationMode.Page,
+      items,
+      useRawItems: false, // Page mode expects array of strings for traditional providers
+      transformOutput: (results) => ({
+        success: true,
+        translatedText: JSON.stringify(results),
+        actualCharCount: results.reduce((sum, r) => sum + (r.text?.length || 0), 0),
+        originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),
+        error: null
+      }),
+      handleError: async (error, items) => {
+        const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+        const fallbackResults = items.map(item => ({ text: item.text || item }));
+        return {
+          success: true, 
+          translatedText: JSON.stringify(fallbackResults),
+          actualCharCount: 0,
+          originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),
+          hasError: true,
+          error: error.message,
+          errorType: matchErrorToType(error),
+          isFatal: isFatalError(error)
+        };
+      }
+    });
+
+    return result;
   }
 
   /**
@@ -173,5 +145,135 @@ export class UnifiedModeCoordinator {
       context: request.context || 'content',
       data: request.data
     }, request.sender);
+  }
+
+  /**
+   * Specialized handler for Subtitle Translation (Batch processing).
+   * Similar to Page translation but optimized for Subtitle cues.
+   */
+  async processSubtitleTranslation(request, deps) {
+    return await this._processGenericBatch(request, deps, {
+      mode: TranslationMode.Subtitle,
+      items: request.data.items,
+      useRawItems: true, // Subtitles need IDs and context for AI providers
+      transformOutput: (results, totalChars) => ({
+        success: true,
+        results, // SubtitleCoordinator expects 'results'
+        actualCharCount: totalChars,
+        originalCharCount: totalChars
+      })
+    });
+  }
+
+  /**
+   * Generic handler for batch translation operations (Page, Subtitle).
+   * Implements common logic for lifecycle management, character counting, and provider coordination.
+   * 
+   * @private
+   */
+  async _processGenericBatch(request, { translationEngine }, options) {
+    const { messageId, data } = request;
+    const { provider, priority, promptTemplate, instruction } = data;
+    const { mode, items, transformOutput, handleError, useRawItems = false } = options;
+    
+    const sourceLanguage = data.sourceLanguage || data.sourceLang || 'auto';
+    const targetLanguage = data.targetLanguage || data.targetLang;
+
+    // Validate that items is an array. Empty arrays are allowed to proceed to provider init for test compatibility.
+    if (!items || !Array.isArray(items)) {
+      throw new Error(`No items provided for ${mode} translation`);
+    }
+
+    const providerInstance = await translationEngine.getProvider(provider);
+    if (!providerInstance) throw new Error(`Provider '${provider}' initialization failed`);
+
+    // Guard against empty items after provider check to avoid null pointer in sampleText
+    if (items.length === 0) {
+      if (transformOutput) return transformOutput([], 0);
+      return { success: true, results: [], actualCharCount: 0, originalCharCount: 0 };
+    }
+    
+    const totalOriginalChars = items.reduce((sum, item) => {
+      const text = typeof item === 'string' ? item : (item.text || '');
+      return sum + (text?.length || 0);
+    }, 0);
+
+    const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
+    const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
+
+    let timeoutId;
+
+    try {
+      const sessionId = request.sessionId || data.sessionId || messageId;
+      
+      // Determine what to pass to the provider
+      const translationPayload = useRawItems 
+        ? items 
+        : items.map(item => (typeof item === 'string' ? item : item.text) || '');
+
+      // Timeout Protection (5 minutes) for each batch call
+      const BATCH_TIMEOUT_MS = 300000;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          const timeoutError = new Error(`Batch translation timed out after ${BATCH_TIMEOUT_MS}ms`);
+          timeoutError.type = 'TIMEOUT';
+          reject(timeoutError);
+        }, BATCH_TIMEOUT_MS);
+        
+        // Link timeout cleanup to abort signal
+        if (abortController?.signal) {
+          abortController.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+        }
+      });
+
+      const response = await Promise.race([
+        providerInstance.translate(translationPayload, sourceLanguage, targetLanguage, {
+          mode,
+          abortController,
+          messageId,
+          sessionId,
+          priority,
+          promptTemplate,
+          instruction,
+          rawJsonPayload: true 
+        }),
+        timeoutPromise
+      ]);
+
+      const translatedSegments = (response && typeof response === 'object' && response.translatedText !== undefined) 
+        ? response.translatedText 
+        : response;
+
+      const resultsArray = Array.isArray(translatedSegments) ? translatedSegments : [translatedSegments];
+      
+      const finalResults = items.map((item, idx) => {
+        const translated = resultsArray[idx];
+        const translatedText = translated !== undefined 
+          ? (typeof translated === 'object' ? translated.text : translated) 
+          : (typeof item === 'string' ? item : item.text);
+          
+        return typeof item === 'string' ? { text: translatedText } : { ...item, text: translatedText };
+      });
+
+      if (transformOutput) {
+        return transformOutput(finalResults, totalOriginalChars);
+      }
+
+      return {
+        success: true,
+        results: finalResults,
+        actualCharCount: totalOriginalChars,
+        originalCharCount: totalOriginalChars
+      };
+    } catch (error) {
+      if (handleError) {
+        return await handleError(error, items);
+      }
+      logger.error(`[UnifiedCoordinator] ${mode} batch failed:`, error);
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+      translationEngine.lifecycleRegistry.unregisterRequest(messageId);
+    }
   }
 }

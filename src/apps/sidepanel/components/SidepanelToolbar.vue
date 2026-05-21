@@ -106,6 +106,21 @@
     </div>
     <div class="toolbar-group-bottom">
       <button
+        id="subtitleBtn"
+        class="toolbar-button"
+        :title="t('popup_subtitle_title_icon') || 'ترجمه زیرنویس'"
+        @click="handleSubtitleClick"
+        @keydown.enter.prevent="handleSubtitleClick"
+        @keydown.space.prevent="handleSubtitleClick"
+      >
+        <img
+          :src="subtitleIcon"
+          alt="Subtitle Translator"
+          class="toolbar-icon"
+        >
+      </button>
+
+      <button
         id="settingsBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_SETTINGS_TITLE_ICON')"
@@ -137,6 +152,7 @@ import { TranslationMode } from '@/shared/config/config.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js';
 import browser from 'webextension-polyfill';
 
 // Icon URLs will be loaded at runtime
@@ -188,6 +204,7 @@ const { isSelectModeActive, activateSelectMode, deactivateSelectMode, isActivati
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle()
 const { revertTranslation } = useSidepanelActions()
 const { handleError } = useErrorHandler()
+const { focusOrCreateTab } = useExtensionAPI()
 
 // Computed
 const isExtensionEnabledGlobal = computed(() => {
@@ -240,6 +257,7 @@ const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
 const mouseHoverIcon = browser.runtime.getURL('icons/ui/mouse-hover.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
+const subtitleIcon = browser.runtime.getURL('icons/ui/subtitle.png')
 
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
@@ -349,6 +367,18 @@ const handleSettingsClick = async () => {
     getLogger().error('Failed to open options page:', error)
     await handleError(error, 'SidepanelToolbar-openSettings')
     showVisualFeedback(document.getElementById('settingsBtn'), 'error')
+  }
+};
+
+const handleSubtitleClick = async () => {
+  getLogger().debug('Subtitle Translator button clicked!')
+  try {
+    await focusOrCreateTab('src/html/subtitle.html')
+    showVisualFeedback(document.getElementById('subtitleBtn'), 'success')
+  } catch (error) {
+    getLogger().error('Failed to open subtitle page:', error)
+    await handleError(error, 'SidepanelToolbar-openSubtitle')
+    showVisualFeedback(document.getElementById('subtitleBtn'), 'error')
   }
 };
 </script>

@@ -5,13 +5,15 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { isCancellationError } from "@/shared/error-management/ErrorMatcher.js";
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
 import { MessageFormat, MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
-import ExtensionContextManager from "@/core/extensionContext.js";
 import { TranslationMode, getSourceLanguageAsync, getTargetLanguageAsync, getEffectiveProviderAsync } from "@/shared/config/config.js";
 import { detectOS as detectPlatform } from "@/utils/browser/compatibility.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { safeSendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { isValidSync } from "@/core/contextCore.js";
+import { handleContextError } from "@/core/contextErrorHandler.js";
 
 import { resourceTracker, processedMessageIds, activeProcessing, successfullyCompletedToastIds } from './state.js';
 import { 
@@ -43,8 +45,8 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     return;
   }
 
-  if (!ExtensionContextManager.isValidSync()) {
-    ExtensionContextManager.handleContextError(new Error('Extension context invalidated'), 'text-field-translation');
+  if (!isValidSync()) {
+    handleContextError(new Error('Extension context invalidated'), 'text-field-translation');
     return;
   }
 
@@ -122,7 +124,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     
     // Race between the message, the timeout, and the abort signal
     const messageResult = await Promise.race([
-      ExtensionContextManager.safeSendMessage(
+      safeSendMessage(
         translationMessage, 
         { forceRegular: true, silent: true }, 
         'text-field-translation'

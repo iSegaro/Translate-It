@@ -25,7 +25,9 @@ PageTranslationManager (Orchestrator)
 ├─→ PageTranslationScheduler (Batching Engine)
 │       ├─→ PageTranslationQueueFilter (On-Stop Filtering)
 │       ├─→ PageTranslationFluidFilter (Fluid/Score Filtering)
-│       └─→ UnifiedMessaging → Translation Engine
+│       └─→ UnifiedMessaging → UnifiedModeCoordinator (Background Orchestration)
+│                                       ↓
+│                                  Translation Engine
 │
 ├─→ PageTranslationScrollTracker (Motion Detection)
 │
@@ -80,7 +82,22 @@ Static utilities for DOM calculations and shared system values.
     - **Optimization Level Alignment**: The `Scheduler` queries the active provider's optimization level (1-5) and adjusts its internal `chunkSize` and `maxConcurrent` limits accordingly.
     - **Fluid Mode**: Automatic flushes using `FluidFilter`.
     - **On Stop Mode**: Deferred flushes triggered by `ScrollTracker` via `QueueFilter`.
-4.  **Application**: Directionality (RTL/LTR) is applied, and text is replaced in the DOM.
+4.  **Background Orchestration**:
+    - **Unified Routing**: Requests are sent to `UnifiedModeCoordinator.processPageTranslation`.
+    - **Standardized Processing**: Uses `_processGenericBatch` for consistent lifecycle management and character counting.
+    - **Stability Guard**: Leverages the 5-minute background timeout to ensure resources are reclaimed if a provider hangs.
+5.  **Application**: Directionality (RTL/LTR) is applied, and text is replaced in the DOM.
+
+## Stability & Resiliency
+
+### 1. Background Timeout
+Page translation batches are protected by a **5-minute timeout** in the background services. This ensures that even if a page has thousands of nodes and the translation provider becomes unresponsive, the background script won't hang indefinitely.
+
+### 2. Smart Abort
+When the user clicks "Stop" or "Restore" in the page translation UI, a cancellation signal is sent to the background to immediately abort any pending batches, saving API costs and local resources.
+
+### 3. Fault-Tolerant Mapping
+The system uses a "Soft-Failure" strategy. If a single batch fails, the scheduler catches the error, marks those specific segments as failed (reverting to original text), and continues with the rest of the page. This prevents a single network error from breaking the entire page translation.
 
 ## Smart Features
 

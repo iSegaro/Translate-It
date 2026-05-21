@@ -76,8 +76,12 @@ describe('OptimizedJsonHandler', () => {
     handler = new OptimizedJsonHandler();
 
     mockAbortController = {
-      signal: { aborted: false },
-      abort: vi.fn(() => { mockAbortController.signal.aborted = true; })
+      signal: { 
+        aborted: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      },
+      abort: vi.fn(function() { this.signal.aborted = true; })
     };
 
     mockEngine = {

@@ -7,6 +7,7 @@ export class MessageActions {
   static GET_INFO = 'getInfo';
   static HANDLE_ERROR = 'handleError';
   static OPEN_OPTIONS_PAGE = 'openOptionsPage';
+  static FOCUS_OR_CREATE_TAB = 'focusOrCreateTab';
   
   // Translation actions
   static TRANSLATE = 'TRANSLATE';
@@ -24,6 +25,13 @@ export class MessageActions {
   static CANCEL_TRANSLATION = 'CANCEL_TRANSLATION';
   static TRANSLATION_CANCELLED = 'TRANSLATION_CANCELLED';
   static CANCEL_SESSION = 'CANCEL_SESSION';
+  
+  // Subtitle Translation
+  static SUBTITLE_TRANSLATE = "SUBTITLE_TRANSLATE";
+  static SUBTITLE_TRANSLATE_PROGRESS = "SUBTITLE_TRANSLATE_PROGRESS";
+  static SUBTITLE_TRANSLATE_COMPLETE = "SUBTITLE_TRANSLATE_COMPLETE";
+  static SUBTITLE_TRANSLATE_ERROR = "SUBTITLE_TRANSLATE_ERROR";
+  static SUBTITLE_TRANSLATE_CANCEL = "SUBTITLE_TRANSLATE_CANCEL";
 
   // Select Element
   static GET_SELECT_ELEMENT_STATE = 'getSelectElementState';

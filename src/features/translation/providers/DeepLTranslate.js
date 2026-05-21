@@ -18,6 +18,7 @@ import {
   PROVIDER_LANGUAGE_MAPPINGS
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
@@ -92,12 +93,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @returns {Object} Validation result with isValid flag and error details
    */
   _validateXMLPlaceholders(requestText, responseText) {
+    const xmlTagRegex = /<(?:x|br)\s+id\s*=\s*["']([A-Za-z0-9_]+)["']\s*\/?>/gi;
+
     // Extract XML tags from request
-    const requestTags = requestText.match(/<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi);
+    const requestTags = requestText.match(xmlTagRegex);
     const requestTagCount = requestTags ? requestTags.length : 0;
 
     // Extract XML tags from response
-    const responseTags = responseText.match(/<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi);
+    const responseTags = responseText.match(xmlTagRegex);
     const responseTagCount = responseTags ? responseTags.length : 0;
 
     // Check 1: Tag count mismatch
@@ -112,38 +115,22 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       };
     }
 
-    // Check 2: Validate tag syntax integrity
-    const malformedPatterns = [
-      /<x\s+id[^>]*[^/]>/gi,      // Missing closing slash: <x id="0">
-      /<x\s+id=\s*[^"'][^>]*>/gi,  // Missing quotes: <x id=0/>
-      /<x\s+[^i]/gi,                // Missing id attribute: <x/>
-      /<\s*x/gi                     // Space after <: < x>
-    ];
-
-    for (const pattern of malformedPatterns) {
-      if (pattern.test(responseText)) {
-        return {
-          isValid: false,
-          error: 'malformed_tags',
-          details: {
-            pattern: pattern.source
-          }
-        };
-      }
-    }
+    // Check 2: Validate tag syntax integrity (REMOVED)
+    // DeepL API can sometimes alter spacing or expand tags, which causes false positives here.
+    // As long as the tags can be parsed and IDs match, we are good.
 
     // Check 3: Verify all placeholder IDs are unique and present
     const requestIds = new Set();
-    const requestIdMatch = /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi;
+    const requestIdMatch = /<(?:x|br)\s+id\s*=\s*["']([A-Za-z0-9_]+)["']\s*\/?>/gi;
     let match;
     while ((match = requestIdMatch.exec(requestText)) !== null) {
-      requestIds.add(parseInt(match[1], 10));
+      requestIds.add(match[1]);
     }
 
     const responseIds = new Set();
-    const responseIdMatch = /<x\s+id\s*=\s*["'](\d+)["']\s*\/?>/gi;
+    const responseIdMatch = /<(?:x|br)\s+id\s*=\s*["']([A-Za-z0-9_]+)["']\s*\/?>/gi;
     while ((match = responseIdMatch.exec(responseText)) !== null) {
-      const id = parseInt(match[1], 10);
+      const id = match[1];
       if (responseIds.has(id)) {
         // Duplicate ID found
         return {
@@ -213,7 +200,10 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     );
 
     // Filter out empty or whitespace-only texts (DeepL rejects them)
-    const validTexts = chunkTexts.filter(text => text && text.trim().length > 0);
+    // Use getTextInfo to extract text from objects (Subtitle cues, Select Element)
+    const validTexts = chunkTexts
+      .map(item => getTextInfo(item).text)
+      .filter(text => text && text.trim().length > 0);
 
     if (validTexts.length === 0) {
       logger.warn('[DeepL] No valid texts to translate after filtering');
@@ -262,16 +252,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
 
-    // Step 1: Detect XML placeholders in request
-    const hasXMLPlaceholders = validTexts.some(text =>
-      /<x\s+id\s*=\s*["']\d+["']\s*\/?>/gi.test(text)
-    );
-
-    logger.debug('[DeepL] XML placeholder detection:', {
-      hasXMLPlaceholders,
-      textCount: validTexts.length
-    });
-
     const sanitizeText = (text) => {
       const originalLength = text.length;
       let sanitized = text
@@ -297,10 +277,36 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
     const textsToTranslate = validTexts.map(text => {
       // CRITICAL: Sanitize text before processing to remove problematic characters
-      const sanitizedText = sanitizeText(text);
+      let sanitizedText = sanitizeText(text);
 
-      // Protect newlines using the unified NewlineManager
-      return NewlineManager.protect(sanitizedText);
+      // CRITICAL: Convert SubtitleTextProtector tokens to DeepL XML tags
+      // Do this AFTER sanitization so the < and > don't get escaped
+      
+      // 1. Convert newline tokens to <br> tags. This is crucial because DeepL treats <br> as a hard 
+      // sentence boundary and will not merge sentences across it or move it to the edges.
+      sanitizedText = sanitizedText.replace(/@@SUB_NL_([A-Za-z0-9_]+)@@/g, '<br id="SUB_NL_$1" />');
+      
+      // 2. Convert other tokens (formatting, styles) to standard <x> placeholders
+      sanitizedText = sanitizedText.replace(/@@SUB_([A-Za-z0-9_]+)@@/g, '<x id="SUB_$1" />');
+
+      // Protect any other newlines using the unified NewlineManager
+      let textWithMarkers = NewlineManager.protect(sanitizedText);
+      
+      // Convert standard NewlineManager markers to HTML <br/> tags as well
+      textWithMarkers = textWithMarkers.replace(/<n1\s*\/?>/gi, '<br/>');
+      textWithMarkers = textWithMarkers.replace(/<n2\s*\/?>/gi, '<br/><br/>');
+      
+      return textWithMarkers;
+    });
+
+    // Step 1: Detect XML placeholders in request (after conversion)
+    const hasXMLPlaceholders = textsToTranslate.some(text =>
+      /<x\s+id\s*=\s*["'][A-Za-z0-9_]+["']\s*\/?>/gi.test(text)
+    );
+
+    logger.debug('[DeepL] XML placeholder detection:', {
+      hasXMLPlaceholders,
+      textCount: validTexts.length
     });
 
     // Get beta languages setting
@@ -348,14 +354,19 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     }
 
     // CRITICAL: Add XML tag handling parameters
-    // This enables DeepL's native XML tag preservation
+    // This enables DeepL's native XML tag preservation.
+    // We MUST NOT use 'ignore_tags' for <x> or <n1> because DeepL's engine often completely deletes
+    // empty ignored tags (which causes the translated output to lose SRT tags and newlines).
+    // By simply enabling XML mode, DeepL treats them as structural elements and preserves them perfectly.
     requestBody.append('tag_handling', 'xml');
-    // Ignore both newline markers and any existing placeholders
-    requestBody.append('ignore_tags', 'n1,n2,x');
+    
+    // IMPORTANT: Force DeepL to treat <n1>, <n2>, and <br> as hard sentence splits.
+    // This prevents DeepL from artificially moving newline markers to the beginning or end of a translation block.
+    requestBody.append('splitting_tags', 'n1,n2,br');
 
     logger.debug('[DeepL] XML tag handling enabled', {
       tag_handling: 'xml',
-      ignore_tags: 'n1,n2,x'
+      splitting_tags: 'n1,n2,br'
     });
 
     // 1. Prepare rich context (Environmental + Compact History)
@@ -372,7 +383,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     }
 
     // Additional options
-    requestBody.append('split_sentences', 'nonewlines'); // Preserve newlines in translation
+    // CRITICAL: We must NOT use 'nonewlines' here. If we use 'nonewlines', DeepL treats the entire
+    // block as a single sentence and will aggressively merge phrases (e.g. "OK\nLet's do it" -> "باشه انجامش بدیم")
+    // which results in the newline being pushed to the very beginning or end of the string.
+    // By using '1' (default), DeepL splits at newlines and preserves their exact structural position.
+    requestBody.append('split_sentences', '1');
     requestBody.append('preserve_formatting', '1'); // true
 
     // Debug log the request (without exposing full text content)
@@ -386,7 +401,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       hasContext: !!richContext
     });
 
-    const originalCharCount = this._calculateTraditionalCharCount(chunkTexts);
+    const originalCharCount = chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0);
 
     try {
       const result = await this._executeRequest({
@@ -440,11 +455,20 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
           // Restore ALL newlines using the unified NewlineManager
           const restoredTranslations = validTranslations.map(translation => {
-            // Step 1: Restore newlines from markers
-            let restored = NewlineManager.restore(translation);
+            // Step 0: Restore standard <br/> tags back to newlines
+            let restored = translation.replace(/<br\s*\/?>/gi, '\n');
+
+            // Step 1: Restore newlines from markers (fallback)
+            restored = NewlineManager.restore(restored);
 
             // Step 2: Unescape XML entities back to original characters
             restored = unescapeXML(restored);
+
+            // Step 3: Restore SubtitleTextProtector tokens.
+            // Restore newline tokens (which were sent as <br id="...">)
+            restored = restored.replace(/<br\s+id\s*=\s*["']SUB_NL_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/br>\s*)?/gi, '@@SUB_NL_$1@@');
+            // Restore other tokens (which were sent as <x id="...">)
+            restored = restored.replace(/<x\s+id\s*=\s*["']SUB_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/x>\s*)?/gi, '@@SUB_$1@@');
 
             return restored;
           });
@@ -460,7 +484,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
           let validIndex = 0;
 
           for (let i = 0; i < chunkTexts.length; i++) {
-            const text = chunkTexts[i];
+            const text = getTextInfo(chunkTexts[i]).text;
             if (text && text.trim().length > 0) {
               // This text was translated - use restored translation
               result.push(restoredTranslations[validIndex] || '');
@@ -475,7 +499,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         },
         context,
         abortController,
-        charCount: this._calculateTraditionalCharCount(validTexts),
+        charCount: validTexts.join('').length,
         sessionId: options.sessionId,
         originalCharCount: options.originalCharCount || originalCharCount
       });
@@ -492,7 +516,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
         logger.error('[DeepL] XML corruption detected, falling back to original text for this chunk');
-        return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
+        return chunkTexts.map(t => getTextInfo(t).text);
       }
 
       // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
@@ -506,9 +530,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         // Run both halves in parallel for better performance during fallback
         const [firstResult, secondResult] = await Promise.all([
           this._translateChunk(firstHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => firstHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t)),
+            .catch(() => firstHalf.map(t => getTextInfo(t).text)),
           this._translateChunk(secondHalf, sourceLang, targetLang, translateMode, abortController, retryAttempt + 1, segmentCount, chunkIndex, totalChunks, options)
-            .catch(() => secondHalf.map(t => typeof t === 'object' ? (t.t || t.text || "") : t))
+            .catch(() => secondHalf.map(t => getTextInfo(t).text))
         ]);
 
         return [...firstResult, ...secondResult];
@@ -520,7 +544,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
         const results = [];
         for (const text of chunkTexts) {
-          const originalText = typeof text === 'object' ? (text.t || text.text || "") : (text || "");
+          const originalText = getTextInfo(text).text;
           if (!originalText || originalText.trim().length === 0) {
             results.push('');
             continue;

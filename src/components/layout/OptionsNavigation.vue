@@ -36,7 +36,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { settingsManager } from '@/shared/managers/SettingsManager.js'
-import ExtensionContextManager from '@/core/extensionContext.js'
+import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 
@@ -197,7 +197,7 @@ const saveAllSettings = async () => {
     await settingsManager.refreshSettings()
 
     // Notify all tabs about settings change using cross-browser compatible approach
-    await ExtensionContextManager.safeSendMessage({
+    await safeSendMessage({
       action: MessageActions.SETTINGS_UPDATED,
       timestamp: Date.now()
     }, 'settings-notification')

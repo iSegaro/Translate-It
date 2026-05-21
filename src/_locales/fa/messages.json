@@ -369,7 +369,10 @@
     "message": "قبل از پخش صدا، زبان متن را به طور هوشمند شناسایی می‌کند تا از صدای صحیح برای آن زبان استفاده شود."
   },
   "import_success": {
-    "message": "تنظیمات با موفقیت وارد شد."
+    "message": "تنظیمات با موفقیت درون‌ریزی شد."
+  },
+  "import_confirm_message": {
+    "message": "⚠️ هشدار: درون‌ریزی تنظیمات باعث جایگزینی کامل پیکربندی فعلی شما و بارگذاری مجدد صفحه خواهد شد.\n\nآیا مایل به ادامه هستید؟"
   },
   "prompt_reset_button": {
     "message": "دوباره"
@@ -2485,5 +2488,101 @@
   },
   "dict_setting_show_examples": {
     "message": "نمایش مثال‌ها"
+  },
+  "subtitle_drop_title": {
+    "message": "فایل زیرنویس خود را اینجا رها کنید"
+  },
+  "subtitle_drop_hint": {
+    "message": "پشتیبانی از فرمت .srt"
+  },
+  "subtitle_select_file": {
+    "message": "انتخاب فایل"
+  },
+  "subtitle_report_issue": {
+    "message": "گزارش مشکل در ترجمه این فایل زیرنویس"
+  },
+  "subtitle_report_description_placeholder": {
+    "message": "[لطفا مشکل در فرمت یا ترجمه را اینجا توضیح دهید. همچنین لطفا فایل .srt مشکل‌دار خود را برای بررسی بیشتر در این کادر رها کنید (Drag & Drop).]"
+  },
+  "subtitle_change_file": {
+    "message": "تغییر فایل"
+  },
+  "subtitle_start_btn": {
+    "message": "شروع ترجمه"
+  },
+  "subtitle_translating": {
+    "message": "در حال ترجمه..."
+  },
+  "subtitle_translated": {
+    "message": "ترجمه شده"
+  },
+  "subtitle_failed": {
+    "message": "ناموفق"
+  },
+  "subtitle_remaining": {
+    "message": "زمان باقی‌مانده"
+  },
+  "subtitle_total": {
+    "message": "کل جملات"
+  },
+  "subtitle_cancel_btn": {
+    "message": "لغو عملیات"
+  },
+  "subtitle_app_title": {
+    "message": "مترجم زیرنویس"
+  },
+  "subtitle_app_powered_by": {
+    "message": "قدرت گرفته از Translate It"
+  },
+  "subtitle_download_btn": {
+    "message": "دانلود زیرنویس ترجمه شده"
+  },
+  "subtitle_another_file_btn": {
+    "message": "ترجمه فایل دیگر"
+  },
+  "app_copyright": {
+    "message": "تمامی حقوق برای Translate It محفوظ است."
+  },
+  "subtitle_complete": {
+    "message": "ترجمه با موفقیت انجام شد"
+  },
+  "subtitle_error_title": {
+    "message": "خطایی رخ داده است!"
+  },
+  "subtitle_try_again_btn": {
+    "message": "تلاش مجدد"
+  },
+  "subtitle_terminal_error": {
+    "message": "متوقف شده به دلیل خطا"
+  },
+  "select_language_placeholder": {
+    "message": "انتخاب زبان"
+  },
+  "subtitle_languages_label": {
+    "message": "زبان‌های ترجمه"
+  },
+  "subtitle_encoding_label": {
+    "message": "کدگذاری (Encoding)"
+  },
+  "subtitle_preview_label": {
+    "message": "پیش‌نمایش (۱۰۰ مورد اول)"
+  },
+  "subtitle_live_view_label": {
+    "message": "نمایش زنده ترجمه"
+  },
+  "subtitle_error": {
+    "message": "خطا"
+  },
+  "popup_subtitle_alt_icon": {
+    "message": "ترجمه زیرنویس"
+  },
+  "popup_subtitle_title_icon": {
+    "message": "ترجمه زیرنویس"
+  },
+  "open_subtitle_translator": {
+    "message": "ترجمه زیرنویس"
+  },
+  "configure_providers_tooltip": {
+    "message": "تنظیمات ارائه‌دهندگان"
   }
 }

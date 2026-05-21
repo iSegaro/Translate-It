@@ -60,7 +60,8 @@ export function generateManifest(browser = 'chrome') {
           'src/styles/*.css',
           'js/*.js',
           '_locales/*',
-          'docs/Changelog.md'
+          'docs/Changelog.md',
+          'src/html/subtitle.html'
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
@@ -240,31 +241,11 @@ function generateFirefoxManifest(baseManifest) {
       default_title: '__MSG_name__'
     },
     
-    // Firefox-specific web accessible resources format
-    web_accessible_resources: [
-      {
-        resources: [
-          'browser-polyfill.js',
-          'icons/flags/*.svg',
-          'icons/ui/*.gif',
-          'icons/ui/*.png',
-          'icons/ui/*.svg',
-          'icons/extension/*.png',
-          'icons/extension/*.svg',
-          'icons/providers/*.png',
-          'icons/providers/*.svg',
-          'css/*.css',
-          'styles/*.css',
-          'src/styles/*.css',
-          'js/*.js',
-          '_locales/*',
-          'docs/Changelog.md',
-          'assets/ocr/*'
-        ],
-        matches: ['<all_urls>', 'file://*/*']
-        // Note: use_dynamic_url not supported in Firefox yet
-      }
-    ]
+    // Firefox-specific web accessible resources format (stripping use_dynamic_url which is unsupported)
+    web_accessible_resources: baseManifest.web_accessible_resources.map(resource => {
+      const { use_dynamic_url, ...rest } = resource;
+      return rest;
+    })
   };
 
   // Ensure no persistent key is present for Firefox MV3

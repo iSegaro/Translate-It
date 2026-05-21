@@ -174,14 +174,19 @@ export const AIConversationHelper = {
       getAIConversationHistoryEnabledAsync()
     ]);
 
-    // 1. Structural Context (Site Title, Section Heading)
+    // 1. Subtitle Context (Dialogue continuity for subtitle translation)
+    if (contextEnabled && contextMetadata?.dialogueContext) {
+      contextParts.push(contextMetadata.dialogueContext);
+    }
+
+    // 2. Structural Context (Site Title, Section Heading)
     if (contextEnabled && contextMetadata) {
       if (contextMetadata.pageTitle) contextParts.push(`Site: ${contextMetadata.pageTitle}`);
       if (contextMetadata.heading) contextParts.push(`Section: ${contextMetadata.heading}`);
       if (contextMetadata.role) contextParts.push(`Context: ${contextMetadata.role}`);
     }
 
-    // 2. Compact History (Last full turn: User + Assistant)
+    // 3. Compact History (Last full turn: User + Assistant)
     // History is only included for Select Element to maintain style/consistency
     if (historyEnabled && sessionId && translateMode === TranslationMode.Select_Element) {
       const charLimit = TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.DEEPL;
@@ -228,6 +233,11 @@ export const AIConversationHelper = {
       getAIContextTranslationEnabledAsync()
     ]);
 
+    // Flatten contextMetadata if it's nested (compatibility with Select Element context passing)
+    const metadata = contextMetadata?.contextMetadata 
+      ? { ...contextMetadata, ...contextMetadata.contextMetadata } 
+      : contextMetadata;
+
     const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js');
     const { getSourceLanguageAsync } = await import('@/shared/config/config.js');
     
@@ -248,13 +258,8 @@ export const AIConversationHelper = {
     // Detect if the input is in the specific JSON format (array of objects with 'text' property)
     let isJsonMode = false;
     const textToCheck = Array.isArray(text) ? text[0] : text;
-    try {
-      const parsedText = JSON.parse(textToCheck);
-      if (isSpecificTextJsonFormat(parsedText)) {
-        isJsonMode = true;
-      }
-    } catch {
-      // Not JSON
+    if (isSpecificTextJsonFormat(textToCheck)) {
+      isJsonMode = true;
     }
 
     // Determine if we should use AI batch prompt
@@ -262,13 +267,17 @@ export const AIConversationHelper = {
     const shouldUseBatchPrompt = !isDictionary && (
       translateMode === TranslationMode.Select_Element ||
       translateMode === TranslationMode.Page ||
+      translateMode === TranslationMode.Subtitle ||
       isJsonMode
     );
 
     if (shouldUseBatchPrompt) {
       const useFollowup = !firstTurn && historyEnabled && translateMode === TranslationMode.Select_Element;
 
-      if (sourceLang === 'auto') {
+      // Prioritize custom prompt template from metadata (Subtitle mode)
+      if (metadata?.promptTemplate) {
+        promptTemplate = metadata.promptTemplate;
+      } else if (sourceLang === 'auto') {
         promptTemplate = useFollowup
           ? await getPromptBASEAIFollowupAutoAsync()
           : await getPromptBASEAIBatchAutoAsync();
@@ -288,29 +297,44 @@ export const AIConversationHelper = {
     }
 
     // Resolve instructions from template even for AI batch prompts
-    const promptInstructionsTemplate = sourceLang === 'auto'
-      ? await getPromptAutoAsync()
-      : await getPromptAsync();
+    let promptInstructions;
+    if (metadata?.instruction) {
+      // Prioritize custom instructions from metadata (Subtitle mode)
+      promptInstructions = metadata.instruction
+        .replace(/\$_{SOURCE}/g, sourceName)
+        .replace(/\$_{TARGET}/g, targetName);
+    } else {
+      const promptInstructionsTemplate = sourceLang === 'auto'
+        ? await getPromptAutoAsync()
+        : await getPromptAsync();
 
-    // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
-    const promptInstructionsWithoutText = promptInstructionsTemplate
-      .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
-      .replace(/\n\s*$/g, '');        // Remove trailing empty lines
+      // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
+      const promptInstructionsWithoutText = promptInstructionsTemplate
+        .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
+        .replace(/\n\s*$/g, '');        // Remove trailing empty lines
 
-    const promptInstructions = promptInstructionsWithoutText
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName);
+      promptInstructions = promptInstructionsWithoutText
+        .replace(/\$_{SOURCE}/g, sourceName)
+        .replace(/\$_{TARGET}/g, targetName);
+    }
 
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
     let systemPrompt;
     if (shouldUseBatchPrompt) {
       // For batch prompts, we need to inject instructions and verify $_{TEXT} exists
       // All prompt templates must include $_{TEXT} placeholder
-      if (!promptTemplate.includes("$_{TEXT}")) {
-        throw new Error('Prompt template must include $_{TEXT} placeholder');
+      
+      // Fallback if the custom template doesn't have standard placeholders (e.g. SubtitlePrompt uses _{SOURCE})
+      let normalizedTemplate = promptTemplate
+        .replace(/_{SOURCE}/g, "$_{SOURCE}")
+        .replace(/_{TARGET}/g, "$_{TARGET}");
+
+      if (!normalizedTemplate.includes("$_{TEXT}")) {
+        // If it's a batch prompt but doesn't have $_{TEXT}, append it at the end
+        normalizedTemplate += "\n\n$_{TEXT}";
       }
 
-      systemPrompt = promptTemplate
+      systemPrompt = normalizedTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName)
         .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
@@ -323,7 +347,7 @@ export const AIConversationHelper = {
     }
 
     // Determine if we should wrap the text in a JSON structure
-    // We wrap for batch requests (Select_Element, Page) or JSON input (excluding dictionary)
+    // We wrap for batch requests (Select_Element, Page, Subtitle) or JSON input (excluding dictionary)
     const shouldWrap = shouldUseBatchPrompt && !isDictionary;
 
     let userText;
@@ -338,7 +362,9 @@ export const AIConversationHelper = {
             const protectedText = NewlineManager.protect(originalText);
             return {
               id: String(t.i || t.id || idx),
-              text: protectedText
+              text: protectedText,
+              // Include per-cue context if available (critical for Subtitles)
+              ...(t.context && { context: t.context })
             };
           }
           return { id: String(idx), text: NewlineManager.protect(String(t)) };
@@ -357,8 +383,8 @@ export const AIConversationHelper = {
                                 translateMode === TranslationMode.Page ||
                                 translateMode === TranslationMode.Selection;
 
-    if (contextMetadata && contextEnabled && contextSupportedMode) {
-      finalSystemPrompt += `\nContext: Page: "${contextMetadata.pageTitle || 'Unknown'}", Section: "${contextMetadata.heading || 'Main'}", Role: "${contextMetadata.role || 'Content'}".`;
+    if (metadata && contextEnabled && contextSupportedMode) {
+      finalSystemPrompt += `\nContext: Page: "${metadata.pageTitle || 'Unknown'}", Section: "${metadata.heading || 'Main'}", Role: "${metadata.role || 'Content'}".`;
     }
 
     // Replace text placeholder according to project standard $_{TEXT} with global regex

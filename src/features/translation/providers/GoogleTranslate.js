@@ -13,7 +13,7 @@ import { TranslationMode } from "@/shared/config/config.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 
@@ -94,7 +94,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
       }
     });
 
-    const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const textToTranslate = chunkTexts
+      .map(item => getTextInfo(item).text)
+      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
     const requestBody = `q=${encodeURIComponent(textToTranslate)}`;
 
     const result = await this._executeRequest({
@@ -176,7 +178,7 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
             }
           }
 
-          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && chunkTexts[i].trim());
+          const hasEmpty = results.some((r, i) => !r.trim() && chunkTexts[i] && getTextInfo(chunkTexts[i]).text.trim());
           if (hasEmpty) {
             const joinedResult = data[0].map(segment => segment[0]).join('');
             return { translatedText: joinedResult, candidateText: "" };
@@ -205,7 +207,9 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
     }
 
     // Return translated text. Coordinator will handle robust splitting for multiple segments.
-    const finalResult = result?.translatedText || chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+    const finalResult = result?.translatedText || chunkTexts
+      .map(item => getTextInfo(item).text)
+      .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
     // Add completion log for successful translation
     if (finalResult) {

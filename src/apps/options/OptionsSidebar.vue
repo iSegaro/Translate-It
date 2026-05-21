@@ -42,6 +42,20 @@
         </div>
       </div>
 
+      <a 
+        id="SUBTITLE_TRANSLATOR"
+        href="#"
+        class="sidebar-section subtitle-link-section"
+        @click.prevent="openSubtitlePage"
+      >
+        <img
+          src="@/icons/ui/subtitle.png"
+          class="subtitle-icon"
+          alt="Subtitle"
+        >
+        <span class="subtitle-label">{{ t('open_subtitle_translator', 'Subtitle Translator') }}</span>
+      </a>
+
       <div class="sidebar-footer">
         <a
           :href="REPO_URLS.GITHUB_MAIN"
@@ -86,6 +100,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { REPO_URLS } from '@/shared/constants/core.js'
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js'
 import ThemeSelector from './components/ThemeSelector.vue'
 import InterfaceLocaleSelector from './components/InterfaceLocaleSelector.vue'
 
@@ -94,6 +109,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsSidebar')
 
 // Composables
 const { t } = useUnifiedI18n()
+const { focusOrCreateTab } = useExtensionAPI()
 
 // State
 const sidebarError = ref('')
@@ -119,4 +135,12 @@ onMounted(async () => {
     sidebarError.value = error?.message || String(error)
   }
 })
+
+const openSubtitlePage = async () => {
+  try {
+    await focusOrCreateTab('src/html/subtitle.html')
+  } catch (error) {
+    logger.error('Failed to open subtitle page:', error)
+  }
+}
 </script>

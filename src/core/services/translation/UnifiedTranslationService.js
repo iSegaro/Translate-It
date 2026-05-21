@@ -78,7 +78,13 @@ export class UnifiedTranslationService {
       data.provider = await this._resolveEffectiveProvider(data, context);
     }
 
-    const estimatedChars = typeof data?.text === 'string' ? data.text.length : 0;
+    // Calculate estimated characters for limit validation
+    let estimatedChars = 0;
+    if (typeof data?.text === 'string') {
+      estimatedChars = data.text.length;
+    } else if (Array.isArray(data?.items)) {
+      estimatedChars = data.items.reduce((sum, item) => sum + (typeof item === 'string' ? item.length : (item.text?.length || 0)), 0);
+    }
     const mode = data?.mode || 'unknown';
 
     // 1. Character Limit Validation

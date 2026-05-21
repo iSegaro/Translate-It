@@ -12,12 +12,19 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })
 }));
 
-vi.mock('@/core/extensionContext.js', () => ({
-  default: {
+vi.mock('@/core/extensionContext.js', () => {
+  const mock = {
     isContextError: vi.fn().mockReturnValue(false),
-    handleContextError: vi.fn()
-  }
-}));
+    handleContextError: vi.fn(),
+    isValidSync: vi.fn().mockReturnValue(true),
+  };
+  return {
+    default: mock,
+    isContextError: mock.isContextError,
+    handleContextError: mock.handleContextError,
+    isValidSync: mock.isValidSync,
+  };
+});
 
 describe('StorageCore CRUD Operations', () => {
   let storage;

@@ -12,6 +12,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import browser from 'webextension-polyfill';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
+import { getTextInfo } from '@/features/translation/providers/utils/TraditionalTextProcessor.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'StreamingManager');
 
@@ -104,7 +105,7 @@ export class StreamingManager extends ResourceTracker {
 
     // Only stream for multiple segments or complex content
     const totalComplexity = segments.reduce((sum, seg) => 
-      sum + this._calculateTextComplexity(seg), 0
+      sum + this._calculateTextComplexity(getTextInfo(seg).text), 0
     );
 
     return segments.length > 1 || totalComplexity > 100;
@@ -170,8 +171,8 @@ export class StreamingManager extends ResourceTracker {
       }
 
       // Log individual batch stats using both counts
-      const networkChars = charCount !== null ? charCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
-      const originalChars = originalCharCount !== null ? originalCharCount : (originalBatch.reduce((sum, t) => sum + (t?.length || 0), 0) || 0);
+      const networkChars = charCount !== null ? charCount : (originalBatch.reduce((sum, t) => sum + getTextInfo(t).length, 0) || 0);
+      const originalChars = originalCharCount !== null ? originalCharCount : (originalBatch.reduce((sum, t) => sum + getTextInfo(t).length, 0) || 0);
       
       statsManager.printSummary(streamInfo.sessionId, {
         status: 'Batch',

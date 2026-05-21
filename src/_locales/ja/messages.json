@@ -1124,6 +1124,12 @@
   "security_warning_question": {
     "message": "パスワード保護なしで続行しますか？"
   },
+  "import_success": {
+    "message": "設定が正常にインポートされました。"
+  },
+  "import_confirm_message": {
+    "message": "⚠️ 警告: 設定をインポートすると、現在の設定が完全に上書きされ、ページが再読み込みされます。\n\n続行しますか？"
+  },
   "export_success": {
     "message": "設定が正常にエクスポートされました！"
   },
@@ -2485,5 +2491,101 @@
   },
   "dict_setting_show_examples": {
     "message": "例文を表示"
+  },
+  "subtitle_drop_title": {
+    "message": "ここに字幕ファイルをドロップしてください"
+  },
+  "subtitle_drop_hint": {
+    "message": ".srt 形式に対応しています"
+  },
+  "subtitle_select_file": {
+    "message": "ファイルを選択"
+  },
+  "subtitle_report_issue": {
+    "message": "この字幕ファイルの翻訳に関する問題を報告する"
+  },
+  "subtitle_report_description_placeholder": {
+    "message": "[ここで翻訳やフォーマットの問題について説明してください。調査に役立てるため、問題のある.srtファイルをここにドラッグ＆ドロップしてください。]"
+  },
+  "subtitle_change_file": {
+    "message": "ファイルを変更"
+  },
+  "subtitle_start_btn": {
+    "message": "翻訳を開始"
+  },
+  "subtitle_translating": {
+    "message": "翻訳中..."
+  },
+  "subtitle_translated": {
+    "message": "翻訳済み"
+  },
+  "subtitle_failed": {
+    "message": "失敗"
+  },
+  "subtitle_remaining": {
+    "message": "残り時間"
+  },
+  "subtitle_total": {
+    "message": "総キュー数"
+  },
+  "subtitle_cancel_btn": {
+    "message": "キャンセル"
+  },
+  "subtitle_app_title": {
+    "message": "字幕翻訳"
+  },
+  "subtitle_app_powered_by": {
+    "message": "Translate It 提供"
+  },
+  "subtitle_download_btn": {
+    "message": "翻訳済み字幕をダウンロード"
+  },
+  "subtitle_another_file_btn": {
+    "message": "別のファイルを翻訳"
+  },
+  "app_copyright": {
+    "message": "© 2026 Translate It. All rights reserved."
+  },
+  "subtitle_complete": {
+    "message": "翻訳が完了しました"
+  },
+  "subtitle_error_title": {
+    "message": "エラーが発生しました"
+  },
+  "subtitle_try_again_btn": {
+    "message": "再試行"
+  },
+  "subtitle_terminal_error": {
+    "message": "エラーにより停止しました"
+  },
+  "select_language_placeholder": {
+    "message": "言語を選択"
+  },
+  "subtitle_languages_label": {
+    "message": "翻訳言語"
+  },
+  "subtitle_encoding_label": {
+    "message": "エンコーディング"
+  },
+  "subtitle_preview_label": {
+    "message": "プレビュー（最初の100件）"
+  },
+  "subtitle_live_view_label": {
+    "message": "ライブ翻訳ビュー"
+  },
+  "subtitle_error": {
+    "message": "エラー"
+  },
+  "popup_subtitle_alt_icon": {
+    "message": "字幕翻訳"
+  },
+  "popup_subtitle_title_icon": {
+    "message": "字幕翻訳"
+  },
+  "open_subtitle_translator": {
+    "message": "字幕翻訳"
+  },
+  "configure_providers_tooltip": {
+    "message": "翻訳プロバイダーの設定"
   }
 }

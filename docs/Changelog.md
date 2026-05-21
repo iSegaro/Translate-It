@@ -1,3 +1,15 @@
+#### v1.17.0 – Released on X XX, 2026
+
+##### Added
+
+- Added a new [Subtitle Translator](#/about?highlight=SUBTITLE_TRANSLATOR) tool for translating subtitle files
+
+##### Fixed
+
+- Fixed an issue where the selected translation provider was not being saved correctly ([#133](https://github.com/iSegaro/Translate-It/issues/133))
+
+---
+
 #### v1.16.0 – Released on May 19, 2026
 
 ##### Added

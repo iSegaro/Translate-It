@@ -9,7 +9,7 @@ import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorM
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { PROVIDER_LANGUAGE_MAPPINGS, getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
 import { getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 
@@ -71,7 +71,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     // Add key info log for translation start
     if (retryAttempt === 0) {
-      logger.info(`[Bing] Starting translation: ${chunkTexts.reduce((s, t) => s + (t?.length || 0), 0)} chars (Level: ${optimizationLevel})`);
+      logger.info(`[Bing] Starting translation: ${chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0)} chars (Level: ${optimizationLevel})`);
     }
 
     try {
@@ -82,7 +82,9 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         throw new Error('Translation cancelled by user');
       }
 
-      const textToTranslate = chunkTexts.join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
+      const textToTranslate = chunkTexts
+        .map(item => getTextInfo(item).text)
+        .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
       
       const sl = this._getLangCode(sourceLang);
       const tl = this._getLangCode(targetLang);
@@ -166,7 +168,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           const targetText = data?.[0]?.translations?.[0]?.text;
           if (typeof targetText !== 'string') {
             // Fallback to original text strings if translation is missing
-            return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
+            return chunkTexts.map(t => getTextInfo(t).text);
           }
           
           // Return raw text string. 
@@ -184,7 +186,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
       // If result is a string and we have multiple segments, let Coordinator split it.
       // If we are in a recursive call, we might need to wrap it in an array for the parent.
-      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t));
+      const finalResult = typeof result === 'string' ? [result] : (result || chunkTexts.map(t => getTextInfo(t).text));
 
       // Add completion log for successful translation
       if (retryAttempt === 0 && finalResult.length > 0) {
@@ -252,7 +254,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         // return the original text for THIS chunk instead of throwing.
         // This prevents one bad chunk from breaking the entire page translation.
         logger.debug(`[Bing] Translation consistently failed for this chunk. Returning original text to preserve stability.`);
-        return chunkTexts.map(t => typeof t === 'object' ? (t.t || t.text || "") : t);
+        return chunkTexts.map(t => getTextInfo(t).text);
       }
 
       const isFatal = isFatalError(error) || isFatalError(errorType);

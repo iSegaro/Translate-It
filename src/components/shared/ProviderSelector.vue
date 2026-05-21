@@ -546,6 +546,11 @@ const props = defineProps({
   ignoreHidden: {
     type: Boolean,
     default: false
+  },
+  placement: {
+    type: String,
+    default: 'auto', // auto, up, down
+    validator: (value) => ['auto', 'up', 'down'].includes(value)
   }
 })
 
@@ -779,7 +784,13 @@ const currentProviderName = computed(() => {
     return isDefaultInvalid.value ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
   }
   const provider = availableProviders.value.find(p => p.id === currentProvider.value)
-  return provider?.name || 'Google Translate'
+  
+  if (!provider) {
+    logger.warn('[ProviderSelector] Unknown provider ID:', currentProvider.value);
+    return currentProvider.value || 'Unknown';
+  }
+  
+  return provider.name;
 })
 
 /**
@@ -950,7 +961,9 @@ const toggleDropdown = () => {
         
         const isOptionsPage = window.location.href.includes('options.html');
 
-        if (props.mode === 'mobile') {
+        if (props.placement !== 'auto') {
+          isUpward.value = props.placement === 'up';
+        } else if (props.mode === 'mobile') {
           // On mobile, downward is almost always preferred to avoid sheet header clipping
           // Only go upward if space below is less than 220px and space above is significant
           isUpward.value = spaceBelow < 220 && spaceAbove > spaceBelow;

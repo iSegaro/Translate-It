@@ -213,6 +213,7 @@ class SecureStorage {
       "PROXY_USERNAME",
       "PROXY_PASSWORD",
       "translationHistory", // Exclude history from settings export
+      "TTS_VOICES_CACHE", // Exclude large TTS voice cache from export
     ];
 
     excludeFields.forEach((field) => {

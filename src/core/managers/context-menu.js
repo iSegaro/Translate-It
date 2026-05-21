@@ -32,6 +32,7 @@ const PAGE_CONTEXT_MENU_ID = "translate-with-select-element";
 const ACTION_TRANSLATE_ELEMENT_ID = "action-translate-element";
 const SCREEN_CAPTURE_MENU_ID = "screen-capture";
 const ACTION_CONTEXT_MENU_OPTIONS_ID = "open-options-page";
+const ACTION_CONTEXT_MENU_SUBTITLE_ID = "open-subtitle-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
@@ -221,20 +222,46 @@ async function deactivateSelectElementModeInAllTabs() {
 }
 
 /**
- * Helper function to focus or create a tab
+ * Helper function to focus or create a tab using the background script message action
  */
 async function focusOrCreateTab(url) {
   try {
-    const tabs = await browser.tabs.query({ url });
-    if (tabs.length > 0) {
-      await browser.tabs.update(tabs[0].id, { active: true });
-      await browser.windows.update(tabs[0].windowId, { focused: true });
-    } else {
-      await browser.tabs.create({ url });
+    const backgroundService = globalThis.backgroundService;
+    if (backgroundService && backgroundService.messageHandler) {
+      const handler = backgroundService.messageHandler.getHandlerForMessage(MessageActions.FOCUS_OR_CREATE_TAB);
+      if (handler) {
+        // Extract just the relative path (e.g. "src/html/subtitle.html")
+        let urlPath = "";
+        try {
+          urlPath = new URL(url).pathname.replace(/^\//, '');
+        } catch {
+          urlPath = url; // Fallback
+        }
+        
+        await handler({
+          action: MessageActions.FOCUS_OR_CREATE_TAB,
+          data: { urlPath }
+        }, { tab: null }, () => {});
+        return;
+      }
     }
+    
+    // Fallback if background service is not available (unlikely in context-menu.js since it runs in background)
+    // Send message through regular messaging system
+    let urlPath = "";
+    try {
+      urlPath = new URL(url).pathname.replace(/^\//, '');
+    } catch {
+      urlPath = url;
+    }
+    
+    await browser.runtime.sendMessage({
+      action: MessageActions.FOCUS_OR_CREATE_TAB,
+      data: { urlPath }
+    });
   } catch (error) {
-    logger.error("Failed to focus or create tab:", error);
-    // Fallback: just create a new tab
+    logger.error("Failed to focus or create tab via message:", error);
+    // Absolute fallback: just create a new tab
     await browser.tabs.create({ url });
   }
 }
@@ -507,6 +534,13 @@ export class ContextMenuManager extends ResourceTracker {
           }
         }
 
+        // --- 2.3.5 Subtitle Menu (Before Options) ---
+        await this.createMenu({
+          id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
+          title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
+          contexts: ["action"],
+        });
+
         // --- 2.4. Options Menu (Fourth option in Action menu) ---
         if (visibility.ACTION_CONTEXT_OPTIONS) {
           await this.createMenu({
@@ -731,6 +765,7 @@ export class ContextMenuManager extends ResourceTracker {
         API_PROVIDER_ITEM_ID_PREFIX
       );
       const isStaticActionClick = [
+        ACTION_CONTEXT_MENU_SUBTITLE_ID,
         ACTION_CONTEXT_MENU_OPTIONS_ID,
         ACTION_CONTEXT_MENU_SHORTCUTS_ID,
         HELP_MENU_ID,
@@ -796,6 +831,10 @@ export class ContextMenuManager extends ResourceTracker {
           await this._activateSelectElement(activeTab);
           break;
         }
+
+        case ACTION_CONTEXT_MENU_SUBTITLE_ID:
+          await focusOrCreateTab(browser.runtime.getURL("src/html/subtitle.html"));
+          break;
 
         case ACTION_CONTEXT_MENU_OPTIONS_ID:
           await focusOrCreateTab(browser.runtime.getURL("src/html/options.html"));

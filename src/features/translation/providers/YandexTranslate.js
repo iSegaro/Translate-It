@@ -7,7 +7,7 @@ import {
   getYandexTranslateUrlAsync
 } from "@/shared/config/config.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
-import { TraditionalTextProcessor } from "./utils/TraditionalTextProcessor.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
@@ -73,17 +73,16 @@ export class YandexTranslateProvider extends BaseTranslateProvider {
     logger.debug(`Yandex: Built lang parameter: '${lang}' from source='${sl}' target='${tl}'`);
 
     // Add key info log for translation start
-    const charCount = TraditionalTextProcessor.calculateTraditionalCharCount(chunkTexts);
+    const charCount = chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0);
     logger.info(`[Yandex] Starting translation: ${charCount} chars`);
 
     const uuid = this._generateUuid();
     const formData = new URLSearchParams();
     formData.append('lang', lang);
     
-    // Extract text from objects (Select Element) to prevent technical artifacts
+    // Extract text from objects (Subtitle cues, Select Element) to prevent technical artifacts
     chunkTexts.forEach(t => {
-      const text = typeof t === 'object' ? (t.t || t.text || "") : (t || "");
-      formData.append('text', String(text));
+      formData.append('text', getTextInfo(t).text);
     });
 
     const apiUrl = await getYandexTranslateUrlAsync();

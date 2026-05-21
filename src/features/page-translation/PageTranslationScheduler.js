@@ -20,7 +20,7 @@ import { DEFAULT_PAGE_TRANSLATION_SETTINGS, PAGE_TRANSLATION_TIMING } from './Pa
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
-import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { sendRegularMessage, safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 
 /**
@@ -412,7 +412,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       if (!this.isTranslated) throw new Error('Session stopped');
 
       this.logger.debug(`Sending batch: ${batch.length} items`);
-      const result = await ExtensionContextManager.safeSendMessage(batchMessage, 'page-translation-batch');
+      const result = await safeSendMessage(batchMessage, 'page-translation-batch');
 
       // Validation after async call
       if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {

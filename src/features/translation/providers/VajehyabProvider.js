@@ -5,6 +5,7 @@ import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'VajehyabProvider');
 
@@ -46,10 +47,11 @@ export class VajehyabProvider extends BaseProvider {
    * Since this is a dictionary, it only processes the first segment and first word.
    */
   async _batchTranslate(texts, sourceLang, targetLang, mode, engine, messageId, abortController, priority, sessionId) {
-    const text = texts[0] || "";
+    const textInfo = getTextInfo(texts[0] || "");
+    const text = textInfo.text;
     
     // 1. Take only the first word
-    const words = String(text).trim().split(/\s+/);
+    const words = text.trim().split(/\s+/);
     const targetWord = words[0] || "";
     
     if (!targetWord) {

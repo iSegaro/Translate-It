@@ -34,10 +34,15 @@ vi.mock('@/features/translation/core/StreamingManager.js', () => ({
 }));
 
 vi.mock('./utils/TraditionalTextProcessor.js', () => ({
+  getTextInfo: vi.fn((item) => {
+    if (typeof item === 'string') return { text: item, length: item.length };
+    const text = item?.t || item?.text || '';
+    return { text: String(text), length: String(text).length };
+  }),
   TraditionalTextProcessor: {
     createChunks: vi.fn(),
     scrubBidiArtifacts: vi.fn(text => text),
-    calculateTraditionalCharCount: vi.fn(texts => texts.reduce((s, t) => s + t.length, 0)),
+    calculateTraditionalCharCount: vi.fn(texts => texts.reduce((s, t) => s + (t?.length || 0), 0)),
   },
 }));
 
