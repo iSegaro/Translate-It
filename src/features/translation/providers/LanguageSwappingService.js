@@ -38,14 +38,23 @@ export class LanguageSwappingService {
       // Check the switch for the CURRENT mode and the ORIGINAL mode
       // If we're in Dictionary mode but came from MouseHover, we must respect the MouseHover switch
       const effectiveMode = originalMode || mode;
-      const isModeEnabled = effectiveMode ? (bilingualModes[effectiveMode] === true) : true;
+      
+      // Determine if bilingual mode is enabled for this specific interaction
+      let isModeEnabled = effectiveMode ? (bilingualModes[effectiveMode] === true) : true;
+      
+      // Backward compatibility: Handle legacy 'field' key if 'content' (TranslationMode.Field) is not found
+      if (!isModeEnabled && effectiveMode === TranslationMode.Field && bilingualModes['field'] === true) {
+        isModeEnabled = true;
+      }
 
-      // If bilingual is disabled for this mode/globally, skip detection and return original languages
-      if (!bilingualEnabled || !isModeEnabled) {
+      const isDictionaryMode = mode === TranslationMode.Dictionary_Translation;
+
+      // If bilingual is disabled AND it's not a dictionary-specific swap, skip detection
+      if ((!bilingualEnabled || !isModeEnabled) && !isDictionaryMode) {
         return [sourceLang, targetLang];
       }
 
-      // Detection is only needed if bilingual is active
+      // Detection is only needed if bilingual is active OR it's dictionary mode
       const accurateDetectedLang = await this.getDetectedLanguage(text);
 
       if (accurateDetectedLang) {
@@ -54,35 +63,31 @@ export class LanguageSwappingService {
         const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = getCanonicalCode(targetNorm);
 
-        // --- BILINGUAL & AUTO-SWAP LOGIC ---
-        // BILINGUAL_TRANSLATION is the master switch.
-        // Only swap when source is AUTO to respect user's explicit source choice.
-        // CRITICAL FIX: Only swap when detected language MATCHES target (meaning text is ALREADY in target language)
-        // This prevents incorrect swaps when translating mixed-language text
-        const shouldSwap = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceNorm === AUTO_DETECT_VALUE;
-
-        // --- MANUAL SOURCE BILINGUAL ---
-        // When user manually sets a source language that doesn't match the detected language and target,
-        // we should swap to get the correct translation
-        const sourceCode = getCanonicalCode(sourceNorm);
-        const shouldSwapManual = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode && sourceCode !== detectedLangCode && sourceCode === targetLangCode;
-
         // --- DICTIONARY MODE SPECIAL HANDLING ---
         // In dictionary mode, if detected language matches target language, we MUST swap to get dictionary data
         // Google Translate API doesn't return dictionary info when source and target are the same
-        const isDictionaryMode = mode === TranslationMode.Dictionary_Translation;
         const shouldSwapForDictionary = isDictionaryMode && detectedLangCode === targetLangCode;
 
-        if (shouldSwap || shouldSwapManual || shouldSwapForDictionary) {
+        // --- BILINGUAL & AUTO-SWAP LOGIC ---
+        // BILINGUAL_TRANSLATION is the master switch.
+        // We swap if detected language MATCHES target (meaning text is ALREADY in target language).
+        // This applies both to 'auto' source and manually set source languages.
+        const shouldSwap = bilingualEnabled && isModeEnabled && detectedLangCode === targetLangCode;
+
+        if (shouldSwap || shouldSwapForDictionary) {
            let newTargetLang;
-           if (this._normalizeLangValue(originalSourceLang) !== AUTO_DETECT_VALUE) {
-             newTargetLang = originalSourceLang;
+           const originalSourceNorm = this._normalizeLangValue(originalSourceLang);
+           
+           // If original source was not auto, and it's different from what we just detected, use it as new target
+           if (originalSourceNorm !== AUTO_DETECT_VALUE && getCanonicalCode(originalSourceNorm) !== detectedLangCode) {
+             newTargetLang = originalSourceNorm;
            } else {
-             // Fallback to English if original source was auto-detect
-             newTargetLang = "en";
+             // Fallback to English if original source was auto-detect or same as detected
+             // If detected is already English, fallback to Persian as a sensible default for this extension
+             newTargetLang = (detectedLangCode === 'en') ? 'fa' : 'en';
            }
 
-           const swapReason = shouldSwapForDictionary ? 'Dictionary swap' : (shouldSwapManual ? 'Manual source swap' : 'Bilingual swap');
+           const swapReason = shouldSwapForDictionary ? 'Dictionary swap' : 'Bilingual swap';
            logger.debug(`${providerName}: ${swapReason} applied for mode ${mode}. Detected ${detectedLangCode} matches target ${targetLangCode}. Swapping target to ${newTargetLang}`);
            return [targetNorm, newTargetLang];
         } else {
