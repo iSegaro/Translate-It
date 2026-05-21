@@ -28,7 +28,6 @@
         </a>
         <ThemeSelector />
       </div>
-
     </header>
 
     <main class="app-content">

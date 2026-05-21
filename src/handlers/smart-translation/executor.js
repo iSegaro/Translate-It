@@ -2,7 +2,7 @@
  * Execution logic for applying translations
  */
 import { TranslationMode, getREPLACE_SPECIAL_SITESAsync, getCOPY_REPLACEAsync } from "@/shared/config/config.js";
-import { OS_PLATFORMS, SITE_PLATFORMS as Platform } from "@/utils/browser/compatibility.js";
+import { SITE_PLATFORMS as Platform } from "@/utils/browser/compatibility.js";
 import { isComplexEditor } from "@/features/text-field-interaction/utils/framework/framework-compat/index.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';

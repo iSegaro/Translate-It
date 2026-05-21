@@ -188,7 +188,7 @@ export default class MediumStrategy extends PlatformStrategy {
 
       const firstParagraph = element.querySelector("div, p");
       return firstParagraph?.innerText?.trim() || element.innerText?.trim() || "";
-    } catch (error) {
+    } catch {
       return element.innerText?.trim() || "";
     }
   }

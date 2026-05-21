@@ -1,7 +1,6 @@
 // src/features/text-field-interaction/strategies/ChatGPTStrategy.js
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import PlatformStrategy from "./PlatformStrategy.js";
-import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { CONFIG } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
