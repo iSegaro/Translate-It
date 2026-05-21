@@ -95,7 +95,7 @@ describe('LanguageSwappingService', () => {
     });
 
     it('should handle legacy "field" mode key for backward compatibility', async () => {
-      const { getBilingualTranslationModesAsync, TranslationMode } = await import("@/shared/config/config.js");
+      const { getBilingualTranslationModesAsync } = await import("@/shared/config/config.js");
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       
       // Setup: BILINGUAL_TRANSLATION_MODES only contains 'field' (legacy) but NOT 'content' (new)

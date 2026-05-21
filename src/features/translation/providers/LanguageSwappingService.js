@@ -60,7 +60,6 @@ export class LanguageSwappingService {
       if (accurateDetectedLang) {
         const detectedLangCode = getCanonicalCode(accurateDetectedLang);
         const targetNorm = this._normalizeLangValue(targetLang);
-        const sourceNorm = this._normalizeLangValue(sourceLang);
         const targetLangCode = getCanonicalCode(targetNorm);
 
         // --- DICTIONARY MODE SPECIAL HANDLING ---
