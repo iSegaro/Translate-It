@@ -245,7 +245,7 @@ const handleDownload = (filename) => {
 
 const config = reactive({
   sourceLanguage: '',
-  targetLanguage: 'en',
+  targetLanguage: settingsStore.settings?.TARGET_LANGUAGE || 'en',
   providerId: settingsStore.settings.TRANSLATION_API || 'googlev2',
   options: { useContext: true }
 });
@@ -257,6 +257,11 @@ onMounted(async () => {
     // Load existing settings and initialize the theme
     await settingsStore.loadSettings();
     applyTheme(settingsStore.settings.THEME);
+
+    // Set default target language from user settings
+    if (settingsStore.settings?.TARGET_LANGUAGE) {
+      config.targetLanguage = settingsStore.settings.TARGET_LANGUAGE;
+    }
 
     // Sync provider with settings - Ensure it supports subtitles and is configured
     const defaultProviderId = settingsStore.settings.TRANSLATION_API || 'googlev2';
