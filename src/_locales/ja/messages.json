@@ -2578,5 +2578,8 @@
   },
   "open_subtitle_translator": {
     "message": "字幕翻訳"
+  },
+  "configure_providers_tooltip": {
+    "message": "翻訳プロバイダーの設定"
   }
 }

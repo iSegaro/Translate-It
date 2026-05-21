@@ -2575,5 +2575,8 @@
   },
   "open_subtitle_translator": {
     "message": "Subtitle Translator"
+  },
+  "configure_providers_tooltip": {
+    "message": "Configure Providers"
   }
 }

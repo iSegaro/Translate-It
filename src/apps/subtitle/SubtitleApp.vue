@@ -49,12 +49,21 @@
               </div>
               <div class="config-item">
                 <label>{{ t('provider_label', 'Provider') }}</label>
-                <ProviderSelector 
-                  v-model="config.providerId" 
-                  placement="up"
-                  required-feature="subtitle"
-                  only-configured
-                />
+                <div class="provider-selector-container">
+                  <ProviderSelector 
+                    v-model="config.providerId" 
+                    placement="up"
+                    required-feature="subtitle"
+                    only-configured
+                  />
+                  <button 
+                    class="icon-btn settings-link-btn" 
+                    :title="t('configure_providers_tooltip', 'Configure Providers')"
+                    @click="goToProviderSettings"
+                  >
+                    <v-icon icon="mdi:cog" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -187,6 +196,7 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { applyTheme } from '@/utils/ui/theme.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -211,6 +221,19 @@ const {
   downloadResult: downloadResultOriginal,
   cleanup
 } = useSubtitleTranslation();
+
+const { focusOrCreateTab } = useExtensionAPI();
+
+/**
+ * Redirects the user to the providers configuration page.
+ */
+const goToProviderSettings = async () => {
+  try {
+    await focusOrCreateTab('src/html/options.html#providers');
+  } catch (err) {
+    logger.error('Failed to open provider settings:', err);
+  }
+};
 
 /**
  * Enhanced download handler to track state.
@@ -482,6 +505,22 @@ onUnmounted(() => {
           font-weight: 600;
           color: var(--text-secondary);
           margin-bottom: 0.75rem;
+        }
+
+        .provider-selector-container {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+
+          > *:first-child {
+            flex: 1;
+          }
+
+          .settings-link-btn {
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+          }
         }
       }
     }

@@ -2575,5 +2575,8 @@
   },
   "open_subtitle_translator": {
     "message": "ترجمه زیرنویس"
+  },
+  "configure_providers_tooltip": {
+    "message": "تنظیمات ارائه‌دهندگان"
   }
 }
