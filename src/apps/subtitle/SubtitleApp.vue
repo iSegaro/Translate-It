@@ -493,9 +493,21 @@ onUnmounted(() => {
       .config-item {
         &.language-pair {
           grid-column: span 2;
+          text-align: center;
           
           @media (max-width: 600px) {
             grid-column: span 1;
+          }
+
+          label {
+            text-align: center !important;
+          }
+
+          .ti-language-controls {
+            justify-content: center !important;
+            margin: 0.5rem auto 0 auto !important;
+            background: transparent !important;
+            padding: 0 !important;
           }
         }
 
