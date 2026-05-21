@@ -1,3 +1,11 @@
+#### v1.17.0 – Released on X XX, 2026
+
+##### Added
+
+- Added a new [Subtitle Translator](#/about?highlight=SUBTITLE_TRANSLATOR) tool for translating subtitle files
+
+---
+
 #### v1.16.0 – Released on May 19, 2026
 
 ##### Added
