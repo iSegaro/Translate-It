@@ -43,6 +43,7 @@
       </div>
 
       <a 
+        id="SUBTITLE_TRANSLATOR"
         href="#"
         class="sidebar-section subtitle-link-section"
         @click.prevent="openSubtitlePage"
