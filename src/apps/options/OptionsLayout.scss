@@ -24,9 +24,11 @@
   &:has(.ti-dropdown-open) {
     .options-main {
       z-index: 2000;
+      position: relative;
     }
     .tab-content-container {
       z-index: 2000;
+      position: relative;
     }
   }
 }

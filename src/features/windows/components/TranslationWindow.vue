@@ -23,7 +23,7 @@
     v-else
     v-show="!isFullscreen"
     ref="windowElement"
-    class="ti-window translation-window aiwc-selection-popup-host normal-window"
+    class="ti-window translation-window aiwc-selection-popup-host normal-window ti-host-container"
     :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
     :style="windowStyle"
     data-translate-ui="true"

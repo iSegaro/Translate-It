@@ -256,6 +256,13 @@ img.ti-dropdown-arrow,
   pointer-events: auto !important;
 
   &.ti-open-upward { top: auto !important; bottom: 100% !important; margin-top: 0 !important; margin-bottom: 4px !important; }
+
+  /* Teleported Mode Override */
+  &.ti-is-teleported {
+    margin: 0 !important;
+    position: fixed !important;
+    /* top/bottom/left/right/width are handled by inline styles from Vue */
+  }
 }
 
 .ti-provider-dropdown-list {
