@@ -871,24 +871,31 @@ const toggleDropdown = () => {
             styles.insetInlineStart = `${rect.right + 10}px !important`;
             styles.top = `${rect.top}px !important`;
             styles.bottom = 'auto !important';
-          } else if (props.mode === 'button' || props.mode === 'mobile') {
-            if (isRTL.value) {
-              styles.right = `${window.innerWidth - rect.right}px !important`;
-              styles.left = 'auto !important';
-            } else {
-              styles.left = `${rect.left}px !important`;
-              styles.right = 'auto !important';
-            }
-            styles.width = `${rect.width}px !important`;
-            styles.minWidth = '220px !important';
           } else {
-            // Split mode
+            if (props.mode === 'button' || props.mode === 'mobile') {
+              styles.width = `${rect.width}px !important`;
+              styles.minWidth = '220px !important';
+            }
+            
+            const expectedWidth = Math.max(rect.width, 220); // 220px is typical min-width
+            
             if (isRTL.value) {
-              styles.right = `${window.innerWidth - rect.right}px !important`;
-              styles.left = 'auto !important';
+              const rightDist = window.innerWidth - rect.right;
+              if (rightDist + expectedWidth > window.innerWidth) {
+                styles.left = `${rect.left}px !important`;
+                styles.right = 'auto !important';
+              } else {
+                styles.right = `${rightDist}px !important`;
+                styles.left = 'auto !important';
+              }
             } else {
-              styles.left = `${rect.left}px !important`;
-              styles.right = 'auto !important';
+              if (rect.left + expectedWidth > window.innerWidth) {
+                styles.right = `${window.innerWidth - rect.right}px !important`;
+                styles.left = 'auto !important';
+              } else {
+                styles.left = `${rect.left}px !important`;
+                styles.right = 'auto !important';
+              }
             }
           }
 
