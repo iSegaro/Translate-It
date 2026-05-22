@@ -2587,5 +2587,11 @@
   },
   "configure_providers_tooltip": {
     "message": "翻訳プロバイダーの設定"
+  },
+  "is_default_provider_tooltip": {
+    "message": "現在のデフォルトサービス"
+  },
+  "set_as_default_tooltip": {
+    "message": "デフォルトサービスとして設定"
   }
 }

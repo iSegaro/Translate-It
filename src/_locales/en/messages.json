@@ -2584,5 +2584,11 @@
   },
   "configure_providers_tooltip": {
     "message": "Configure Providers"
+  },
+  "is_default_provider_tooltip": {
+    "message": "Current Default Service"
+  },
+  "set_as_default_tooltip": {
+    "message": "Set as Default Service"
   }
 }

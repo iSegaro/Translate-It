@@ -82,6 +82,20 @@
             :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
           >
           <span>{{ provider.name }}</span>
+
+          <!-- Set as Default (Star) Icon -->
+          <button
+            v-if="allowSetDefault && !isGlobal"
+            class="ti-set-default-btn"
+            :class="{ 'is-default': globalDefaultProvider === provider.id }"
+            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+            @click.stop="setAsGlobalDefault(provider)"
+          >
+            <Icon 
+              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
+              class="ti-star-icon"
+            />
+          </button>
         </div>
       </div>
 
@@ -206,6 +220,20 @@
             :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
           >
           <span>{{ provider.name }}</span>
+
+          <!-- Set as Default (Star) Icon -->
+          <button
+            v-if="allowSetDefault && !isGlobal"
+            class="ti-set-default-btn"
+            :class="{ 'is-default': globalDefaultProvider === provider.id }"
+            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+            @click.stop="setAsGlobalDefault(provider)"
+          >
+            <Icon 
+              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
+              class="ti-star-icon"
+            />
+          </button>
         </div>
       </div>
 
@@ -322,6 +350,20 @@
             :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
           >
           <span>{{ provider.name }}</span>
+
+          <!-- Set as Default (Star) Icon -->
+          <button
+            v-if="allowSetDefault && !isGlobal"
+            class="ti-set-default-btn"
+            :class="{ 'is-default': globalDefaultProvider === provider.id }"
+            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+            @click.stop="setAsGlobalDefault(provider)"
+          >
+            <Icon 
+              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
+              class="ti-star-icon"
+            />
+          </button>
         </div>
       </div>
 
@@ -446,6 +488,20 @@
             :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
           >
           <span>{{ provider.name }}</span>
+
+          <!-- Set as Default (Star) Icon -->
+          <button
+            v-if="allowSetDefault && !isGlobal"
+            class="ti-set-default-btn"
+            :class="{ 'is-default': globalDefaultProvider === provider.id }"
+            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+            @click.stop="setAsGlobalDefault(provider)"
+          >
+            <Icon 
+              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
+              class="ti-star-icon"
+            />
+          </button>
         </div>
       </div>
     </div>
@@ -547,6 +603,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  allowSetDefault: {
+    type: Boolean,
+    default: false
+  },
   placement: {
     type: String,
     default: 'auto', // auto, up, down
@@ -571,6 +631,33 @@ const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
 const dropdownMaxHeight = ref('400px')
+
+/**
+ * Computed property to identify the current global default provider
+ */
+const globalDefaultProvider = computed(() => settingsStore.settings?.TRANSLATION_API)
+
+/**
+ * Sets a provider as the global default translation service.
+ * Used primarily in the Popup to allow making session overrides permanent.
+ */
+const setAsGlobalDefault = async (provider) => {
+  logger.debug('Setting global default provider:', provider.id)
+  try {
+    // 1. Persist to storage
+    await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
+    
+    // 2. Also select it for the current session if it wasn't already
+    if (currentProvider.value !== provider.id) {
+      await selectProvider(provider)
+    }
+    
+    logger.info(`Provider ${provider.id} set as global default.`)
+  } catch (error) {
+    logger.error('Failed to set global default provider:', error)
+    await handleError(error, 'provider-selector-set-default')
+  }
+}
 
 // Handle keyboard navigation
 const handleKeydown = (event) => {

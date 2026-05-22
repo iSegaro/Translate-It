@@ -2584,5 +2584,11 @@
   },
   "configure_providers_tooltip": {
     "message": "تنظیمات ارائه‌دهندگان"
+  },
+  "is_default_provider_tooltip": {
+    "message": "سرویس پیش‌فرض فعلی"
+  },
+  "set_as_default_tooltip": {
+    "message": "تنظیم به عنوان سرویس پیش‌فرض"
   }
 }

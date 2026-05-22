@@ -278,6 +278,41 @@ img.ti-dropdown-arrow,
   span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
+.ti-set-default-btn {
+  margin-inline-start: auto !important;
+  background: none !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--color-text-secondary) !important;
+  transition: transform 0.2s ease, color 0.2s ease, opacity 0.2s ease !important;
+  opacity: 0.3;
+  z-index: 2 !important;
+
+  &:hover {
+    transform: scale(1.2);
+    color: var(--color-primary) !important;
+    opacity: 1;
+  }
+
+  &.is-default {
+    color: #ffb800 !important;
+    opacity: 1;
+    
+    &:hover {
+      color: #ff9900 !important;
+    }
+  }
+
+  .ti-star-icon {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
 /* 6. RTL Support - Simplified using Logical Properties */
 :global(.rtl) {
   .ti-provider-icon-only-container .ti-provider-dropdown-menu {

@@ -49,6 +49,7 @@
           :model-value="props.provider"
           mode="icon-only"
           :is-global="false"
+          allow-set-default
           only-configured
           class="ti-window-provider-selector"
           @update:model-value="handleProviderChange"

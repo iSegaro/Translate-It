@@ -42,6 +42,7 @@
             mode="split"
             :is-global="false"
             show-sync
+            allow-set-default
             only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
@@ -72,6 +73,7 @@
             mode="split"
             :is-global="false"
             show-sync
+            allow-set-default
             only-configured
             :loading="isTranslating"
             @translate="handleTranslate"
