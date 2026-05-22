@@ -881,6 +881,18 @@
   "enhanced_triple_click_drag_description": {
     "message": "When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs."
   },
+  "show_translate_icon_in_toolbar_label": {
+    "message": "Show Translate Button in Selection Toolbar"
+  },
+  "show_translate_icon_in_toolbar_description": {
+    "message": "Display the Google Translate icon inside the floating selection toolbar."
+  },
+  "show_tts_icon_in_toolbar_label": {
+    "message": "Show Text-to-Speech (TTS) Button in Selection Toolbar"
+  },
+  "show_tts_icon_in_toolbar_description": {
+    "message": "Display the stateful volume icon to speak selected text inside the floating selection toolbar."
+  },
   "enable_dictionary_translation_description": {
     "message": "When text selection translation is enabled, single words or short phrases will be treated as dictionary lookups, providing detailed definitions instead of standard translations."
   },

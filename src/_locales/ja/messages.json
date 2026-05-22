@@ -878,6 +878,18 @@
   "enhanced_triple_click_drag_description": {
     "message": "有効にすると、段落をトリプルクリックで選択してからドラッグで範囲を広げた場合、マウスを離すまで翻訳を待機します。複数段落を選択したいときに途中で翻訳されるのを防ぎます。"
   },
+  "show_translate_icon_in_toolbar_label": {
+    "message": "選択ツールバーに翻訳ボタンを表示"
+  },
+  "show_translate_icon_in_toolbar_description": {
+    "message": "浮動選択ツールバー内にGoogle翻訳アイコンを表示します。"
+  },
+  "show_tts_icon_in_toolbar_label": {
+    "message": "選択ツールバーに音声読み上げ (TTS) ボタンを表示"
+  },
+  "show_tts_icon_in_toolbar_description": {
+    "message": "浮動選択ツールバー内に選択したテキストを読み上げるための音量アイコンを表示します。"
+  },
   "enable_dictionary_translation_description": {
     "message": "テキスト選択翻訳が有効な場合、単語や短いフレーズを辞書として検索し、通常の翻訳の代わりに詳細な定義を表示します。"
   },
