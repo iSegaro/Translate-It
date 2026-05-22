@@ -404,14 +404,11 @@
   "tts_done": {
     "message": "保存"
   },
-  "tts_cancel": {
-    "message": "キャンセル"
-  },
   "tts_confirm_reset": {
     "message": "カスタマイズされたすべての音声をデフォルトにリセットしてもよろしいですか？"
   },
   "import_success": {
-    "message": "設定のインポートが完了しました。"
+    "message": "設定が正常にインポートされました。"
   },
   "prompt_reset_button": {
     "message": "リセット"
@@ -1165,9 +1162,6 @@
   },
   "security_warning_question": {
     "message": "パスワード保護なしで続行しますか？"
-  },
-  "import_success": {
-    "message": "設定が正常にインポートされました。"
   },
   "import_confirm_message": {
     "message": "⚠️ 警告: 設定をインポートすると、現在の設定が完全に上書きされ、ページが再読み込みされます。\n\n続行しますか？"

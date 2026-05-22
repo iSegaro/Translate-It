@@ -213,13 +213,6 @@
           </BaseButton>
           <div class="drawer-footer-actions">
             <BaseButton 
-              variant="secondary" 
-              size="sm" 
-              @click="closeVoicesDrawer"
-            >
-              {{ t('tts_cancel') || 'Cancel' }}
-            </BaseButton>
-            <BaseButton 
               variant="primary" 
               size="sm" 
               @click="saveAndCloseVoicesDrawer"

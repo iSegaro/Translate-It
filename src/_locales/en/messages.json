@@ -404,9 +404,6 @@
   "tts_done": {
     "message": "Save"
   },
-  "tts_cancel": {
-    "message": "Cancel"
-  },
   "tts_confirm_reset": {
     "message": "Are you sure you want to reset all customized voices to defaults?"
   },
