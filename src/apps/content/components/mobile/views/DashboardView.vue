@@ -357,18 +357,9 @@ const goToHistoryView = () => {
   mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.HISTORY);
 }
 const openSettings = () => {
-  try {
-    logger.debug('Opening Settings from Mobile Dashboard');
-    pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS);
-  } catch (err) {
-    if (ExtensionContextManager.isContextError(err)) {
-      // Close dashboard to make toast visible
-      mobileStore.closeSheet();
-      ExtensionContextManager.handleContextError(err, 'mobile-dashboard:open-settings');
-    } else {
-      logger.error('Open Settings handler failed:', err);
-    }
-  }
+  logger.debug('Opening Settings from Mobile Dashboard');
+  pageEventBus.emit(WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS);
+  mobileStore.closeSheet(); // Ensure the sheet is closed when opening settings
 }
 
 const revertTranslations = () => {

@@ -7,6 +7,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppLifecycle');
 
@@ -81,14 +82,22 @@ export function useContentAppLifecycle({
     if (!pageEventBus) return;
 
     // Open Options Page
-    tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS, (detail) => {
-      logger.info('Received open-options-page event:', detail);
-      const anchor = detail?.section || detail?.anchor;
-      
-      browser.runtime.sendMessage({
-        action: MessageActions.OPEN_OPTIONS_PAGE,
-        data: { anchor }
-      }).catch(err => logger.error('Error opening options page:', err));
+    tracker.addEventListener(pageEventBus, WINDOWS_MANAGER_EVENTS.OPEN_SETTINGS, async (detail) => {
+      try {
+        logger.info('Received open-options-page event:', detail);
+        const anchor = detail?.section || detail?.anchor;
+        
+        await browser.runtime.sendMessage({
+          action: MessageActions.OPEN_OPTIONS_PAGE,
+          data: { anchor }
+        });
+      } catch (err) {
+        if (ExtensionContextManager.isContextError(err)) {
+          ExtensionContextManager.handleContextError(err, 'ContentApp:open-settings');
+        } else {
+          logger.error('Error opening options page:', err);
+        }
+      }
     });
 
     // Navigation Cleanup

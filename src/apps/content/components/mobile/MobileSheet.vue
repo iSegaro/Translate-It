@@ -55,6 +55,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 import DashboardView from './views/DashboardView.vue'
 import SelectionView from './views/SelectionView.vue'
@@ -155,13 +156,18 @@ watch(isOpen, (newValue) => {
     if (newValue === false) {
       sendMessage({
         action: MessageActions.TTS_STOP,
-        data: { 
+        data: {
           source: 'mobile-sheet-close',
-          stopOnlyIfOwner: true 
+          stopOnlyIfOwner: true
         }
-      }).catch(err => logger.debug('Failed to stop TTS on mobile sheet close:', err));
-    }
-  }
+      }).catch(err => {
+        if (ExtensionContextManager.isContextError(err)) {
+          // Ignore context errors during cleanup as they are expected when extension reloads
+          return;
+        }
+        logger.debug('Failed to stop TTS on mobile sheet close:', err);
+      });
+    }  }
 }, { immediate: true })
 
 const sheetStyle = computed(() => {

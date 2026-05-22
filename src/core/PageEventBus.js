@@ -20,7 +20,17 @@ class EventBus {
   on(event, callback) {
     if (!this.bus) return; // Do nothing in non-document contexts (e.g., background script)
 
-    const wrappedCallback = (e) => callback(e.detail);
+    const wrappedCallback = (e) => {
+      try {
+        callback(e.detail);
+      } catch (err) {
+        // Handle context-related errors silently to prevent console spam after invalidation
+        const isContext = (err?.message || err || "").toLowerCase().includes("extension context invalidated");
+        if (!isContext) {
+          console.error(`[PageEventBus] Error in listener for ${event}:`, err);
+        }
+      }
+    };
 
     // Store mapping from original callback to wrapped callback
     if (!this.wrappedCallbacks.has(event)) {
