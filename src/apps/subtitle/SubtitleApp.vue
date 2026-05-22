@@ -62,10 +62,11 @@
                 <div class="provider-selector-container">
                   <ProviderSelector 
                     v-model="config.providerId" 
-                    placement="auto"
+                    mode="button"
                     :is-global="false"
                     required-feature="subtitle"
                     only-configured
+                    ignore-hidden
                   />
                   <button 
                     class="icon-btn settings-link-btn" 
@@ -641,8 +642,8 @@ onUnmounted(() => {
 
           .settings-link-btn {
             flex-shrink: 0;
-            width: 42px;
-            height: 42px;
+            width: 40px;
+            height: 40px;
           }
         }
       }
