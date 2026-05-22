@@ -109,12 +109,11 @@
 
 <script setup>
 import './ProvidersTab.scss'
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, watch } from 'vue'
+import { onMounted, onUnmounted, computed, defineAsyncComponent, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { findProviderById, getProviderManifest } from '@/features/translation/providers/ProviderManifest.js'
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
