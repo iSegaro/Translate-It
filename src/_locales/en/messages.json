@@ -368,6 +368,45 @@
   "tts_autodetect_desc": {
     "message": "Automatically identify the text language before pronunciation to ensure the correct voice is used."
   },
+  "tts_voices_tuning_label": {
+    "message": "Language-Specific Voice Tuning"
+  },
+  "tts_voices_tuning_desc": {
+    "message": "Customize regional accents, genders, and dialects for each supported language, and test them with real-time previews."
+  },
+  "tts_manage_voices_btn": {
+    "message": "Manage Voices & Accents ⚙️"
+  },
+  "tts_drawer_title": {
+    "message": "Voice & Accent Tuning"
+  },
+  "tts_search_placeholder": {
+    "message": "Search languages..."
+  },
+  "tts_loading_languages": {
+    "message": "Loading languages..."
+  },
+  "tts_no_languages": {
+    "message": "No languages found."
+  },
+  "tts_static_fallback": {
+    "message": "(Static Fallback)"
+  },
+  "tts_voice_default": {
+    "message": "Default (System Dynamic)"
+  },
+  "tts_preferred_voice_option": {
+    "message": "Preferred {engine} Option"
+  },
+  "tts_reset_all": {
+    "message": "Reset All"
+  },
+  "tts_done": {
+    "message": "Save"
+  },
+  "tts_confirm_reset": {
+    "message": "Are you sure you want to reset all customized voices to defaults?"
+  },
   "import_success": {
     "message": "Settings imported successfully."
   },

@@ -234,6 +234,8 @@ export const CONFIG = {
   TTS_ENGINE: TTS_ENGINES.EDGE, // موتور پیش‌فرض تلفظ صوتی (google یا edge)
   TTS_FALLBACK_ENABLED: true, // استفاده از صدای جایگزین (مثل عربی برای فارسی) در صورت عدم پشتیبانی موتور
   TTS_AUTO_DETECT_ENABLED: true, // تشخیص خودکار زبان متن قبل از پخش صوتی
+  TTS_PREFERRED_VOICES: {}, // لهجه‌ها و صداهای ترجیحی کاربر برای هر زبان
+
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   SHOW_MOBILE_FAB: true, // نمایش دکمه دسترسی سریع در موبایل
   WINDOW_IS_PINNED: false, // پنجره ترجمه پین شده باشد یا نه

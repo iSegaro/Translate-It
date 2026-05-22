@@ -7,6 +7,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
 import { ttsVoiceService } from '@/features/tts/services/TTSVoiceService.js';
+import storageCore from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSLanguageService');
 
@@ -91,11 +92,27 @@ export class TTSLanguageService {
    * @param {string} language - The detected or requested language
    * @param {string} preferredEngine - The user's preferred TTS engine
    * @param {boolean} fallbackEnabled - Whether to switch engines if the preferred one fails
+   * @param {Object} preferredVoices - Optional map of user preferred voices per language
    * @returns {Object} { engine: string, language: string }
    */
-  static resolveTTSSettings(language, preferredEngine = TTS_ENGINES.GOOGLE, fallbackEnabled = true) {
+  static resolveTTSSettings(language, preferredEngine = TTS_ENGINES.GOOGLE, fallbackEnabled = true, preferredVoices = {}) {
+    let resolvedLang = language;
+    const lowerLang = (language || '').toLowerCase().trim();
+    const baseLang = lowerLang.split('-')[0];
+
+    // 0. Resolve preferred Google dialect if engine is Google
+    if (preferredEngine === TTS_ENGINES.GOOGLE && preferredVoices) {
+      const preferred = preferredVoices[lowerLang] || preferredVoices[baseLang];
+      if (preferred) {
+        const googleDialect = typeof preferred === 'object' ? preferred.google : preferred;
+        if (googleDialect && googleDialect !== 'default') {
+          resolvedLang = googleDialect;
+        }
+      }
+    }
+
     // 1. First, attempt to normalize the language for the preferred engine
-    const normalizedLang = TTSLanguageService.getSupportedLanguageCode(preferredEngine, language);
+    const normalizedLang = TTSLanguageService.getSupportedLanguageCode(preferredEngine, resolvedLang);
 
     if (TTSLanguageService.supportsLanguage(preferredEngine, normalizedLang)) {
       return { engine: preferredEngine, language: normalizedLang };
@@ -104,7 +121,19 @@ export class TTSLanguageService {
     // 2. If preferred engine fails and fallback is enabled, try the alternative engine
     if (fallbackEnabled) {
       const otherEngine = preferredEngine === TTS_ENGINES.GOOGLE ? TTS_ENGINES.EDGE : TTS_ENGINES.GOOGLE;
-      const otherNormalized = TTSLanguageService.getSupportedLanguageCode(otherEngine, language);
+      
+      let otherResolvedLang = language;
+      if (otherEngine === TTS_ENGINES.GOOGLE && preferredVoices) {
+        const preferred = preferredVoices[lowerLang] || preferredVoices[baseLang];
+        if (preferred) {
+          const googleDialect = typeof preferred === 'object' ? preferred.google : preferred;
+          if (googleDialect && googleDialect !== 'default') {
+            otherResolvedLang = googleDialect;
+          }
+        }
+      }
+
+      const otherNormalized = TTSLanguageService.getSupportedLanguageCode(otherEngine, otherResolvedLang);
 
       if (TTSLanguageService.supportsLanguage(otherEngine, otherNormalized)) {
         logger.debug(`[TTSLanguageService] Switching engine to ${otherEngine} for language ${otherNormalized}`);
@@ -123,9 +152,26 @@ export class TTSLanguageService {
    * @param {string} language - ISO language code
    * @returns {Promise<string|null>} The voice name (e.g., 'en-US-AriaNeural') or null
    */
-  static async getEdgeVoiceForLanguage(language) {
+  static async getEdgeVoiceForLanguage(language, preferredVoices = null) {
     if (!language) return null;
-    const lowerLang = language.toLowerCase();
+    const lowerLang = language.toLowerCase().trim();
+    const baseLang = lowerLang.split('-')[0];
+
+    // 0. Check preferred voices setting
+    try {
+      const activePreferredVoices = preferredVoices || (await storageCore.get({ 'TTS_PREFERRED_VOICES': {} })).TTS_PREFERRED_VOICES || {};
+      const preferred = activePreferredVoices[lowerLang] || activePreferredVoices[baseLang];
+      
+      if (preferred) {
+        const edgeVoice = typeof preferred === 'object' ? preferred.edge : preferred;
+        if (edgeVoice && edgeVoice !== 'default') {
+          logger.debug(`[TTSLanguageService] Using preferred Edge voice: ${edgeVoice}`);
+          return edgeVoice;
+        }
+      }
+    } catch (e) {
+      logger.warn('[TTSLanguageService] Failed to load preferred Edge voice:', e);
+    }
 
     // 1. Attempt dynamic resolution (live list from server)
     try {
@@ -139,7 +185,6 @@ export class TTSLanguageService {
     const voices = PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices;
     
     // Check for exact match (e.g., 'zh-hk') then base language (e.g., 'zh')
-    const baseLanguage = lowerLang.split('-')[0];
-    return voices[lowerLang] || voices[baseLanguage] || null;
+    return voices[lowerLang] || voices[baseLang] || null;
   }
 }

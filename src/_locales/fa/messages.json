@@ -368,6 +368,45 @@
   "tts_autodetect_desc": {
     "message": "قبل از پخش صدا، زبان متن را به طور هوشمند شناسایی می‌کند تا از صدای صحیح برای آن زبان استفاده شود."
   },
+  "tts_voices_tuning_label": {
+    "message": "تنظیمات اختصاصی صدا برای زبان‌ها"
+  },
+  "tts_voices_tuning_desc": {
+    "message": "لهجه‌های منطقه‌ای، جنسیت و گویش‌ها را برای هر زبان پشتیبانی شده سفارشی کنید و آن‌ها را با پیش‌نمایش آنی آزمایش کنید."
+  },
+  "tts_manage_voices_btn": {
+    "message": "مدیریت صداها و لهجه‌ها ⚙️"
+  },
+  "tts_drawer_title": {
+    "message": "تنظیم دقیق صدا و لهجه"
+  },
+  "tts_search_placeholder": {
+    "message": "جستجوی زبان‌ها..."
+  },
+  "tts_loading_languages": {
+    "message": "در حال بارگذاری زبان‌ها..."
+  },
+  "tts_no_languages": {
+    "message": "زبانی یافت نشد."
+  },
+  "tts_static_fallback": {
+    "message": "(جایگزین ثابت)"
+  },
+  "tts_voice_default": {
+    "message": "پیش‌فرض (سیستم پویا)"
+  },
+  "tts_preferred_voice_option": {
+    "message": "گزینه ترجیحی {engine}"
+  },
+  "tts_reset_all": {
+    "message": "بازنشانی همه"
+  },
+  "tts_done": {
+    "message": "ذخیره"
+  },
+  "tts_confirm_reset": {
+    "message": "آیا مطمئن هستید که می‌خواهید تمام صداهای سفارشی‌سازی شده را به حالت پیش‌فرض بازگردانید؟"
+  },
   "import_success": {
     "message": "تنظیمات با موفقیت درون‌ریزی شد."
   },
