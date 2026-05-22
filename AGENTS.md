@@ -28,6 +28,7 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 - **Error Management**: Centralized error management system.
 - **Storage Manager**: Smart storage with built-in caching.
 - **Logging System**: Structured, linear, and production-aware logging system with component-based levels and concise output.
+- **Subtitle Translation System**: A robust, standalone system for translating `.srt` subtitle files with progressive batching, formatting protection, and real-time UI updates.
 - **UI Host System**: A centralized Vue application to manage all in-page UIs within the Shadow DOM.
 - **Memory Garbage Collector**: Advanced memory management system with a Critical Protection System to prevent memory leaks and preserve vital resources.
 - **Element Detection Service**: Centralized element detection system that eliminates hardcoded selectors and optimizes DOM queries.
@@ -43,10 +44,11 @@ Your mission is to evolve this codebase while rigorously maintaining its structu
 4. **Element Selection**: Select and translate specific DOM elements.
 5. **Popup Interface**: The primary translation interface within the popup.
 6. **Sidepanel**: A full-featured interface in the browser's sidepanel.
-7. **Screen Capture**: Image translation using OCR.
-8. **Context Menu**: Access via the right-click menu.
-9. **Mouse on Hover**: Instant translation by hovering over text with optional modifier keys.
-10. **Keyboard Shortcuts**: Customizable hotkeys.
+7. **Subtitle Translation**: Standalone app for translating subtitle files (SRT) while preserving timestamps and formatting.
+8. **Screen Capture**: Image translation using OCR.
+9. **Context Menu**: Access via the right-click menu.
+10. **Mouse on Hover**: Instant translation by hovering over text with optional modifier keys.
+11. **Keyboard Shortcuts**: Customizable hotkeys.
 
 ## Provider Development
 The system utilizes a provider hierarchy pattern:
@@ -61,7 +63,7 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
 ## Project Structure (Feature-Based Architecture)
 
 ### Vue Applications (Entry Points)
-- **`src/apps/`**: Vue applications - popup, sidepanel, options, content.
+- **`src/apps/`**: Vue applications - popup, sidepanel, options, content, subtitle.
   - Each app contains its specialized components.
   - Centralized UI Host for managing in-page components.
 
@@ -79,6 +81,7 @@ To implement a new provider, refer to the `docs/technical/PROVIDERS.md` document
 - **`src/features/`**: Each feature is self-contained and independent.
   - `translation/`: **Translation Engine ** – coordination, request tracking, and delivery.
   - `tts/`: **TTS System** – `useTTSSmart.js` as the single source of truth.
+  - `subtitle-translation/`: **Subtitle System** – progressive batching, parser factory, and formatting protection.
   - `mobile/`: **Touch & Mobile Support** – Bottom sheet UI and touch logic.
   - `screen-capture/`: OCR and image translation.
   - `element-selection/`: **Redesigned Element Selection** – SelectionManager and services.
@@ -117,6 +120,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**MEMORY_GARBAGE_COLLECTOR.md**](docs/technical/MEMORY_GARBAGE_COLLECTOR.md): **ResourceTracker** – Advanced memory management.
 - [**PROXY_SYSTEM.md**](docs/technical/PROXY_SYSTEM.md): Extension-only proxy system using Strategy Pattern.
 - [**TOAST_INTEGRATION_SYSTEM.md**](docs/technical/TOAST_INTEGRATION_SYSTEM.md): **Toast System** – Event-driven notifications and actions.
+- [**VITE_BUILD_SYSTEM.md**](docs/technical/VITE_BUILD_SYSTEM.md): **Vite Build System** – Modular bundling, manual chunking, and warning suppression filters.
 - [**CSS_ARCHITECTURE.md**](docs/technical/CSS_ARCHITECTURE.md): Modern principled CSS and Shadow DOM isolation.
 - [**CSS_VARIABLES_GUIDE.md**](docs/technical/CSS_VARIABLES_GUIDE.md): Design tokens and safe SCSS variable functions.
 - [**COMPONENT_ADJACENT_SCSS.md**](docs/technical/COMPONENT_ADJACENT_SCSS.md): Rules for component-specific style management.
@@ -134,6 +138,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**TEXT_SELECTION_SYSTEM.md**](docs/technical/TEXT_SELECTION_SYSTEM.md): **Text Selection** – Site handlers and field interaction.
 - [**SELECT_ELEMENT_SYSTEM.md**](docs/technical/SELECT_ELEMENT_SYSTEM.md): **Element Selection** – Interactive DOM selection.
 - [**SCREEN_CAPTURE_SYSTEM.md**](docs/technical/SCREEN_CAPTURE_SYSTEM.md): **OCR System** – Interactive capture and Tesseract.js.
+- [**SUBTITLE_TRANSLATION_SYSTEM.md**](docs/technical/SUBTITLE_TRANSLATION_SYSTEM.md): **Subtitle Translation** – Progressive batching and format preservation.
 - [**MOUSE_HOVER_SYSTEM.md**](docs/technical/MOUSE_HOVER_SYSTEM.md): **Mouse on Hover** – Optimized detection and tooltip coordination.
 - [**WHOLE_PAGE_TRANSLATION.md**](docs/technical/WHOLE_PAGE_TRANSLATION.md): **Page Translation** – Recursive batch processing.
 - [**TEXT_ACTIONS_SYSTEM.md**](docs/technical/TEXT_ACTIONS_SYSTEM.md): **Text Actions** – Copy/paste/TTS logic integration.
@@ -195,6 +200,12 @@ Comprehensive documentation is available in the `docs/` folder:
 - **Duplicate Prevention**: `TranslationRequestTracker` prevents redundant processing.
 - **Intelligent Routing**: Results delivered based on translation mode (Field, Select Element, Standard).
 - **Streaming Coordination**: Supports streaming for large translations.
+
+### Subtitle Translation System
+- **Standalone Architecture**: Operates as a decoupled, high-performance app for large file processing.
+- **Progressive Batching**: Intelligent chunking of subtitle cues to optimize provider character limits.
+- **Format Preservation**: Advanced "Text Protection" system for safeguarding SRT timestamps and HTML/style tags.
+- **Real-Time Progress**: Live UI updates with dynamic ETA and per-cue status tracking.
 
 ### Structured Logging
 - **Production Performance**: Linear formatting and level-gating ensure zero performance hit in production while maintaining high debuggability.

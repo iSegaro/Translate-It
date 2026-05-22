@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, createLogger } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import babel from '@rollup/plugin-babel'
@@ -12,7 +12,36 @@ export const createBaseConfig = (browser, options = {}) => {
 
   console.log(`🔧 Creating base config for ${browser} (${isProduction ? 'production' : 'development'} mode)${isWatchMode ? ' [WATCH MODE]' : ''}`);
 
+  const customLogger = createLogger();
+  const originalWarn = customLogger.warn;
+  customLogger.warn = (msg, options) => {
+    const allowedSuppressedFiles = [
+      'src/shared/logging/GlobalDebugState.js',
+      'src/shared/error-management/ErrorTypes.js',
+      'src/shared/storage/core/StorageCore.js',
+      'src/shared/error-management/ErrorMatcher.js',
+      'src/shared/error-management/ErrorHandler.js',
+      'src/utils/i18n/LanguagePackLoader.js',
+      'src/utils/i18n/LazyLanguageLoader.js',
+      'src/utils/i18n/languages.js',
+      'src/utils/i18n/i18n.js'
+    ];
+
+    if (
+      msg.includes('DYNAMIC_IMPORT_WILL_NOT_MOVE_MODULE') ||
+      msg.includes('dynamic import will not move module')
+    ) {
+      const isIntentional = allowedSuppressedFiles.some(file => msg.includes(file));
+      if (isIntentional) {
+        return;
+      }
+    }
+
+    originalWarn(msg, options);
+  };
+
   return defineConfig({
+    customLogger,
     publicDir: resolve(process.cwd(), 'src/public'),
     plugins: [
       vue({
@@ -75,7 +104,50 @@ export const createBaseConfig = (browser, options = {}) => {
         clearScreen: false
       } : undefined,
       rollupOptions: {
-        
+        onwarn(warning, warn) {
+          // Surgically suppress DYNAMIC_IMPORT_WILL_NOT_MOVE_MODULE warnings ONLY for intentional core-shared modules in whitelist
+          if (warning.code === 'DYNAMIC_IMPORT_WILL_NOT_MOVE_MODULE') {
+            const allowedSuppressedFiles = [
+              'src/shared/logging/GlobalDebugState.js',
+              'src/shared/error-management/ErrorTypes.js',
+              'src/shared/storage/core/StorageCore.js',
+              'src/shared/error-management/ErrorMatcher.js',
+              'src/shared/error-management/ErrorHandler.js',
+              'src/utils/i18n/LanguagePackLoader.js',
+              'src/utils/i18n/LazyLanguageLoader.js',
+              'src/utils/i18n/languages.js',
+              'src/utils/i18n/i18n.js'
+            ];
+            
+            const isIntentional = allowedSuppressedFiles.some(file => warning.message?.includes(file));
+            if (isIntentional) {
+              return;
+            }
+          }
+          warn(warning);
+        },
+        onLog(level, log, defaultHandler) {
+          // Surgically suppress DYNAMIC_IMPORT_WILL_NOT_MOVE_MODULE warnings ONLY for intentional core-shared modules in whitelist (Rolldown compatibility)
+          if (level === 'warn' && log.code === 'DYNAMIC_IMPORT_WILL_NOT_MOVE_MODULE') {
+            const allowedSuppressedFiles = [
+              'src/shared/logging/GlobalDebugState.js',
+              'src/shared/error-management/ErrorTypes.js',
+              'src/shared/storage/core/StorageCore.js',
+              'src/shared/error-management/ErrorMatcher.js',
+              'src/shared/error-management/ErrorHandler.js',
+              'src/utils/i18n/LanguagePackLoader.js',
+              'src/utils/i18n/LazyLanguageLoader.js',
+              'src/utils/i18n/languages.js',
+              'src/utils/i18n/i18n.js'
+            ];
+            
+            const isIntentional = allowedSuppressedFiles.some(file => log.message?.includes(file));
+            if (isIntentional) {
+              return;
+            }
+          }
+          defaultHandler(level, log);
+        },
         output: {
           // Optimized chunk strategy: Let Vite handle the complex dependency graph
           // while keeping heavy third-party libs and data separate.
@@ -106,10 +178,10 @@ export const createBaseConfig = (browser, options = {}) => {
             }
 
             // 3. Independent Feature Modules (Lazy by nature)
-            if (id.includes('src/capture') || id.includes('ScreenCapture')) {
+            if (id.includes('src/features/screen-capture') || id.includes('ScreenCapture')) {
               return 'features/feature-capture'
             }
-            if (id.includes('src/subtitle') || id.includes('Subtitle')) {
+            if ((id.includes('src/features/subtitle-translation') || id.includes('src/apps/subtitle')) && !id.includes('node_modules')) {
               return 'features/feature-subtitle'
             }
 
@@ -123,8 +195,26 @@ export const createBaseConfig = (browser, options = {}) => {
               if (id.includes('tts')) return 'languages/tts-data';
             }
 
-            // Note: We removed manual chunks for core logic (store, shared comps, utils)
-            // to allow Vite to resolve circular dependencies correctly.
+            // 5. Shared Core Systems (Store, Shared Composables, Utils, and Shared modules)
+            // Grouped into a single manual chunk to prevent circular dependency errors across chunk boundaries,
+            // while completely extracting them from lazy-loaded feature chunks.
+            if (
+              (id.includes('src/shared/') || 
+               id.includes('src/store/') || 
+               id.includes('src/composables/') ||
+               id.includes('src/utils/') ||
+               id.includes('src/features/settings/') ||
+               id.includes('src/features/translation/composables/') ||
+               id.includes('src/components/shared/') ||
+               id.includes('ThemeSelector.vue') ||
+               id.includes('ProviderConstants.js') ||
+               id.includes('ProviderManifest.js') ||
+               id.includes('ProviderConfigurations.js') ||
+               id.includes('textDirection.js')) && 
+              !id.includes('node_modules')
+            ) {
+              return 'core/core-shared'
+            }
           },
           
           chunkFileNames: 'js/[name].[hash].js',

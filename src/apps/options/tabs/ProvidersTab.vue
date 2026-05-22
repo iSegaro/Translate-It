@@ -114,13 +114,11 @@ import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { findProviderById, getProviderManifest } from '@/features/translation/providers/ProviderManifest.js'
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { useProviderVisibility } from '../composables/useProviderVisibility.js'
-import { useTabSettings } from '../composables/useTabSettings.js'
 
 // Components
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -132,17 +130,23 @@ const route = useRoute()
 const { t } = useUnifiedI18n()
 const { checkAndHighlight, highlightElement } = useHighlightManager()
 
-const { createSetting } = useTabSettings(settingsStore, logger)
-const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2)
+// Use the store-managed activeConfigProvider instead of a local ref.
+// This allows the configuration state to persist across tab switches in the Options page,
+// while remaining reactive to global TRANSLATION_API changes.
+const selectedProvider = computed({
+  get: () => settingsStore.activeConfigProvider,
+  set: (val) => { settingsStore.activeConfigProvider = val }
+})
 
 // Auto-highlight missing settings when provider is changed manually
 watch(selectedProvider, (newProvider) => {
   logger.debug(`[ProvidersTab] Local provider changed to ${newProvider}`);
   const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
   if (missingKey) {
-    setTimeout(() => {
+    // Increase timeout and use nextTick to allow async component loading and transition
+    setTimeout(async () => {
       highlightElement(missingKey);
-    }, 400);
+    }, 600);
   }
 })
 
@@ -153,7 +157,7 @@ onMounted(async () => {
   if (highlightKey) {
     const provider = getProviderManifest().find(p => p.requiredSettings?.includes(highlightKey));
     if (provider) {
-      selectedProvider.value = provider.id;
+      settingsStore.activeConfigProvider = provider.id;
     }
   }
 
@@ -188,10 +192,25 @@ const providerSettingsComponent = computed(() => {
 const handleValidationFeedback = (e) => {
   const { field } = e.detail || {};
   
-  if (field === 'provider' || (field && field.includes('API'))) {
+  if (!field) return;
+
+  // 1. If it's a specific provider setting (e.g., DEEPL_API_KEY), 
+  // check if we need to switch the active provider view first.
+  if (field.includes('API') || field.includes('URL') || field.includes('MODEL')) {
+    const manifest = getProviderManifest();
+    const targetProvider = manifest.find(p => p.requiredSettings?.includes(field));
+    
+    if (targetProvider && targetProvider.id !== settingsStore.activeConfigProvider) {
+      logger.debug(`[ProvidersTab] Switching view to ${targetProvider.id} to show error in ${field}`);
+      settingsStore.activeConfigProvider = targetProvider.id;
+    }
+  }
+  
+  // 2. Perform highlight with a delay to ensure component is rendered
+  if (field === 'provider' || field.includes('API') || field.includes('URL') || field.includes('MODEL')) {
     setTimeout(() => {
-      highlightElement(field || 'TRANSLATION_API');
-    }, 400);
+      highlightElement(field === 'provider' ? 'TRANSLATION_API' : field);
+    }, 600);
   }
 };
 

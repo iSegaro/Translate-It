@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, onUnmounted, getCurrentInstance } from 'vue'
+import { ref, computed, watch, onUnmounted, getCurrentInstance } from 'vue'
 import browser from 'webextension-polyfill'
 import { CONFIG, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
@@ -196,6 +196,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const isInitialized = ref(false)
   const isSaving = ref(false)
   const isSettingsValid = ref(true) // Global validation state for options UI
+  
+  // Non-persisted UI state for the Options page
+  const activeConfigProvider = ref(null)
   
   // Getters
   const isDarkTheme = computed(() => {
@@ -802,6 +805,16 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  // Sync activeConfigProvider with global TRANSLATION_API
+  // This ensures that if the user changes the primary provider in the Languages tab, 
+  // the Providers tab will automatically switch to it for configuration.
+  watch(() => settings.value.TRANSLATION_API, (newVal) => {
+    if (newVal) {
+      activeConfigProvider.value = newVal;
+      logger.debug(`[SettingsStore] activeConfigProvider synced to: ${newVal}`);
+    }
+  }, { immediate: true });
+
   // Initialize settings on store creation and setup listener
   loadSettings().then(async () => {
     // Initialize DebugModeBridge after settings are loaded
@@ -835,6 +848,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isInitialized,
     isSaving,
     isSettingsValid,
+    activeConfigProvider,
     
     // Getters
     isDarkTheme,

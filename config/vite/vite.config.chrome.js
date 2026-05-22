@@ -226,6 +226,7 @@ export default defineConfig({
           outDir: baseOutDir,
           modulePreload: false,
           rollupOptions: {
+            ...baseConfig.build?.rollupOptions,
             output: {
               ...baseConfig.build?.rollupOptions?.output,
               assetFileNames: (assetInfo) => {

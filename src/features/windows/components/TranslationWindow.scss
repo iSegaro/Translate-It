@@ -169,13 +169,18 @@
     position: relative !important;
     top: auto !important;
     left: auto !important;
-    z-index: 10 !important;
+    z-index: 150 !important; // Higher than TranslationDisplay's 100 loading overlay
     width: 28px !important;
     height: 28px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
+
+    // Raise stacking context when dropdown is open to ensure it overlaps body/loading
+    &.ti-dropdown-open {
+      z-index: 2000 !important;
+    }
   }
 
   // Buttons

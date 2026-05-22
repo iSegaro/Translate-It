@@ -24,7 +24,14 @@ import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { registerTranslation, handleMessage as routeMessage } from "@/shared/messaging/core/ContentScriptIntegration.js";
 import { sendMessage as sendUnifiedMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
+// Lazy logger to avoid TDZ ReferenceErrors when bundled
+const logger = new Proxy({}, {
+  get(target, prop) {
+    const instance = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedTranslation');
+    const value = instance[prop];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  }
+});
 
 /**
  * useUnifiedTranslation - Unified composable for translation features

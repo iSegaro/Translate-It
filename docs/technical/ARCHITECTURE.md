@@ -25,6 +25,7 @@
 - **[Memory Garbage Collector](MEMORY_GARBAGE_COLLECTOR.md)** - Advanced memory management system with Critical Protection for essential resources
 - **[Proxy System](PROXY_SYSTEM.md)** - Extension-only proxy system with Strategy Pattern for accessing geo-restricted translation services
 - **[Toast Integration System](TOAST_INTEGRATION_SYSTEM.md)** - Comprehensive Vue Sonner toast integration with actionable notifications and event-driven architecture
+- **[Vite Build System](VITE_BUILD_SYSTEM.md)** - Modular bundling, manual chunking, and warning suppression filters
 - **[CSS Architecture](CSS_ARCHITECTURE.md)** - Modern principled CSS with Grid layout, containment, safe variable functions, and future-proof SCSS patterns
 - **[CSS Variables Guide](CSS_VARIABLES_GUIDE.md)** - Comprehensive guide for using and extending CSS variables
 - **[Component-Adjacent SCSS](COMPONENT_ADJACENT_SCSS.md)** - Rules for managing component-specific styles
@@ -45,6 +46,7 @@
 - **[Whole Page Translation System](WHOLE_PAGE_TRANSLATION.md)** - Recursive translation of web pages with dynamic batching
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[Screen Capture System](SCREEN_CAPTURE_SYSTEM.md)** - Interactive area capture with Tesseract.js OCR engine
+- **[Subtitle Translation System](SUBTITLE_TRANSLATION_SYSTEM.md)** - Standalone tool for translating `.srt` subtitle files with format preservation and progressive batching
 - **[Mouse Hover System](MOUSE_HOVER_SYSTEM.md)** - High-performance "zero-click" translation with word/sentence/container detection
 - **[Options Page Documentation](OPTIONS_PAGE.md)** - Guide for configuration hub and settings application logic
 - **[Optimization Levels](OPTIMIZATION_LEVELS.md)** - Strategy for balancing speed vs. cost in translations
@@ -999,6 +1001,29 @@ The select element system provides an interactive mode for translating specific 
 
 ### Documentation
 For a comprehensive guide on implementation details, abbreviated protocols, and streaming logic, refer to the **[Select Element System Documentation](SELECT_ELEMENT_SYSTEM.md)**.
+
+</details>
+
+---
+
+## Subtitle Translation System
+
+<details>
+<summary>View Subtitle Translation details</summary>
+
+### Overview
+The subtitle translation system is a standalone, robust tool designed to translate `.srt` subtitle files into any target language. It operates independently from page-level translation features to efficiently handle large file volumes while strictly preserving formatting, timestamps, and style tags.
+
+### Architecture and Integration
+- **Standalone UI Application**: Hosted in `SubtitleApp.vue`, providing a premium, glassmorphic interface with drag-and-drop file support, dynamic ETA, and a live preview viewer.
+- **SubtitleTranslationCoordinator**: The central background orchestrator that manages the entire job lifecycle, from parsing to serialization, ensuring process stability with 5-minute batch timeouts.
+- **Progressive Batching**: Uses `SubtitleBatchPlanner` to intelligently chunk subtitle cues based on the active provider's character and item limits, optimizing API payloads.
+- **Format Protection (TextProtector)**: A specialized adapter (`SubtitleTextProtector`) that shields HTML tags (e.g., `<i>`, `<b>`) and structural braces from the translation engine, preventing file corruption.
+- **Unified Provider Integration**: Seamlessly delegates the actual translation requests to the `UnifiedModeCoordinator`, leveraging the extension's existing provider hierarchy and rate limiting while maintaining a decoupled orchestration flow.
+- **Validation and Integrity**: The `SubtitleValidationService` ensures translation results align perfectly with the original cues before re-injecting formatting tokens.
+
+### Documentation
+For a comprehensive breakdown of the background orchestration, parsing adapters, protection mechanisms, and UI integration, refer to the **[Subtitle Translation System Documentation](SUBTITLE_TRANSLATION_SYSTEM.md)**.
 
 </details>
 

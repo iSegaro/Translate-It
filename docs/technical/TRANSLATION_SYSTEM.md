@@ -100,6 +100,12 @@ User Input → useSidepanelTranslation → handleTranslate.js → Provider → U
 DOM Selection → JSON Payload → UnifiedTranslationService → Streaming Coordinator → DOM Update
 ```
 
+### 4. Subtitle Translation
+```
+File Upload → SubtitleTranslationCoordinator → Progressive Batching → SrtAdapter → UI Preview
+```
+*Note: Subtitle translation uses the unified provider infrastructure but maintains a decoupled orchestration flow to handle large file volumes and format preservation.*
+
 **Special Processing**: Select element mode uses streaming for large content:
 - **Streaming Updates**: Real-time translation progress
 - **JSON Processing**: Efficient handling of multiple text elements

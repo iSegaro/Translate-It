@@ -278,6 +278,41 @@ img.ti-dropdown-arrow,
   span { font-size: 14px !important; white-space: nowrap !important; }
 }
 
+.ti-set-default-btn {
+  margin-inline-start: auto !important;
+  background: none !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: var(--color-text-secondary) !important;
+  transition: transform 0.2s ease, color 0.2s ease, opacity 0.2s ease !important;
+  opacity: 0.3;
+  z-index: 2 !important;
+
+  &:hover {
+    transform: scale(1.2);
+    color: var(--color-primary) !important;
+    opacity: 1;
+  }
+
+  &.is-default {
+    color: #ffb800 !important;
+    opacity: 1;
+    
+    &:hover {
+      color: #ff9900 !important;
+    }
+  }
+
+  .ti-star-icon {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
 /* 6. RTL Support - Simplified using Logical Properties */
 :global(.rtl) {
   .ti-provider-icon-only-container .ti-provider-dropdown-menu {
@@ -459,8 +494,21 @@ img.ti-dropdown-arrow,
   }
 }
 
-/* 8. Final Polish for Popup */
+/* 8. Final Polish for Popup and Sidepanel context overrides */
 :global(.popup-wrapper) {
   .ti-split-translate-button { height: 28px !important; }
   .ti-translate-main-area span { font-size: 12px !important; }
+}
+
+/* Specific centering for Sidepanel split selector to avoid edge overflow */
+.ti-sidepanel-split-selector {
+  &.ti-split-translate-button-container .ti-provider-dropdown-menu {
+    left: 50% !important;
+    right: auto !important;
+    inset-inline-start: auto !important;
+    inset-inline-end: auto !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    min-width: 190px !important;
+  }
 }
