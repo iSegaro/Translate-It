@@ -88,7 +88,15 @@
 
 <br>
 
-### 5. Smart Optimization Slider (Economy vs. Turbo)
+### 5. Subtitle Translation (SRT)
+- **Easy File Translation:** Upload your movie or course subtitles (`.srt`) and translate them to any language in seconds.
+- **Perfect Timing & Style:** Your video timestamps, italics, and bold text stay exactly as they are. No broken files.
+- **Live Preview:** Watch the translation happen line-by-line with a clear progress bar and estimated time remaining.
+- **Fast & Reliable:** Built to handle even long movies smoothly without missing a single line.
+
+<br>
+
+### 6. Smart Optimization Slider (Economy vs. Turbo)
 Take full control over your API costs and UI speed with **Optimization Levels (1-5)**:
 - **Economy Mode (Level 1):** Packs 70% more text per request. Perfect for saving AI tokens and preventing IP bans on traditional providers.
 - **Turbo Mode (Level 5):** Maximizes concurrency for the fastest possible UI response.
