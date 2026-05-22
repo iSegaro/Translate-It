@@ -85,6 +85,7 @@ export default defineConfig({
           modulePreload: false,
           sourcemap: false,
           rollupOptions: {
+            ...baseConfig.build?.rollupOptions,
             output: {
               ...baseConfig.build?.rollupOptions?.output,
               assetFileNames: (assetInfo) => {
