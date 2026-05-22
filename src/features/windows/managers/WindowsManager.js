@@ -191,6 +191,7 @@ export class WindowsManager extends ResourceTracker {
   // --- Utility Forwarders for internal sub-manager use and backward compatibility ---
   _addDismissListener() { return this.dismissalManager._addDismissListener(); }
   _showWindow(text, pos, opt) { return this.displayManager._showWindow(text, pos, opt); }
+  _showMobileSheet(text, opt) { return this.displayManager._showMobileSheet(text, opt); }
   _createTranslationWindow(text, pos) { return this.displayManager._createTranslationWindow(text, pos); }
   _handleTranslationError(err, text, pos) { return this.displayManager._handleTranslationError(err, text, pos); }
   _handleWindowCreationRequest(data) { return this.eventCoordinator._handleWindowCreationRequest(data); }
