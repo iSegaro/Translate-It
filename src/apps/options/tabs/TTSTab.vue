@@ -316,7 +316,7 @@ onUnmounted(() => {
 })
 
 const activeEngineName = computed(() => {
-  const currentEngine = settingsStore.settings?.TTS_ENGINE || TTS_ENGINES.EDGE
+  const currentEngine = ttsEngine.value || TTS_ENGINES.EDGE
   return currentEngine === TTS_ENGINES.EDGE ? 'Edge Neural' : 'Google'
 })
 
@@ -470,7 +470,7 @@ const filteredLanguages = computed(() => {
 
 // Get available voice options dynamically for the selected engine and language
 const getVoiceOptionsForLang = (langCode) => {
-  const currentEngine = settingsStore.settings?.TTS_ENGINE || TTS_ENGINES.EDGE
+  const currentEngine = ttsEngine.value || TTS_ENGINES.EDGE
   const baseLang = langCode.toLowerCase().split('-')[0]
   
   if (currentEngine === TTS_ENGINES.EDGE) {
@@ -546,7 +546,7 @@ const getVoiceOptionsForLang = (langCode) => {
 
 const getPreferredVoiceValue = (langCode) => {
   const preferred = tempPreferredVoices.value?.[langCode]
-  const currentEngine = settingsStore.settings?.TTS_ENGINE || TTS_ENGINES.EDGE
+  const currentEngine = ttsEngine.value || TTS_ENGINES.EDGE
   
   if (preferred) {
     if (typeof preferred === 'object') {
@@ -562,7 +562,7 @@ const getPreferredVoiceValue = (langCode) => {
 
 const savePreferredVoice = (langCode, voiceValue) => {
   const current = { ...tempPreferredVoices.value }
-  const currentEngine = settingsStore.settings?.TTS_ENGINE || TTS_ENGINES.EDGE
+  const currentEngine = ttsEngine.value || TTS_ENGINES.EDGE
   
   if (!current[langCode] || typeof current[langCode] !== 'object') {
     current[langCode] = { edge: 'default', google: 'default' }
@@ -609,7 +609,10 @@ const previewVoice = async (langCode) => {
   const text = previewTexts[baseLang] || previewTexts['en']
   
   try {
-    const success = await speak(text, langCode, { preferredVoices: tempPreferredVoices.value })
+    const success = await speak(text, langCode, { 
+      preferredVoices: tempPreferredVoices.value,
+      engine: ttsEngine.value
+    })
     if (!success) {
       playingLangCode.value = null
     }

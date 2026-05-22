@@ -30,7 +30,7 @@ export class TTSDispatcher {
         'TTS_PREFERRED_VOICES': {}
       });
 
-      const preferredEngine = settings.TTS_ENGINE || TTS_ENGINES.GOOGLE;
+      const preferredEngine = message.data?.engine || settings.TTS_ENGINE || TTS_ENGINES.GOOGLE;
       const fallbackEnabled = settings.TTS_FALLBACK_ENABLED !== false;
       const globalAutoDetectEnabled = settings.TTS_AUTO_DETECT_ENABLED !== false;
       const preferredVoices = message.data?.preferredVoices || settings.TTS_PREFERRED_VOICES || {};
