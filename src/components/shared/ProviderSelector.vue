@@ -395,7 +395,7 @@ const isTeleportEnabled = ref(false)
 const isRTL = computed(() => {
   try {
     return document.documentElement.dir === 'rtl' || document.body.dir === 'rtl' || selectorRef.value?.closest('.rtl') !== null;
-  } catch (e) {
+  } catch {
     return false;
   }
 })
