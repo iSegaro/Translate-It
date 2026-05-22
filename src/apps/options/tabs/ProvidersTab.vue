@@ -131,9 +131,13 @@ const route = useRoute()
 const { t } = useUnifiedI18n()
 const { checkAndHighlight, highlightElement } = useHighlightManager()
 
-// Use a local ref for selectedProvider instead of syncing with global TRANSLATION_API setting.
-// This decouples "configuration view" from "active service selection".
-const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)
+// Use the store-managed activeConfigProvider instead of a local ref.
+// This allows the configuration state to persist across tab switches in the Options page,
+// while remaining reactive to global TRANSLATION_API changes.
+const selectedProvider = computed({
+  get: () => settingsStore.activeConfigProvider,
+  set: (val) => { settingsStore.activeConfigProvider = val }
+})
 
 // Auto-highlight missing settings when provider is changed manually
 watch(selectedProvider, (newProvider) => {
@@ -154,7 +158,7 @@ onMounted(async () => {
   if (highlightKey) {
     const provider = getProviderManifest().find(p => p.requiredSettings?.includes(highlightKey));
     if (provider) {
-      selectedProvider.value = provider.id;
+      settingsStore.activeConfigProvider = provider.id;
     }
   }
 
