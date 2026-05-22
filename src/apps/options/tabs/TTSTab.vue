@@ -154,11 +154,8 @@
               class="drawer-item"
             >
               <div class="lang-meta">
-                <span 
-                  v-if="lang.flagCode" 
-                  class="lang-flag"
-                >
-                  {{ getFlagEmoji(lang.flagCode) }}
+                <span class="lang-flag">
+                  {{ getFlagEmoji(lang) }}
                 </span>
                 <span class="lang-name">{{ lang.name }}</span>
                 <span class="lang-code-badge">{{ lang.code.toUpperCase() }}</span>
@@ -340,10 +337,93 @@ const closeVoicesDrawer = () => {
   tempPreferredVoices.value = JSON.parse(JSON.stringify(settingsStore.settings?.TTS_PREFERRED_VOICES || {}))
 }
 
-// Generate Flag emoji dynamically
-const getFlagEmoji = (flagCode) => {
-  if (!flagCode) return ''
-  const codePoints = flagCode
+// Generate Flag emoji dynamically with comprehensive fallback resolution
+const getFlagEmoji = (lang) => {
+  if (!lang) return '🌐'
+  
+  // Use explicit flagCode from language metadata JSON if populated
+  let code = lang.flagCode
+  
+  // Dynamic fallback mapping for languages missing flagCode in JSON
+  if (!code && lang.code) {
+    const cleanCode = lang.code.toLowerCase().trim()
+    const baseLang = cleanCode.split('-')[0]
+    
+    const fallbackFlags = {
+      'en': 'gb',
+      'fa': 'ir',
+      'ja': 'jp',
+      'ko': 'kr',
+      'zh': 'cn',
+      'zh-cn': 'cn',
+      'zh-tw': 'tw',
+      'yue': 'hk',
+      'lzh': 'tw',
+      'ar': 'sa',
+      'he': 'il',
+      'hi': 'in',
+      'el': 'gr',
+      'da': 'dk',
+      'sv': 'se',
+      'uk': 'ua',
+      'cs': 'cz',
+      'et': 'ee',
+      'sl': 'si',
+      'sq': 'al',
+      'be': 'by',
+      'ka': 'ge',
+      'hy': 'am',
+      'ne': 'np',
+      'si': 'lk',
+      'my': 'mm',
+      'km': 'kh',
+      'lo': 'la',
+      'gu': 'in',
+      'ta': 'in',
+      'te': 'in',
+      'kn': 'in',
+      'ml': 'in',
+      'pa': 'in',
+      'bn': 'bd',
+      'ur': 'pk',
+      'am': 'et',
+      'om': 'et',
+      'sw': 'ke',
+      'ny': 'mw',
+      'st': 'za',
+      'zu': 'za',
+      'xh': 'za',
+      'af': 'za',
+      'eu': 'es',
+      'ca': 'es',
+      'co': 'fr',
+      'fy': 'nl',
+      'gl': 'es',
+      'haw': 'us',
+      'hmn': 'la',
+      'ig': 'ng',
+      'jw': 'id',
+      'kk': 'kz',
+      'ky': 'kg',
+      'lb': 'lu',
+      'mi': 'nz',
+      'sm': 'ws',
+      'gd': 'gb',
+      'sn': 'zw',
+      'su': 'id',
+      'tg': 'tj',
+      'tt': 'ru',
+      'uz': 'uz',
+      'yi': 'il',
+      'yo': 'ng'
+    }
+    
+    code = fallbackFlags[cleanCode] || fallbackFlags[baseLang] || baseLang
+  }
+  
+  if (!code) return '🌐'
+  
+  const codePoints = code
     .toUpperCase()
     .split('')
     .map(char => 127397 + char.charCodeAt(0))
