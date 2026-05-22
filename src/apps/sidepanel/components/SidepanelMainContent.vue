@@ -40,6 +40,7 @@
           <ProviderSelector
             v-model="currentProviderLocal"
             mode="split"
+            class="ti-sidepanel-split-selector"
             :is-global="false"
             show-sync
             allow-set-default
@@ -71,6 +72,7 @@
           <ProviderSelector
             v-model="currentProviderLocal"
             mode="split"
+            class="ti-sidepanel-split-selector"
             :is-global="false"
             show-sync
             allow-set-default
