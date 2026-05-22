@@ -18,6 +18,19 @@
   height: 100svh; 
   
   overflow: hidden;
+
+  // Fix for dropdowns being covered by sidebar/navigation on tablet/mobile
+  // When a dropdown is open, we raise the stacking context of the entire layout
+  &:has(.ti-dropdown-open) {
+    .options-main {
+      z-index: 2000;
+      overflow: visible; // Allow dropdowns to overlap navigation
+    }
+    .tab-content-container {
+      z-index: 2000;
+      overflow: visible; // Allow dropdowns to overlap sidebar/header
+    }
+  }
 }
 
 /* RTL layout adjustments */
