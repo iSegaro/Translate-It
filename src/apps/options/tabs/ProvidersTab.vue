@@ -193,9 +193,24 @@ const providerSettingsComponent = computed(() => {
 const handleValidationFeedback = (e) => {
   const { field } = e.detail || {};
   
-  if (field === 'provider' || (field && field.includes('API'))) {
+  if (!field) return;
+
+  // 1. If it's a specific provider setting (e.g., DEEPL_API_KEY), 
+  // check if we need to switch the active provider view first.
+  if (field.includes('API') || field.includes('URL') || field.includes('MODEL')) {
+    const manifest = getProviderManifest();
+    const targetProvider = manifest.find(p => p.requiredSettings?.includes(field));
+    
+    if (targetProvider && targetProvider.id !== settingsStore.activeConfigProvider) {
+      logger.debug(`[ProvidersTab] Switching view to ${targetProvider.id} to show error in ${field}`);
+      settingsStore.activeConfigProvider = targetProvider.id;
+    }
+  }
+  
+  // 2. Perform highlight with a delay to ensure component is rendered
+  if (field === 'provider' || field.includes('API') || field.includes('URL') || field.includes('MODEL')) {
     setTimeout(() => {
-      highlightElement(field || 'TRANSLATION_API');
+      highlightElement(field === 'provider' ? 'TRANSLATION_API' : field);
     }, 600);
   }
 };
