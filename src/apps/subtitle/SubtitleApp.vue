@@ -125,7 +125,7 @@
               @click="handleDownload(currentFile.name)"
             >
               <v-icon icon="mdi:download" />
-              {{ t('subtitle_download_btn', 'Download Translated Subtitles') }}
+              {{ t('subtitle_download_btn', 'Download Translated Subtitle') }}
             </button>
             <button
               v-if="isDownloaded"
@@ -689,6 +689,7 @@ onUnmounted(() => {
 
     &.success {
       background: var(--success-color);
+      color: #0f172a; /* Dark text for better contrast on success background */
       padding: 1rem 3rem;
       font-size: 1.1rem;
     }
