@@ -71,12 +71,14 @@ export class PageTranslationSettingsLoader {
 
     // Provider Resolution: Options -> Mode Provider -> Global Provider
     let effectiveProvider = options.provider;
+    const isExplicitProvider = !!options.provider;
     if (!effectiveProvider) {
       effectiveProvider = modeProviders?.[TranslationMode.Page] || globalTranslationApi;
     }
 
     const settings = {
       translationApi: effectiveProvider,
+      isExplicitProvider,
       targetLanguage: options.targetLanguage || targetLanguage,
       lazyLoading: !!lazyLoading,
       rootMargin: formattedRootMargin,

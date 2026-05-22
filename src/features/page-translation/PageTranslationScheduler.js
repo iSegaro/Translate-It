@@ -398,6 +398,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       {
         text: JSON.stringify(textsToTranslate),
         provider: config.providerRegistryId,
+        isExplicitProvider: this.settings.isExplicitProvider,
         sourceLanguage: AUTO_DETECT_VALUE, 
         targetLanguage: config.targetLanguage,
         mode: TranslationMode.Page,

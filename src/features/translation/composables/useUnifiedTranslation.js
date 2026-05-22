@@ -223,6 +223,7 @@ export function useUnifiedTranslation(context = 'popup') {
         sourceLanguage: sourceLang || sourceLanguage.value,
         targetLanguage: targetLang || targetLanguage.value,
         mode: mode,
+        isExplicitProvider: true,
         options: {}
       }
     };

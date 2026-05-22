@@ -72,6 +72,7 @@ export class TranslationHandler {
       let modeSpecificProvider = settings.MODE_PROVIDERS?.[translationMode];
       
       const finalProvider = options.provider || modeSpecificProvider || settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
+      const isExplicitProvider = !!options.provider;
 
       // Generate unique messageId
       const messageId = generateTranslationMessageId('content');
@@ -85,6 +86,7 @@ export class TranslationHandler {
         from: AUTO_DETECT_VALUE,
         to: settings.TARGET_LANGUAGE || 'fa',
         provider: finalProvider,
+        isExplicitProvider: isExplicitProvider,
         messageId: messageId,
         mode: translationMode,
         contextMetadata: isAIContextEnabled ? { pageTitle: document.title } : null,
@@ -188,6 +190,7 @@ export class TranslationHandler {
           data: {
             text: payload.text,
             provider: payload.provider,
+            isExplicitProvider: payload.isExplicitProvider,
             sourceLanguage: payload.from,
             targetLanguage: payload.to,
             mode: payload.mode,

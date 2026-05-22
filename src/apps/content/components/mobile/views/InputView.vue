@@ -246,6 +246,7 @@ const handleTranslate = async () => {
       sourceLanguage: sourceLang.value, 
       targetLanguage: targetLang.value, 
       provider: currentProvider.value, 
+      isExplicitProvider: true,
       mode: TranslationMode.Mobile_Translate,
       messageId: currentMessageId.value
     };
