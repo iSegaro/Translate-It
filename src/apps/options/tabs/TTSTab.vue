@@ -43,7 +43,7 @@
           <div class="setting-control">
             <BaseButton
               id="TTS_MANAGE_VOICES_BTN"
-              variant="secondary"
+              class="manage-voices-button"
               @click="openVoicesDrawer"
             >
               {{ t('tts_manage_voices_btn') || 'Manage Voices & Accents ⚙️' }}
