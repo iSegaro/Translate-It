@@ -58,6 +58,7 @@ describe('PageTranslationSettingsLoader', () => {
 
     expect(settings).toEqual({
       translationApi: 'google',
+      isExplicitProvider: false,
       targetLanguage: 'fa',
       lazyLoading: true,
       rootMargin: '150px',
@@ -87,6 +88,7 @@ describe('PageTranslationSettingsLoader', () => {
     });
 
     expect(settings.translationApi).toBe('gemini');
+    expect(settings.isExplicitProvider).toBe(true);
     expect(settings.targetLanguage).toBe('en');
   });
 
@@ -97,10 +99,12 @@ describe('PageTranslationSettingsLoader', () => {
 
     let settings = await PageTranslationSettingsLoader.load();
     expect(settings.translationApi).toBe('openai');
+    expect(settings.isExplicitProvider).toBe(false);
 
     // Option overrides mode specific
     settings = await PageTranslationSettingsLoader.load({ provider: 'gemini' });
     expect(settings.translationApi).toBe('gemini');
+    expect(settings.isExplicitProvider).toBe(true);
 
     // If mode specific doesn't exist, use global
     config.getModeProvidersAsync.mockResolvedValue({});
