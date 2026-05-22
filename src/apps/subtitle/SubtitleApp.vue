@@ -66,7 +66,6 @@
                     :is-global="false"
                     required-feature="subtitle"
                     only-configured
-                    ignore-hidden
                   />
                   <button 
                     class="icon-btn settings-link-btn" 
