@@ -106,10 +106,10 @@ export const createBaseConfig = (browser, options = {}) => {
             }
 
             // 3. Independent Feature Modules (Lazy by nature)
-            if (id.includes('src/capture') || id.includes('ScreenCapture')) {
+            if (id.includes('src/features/screen-capture') || id.includes('ScreenCapture')) {
               return 'features/feature-capture'
             }
-            if (id.includes('src/subtitle') || id.includes('Subtitle')) {
+            if ((id.includes('src/features/subtitle-translation') || id.includes('src/apps/subtitle')) && !id.includes('node_modules')) {
               return 'features/feature-subtitle'
             }
 
@@ -123,8 +123,26 @@ export const createBaseConfig = (browser, options = {}) => {
               if (id.includes('tts')) return 'languages/tts-data';
             }
 
-            // Note: We removed manual chunks for core logic (store, shared comps, utils)
-            // to allow Vite to resolve circular dependencies correctly.
+            // 5. Shared Core Systems (Store, Shared Composables, Utils, and Shared modules)
+            // Grouped into a single manual chunk to prevent circular dependency errors across chunk boundaries,
+            // while completely extracting them from lazy-loaded feature chunks.
+            if (
+              (id.includes('src/shared/') || 
+               id.includes('src/store/') || 
+               id.includes('src/composables/') ||
+               id.includes('src/utils/') ||
+               id.includes('src/features/settings/') ||
+               id.includes('src/features/translation/composables/') ||
+               id.includes('src/components/shared/') ||
+               id.includes('ThemeSelector.vue') ||
+               id.includes('ProviderConstants.js') ||
+               id.includes('ProviderManifest.js') ||
+               id.includes('ProviderConfigurations.js') ||
+               id.includes('textDirection.js')) && 
+              !id.includes('node_modules')
+            ) {
+              return 'core/core-shared'
+            }
           },
           
           chunkFileNames: 'js/[name].[hash].js',

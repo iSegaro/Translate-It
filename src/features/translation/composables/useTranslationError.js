@@ -9,7 +9,14 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationError');
+// Lazy logger to avoid TDZ ReferenceErrors when bundled
+const logger = new Proxy({}, {
+  get(target, prop) {
+    const instance = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationError');
+    const value = instance[prop];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  }
+});
 
 /**
  * useTranslationError - Composable for localized translation error handling

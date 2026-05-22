@@ -17,7 +17,14 @@ import { createMessageHandler } from '@/shared/messaging/core/MessageHandler.js'
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
+// Lazy logger to avoid TDZ ReferenceErrors when bundled
+const logger = new Proxy({}, {
+  get(target, prop) {
+    const instance = getScopedLogger(LOG_COMPONENTS.UI, 'useTranslationModes');
+    const value = instance[prop];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  }
+});
 
 // Shared reactive state for select element mode (module-level so all callers share it)
 const sharedIsSelectModeActive = ref(false);
