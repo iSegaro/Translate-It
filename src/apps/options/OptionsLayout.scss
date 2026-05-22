@@ -24,11 +24,9 @@
   &:has(.ti-dropdown-open) {
     .options-main {
       z-index: 2000;
-      overflow: visible; // Allow dropdowns to overlap navigation
     }
     .tab-content-container {
       z-index: 2000;
-      overflow: visible; // Allow dropdowns to overlap sidebar/header
     }
   }
 }

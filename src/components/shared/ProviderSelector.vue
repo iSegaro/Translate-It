@@ -1041,7 +1041,10 @@ const toggleDropdown = () => {
         // Mobile-specific sheet container detection
         const mobileContainer = selectorRef.value.closest('.ti-m-sheet-content');
         const sidepanelContainer = selectorRef.value.closest('.ti-sidepanel-container');
-        const container = mobileContainer || sidepanelContainer || selectorRef.value.closest('.ti-window-body');
+        const tabContainer = selectorRef.value.closest('.tab-content-container');
+        const windowBody = selectorRef.value.closest('.ti-window-body');
+        
+        const container = mobileContainer || sidepanelContainer || tabContainer || windowBody;
         
         // For floating windows or when outside a specific container, use viewport
         const useViewport = !container || isFloatingWindow;
