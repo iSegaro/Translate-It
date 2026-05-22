@@ -126,7 +126,7 @@
             type="text"
             class="drawer-search-input"
             :placeholder="t('tts_search_placeholder') || 'Search languages...'"
-          />
+          >
           <button 
             v-if="searchQuery" 
             class="search-clear-btn" 
@@ -166,7 +166,7 @@
                     :src="getFarsiFlagUrl()" 
                     alt="🇮🇷" 
                     class="farsi-flag-img" 
-                  />
+                  >
                   <template v-else>
                     {{ getFlagEmoji(lang) }}
                   </template>
@@ -183,7 +183,9 @@
                     class="voice-select-dropdown"
                     @change="savePreferredVoice(lang.code, $event.target.value)"
                   >
-                    <option value="default">{{ t('tts_voice_default') || 'Default (System Dynamic)' }}</option>
+                    <option value="default">
+                      {{ t('tts_voice_default') || 'Default (System Dynamic)' }}
+                    </option>
                     <option
                       v-for="opt in getVoiceOptionsForLang(lang.code)"
                       :key="opt.value"
@@ -288,7 +290,7 @@ const tempPreferredVoices = ref({})
 const { isLoaded: isLanguagesLoaded, translationLanguages, loadLanguages } = useLanguages()
 
 // TTS Player preview composable
-const { speak, stop, isPlaying, isLoading, ttsState } = useTTSSmart()
+const { speak, stop, isPlaying, isLoading } = useTTSSmart()
 
 const handleKeyDown = (e) => {
   if (e.key === 'Escape' && isDrawerOpen.value) {
