@@ -62,7 +62,8 @@
                 <div class="provider-selector-container">
                   <ProviderSelector 
                     v-model="config.providerId" 
-                    placement="up"
+                    placement="auto"
+                    :is-global="false"
                     required-feature="subtitle"
                     only-configured
                   />
