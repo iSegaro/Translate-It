@@ -120,6 +120,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**MEMORY_GARBAGE_COLLECTOR.md**](docs/technical/MEMORY_GARBAGE_COLLECTOR.md): **ResourceTracker** – Advanced memory management.
 - [**PROXY_SYSTEM.md**](docs/technical/PROXY_SYSTEM.md): Extension-only proxy system using Strategy Pattern.
 - [**TOAST_INTEGRATION_SYSTEM.md**](docs/technical/TOAST_INTEGRATION_SYSTEM.md): **Toast System** – Event-driven notifications and actions.
+- [**VITE_BUILD_SYSTEM.md**](docs/technical/VITE_BUILD_SYSTEM.md): **Vite Build System** – Modular bundling, manual chunking, and warning suppression filters.
 - [**CSS_ARCHITECTURE.md**](docs/technical/CSS_ARCHITECTURE.md): Modern principled CSS and Shadow DOM isolation.
 - [**CSS_VARIABLES_GUIDE.md**](docs/technical/CSS_VARIABLES_GUIDE.md): Design tokens and safe SCSS variable functions.
 - [**COMPONENT_ADJACENT_SCSS.md**](docs/technical/COMPONENT_ADJACENT_SCSS.md): Rules for component-specific style management.
