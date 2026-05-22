@@ -109,7 +109,7 @@
 
 <script setup>
 import './ProvidersTab.scss'
-import { onMounted, onUnmounted, computed, defineAsyncComponent, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -120,7 +120,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { useProviderVisibility } from '../composables/useProviderVisibility.js'
-import { useTabSettings } from '../composables/useTabSettings.js'
 
 // Components
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -132,8 +131,9 @@ const route = useRoute()
 const { t } = useUnifiedI18n()
 const { checkAndHighlight, highlightElement } = useHighlightManager()
 
-const { createSetting } = useTabSettings(settingsStore, logger)
-const selectedProvider = createSetting('TRANSLATION_API', ProviderRegistryIds.GOOGLE_V2)
+// Use a local ref for selectedProvider instead of syncing with global TRANSLATION_API setting.
+// This decouples "configuration view" from "active service selection".
+const selectedProvider = ref(settingsStore.settings?.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2)
 
 // Auto-highlight missing settings when provider is changed manually
 watch(selectedProvider, (newProvider) => {
