@@ -1,7 +1,6 @@
 node_modules/
 *.pem
 .vscode/
-.claude/
 dist/chrome/*
 dist/firefox/*
 # !dist/chrome/*.zip
@@ -10,3 +9,6 @@ dist/*.zip
 dist/Publish/Source-*.zip
 temp/
 tests/coverage/
+.claude/
+.agents/
+.antigravitycli
