@@ -383,8 +383,20 @@
   "tts_search_placeholder": {
     "message": "言語を検索..."
   },
+  "tts_loading_languages": {
+    "message": "言語を読み込んでいます..."
+  },
+  "tts_no_languages": {
+    "message": "言語が見つかりません。"
+  },
+  "tts_static_fallback": {
+    "message": "(静的フォールバック)"
+  },
   "tts_voice_default": {
     "message": "デフォルト（システム動的）"
+  },
+  "tts_preferred_voice_option": {
+    "message": "優先される {engine} オプション"
   },
   "tts_reset_all": {
     "message": "すべてリセット"

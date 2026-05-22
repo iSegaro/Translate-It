@@ -136,13 +136,13 @@
             class="drawer-loading"
           >
             <LoadingSpinner size="md" />
-            <span>Loading languages...</span>
+            <span>{{ t('tts_loading_languages') || 'Loading languages...' }}</span>
           </div>
           <div 
             v-else-if="filteredLanguages.length === 0" 
             class="drawer-empty"
           >
-            No languages found.
+            {{ t('tts_no_languages') || 'No languages found.' }}
           </div>
           <div 
             v-else 
@@ -165,7 +165,7 @@
               </div>
               
               <div class="voice-selection-box">
-                <label class="control-sublabel">Preferred {{ activeEngineName }} Option</label>
+                <label class="control-sublabel">{{ t('tts_preferred_voice_option', { engine: activeEngineName }) || `Preferred ${activeEngineName} Option` }}</label>
                 <div class="selection-row">
                   <select
                     :value="getPreferredVoiceValue(lang.code)"
@@ -375,7 +375,7 @@ const getVoiceOptionsForLang = (langCode) => {
       const staticVoice = PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[langCode] || 
                           PROVIDER_CONFIGS[TTS_ENGINES.EDGE].voices[baseLang]
       if (staticVoice) {
-        return [{ value: staticVoice, label: `${staticVoice} (Static Fallback)` }]
+        return [{ value: staticVoice, label: `${staticVoice} ${t('tts_static_fallback') || '(Static Fallback)'}` }]
       }
       return []
     }

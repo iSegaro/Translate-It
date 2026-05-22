@@ -383,8 +383,20 @@
   "tts_search_placeholder": {
     "message": "Search languages..."
   },
+  "tts_loading_languages": {
+    "message": "Loading languages..."
+  },
+  "tts_no_languages": {
+    "message": "No languages found."
+  },
+  "tts_static_fallback": {
+    "message": "(Static Fallback)"
+  },
   "tts_voice_default": {
     "message": "Default (System Dynamic)"
+  },
+  "tts_preferred_voice_option": {
+    "message": "Preferred {engine} Option"
   },
   "tts_reset_all": {
     "message": "Reset All"

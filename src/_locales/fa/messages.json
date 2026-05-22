@@ -383,8 +383,20 @@
   "tts_search_placeholder": {
     "message": "جستجوی زبان‌ها..."
   },
+  "tts_loading_languages": {
+    "message": "در حال بارگذاری زبان‌ها..."
+  },
+  "tts_no_languages": {
+    "message": "زبانی یافت نشد."
+  },
+  "tts_static_fallback": {
+    "message": "(جایگزین ثابت)"
+  },
   "tts_voice_default": {
     "message": "پیش‌فرض (سیستم پویا)"
+  },
+  "tts_preferred_voice_option": {
+    "message": "گزینه ترجیحی {engine}"
   },
   "tts_reset_all": {
     "message": "بازنشانی همه"
