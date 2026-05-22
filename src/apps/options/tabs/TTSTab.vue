@@ -155,7 +155,15 @@
             >
               <div class="lang-meta">
                 <span class="lang-flag">
-                  {{ getFlagEmoji(lang) }}
+                  <img 
+                    v-if="lang.code === 'fa'" 
+                    :src="getFarsiFlagUrl()" 
+                    alt="🇮🇷" 
+                    class="farsi-flag-img" 
+                  />
+                  <template v-else>
+                    {{ getFlagEmoji(lang) }}
+                  </template>
                 </span>
                 <span class="lang-name">{{ lang.name }}</span>
                 <span class="lang-code-badge">{{ lang.code.toUpperCase() }}</span>
@@ -228,6 +236,7 @@
 <script setup>
 import './TTSTab.scss'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import browser from 'webextension-polyfill'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -335,6 +344,15 @@ const closeVoicesDrawer = () => {
   isDrawerOpen.value = false
   // Revert any unsaved changes to avoid leaking local changes
   tempPreferredVoices.value = JSON.parse(JSON.stringify(settingsStore.settings?.TTS_PREFERRED_VOICES || {}))
+}
+
+// Get Farsi SVG flag URL from extension assets
+const getFarsiFlagUrl = () => {
+  try {
+    return browser.runtime.getURL('icons/flags/ir.svg')
+  } catch {
+    return ''
+  }
 }
 
 // Generate Flag emoji dynamically with comprehensive fallback resolution
