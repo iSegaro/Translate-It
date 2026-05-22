@@ -1,5 +1,8 @@
 <template>
-  <div class="api-key-section">
+  <div 
+    :id="id"
+    class="api-key-section"
+  >
     <div class="setting-group vertical">
       <div class="label-with-toggle">
         <label>{{ label }}</label>
@@ -75,6 +78,10 @@ import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 const { t } = useI18n()
 
 const props = defineProps({
+  id: {
+    type: String,
+    default: null
+  },
   modelValue: {
     type: String,
     default: ''

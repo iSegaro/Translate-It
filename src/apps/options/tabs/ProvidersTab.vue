@@ -140,9 +140,10 @@ watch(selectedProvider, (newProvider) => {
   logger.debug(`[ProvidersTab] Local provider changed to ${newProvider}`);
   const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
   if (missingKey) {
-    setTimeout(() => {
+    // Increase timeout and use nextTick to allow async component loading and transition
+    setTimeout(async () => {
       highlightElement(missingKey);
-    }, 400);
+    }, 600);
   }
 })
 
@@ -191,7 +192,7 @@ const handleValidationFeedback = (e) => {
   if (field === 'provider' || (field && field.includes('API'))) {
     setTimeout(() => {
       highlightElement(field || 'TRANSLATION_API');
-    }, 400);
+    }, 600);
   }
 };
 
