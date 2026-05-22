@@ -402,7 +402,7 @@
     "message": "Reset All"
   },
   "tts_done": {
-    "message": "Done"
+    "message": "Save"
   },
   "tts_cancel": {
     "message": "Cancel"

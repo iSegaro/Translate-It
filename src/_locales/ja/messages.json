@@ -402,7 +402,7 @@
     "message": "すべてリセット"
   },
   "tts_done": {
-    "message": "完了"
+    "message": "保存"
   },
   "tts_cancel": {
     "message": "キャンセル"
