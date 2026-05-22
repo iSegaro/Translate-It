@@ -32,7 +32,10 @@
       <div class="section-separator" />
 
       <!-- Language Specific Voices Trigger Button -->
-      <div class="setting-group">
+      <div 
+        id="TTS_VOICES_TUNING_SECTION"
+        class="setting-group"
+      >
         <div class="setting-row">
           <div class="setting-info">
             <label class="setting-label">{{ t('tts_voices_tuning_label') || 'Language-Specific Voice Tuning' }}</label>
@@ -75,7 +78,10 @@
       <div class="section-separator" />
 
       <!-- Auto Detect Toggle -->
-      <div class="setting-group">
+      <div 
+        id="TTS_AUTO_DETECT_SECTION"
+        class="setting-group"
+      >
         <div class="setting-row">
           <div class="setting-info">
             <BaseCheckbox
