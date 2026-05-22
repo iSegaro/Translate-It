@@ -239,6 +239,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TTS_ENGINES } from '@/shared/constants/tts.js'
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js'
 import { ttsVoiceService } from '@/features/tts/services/TTSVoiceService.js'
+import { TTSLanguageService } from '@/features/tts/services/TTSLanguageService.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -353,12 +354,17 @@ const getFlagEmoji = (flagCode) => {
   }
 }
 
-// Filter languages based on search query
+// Filter languages based on search query and active TTS engine support
 const filteredLanguages = computed(() => {
   const list = translationLanguages.value || []
-  if (!searchQuery.value.trim()) return list
+  const engine = ttsEngine.value || TTS_ENGINES.EDGE
+  
+  // Filter list to only include languages supported by the active TTS engine
+  const supportedList = list.filter(l => TTSLanguageService.supportsLanguage(engine, l.code))
+  
+  if (!searchQuery.value.trim()) return supportedList
   const query = searchQuery.value.toLowerCase().trim()
-  return list.filter(l => 
+  return supportedList.filter(l => 
     l.name.toLowerCase().includes(query) || 
     l.code.toLowerCase().includes(query)
   )
