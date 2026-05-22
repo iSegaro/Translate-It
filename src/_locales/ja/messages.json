@@ -368,6 +368,36 @@
   "tts_autodetect_desc": {
     "message": "正しい音声が使用されるように、読み上げの前にテキストの言語を自動的に識別します。"
   },
+  "tts_voices_tuning_label": {
+    "message": "言語別の音声調整"
+  },
+  "tts_voices_tuning_desc": {
+    "message": "サポートされている各言語の地域アクセント、性別、方言をカスタマイズし、リアルタイムのプレビューでテストします。"
+  },
+  "tts_manage_voices_btn": {
+    "message": "音声とアクセントの管理 ⚙️"
+  },
+  "tts_drawer_title": {
+    "message": "音声とアクセントの調整"
+  },
+  "tts_search_placeholder": {
+    "message": "言語を検索..."
+  },
+  "tts_voice_default": {
+    "message": "デフォルト（システム動的）"
+  },
+  "tts_reset_all": {
+    "message": "すべてリセット"
+  },
+  "tts_done": {
+    "message": "完了"
+  },
+  "tts_cancel": {
+    "message": "キャンセル"
+  },
+  "tts_confirm_reset": {
+    "message": "カスタマイズされたすべての音声をデフォルトにリセットしてもよろしいですか？"
+  },
   "import_success": {
     "message": "設定のインポートが完了しました。"
   },

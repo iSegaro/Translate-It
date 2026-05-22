@@ -37,8 +37,9 @@ export const handleEdgeTTSSpeak = async (message, sender, overrideLanguage = nul
     ttsStateManager.currentTTSSender = sender;
     ttsStateManager.currentTTSId = message.data?.ttsId || overrideLanguage?.ttsId || null;
 
-    const voiceName = await TTSLanguageService.getEdgeVoiceForLanguage(language) || 
-                      await TTSLanguageService.getEdgeVoiceForLanguage('en') || 
+    const preferredVoices = message.data?.preferredVoices;
+    const voiceName = await TTSLanguageService.getEdgeVoiceForLanguage(language, preferredVoices) || 
+                      await TTSLanguageService.getEdgeVoiceForLanguage('en', preferredVoices) || 
                       undefined;
     
     ttsStateManager.currentTTSRequest = (async () => {

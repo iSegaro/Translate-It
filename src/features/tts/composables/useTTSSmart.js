@@ -109,7 +109,8 @@ export function useTTSSmart() {
         data: {
           text: cleanText.trim(),
           language: language,
-          ttsId: currentTTSId.value
+          ttsId: currentTTSId.value,
+          preferredVoices: options.preferredVoices
         },
         context: 'tts-smart',
         messageId: `tts-speak-${currentTTSId.value}`

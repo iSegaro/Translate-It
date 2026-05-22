@@ -26,12 +26,14 @@ export class TTSDispatcher {
       const settings = await storageCore.get({
         'TTS_ENGINE': TTS_ENGINES.GOOGLE,
         'TTS_FALLBACK_ENABLED': true,
-        'TTS_AUTO_DETECT_ENABLED': true
+        'TTS_AUTO_DETECT_ENABLED': true,
+        'TTS_PREFERRED_VOICES': {}
       });
 
       const preferredEngine = settings.TTS_ENGINE || TTS_ENGINES.GOOGLE;
       const fallbackEnabled = settings.TTS_FALLBACK_ENABLED !== false;
       const globalAutoDetectEnabled = settings.TTS_AUTO_DETECT_ENABLED !== false;
+      const preferredVoices = message.data?.preferredVoices || settings.TTS_PREFERRED_VOICES || {};
 
       const incomingLang = (language || '').toLowerCase().trim();
       const isExplicitAuto = incomingLang === AUTO_DETECT_VALUE || 
@@ -90,7 +92,7 @@ export class TTSDispatcher {
       }
 
       // 3. Resolve BEST ENGINE with Circuit Breaker awareness
-      let resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled);
+      let resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled, preferredVoices);
       
       // Check if the resolved engine is actually allowed (not blocked)
       const isEngineAllowed = await ttsCircuitBreaker.isAllowed(resolution.engine);
@@ -125,7 +127,7 @@ export class TTSDispatcher {
       }
 
       // 3. Resolve BEST ENGINE with Circuit Breaker awareness
-      resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled);
+      resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled, preferredVoices);
       
       // Update state manager with the resolved language for accurate broadcasting
       ttsStateManager.lastTTSLanguage = resolution.language;
