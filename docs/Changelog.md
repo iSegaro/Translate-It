@@ -3,6 +3,7 @@
 ##### Added
 
 - Added a new [Subtitle Translator](#/about?highlight=SUBTITLE_TRANSLATOR) tool for translating subtitle files
+- Added new pronunciation accent and voice tuning options in the [Text-to-Speech Settings](#/tts?highlight=TTS_VOICES_TUNING_SECTION)
 
 ##### Fixed
 
