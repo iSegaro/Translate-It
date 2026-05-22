@@ -51,110 +51,6 @@
         />
       </button>
     </div>
-    
-    <!-- Provider Dropdown -->
-    <div 
-      v-if="isDropdownOpen"
-      class="ti-provider-dropdown-menu"
-      :class="{ 'ti-open-upward': isUpward }"
-      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
-      @click.stop
-    >
-      <div
-        ref="dropdownMenuRef"
-        class="ti-provider-dropdown-list"
-        @mouseleave="focusedIndex = -1"
-      >
-        <div
-          v-for="(provider, index) in availableProviders"
-          :key="provider.id"
-          class="ti-dropdown-item"
-          :class="{ 
-            'ti-active': currentProvider === provider.id,
-            'is-focused': focusedIndex === index 
-          }"
-          @click="selectProvider(provider)"
-          @mouseenter="focusedIndex = index"
-        >
-          <img
-            :src="getProviderIcon(provider.icon)"
-            :alt="provider.name"
-            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
-          >
-          <span>{{ provider.name }}</span>
-
-          <!-- Set as Default (Star) Icon -->
-          <button
-            v-if="allowSetDefault && !isGlobal"
-            class="ti-set-default-btn"
-            :class="{ 'is-default': globalDefaultProvider === provider.id }"
-            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-            @click.stop="setAsGlobalDefault(provider)"
-          >
-            <Icon 
-              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
-              class="ti-star-icon"
-            />
-          </button>
-        </div>
-      </div>
-
-      <!-- Ephemeral Sync Footer -->
-      <div
-        v-if="showSync"
-        class="ti-provider-dropdown-footer"
-      >
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.page,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('page')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('page')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
-            alt="Target Provider"
-          >
-        </button>
-        
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.element,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('element')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('element')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
-            alt="Target Provider"
-          >
-        </button>
-      </div>
-    </div>
   </div>
   
   <!-- Regular Button Mode for Sidepanel -->
@@ -189,110 +85,6 @@
         :disabled="disabled"
       />
     </button>
-    
-    <!-- Provider Dropdown -->
-    <div 
-      v-if="isDropdownOpen"
-      class="ti-provider-dropdown-menu"
-      :class="{ 'ti-open-upward': isUpward }"
-      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
-      @click.stop
-    >
-      <div
-        ref="dropdownMenuRef"
-        class="ti-provider-dropdown-list"
-        @mouseleave="focusedIndex = -1"
-      >
-        <div
-          v-for="(provider, index) in availableProviders"
-          :key="provider.id"
-          class="ti-dropdown-item"
-          :class="{ 
-            'ti-active': currentProvider === provider.id,
-            'is-focused': focusedIndex === index 
-          }"
-          @click="selectProvider(provider)"
-          @mouseenter="focusedIndex = index"
-        >
-          <img
-            :src="getProviderIcon(provider.icon)"
-            :alt="provider.name"
-            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
-          >
-          <span>{{ provider.name }}</span>
-
-          <!-- Set as Default (Star) Icon -->
-          <button
-            v-if="allowSetDefault && !isGlobal"
-            class="ti-set-default-btn"
-            :class="{ 'is-default': globalDefaultProvider === provider.id }"
-            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-            @click.stop="setAsGlobalDefault(provider)"
-          >
-            <Icon 
-              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
-              class="ti-star-icon"
-            />
-          </button>
-        </div>
-      </div>
-
-      <!-- Ephemeral Sync Footer -->
-      <div
-        v-if="showSync"
-        class="ti-provider-dropdown-footer"
-      >
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.page,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('page')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('page')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
-            alt="Target Provider"
-          >
-        </button>
-        
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.element,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('element')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('element')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
-            alt="Target Provider"
-          >
-        </button>
-      </div>
-    </div>
   </div>
   
   <!-- Icon Only Mode for Sidepanel Toolbar -->
@@ -319,110 +111,6 @@
         :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
       >
     </button>
-    
-    <!-- Provider Dropdown -->
-    <div 
-      v-if="isDropdownOpen"
-      class="ti-provider-dropdown-menu"
-      :class="{ 'ti-open-upward': isUpward }"
-      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
-      @click.stop
-    >
-      <div
-        ref="dropdownMenuRef"
-        class="ti-provider-dropdown-list"
-        @mouseleave="focusedIndex = -1"
-      >
-        <div
-          v-for="(provider, index) in availableProviders"
-          :key="provider.id"
-          class="ti-dropdown-item"
-          :class="{ 
-            'ti-active': currentProvider === provider.id,
-            'is-focused': focusedIndex === index 
-          }"
-          @click="selectProvider(provider)"
-          @mouseenter="focusedIndex = index"
-        >
-          <img
-            :src="getProviderIcon(provider.icon)"
-            :alt="provider.name"
-            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
-          >
-          <span>{{ provider.name }}</span>
-
-          <!-- Set as Default (Star) Icon -->
-          <button
-            v-if="allowSetDefault && !isGlobal"
-            class="ti-set-default-btn"
-            :class="{ 'is-default': globalDefaultProvider === provider.id }"
-            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-            @click.stop="setAsGlobalDefault(provider)"
-          >
-            <Icon 
-              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
-              class="ti-star-icon"
-            />
-          </button>
-        </div>
-      </div>
-
-      <!-- Ephemeral Sync Footer -->
-      <div
-        v-if="showSync"
-        class="ti-provider-dropdown-footer"
-      >
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.page,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('page')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('page')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
-            alt="Target Provider"
-          >
-        </button>
-        
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.element,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('element')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('element')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
-            alt="Target Provider"
-          >
-        </button>
-      </div>
-    </div>
   </div>
 
   <!-- Mobile Mode for Manual Input / Bottom Sheets -->
@@ -457,13 +145,46 @@
         :disabled="disabled"
       />
     </button>
-    
-    <!-- Provider Dropdown -->
+  </div>
+  
+  <!-- Compact Mode -->
+  <div
+    v-else
+    class="ti-provider-compact-container"
+    :class="{ 'is-disabled': disabled }"
+    v-bind="$attrs"
+  >
+    <select
+      :value="currentProvider"
+      class="ti-provider-select"
+      :class="{ 'is-dark': settingsStore.isDarkTheme }"
+      :disabled="disabled"
+      @change="handleProviderChange"
+    >
+      <option
+        v-for="provider in availableProviders"
+        :key="provider.id"
+        :value="provider.id"
+      >
+        {{ provider.name }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Common Dropdown Teleport (Single instance for all modes) -->
+  <Teleport
+    v-if="mode !== 'compact'"
+    :to="teleportTarget"
+    :disabled="!isTeleportEnabled"
+  >
     <div 
       v-if="isDropdownOpen"
       class="ti-provider-dropdown-menu"
-      :class="{ 'ti-open-upward': isUpward }"
-      :style="{ maxHeight: dropdownMaxHeight + ' !important' }"
+      :class="{ 
+        'ti-open-upward': isUpward,
+        'ti-is-teleported': isTeleportEnabled
+      }"
+      :style="dropdownStyles"
       @click.stop
     >
       <div
@@ -504,32 +225,64 @@
           </button>
         </div>
       </div>
-    </div>
-  </div>
-  
-  <!-- Compact Mode -->
-  <div
-    v-else
-    class="ti-provider-compact-container"
-    :class="{ 'is-disabled': disabled }"
-    v-bind="$attrs"
-  >
-    <select
-      :value="currentProvider"
-      class="ti-provider-select"
-      :class="{ 'is-dark': settingsStore.isDarkTheme }"
-      :disabled="disabled"
-      @change="handleProviderChange"
-    >
-      <option
-        v-for="provider in availableProviders"
-        :key="provider.id"
-        :value="provider.id"
+
+      <!-- Ephemeral Sync Footer -->
+      <div
+        v-if="showSync"
+        class="ti-provider-dropdown-footer"
       >
-        {{ provider.name }}
-      </option>
-    </select>
-  </div>
+        <button 
+          class="ti-sync-row" 
+          :class="{ 
+            'is-active': ephemeralSync.page,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('page')"
+        >
+          <div class="ti-sync-info">
+            <Icon 
+              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+          </div>
+          <img
+            :src="getEffectiveIcon('page')"
+            class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
+            alt="Target Provider"
+          >
+        </button>
+        
+        <button 
+          class="ti-sync-row" 
+          :class="{ 
+            'is-active': ephemeralSync.element,
+            'is-disabled': !canSyncToBulk
+          }"
+          :disabled="!canSyncToBulk"
+          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+          @click.stop="canSyncToBulk && toggleSync('element')"
+        >
+          <div class="ti-sync-info">
+            <Icon 
+              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+              class="ti-sync-icon"
+            />
+            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+          </div>
+          <img
+            :src="getEffectiveIcon('element')"
+            class="ti-sync-provider-icon"
+            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
+            alt="Target Provider"
+          >
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -631,6 +384,21 @@ const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
 const dropdownMaxHeight = ref('400px')
+const dropdownStyles = ref({})
+
+const teleportTarget = ref('body')
+const isTeleportEnabled = ref(false)
+
+/**
+ * Detects RTL direction for correct alignment of teleported dropdowns.
+ */
+const isRTL = computed(() => {
+  try {
+    return document.documentElement.dir === 'rtl' || document.body.dir === 'rtl' || selectorRef.value?.closest('.rtl') !== null;
+  } catch {
+    return false;
+  }
+})
 
 /**
  * Computed property to identify the current global default provider
@@ -1033,35 +801,39 @@ const toggleDropdown = () => {
     focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
     
     // Calculate dynamic max-height and direction based on available space
+    const isTeleport = isTeleportEnabled.value;
+
     nextTick(() => {
       if (selectorRef.value) {
         const rect = selectorRef.value.getBoundingClientRect();
         const isFloatingWindow = selectorRef.value.closest('.ti-window');
-        
+
         // Mobile-specific sheet container detection
         const mobileContainer = selectorRef.value.closest('.ti-m-sheet-content');
         const sidepanelContainer = selectorRef.value.closest('.ti-sidepanel-container');
-        const container = mobileContainer || sidepanelContainer || selectorRef.value.closest('.ti-window-body');
-        
-        // For floating windows or when outside a specific container, use viewport
-        const useViewport = !container || isFloatingWindow;
+        const tabContainer = selectorRef.value.closest('.tab-content-container');
+        const windowBody = selectorRef.value.closest('.ti-window-body');
+
+        const container = mobileContainer || sidepanelContainer || tabContainer || windowBody;
+
+        // If teleported, always use viewport for calculations to avoid clipping by parents
+        const useViewport = isTeleport || !container || isFloatingWindow;
         const containerRect = useViewport 
           ? { top: 0, bottom: window.innerHeight } 
           : container.getBoundingClientRect();
-        
+
         const spaceBelow = containerRect.bottom - rect.bottom;
         const spaceAbove = rect.top - containerRect.top;
-        
+
         const isOptionsPage = window.location.href.includes('options.html');
 
         if (props.placement !== 'auto') {
           isUpward.value = props.placement === 'up';
         } else if (props.mode === 'mobile') {
           // On mobile, downward is almost always preferred to avoid sheet header clipping
-          // Only go upward if space below is less than 220px and space above is significant
           isUpward.value = spaceBelow < 220 && spaceAbove > spaceBelow;
         } else if (isOptionsPage || !props.isGlobal || isFloatingWindow) {
-          // For floating windows, prioritize downward unless space is very tight
+          // For floating windows or options page, prioritize downward unless space is tight
           const flipThreshold = isFloatingWindow ? 180 : 250;
           isUpward.value = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
         } else {
@@ -1071,12 +843,57 @@ const toggleDropdown = () => {
         const availableHeight = isUpward.value 
           ? spaceAbove - 20
           : spaceBelow - 20;
-        
+
         // Large limit for desktop floating windows, smaller for mobile
         const maxLimit = isFloatingWindow ? 650 : (props.mode === 'mobile' ? 350 : (props.isGlobal ? 400 : 550));
-        
+
         // Final height calculation
         dropdownMaxHeight.value = `${Math.min(maxLimit, Math.max(250, availableHeight))}px`;
+
+        // Calculate fixed positioning for teleported dropdown
+        if (isTeleport && selectorRef.value) {
+          const styles = {
+            position: 'fixed !important',
+            zIndex: '2147483647 !important',
+            maxHeight: `${dropdownMaxHeight.value} !important`
+          };
+
+          if (isUpward.value) {
+            styles.bottom = `${window.innerHeight - rect.top + 4}px !important`;
+            styles.top = 'auto !important';
+          } else {
+            styles.top = `${rect.bottom + 4}px !important`;
+            styles.bottom = 'auto !important';
+          }
+
+          // Alignment logic based on mode and RTL
+          if (props.mode === 'icon-only') {
+            styles.insetInlineStart = `${rect.right + 10}px !important`;
+            styles.top = `${rect.top}px !important`;
+            styles.bottom = 'auto !important';
+          } else if (props.mode === 'button' || props.mode === 'mobile') {
+            if (isRTL.value) {
+              styles.right = `${window.innerWidth - rect.right}px !important`;
+              styles.left = 'auto !important';
+            } else {
+              styles.left = `${rect.left}px !important`;
+              styles.right = 'auto !important';
+            }
+            styles.width = `${rect.width}px !important`;
+            styles.minWidth = '220px !important';
+          } else {
+            // Split mode
+            if (isRTL.value) {
+              styles.right = `${window.innerWidth - rect.right}px !important`;
+              styles.left = 'auto !important';
+            } else {
+              styles.left = `${rect.left}px !important`;
+              styles.right = 'auto !important';
+            }
+          }
+
+          dropdownStyles.value = styles;
+        }
       }
       scrollToFocused();
     });
@@ -1160,6 +977,31 @@ const handleStorageChange = (changes, areaName) => {
 
 // Initialize providers
 onMounted(() => {
+  // Determine teleport target dynamically
+  if (ExtensionContextManager.isContentScript() && selectorRef.value) {
+    const rootNode = selectorRef.value.getRootNode();
+    if (rootNode instanceof ShadowRoot) {
+      // Find a suitable overlay/container that is fixed and has no transform
+      // to ensure fixed positioning works correctly inside the shadow DOM.
+      const overlay = rootNode.querySelector('.ti-m-sheet-overlay') || 
+                      rootNode.querySelector('.ti-window-overlay') ||
+                      rootNode.querySelector('.ti-host-container') ||
+                      rootNode.querySelector('.ti-shadow-host-inner') ||
+                      rootNode.firstElementChild; // Fallback to root element
+                      
+      if (overlay) {
+        teleportTarget.value = overlay;
+        isTeleportEnabled.value = true;
+      } else {
+        isTeleportEnabled.value = false;
+      }
+    }
+  } else {
+    // In extension pages (Popup, Options, Sidepanel), teleport to body
+    teleportTarget.value = 'body';
+    isTeleportEnabled.value = true;
+  }
+
   /**
    * USE CAPTURE PHASE FOR CLICK-OUTSIDE
    * Why? Content script UI often uses @click.stop to prevent events from reaching the host page.
@@ -1167,6 +1009,28 @@ onMounted(() => {
    * (like TranslationWindow.vue). This ensures the dropdown closes correctly in Shadow DOM.
    */
   tracker.addEventListener(document, 'click', handleClickOutside, { capture: true })
+  
+  // Close dropdown on scroll or resize when teleported to prevent misalignment
+  if (isTeleportEnabled.value) {
+    tracker.addEventListener(window, 'scroll', (event) => {
+      if (!isDropdownOpen.value) return;
+      
+      // Ignore scroll events originating from within the dropdown itself
+      const path = event.composedPath();
+      const isInternalScroll = path.some(el => 
+        el instanceof HTMLElement && 
+        (el.classList?.contains('ti-provider-dropdown-menu') || el.classList?.contains('ti-provider-dropdown-list'))
+      );
+      
+      if (isInternalScroll) return;
+      
+      closeDropdown();
+    }, { capture: true, passive: true });
+
+    tracker.addEventListener(window, 'resize', () => {
+      if (isDropdownOpen.value) closeDropdown();
+    }, { passive: true });
+  }
   
   // Add storage listener for cross-context updates using ResourceTracker
   if (typeof browser !== 'undefined' && browser.storage) {

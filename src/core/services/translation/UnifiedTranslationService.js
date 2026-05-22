@@ -50,12 +50,19 @@ export class UnifiedTranslationService {
    * @private
    */
   async _resolveEffectiveProvider(data, context) {
+    // 1. Direct UI Override (Highest Priority)
+    // If the request is marked explicitly by the UI (e.g. user manually changed dropdown)
+    if (data.isExplicitProvider && data.provider) {
+      logger.debug(`[UnifiedTranslationService] Using EXPLICIT UI provider override: ${data.provider}`);
+      return data.provider;
+    }
+
     const modeProviders = await getModeProvidersAsync();
     const modeSpecificProvider = modeProviders ? modeProviders[data.mode] : null;
 
-    // 1. Prioritize mode-specific provider if explicitly configured (not 'default')
+    // 2. Feature-Specific Setting (e.g., Dictionary, Page Translation)
     if (modeSpecificProvider && modeSpecificProvider !== 'default') {
-      logger.debug(`Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
+      logger.debug(`[UnifiedTranslationService] Using mode-specific provider for ${data.mode}: ${modeSpecificProvider}`);
       return modeSpecificProvider;
     }
 
@@ -64,10 +71,10 @@ export class UnifiedTranslationService {
       MessageContexts.PAGE_TRANSLATION_BATCH, MessageContexts.CONTENT, MessageContexts.MOBILE_TRANSLATE
     ];
     
-    // 2. Use UI-provided provider as fallback
+    // 3. Use UI-provided provider as fallback (Standard behavioral consistency)
     if (uiContexts.includes(context) && data.provider) return data.provider;
 
-    // 3. Global default
+    // 4. Global default
     return data.provider || await getTranslationApiAsync();
   }
 

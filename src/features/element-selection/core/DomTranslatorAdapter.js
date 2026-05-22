@@ -270,6 +270,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         data: {
           text: JSON.stringify(textsToTranslate),
           provider,
+          isExplicitProvider: !!options.provider,
           sourceLanguage: AUTO_DETECT_VALUE,
           targetLanguage: effectiveTargetLanguage,
           originalSourceLang: this.originalSettings.source,
@@ -278,7 +279,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           contextMetadata: isAIContextEnabled ? contextMetadata : null,
           contextSummary: contextSummary,
           options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
-          sessionId: this.currentSessionId, 
+          sessionId: this.currentSessionId,
         },
         context: MessageContexts.SELECT_ELEMENT,
       });
