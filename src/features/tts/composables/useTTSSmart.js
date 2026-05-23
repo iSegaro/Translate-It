@@ -135,6 +135,10 @@ export function useTTSSmart() {
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'tts:speak');
+      } else if (error.errorType === 'ERRORS_TTS_EMPTY_RESPONSE') {
+        logger.info("[useTTSSmart] TTS empty response (silent):", error.message);
+        handleTTSResult('idle');
+        return false;
       } else {
         logger.error("[useTTSSmart] TTS start failed:", error);
       }

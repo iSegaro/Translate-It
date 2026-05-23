@@ -66,7 +66,9 @@ export class EdgeTTSClient {
 
       const audioBlob = await response.blob();
       if (audioBlob.size === 0) {
-        throw new Error('Edge TTS returned empty audio data');
+        const error = new Error('Edge TTS returned empty audio data (possible language/voice mismatch)');
+        error.errorType = 'ERRORS_TTS_EMPTY_RESPONSE';
+        throw error;
       }
       
       // Success! Record success for circuit breaker
@@ -74,7 +76,8 @@ export class EdgeTTSClient {
       return audioBlob;
     } catch (err) {
       // Record failure for non-auth errors too
-      if (err.message && !err.message.includes('Circuit Breaker')) {
+      // CRITICAL: Don't count empty response (language mismatch) as a service failure
+      if (err.message && !err.message.includes('Circuit Breaker') && err.errorType !== 'ERRORS_TTS_EMPTY_RESPONSE') {
         await ttsCircuitBreaker.recordFailure(TTS_ENGINES.EDGE);
       }
       logger.warn('Synthesis failed:', err);
