@@ -310,7 +310,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
-                          BlockGroupReconstructor.apply(group.units, text);
+                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element);
                           group.units.forEach(u => processedUids.add(u.id));
                         } catch (error) {
                           this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
@@ -353,6 +353,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
             } catch (err) {
               this.logger.error('Error during onStreamUpdate processing:', err);
+              safeResolve({ success: false, error: err });
             }
           },
           onStreamEnd: (data) => {
@@ -531,7 +532,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
-                BlockGroupReconstructor.apply(group.units, text);
+                BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element);
                 group.units.forEach(u => processedUids.add(u.id));
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);

@@ -1,5 +1,8 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
+import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
+import { detectDirectionFromContent, applyNodeDirection, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
 
@@ -82,10 +85,12 @@ export class BlockGroupReconstructor {
    *
    * @param {TranslationUnit[]} expectedUnits - The extracted TranslationUnits
    * @param {string} translatedText - The raw translated block text
+   * @param {string} targetLanguage - The target language code
+   * @param {HTMLElement} rootElement - The active translation root element
    * @returns {boolean} True if successfully reconstructed and written
    * @throws {Error} If connection validation fails, marker parsing fails, or state is stale
    */
-  static apply(expectedUnits, translatedText) {
+  static apply(expectedUnits, translatedText, targetLanguage, rootElement) {
     if (!expectedUnits || expectedUnits.length === 0) {
       return false;
     }
@@ -113,19 +118,37 @@ export class BlockGroupReconstructor {
         firstNodeParent.classList.add('ti-translating');
       }
 
-      // 2. Synchronous Write loop with unescaping and whitespace restoration
+      // 2. Synchronous Write loop with unescaping, whitespace, bidi, and direction restoration
       for (let i = 0; i < expectedUnits.length; i++) {
         const unit = expectedUnits[i];
         const segment = parsedSegments[i];
         
         // Reversible unescaping: convert [--ESCAPED_SEG: back to [--SEG:
         const cleanText = segment.text.replace(/\[--ESCAPED_SEG:/g, '[--SEG:');
+        const trimmedTranslation = cleanText.trim();
         
-        // Boundary strip-and-restore reconstruction
-        const finalValue = unit.leadingWS + cleanText.trim() + unit.trailingWS;
+        // 1. Register original text before modification for Hover Tooltip
+        const originalText = unit.node.textContent;
+        hoverPreviewLookup.add(unit.node, originalText);
+
+        // 2. Mark the immediate parent element as having original text (Surgical marking)
+        const parentElement = unit.node.parentElement;
+        if (parentElement && parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL) !== 'true') {
+          parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
+        }
+
+        // BiDi Text & Punctuation Support
+        const detectedDir = detectDirectionFromContent(trimmedTranslation);
+        const bidiMark = detectedDir === 'rtl' ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
+
+        // Boundary strip-and-restore reconstruction with BiDi mark injection
+        const finalValue = unit.leadingWS + bidiMark + trimmedTranslation + bidiMark + unit.trailingWS;
         
         // Mutate node
         unit.node.nodeValue = finalValue;
+
+        // Apply node direction
+        applyNodeDirection(unit.node, targetLanguage, rootElement);
       }
 
       return true;

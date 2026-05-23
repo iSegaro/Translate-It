@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
+import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -112,20 +113,20 @@ describe('BlockGroupReconstructor', () => {
   });
 
   describe('apply & Pre-Apply DOM Connection Revalidation', () => {
-    it('should apply translations atomically to DOM nodes with whitespace restoration and unescaping', () => {
+    it('should apply translations atomically to DOM nodes with whitespace restoration, unescaping, and BiDi marks', () => {
       const originalParent = textNodes[0].parentElement;
       const translated = '  مرحبا   [--SEG:n2--]بالعالم  [--SEG:n3--]  [--ESCAPED_SEG:n4--]  ';
 
-      const result = BlockGroupReconstructor.apply(units, translated);
+      const result = BlockGroupReconstructor.apply(units, translated, 'fa', originalParent);
 
       expect(result).toBe(true);
 
-      // Verify whitespace boundary restoration and trimming
-      expect(textNodes[0].nodeValue).toBe('مرحبا '); // original trailingWS is ' ', leadingWS is ''
-      expect(textNodes[1].nodeValue).toBe('بالعالم'); // leading/trailingWS are both ''
+      // Verify whitespace boundary restoration, trimming and RTL BiDi mark injection (\u200f)
+      expect(textNodes[0].nodeValue).toBe('\u200fمرحبا\u200f '); // original trailingWS is ' ', leadingWS is ''
+      expect(textNodes[1].nodeValue).toBe('\u200fبالعالم\u200f'); // leading/trailingWS are both ''
       
-      // Verify unescaping of escaped marker sequence
-      expect(textNodes[2].nodeValue).toBe('[--SEG:n4--]');
+      // Verify unescaping of escaped marker sequence and LTR BiDi mark injection (\u200e)
+      expect(textNodes[2].nodeValue).toBe('\u200e[--SEG:n4--]\u200e');
     });
 
     it('should abort DOM mutation entirely and throw error if a text node is detached', () => {
@@ -133,7 +134,7 @@ describe('BlockGroupReconstructor', () => {
       textNodes[1].remove();
 
       // Verify that calling apply throws
-      expect(() => BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].')).toThrow(
+      expect(() => BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', document.body)).toThrow(
         /Stale or detached DOM node reference/
       );
 
@@ -148,10 +149,21 @@ describe('BlockGroupReconstructor', () => {
       const addSpy = vi.spyOn(parent.classList, 'add');
       const removeSpy = vi.spyOn(parent.classList, 'remove');
 
-      BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].');
+      BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', parent);
 
       expect(addSpy).toHaveBeenCalledWith('ti-translating');
       expect(removeSpy).toHaveBeenCalledWith('ti-translating');
+    });
+
+    it('should register modified nodes with hoverPreviewLookup and set data-has-original attribute on parent', () => {
+      const parent = textNodes[0].parentElement;
+      const addSpy = vi.spyOn(hoverPreviewLookup, 'add');
+
+      BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', parent);
+
+      expect(addSpy).toHaveBeenCalledWith(textNodes[0], 'Hello ');
+      expect(addSpy).toHaveBeenCalledWith(textNodes[1], 'world');
+      expect(parent.getAttribute('data-has-original')).toBe('true');
     });
   });
 });
