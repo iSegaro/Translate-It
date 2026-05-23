@@ -62,6 +62,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.currentMessageId = null;
     this.currentStreamEndReject = null;
     this.currentSessionId = null;
+    this.translatedSegmentMap = new Map();
 
     // Cache for original settings
     this.originalSettings = null;
@@ -110,6 +111,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       const originalHTML = element.innerHTML;
       const elementId = generateElementId();
+      const originalClone = element.cloneNode(true);
+      this.translatedSegmentMap = new Map();
       
       // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag
       const isBlockGroupingEnabled = await getFeatureSemanticBlockGroupingAsync();
@@ -305,6 +308,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       if (!processedUids.has(unit.id)) {
                         this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
                         processedUids.add(unit.id);
+                        this.translatedSegmentMap.set(unit.id, text);
                       }
                     } else {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -312,6 +316,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
                         try {
                           BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element);
                           group.units.forEach(u => processedUids.add(u.id));
+                          
+                          // Capture split segment translations for shadow comparison
+                          try {
+                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units);
+                            parsed.forEach(seg => {
+                              this.translatedSegmentMap.set(seg.id, seg.text);
+                            });
+                          } catch {}
                         } catch (error) {
                           this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                           this._rollbackBlockGroup(this.currentSessionId, group.blockId);
@@ -337,6 +349,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     if (nodeData && !processedUids.has(nodeData.uid)) {
                       this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                       processedUids.add(nodeData.uid);
+                      this.translatedSegmentMap.set(nodeData.uid, text);
                     }
                   }
                 });
@@ -424,9 +437,36 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw result.error;
       }
 
-      return await this._finalizeTranslation({
+      const finalResult = await this._finalizeTranslation({
         result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId
       });
+
+      // --- Phase 6 Shadow Mode Validation Gate ---
+      if (isBlockGroupingEnabled && finalResult?.success) {
+        try {
+          const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
+          const v2Clone = originalClone.cloneNode(true);
+          const v2TextNodes = collectTextNodes(v2Clone);
+          
+          v2TextNodes.forEach((nodeData) => {
+            const translatedText = this.translatedSegmentMap.get(nodeData.uid);
+            if (translatedText !== undefined) {
+              this._applyTranslationToNode(nodeData.node, translatedText, effectiveTargetLanguage, v2Clone);
+            }
+          });
+
+          const comparison = ShadowComparisonEngine.compare(v2Clone, element);
+          if (!comparison.equivalent) {
+            this.logger.error(`[ShadowMode] Reconstruction anomaly detected!\nReason: ${comparison.reason}`);
+          } else {
+            this.logger.debug('[ShadowMode] Reconstruction perfectly validated. Semantic equivalence verified.');
+          }
+        } catch (shadowError) {
+          this.logger.warn('[ShadowMode] Failed to execute shadow comparison gate:', shadowError.message);
+        }
+      }
+
+      return finalResult;
 
     } catch (error) {
       this.isTranslating = false; 
@@ -527,6 +567,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             if (!processedUids.has(unit.id)) {
               this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
               processedUids.add(unit.id);
+              this.translatedSegmentMap.set(unit.id, text);
             }
           } else {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
@@ -534,6 +575,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
               try {
                 BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element);
                 group.units.forEach(u => processedUids.add(u.id));
+                
+                // Capture split segment translations for shadow comparison
+                try {
+                  const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units);
+                  parsed.forEach(seg => {
+                    this.translatedSegmentMap.set(seg.id, seg.text);
+                  });
+                } catch {}
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                 this._rollbackBlockGroup(this.currentSessionId, group.blockId);
@@ -546,6 +595,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           if (nodeData && !processedUids.has(nodeData.uid)) {
             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
             processedUids.add(nodeData.uid);
+            this.translatedSegmentMap.set(nodeData.uid, text);
           }
         }
       });

@@ -176,7 +176,7 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(collectBlockGroups).toHaveBeenCalledTimes(1);
-      expect(collectTextNodes).not.toHaveBeenCalled();
+      expect(collectTextNodes).not.toHaveBeenCalledWith(testElement);
       expect(testElement.textContent).toContain('سلام');
     });
 
@@ -690,6 +690,154 @@ describe('DomTranslatorAdapter', () => {
 
       expect(span1.firstChild.nodeValue).toBe('Hello ');
       expect(span2.firstChild.nodeValue).toBe('world');
+    });
+
+    it('should run Shadow Mode validation and log debug on perfect equivalence', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockImplementationOnce((el) => [
+        { node: el.firstChild.firstChild, text: 'Hello', uid: 'n1' },
+        { node: el.lastChild.firstChild, text: 'world', uid: 'n2' }
+      ]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const debugSpy = vi.spyOn(adapter.logger, 'debug');
+
+      const result = await adapter.translateElement(div);
+
+      expect(result.success).toBe(true);
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction perfectly validated'));
+    });
+
+    it('should run Shadow Mode validation and log error on reconstruction anomaly', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const errorSpy = vi.spyOn(adapter.logger, 'error');
+
+      const resultPromise = adapter.translateElement(div);
+      
+      await new Promise(resolve => setTimeout(resolve, 5));
+      adapter.translatedSegmentMap.set('n1', 'مختلف');
+
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction anomaly detected'));
     });
   });
 });

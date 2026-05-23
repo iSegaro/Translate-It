@@ -81,7 +81,7 @@ export const CONFIG = {
   },
   THEME: "auto",
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
-  FEATURE_SEMANTIC_BLOCK_GROUPING: false,
+  FEATURE_SEMANTIC_BLOCK_GROUPING: true,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
