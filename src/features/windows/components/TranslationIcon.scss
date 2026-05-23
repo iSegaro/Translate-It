@@ -16,6 +16,55 @@
   box-sizing: border-box !important;
   animation: ti-slide-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  /* Theme Support: Dark Mode */
+  &.dark {
+    background-color: #2d2d2d !important;
+    border-color: #424242 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+
+    .ti-icon-btn {
+      color: #b0b0b0 !important;
+
+      &:hover {
+        background-color: #424242 !important;
+        color: #64b5f6 !important; /* Material Light Blue */
+      }
+
+      &:active {
+        background-color: #1e3a8a !important;
+      }
+    }
+
+    .ti-icon-btn--translate {
+      &:hover {
+        color: #81c784 !important; /* Material Light Green */
+        background-color: #1b5e20 !important; /* Dark Green */
+      }
+    }
+
+    .ti-icon-btn--playing {
+      color: #81c784 !important;
+      background-color: #1b5e20 !important;
+
+      &:hover {
+        background-color: #2e7d32 !important;
+      }
+    }
+
+    .ti-icon-btn--loading {
+      color: #64b5f6 !important;
+    }
+
+    .ti-icon-btn--error {
+      color: #e57373 !important; /* Material Light Red */
+      background-color: #b71c1c !important; /* Dark Red */
+
+      &:hover {
+        background-color: #d32f2f !important;
+      }
+    }
+  }
 }
 
 /* Individual Toolbar Icon Button Styles */

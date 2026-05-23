@@ -3,6 +3,7 @@
     v-if="isVisible && !isFullscreen"
     ref="iconElement"
     class="ti-translation-icon"
+    :class="{ 'dark': isDarkTheme }"
     :style="dynamicStyle"
     data-translate-ui="true"
     role="toolbar"
@@ -156,6 +157,7 @@ const tts = useTTSSmart();
 // Visibility Configurations from Settings Store
 const showTTS = computed(() => settingsStore.settings.SHOW_TTS_ICON_IN_TOOLBAR !== false);
 const showTranslate = computed(() => settingsStore.settings.SHOW_TRANSLATE_ICON_IN_TOOLBAR !== false);
+const isDarkTheme = computed(() => settingsStore.isDarkTheme);
 
 // Static initial width calculation for non-reactive usePositioning init
 const initialWidth = (() => {
