@@ -407,6 +407,9 @@
   "tts_confirm_reset": {
     "message": "カスタマイズされたすべての音声をデフォルトにリセットしてもよろしいですか？"
   },
+  "tts_custom_preview_placeholder": {
+    "message": "音声をテストするために何か入力してください..."
+  },
   "import_success": {
     "message": "設定が正常にインポートされました。"
   },
