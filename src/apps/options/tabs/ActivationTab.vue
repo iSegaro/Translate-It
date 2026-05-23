@@ -79,187 +79,10 @@
       </div>
     </BaseFieldset>
 
-    <!-- Text Field Translation -->
-    <BaseFieldset 
-      id="activation_group_text_fields"
-      :legend="t('activation_group_text_fields_title') || 'Text Field Translation'"
-    >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="fieldProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
-          />
-        </div>
-      </template>
-
-      <div class="setting-group">
-        <BaseCheckbox
-          v-model="translateOnTextFields"
-          :disabled="!extensionEnabled"
-          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
-        />
-        <span class="setting-description">
-          {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
-        </span>
-      </div>
-
-      <div class="setting-group">
-        <div class="setting-row">
-          <BaseCheckbox
-            v-model="enableShortcutForTextFields"
-            :disabled="!extensionEnabled"
-            :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
-          />
-          <div 
-            class="shortcut-picker-animated-wrapper"
-            :class="{ open: enableShortcutForTextFields }"
-          >
-            <ShortcutPicker
-              v-model="textFieldShortcut"
-              :disabled="!extensionEnabled"
-              :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
-              class="inline-picker"
-            />
-          </div>
-        </div>
-        <span
-          v-if="!enableShortcutForTextFields"
-          class="setting-description"
-        >
-          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using a keyboard shortcut to trigger translation when inside a text field.' }}
-        </span>
-      </div>
-
-      <!-- Text Field Mode Options -->
-      <div 
-        class="sub-options-group"
-        :class="{ open: translateOnTextFields || enableShortcutForTextFields }"
-      >
-        <div class="sub-options-inner">
-          <div class="radio-group">
-            <BaseRadio
-              v-model="textFieldMode"
-              value="replace"
-              name="textFieldMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
-            />
-            <BaseRadio
-              v-model="textFieldMode"
-              value="copy"
-              name="textFieldMode"
-              :disabled="!extensionEnabled"
-              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
-            />
-          </div>
-
-          <div class="setting-group sub-setting-group">
-            <BaseCheckbox 
-              v-model="replaceOnSpecialSites" 
-              :disabled="!extensionEnabled || textFieldMode !== 'copy'"
-              :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
-            />
-          </div>
-        </div>
-      </div>
-    </BaseFieldset>
-
-    <!-- Select Element -->
-    <BaseFieldset 
-      id="activation_group_select_element"
-      :legend="t('activation_group_select_element_title') || 'Select Element'"
-    >
-      <template #header>
-        <div class="legend-actions-wrapper">
-          <span 
-            class="legend-action-label"
-            :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
-          >{{ t('provider_label') }}:</span>
-          <ProviderSelector
-            v-model="selectElementProvider"
-            allow-default
-            mode="button"
-            required-feature="bulk"
-            only-configured
-            :is-global="false"
-            :disabled="!extensionEnabled || !translateWithSelectElement"
-          />
-        </div>
-      </template>
-      <div class="setting-group">
-        <div class="setting-row">
-          <BaseCheckbox
-            v-model="translateWithSelectElement"
-            :disabled="!extensionEnabled"
-            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
-          />
-          <div 
-            id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
-            class="shortcut-picker-animated-wrapper"
-            :class="{ open: translateWithSelectElement }"
-          >
-            <ConfigureShortcutButton
-              command-name="SELECT-ELEMENT-COMMAND"
-              :disabled="!extensionEnabled"
-            />
-          </div>
-        </div>
-        <span class="setting-description">
-          {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
-        </span>
-      </div>
-
-      <!-- Select Element Sub-Options -->
-      <div 
-        class="sub-options-group"
-        :class="{ open: translateWithSelectElement }"
-      >
-        <div class="sub-options-inner">
-          <div
-            id="SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER"
-            class="setting-group sub-setting-group"
-          >
-            <BaseCheckbox
-              v-model="selectElementShowOriginal"
-              :disabled="!extensionEnabled"
-              :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
-            />
-            <span class="setting-description">
-              {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
-            </span>
-          </div>
-
-          <div
-            id="PAGE_CONTEXT_SELECT_ELEMENT"
-            class="setting-group sub-setting-group"
-          >
-            <BaseCheckbox
-              v-model="showSelectElementInContextMenu"
-              :disabled="!extensionEnabled"
-              :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
-            />
-            <span class="setting-description">
-              {{ t('show_select_element_in_context_menu_description') || 'Display the \'Select Element\' option in the browser\'s right-click context menu.' }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </BaseFieldset>
-
     <!-- On-Page Selection -->
     <BaseFieldset 
       id="activation_group_page_selection"
-      :legend="t('activation_group_page_selection_title') || 'On-Page Selection'"
+      :legend="t('activation_group_page_selection_title') || 'Text Selection'"
     >
       <template #header>
         <div class="legend-actions-wrapper">
@@ -376,6 +199,88 @@
             />
             <span class="setting-description">
               {{ t('show_tts_icon_in_toolbar_description') || 'Display the stateful volume icon to speak selected text inside the floating selection toolbar.' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </BaseFieldset>
+
+    <!-- Select Element -->
+    <BaseFieldset 
+      id="activation_group_select_element"
+      :legend="t('activation_group_select_element_title') || 'Select Element'"
+    >
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || !translateWithSelectElement }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="selectElementProvider"
+            allow-default
+            mode="button"
+            required-feature="bulk"
+            only-configured
+            :is-global="false"
+            :disabled="!extensionEnabled || !translateWithSelectElement"
+          />
+        </div>
+      </template>
+      <div class="setting-group">
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="translateWithSelectElement"
+            :disabled="!extensionEnabled"
+            :label="t('translate_with_select_element_label') || 'Enable translation via select element'"
+          />
+          <div 
+            id="SELECT_ELEMENT_CONFIGURE_SHORTCUTS"
+            class="shortcut-picker-animated-wrapper"
+            :class="{ open: translateWithSelectElement }"
+          >
+            <ConfigureShortcutButton
+              command-name="SELECT-ELEMENT-COMMAND"
+              :disabled="!extensionEnabled"
+            />
+          </div>
+        </div>
+        <span class="setting-description">
+          {{ t('translate_with_select_element_description') || 'Allow triggering translation using a specific selection method (if implemented, e.g., selecting a whole paragraph).' }}
+        </span>
+      </div>
+
+      <!-- Select Element Sub-Options -->
+      <div 
+        class="sub-options-group"
+        :class="{ open: translateWithSelectElement }"
+      >
+        <div class="sub-options-inner">
+          <div
+            id="SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="selectElementShowOriginal"
+              :disabled="!extensionEnabled"
+              :label="t('select_element_show_original_on_hover_label') || 'Show original on hover'"
+            />
+            <span class="setting-description">
+              {{ t('select_element_show_original_on_hover_description') || 'Show the original text in a tooltip when hovering over elements translated via Select Element.' }}
+            </span>
+          </div>
+
+          <div
+            id="PAGE_CONTEXT_SELECT_ELEMENT"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="showSelectElementInContextMenu"
+              :disabled="!extensionEnabled"
+              :label="t('show_select_element_in_context_menu_label') || 'Show in context menu'"
+            />
+            <span class="setting-description">
+              {{ t('show_select_element_in_context_menu_description') || 'Display the \'Select Element\' option in the browser\'s right-click context menu.' }}
             </span>
           </div>
         </div>
@@ -685,6 +590,101 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </BaseFieldset>
+
+    <!-- Text Field Translation -->
+    <BaseFieldset 
+      id="activation_group_text_fields"
+      :legend="t('activation_group_text_fields_title') || 'Text Field Translation'"
+    >
+      <template #header>
+        <div class="legend-actions-wrapper">
+          <span 
+            class="legend-action-label"
+            :class="{ 'is-disabled': !extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields) }"
+          >{{ t('provider_label') }}:</span>
+          <ProviderSelector
+            v-model="fieldProvider"
+            allow-default
+            mode="button"
+            required-feature="bulk"
+            only-configured
+            :is-global="false"
+            :disabled="!extensionEnabled || (!translateOnTextFields && !enableShortcutForTextFields)"
+          />
+        </div>
+      </template>
+
+      <div class="setting-group">
+        <BaseCheckbox
+          v-model="translateOnTextFields"
+          :disabled="!extensionEnabled"
+          :label="t('translate_on_text_fields_label') || 'Enable translation on text fields'"
+        />
+        <span class="setting-description">
+          {{ t('translate_on_text_fields_description') || 'Allow triggering translation directly within input/textarea fields (e.g., via context menu or shortcut).' }}
+        </span>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-row">
+          <BaseCheckbox
+            v-model="enableShortcutForTextFields"
+            :disabled="!extensionEnabled"
+            :label="t('enable_shortcut_for_text_fields_label') || 'Enable shortcut for text fields'"
+          />
+          <div 
+            class="shortcut-picker-animated-wrapper"
+            :class="{ open: enableShortcutForTextFields }"
+          >
+            <ShortcutPicker
+              v-model="textFieldShortcut"
+              :disabled="!extensionEnabled"
+              :placeholder="t('click_to_set_shortcut') || 'Set shortcut'"
+              class="inline-picker"
+            />
+          </div>
+        </div>
+        <span
+          v-if="!enableShortcutForTextFields"
+          class="setting-description"
+        >
+          {{ t('enable_shortcut_for_text_fields_description') || 'Allow using a keyboard shortcut to trigger translation when inside a text field.' }}
+        </span>
+      </div>
+
+      <!-- Text Field Mode Options -->
+      <div 
+        class="sub-options-group"
+        :class="{ open: translateOnTextFields || enableShortcutForTextFields }"
+      >
+        <div class="sub-options-inner">
+          <div class="radio-group">
+            <BaseRadio
+              v-model="textFieldMode"
+              value="replace"
+              name="textFieldMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_textField_mode_replace') || 'Replace on Textfield'"
+            />
+            <BaseRadio
+              v-model="textFieldMode"
+              value="copy"
+              name="textFieldMode"
+              :disabled="!extensionEnabled"
+              :label="t('options_textField_mode_copy') || 'Copy to Clipboard'"
+            />
+          </div>
+
+          <div class="setting-group sub-setting-group">
+            <BaseCheckbox 
+              v-model="replaceOnSpecialSites" 
+              :disabled="!extensionEnabled || textFieldMode !== 'copy'"
+              :label="t('enable_replace_on_special_sites') || 'Enable replace on special sites (Whatsapp, Telegram, etc.)'"
+            />
           </div>
         </div>
       </div>
