@@ -4,6 +4,7 @@
 
 - Added a new [Subtitle Translator](#/about?highlight=SUBTITLE_TRANSLATOR) tool for translating subtitle files
 - Added new pronunciation accent and voice tuning options in the [Text-to-Speech Settings](#/tts?highlight=TTS_VOICES_TUNING_SECTION)
+- Added a Text-to-Speech button when selecting text on webpages, along with new options to customize the visibility of the [translation button](#/activation?highlight=SHOW_TRANSLATE_ICON_IN_TOOLBAR) and [pronunciation button](#/activation?highlight=SHOW_TTS_ICON_IN_TOOLBAR)
 
 ##### Fixed
 

@@ -136,6 +136,24 @@
           </button>
         </div>
 
+        <!-- Custom Preview Text Input -->
+        <div class="drawer-custom-preview">
+          <div class="custom-preview-input-wrapper">
+            <textarea
+              v-model="customPreviewText"
+              class="custom-preview-input"
+              :placeholder="t('tts_custom_preview_placeholder') || 'Type something to test the voice...'"
+            />
+            <button 
+              v-if="customPreviewText" 
+              class="search-clear-btn" 
+              @click="customPreviewText = ''"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
         <div class="drawer-body">
           <div 
             v-if="!isLanguagesLoaded" 
@@ -282,6 +300,7 @@ const isRTL = computed(() => {
 // Drawer State
 const isDrawerOpen = ref(false)
 const searchQuery = ref('')
+const customPreviewText = ref('')
 const edgeVoices = ref([])
 const playingLangCode = ref(null)
 const tempPreferredVoices = ref({})
@@ -607,7 +626,9 @@ const previewVoice = async (langCode) => {
   }
   
   const baseLang = langCode.toLowerCase().split('-')[0]
-  const text = previewTexts[baseLang] || previewTexts['en']
+  
+  // Priority: 1. User custom text, 2. Hardcoded language default, 3. English fallback
+  const text = customPreviewText.value.trim() || previewTexts[baseLang] || previewTexts['en']
   
   try {
     const success = await speak(text, langCode, { 

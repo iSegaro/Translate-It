@@ -348,6 +348,36 @@
               {{ t('enhanced_triple_click_drag_description') || 'When enabled, triple-clicking to select a paragraph and then dragging to extend the selection will wait until you release the mouse before showing the translation. This prevents premature translation when you want to select multiple paragraphs.' }}
             </span>
           </div>
+
+          <div
+            v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            id="SHOW_TRANSLATE_ICON_IN_TOOLBAR"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="showTranslateIconInToolbar"
+              :disabled="!extensionEnabled || !showTtsIconInToolbar"
+              :label="t('show_translate_icon_in_toolbar_label') || 'Show Translate Button in Selection Toolbar'"
+            />
+            <span class="setting-description">
+              {{ t('show_translate_icon_in_toolbar_description') || 'Display the Translate icon inside the floating selection toolbar.' }}
+            </span>
+          </div>
+
+          <div
+            v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            id="SHOW_TTS_ICON_IN_TOOLBAR"
+            class="setting-group sub-setting-group"
+          >
+            <BaseCheckbox
+              v-model="showTtsIconInToolbar"
+              :disabled="!extensionEnabled || !showTranslateIconInToolbar"
+              :label="t('show_tts_icon_in_toolbar_label') || 'Show Text-to-Speech (TTS) Button in Selection Toolbar'"
+            />
+            <span class="setting-description">
+              {{ t('show_tts_icon_in_toolbar_description') || 'Display the stateful volume icon to speak selected text inside the floating selection toolbar.' }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -754,6 +784,8 @@ const showSelectElementInContextMenu = computed({
 const translateOnTextSelection = createSetting('TRANSLATE_ON_TEXT_SELECTION', CONFIG.TRANSLATE_ON_TEXT_SELECTION)
 const selectionTranslationMode = createSetting('selectionTranslationMode', SelectionTranslationMode.IMMEDIATE)
 const requireCtrlForTextSelection = createSetting('REQUIRE_CTRL_FOR_TEXT_SELECTION', false)
+const showTtsIconInToolbar = createSetting('SHOW_TTS_ICON_IN_TOOLBAR', true)
+const showTranslateIconInToolbar = createSetting('SHOW_TRANSLATE_ICON_IN_TOOLBAR', true)
 const activeSelectionIconOnTextfields = createSetting('ACTIVE_SELECTION_ICON_ON_TEXTFIELDS', true)
 const enhancedTripleClickDrag = createSetting('ENHANCED_TRIPLE_CLICK_DRAG', false)
 

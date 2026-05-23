@@ -256,6 +256,8 @@ export const CONFIG = {
   TRANSLATE_WITH_SELECT_ELEMENT: true, // فعال کردن ترجمه با انتخاب المان (مثلاً از منوی راست‌کلیک)
   TRANSLATE_ON_TEXT_SELECTION: !isMobile, // فعال کردن ترجمه با انتخاب متن در صفحه (غیرفعال در موبایل)
   REQUIRE_CTRL_FOR_TEXT_SELECTION: false, // نیاز به نگه داشتن Ctrl هنگام انتخاب متن
+  SHOW_TTS_ICON_IN_TOOLBAR: true, // نمایش آیکون تلفظ صوتی در تولبار انتخاب متن
+  SHOW_TRANSLATE_ICON_IN_TOOLBAR: true, // نمایش آیکون ترجمه در تولبار انتخاب متن
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator

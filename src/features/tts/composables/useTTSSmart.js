@@ -26,6 +26,7 @@ export function useTTSSmart() {
   const progress = ref(0);
   const lastText = ref('');
   const lastLanguage = ref('auto');
+  const detectedLanguage = ref('');
   const isProcessing = ref(false);
 
   const isPlaying = computed(() => ttsState.value === 'playing');
@@ -83,6 +84,7 @@ export function useTTSSmart() {
       // Reset local state for the new request
       errorMessage.value = '';
       errorType.value = '';
+      detectedLanguage.value = '';
       progress.value = 0;
       
       // Stop any other active TTS globally before starting this one
@@ -135,6 +137,10 @@ export function useTTSSmart() {
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'tts:speak');
+      } else if (error.errorType === 'ERRORS_TTS_EMPTY_RESPONSE') {
+        logger.info("[useTTSSmart] TTS empty response (silent):", error.message);
+        handleTTSResult('idle');
+        return false;
       } else {
         logger.error("[useTTSSmart] TTS start failed:", error);
       }
@@ -207,28 +213,36 @@ export function useTTSSmart() {
     return await speak(text, lang);
   };
 
-  /**
-   * Message listener for this specific instance.
-   * Only reacts to events matching the currentTTSId.
-   */
   const messageListener = (message) => {
-    if (message.action !== MessageActions.GOOGLE_TTS_ENDED) return;
+    if (message.action !== MessageActions.GOOGLE_TTS_ENDED && message.action !== MessageActions.TTS_LANG_DETECTED) return;
 
     const status = message.status || message.reason || 'completed';
     const msgId = message.ttsId;
 
     // 1. Precise Match: Sync with ID-specific messages
     if (msgId && msgId === currentTTSId.value) {
-      handleTTSResult(status, message.error ? { error: message.error, errorType: message.errorType } : null);
+      if (message.detectedSourceLanguage) {
+        detectedLanguage.value = message.detectedSourceLanguage;
+      }
+      
+      if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
+        handleTTSResult(status, message.error ? { error: message.error, errorType: message.errorType } : null);
+      }
     }
     
     // 2. Loose Match: If a broadcast arrives with null ID but this instance is waiting/active
     // This handles cases where ID was lost in background but the failure is still relevant.
     else if (!msgId && (isPlaying.value || isLoading.value)) {
-      if (status === 'error') {
-        handleTTSResult('error', { error: message.error, errorType: message.errorType });
-      } else {
-        handleTTSResult('interrupted');
+      if (message.detectedSourceLanguage) {
+        detectedLanguage.value = message.detectedSourceLanguage;
+      }
+      
+      if (message.action === MessageActions.GOOGLE_TTS_ENDED) {
+        if (status === 'error') {
+          handleTTSResult('error', { error: message.error, errorType: message.errorType });
+        } else {
+          handleTTSResult('interrupted');
+        }
       }
     }
   };
@@ -258,6 +272,7 @@ export function useTTSSmart() {
     progress,
     lastText,
     lastLanguage,
+    detectedLanguage,
     canStop,
     isError,
     isPlaying, 
