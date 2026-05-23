@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { extractContextMetadata, collectTextNodes, generateElementId } from './DomTranslatorUtils.js';
+import { extractContextMetadata, collectTextNodes, generateElementId, collectBlockGroups } from './DomTranslatorUtils.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -183,6 +183,105 @@ describe('DomTranslatorUtils', () => {
 
       expect(nodes.length).toBe(1);
       expect(nodes[0].text).toBe('Actual text');
+    });
+  });
+
+  describe('collectBlockGroups', () => {
+    it('should successfully group nodes and assign sequential IDs using WeakMap session context without touching the DOM', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div class="block1">
+          <span>Text 1</span>
+          <span>Text 2</span>
+        </div>
+      `;
+      document.body.appendChild(container);
+
+      const sessionContext = {
+        blockMap: new WeakMap(),
+        blockCounter: { value: 0 },
+        activeSessionId: 's123'
+      };
+
+      const units = collectBlockGroups(container, sessionContext);
+
+      expect(units.length).toBe(2);
+      expect(units[0].id).toBe('n1');
+      expect(units[1].id).toBe('n2');
+      expect(units[0].blockId).toBe('g1');
+      expect(units[1].blockId).toBe('g1');
+      expect(units[0].text).toBe('Text 1');
+      expect(units[1].text).toBe('Text 2');
+
+      // Crucial: The live DOM is clean of blockId dataset variables
+      const block1El = container.querySelector('.block1');
+      expect(block1El.dataset.blockId).toBeUndefined();
+    });
+
+    it('should extract whitespace boundaries correctly using boundary strip-and-restore', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `<p>  Hello world \n</p>`;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container);
+
+      expect(units.length).toBe(1);
+      expect(units[0].text).toBe('Hello world');
+      expect(units[0].leadingWS).toBe('  ');
+      expect(units[0].trailingWS).toBe(' \n');
+    });
+
+    it('should implement reversible escaping of printable segment delimiters', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `<p>Check [--SEG:n2--] tag</p>`;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container);
+
+      expect(units.length).toBe(1);
+      expect(units[0].text).toBe('Check [--ESCAPED_SEG:n2--] tag');
+    });
+
+    it('should exclude preformatted nodes by setting V2_PASSTHROUGH mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Standard text</p>
+        <pre>Preformatted text</pre>
+        <code>Code text</code>
+      `;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container);
+
+      expect(units.length).toBe(3);
+      expect(units[0].mode).toBe('standard');
+      expect(units[0].preWhitespace).toBe(false);
+
+      expect(units[1].mode).toBe('V2_PASSTHROUGH');
+      expect(units[1].preWhitespace).toBe(true);
+      expect(units[1].text).toBe('Preformatted text');
+
+      expect(units[2].mode).toBe('V2_PASSTHROUGH');
+      expect(units[2].preWhitespace).toBe(true);
+      expect(units[2].text).toBe('Code text');
+    });
+
+    it('should correctly capture direction hints and inline parent tags', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div dir="rtl">
+          <p>
+            <span><strong>text</strong></span>
+          </p>
+        </div>
+      `;
+      document.body.appendChild(container);
+
+      const units = collectBlockGroups(container);
+
+      expect(units.length).toBe(1);
+      expect(units[0].directionHint).toBe('rtl');
+      expect(units[0].inlineParentTags).toEqual(['strong', 'span']);
     });
   });
 });

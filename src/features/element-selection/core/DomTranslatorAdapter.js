@@ -20,7 +20,8 @@ import {
   getTargetLanguageAsync,
   getAIContextTranslationEnabledAsync,
   getSourceLanguageAsync,
-  getEffectiveProviderAsync
+  getEffectiveProviderAsync,
+  getFeatureSemanticBlockGroupingAsync
 } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -34,7 +35,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
-import { collectTextNodes, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
+import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Import hover manager dependencies
@@ -96,8 +97,28 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalHTML = element.innerHTML;
       const elementId = generateElementId();
       
-      // 1. Collect all valid text nodes
-      const textNodesData = collectTextNodes(element);
+      // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag
+      const isBlockGroupingEnabled = await getFeatureSemanticBlockGroupingAsync();
+      let textNodesData = [];
+
+      if (isBlockGroupingEnabled) {
+        this.sessionContext = {
+          blockMap: new WeakMap(),
+          blockCounter: { value: 0 },
+          activeSessionId: this.currentSessionId
+        };
+        const translationUnits = collectBlockGroups(element, this.sessionContext);
+        textNodesData = translationUnits.map(unit => ({
+          node: unit.node,
+          text: unit.text,
+          uid: unit.id,
+          blockId: unit.blockId,
+          role: unit.inlineParentTags[0] || 'span'
+        }));
+      } else {
+        textNodesData = collectTextNodes(element);
+      }
+
       if (textNodesData.length === 0) throw new Error('No translatable text found');
 
       // Validate segment count to prevent timeout issues

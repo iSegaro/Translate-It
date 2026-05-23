@@ -16,7 +16,8 @@ vi.mock('@/config.js', () => ({
   getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
-  getSourceLanguageAsync: vi.fn(() => Promise.resolve('en'))
+  getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
+  getFeatureSemanticBlockGroupingAsync: vi.fn(() => Promise.resolve(false))
 }));
 
 vi.mock('@/shared/config/constants.js', () => ({
@@ -71,6 +72,9 @@ vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
 vi.mock('./DomTranslatorUtils.js', () => ({
   collectTextNodes: vi.fn((el) => [
     { node: el.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
+  ]),
+  collectBlockGroups: vi.fn((el) => [
+    { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: el.firstChild }
   ]),
   generateElementId: vi.fn(() => 'test-el-id'),
   extractContextMetadata: vi.fn(() => ({ contextSummary: 'test context' }))
@@ -151,6 +155,28 @@ describe('DomTranslatorAdapter', () => {
       const result = await adapter.translateElement(testElement, { onProgress });
 
       expect(result.success).toBe(true);
+      expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      collectBlockGroups.mockClear();
+      collectTextNodes.mockClear();
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result.success).toBe(true);
+      expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+      expect(collectTextNodes).not.toHaveBeenCalled();
       expect(testElement.textContent).toContain('سلام');
     });
 

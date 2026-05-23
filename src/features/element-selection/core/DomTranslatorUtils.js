@@ -7,6 +7,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js';
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
+import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
+import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
 
@@ -24,6 +26,73 @@ function findClosestBlockParent(node) {
     parent = parent.parentElement;
   }
   return document.body;
+}
+
+/**
+ * Helper to determine if a node or any of its ancestors are preformatted (pre/code/textarea/etc.)
+ * or have pre-computed white-space styling.
+ * @param {Node} node - The DOM node to check
+ * @returns {boolean}
+ */
+function isPreformatted(node) {
+  let parent = node.parentElement;
+  while (parent) {
+    const tagName = parent.tagName.toUpperCase();
+    if (['PRE', 'CODE', 'TEXTAREA', 'SAMP', 'KBD'].includes(tagName)) {
+      return true;
+    }
+    try {
+      const style = window.getComputedStyle(parent);
+      if (['pre', 'pre-wrap', 'pre-line'].includes(style.whiteSpace)) {
+        return true;
+      }
+    } catch {
+      // computed style check failed, traverse parent
+    }
+    parent = parent.parentElement;
+  }
+  return false;
+}
+
+/**
+ * Resolves the computed layout direction for a text node, inheriting parent attributes
+ * before falling back to statistical content detection.
+ * @param {Node} node - The text node to check
+ * @returns {'rtl'|'ltr'|null}
+ */
+function getDirectionHint(node) {
+  let parent = node.parentElement;
+  while (parent) {
+    const dir = parent.getAttribute('dir');
+    if (dir === 'rtl' || dir === 'ltr') {
+      return dir;
+    }
+    parent = parent.parentElement;
+  }
+  const text = node.textContent || '';
+  try {
+    return detectDirectionFromContent(text);
+  } catch {
+    // Simple fallback if service is unavailable
+    const rtlRegex = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+    return rtlRegex.test(text) ? 'rtl' : 'ltr';
+  }
+}
+
+/**
+ * Collects an ordered array of inline ancestor tag names between the node and block parent.
+ * @param {Node} node - The text node
+ * @param {HTMLElement} blockParent - The block-level parent
+ * @returns {string[]}
+ */
+function getInlineParentTags(node, blockParent) {
+  const tags = [];
+  let parent = node.parentElement;
+  while (parent && parent !== blockParent) {
+    tags.push(parent.tagName.toLowerCase());
+    parent = parent.parentElement;
+  }
+  return tags;
 }
 
 /**
@@ -151,6 +220,112 @@ export function collectTextNodes(element) {
 
   logger.debug(`Collected ${textNodesData.length} text nodes with structural data`);
   return textNodesData;
+}
+
+/**
+ * Collect visible text nodes grouped and enriched into TranslationUnit objects.
+ * Employs a session-scoped WeakMap context to track blockIds cleanly without DOM mutation.
+ *
+ * @param {HTMLElement} element - Root element to crawl
+ * @param {Object} [sessionContext={}] - Session-scoped context to track block IDs across calls
+ * @param {WeakMap} [sessionContext.blockMap] - Maps elements to blockIds
+ * @param {Object} [sessionContext.blockCounter] - Sequential counter object { value: number }
+ * @returns {TranslationUnit[]} Array of enriched TranslationUnits
+ */
+export function collectBlockGroups(element, sessionContext = {}) {
+  if (!sessionContext.blockMap) {
+    sessionContext.blockMap = new WeakMap();
+  }
+  if (!sessionContext.blockCounter) {
+    sessionContext.blockCounter = { value: 0 };
+  }
+
+  const units = [];
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+
+      // Skip elements that shouldn't be translated (scripts, styles, invisible)
+      const tagName = parent.tagName;
+      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      try {
+        const style = window.getComputedStyle(parent);
+        if (style.display === 'none' || style.visibility === 'hidden') {
+          return NodeFilter.FILTER_REJECT;
+        }
+      } catch {
+        // Fallback to acceptance if style checking fails
+      }
+
+      // Filter out empty or whitespace-only nodes early
+      const trimmed = node.textContent.trim();
+      if (!trimmed) return NodeFilter.FILTER_REJECT;
+
+      // Filter out technical patterns (Email, URL, etc.)
+      if (DOM_FILTERS.isTechnicalPattern(trimmed)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  let node;
+  let nodeCounter = 0;
+  while ((node = walker.nextNode())) {
+    const blockParent = findClosestBlockParent(node);
+    
+    // Assign blockId using WeakMap session context (no DOM writes)
+    let blockId = sessionContext.blockMap.get(blockParent);
+    if (!blockId) {
+      sessionContext.blockCounter.value++;
+      blockId = `g${sessionContext.blockCounter.value}`;
+      sessionContext.blockMap.set(blockParent, blockId);
+    }
+
+    nodeCounter++;
+    const uid = `n${nodeCounter}`;
+    const rawText = node.textContent || '';
+    
+    // Boundary strip-and-restore model
+    const leadingWS = (rawText.match(/^(\s*)/) || [''])[0];
+    const trailingWS = (rawText.match(/(\s*)$/) || [''])[0];
+    const trimmedText = rawText.trim();
+
+    // Reversible escaping: escape sequence "[--SEG:" to "[--ESCAPED_SEG:"
+    const escapedText = trimmedText.replace(/\[--SEG:/g, '[--ESCAPED_SEG:');
+
+    // Preformatted preWhitespace tag & CSS checks
+    const preWhitespace = isPreformatted(node);
+
+    // Direction Hint extraction
+    const directionHint = getDirectionHint(node);
+
+    // Inline parent tags collection
+    const inlineParentTags = getInlineParentTags(node, blockParent);
+
+    // Build the unit using the TranslationUnit class
+    const unit = new TranslationUnit({
+      id: uid,
+      blockId,
+      text: escapedText,
+      leadingWS,
+      trailingWS,
+      preWhitespace,
+      directionHint,
+      inlineParentTags,
+      mode: preWhitespace ? 'V2_PASSTHROUGH' : 'standard'
+    });
+
+    units.push(unit);
+  }
+
+  logger.debug(`[collectBlockGroups] Collected ${units.length} units cleanly in session`);
+  return units;
 }
 
 /**

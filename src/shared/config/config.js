@@ -81,6 +81,7 @@ export const CONFIG = {
   },
   THEME: "auto",
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
+  FEATURE_SEMANTIC_BLOCK_GROUPING: false,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
@@ -825,6 +826,10 @@ export const getSourceLanguageAsync = async () => {
 
 export const getTargetLanguageAsync = async () => {
   return getSettingValueAsync("TARGET_LANGUAGE", CONFIG.TARGET_LANGUAGE);
+};
+
+export const getFeatureSemanticBlockGroupingAsync = async () => {
+  return getSettingValueAsync("FEATURE_SEMANTIC_BLOCK_GROUPING", CONFIG.FEATURE_SEMANTIC_BLOCK_GROUPING);
 };
 
 export const getEnableDictionaryAsync = async () => {
