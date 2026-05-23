@@ -349,8 +349,9 @@
             </span>
           </div>
 
-          <div 
+          <div
             v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            id="SHOW_TRANSLATE_ICON_IN_TOOLBAR"
             class="setting-group sub-setting-group"
           >
             <BaseCheckbox
@@ -363,8 +364,9 @@
             </span>
           </div>
 
-          <div 
+          <div
             v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            id="SHOW_TTS_ICON_IN_TOOLBAR"
             class="setting-group sub-setting-group"
           >
             <BaseCheckbox
@@ -375,8 +377,7 @@
             <span class="setting-description">
               {{ t('show_tts_icon_in_toolbar_description') || 'Display the stateful volume icon to speak selected text inside the floating selection toolbar.' }}
             </span>
-          </div>
-        </div>
+          </div>        </div>
       </div>
     </BaseFieldset>
 
