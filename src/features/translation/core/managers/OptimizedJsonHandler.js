@@ -307,8 +307,13 @@ export class OptimizedJsonHandler {
       return text;
     });
 
-    if (results.length !== originalBatch.length && originalBatch.length > 1) {
-      logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}`);
+    if (results.length !== originalBatch.length) {
+      const errorMsg = `Segment count mismatch: expected ${originalBatch.length}, received ${results.length}`;
+      logger.error(`[JsonHandler] ${errorMsg}`);
+      const err = new Error(errorMsg);
+      err.isFatal = true;
+      err.type = ErrorTypes.VALIDATION_ERROR;
+      throw err;
     }
 
     return originalBatch.map((item, idx) => {

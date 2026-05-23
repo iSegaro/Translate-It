@@ -109,10 +109,21 @@ export async function buildPrompt(
       ? await getPromptBASEAIBatchAutoAsync()
       : await getPromptBASEAIBatchAsync();
 
+    let jsonCount = 1;
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        jsonCount = parsed.length;
+      } else if (parsed && Array.isArray(parsed.translations)) {
+        jsonCount = parsed.translations.length;
+      }
+    } catch {}
+
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
       .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+      .replace(/\$_{COUNT}/g, String(jsonCount))
       .replace(/\$_{TEXT}/g, text);
   }
 
@@ -156,7 +167,8 @@ export async function buildPrompt(
   let finalPromptWithInstructions = promptBase
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName)
-    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+    .replace(/\$_{COUNT}/g, '1');
 
   // Inject the actual text to be translated.
   // $_{TEXT} is now required in the prompt template, so we can safely replace it.

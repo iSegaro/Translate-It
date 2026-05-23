@@ -124,6 +124,12 @@ describe('OptimizedJsonHandler', () => {
       const result = handler._mapResults(original, malformedJson);
       expect(result).toEqual(['s1']);
     });
+
+    it('should throw a fatal validation error on segment count mismatch', () => {
+      const original = ['s1', 's2'];
+      const translated = ['t1'];
+      expect(() => handler._mapResults(original, translated)).toThrow(/Segment count mismatch/);
+    });
   });
 
   describe('execute', () => {
@@ -163,6 +169,18 @@ describe('OptimizedJsonHandler', () => {
 
       await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
 
+      expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('should abort execution and bubble validation error on count mismatch', async () => {
+      mockProvider.translate.mockResolvedValueOnce({
+        translatedText: []
+      });
+
+      const result = await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('Segment count mismatch');
       expect(mockAbortController.abort).toHaveBeenCalled();
     });
   });

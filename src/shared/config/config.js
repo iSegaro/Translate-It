@@ -480,13 +480,12 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Your response MUST be a valid JSON object containing a "translations" array with exactly $_{COUNT} items. 
 Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
-  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -500,13 +499,12 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Your response MUST be a valid JSON object containing a "translations" array with exactly $_{COUNT} items. 
 Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
-  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 

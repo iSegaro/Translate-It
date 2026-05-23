@@ -318,6 +318,9 @@ export const AIConversationHelper = {
         .replace(/\$_{TARGET}/g, targetName);
     }
 
+    const textsArray = Array.isArray(text) ? text : [text];
+    const textsCount = textsArray.length;
+
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
     let systemPrompt;
     if (shouldUseBatchPrompt) {
@@ -337,13 +340,15 @@ export const AIConversationHelper = {
       systemPrompt = normalizedTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName)
-        .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+        .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+        .replace(/\$_{COUNT}/g, String(textsCount));
     } else {
       // For non-batch prompts (from buildPrompt), the text is already injected
       // We only need to replace language placeholders if they haven't been replaced yet
       systemPrompt = promptTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
-        .replace(/\$_{TARGET}/g, targetName);
+        .replace(/\$_{TARGET}/g, targetName)
+        .replace(/\$_{COUNT}/g, '1');
     }
 
     // Determine if we should wrap the text in a JSON structure
@@ -352,7 +357,6 @@ export const AIConversationHelper = {
 
     let userText;
     if (shouldWrap) {
-      const textsArray = Array.isArray(text) ? text : [text];
       // Wrap into the structured JSON format expected by PROMPT_BASE_AI_BATCH
       // This ensures compatibility with strict AI models that expect 'translations' and 'id'
       userText = JSON.stringify({
