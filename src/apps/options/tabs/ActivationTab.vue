@@ -359,7 +359,7 @@
               :label="t('show_translate_icon_in_toolbar_label') || 'Show Translate Button in Selection Toolbar'"
             />
             <span class="setting-description">
-              {{ t('show_translate_icon_in_toolbar_description') || 'Display the Google Translate icon inside the floating selection toolbar.' }}
+              {{ t('show_translate_icon_in_toolbar_description') || 'Display the Translate icon inside the floating selection toolbar.' }}
             </span>
           </div>
 

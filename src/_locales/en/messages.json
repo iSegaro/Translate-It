@@ -885,7 +885,7 @@
     "message": "Show Translate Button in Selection Toolbar"
   },
   "show_translate_icon_in_toolbar_description": {
-    "message": "Display the Google Translate icon inside the floating selection toolbar."
+    "message": "Display the Translate icon inside the floating selection toolbar."
   },
   "show_tts_icon_in_toolbar_label": {
     "message": "Show Text-to-Speech (TTS) Button in Selection Toolbar"

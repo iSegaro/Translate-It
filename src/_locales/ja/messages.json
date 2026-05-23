@@ -882,7 +882,7 @@
     "message": "選択ツールバーに翻訳ボタンを表示"
   },
   "show_translate_icon_in_toolbar_description": {
-    "message": "浮動選択ツールバー内にGoogle翻訳アイコンを表示します。"
+    "message": "浮動選択ツールバー内に翻訳アイコンを表示します。"
   },
   "show_tts_icon_in_toolbar_label": {
     "message": "選択ツールバーに音声読み上げ (TTS) ボタンを表示"
