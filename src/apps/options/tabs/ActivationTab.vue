@@ -355,7 +355,7 @@
           >
             <BaseCheckbox
               v-model="showTranslateIconInToolbar"
-              :disabled="!extensionEnabled"
+              :disabled="!extensionEnabled || !showTtsIconInToolbar"
               :label="t('show_translate_icon_in_toolbar_label') || 'Show Translate Button in Selection Toolbar'"
             />
             <span class="setting-description">
@@ -369,7 +369,7 @@
           >
             <BaseCheckbox
               v-model="showTtsIconInToolbar"
-              :disabled="!extensionEnabled"
+              :disabled="!extensionEnabled || !showTranslateIconInToolbar"
               :label="t('show_tts_icon_in_toolbar_label') || 'Show Text-to-Speech (TTS) Button in Selection Toolbar'"
             />
             <span class="setting-description">
