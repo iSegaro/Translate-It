@@ -133,6 +133,7 @@ import { useMobileStore } from '@/store/modules/mobile.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 
 // Event bus and coordination
 const pageEventBus = window.pageEventBus;
@@ -247,13 +248,21 @@ const ttsClasses = computed(() => [
 
 // Localized tooltip title for TTS button
 const ttsTitle = computed(() => {
+  const displayLang = tts.detectedLanguage.value 
+    ? getLanguageNameFromCode(tts.detectedLanguage.value) 
+    : '';
+  const langName = displayLang 
+    ? displayLang.charAt(0).toUpperCase() + displayLang.slice(1) 
+    : '';
+  const langSuffix = langName ? ` (${langName})` : '';
+
   switch (effectiveTTSState.value) {
     case 'idle':
-      return t('action_speak_text') || 'Speak text';
+      return (t('action_speak_text') || 'Speak text') + langSuffix;
     case 'loading':
       return t('window_loading_alt') || 'Loading...';
     case 'playing':
-      return t('action_stop_speaking') || 'Stop speaking';
+      return (t('action_stop_speaking') || 'Stop speaking') + langSuffix;
     case 'error':
       return tts.errorMessage.value || 'TTS error';
     default:
