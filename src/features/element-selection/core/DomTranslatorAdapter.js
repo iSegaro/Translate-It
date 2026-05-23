@@ -36,14 +36,17 @@ import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorM
 
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
+import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Import hover manager dependencies
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 
-// Export state and revert logic for external use
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
+
+// Strategy X - Subtree Exclusion Active Set
+const activeTranslationRoots = new Set();
 
 /**
  * Specialized adapter that coordinates between background services and visual DOM management.
@@ -87,6 +90,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.logger.operation('Starting element translation');
 
     try {
+      // Strategy X - Subtree Exclusion Check
+      for (const root of activeTranslationRoots) {
+        if (root === element || root.contains(element) || element.contains(root)) {
+          const error = new Error('Translation already in progress for this element');
+          error.isFatal = false;
+          error.type = ErrorTypes.FEATURE_BLOCKED;
+          throw error;
+        }
+      }
+      activeTranslationRoots.add(element);
+
       this.isTranslating = true;
       
       // Generate a fresh session ID for this specific translation request
@@ -100,6 +114,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag
       const isBlockGroupingEnabled = await getFeatureSemanticBlockGroupingAsync();
       let textNodesData = [];
+      const groupMap = new Map();
+      const groups = [];
 
       if (isBlockGroupingEnabled) {
         this.sessionContext = {
@@ -108,6 +124,43 @@ export class DomTranslatorAdapter extends ResourceTracker {
           activeSessionId: this.currentSessionId
         };
         const translationUnits = collectBlockGroups(element, this.sessionContext);
+        
+        // Build groups and maps for V3 block grouping
+        const blockMap = new Map();
+        for (const unit of translationUnits) {
+          if (unit.mode === 'V2_PASSTHROUGH') {
+            const group = {
+              blockId: unit.blockId,
+              isV2Passthrough: true,
+              units: [unit],
+              id: unit.id,
+              text: unit.text,
+              role: unit.inlineParentTags[0] || 'span'
+            };
+            groups.push(group);
+            groupMap.set(unit.id, group);
+          } else {
+            let group = blockMap.get(unit.blockId);
+            if (!group) {
+              group = {
+                blockId: unit.blockId,
+                isV2Passthrough: false,
+                units: [],
+                id: unit.blockId,
+                role: unit.inlineParentTags[0] || 'div'
+              };
+              blockMap.set(unit.blockId, group);
+              groups.push(group);
+              groupMap.set(unit.blockId, group);
+            }
+            group.units.push(unit);
+            // Also map segment IDs to their parent group to support fallback lookup
+            groupMap.set(unit.id, group);
+          }
+        }
+        
+        this.groupMap = groupMap;
+
         textNodesData = translationUnits.map(unit => ({
           node: unit.node,
           text: unit.text,
@@ -116,6 +169,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           role: unit.inlineParentTags[0] || 'span'
         }));
       } else {
+        this.groupMap = null;
         textNodesData = collectTextNodes(element);
       }
 
@@ -147,12 +201,34 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
-      const textsToTranslate = textNodesData.map(data => ({ 
-        t: data.text || '',
-        i: data.uid,
-        b: data.blockId,
-        r: data.role
-      }));
+      let textsToTranslate = [];
+      if (isBlockGroupingEnabled) {
+        textsToTranslate = groups.map(g => {
+          if (g.isV2Passthrough) {
+            return {
+              t: g.text || '',
+              i: g.id,
+              b: g.blockId,
+              r: g.role
+            };
+          } else {
+            const assembled = BlockGroupReconstructor.injectMarkers(g.units);
+            return {
+              t: assembled,
+              i: g.id,
+              b: g.blockId,
+              r: g.role
+            };
+          }
+        });
+      } else {
+        textsToTranslate = textNodesData.map(data => ({ 
+          t: data.text || '',
+          i: data.uid,
+          b: data.blockId,
+          r: data.role
+        }));
+      }
 
       const nodeMap = new Map();
       textNodesData.forEach(data => nodeMap.set(data.uid, data));
@@ -220,26 +296,48 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 data.data.forEach((translatedItem, index) => {
                   // Handle both abbreviated and full keys for backward compatibility
                   const uid = translatedItem?.i || translatedItem?.uid || (data.originalData && (data.originalData[index]?.i || data.originalData[index]?.uid));
+                  const text = translatedItem?.t || translatedItem?.text || translatedItem;
 
-                  let nodeData = null;
-                  if (uid) {
-                    nodeData = nodeMap.get(uid);
-                  }
-
-                  // Fallback to sequential index ONLY if UID mapping fails or is missing
-                  if (!nodeData) {
-                    nodeData = textNodesData[lastProcessedIndex++];
+                  if (isBlockGroupingEnabled && groupMap && groupMap.has(uid)) {
+                    const group = groupMap.get(uid);
+                    if (group.isV2Passthrough) {
+                      const unit = group.units[0];
+                      if (!processedUids.has(unit.id)) {
+                        this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
+                        processedUids.add(unit.id);
+                      }
+                    } else {
+                      const anyProcessed = group.units.some(u => processedUids.has(u.id));
+                      if (!anyProcessed) {
+                        try {
+                          BlockGroupReconstructor.apply(group.units, text);
+                          group.units.forEach(u => processedUids.add(u.id));
+                        } catch (error) {
+                          this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
+                          this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                          throw error;
+                        }
+                      }
+                    }
                   } else {
-                    // If we found by UID, update our sequential pointer if possible
-                    const currentIdx = textNodesData.findIndex(d => d.uid === uid);
-                    if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
-                  }
+                    let nodeData = null;
+                    if (uid) {
+                      nodeData = nodeMap.get(uid);
+                    }
 
-                  if (nodeData && !processedUids.has(nodeData.uid)) {
-                    // Extract text from abbreviated key 't' or full key 'text'
-                    const text = translatedItem?.t || translatedItem?.text || translatedItem;
-                    this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
-                    processedUids.add(nodeData.uid);
+                    // Fallback to sequential index ONLY if UID mapping fails or is missing
+                    if (!nodeData) {
+                      nodeData = textNodesData[lastProcessedIndex++];
+                    } else {
+                      // If we found by UID, update our sequential pointer if possible
+                      const currentIdx = textNodesData.findIndex(d => d.uid === uid);
+                      if (currentIdx !== -1) lastProcessedIndex = Math.max(lastProcessedIndex, currentIdx + 1);
+                    }
+
+                    if (nodeData && !processedUids.has(nodeData.uid)) {
+                      this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
+                      processedUids.add(nodeData.uid);
+                    }
                   }
                 });
 
@@ -342,6 +440,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error });
       throw error;
     } finally {
+      activeTranslationRoots.delete(element);
       this._cleanupCurrentSession(true);
     }
   }
@@ -412,14 +511,41 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const results = Array.isArray(rawResults) ? rawResults : [rawResults];
       const finalTargetLanguage = response.targetLanguage || targetLanguage;
 
+      const processedUids = new Set();
+      const isBlockGroupingEnabled = this.sessionContext !== undefined;
+
       results.forEach((item, i) => {
         // Handle abbreviated key 'i' for UID
         const uid = item?.i || item?.uid;
-        const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
-        if (nodeData) {
-          // Handle abbreviated key 't' for text
-          const text = item?.t || item?.text || item;
-          this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
+        const text = item?.t || item?.text || item;
+
+        if (isBlockGroupingEnabled && this.groupMap && this.groupMap.has(uid)) {
+          const group = this.groupMap.get(uid);
+          if (group.isV2Passthrough) {
+            const unit = group.units[0];
+            if (!processedUids.has(unit.id)) {
+              this._applyTranslationToNode(unit.node, text, finalTargetLanguage, element);
+              processedUids.add(unit.id);
+            }
+          } else {
+            const anyProcessed = group.units.some(u => processedUids.has(u.id));
+            if (!anyProcessed) {
+              try {
+                BlockGroupReconstructor.apply(group.units, text);
+                group.units.forEach(u => processedUids.add(u.id));
+              } catch (error) {
+                this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
+                this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+                throw error;
+              }
+            }
+          }
+        } else {
+          const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
+          if (nodeData && !processedUids.has(nodeData.uid)) {
+            this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
+            processedUids.add(nodeData.uid);
+          }
         }
       });
 
@@ -476,9 +602,37 @@ export class DomTranslatorAdapter extends ResourceTracker {
   }
 
   _storeTranslationState(data) {
-    const { element } = data;
+    const { element, originalTextNodesData, sessionId } = data;
+    
+    // Ensure absolute immutability of the rollback text node snapshots and register them
+    const frozenTextNodesData = originalTextNodesData
+      ? originalTextNodesData.map(d => Object.freeze({
+          node: d.node,
+          originalText: Object.freeze(String(d.originalText)),
+          blockId: d.blockId || null
+        }))
+      : null;
+
+    // Enforce namespaced and session-scoped snapshots for rollback safety
+    if (frozenTextNodesData && sessionId) {
+      if (!globalSelectElementState.snapshots) {
+        globalSelectElementState.snapshots = new Map();
+      }
+      frozenTextNodesData.forEach(d => {
+        const blockId = d.blockId || 'default';
+        const key = `${sessionId}:${blockId}`;
+        let blockSnapshots = globalSelectElementState.snapshots.get(key);
+        if (!blockSnapshots) {
+          blockSnapshots = [];
+          globalSelectElementState.snapshots.set(key, blockSnapshots);
+        }
+        blockSnapshots.push(d);
+      });
+    }
+
     const stateEntry = { 
       ...data, 
+      originalTextNodesData: frozenTextNodesData,
       originalDir: element.getAttribute('dir'),
       originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,
@@ -487,6 +641,20 @@ export class DomTranslatorAdapter extends ResourceTracker {
     
     globalSelectElementState.translationHistory.push(stateEntry);
     globalSelectElementState.currentTranslation = stateEntry; // IMPORTANT: Set current translation pointer
+  }
+
+  _rollbackBlockGroup(sessionId, blockId) {
+    if (!sessionId || !blockId) return;
+    const key = `${sessionId}:${blockId}`;
+    const snapshots = globalSelectElementState.snapshots?.get(key);
+    if (snapshots && snapshots.length > 0) {
+      this.logger.warn(`[Rollback] Performing atomic rollback for block group ${blockId} (Session: ${sessionId})`);
+      snapshots.forEach(({ node, originalText }) => {
+        if (node && node.parentNode && document.documentElement.contains(node)) {
+          node.nodeValue = originalText;
+        }
+      });
+    }
   }
 
   _cleanupCurrentSession(isSuccess = false) {

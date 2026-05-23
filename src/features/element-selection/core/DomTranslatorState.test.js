@@ -108,5 +108,35 @@ describe('DomTranslatorState', () => {
       
       document.body.removeChild(container);
     });
+
+    it('should verify session ownership and skip revert if session ID is mismatched', async () => {
+      const container = document.createElement('div');
+      const textNode = document.createTextNode('Translated');
+      container.appendChild(textNode);
+      document.body.appendChild(container);
+
+      globalSelectElementState.snapshots = new Map();
+      globalSelectElementState.translationHistory = [{
+        element: container,
+        sessionId: 's_owner',
+        originalTextNodesData: [
+          { node: textNode, originalText: 'Original' }
+        ]
+      }];
+
+      // Call revert with mismatched session
+      const count1 = await revertSelectElementTranslation('s_wrong');
+      expect(count1).toBe(0);
+      expect(textNode.nodeValue).toBe('Translated'); // Mismatched session did not revert
+      expect(globalSelectElementState.translationHistory).toHaveLength(1);
+
+      // Call revert with correct session
+      const count2 = await revertSelectElementTranslation('s_owner');
+      expect(count2).toBe(1);
+      expect(textNode.nodeValue).toBe('Original'); // Reverted successfully
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+
+      document.body.removeChild(container);
+    });
   });
 });

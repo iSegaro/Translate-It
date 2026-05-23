@@ -528,4 +528,168 @@ describe('DomTranslatorAdapter', () => {
       expect(textNode.nodeValue).toContain('\u200c');
     });
   });
+
+  describe('Strategy X Subtree Exclusion and V3 Rollback integration tests', () => {
+    it('should reject overlapping concurrent translation requests (Strategy X)', async () => {
+      let resolveFirst;
+      const firstPromise = new Promise((resolve) => {
+        resolveFirst = resolve;
+      });
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(() => firstPromise);
+
+      const firstCall = adapter.translateElement(testElement);
+
+      const childElement = document.createElement('span');
+      testElement.appendChild(childElement);
+
+      await expect(adapter.translateElement(childElement)).rejects.toThrow(
+        'Translation already in progress for this element'
+      );
+
+      resolveFirst({ success: true, streaming: false });
+      await firstCall;
+    });
+
+    it('should rollback to original immutable values if pre-apply connection validation fails', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          // Detach one node before applying translation
+          span2.firstChild.remove();
+
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(div)).rejects.toThrow(
+        /Stale or detached DOM node reference/
+      );
+
+      expect(span1.firstChild.nodeValue).toBe('Hello ');
+    });
+
+    it('should abort and rollback to original immutable values if marker corruption is detected', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'مرحبا بالعالم', i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(div)).rejects.toThrow(
+        /Segment count mismatch/
+      );
+
+      expect(span1.firstChild.nodeValue).toBe('Hello ');
+      expect(span2.firstChild.nodeValue).toBe('world');
+    });
+  });
 });

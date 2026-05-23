@@ -1,5 +1,6 @@
 /**
- * Global translation state and revert logic for Select Element mode
+ * Global translation state and revert logic for Select Element mode.
+ * Enforces immutable, session-scoped snapshot tracking for absolute concurrency safety.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -15,7 +16,9 @@ const getGlobalState = () => {
       window.__selectElementTranslationState__ = {
         translationHistory: [], // Store all translations for proper revert
         isTranslating: false,
-        currentTranslation: null
+        currentTranslation: null,
+        // Immutable, session-scoped snapshots mapping
+        snapshots: new Map() // Key: "sessionId:blockId" -> Immutable Snapshot array
       };
     }
     return window.__selectElementTranslationState__;
@@ -24,7 +27,8 @@ const getGlobalState = () => {
   return { 
     translationHistory: [], 
     isTranslating: false,
-    currentTranslation: null
+    currentTranslation: null,
+    snapshots: new Map()
   };
 };
 
@@ -38,7 +42,13 @@ export function getSelectElementTranslationState() {
   return globalSelectElementState;
 }
 
-export async function revertSelectElementTranslation() {
+/**
+ * Reverts active translations. Supports session-owned reversion to prevent stale races.
+ *
+ * @param {string|null} [targetSessionId=null] - The target session ID to revert, or null for all
+ * @returns {Promise<number>} Reverted count
+ */
+export async function revertSelectElementTranslation(targetSessionId = null) {
   if (!globalSelectElementState.translationHistory || globalSelectElementState.translationHistory.length === 0) {
     return 0;
   }
@@ -53,19 +63,24 @@ export async function revertSelectElementTranslation() {
     for (const translation of translationsToRevert) {
       const { 
         element, 
-        originalTextNodesData
+        originalTextNodesData,
+        sessionId
       } = translation;
 
+      // Strict Ownership Verification: If a specific targetSessionId is requested,
+      // verify it matches the snapshot owner session to prevent stale race conditions.
+      if (targetSessionId && sessionId !== targetSessionId) {
+        logger.warn(`[Rollback] Revert request skipped: session ID mismatch (Caller: ${targetSessionId}, Owner: ${sessionId})`);
+        continue;
+      }
+
       // Skip if element no longer exists in DOM
-      // Use documentElement.contains to support reverting HTML and BODY tags
       if (!document.documentElement.contains(element)) {
         logger.debug('Element no longer in DOM, skipping', { tagName: element?.tagName });
         continue;
       }
 
       // 1. Restore content - SURGICAL RESTORATION ONLY
-      // We NEVER use innerHTML for active page elements as it destroys event listeners, 
-      // breaks SPAs, and causes massive layout recalculations.
       if (originalTextNodesData && originalTextNodesData.length > 0) {
         let restoredNodes = 0;
         originalTextNodesData.forEach(({ node, originalText }) => {
@@ -82,25 +97,40 @@ export async function revertSelectElementTranslation() {
           logger.debug('No valid text nodes found to restore for this element');
         }
       } else {
-        logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration to preserve page integrity.');
+        logger.debug('Missing originalTextNodesData for surgical revert. Skipping content restoration.');
       }
 
-      // 2. Restore direction and styles for the element, its descendants, and its ancestors.
+      // 2. Restore direction and styles
       if (element) {
-        // Remove tracking attribute for hover tooltip from element and ALL descendants
         const attr = PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL;
         element.removeAttribute(attr);
         element.querySelectorAll(`[${attr}]`).forEach(el => el.removeAttribute(attr));
 
-        // This function now recursively cleans ancestors up to the body
         restoreElementDirection(element);
-
         pageEventBus.emit('hide-translation', { element });
       }
     }
 
-    // Clear history after successful revert
-    globalSelectElementState.translationHistory = [];
+    // Clean up registry history
+    if (targetSessionId) {
+      globalSelectElementState.translationHistory = globalSelectElementState.translationHistory.filter(
+        t => t.sessionId !== targetSessionId
+      );
+      if (globalSelectElementState.snapshots) {
+        // Purge session-scoped snapshots
+        for (const key of globalSelectElementState.snapshots.keys()) {
+          if (key.startsWith(`${targetSessionId}:`)) {
+            globalSelectElementState.snapshots.delete(key);
+          }
+        }
+      }
+    } else {
+      globalSelectElementState.translationHistory = [];
+      if (globalSelectElementState.snapshots) {
+        globalSelectElementState.snapshots.clear();
+      }
+    }
+
     logger.info(`Reverted ${revertedCount} translations via global function`);
     return revertedCount;
   } catch (error) {
