@@ -350,8 +350,8 @@
           </div>
 
           <div 
-            class="setting-group sub-setting-group"
             v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            class="setting-group sub-setting-group"
           >
             <BaseCheckbox
               v-model="showTranslateIconInToolbar"
@@ -364,8 +364,8 @@
           </div>
 
           <div 
-            class="setting-group sub-setting-group"
             v-if="selectionTranslationMode === SelectionTranslationMode.ON_CLICK"
+            class="setting-group sub-setting-group"
           >
             <BaseCheckbox
               v-model="showTtsIconInToolbar"
