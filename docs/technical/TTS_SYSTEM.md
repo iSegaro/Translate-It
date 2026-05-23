@@ -128,8 +128,10 @@ When searching for a voice, the system follows this priority:
 ## Lifecycle & State Management
 
 ### Optimized UI Reactivity
-- **Instance-Level Scoping**: Each call to `useTTSSmart.js` creates an independent state. This allows multiple TTS buttons on the same page to operate without unwanted synchronization.
+- **Standardized Entry Points**: The system is integrated into the Popup, Sidepanel, and the **Selection Toolbar** (`TranslationIcon.vue`), ensuring consistent playback behavior across all surfaces.
+- **Instance-Level Scoping**: Each call to `useTTSSmart.js` creates an independent state. This allows multiple TTS buttons on the same page (e.g., in a translation window and a selection toolbar) to operate without unwanted synchronization.
 - **Broadcast Synchronization**: UI components listen for `GOOGLE_TTS_ENDED` broadcasts to stay in sync with the background state, even if they didn't initiate the request.
+- **Lifecycle-Linked Cleanup**: The Selection Toolbar explicitly stops playback upon dismissal (outside click) or component destruction, preventing background audio "leaks" after the user has finished their interaction.
 - **Instant Feedback**: The composable clears previous error states at the start of each call, ensuring the UI always reacts to retries.
 - **Background Initialization**: `LifecycleManager.js` triggers a background voice list update on startup if the 24-hour cache has expired.
 

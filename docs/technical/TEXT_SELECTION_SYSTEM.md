@@ -2,9 +2,16 @@
 
 ## Overview
 
-The Text Selection system is a key component of the Translate-It extension, responsible for detecting, managing, and processing text selection on web pages. With a **Simplified Architecture (2025)** based on `selectionchange` events, it provides an optimized user experience for translating selected text.
+The Text Selection system is a key component of the Translate-It extension, responsible for detecting, managing, and processing text selection on web pages. With a **Simplified Architecture** based on `selectionchange` events, it provides an optimized user experience for translating or pronouncing selected text.
 
-### ✅ 2025 Updates - Simplified System:
+### Updates - Selection Toolbar:
+- **Icon to Toolbar Evolution**: The single "Translation Icon" has been refactored into a modular **Selection Toolbar** (pill-shaped icon group).
+- **Multi-Action Support**: Supports both **Translate** and **Text-to-Speech (TTS)** actions directly from the initial selection trigger.
+- **Configurable Visibility**: Users can toggle individual buttons (Translate/TTS) via settings.
+- **Stateful Interaction**: The toolbar integrates with `useTTSSmart` to provide real-time playback states (loading, playing) within the selection UI.
+- **Smart Dismissal**: TTS playback automatically stops when the toolbar is dismissed (e.g., clicking outside), ensuring audio doesn't leak after the UI is gone.
+
+### Updates - Simplified System:
 - **Complexity Removal**: Complete removal of complex drag detection and the `pendingSelection` system.
 - **selectionchange-only**: Utilizes only `selectionchange` events for all scenarios.
 - **Text Field Decoupling**: Text field logic has been moved to the `text-field-interaction` module.
@@ -14,21 +21,21 @@ The Text Selection system is a key component of the Translate-It extension, resp
 
 ## Architecture
 
-### 🎯 Core Components
+### Core Components
 
 #### 1. **SimpleTextSelectionHandler**
 `src/features/text-selection/handlers/SimpleTextSelectionHandler.js`
 
 - Manages the standalone `selectionchange` event.
 - Simple drag detection (`mousedown`/`mouseup`).
-- Prevents icon display within text fields.
+- Prevents toolbar display within text fields.
 - Communicates directly with the `SelectionManager`.
 
 #### 2. **SelectionManager**
 `src/features/text-selection/core/SelectionManager.js`
 
 - Processes text selection simply.
-- Calculates UI positioning.
+- Calculates UI positioning for the toolbar.
 - Interacts with `WindowsManager`.
 - Supports iframe communication.
 
@@ -49,7 +56,7 @@ The Text Selection system is a key component of the Translate-It extension, resp
 
 ## Selection Strategy (Simplified)
 
-### 🚀 New Approach: selectionchange-only
+### New Approach: selectionchange-only
 
 The new system utilizes a single strategy:
 
@@ -64,13 +71,14 @@ document.addEventListener('selectionchange', () => {
 
 ```
 
-### Icon Display Conditions:
+### Toolbar Display Conditions:
 
 1. **Text is selected** (`selectedText.trim()`)
 2. **Not currently dragging** (`!isDragging`)
 3. **Not inside a text field** (`!isInTextField`)
 4. **Ctrl key requirement** (if enabled)
 5. **Select element mode is disabled** (`!selectModeActive`)
+6. **At least one toolbar icon is enabled** (Translate or TTS)
 
 ### Separation of Concerns:
 
@@ -132,7 +140,7 @@ class SimpleTextSelectionHandler {
     }
 
     // Process page selection
-    await this.showTranslationIcon();
+    await this.showSelectionToolbar();
   }
 }
 
@@ -151,7 +159,11 @@ graph TD
     E --> F[User MouseUp]
     F --> G[isDragging = false]
     G --> H[Process selection after 50ms]
-    H --> I[Show Translation Icon]
+    H --> I[Show Selection Toolbar]
+    I --> J1[Click Translate]
+    I --> J2[Click TTS]
+    J1 --> K1[Show Translation Window]
+    J2 --> K2[Play Audio / Toggle State]
 
 ```
 
@@ -164,14 +176,14 @@ mousedown → isDragging = true
   ↓
 selectionchange → skip (isDragging = true)
   ↓
-mouseup → isDragging = false → process after 50ms → show icon
+mouseup → isDragging = false → process after 50ms → show toolbar
 
 ```
 
 #### 2. **Keyboard Selection** (Ctrl+A, Shift+Arrow)
 
 ```
-selectionchange (isDragging = false) → immediate processing → show icon
+selectionchange (isDragging = false) → immediate processing → show toolbar
 
 ```
 
@@ -180,7 +192,7 @@ selectionchange (isDragging = false) → immediate processing → show icon
 ```
 selectionchange → isSelectionInTextField() = true → skip
   ↓
-double-click in text field → TextFieldDoubleClickHandler → show icon
+double-click in text field → TextFieldDoubleClickHandler → show toolbar/icon
 
 ```
 
@@ -314,7 +326,10 @@ class TextSelectionManager extends ResourceTracker {
 
 ```
 
-#### 2. **Duplicate Prevention**
+#### 2. **Dynamic Toolbar Scaling**
+The Selection Toolbar (`TranslationIcon.vue`) calculates its width dynamically based on active settings (`SHOW_TTS_ICON_IN_TOOLBAR`, `SHOW_TRANSLATE_ICON_IN_TOOLBAR`). This ensures the `usePositioning` logic always aligns the "pill" correctly relative to the selection without overflow.
+
+#### 3. **Duplicate Prevention**
 
 ```javascript
 // Prevent duplicate processing
@@ -392,7 +407,7 @@ this.logger.debug('Selection detected', {
 ```javascript
 // User drags text on a regular website
 // → selectionchange events ignored while dragging
-// → On mouseup: process and show icon
+// → On mouseup: process and show selection toolbar
 
 ```
 
@@ -408,7 +423,7 @@ this.logger.debug('Selection detected', {
 ```javascript
 // User presses Ctrl+A
 // → selectionchange with isDragging = false
-// → Immediate processing and icon display
+// → Immediate processing and toolbar display
 
 ```
 
@@ -432,7 +447,7 @@ this.logger.debug('Selection detected', {
 * **Smart Handler Registration**: `docs/technical/SMART_HANDLER_REGISTRATION_SYSTEM.md`
 * **Error Management**: `docs/technical/ERROR_MANAGEMENT_SYSTEM.md`
 
-### Key Improvements (2025) - Simplification
+### Key Improvements - Simplification
 
 * **60-70% Code Reduction**: Eliminated unnecessary complexities.
 * **selectionchange-only**: Switched exclusively to `selectionchange` events.
