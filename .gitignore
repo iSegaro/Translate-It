@@ -11,4 +11,8 @@ temp/
 tests/coverage/
 .claude/
 .agents/
-.antigravitycli
+.antigravitycli/
+.codex/
+.agent/
+.gemini/
+openspec/
