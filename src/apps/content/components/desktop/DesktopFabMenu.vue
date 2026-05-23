@@ -240,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -261,7 +261,6 @@ import useFabSelection from '@/apps/content/composables/useFabSelection.js';
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import './DesktopFabMenu.scss';
@@ -335,7 +334,13 @@ const hoveredItemIndex = ref(-1);
 // Track the specific TTS request started by this component instance
 const localTTSId = ref(null);
 const isLocalLoading = ref(false);
-const detectedLanguage = ref('auto');
+const detectedLanguage = computed(() => {
+  // Only display the detected language suffix if it corresponds to the currently selected text
+  if (tts.lastText.value === pendingSelection.value.text) {
+    return tts.detectedLanguage.value || 'auto';
+  }
+  return 'auto';
+});
 
 const isFullscreen = computed(() => mobileStore.isFullscreen);
 const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
@@ -360,21 +365,6 @@ const { pendingSelection, triggerTranslation } = useFabSelection({
     if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled.value) {
       startFadeTimer();
     }
-  }
-});
-
-// Detect language whenever selection changes
-watch(() => pendingSelection.value.text, async (newText) => {
-  if (newText && newText.trim().length > 0) {
-    try {
-      const lang = await LanguageDetectionService.detect(newText);
-      if (lang) detectedLanguage.value = lang;
-    } catch (err) {
-      logger.debug('Failed to detect language for FAB TTS tooltip:', err);
-      detectedLanguage.value = 'auto';
-    }
-  } else {
-    detectedLanguage.value = 'auto';
   }
 });
 
@@ -753,10 +743,11 @@ const handleTTS = async () => {
     logger.info('Stopping TTS from Desktop FAB');
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
-    logger.info('Starting TTS from Desktop FAB', { language: detectedLanguage.value });
+    logger.info('Starting TTS from Desktop FAB');
     isLocalLoading.value = true;
     try {
-      const result = await tts.speak(pendingSelection.value.text, detectedLanguage.value);
+      // Pass 'auto' to ensure the background triggers detection on the new text
+      const result = await tts.speak(pendingSelection.value.text, 'auto');
       if (result) {
         localTTSId.value = tts.currentTTSId.value;
       }
