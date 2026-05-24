@@ -103,10 +103,10 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
 
       // Inject markers for the group
       const assembled = BlockGroupReconstructor.injectMarkers(units);
-      expect(assembled).toBe('سلام[--SEG:n2--]world[--SEG:n3--]خوبه؟');
+      expect(assembled).toBe('سلام@@SEG_n2@@world@@SEG_n3@@خوبه؟');
 
       // Verify splitting and reconstructed layout (strict deterministic check)
-      const mockTranslatedBlock = 'Hello [--SEG:n2--]world[--SEG:n3--] is it good?';
+      const mockTranslatedBlock = 'Hello @@SEG_n2@@world@@SEG_n3@@ is it good?';
       const parsed = BlockGroupReconstructor.splitTranslatedBlock(mockTranslatedBlock, units);
       
       expect(parsed[0].text.trim()).toBe('Hello');
@@ -126,9 +126,9 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
 
       expect(units.length).toBe(3);
       const assembled = BlockGroupReconstructor.injectMarkers(units);
-      expect(assembled).toBe('قیمت[--SEG:n2--]iPhone 15 Pro Max[--SEG:n3--]کاهش یافت.');
+      expect(assembled).toBe('قیمت@@SEG_n2@@iPhone 15 Pro Max@@SEG_n3@@کاهش یافت.');
 
-      const mockTranslatedBlock = 'Price [--SEG:n2--]iPhone 15 Pro Max[--SEG:n3--] decreased.';
+      const mockTranslatedBlock = 'Price @@SEG_n2@@iPhone 15 Pro Max@@SEG_n3@@ decreased.';
       const parsed = BlockGroupReconstructor.splitTranslatedBlock(mockTranslatedBlock, units);
       
       expect(parsed[0].text.trim()).toBe('Price');
@@ -153,9 +153,9 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(units[1].inlineParentTags).toEqual(['i', 'b']); // captures deep nesting stack
 
       const assembled = BlockGroupReconstructor.injectMarkers(units);
-      expect(assembled).toBe('سلام[--SEG:n2--]world[--SEG:n3--]خوبه؟');
+      expect(assembled).toBe('سلام@@SEG_n2@@world@@SEG_n3@@خوبه؟');
 
-      const mockTranslatedBlock = 'Hello [--SEG:n2--]world[--SEG:n3--] is good?';
+      const mockTranslatedBlock = 'Hello @@SEG_n2@@world@@SEG_n3@@ is good?';
       const parsed = BlockGroupReconstructor.splitTranslatedBlock(mockTranslatedBlock, units);
       
       expect(parsed[0].text.trim()).toBe('Hello');
@@ -179,9 +179,9 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(units[3].inlineParentTags).toEqual([]);
 
       const assembled = BlockGroupReconstructor.injectMarkers(units);
-      expect(assembled).toBe('Hello[--SEG:n2--]beautiful[--SEG:n3--]world[--SEG:n4--]!');
+      expect(assembled).toBe('Hello@@SEG_n2@@beautiful@@SEG_n3@@world@@SEG_n4@@!');
 
-      const mockTranslated = 'سلام[--SEG:n2--]زیبا[--SEG:n3--]جهان[--SEG:n4--]!';
+      const mockTranslated = 'سلام@@SEG_n2@@زیبا@@SEG_n3@@جهان@@SEG_n4@@!';
       const parsed = BlockGroupReconstructor.splitTranslatedBlock(mockTranslated, units);
       expect(parsed[0].text.trim()).toBe('سلام');
       expect(parsed[1].text.trim()).toBe('زیبا');
@@ -210,7 +210,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(units[2].trailingWS).toBe('');
 
       // Mutate via apply
-      const translation = 'Hello[--SEG:n2--]world[--SEG:n3--]is good?';
+      const translation = 'Hello@@SEG_n2@@world@@SEG_n3@@is good?';
       BlockGroupReconstructor.apply(units, translation, 'fa', container);
 
       // Verify the text nodes contain exactly the reconstructed whitespace layout with bidi marks
@@ -240,22 +240,22 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       const context = { blockMap: new WeakMap(), blockCounter: { value: 0 }, activeSessionId: 'test-session' };
       const units = collectBlockGroups(container, context);
 
-      // 1. Spaced uppercase marker: "A [ --SEG:n2-- ] B [ --SEG:n3-- ] C"
-      const spacedUpper = 'A [ --SEG:n2-- ] B [ --SEG:n3-- ] C';
+      // 1. Spaced uppercase marker: "A @@  SEG_n2  @@ B @@  SEG_n3  @@ C"
+      const spacedUpper = 'A @@  SEG_n2  @@ B @@  SEG_n3  @@ C';
       const parsed1 = BlockGroupReconstructor.splitTranslatedBlock(spacedUpper, units);
       expect(parsed1[0].text.trim()).toBe('A');
       expect(parsed1[1].text.trim()).toBe('B');
       expect(parsed1[2].text.trim()).toBe('C');
 
-      // 2. Lowercase marker: "A [--seg:n2--] B [--seg:n3--] C"
-      const lowercase = 'A [--seg:n2--] B [--seg:n3--] C';
+      // 2. Lowercase marker: "A @@seg_n2@@ B @@seg_n3@@ C"
+      const lowercase = 'A @@seg_n2@@ B @@seg_n3@@ C';
       const parsed2 = BlockGroupReconstructor.splitTranslatedBlock(lowercase, units);
       expect(parsed2[0].text.trim()).toBe('A');
       expect(parsed2[1].text.trim()).toBe('B');
       expect(parsed2[2].text.trim()).toBe('C');
 
-      // 3. Spaced colon cased marker: "A [  --sEg  :   n2  --  ] B [  --SeG : n3 -- ] C"
-      const mixedFuzz = 'A [  --sEg  :   n2  --  ] B [  --SeG : n3 -- ] C';
+      // 3. Mixed case and spaces: "A @@ sEg _ n2 @@ B @@ SeG _ n3 @@ C"
+      const mixedFuzz = 'A @@ sEg _ n2 @@ B @@ SeG _ n3 @@ C';
       const parsed3 = BlockGroupReconstructor.splitTranslatedBlock(mixedFuzz, units);
       expect(parsed3[0].text.trim()).toBe('A');
       expect(parsed3[1].text.trim()).toBe('B');
@@ -322,7 +322,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(s1.textContent).toBe('Part A');
       expect(s2.textContent).toBe('Part B');
 
-      // Simulate a corrupted translation returned by LLM (missing the segment marker [--SEG:n2--])
+      // Simulate a corrupted translation returned by LLM (missing the segment marker @@SEG_n2@@)
       const corruptedResponse = 'Translated Part A and also Translated Part B without markers';
 
       expect(() => {
@@ -358,7 +358,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       s2.remove();
 
       // Attempt to apply translation
-      const translation = 'Translated 1 [--SEG:n2--]Translated 2';
+      const translation = 'Translated 1 @@SEG_n2@@Translated 2';
 
       expect(() => {
         BlockGroupReconstructor.apply(units, translation, 'fa', container);
@@ -389,7 +389,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async (message) => {
         sentPayload = JSON.parse(message.data.text);
         const sessionId = message.data.sessionId;
-        const responseText = `سلام[--TI-SEG-${sessionId}-n2--]جهان[--TI-SEG-${sessionId}-n3--]!`;
+        const responseText = `سلام@@TI_SEG_${sessionId}_n2@@جهان@@TI_SEG_${sessionId}_n3@@!`;
         return { success: true, streaming: false, translatedText: JSON.stringify([{ t: responseText, i: 'g1' }]) };
       });
 
@@ -401,7 +401,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(sentPayload[0].i).toBe('g1'); // The block ID is g1
       
       const sessionId = adapter.currentSessionId;
-      expect(sentPayload[0].t).toBe(`Hello[--TI-SEG-${sessionId}-n2--]world[--TI-SEG-${sessionId}-n3--]!`); // Contains session-scoped markers!
+      expect(sentPayload[0].t).toBe(`Hello@@TI_SEG_${sessionId}_n2@@world@@TI_SEG_${sessionId}_n3@@!`); // Contains session-scoped markers!
 
       document.body.removeChild(container);
     });
@@ -427,10 +427,10 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
         const sessionId = message.data.sessionId;
         
         expect(payload.length).toBe(1); // Grouped into 1 block
-        expect(payload[0].t).toBe(`Hello[--TI-SEG-${sessionId}-n2--]beautiful[--TI-SEG-${sessionId}-n3--]world[--TI-SEG-${sessionId}-n4--]!`);
+        expect(payload[0].t).toBe(`Hello@@TI_SEG_${sessionId}_n2@@beautiful@@TI_SEG_${sessionId}_n3@@world@@TI_SEG_${sessionId}_n4@@!`);
 
         // Translate the block keeping markers perfectly in place
-        const translatedBlock = `درود[--TI-SEG-${sessionId}-n2--]زیبا[--TI-SEG-${sessionId}-n3--]جهان[--TI-SEG-${sessionId}-n4--]!`;
+        const translatedBlock = `درود@@TI_SEG_${sessionId}_n2@@زیبا@@TI_SEG_${sessionId}_n3@@جهان@@TI_SEG_${sessionId}_n4@@!`;
         return {
           success: true,
           streaming: false,
@@ -473,7 +473,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       const units = collectBlockGroups(container, context);
 
       const sessionId = 's12345';
-      const reorderedBlock = `جهان[--TI-SEG-${sessionId}-n3--]دنیا[--TI-SEG-${sessionId}-n2--]سلام!`; // LLM swapped segment order!
+      const reorderedBlock = `جهان@@TI_SEG_${sessionId}_n3@@دنیا@@TI_SEG_${sessionId}_n2@@سلام!`; // LLM swapped segment order!
 
       expect(() => {
         BlockGroupReconstructor.apply(units, reorderedBlock, 'fa', container, sessionId);
@@ -502,7 +502,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       const foreignSession = 'foreignSession999';
 
       // Reconstructed translation with a FOREIGN session ID in the marker
-      const foreignTranslatedBlock = `درود[--TI-SEG-${foreignSession}-n2--]جهان!`;
+      const foreignTranslatedBlock = `درود@@TI_SEG_${foreignSession}-n2@@جهان!`;
 
       // Applying with activeSession should reject it, because it is strictly scoped to activeSession123!
       expect(() => {

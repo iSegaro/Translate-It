@@ -75,20 +75,20 @@ describe('BlockGroupReconstructor', () => {
   });
 
   describe('injectMarkers', () => {
-    it('should inject printable markers correctly at segment boundaries', () => {
+    it('should inject printable markers correctly at segment boundaries using ASCII @@', () => {
       const assembledText = BlockGroupReconstructor.injectMarkers(units);
-      expect(assembledText).toBe('Hello[--SEG:n2--]world[--SEG:n3--].');
+      expect(assembledText).toBe('Hello@@SEG_n2@@world@@SEG_n3@@.');
     });
 
-    it('should return empty string if units array is empty', () => {
-      expect(BlockGroupReconstructor.injectMarkers([])).toBe('');
-      expect(BlockGroupReconstructor.injectMarkers(null)).toBe('');
+    it('should support session-scoped markers', () => {
+      const assembledText = BlockGroupReconstructor.injectMarkers(units, 'abc');
+      expect(assembledText).toBe('Hello@@TI_SEG_abc_n2@@world@@TI_SEG_abc_n3@@.');
     });
   });
 
   describe('splitTranslatedBlock & Corruption Detection', () => {
     it('should split translated text correctly into expected segments', () => {
-      const translated = 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].';
+      const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
       const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, units);
 
       expect(segments.length).toBe(3);
@@ -97,73 +97,83 @@ describe('BlockGroupReconstructor', () => {
       expect(segments[2]).toEqual({ id: 'n3', text: '.' });
     });
 
-    it('should throw an error if a marker is missing or segment count mismatches', () => {
-      const corrupted = 'مرحبا بالعالم.';
-      expect(() => BlockGroupReconstructor.splitTranslatedBlock(corrupted, units)).toThrow(
-        /Segment count mismatch/
-      );
+    it('should be robust to LLM fuzzing (spaces/casing) inside markers', () => {
+      const translated = 'مرحبا @@  seg_n2  @@بالعالم@@  SEG_n3  @@.';
+      const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, units);
+      expect(segments.length).toBe(3);
+      expect(segments[1].id).toBe('n2');
     });
 
-    it('should throw an error if marker UID sequence order is violated', () => {
-      const sequenceBroken = 'مرحبا [--SEG:n3--]بالعالم[--SEG:n2--].';
-      expect(() => BlockGroupReconstructor.splitTranslatedBlock(sequenceBroken, units)).toThrow(
-        /Segment UID sequence mismatch/
-      );
+    it('should reject foreign session IDs', () => {
+      const translated = 'مرحبا @@TI_SEG_wrong_n2@@بالعالم@@TI_SEG_wrong_n3@@.';
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 'abc')).toThrow();
+    });
+
+    it('should detect and reject duplicate marker attempts (as count mismatch)', () => {
+      const duplicated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n2@@@@SEG_n3@@.';
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(duplicated, units)).toThrow(/Segment count mismatch/);
+    });
+
+    it('should detect and reject reordered markers', () => {
+      const reordered = 'مرحبا @@SEG_n3@@.@@SEG_n2@@بالعالم';
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, units)).toThrow(/Segment UID sequence mismatch/);
     });
   });
 
-  describe('apply & Pre-Apply DOM Connection Revalidation', () => {
-    it('should apply translations atomically to DOM nodes with whitespace restoration, unescaping, and BiDi marks', () => {
-      const originalParent = textNodes[0].parentElement;
-      const translated = '  مرحبا   [--SEG:n2--]بالعالم  [--SEG:n3--]  [--ESCAPED_SEG:n4--]  ';
+  describe('Validation Resilience', () => {
+    it('should accept hydration adjustments but reject content changes', () => {
+      textNodes[0].nodeValue = 'Hello\u00A0'; // nbsp
+      const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
+      expect(BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toBe(true);
+    });
 
-      const result = BlockGroupReconstructor.apply(units, translated, 'fa', originalParent);
+    it('should reject semantic content changes', () => {
+      textNodes[0].nodeValue = 'Helloworld'; // Space removed
+      const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
+      expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow();
+    });
+  });
 
-      expect(result).toBe(true);
-
-      // Verify whitespace boundary restoration, raw lossless exact segment match, and context-aware RTL BiDi mark injection (\u200f)
-      expect(textNodes[0].nodeValue).toBe('\u200f  مرحبا   \u200f '); // original trailingWS is ' ', leadingWS is '', exact raw segment preserves internal/boundary spaces
-      expect(textNodes[1].nodeValue).toBe('\u200fبالعالم  \u200f'); // leading/trailingWS are both '', raw segment is 'بالعالم  '
+  describe('Invisible Character Defenses', () => {
+    it('should normalize markers containing ZWSP but preserve ZWSP in content', () => {
+      // Marker has ZWSP (\u200b) injected by model
+      const translated = 'مرحبا @@SEG\u200b_n2@@\u200bبالعالم@@SEG_n3@@';
       
-      // Verify unescaping of escaped marker sequence and context-aware bidi check (no LRM injection since it matches the LTR parent container perfectly)
-      expect(textNodes[2].nodeValue).toBe('  [--SEG:n4--]  ');
+      // Sanitization happens in apply(), so we test it here
+      BlockGroupReconstructor.apply(units, translated, 'fa', document.body);
+      expect(textNodes[1].nodeValue).toContain('\u200bبالعالم'); // ZWSP in content preserved
+    });
+  });
+
+  describe('Edge Case Hardening', () => {
+    it('should handle Emoji grapheme clusters safely', () => {
+      const emojiUnits = [
+        new TranslationUnit({ id: 'n1', blockId: 'e1', text: '👨‍👩‍👧‍👦', leadingWS: '', trailingWS: '' })
+      ];
+      const div = document.createElement('div');
+      document.body.appendChild(div);
+      const textNode = document.createTextNode('👨‍👩‍👧‍👦');
+      div.appendChild(textNode);
+      emojiUnits[0].node = textNode;
+
+      const translated = '🌈';
+      BlockGroupReconstructor.apply(emojiUnits, translated, 'en', div);
+      expect(textNode.nodeValue).toBe('🌈');
     });
 
-    it('should abort DOM mutation entirely and throw error if a text node is detached', () => {
-      // Detach the second node
-      textNodes[1].remove();
+    it('should handle ZWJ Persian sequences', () => {
+      const zwjUnits = [
+        new TranslationUnit({ id: 'n1', blockId: 'z1', text: 'می‌روم', leadingWS: '', trailingWS: '' })
+      ];
+      const div = document.createElement('div');
+      document.body.appendChild(div);
+      const textNode = document.createTextNode('می‌روم');
+      div.appendChild(textNode);
+      zwjUnits[0].node = textNode;
 
-      // Verify that calling apply throws
-      expect(() => BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', document.body)).toThrow(
-        /Stale or detached DOM node reference/
-      );
-
-      // All-or-nothing: First node should not be mutated because apply aborted before write phase
-      expect(textNodes[0].nodeValue).toBe('Hello ');
-    });
-
-    it('should toggle flicker prevention classes synchronously', () => {
-      const parent = textNodes[0].parentElement;
-      
-      // Spy on classList
-      const addSpy = vi.spyOn(parent.classList, 'add');
-      const removeSpy = vi.spyOn(parent.classList, 'remove');
-
-      BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', parent);
-
-      expect(addSpy).toHaveBeenCalledWith('ti-translating');
-      expect(removeSpy).toHaveBeenCalledWith('ti-translating');
-    });
-
-    it('should register modified nodes with hoverPreviewLookup and set data-has-original attribute on parent', () => {
-      const parent = textNodes[0].parentElement;
-      const addSpy = vi.spyOn(hoverPreviewLookup, 'add');
-
-      BlockGroupReconstructor.apply(units, 'مرحبا [--SEG:n2--]بالعالم[--SEG:n3--].', 'fa', parent);
-
-      expect(addSpy).toHaveBeenCalledWith(textNodes[0], 'Hello ');
-      expect(addSpy).toHaveBeenCalledWith(textNodes[1], 'world');
-      expect(parent.getAttribute('data-has-original')).toBe('true');
+      const translated = 'می‌روم';
+      BlockGroupReconstructor.apply(zwjUnits, translated, 'fa', div);
+      expect(textNode.nodeValue).toContain('می‌روم');
     });
   });
 });

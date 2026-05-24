@@ -500,7 +500,7 @@ describe('DomTranslatorAdapter', () => {
       const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
       detectDirectionFromContent.mockReturnValue('ltr');
 
-      const spy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({ direction: 'rtl' });
+      testElement.setAttribute('dir', 'rtl');
 
       const textNode = testElement.firstChild;
       adapter._applyTranslationToNode(textNode, 'Hello', 'en', testElement);
@@ -508,7 +508,7 @@ describe('DomTranslatorAdapter', () => {
       // LRM mark (\u200e) should be present
       expect(textNode.nodeValue).toContain('\u200eHello\u200e');
 
-      spy.mockRestore();
+      testElement.removeAttribute('dir');
       detectDirectionFromContent.mockReturnValue('rtl');
     });
 
@@ -615,7 +615,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -758,7 +758,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -828,7 +828,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);

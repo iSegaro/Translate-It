@@ -507,20 +507,18 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const hasAlphaNumeric = /[\p{L}\p{N}]/u.test(translation);
     if (!hasAlphaNumeric) return false;
     
-    // Check if the text itself contains mixed direction scripts (both RTL and LTR characters present)
-    const hasRtl = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(translation);
-    const hasLtr = /[a-zA-Z]/.test(translation);
-    const isTextMixed = hasRtl && hasLtr;
-    if (isTextMixed) return true;
-    
-    // Check if the detected direction of the translated segment differs from container computed direction
+    // Check if the detected direction of the translated segment differs from container explicit direction
     const detectedDir = DirectionManager.detectDirectionFromContent(translation);
     let parentDir = 'ltr';
     try {
-      parentDir = window.getComputedStyle(node.parentElement).direction || 'ltr';
-    } catch (e) {
-      // Fallback if window or getComputedStyle is not defined in mock environment
-    }
+      // Avoid getComputedStyle layout flush by reading attributes directly
+      const dirNode = node.parentElement.closest('[dir]');
+      if (dirNode) {
+        parentDir = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
+      } else {
+        parentDir = document.documentElement.dir || 'ltr';
+      }
+    } catch (e) {}
     
     return detectedDir !== parentDir;
   }
