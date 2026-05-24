@@ -177,7 +177,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
         textNodesData = translationUnits.map(unit => ({
           node: unit.node,
-          text: unit.text,
+          text: unit.node.textContent, // Use literal nodeValue/textContent for absolute fidelity on revert
           uid: unit.id,
           blockId: unit.blockId,
           role: unit.inlineParentTags[0] || 'span'
@@ -259,8 +259,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
         element, 
         elementId, 
         originalHTML, 
-        originalTextNodesData: textNodesData.map(d => ({ node: d.node, originalText: d.text })), 
+        originalTextNodesData: textNodesData.map(d => ({ 
+          node: d.node, 
+          originalText: d.text,
+          blockId: d.blockId
+        })), 
         targetLanguage,
+        sessionId: this.currentSessionId,
         partial: true
       });
 

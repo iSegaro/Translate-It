@@ -80,14 +80,20 @@ vi.mock('./DomTranslatorUtils.js', () => ({
   extractContextMetadata: vi.fn(() => ({ contextSummary: 'test context' }))
 }));
 
-vi.mock('./DomTranslatorState.js', () => ({
-  globalSelectElementState: {
-    translationHistory: [],
-    currentTranslation: null
-  },
-  revertSelectElementTranslation: vi.fn(),
-  getSelectElementTranslationState: vi.fn()
-}));
+vi.mock('./DomTranslatorState.js', async () => {
+  const actual = await vi.importActual('./DomTranslatorState.js');
+  return {
+    ...actual,
+    revertSelectElementTranslation: vi.fn(actual.revertSelectElementTranslation),
+    getSelectElementTranslationState: vi.fn(actual.getSelectElementTranslationState)
+  };
+});
+
+import { 
+  globalSelectElementState, 
+  revertSelectElementTranslation, 
+  getSelectElementTranslationState 
+} from './DomTranslatorState.js';
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({
   hoverPreviewLookup: {
@@ -120,9 +126,9 @@ describe('DomTranslatorAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    globalSelectElementState.translationHistory = [];
     adapter = new DomTranslatorAdapter();
-    testElement = document.createElement('div');
-    testElement.textContent = 'Hello';
+    testElement = document.createElement('div');    testElement.textContent = 'Hello';
     document.body.appendChild(testElement);
   });
 
@@ -182,6 +188,53 @@ describe('DomTranslatorAdapter', () => {
       expect(collectBlockGroups).not.toHaveBeenCalled();
       // Should use traditional node extraction (V2)
       expect(collectTextNodes).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve literal whitespace on revert when using Block Grouping', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const textNode = document.createTextNode('Welcome to '); // Trailing space
+      div.appendChild(textNode);
+      document.body.appendChild(div);
+
+      collectBlockGroups.mockReturnValueOnce([{
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Welcome to',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['div'],
+        mode: 'standard',
+        node: textNode
+      }]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'خوش آمدید', i: 'n1' }])
+      });
+
+      // Translate
+      await adapter.translateElement(div);
+      
+      // Verify translation applied (contains the translated text and the trailing space)
+      expect(textNode.nodeValue).toContain('خوش آمدید');
+      expect(textNode.nodeValue.endsWith(' ')).toBe(true);
+
+      // Revert
+      await revertSelectElementTranslation();
+
+      // Verify original literal text restored (including trailing space)
+      expect(textNode.nodeValue).toBe('Welcome to ');
+      
+      document.body.removeChild(div);
     });
 
     it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {
