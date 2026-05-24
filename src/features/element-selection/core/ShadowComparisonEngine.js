@@ -158,6 +158,9 @@ export class ShadowComparisonEngine {
         name === 'data-dir-original-saved' ||
         name === 'data-has-original' ||
         name.startsWith('data-original-') ||
+        // Ignore internal markers from Whole Page Translation
+        name === 'data-page-translated' ||
+        name === 'data-translate-ignore' ||
         // Ignore volatile attributes that might be modified by external side-effect observers (e.g. Page Translation)
         ['title', 'alt', 'placeholder'].includes(name)
       ) {
