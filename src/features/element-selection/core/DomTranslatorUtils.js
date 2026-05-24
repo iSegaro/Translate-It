@@ -9,8 +9,20 @@ import { SELECT_ELEMENT_BLOCK_TAGS } from '@/utils/dom/DomTranslatorConstants.js
 import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
+import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
+
+/**
+ * Shared configuration for elements that should be excluded from translation
+ */
+const EXCLUDED_TAGS = [
+  'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 
+  'HEAD', 'META', 'LINK', 'SVG', 'KBD', 'SAMP', 'TIME',
+  'RUBY', 'RT', 'RP', 'PRE', 'CODE'
+];
+
+const EXCLUDED_ROLES = ['textbox', 'searchbox', 'combobox', 'code'];
 
 /**
  * Finds the closest block-level parent for a node based on context boundaries
@@ -157,52 +169,154 @@ export function extractContextMetadata(element) {
 }
 
 /**
+ * Checks if a single element should be excluded based on its tags, classes, or attributes.
+ * Does NOT check ancestors.
+ * 
+ * @param {Element} el - The element to check
+ * @param {boolean} isRoot - Whether this is the root element being translated
+ * @returns {boolean}
+ */
+function isExcludedElement(el, isRoot = false) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  
+  const tagName = el.tagName.toUpperCase();
+  
+  // 1. Technical/Interactive tags
+  if (EXCLUDED_TAGS.includes(tagName)) {
+    logger.debug(`[isExcludedElement] Rejected by tag: ${tagName}`, el);
+    return true;
+  }
+  
+  // 2. Explicit exclusions (class/attribute)
+  if (el.classList?.contains(TRANSLATION_HTML.NO_TRANSLATE_CLASS) || 
+      el.classList?.contains(TRANSLATION_HTML.IGNORE_CLASS) ||
+      el.getAttribute?.('translate') === TRANSLATION_HTML.NO_TRANSLATE_VALUE ||
+      el.hasAttribute?.('data-translate-ignore')) {
+    logger.debug(`[isExcludedElement] Rejected by exclusion marker (class or attr)`, el);
+    return true;
+  }
+
+  // 3. GitHub and other common code editor line detection
+  if (el.classList?.contains('react-code-text') || 
+      el.classList?.contains('react-file-line') ||
+      el.classList?.contains('blob-code')) {
+    if (!isRoot) {
+      logger.debug(`[isExcludedElement] Rejected by code-related class`, el);
+      return true;
+    }
+  }
+
+  // 4. User-editable content (Attribute check is more robust in some environments)
+  const contentEditable = el.getAttribute?.('contenteditable');
+  if (el.isContentEditable || (contentEditable !== null && contentEditable !== 'false')) {
+    logger.debug(`[isExcludedElement] Rejected by contenteditable`, el);
+    return true;
+  }
+
+  // 5. Custom interactive or code roles
+  const role = el.getAttribute?.('role')?.toLowerCase();
+  if (role && EXCLUDED_ROLES.includes(role)) {
+    logger.debug(`[isExcludedElement] Rejected by role: ${role}`, el);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Recursively checks if a node or any of its ancestors should be excluded from translation.
+ * 
+ * @param {Node} node - The DOM node to check
+ * @param {boolean} isRoot - Whether this is the root element
+ * @returns {boolean} True if the node should be excluded
+ */
+export function isExcludedAncestor(node, isRoot = false) {
+  if (!node) return false;
+  
+  // Start from the node itself if it's an element, or its parent if it's text
+  let curr = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+  let currentIsRoot = isRoot;
+
+  while (curr) {
+    if (isExcludedElement(curr, currentIsRoot)) return true;
+
+    // Cross Shadow DOM boundary
+    if (curr.host) {
+      curr = curr.host;
+    } else {
+      curr = curr.parentNode;
+    }
+    currentIsRoot = false; // Ancestors are never the root
+  }
+  return false;
+}
+
+/**
  * Collect all visible text nodes with unique structural IDs for accurate batch mapping
  * @param {HTMLElement} element - Root element to crawl
  * @returns {Object[]} Array of objects { node, text, uid, blockId, role }
  */
 export function collectTextNodes(element) {
+  // 1. Entry check: If the starting element is already excluded, return empty
+  if (isExcludedAncestor(element, true)) {
+    return [];
+  }
+
   const textNodesData = [];
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-
-      // Skip elements that shouldn't be translated (scripts, styles, invisible, form inputs)
-      const tagName = parent.tagName;
-      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'BUTTON'].includes(tagName)) {
-        return NodeFilter.FILTER_REJECT;
-      }
-
+  
+  // 2. High-performance filter that rejects entire branches
+  const filter = (node) => {
+    // Branch Filtering (Elements)
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
+      if (isExcludedElement(node)) return NodeFilter.FILTER_REJECT;
+      
+      // Visibility check
       try {
-        const style = window.getComputedStyle(parent);
+        const style = window.getComputedStyle(node);
         if (style.display === 'none' || style.visibility === 'hidden') {
           return NodeFilter.FILTER_REJECT;
         }
       } catch {
-        // Fallback to acceptance if style checking fails
+        // Skip current element but visit children if style check fails
       }
 
-      // Filter out empty or whitespace-only nodes early
-      const trimmed = node.textContent.trim();
-      if (!trimmed) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_SKIP;
+    }
 
-      // Filter out technical patterns (Email, URL, etc.)
-      if (DOM_FILTERS.isTechnicalPattern(trimmed)) {
+    // Leaf Filtering (Text Nodes)
+    if (node.nodeType === Node.TEXT_NODE) {
+      const trimmed = node.textContent.trim();
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      
+      // Skip pure numbers, symbols, or whitespace (Line numbers, etc.)
+      if (DOM_FILTERS.NUMERIC_REGEX.test(trimmed) || /^[\d\s\p{P}\p{S}]+$/u.test(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
 
       return NodeFilter.FILTER_ACCEPT;
     }
-  });
+
+    return NodeFilter.FILTER_SKIP;
+  };
+
+  // Necessary for cross-browser compatibility with TreeWalker
+  filter.acceptNode = filter;
+
+  // Use SHOW_ELEMENT | SHOW_TEXT to allow branch rejection
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filter);
 
   let node;
   let nodeCounter = 0;
   while ((node = walker.nextNode())) {
+    // Skip element nodes in the loop, we only process accepted text nodes
+    if (node.nodeType === Node.ELEMENT_NODE) continue;
+
     const blockParent = findClosestBlockParent(node);
     
     // Ensure blockId persists for mapping back to the DOM
-    // Use a shorter random string for blockId (6 chars total including prefix)
     if (!blockParent.dataset.blockId) {
       blockParent.dataset.blockId = `b${Math.random().toString(36).substr(2, 4)}`;
     }
@@ -211,14 +325,32 @@ export function collectTextNodes(element) {
     textNodesData.push({
       node,
       text: node.textContent || '',
-      // Short UID: e.g., "n1", "n2" etc. to drastically reduce token usage
       uid: `n${nodeCounter}`,
       blockId: blockParent.dataset.blockId,
       role: blockParent.tagName.toLowerCase()
     });
   }
 
-  logger.debug(`Collected ${textNodesData.length} text nodes with structural data`);
+  logger.debug(`Collected ${textNodesData.length} text nodes with structural data.`);
+  
+  // Diagnostic Ancestor Path Logging
+  textNodesData.forEach((d, idx) => {
+    let path = [];
+    let curr = d.node.parentElement || d.node.parentNode;
+    let depth = 0;
+    while (curr && depth < 5) {
+      const tag = curr.tagName || 'ShadowRoot';
+      const cls = curr.className || '';
+      const id = curr.id || '';
+      const role = curr.getAttribute?.('role') || '';
+      const editable = curr.isContentEditable ? 'true' : 'false';
+      path.push(`${tag}[class="${cls}", id="${id}", role="${role}", editable="${editable}"]`);
+      curr = curr.parentElement || curr.parentNode?.host;
+      depth++;
+    }
+    logger.debug(`  Node #${idx + 1}: "${d.text.trim().substring(0, 40)}" | Path: ${path.join(' -> ')}`);
+  });
+
   return textNodesData;
 }
 
@@ -233,6 +365,11 @@ export function collectTextNodes(element) {
  * @returns {TranslationUnit[]} Array of enriched TranslationUnits
  */
 export function collectBlockGroups(element, sessionContext = {}) {
+  // 1. Entry check: If the starting element is already excluded, return empty
+  if (isExcludedAncestor(element, true)) {
+    return [];
+  }
+
   if (!sessionContext.blockMap) {
     sessionContext.blockMap = new WeakMap();
   }
@@ -241,42 +378,57 @@ export function collectBlockGroups(element, sessionContext = {}) {
   }
 
   const units = [];
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
 
-      // Skip elements that shouldn't be translated (scripts, styles, invisible, form inputs)
-      const tagName = parent.tagName;
-      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'BUTTON'].includes(tagName)) {
-        return NodeFilter.FILTER_REJECT;
-      }
-
+  // 2. High-performance filter that rejects entire branches
+  const filter = (node) => {
+    // Branch Filtering (Elements)
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
+      if (isExcludedElement(node)) return NodeFilter.FILTER_REJECT;
+      
+      // Visibility check
       try {
-        const style = window.getComputedStyle(parent);
+        const style = window.getComputedStyle(node);
         if (style.display === 'none' || style.visibility === 'hidden') {
           return NodeFilter.FILTER_REJECT;
         }
       } catch {
-        // Fallback to acceptance if style checking fails
+        // Skip current element but visit children if style check fails
       }
 
-      // Filter out empty or whitespace-only nodes early
-      const trimmed = node.textContent.trim();
-      if (!trimmed) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_SKIP;
+    }
 
-      // Filter out technical patterns (Email, URL, etc.)
-      if (DOM_FILTERS.isTechnicalPattern(trimmed)) {
+    // Leaf Filtering (Text Nodes)
+    if (node.nodeType === Node.TEXT_NODE) {
+      const trimmed = node.textContent.trim();
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      
+      // Skip pure numbers, symbols, or whitespace (Line numbers, etc.)
+      if (DOM_FILTERS.NUMERIC_REGEX.test(trimmed) || /^[\d\s\p{P}\p{S}]+$/u.test(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
 
       return NodeFilter.FILTER_ACCEPT;
     }
-  });
+
+    return NodeFilter.FILTER_SKIP;
+  };
+
+  // Necessary for cross-browser compatibility with TreeWalker
+  filter.acceptNode = filter;
+
+  // Use SHOW_ELEMENT | SHOW_TEXT to allow branch rejection
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filter);
 
   let node;
   let nodeCounter = 0;
   while ((node = walker.nextNode())) {
+    // Skip element nodes in the loop, we only process accepted text nodes
+    if (node.nodeType === Node.ELEMENT_NODE) continue;
+
     const blockParent = findClosestBlockParent(node);
     
     // Assign blockId using WeakMap session context (no DOM writes)
@@ -325,7 +477,26 @@ export function collectBlockGroups(element, sessionContext = {}) {
     units.push(unit);
   }
 
-  logger.debug(`[collectBlockGroups] Collected ${units.length} units cleanly in session`);
+  logger.debug(`[collectBlockGroups] Collected ${units.length} units cleanly in session.`);
+  
+  // Diagnostic Ancestor Path Logging
+  units.forEach((u, idx) => {
+    let path = [];
+    let curr = u.node?.parentElement || u.node?.parentNode;
+    let depth = 0;
+    while (curr && depth < 5) {
+      const tag = curr.tagName || 'ShadowRoot';
+      const cls = curr.className || '';
+      const id = curr.id || '';
+      const role = curr.getAttribute?.('role') || '';
+      const editable = curr.isContentEditable ? 'true' : 'false';
+      path.push(`${tag}[class="${cls}", id="${id}", role="${role}", editable="${editable}"]`);
+      curr = curr.parentElement || curr.parentNode?.host;
+      depth++;
+    }
+    logger.debug(`  Unit #${idx + 1}: "${u.text.substring(0, 40)}" | Path: ${path.join(' -> ')}`);
+  });
+
   return units;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { extractContextMetadata, collectTextNodes, generateElementId, collectBlockGroups } from './DomTranslatorUtils.js';
+import { extractContextMetadata, collectTextNodes, generateElementId, collectBlockGroups, isExcludedAncestor } from './DomTranslatorUtils.js';
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -185,7 +185,7 @@ describe('DomTranslatorUtils', () => {
       expect(nodes[0].text).toBe('Actual text');
     });
 
-    it('should reject text nodes inside interactive elements (textarea, input, select, button)', () => {
+    it('should reject text nodes inside interactive elements (textarea, input, select, button) and contenteditable elements recursively', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
@@ -194,7 +194,9 @@ describe('DomTranslatorUtils', () => {
         <select>
           <option>Should be rejected option text.</option>
         </select>
-        <button>Should be rejected button text.</button>
+        <button><span>Should be rejected nested button text.</span></button>
+        <div contenteditable="true">Should be rejected editor text.</div>
+        <div class="nested-editor"><p contenteditable="true">Should be rejected deeply nested editor text.</p></div>
       `;
       document.body.appendChild(container);
 
@@ -316,7 +318,7 @@ describe('DomTranslatorUtils', () => {
       expect(units[0].inlineParentTags).toEqual(['strong', 'span']);
     });
 
-    it('should reject text nodes inside interactive elements (textarea, input, select, button) in block grouping mode', () => {
+    it('should reject text nodes inside interactive elements (textarea, input, select, button) and contenteditable elements in block grouping mode recursively', () => {
       const container = document.createElement('div');
       container.innerHTML = `
         <p>Translatable text outside.</p>
@@ -324,7 +326,9 @@ describe('DomTranslatorUtils', () => {
         <select>
           <option>Should be rejected option text.</option>
         </select>
-        <button>Should be rejected button text.</button>
+        <button><span>Should be rejected nested button text.</span></button>
+        <div contenteditable="true">Should be rejected editor text.</div>
+        <div class="nested-editor"><p contenteditable="true">Should be rejected deeply nested editor text.</p></div>
       `;
       document.body.appendChild(container);
 
@@ -341,6 +345,53 @@ describe('DomTranslatorUtils', () => {
       } finally {
         window.getComputedStyle = originalGetComputedStyle;
       }
+    });
+  });
+
+  describe('isExcludedAncestor', () => {
+    it('should correctly identify text nodes inside normal interactive tags', () => {
+      const textarea = document.createElement('textarea');
+      textarea.textContent = 'text';
+      expect(isExcludedAncestor(textarea.firstChild)).toBe(true);
+
+      const button = document.createElement('button');
+      const span = document.createElement('span');
+      span.textContent = 'click';
+      button.appendChild(span);
+      expect(isExcludedAncestor(span.firstChild)).toBe(true);
+    });
+
+    it('should identify text nodes inside contenteditable containers', () => {
+      const div = document.createElement('div');
+      div.setAttribute('contenteditable', 'true');
+      div.textContent = 'edit';
+      expect(isExcludedAncestor(div.firstChild)).toBe(true);
+      
+      const divEmpty = document.createElement('div');
+      divEmpty.setAttribute('contenteditable', ''); // standard implicit true
+      divEmpty.textContent = 'edit';
+      expect(isExcludedAncestor(divEmpty.firstChild)).toBe(true);
+    });
+
+    it('should identify custom interactive roles like role="textbox"', () => {
+      const div = document.createElement('div');
+      div.setAttribute('role', 'textbox');
+      div.textContent = 'custom';
+      expect(isExcludedAncestor(div.firstChild)).toBe(true);
+    });
+
+    it('should correctly cross shadow DOM boundary to find ancestor hosts', () => {
+      const container = document.createElement('div');
+      const host = document.createElement('div');
+      container.appendChild(host);
+      
+      const shadow = host.attachShadow({ mode: 'open' });
+      const textarea = document.createElement('textarea');
+      textarea.textContent = 'shadow text';
+      shadow.appendChild(textarea);
+      
+      const textNode = textarea.firstChild;
+      expect(isExcludedAncestor(textNode)).toBe(true);
     });
   });
 });
