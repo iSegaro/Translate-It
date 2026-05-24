@@ -187,7 +187,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
         textNodesData = collectTextNodes(element);
       }
 
-      if (textNodesData.length === 0) throw new Error('No translatable text found');
+      if (textNodesData.length === 0) {
+        const error = new Error('No translatable text found');
+        error.type = ErrorTypes.VALIDATION;
+        throw error;
+      }
 
       // Validate segment count to prevent timeout issues
       const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts

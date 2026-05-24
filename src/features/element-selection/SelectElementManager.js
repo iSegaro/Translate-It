@@ -9,6 +9,7 @@ import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
@@ -518,9 +519,12 @@ class SelectElementManager extends ResourceTracker {
       }
     } catch (error) {
       const isCancellation = isCancellationError(error);
+      const isValidation = error.type === ErrorTypes.VALIDATION || error.message?.includes('No translatable text found');
 
       if (isCancellation) {
         this.logger.debug('Select Element translation cancelled:', error.message);
+      } else if (isValidation) {
+        this.logger.debug('Select Element translation skipped:', error.message);
       } else {
         this.logger.warn('Select Element translation failed:', error);
         // Delegate to centralized error handler to show notification
@@ -531,10 +535,10 @@ class SelectElementManager extends ResourceTracker {
         ExtensionContextManager.handleContextError(error, 'element-selection');
       }
 
-      if (isFatalError(error) && !isCancellation) {
+      if (isFatalError(error) && !isCancellation && !isValidation) {
         this.deactivate({ preserveTranslations: true, reason: 'error' });
       } else {
-        this.performPostTranslationCleanup({ reason: isCancellation ? 'cancel' : 'error' });
+        this.performPostTranslationCleanup({ reason: isCancellation || isValidation ? 'cancel' : 'error' });
       }
     } finally {
       // Clear flag after translation is complete (success or error)
