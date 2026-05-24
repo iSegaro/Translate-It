@@ -45,8 +45,8 @@ export class BlockGroupReconstructor {
       throw new Error('Translated text is empty or invalid');
     }
 
-    // Split text using the printable marker regex (captures UIDs in alternating indices)
-    const parts = translatedText.split(/\[--SEG:(n\d+)--\]/);
+    // Split text using the printable marker regex (tolerant to casing and whitespace anomalies)
+    const parts = translatedText.split(/\[\s*--[sS][eE][gG]\s*:\s*(n\d+)\s*--\s*\]/);
     
     const segments = [];
     // The first segment has no leading marker, maps to first expected unit
