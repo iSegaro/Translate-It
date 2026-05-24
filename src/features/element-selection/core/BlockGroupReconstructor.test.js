@@ -84,6 +84,20 @@ describe('BlockGroupReconstructor', () => {
       const assembledText = BlockGroupReconstructor.injectMarkers(units, 'abc');
       expect(assembledText).toBe('Hello@@TI_SEG_abc_n2@@world@@TI_SEG_abc_n3@@.');
     });
+
+    it('should support entropy-scoped escaping and canonical marker format', () => {
+      const entropy = 'xyz';
+      const session = 's123';
+      const assembledText = BlockGroupReconstructor.injectMarkers(units, session, entropy);
+      // Canonical: @@TI_SEG_<entropy>_<sessionId>_<segmentId>@@
+      expect(assembledText).toBe('Hello@@TI_SEG_xyz_s123_n2@@world@@TI_SEG_xyz_s123_n3@@.');
+    });
+
+    it('should escape literal @@ sequences in content', () => {
+      units[0].text = 'a@@b';
+      const assembledText = BlockGroupReconstructor.injectMarkers(units, 's1', 'e1');
+      expect(assembledText).toContain('a@@TI_ESC_e1@@b');
+    });
   });
 
   describe('splitTranslatedBlock & Corruption Detection', () => {
@@ -104,9 +118,19 @@ describe('BlockGroupReconstructor', () => {
       expect(segments[1].id).toBe('n2');
     });
 
+    it('should require exact entropy and session ID matching', () => {
+      const translated = 'مرحبا @@TI_SEG_xyz_s123_n2@@بالعالم@@TI_SEG_xyz_s123_n3@@.';
+      const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, units, 's123', 'xyz');
+      expect(segments[1].id).toBe('n2');
+
+      // Mismatched entropy should be treated as literal text
+      const mismatched = 'مرحبا @@TI_SEG_WRONG_s123_n2@@بالعالم@@TI_SEG_xyz_s123_n3@@.';
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(mismatched, units, 's123', 'xyz')).toThrow(/Segment count mismatch/);
+    });
+
     it('should reject foreign session IDs', () => {
-      const translated = 'مرحبا @@TI_SEG_wrong_n2@@بالعالم@@TI_SEG_wrong_n3@@.';
-      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 'abc')).toThrow();
+      const translated = 'مرحبا @@TI_SEG_abc_n2@@بالعالم@@TI_SEG_abc_n3@@.';
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, units, 'def')).toThrow();
     });
 
     it('should detect and reject duplicate marker attempts (as count mismatch)', () => {
@@ -116,21 +140,102 @@ describe('BlockGroupReconstructor', () => {
 
     it('should detect and reject reordered markers', () => {
       const reordered = 'مرحبا @@SEG_n3@@.@@SEG_n2@@بالعالم';
-      expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, units)).toThrow(/Segment UID sequence mismatch/);
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, units)).toThrow(/Structural validation failure \(monotonicity\)/);
     });
   });
 
-  describe('Validation Resilience', () => {
+  describe('Validation Resilience & Unescaping', () => {
     it('should accept hydration adjustments but reject content changes', () => {
       textNodes[0].nodeValue = 'Hello\u00A0'; // nbsp
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
       expect(BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toBe(true);
     });
 
+    it('should correctly unescape entropy-scoped escaping in apply()', () => {
+      const entropy = 'e1';
+      const session = 's1';
+      // Injected: a@@b -> a@@TI_ESC_e1@@b
+      const translated = 'A @@TI_ESC_e1@@ B @@TI_SEG_e1_s1_n2@@ C';
+      
+      const u1 = new TranslationUnit({ id: 'n1', blockId: 'g1', text: 'a@@b' });
+      const u2 = new TranslationUnit({ id: 'n2', blockId: 'g1', text: 'c' });
+      
+      const d1 = document.createElement('span');
+      d1.textContent = 'a@@b';
+      const d2 = document.createElement('span');
+      d2.textContent = 'c';
+      document.body.appendChild(d1);
+      document.body.appendChild(d2);
+      
+      u1.node = d1.firstChild;
+      u2.node = d2.firstChild;
+      
+      BlockGroupReconstructor.apply([u1, u2], translated, 'en', document.body, session, entropy);
+      expect(u1.node.nodeValue.trim()).toBe('A @@ B');
+    });
+
     it('should reject semantic content changes', () => {
       textNodes[0].nodeValue = 'Helloworld'; // Space removed
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';
       expect(() => BlockGroupReconstructor.apply(units, translated, 'fa', document.body)).toThrow();
+    });
+  });
+
+  describe('Hardened Protocol & Adversarial Tests', () => {
+    it('should handle fuzzy metadata mutations but strict ID matching', () => {
+      const entropy = 'ax9';
+      const session = 's1';
+      // Mutations: spaces, lowercase 'ti_seg', zero-width noise (added in apply but split expects sanitized)
+      const translated = 'A @@  ti_seg  _  ax9  _  s1  _  n2  @@ B';
+      const u = [
+        new TranslationUnit({ id: 'n1', blockId: 'g1', text: 'a' }),
+        new TranslationUnit({ id: 'n2', blockId: 'g1', text: 'b' })
+      ];
+      u[0].node = textNodes[0];
+      u[1].node = textNodes[1];
+
+      const segments = BlockGroupReconstructor.splitTranslatedBlock(translated, u, session, entropy);
+      expect(segments.length).toBe(2);
+      expect(segments[1].id).toBe('n2');
+      expect(segments[1].text).toBe(' B');
+
+      // Rejecting mismatched sessionId
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(translated, u, 'WRONG', entropy)).toThrow(/Segment count mismatch/);
+    });
+
+    it('should reject duplicate IDs within a block group', () => {
+      const entropy = 'e1';
+      const session = 's1';
+      const duplicated = 'A @@TI_SEG_e1_s1_n2@@ B @@TI_SEG_e1_s1_n2@@ C';
+      const u = [
+        new TranslationUnit({ id: 'n1', blockId: 'g1', text: 'a' }),
+        new TranslationUnit({ id: 'n2', blockId: 'g1', text: 'b' })
+      ];
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(duplicated, u, session, entropy)).toThrow(/Segment count mismatch/);
+    });
+
+    it('should reject missing segments (Structural Validation)', () => {
+      const entropy = 'e1';
+      const session = 's1';
+      const missing = 'A @@TI_SEG_e1_s1_n3@@ C'; // n2 is missing
+      const u = [
+        new TranslationUnit({ id: 'n1', blockId: 'g1', text: 'a' }),
+        new TranslationUnit({ id: 'n2', blockId: 'g1', text: 'b' }),
+        new TranslationUnit({ id: 'n3', blockId: 'g1', text: 'c' })
+      ];
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(missing, u, session, entropy)).toThrow(/Segment count mismatch/);
+    });
+
+    it('should reject reordered segments (Monotonicity)', () => {
+      const entropy = 'e1';
+      const session = 's1';
+      const reordered = 'A @@TI_SEG_e1_s1_n3@@ C @@TI_SEG_e1_s1_n2@@ B';
+      const u = [
+        new TranslationUnit({ id: 'n1', blockId: 'g1', text: 'a' }),
+        new TranslationUnit({ id: 'n2', blockId: 'g1', text: 'b' }),
+        new TranslationUnit({ id: 'n3', blockId: 'g1', text: 'c' })
+      ];
+      expect(() => BlockGroupReconstructor.splitTranslatedBlock(reordered, u, session, entropy)).toThrow(/Structural validation failure \(monotonicity\)/);
     });
   });
 

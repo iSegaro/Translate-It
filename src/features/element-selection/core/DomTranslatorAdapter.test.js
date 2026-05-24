@@ -615,7 +615,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -758,7 +758,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -828,7 +828,7 @@ describe('DomTranslatorAdapter', () => {
           const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: `مرحبا @@TI_SEG_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);

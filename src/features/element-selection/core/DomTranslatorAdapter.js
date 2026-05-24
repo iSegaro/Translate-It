@@ -104,8 +104,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       this.isTranslating = true;
       
-      // Generate a fresh session ID for this specific translation request
+      // Generate a fresh session ID and entropy-scoped escaping prefix for this specific translation request
       this.currentSessionId = `s${Math.random().toString(36).substr(2, 6)}`;
+      this.currentEntropy = Math.random().toString(36).substr(2, 4);
       
       if (onProgress) await onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' });
 
@@ -215,7 +216,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               r: g.role
             };
           } else {
-            const assembled = BlockGroupReconstructor.injectMarkers(g.units, this.currentSessionId);
+            const assembled = BlockGroupReconstructor.injectMarkers(g.units, this.currentSessionId, this.currentEntropy);
             return {
               t: assembled,
               i: g.id,
@@ -314,12 +315,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
-                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId);
+                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
                           group.units.forEach(u => processedUids.add(u.id));
                           
                           // Capture split segment translations for shadow comparison
                           try {
-                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId);
+                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy);
                             parsed.forEach(seg => {
                               this.translatedSegmentMap.set(seg.id, seg.text);
                             });
@@ -626,12 +627,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
-                 BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId);
+                 BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
                  group.units.forEach(u => processedUids.add(u.id));
                  
                  // Capture split segment translations for shadow comparison
                  try {
-                   const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId);
+                   const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId, this.currentEntropy);
                    parsed.forEach(seg => {
                      this.translatedSegmentMap.set(seg.id, seg.text);
                    });

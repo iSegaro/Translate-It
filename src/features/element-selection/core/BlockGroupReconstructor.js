@@ -14,46 +14,6 @@ function escapeRegExp(string) {
 }
 
 /**
- * Direction resolution cache to prevent layout flushes during hot-path bidi checks.
- */
-const directionCache = new WeakMap();
-
-/**
- * Resolves the effective direction of a node without triggering layout thrashes if possible.
- * 
- * @param {Node} node - The DOM node
- * @returns {string} 'ltr' or 'rtl'
- */
-function resolveEffectiveDirection(node) {
-  if (!node || !node.parentElement) return 'ltr';
-  
-  const element = node.parentElement;
-  
-  // Check cache first
-  if (directionCache.has(element)) {
-    return directionCache.get(element);
-  }
-
-  let direction = 'ltr';
-  try {
-    // 1. Check for explicit [dir] attribute in ancestors (Fast, no layout flush)
-    const dirNode = element.closest('[dir]');
-    if (dirNode) {
-      direction = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
-    } else {
-      // 2. Fallback to computed style (Triggers layout flush if needed)
-      // Only called once per element due to cache.
-      direction = window.getComputedStyle(element).direction || 'ltr';
-    }
-  } catch (e) {
-    // Fallback if environment is restricted
-  }
-
-  directionCache.set(element, direction);
-  return direction;
-}
-
-/**
  * Reconstructor engine for whitespace-marker based translation block reconstruction.
  * Implements strict all-or-nothing transactional safety, pre-apply DOM revalidation,
  * printable ASCII-safe segment markers @@TI_SEG_uuid_nN@@, and flicker prevention.
@@ -64,20 +24,35 @@ export class BlockGroupReconstructor {
    *
    * @param {TranslationUnit[]} units - Array of TranslationUnits in the block group
    * @param {string} sessionId - Optional translation session ID
+   * @param {string} entropy - Optional randomized entropy-scoped escaping prefix
    * @returns {string} The assembled block text
    */
-  static injectMarkers(units, sessionId = '') {
+  static injectMarkers(units, sessionId = '', entropy = '') {
     if (!units || units.length === 0) return '';
     
-    // First node start is block start (no marker prefix)
-    let result = units[0].text;
+    // entropy-scoped escaping: @@ -> @@TI_ESC_<entropy>@@
+    const escapePattern = /@@/g;
+    const escapeReplacement = entropy ? `@@TI_ESC_${entropy}@@` : '@@TI_ESC@@';
     
-    // Use session-scoped markers with ASCII-safe delimiters @@ to prevent collisions/normalization risk
-    const markerPrefix = sessionId ? `TI_SEG_${sessionId}_` : 'SEG_';
+    const escapeText = (text) => text.replace(escapePattern, escapeReplacement);
+
+    // First node start is block start (no marker prefix)
+    let result = escapeText(units[0].text);
+    
+    // Use session-scoped markers with ASCII-safe delimiters @@
+    // Hardened Reconstruction Protocol: @@TI_SEG_<entropy>_<sessionId>_<segmentId>@@
+    let markerPrefix;
+    if (entropy && sessionId) {
+      markerPrefix = `TI_SEG_${entropy}_${sessionId}_`;
+    } else if (sessionId) {
+      markerPrefix = `TI_SEG_${sessionId}_`;
+    } else {
+      markerPrefix = 'SEG_';
+    }
     
     for (let i = 1; i < units.length; i++) {
       // @@ delimiters are ASCII-safe, model-resilient, and normalization-safe
-      result += `@@${markerPrefix}${units[i].id}@@${units[i].text}`;
+      result += `@@${markerPrefix}${units[i].id}@@${escapeText(units[i].text)}`;
     }
     
     return result;
@@ -90,22 +65,32 @@ export class BlockGroupReconstructor {
    * @param {string} translatedText - Raw translated block text from LLM
    * @param {TranslationUnit[]} expectedUnits - The expected TranslationUnits in order
    * @param {string} sessionId - Optional session ID to validate
+   * @param {string} entropy - Optional entropy-scoped escaping prefix
    * @returns {Object[]} Parsed segment objects { id, text }
    * @throws {Error} If markers are corrupted, count mismatches, or UID order is broken
    */
-  static splitTranslatedBlock(translatedText, expectedUnits, sessionId = '') {
+  static splitTranslatedBlock(translatedText, expectedUnits, sessionId = '', entropy = '') {
     if (!translatedText || typeof translatedText !== 'string') {
       throw new Error('Translated text is empty or invalid');
     }
 
-    // --- Hardened Parser Logic ---
+    // --- Hardened Deterministic Parser Logic ---
     let regex;
     if (sessionId) {
       const escapedSessionId = escapeRegExp(sessionId);
-      // capture 1: (n\d+)
-      // Plan: @@TI_SEG_<sessionId>_<segmentId>@@
-      // We allow optional whitespace around all parts for LLM robustness
-      regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
+      
+      // Strict generator / tolerant parser model:
+      // We allow optional whitespace around delimiters and keywords.
+      // We allow case-insensitivity for 'TI_SEG'.
+      // BUT we require EXACT matches for entropy and sessionId.
+      // segmentId (capture 1) remains exact and case-sensitive.
+      
+      if (entropy) {
+        const escapedEntropy = escapeRegExp(entropy);
+        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedEntropy}\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
+      } else {
+        regex = new RegExp(`@@\\s*TI\\s*_\\s*SEG\\s*_\\s*${escapedSessionId}\\s*_\\s*(n\\d+)\\s*@@`, 'giu');
+      }
     } else {
       // capture 1: (n\d+)
       // Plan: @@SEG_<segmentId>@@
@@ -115,29 +100,32 @@ export class BlockGroupReconstructor {
     const parts = translatedText.split(regex);
     const segments = [];
     
+    // The first part is always the text before the first marker (segment n1)
     segments.push({
       id: expectedUnits[0].id,
       text: parts[0] || ''
     });
 
+    // Subsequent parts come in pairs: [segmentId, textAfterMarker]
     for (let i = 1; i < parts.length; i += 2) {
       const id = parts[i];
       const text = parts[i + 1] || '';
       segments.push({ id, text });
     }
 
-    // --- Strict Corruption Detection Validation Gates ---
+    // --- Deterministic Structural Validation Gates ---
     
     // 1. Verify exact segment count matches expected. 
-    // This also effectively catches duplicated/nested markers because split() would create more parts.
+    // This catches duplicated/nested markers because split() would create more parts.
     if (segments.length !== expectedUnits.length) {
       throw new Error(`Segment count mismatch: expected ${expectedUnits.length}, received ${segments.length}`);
     }
 
-    // 2. Verify each segment UID maps perfectly in the expected sequential order
+    // 2. Verify each segment UID maps perfectly in the expected sequential order (Monotonicity)
+    // Segment IDs must remain exact and case-sensitive.
     for (let i = 0; i < expectedUnits.length; i++) {
       if (segments[i].id !== expectedUnits[i].id) {
-        throw new Error(`Segment UID sequence mismatch: expected ${expectedUnits[i].id}, received ${segments[i].id}`);
+        throw new Error(`Structural validation failure (monotonicity): expected ${expectedUnits[i].id}, received ${segments[i].id}`);
       }
     }
 
@@ -145,44 +133,33 @@ export class BlockGroupReconstructor {
   }
 
   /**
-   * Helper to check if BiDi controls should be injected for a node.
-   * Skip injection inside inputs, textareas, code/pre blocks, or contenteditable trees.
-   */
-  static shouldInjectBidi(node, translation) {
-    if (!node || !node.parentElement) return false;
-    
-    let parent = node.parentElement;
-    while (parent) {
-      const tag = parent.tagName.toUpperCase();
-      if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(tag)) return false;
-      if (parent.contentEditable === 'true' || parent.getAttribute('contenteditable') === 'true') return false;
-      parent = parent.parentElement;
-    }
-    
-    if (!translation || typeof translation !== 'string') return false;
-
-    // Skip pure punctuation, numbers or spacing nodes to avoid unnecessary pollution
-    // Use /u flag for Unicode-aware alphanumeric check
-    const hasAlphaNumeric = /[\p{L}\p{N}]/u.test(translation);
-    if (!hasAlphaNumeric) return false;
-    
-    const detectedDir = detectDirectionFromContent(translation);
-    const parentDir = resolveEffectiveDirection(node);
-    
-    return detectedDir !== parentDir;
-  }
-
-  /**
    * Applies the parsed translations atomically to the DOM.
-   * Synchronously performs connection validation check first, ensuring 100% rollback safety.
+   * Synchronously performs connection validation check first, ensuring absolute rollback safety.
    */
-  static apply(expectedUnits, translatedText, targetLanguage, rootElement, sessionId = '') {
+  static apply(expectedUnits, translatedText, targetLanguage, rootElement, sessionId = '', entropy = '') {
     if (!expectedUnits || expectedUnits.length === 0) {
       return false;
     }
  
     const blockId = expectedUnits[0].blockId;
     logger.debug(`[Reconstructor] Starting apply for block group ${blockId}`);
+
+    // --- Hardened Reconstruction Protocol: Transaction-Scoped Bidi Cache ---
+    // Instantiating a fresh cache per apply transaction ensures fresh direction lookups.
+    const transactionCache = new WeakMap();
+    const resolveDir = (node) => {
+      if (!node || !node.parentElement) return 'ltr';
+      const el = node.parentElement;
+      if (transactionCache.has(el)) return transactionCache.get(el);
+      let direction = 'ltr';
+      try {
+        const dirNode = el.closest('[dir]');
+        if (dirNode) direction = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
+        else direction = window.getComputedStyle(el).direction || 'ltr';
+      } catch (e) {}
+      transactionCache.set(el, direction);
+      return direction;
+    };
 
     // --- Read-Only Validation Phase (Pre-Apply Connection & Semantic Revalidation) ---
     // Use Unicode-aware whitespace normalization for validation
@@ -202,25 +179,41 @@ export class BlockGroupReconstructor {
     }
 
     // --- Parsing & Structural Verification Phase ---
-    // Remove zero-width characters ONLY inside markers @@...@@
-    // This protects the parser without mutating the actual translated content.
+    // Pre-parsing sanitization: strip zero-width characters ONLY inside markers @@...@@
     const sanitizedText = translatedText.replace(/@@[\s\S]*?@@/gu, (match) => {
        return match.replace(/[\u200B-\u200D\uFEFF]/gu, '');
     });
 
-    const parsedSegments = this.splitTranslatedBlock(sanitizedText, expectedUnits, sessionId);
+    const parsedSegments = this.splitTranslatedBlock(sanitizedText, expectedUnits, sessionId, entropy);
 
     // --- Preparation Phase (Calculate everything before DOM mutations) ---
     const commitPlan = [];
+    const unescapeReplacement = '@@';
+    const unescapePattern = entropy ? new RegExp(`@@TI_ESC_${escapeRegExp(entropy)}@@`, 'g') : /@@TI_ESC@@/g;
+
     for (let i = 0; i < expectedUnits.length; i++) {
       const unit = expectedUnits[i];
       const segment = parsedSegments[i];
       
-      // Reversible unescaping: convert @@ESCAPED_SEG: back to @@SEG:
-      const exactTranslation = segment.text.replace(/@@ESCAPED_SEG:/g, '@@SEG:');
+      // entropy-scoped escaping: unescape back to literal @@
+      const exactTranslation = segment.text.replace(unescapePattern, unescapeReplacement);
       
       let finalValue;
-      if (BlockGroupReconstructor.shouldInjectBidi(unit.node, exactTranslation)) {
+      const shouldBidi = () => {
+        if (!unit.node || !unit.node.parentElement) return false;
+        let p = unit.node.parentElement;
+        while (p) {
+          const t = p.tagName.toUpperCase();
+          if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(t)) return false;
+          if (p.contentEditable === 'true' || p.getAttribute('contenteditable') === 'true') return false;
+          p = p.parentElement;
+        }
+        if (!exactTranslation || typeof exactTranslation !== 'string') return false;
+        if (!/[\p{L}\p{N}]/u.test(exactTranslation)) return false;
+        return detectDirectionFromContent(exactTranslation) !== resolveDir(unit.node);
+      };
+
+      if (shouldBidi()) {
         const detectedDir = detectDirectionFromContent(exactTranslation);
         const bidiMark = detectedDir === 'rtl' ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
         finalValue = unit.leadingWS + bidiMark + exactTranslation + bidiMark + unit.trailingWS;
@@ -228,12 +221,10 @@ export class BlockGroupReconstructor {
         finalValue = unit.leadingWS + exactTranslation + unit.trailingWS;
       }
       
-      const originalText = unit.node.textContent;
-      
       commitPlan.push({
         unit,
         finalValue,
-        originalText
+        originalText: unit.node.textContent
       });
     }
 

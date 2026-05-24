@@ -389,7 +389,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async (message) => {
         sentPayload = JSON.parse(message.data.text);
         const sessionId = message.data.sessionId;
-        const responseText = `سلام@@TI_SEG_${sessionId}_n2@@جهان@@TI_SEG_${sessionId}_n3@@!`;
+        const responseText = `سلام@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@جهان@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n3@@!`;
         return { success: true, streaming: false, translatedText: JSON.stringify([{ t: responseText, i: 'g1' }]) };
       });
 
@@ -401,7 +401,7 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(sentPayload[0].i).toBe('g1'); // The block ID is g1
       
       const sessionId = adapter.currentSessionId;
-      expect(sentPayload[0].t).toBe(`Hello@@TI_SEG_${sessionId}_n2@@world@@TI_SEG_${sessionId}_n3@@!`); // Contains session-scoped markers!
+      expect(sentPayload[0].t).toBe(`Hello@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@world@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n3@@!`); // Contains session-scoped markers!
 
       document.body.removeChild(container);
     });
@@ -427,10 +427,10 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
         const sessionId = message.data.sessionId;
         
         expect(payload.length).toBe(1); // Grouped into 1 block
-        expect(payload[0].t).toBe(`Hello@@TI_SEG_${sessionId}_n2@@beautiful@@TI_SEG_${sessionId}_n3@@world@@TI_SEG_${sessionId}_n4@@!`);
+        expect(payload[0].t).toBe(`Hello@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@beautiful@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n3@@world@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n4@@!`);
 
         // Translate the block keeping markers perfectly in place
-        const translatedBlock = `درود@@TI_SEG_${sessionId}_n2@@زیبا@@TI_SEG_${sessionId}_n3@@جهان@@TI_SEG_${sessionId}_n4@@!`;
+        const translatedBlock = `درود@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@زیبا@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n3@@جهان@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n4@@!`;
         return {
           success: true,
           streaming: false,
@@ -473,11 +473,14 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       const units = collectBlockGroups(container, context);
 
       const sessionId = 's12345';
-      const reorderedBlock = `جهان@@TI_SEG_${sessionId}_n3@@دنیا@@TI_SEG_${sessionId}_n2@@سلام!`; // LLM swapped segment order!
+      const reorderedBlock = `جهان@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n3@@دنیا@@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@سلام!`; // LLM swapped segment order!
 
+      // units has n1, n2, n3. reorderedBlock has no n1, but n3 and n2.
+      // splitTranslatedBlock will fail because segments.length (2) !== expectedUnits.length (3)
+      
       expect(() => {
-        BlockGroupReconstructor.apply(units, reorderedBlock, 'fa', container, sessionId);
-      }).toThrow('Segment UID sequence mismatch');
+        BlockGroupReconstructor.apply(units, reorderedBlock, 'fa', container, sessionId, adapter.currentEntropy);
+      }).toThrow(/Segment count mismatch/);
 
       // DOM remains original
       expect(container.innerHTML).toBe('Hello <span>world</span>!');
