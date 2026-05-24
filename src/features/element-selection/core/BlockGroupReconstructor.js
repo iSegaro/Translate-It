@@ -18,14 +18,17 @@ export class BlockGroupReconstructor {
    * @param {TranslationUnit[]} units - Array of TranslationUnits in the block group
    * @returns {string} The assembled block text
    */
-  static injectMarkers(units) {
+  static injectMarkers(units, sessionId = '') {
     if (!units || units.length === 0) return '';
     
     // First node start is block start (no marker prefix)
     let result = units[0].text;
     
+    // Use session-scoped randomized markers if sessionId is provided to completely prevent collisions
+    const markerPrefix = sessionId ? `TI-SEG-${sessionId}-` : 'SEG:';
+    
     for (let i = 1; i < units.length; i++) {
-      result += `[--SEG:${units[i].id}--]${units[i].text}`;
+      result += `[--${markerPrefix}${units[i].id}--]${units[i].text}`;
     }
     
     return result;
@@ -40,13 +43,18 @@ export class BlockGroupReconstructor {
    * @returns {Object[]} Parsed segment objects { id, text }
    * @throws {Error} If markers are corrupted, count mismatches, or UID order is broken
    */
-  static splitTranslatedBlock(translatedText, expectedUnits) {
+  static splitTranslatedBlock(translatedText, expectedUnits, sessionId = '') {
     if (!translatedText || typeof translatedText !== 'string') {
       throw new Error('Translated text is empty or invalid');
     }
 
     // Split text using the printable marker regex (tolerant to casing and whitespace anomalies)
-    const parts = translatedText.split(/\[\s*--[sS][eE][gG]\s*:\s*(n\d+)\s*--\s*\]/);
+    // If sessionId is provided, strictly match the session ID to completely prevent collisions
+    const regex = sessionId
+      ? new RegExp(`\\[\\s*--[tT][iI]-[sS][eE][gG]-${sessionId}-(n\\d+)\\s*--\\s*\\]`)
+      : /\[\s*--[sS][eE][gG]\s*:\s*(n\d+)\s*--\s*\]/;
+
+    const parts = translatedText.split(regex);
     
     const segments = [];
     // The first segment has no leading marker, maps to first expected unit
@@ -90,24 +98,84 @@ export class BlockGroupReconstructor {
    * @returns {boolean} True if successfully reconstructed and written
    * @throws {Error} If connection validation fails, marker parsing fails, or state is stale
    */
-  static apply(expectedUnits, translatedText, targetLanguage, rootElement) {
+  /**
+   * Helper to check if BiDi controls should be injected for a node.
+   * Skip injection inside inputs, textareas, code/pre blocks, or contenteditable trees
+   * to avoid duplicated bidi controls, punctuation drift, caret drift, and copy/paste artifacts.
+   * Only injects if there is mixed-direction script ambiguity or parent container direction mismatch.
+   */
+  static shouldInjectBidi(node, translation) {
+    if (!node || !node.parentElement) return false;
+    
+    let parent = node.parentElement;
+    while (parent) {
+      const tag = parent.tagName.toUpperCase();
+      if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(tag)) return false;
+      if (parent.contentEditable === 'true' || parent.getAttribute('contenteditable') === 'true') return false;
+      parent = parent.parentElement;
+    }
+    
+    if (!translation || typeof translation !== 'string') return false;
+
+    // Skip pure punctuation, numbers or spacing nodes to avoid unnecessary pollution
+    const hasAlphaNumeric = /[\p{L}\p{N}]/u.test(translation);
+    if (!hasAlphaNumeric) return false;
+    
+    // Check if the text itself contains mixed direction scripts (both RTL and LTR characters present)
+    const hasRtl = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(translation);
+    const hasLtr = /[a-zA-Z]/.test(translation);
+    const isTextMixed = hasRtl && hasLtr;
+    if (isTextMixed) return true;
+    
+    // Check if the detected direction of the translated segment differs from container computed direction
+    const detectedDir = detectDirectionFromContent(translation);
+    let parentDir = 'ltr';
+    try {
+      parentDir = window.getComputedStyle(node.parentElement).direction || 'ltr';
+    } catch (e) {
+      // Fallback if window or getComputedStyle is not defined in mock environment
+    }
+    
+    return detectedDir !== parentDir;
+  }
+
+  /**
+   * Applies the parsed translations atomically to the DOM.
+   * Synchronously performs connection validation check first, ensuring 100% rollback safety.
+   *
+   * @param {TranslationUnit[]} expectedUnits - The extracted TranslationUnits
+   * @param {string} translatedText - The raw translated block text
+   * @param {string} targetLanguage - The target language code
+   * @param {HTMLElement} rootElement - The active translation root element
+   * @param {string} [sessionId] - Unique translation session ID to scope the parsing
+   * @returns {boolean} True if successfully reconstructed and written
+   * @throws {Error} If connection validation fails, marker parsing fails, or state is stale
+   */
+  static apply(expectedUnits, translatedText, targetLanguage, rootElement, sessionId = '') {
     if (!expectedUnits || expectedUnits.length === 0) {
       return false;
     }
-
+ 
     const blockId = expectedUnits[0].blockId;
     logger.debug(`[Reconstructor] Starting apply for block group ${blockId}`);
 
-    // --- Read-Only Validation Phase (Pre-Apply Connection Revalidation) ---
+    // --- Read-Only Validation Phase (Pre-Apply Connection & Semantic Revalidation) ---
     for (const unit of expectedUnits) {
       if (!unit.node || !unit.node.isConnected) {
         throw new Error(`Stale or detached DOM node reference for segment ${unit.id}`);
+      }
+      
+      // Strict semantic ownership verification: protects against React/Vue virtualized content change mid-flight
+      const currentVal = unit.node.nodeValue;
+      const expectedOriginalVal = unit.leadingWS + unit.text + unit.trailingWS;
+      if (currentVal !== expectedOriginalVal) {
+        throw new Error(`DOM node content changed mid-flight for segment ${unit.id}: expected "${expectedOriginalVal}", found "${currentVal}"`);
       }
     }
 
     // --- Parsing & Structural Verification Phase ---
     // If splitting throws, it aborts before any DOM mutations begin (all-or-nothing rollback)
-    const parsedSegments = this.splitTranslatedBlock(translatedText, expectedUnits);
+    const parsedSegments = this.splitTranslatedBlock(translatedText, expectedUnits, sessionId);
 
     // --- Mutation Phase (Synchronous DOM writes with Flicker Prevention) ---
     const firstNodeParent = expectedUnits[0].node.parentElement;
@@ -124,8 +192,8 @@ export class BlockGroupReconstructor {
         const segment = parsedSegments[i];
         
         // Reversible unescaping: convert [--ESCAPED_SEG: back to [--SEG:
-        const cleanText = segment.text.replace(/\[--ESCAPED_SEG:/g, '[--SEG:');
-        const trimmedTranslation = cleanText.trim();
+        // Keep the exact raw segment string, only removing marker token itself (100% lossless)
+        const exactTranslation = segment.text.replace(/\[--ESCAPED_SEG:/g, '[--SEG:');
         
         // 1. Register original text before modification for Hover Tooltip
         const originalText = unit.node.textContent;
@@ -137,12 +205,15 @@ export class BlockGroupReconstructor {
           parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
         }
 
-        // BiDi Text & Punctuation Support
-        const detectedDir = detectDirectionFromContent(trimmedTranslation);
-        const bidiMark = detectedDir === 'rtl' ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
-
-        // Boundary strip-and-restore reconstruction with BiDi mark injection
-        const finalValue = unit.leadingWS + bidiMark + trimmedTranslation + bidiMark + unit.trailingWS;
+        // BiDi Text & Punctuation Support (Conditional & Context-Aware)
+        let finalValue;
+        if (BlockGroupReconstructor.shouldInjectBidi(unit.node, exactTranslation)) {
+          const detectedDir = detectDirectionFromContent(exactTranslation);
+          const bidiMark = detectedDir === 'rtl' ? BIDI_MARKS.RLM : BIDI_MARKS.LRM;
+          finalValue = unit.leadingWS + bidiMark + exactTranslation + bidiMark + unit.trailingWS;
+        } else {
+          finalValue = unit.leadingWS + exactTranslation + unit.trailingWS;
+        }
         
         // Mutate node
         unit.node.nodeValue = finalValue;

@@ -372,10 +372,10 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
   });
 
   // ==========================================
-  // STRESS TEST 5: Grouped Payload Verification
+  // STRESS TEST 5: Grouped Payload Verification (With Session-Scoped Markers)
   // ==========================================
   describe('Grouped Payload Verification', () => {
-    it('should verify that multiple inline segments are sent as a grouped payload, not V2 segmented', async () => {
+    it('should verify that multiple inline segments are sent as a grouped payload with session-scoped markers', async () => {
       const container = document.createElement('div');
       container.innerHTML = 'Hello <span>world</span>!';
       document.body.appendChild(container);
@@ -388,7 +388,9 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       let sentPayload = null;
       contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async (message) => {
         sentPayload = JSON.parse(message.data.text);
-        return { success: true, streaming: false, translatedText: JSON.stringify([{ t: 'سلام [--SEG:n2--]جهان[--SEG:n3--]!', i: 'g1' }]) };
+        const sessionId = message.data.sessionId;
+        const responseText = `سلام[--TI-SEG-${sessionId}-n2--]جهان[--TI-SEG-${sessionId}-n3--]!`;
+        return { success: true, streaming: false, translatedText: JSON.stringify([{ t: responseText, i: 'g1' }]) };
       });
 
       await adapter.translateElement(container);
@@ -397,7 +399,118 @@ describe('DomTranslatorAdapter Stress and Edge-Case Testing', () => {
       expect(sentPayload).toBeDefined();
       expect(sentPayload.length).toBe(1); // Single grouped block item, NOT 3 individual items!
       expect(sentPayload[0].i).toBe('g1'); // The block ID is g1
-      expect(sentPayload[0].t).toBe('Hello[--SEG:n2--]world[--SEG:n3--]!'); // Contains injected markers
+      
+      const sessionId = adapter.currentSessionId;
+      expect(sentPayload[0].t).toBe(`Hello[--TI-SEG-${sessionId}-n2--]world[--TI-SEG-${sessionId}-n3--]!`); // Contains session-scoped markers!
+
+      document.body.removeChild(container);
+    });
+  });
+
+  // ==========================================
+  // STRESS TEST 6: Full Pipeline End-to-End Test
+  // ==========================================
+  describe('Full Pipeline End-to-End Test', () => {
+    it('should execute the entire DOM extraction, grouping, serialization, LLM response, parsing, reconstruction, and final DOM equality pipeline cleanly', async () => {
+      const container = document.createElement('div');
+      container.innerHTML = 'Hello <span>beautiful <b>world</b></span>!';
+      document.body.appendChild(container);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      // 1. Mock the background LLM processing the grouped payload and returning a valid translated block with session-scoped markers
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async (message) => {
+        const payload = JSON.parse(message.data.text);
+        const sessionId = message.data.sessionId;
+        
+        expect(payload.length).toBe(1); // Grouped into 1 block
+        expect(payload[0].t).toBe(`Hello[--TI-SEG-${sessionId}-n2--]beautiful[--TI-SEG-${sessionId}-n3--]world[--TI-SEG-${sessionId}-n4--]!`);
+
+        // Translate the block keeping markers perfectly in place
+        const translatedBlock = `درود[--TI-SEG-${sessionId}-n2--]زیبا[--TI-SEG-${sessionId}-n3--]جهان[--TI-SEG-${sessionId}-n4--]!`;
+        return {
+          success: true,
+          streaming: false,
+          translatedText: JSON.stringify([{ t: translatedBlock, i: 'g1' }])
+        };
+      });
+
+      // 2. Run the adapter
+      const result = await adapter.translateElement(container);
+      expect(result.success).toBe(true);
+
+      // 3. Verify final DOM structures and content
+      const textNodes = [];
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = walker.nextNode())) {
+        textNodes.push(n.textContent);
+      }
+
+      // Check exact values and whitespaces restored cleanly with bidi marks
+      expect(textNodes[0]).toMatch(/^[\u200e\u200f]?درود[\u200e\u200f]?\s*$/);
+      expect(textNodes[1]).toMatch(/^[\u200e\u200f]?زیبا[\u200e\u200f]?\s+$/);
+      expect(textNodes[2]).toMatch(/^[\u200e\u200f]?جهان[\u200e\u200f]?$/);
+      expect(textNodes[3]).toBe('!'); // exact punctuation adjacency preserved!
+
+      document.body.removeChild(container);
+    });
+  });
+
+  // ==========================================
+  // STRESS TEST 7: Reorder Corruption Detection Test
+  // ==========================================
+  describe('Reorder Corruption Detection Test', () => {
+    it('should throw an error and rollback if LLM attempts to reorder segment IDs inside a block group', async () => {
+      const container = document.createElement('div');
+      container.innerHTML = 'Hello <span>world</span>!';
+      document.body.appendChild(container);
+
+      const context = { blockMap: new WeakMap(), blockCounter: { value: 0 }, activeSessionId: 'test-session' };
+      const units = collectBlockGroups(container, context);
+
+      const sessionId = 's12345';
+      const reorderedBlock = `جهان[--TI-SEG-${sessionId}-n3--]دنیا[--TI-SEG-${sessionId}-n2--]سلام!`; // LLM swapped segment order!
+
+      expect(() => {
+        BlockGroupReconstructor.apply(units, reorderedBlock, 'fa', container, sessionId);
+      }).toThrow('Segment UID sequence mismatch');
+
+      // DOM remains original
+      expect(container.innerHTML).toBe('Hello <span>world</span>!');
+
+      document.body.removeChild(container);
+    });
+  });
+
+  // ==========================================
+  // STRESS TEST 8: Session-Scoped Randomized Marker Verification
+  // ==========================================
+  describe('Session-Scoped Randomized Marker Verification', () => {
+    it('should completely ignore markers that do not belong to the active translation session ID', () => {
+      const container = document.createElement('div');
+      container.innerHTML = 'Hello <span>world</span>!';
+      document.body.appendChild(container);
+
+      const context = { blockMap: new WeakMap(), blockCounter: { value: 0 }, activeSessionId: 'test-session' };
+      const units = collectBlockGroups(container, context);
+
+      const activeSession = 'activeSession123';
+      const foreignSession = 'foreignSession999';
+
+      // Reconstructed translation with a FOREIGN session ID in the marker
+      const foreignTranslatedBlock = `درود[--TI-SEG-${foreignSession}-n2--]جهان!`;
+
+      // Applying with activeSession should reject it, because it is strictly scoped to activeSession123!
+      expect(() => {
+        BlockGroupReconstructor.apply(units, foreignTranslatedBlock, 'fa', container, activeSession);
+      }).toThrow('Segment count mismatch'); // Rejects because the foreign marker was treated as plain text, yielding count 1 instead of 3
+
+      // DOM remains unchanged
+      expect(container.innerHTML).toBe('Hello <span>world</span>!');
 
       document.body.removeChild(container);
     });

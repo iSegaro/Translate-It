@@ -121,12 +121,12 @@ describe('BlockGroupReconstructor', () => {
 
       expect(result).toBe(true);
 
-      // Verify whitespace boundary restoration, trimming and RTL BiDi mark injection (\u200f)
-      expect(textNodes[0].nodeValue).toBe('\u200fمرحبا\u200f '); // original trailingWS is ' ', leadingWS is ''
-      expect(textNodes[1].nodeValue).toBe('\u200fبالعالم\u200f'); // leading/trailingWS are both ''
+      // Verify whitespace boundary restoration, raw lossless exact segment match, and context-aware RTL BiDi mark injection (\u200f)
+      expect(textNodes[0].nodeValue).toBe('\u200f  مرحبا   \u200f '); // original trailingWS is ' ', leadingWS is '', exact raw segment preserves internal/boundary spaces
+      expect(textNodes[1].nodeValue).toBe('\u200fبالعالم  \u200f'); // leading/trailingWS are both '', raw segment is 'بالعالم  '
       
-      // Verify unescaping of escaped marker sequence and LTR BiDi mark injection (\u200e)
-      expect(textNodes[2].nodeValue).toBe('\u200e[--SEG:n4--]\u200e');
+      // Verify unescaping of escaped marker sequence and context-aware bidi check (no LRM injection since it matches the LTR parent container perfectly)
+      expect(textNodes[2].nodeValue).toBe('  [--SEG:n4--]  ');
     });
 
     it('should abort DOM mutation entirely and throw error if a text node is detached', () => {

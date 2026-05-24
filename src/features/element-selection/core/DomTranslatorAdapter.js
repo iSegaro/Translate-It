@@ -215,7 +215,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               r: g.role
             };
           } else {
-            const assembled = BlockGroupReconstructor.injectMarkers(g.units);
+            const assembled = BlockGroupReconstructor.injectMarkers(g.units, this.currentSessionId);
             return {
               t: assembled,
               i: g.id,
@@ -314,12 +314,12 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       const anyProcessed = group.units.some(u => processedUids.has(u.id));
                       if (!anyProcessed) {
                         try {
-                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element);
+                          BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId);
                           group.units.forEach(u => processedUids.add(u.id));
                           
                           // Capture split segment translations for shadow comparison
                           try {
-                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units);
+                            const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId);
                             parsed.forEach(seg => {
                               this.translatedSegmentMap.set(seg.id, seg.text);
                             });
@@ -491,6 +491,40 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
+  _shouldInjectBidi(node, translation) {
+    if (!node || !node.parentElement) return false;
+    let parent = node.parentElement;
+    while (parent) {
+      const tag = parent.tagName.toUpperCase();
+      if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(tag)) return false;
+      if (parent.contentEditable === 'true' || parent.getAttribute('contenteditable') === 'true') return false;
+      parent = parent.parentElement;
+    }
+    
+    if (!translation || typeof translation !== 'string') return false;
+
+    // Skip pure punctuation, numbers or spacing nodes to avoid unnecessary pollution
+    const hasAlphaNumeric = /[\p{L}\p{N}]/u.test(translation);
+    if (!hasAlphaNumeric) return false;
+    
+    // Check if the text itself contains mixed direction scripts (both RTL and LTR characters present)
+    const hasRtl = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(translation);
+    const hasLtr = /[a-zA-Z]/.test(translation);
+    const isTextMixed = hasRtl && hasLtr;
+    if (isTextMixed) return true;
+    
+    // Check if the detected direction of the translated segment differs from container computed direction
+    const detectedDir = DirectionManager.detectDirectionFromContent(translation);
+    let parentDir = 'ltr';
+    try {
+      parentDir = window.getComputedStyle(node.parentElement).direction || 'ltr';
+    } catch (e) {
+      // Fallback if window or getComputedStyle is not defined in mock environment
+    }
+    
+    return detectedDir !== parentDir;
+  }
+
   _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
     if (!textNode || !translatedText) return;
     
@@ -522,9 +556,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       finalTranslation = finalTranslation.trim();
     }
     
-    const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
-    const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
-    
     // 1. Register original text before modification for Hover Tooltip
     hoverPreviewLookup.add(textNode, originalText);
 
@@ -534,7 +565,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
       parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
     }
 
-    textNode.nodeValue = leadingWhitespace + bidiMark + finalTranslation + bidiMark + trailingWhitespace;
+    // BiDi Text & Punctuation Support (Conditional & Context-Aware)
+    let finalValue;
+    if (this._shouldInjectBidi(textNode, finalTranslation)) {
+      const detectedDir = DirectionManager.detectDirectionFromContent(finalTranslation);
+      const bidiMark = detectedDir === 'rtl' ? DirectionManager.BIDI_MARKS.RLM : DirectionManager.BIDI_MARKS.LRM;
+      finalValue = leadingWhitespace + bidiMark + finalTranslation + bidiMark + trailingWhitespace;
+    } else {
+      finalValue = leadingWhitespace + finalTranslation + trailingWhitespace;
+    }
+
+    textNode.nodeValue = finalValue;
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
   }
 
@@ -587,16 +628,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
             const anyProcessed = group.units.some(u => processedUids.has(u.id));
             if (!anyProcessed) {
               try {
-                BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element);
-                group.units.forEach(u => processedUids.add(u.id));
-                
-                // Capture split segment translations for shadow comparison
-                try {
-                  const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units);
-                  parsed.forEach(seg => {
-                    this.translatedSegmentMap.set(seg.id, seg.text);
-                  });
-                } catch {}
+                 BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId);
+                 group.units.forEach(u => processedUids.add(u.id));
+                 
+                 // Capture split segment translations for shadow comparison
+                 try {
+                   const parsed = BlockGroupReconstructor.splitTranslatedBlock(text, group.units, this.currentSessionId);
+                   parsed.forEach(seg => {
+                     this.translatedSegmentMap.set(seg.id, seg.text);
+                   });
+                 } catch {}
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                 this._rollbackBlockGroup(this.currentSessionId, group.blockId);

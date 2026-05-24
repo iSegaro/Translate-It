@@ -498,13 +498,18 @@ describe('DomTranslatorAdapter', () => {
 
     it('should apply LRM mark for LTR detection', async () => {
       const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
-      detectDirectionFromContent.mockReturnValueOnce('ltr');
+      detectDirectionFromContent.mockReturnValue('ltr');
+
+      const spy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({ direction: 'rtl' });
 
       const textNode = testElement.firstChild;
       adapter._applyTranslationToNode(textNode, 'Hello', 'en', testElement);
 
       // LRM mark (\u200e) should be present
       expect(textNode.nodeValue).toContain('\u200eHello\u200e');
+
+      spy.mockRestore();
+      detectDirectionFromContent.mockReturnValue('rtl');
     });
 
     it('should handle object formatted translated text', () => {
@@ -607,9 +612,10 @@ describe('DomTranslatorAdapter', () => {
           // Detach one node before applying translation
           span2.firstChild.remove();
 
+          const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -749,9 +755,10 @@ describe('DomTranslatorAdapter', () => {
 
       contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
         setTimeout(() => {
+          const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
@@ -818,9 +825,10 @@ describe('DomTranslatorAdapter', () => {
 
       contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
         setTimeout(() => {
+          const sessionId = adapter.currentSessionId;
           streamCallbacks.onStreamUpdate({
             success: true,
-            data: [{ t: 'مرحبا [--SEG:n2--]بالعالم', i: 'g1' }]
+            data: [{ t: `مرحبا [--TI-SEG-${sessionId}-n2--]بالعالم`, i: 'g1' }]
           });
           streamCallbacks.onStreamEnd({ success: true });
         }, 10);
