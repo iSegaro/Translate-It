@@ -419,7 +419,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
-      if (response?.success && response.streaming) {
+      if (response?.success && (response.streaming || response.type === 'stream_end')) {
         result = await streamEndPromise;
       } else if (response?.success) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
@@ -447,6 +447,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
           const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
           const v2Clone = originalClone.cloneNode(true);
           const v2TextNodes = collectTextNodes(v2Clone);
+          
+          this.logger.debug('[ShadowMode] textsToTranslate:', textsToTranslate);
+          this.logger.debug('[ShadowMode] keys in translatedSegmentMap:', Array.from(this.translatedSegmentMap.keys()));
+          this.logger.debug('[ShadowMode] values in translatedSegmentMap:', Array.from(this.translatedSegmentMap.values()));
+          this.logger.debug('[ShadowMode] UIDs in v2TextNodes:', v2TextNodes.map(n => n.uid));
           
           v2TextNodes.forEach((nodeData) => {
             const translatedText = this.translatedSegmentMap.get(nodeData.uid);
@@ -549,6 +554,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
       }
 
+      if (rawResults && typeof rawResults === 'object' && Array.isArray(rawResults.translations)) {
+        rawResults = rawResults.translations;
+      }
+
       const results = Array.isArray(rawResults) ? rawResults : [rawResults];
       const finalTargetLanguage = response.targetLanguage || targetLanguage;
 
@@ -557,8 +566,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       results.forEach((item, i) => {
         // Handle abbreviated key 'i' for UID
-        const uid = item?.i || item?.uid;
+        const uid = item?.i || item?.uid || item?.id;
         const text = item?.t || item?.text || item;
+
+        if (text === undefined || text === null) {
+          this.logger.warn(`[DomTranslatorAdapter] Skipping undefined/null translation at index ${i}`);
+          return;
+        }
 
         if (isBlockGroupingEnabled && this.groupMap && this.groupMap.has(uid)) {
           const group = this.groupMap.get(uid);
@@ -591,7 +605,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
             }
           }
         } else {
-          const nodeData = uid ? nodeMap.get(uid) : textNodesData[i];
+          let nodeData = uid ? nodeMap.get(uid) : null;
+          if (!nodeData) {
+            nodeData = textNodesData[i];
+          }
           if (nodeData && !processedUids.has(nodeData.uid)) {
             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
             processedUids.add(nodeData.uid);
