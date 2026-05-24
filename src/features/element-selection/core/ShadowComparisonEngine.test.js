@@ -51,11 +51,21 @@ describe('ShadowComparisonEngine', () => {
       expect(result.equivalent).toBe(true);
     });
 
-    it('should tolerate compiler injected data-v-* attributes and key/ref properties', () => {
+    it('should tolerate compiler injected data-v-* attributes, key/ref properties, and data-block-id', () => {
       const elA = document.createElement('div');
-      elA.innerHTML = '<span class="test" data-v-123456="true" key="1">Hello</span>';
+      elA.innerHTML = '<span class="test" data-v-123456="true" data-block-id="g1" key="1">Hello</span>';
       const elB = document.createElement('div');
       elB.innerHTML = '<span class="test" data-v-abcdef="true" ref="spanEl">Hello</span>';
+
+      const result = ShadowComparisonEngine.compare(elA, elB);
+      expect(result.equivalent).toBe(true);
+    });
+
+    it('should tolerate dynamic translation-injected layout direction attributes and style overrides', () => {
+      const elA = document.createElement('div');
+      elA.innerHTML = '<span class="test">Hello</span>';
+      const elB = document.createElement('div');
+      elB.innerHTML = '<span class="test" data-translate-dir="rtl" data-dir-original-saved="true" data-has-original="true" data-original-direction="ltr" style="direction: rtl; unicode-bidi: isolate; max-width: 100%; text-align: right;">Hello</span>';
 
       const result = ShadowComparisonEngine.compare(elA, elB);
       expect(result.equivalent).toBe(true);

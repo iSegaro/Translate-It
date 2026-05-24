@@ -119,6 +119,25 @@ export class ShadowComparisonEngine {
   }
 
   /**
+   * Cleans a style string by removing transient direction-related properties.
+   */
+  static cleanStyleString(styleStr) {
+    if (!styleStr) return '';
+    return styleStr
+      .split(';')
+      .map(part => part.trim())
+      .filter(part => {
+        if (!part) return false;
+        const colonIdx = part.indexOf(':');
+        if (colonIdx === -1) return true;
+        const prop = part.substring(0, colonIdx).trim().toLowerCase();
+        return !['direction', 'unicode-bidi', 'max-width', 'text-align'].includes(prop);
+      })
+      .join('; ')
+      .trim();
+  }
+
+  /**
    * Extracts clean attributes, ignoring framework data-v-* tags and compilers unique keys.
    */
   static getCleanAttributes(element) {
@@ -127,14 +146,36 @@ export class ShadowComparisonEngine {
     
     for (let i = 0; i < element.attributes.length; i++) {
       const attr = element.attributes[i];
-      // Ignore framework compiler identifiers (like data-v-xxxx) and reactive indexes/keys
-      if (attr.name.startsWith('data-v-') || attr.name === 'key' || attr.name === 'ref') {
+      const name = attr.name.toLowerCase();
+      
+      // Ignore framework compiler identifiers (like data-v-xxxx) and reactive indexes/keys/block-ids/direction-attributes
+      if (
+        name.startsWith('data-v-') || 
+        name === 'key' || 
+        name === 'ref' || 
+        name === 'data-block-id' ||
+        name === 'data-translate-dir' ||
+        name === 'data-dir-original-saved' ||
+        name === 'data-has-original' ||
+        name.startsWith('data-original-')
+      ) {
         continue;
       }
+      
       // Ignore empty class attribute left by classList.remove in test environments
-      if (attr.name === 'class' && attr.value.trim() === '') {
+      if (name === 'class' && attr.value.trim() === '') {
         continue;
       }
+      
+      if (name === 'style') {
+        const cleanedStyle = this.cleanStyleString(attr.value);
+        if (cleanedStyle === '') {
+          continue;
+        }
+        attrs[name] = cleanedStyle;
+        continue;
+      }
+      
       attrs[attr.name] = attr.value;
     }
     return attrs;
