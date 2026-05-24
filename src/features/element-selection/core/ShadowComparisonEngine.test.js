@@ -71,6 +71,16 @@ describe('ShadowComparisonEngine', () => {
       expect(result.equivalent).toBe(true);
     });
 
+    it('should tolerate volatile attribute differences like title, alt, and placeholder (often modified by side-effect observers)', () => {
+      const elA = document.createElement('div');
+      elA.innerHTML = '<a title="" alt="">Hello</a>';
+      const elB = document.createElement('div');
+      elB.innerHTML = '<a title="Translated Title" alt="Translated Alt" placeholder="Translated Placeholder">Hello</a>';
+
+      const result = ShadowComparisonEngine.compare(elA, elB);
+      expect(result.equivalent).toBe(true);
+    });
+
     it('should tolerate harmless style spacing variations', () => {
       const elA = document.createElement('div');
       elA.innerHTML = '<span style="direction: rtl; text-align: center;">Hello</span>';
