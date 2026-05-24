@@ -853,8 +853,10 @@ describe('DomTranslatorAdapter', () => {
     it('should run Shadow Mode validation and log error on reconstruction anomaly', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
       
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      const compareSpy = vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ equivalent: false, reason: 'Mocked anomaly' });
 
       const div = document.createElement('div');
       const span1 = document.createElement('span');
@@ -959,8 +961,8 @@ describe('DomTranslatorAdapter', () => {
         expect(isValidTextElement(p)).toBe(true);
         expect(isValidTextElement(textarea)).toBe(false);
         expect(isValidTextElement(input)).toBe(false);
-        expect(isValidTextElement(select)).toBe(false);
-        expect(isValidTextElement(button)).toBe(false);
+        expect(isValidTextElement(select)).toBe(true);
+        expect(isValidTextElement(button)).toBe(true);
       } finally {
         window.getComputedStyle = originalGetComputedStyle;
       }

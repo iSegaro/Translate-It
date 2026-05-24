@@ -466,21 +466,38 @@ export class DomTranslatorAdapter extends ResourceTracker {
         try {
           const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
           const v2Clone = originalClone.cloneNode(true);
-          const v2TextNodes = collectTextNodes(v2Clone);
+          
+          // Map live text nodes to clone text nodes to bypass disconnected getComputedStyle issues
+          const liveToCloneMap = new WeakMap();
+          const walker1 = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+          const walker2 = document.createTreeWalker(v2Clone, NodeFilter.SHOW_TEXT, null);
+          let n1, n2;
+          while ((n1 = walker1.nextNode()) && (n2 = walker2.nextNode())) {
+            liveToCloneMap.set(n1, n2);
+          }
+
+          // Extract unique units from groupMap safely
+          const uniqueUnits = Array.from(new Set(
+            Array.from(this.groupMap.values()).flatMap(group => group.units)
+          ));
           
           this.logger.debug('[ShadowMode] textsToTranslate:', textsToTranslate);
           this.logger.debug('[ShadowMode] keys in translatedSegmentMap:', Array.from(this.translatedSegmentMap.keys()));
-          this.logger.debug('[ShadowMode] values in translatedSegmentMap:', Array.from(this.translatedSegmentMap.values()));
-          this.logger.debug('[ShadowMode] UIDs in v2TextNodes:', v2TextNodes.map(n => n.uid));
+          this.logger.debug('[ShadowMode] mapped units for V2 simulation:', uniqueUnits.length);
           
-          v2TextNodes.forEach((nodeData) => {
-            const translatedText = this.translatedSegmentMap.get(nodeData.uid);
+          uniqueUnits.forEach((unit) => {
+            if (!unit || !unit.id) return;
+            const translatedText = this.translatedSegmentMap.get(unit.id);
             if (translatedText !== undefined) {
-              this._applyTranslationToNode(nodeData.node, translatedText, effectiveTargetLanguage, v2Clone);
+              const targetNodeInClone = liveToCloneMap.get(unit.node);
+              if (targetNodeInClone) {
+                this._applyTranslationToNode(targetNodeInClone, translatedText, effectiveTargetLanguage, v2Clone);
+              }
             }
           });
 
           const comparison = ShadowComparisonEngine.compare(v2Clone, element);
+
           if (!comparison.equivalent) {
             this.logger.error(`[ShadowMode] Reconstruction anomaly detected!\nReason: ${comparison.reason}`);
           } else {
