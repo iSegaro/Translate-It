@@ -40,7 +40,24 @@ export class ProviderCoordinator {
     const originalSource = options.originalSourceLang || sourceLang;
 
     try {
-      const sampleText = Array.isArray(text) ? text.join(' ') : (typeof text === 'string' ? text : '');
+      let sampleText = '';
+      if (Array.isArray(text)) {
+        // Extract text from objects (V3) or use the string directly (V2)
+        const extractedTexts = text.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return item.t || item.text || '';
+          }
+          return typeof item === 'string' ? item : '';
+        });
+        
+        // Join and limit the sample size to prevent massive strings causing performance issues
+        // 500 characters is more than enough for reliable statistical/heuristic language detection
+        sampleText = extractedTexts.join(' ').substring(0, 500);
+      } else if (typeof text === 'string') {
+        sampleText = text.substring(0, 500);
+      } else {
+        sampleText = '';
+      }
 
       // Check if provider supports bilingual swapping (e.g. specialized dictionaries like Vajehyab may not)
       const providerId = nameToRegistryId(providerName) || providerName;

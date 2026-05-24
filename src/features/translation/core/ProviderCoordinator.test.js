@@ -102,6 +102,36 @@ describe('ProviderCoordinator', () => {
         'Guten Tag', 'de', expect.anything()
       );
     });
+
+    it('should correctly extract sample text from V3 objects for language swapping', async () => {
+      const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
+      
+      const v3Text = [
+        { t: 'سلام دنیا', i: 'n1' },
+        { t: 'چطوری؟', i: 'n2' }
+      ];
+
+      // Setup swap to happen if it detects 'fa' (Persian)
+      LanguageSwappingService.applyLanguageSwapping.mockImplementation(async (sample) => {
+        if (sample.includes('سلام')) {
+          return ['fa', 'en']; // Swap to English
+        }
+        return ['en', 'fa'];
+      });
+
+      await providerCoordinator.execute(
+        mockProvider, v3Text, 'en', 'fa'
+      );
+
+      // Verify that extracted text was passed to swapping service, not [object Object]
+      expect(LanguageSwappingService.applyLanguageSwapping).toHaveBeenCalledWith(
+        expect.stringContaining('سلام دنیا چطوری؟'),
+        'en',
+        'fa',
+        'en',
+        expect.anything()
+      );
+    });
   });
 
   describe('Result Normalization', () => {
