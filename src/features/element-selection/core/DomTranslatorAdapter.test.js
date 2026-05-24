@@ -12,8 +12,8 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/config.js', () => ({
-  getTranslationApiAsync: vi.fn(() => Promise.resolve('google')),
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getTranslationApiAsync: vi.fn(() => Promise.resolve('gemini')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
@@ -30,7 +30,7 @@ vi.mock('@/shared/config/constants.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   TranslationMode: {
     Select_Element: 'select-element'
   }
@@ -156,6 +156,32 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should fallback to V2 node-by-node extraction for traditional providers even if Block Grouping is globally enabled', async () => {
+      const { getFeatureSemanticBlockGroupingAsync, getEffectiveProviderAsync } = await import('@/config.js');
+      const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+
+      // Enable Block Grouping globally but use a traditional provider (google)
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      getEffectiveProviderAsync.mockResolvedValueOnce('google');
+      
+      collectBlockGroups.mockClear();
+      collectTextNodes.mockClear();
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result.success).toBe(true);
+      // Should NOT use Block Grouping (V3)
+      expect(collectBlockGroups).not.toHaveBeenCalled();
+      // Should use traditional node extraction (V2)
+      expect(collectTextNodes).toHaveBeenCalledTimes(1);
     });
 
     it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {

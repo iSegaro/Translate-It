@@ -15,8 +15,8 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/config.js', () => ({
-  getTranslationApiAsync: vi.fn(() => Promise.resolve('google')),
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getTranslationApiAsync: vi.fn(() => Promise.resolve('gemini')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
@@ -24,7 +24,7 @@ vi.mock('@/config.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   TranslationMode: {
     Select_Element: 'select-element'
   }

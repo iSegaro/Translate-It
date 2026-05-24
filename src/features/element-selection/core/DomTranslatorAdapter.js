@@ -34,6 +34,8 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 
+import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
+
 import { globalSelectElementState, revertSelectElementTranslation } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
@@ -115,8 +117,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const originalClone = element.cloneNode(true);
       this.translatedSegmentMap = new Map();
       
-      // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag
-      const isBlockGroupingEnabled = await getFeatureSemanticBlockGroupingAsync();
+      // Resolve provider and target language early to determine extraction strategy
+      const [provider, targetLanguage] = await Promise.all([
+        options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
+        options.targetLanguage || getTargetLanguageAsync()
+      ]);
+
+      // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag and provider type
+      const isAIProvider = isProviderType(registryIdToName(provider), ProviderTypes.AI);
+      const isBlockGroupingEnabled = isAIProvider && (await getFeatureSemanticBlockGroupingAsync());
+      
       let textNodesData = [];
       const groupMap = new Map();
       const groups = [];
@@ -241,11 +251,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const contextMetadata = extractContextMetadata(element);
       const contextSummary = contextMetadata.contextSummary; // Extract the summary
       const isAIContextEnabled = await getAIContextTranslationEnabledAsync();
-
-      const [provider, targetLanguage] = await Promise.all([
-        options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
-        options.targetLanguage || getTargetLanguageAsync()
-      ]);
 
       if (!this.originalSettings) await this._loadOriginalSettings();
 
