@@ -38,10 +38,15 @@ export class OptimizedJsonHandler {
       const level = await getProviderOptimizationLevelAsync(providerInstance.providerName);
       const providerConfig = getProviderConfiguration(providerInstance.providerName, level);
       
+      // Mode-specific overrides (Select Element)
+      const selectElementOverride = providerConfig?.batching?.modeOverrides?.select_element || {};
+      const optimalSize = selectElementOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
+      const characterLimit = selectElementOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
+
       const batches = engine.createIntelligentBatches(
         segments, 
-        providerConfig?.batching?.optimalSize || 25, 
-        providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
+        optimalSize, 
+        characterLimit
       );
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);

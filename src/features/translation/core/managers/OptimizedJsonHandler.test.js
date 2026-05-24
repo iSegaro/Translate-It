@@ -22,6 +22,8 @@ vi.mock('@/shared/error-management/ErrorMatcher.js');
 
 import { OptimizedJsonHandler } from './OptimizedJsonHandler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
+import { TranslationBatcher } from '@/features/translation/core/utils/TranslationBatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -182,6 +184,120 @@ describe('OptimizedJsonHandler', () => {
       expect(result.success).toBe(false);
       expect(result.error.message).toContain('Segment count mismatch');
       expect(mockAbortController.abort).toHaveBeenCalled();
+    });
+
+    it('should respect select_element overrides from provider configurations', async () => {
+      getProviderConfiguration.mockReturnValueOnce({
+        batching: {
+          optimalSize: 10,
+          characterLimit: 2000,
+          modeOverrides: {
+            select_element: {
+              optimalSize: 15,
+              characterLimit: 1200
+            }
+          }
+        },
+        rateLimit: { maxConcurrent: 2 }
+      });
+
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['t1'] })
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
+
+      expect(mockEngine.createIntelligentBatches).toHaveBeenCalledWith(
+        expect.any(Array),
+        15, // override.optimalSize
+        1200 // override.characterLimit
+      );
+    });
+
+    it('should correctly scale and batch for Level 5 (Turbo) in an end-to-end flow', async () => {
+      mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
+
+      // Mock a realistic AI provider config scaled to Level 5 (Turbo)
+      // At Level 5, multiplier is 0.3
+      // Scaled mode override: optimalSize: Math.max(5, Math.round(25 * 0.3)) = 8
+      // Scaled characterLimit: Math.max(500, Math.round(3500 * 0.3)) = 1050
+      getProviderConfiguration.mockReturnValueOnce({
+        batching: {
+          optimalSize: 6, // scaled base
+          characterLimit: 5000,
+          modeOverrides: {
+            select_element: {
+              optimalSize: 8, // scaled override
+              characterLimit: 1050 // scaled override
+            }
+          }
+        },
+        rateLimit: { maxConcurrent: 2 }
+      });
+
+      // Prepare a larger set of segments (e.g., 20 segments of ~10 chars each)
+      const testSegments = Array.from({ length: 20 }, (_, index) => ({
+        t: `Segment ${index} text content.`,
+        i: `uid-${index}`
+      }));
+
+      const customMockData = {
+        ...mockData,
+        text: JSON.stringify(testSegments)
+      };
+
+      // Mock translate responses for the expected number of batches (20 segments / 8 size = 3 batches)
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(0, 8).map(s => s.t) })
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(8, 16).map(s => s.t) })
+        .mockResolvedValueOnce({ translatedText: testSegments.slice(16, 20).map(s => s.t) });
+
+      const result = await handler.execute(mockEngine, customMockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(3); // 3 batches (8, 8, 4)
+    });
+
+    it('should correctly scale and batch for Level 1 (Economy) in an end-to-end flow', async () => {
+      mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
+
+      // Mock a realistic AI provider config scaled to Level 1 (Economy)
+      // At Level 1, multiplier is 2.5
+      // Scaled mode override: optimalSize: Math.max(5, Math.round(25 * 2.5)) = 62
+      // Scaled characterLimit: Math.max(500, Math.round(3500 * 2.5)) = 8750
+      getProviderConfiguration.mockReturnValueOnce({
+        batching: {
+          optimalSize: 50, // scaled base
+          characterLimit: 5000,
+          modeOverrides: {
+            select_element: {
+              optimalSize: 62, // scaled override
+              characterLimit: 8750 // scaled override
+            }
+          }
+        },
+        rateLimit: { maxConcurrent: 1 }
+      });
+
+      // Prepare 20 segments
+      const testSegments = Array.from({ length: 20 }, (_, index) => ({
+        t: `Segment ${index} text content.`,
+        i: `uid-${index}`
+      }));
+
+      const customMockData = {
+        ...mockData,
+        text: JSON.stringify(testSegments)
+      };
+
+      // Mock translate response for 1 batch (20 segments < 62 optimalSize)
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: testSegments.map(s => s.t) });
+
+      const result = await handler.execute(mockEngine, customMockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
+
+      expect(result.success).toBe(true);
+      expect(mockProvider.translate).toHaveBeenCalledTimes(1); // 1 single batch
     });
   });
 });

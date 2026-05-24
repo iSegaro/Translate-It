@@ -431,6 +431,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
       if (response?.success && (response.streaming || response.type === 'stream_end')) {
+        if (response.metadata?.batchCount !== undefined) {
+          this.batchCount = response.metadata.batchCount;
+        }
         result = await streamEndPromise;
       } else if (response?.success) {
         result = await this._handleDirectResponse(response, textNodesData, nodeMap, effectiveTargetLanguage, element);
