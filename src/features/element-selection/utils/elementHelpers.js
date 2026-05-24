@@ -64,7 +64,7 @@ export function isValidTextElement(element) {
   if (!element) return false;
 
   // 1. Skip invalid tags
-  const invalidTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
+  const invalidTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME', 'TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'];
   if (invalidTags.includes(element.tagName)) {
     return false;
   }

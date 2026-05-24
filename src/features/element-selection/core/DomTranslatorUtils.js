@@ -168,9 +168,9 @@ export function collectTextNodes(element) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
 
-      // Skip elements that shouldn't be translated (scripts, styles, invisible)
+      // Skip elements that shouldn't be translated (scripts, styles, invisible, form inputs)
       const tagName = parent.tagName;
-      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
+      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'BUTTON'].includes(tagName)) {
         return NodeFilter.FILTER_REJECT;
       }
 
@@ -246,9 +246,9 @@ export function collectBlockGroups(element, sessionContext = {}) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
 
-      // Skip elements that shouldn't be translated (scripts, styles, invisible)
+      // Skip elements that shouldn't be translated (scripts, styles, invisible, form inputs)
       const tagName = parent.tagName;
-      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME'].includes(tagName)) {
+      if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'BUTTON'].includes(tagName)) {
         return NodeFilter.FILTER_REJECT;
       }
 

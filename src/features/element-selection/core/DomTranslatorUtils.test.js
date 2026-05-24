@@ -184,6 +184,34 @@ describe('DomTranslatorUtils', () => {
       expect(nodes.length).toBe(1);
       expect(nodes[0].text).toBe('Actual text');
     });
+
+    it('should reject text nodes inside interactive elements (textarea, input, select, button)', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Translatable text outside.</p>
+        <textarea>Should be rejected text.</textarea>
+        <input type="text" value="Should be rejected text." />
+        <select>
+          <option>Should be rejected option text.</option>
+        </select>
+        <button>Should be rejected button text.</button>
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const textNodes = collectTextNodes(container);
+        expect(textNodes.length).toBe(1);
+        expect(textNodes[0].text.trim()).toBe('Translatable text outside.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
   });
 
   describe('collectBlockGroups', () => {
@@ -286,6 +314,33 @@ describe('DomTranslatorUtils', () => {
       expect(units.length).toBe(1);
       expect(units[0].directionHint).toBe('rtl');
       expect(units[0].inlineParentTags).toEqual(['strong', 'span']);
+    });
+
+    it('should reject text nodes inside interactive elements (textarea, input, select, button) in block grouping mode', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <p>Translatable text outside.</p>
+        <textarea>Should be rejected text.</textarea>
+        <select>
+          <option>Should be rejected option text.</option>
+        </select>
+        <button>Should be rejected button text.</button>
+      `;
+      document.body.appendChild(container);
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible'
+      });
+
+      try {
+        const units = collectBlockGroups(container);
+        expect(units.length).toBe(1);
+        expect(units[0].text.trim()).toBe('Translatable text outside.');
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
     });
   });
 });

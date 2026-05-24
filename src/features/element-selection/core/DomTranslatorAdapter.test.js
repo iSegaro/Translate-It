@@ -927,4 +927,45 @@ describe('DomTranslatorAdapter', () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction anomaly detected'));
     });
   });
+
+  describe('Interactive Tag Exclusions', () => {
+    it('should reject interactive elements in isValidTextElement', async () => {
+      const { isValidTextElement } = await import('@/features/element-selection/utils/elementHelpers.js');
+      
+      const p = document.createElement('p');
+      p.textContent = 'This is valid translatable text.';
+      
+      const textarea = document.createElement('textarea');
+      textarea.value = 'Form input text area.';
+      
+      const input = document.createElement('input');
+      input.value = 'Form input text.';
+      
+      const select = document.createElement('select');
+      const option = document.createElement('option');
+      option.textContent = 'Option text';
+      select.appendChild(option);
+      
+      const button = document.createElement('button');
+      button.textContent = 'Click me';
+
+      // Mock getComputedStyle for valid check
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        opacity: '1'
+      });
+
+      try {
+        expect(isValidTextElement(p)).toBe(true);
+        expect(isValidTextElement(textarea)).toBe(false);
+        expect(isValidTextElement(input)).toBe(false);
+        expect(isValidTextElement(select)).toBe(false);
+        expect(isValidTextElement(button)).toBe(false);
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
+    });
+  });
 });
