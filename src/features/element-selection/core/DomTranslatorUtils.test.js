@@ -212,6 +212,10 @@ describe('DomTranslatorUtils', () => {
       expect(units[1].blockId).toBe('g1');
       expect(units[0].text).toBe('Text 1');
       expect(units[1].text).toBe('Text 2');
+      expect(units[0].node).toBeDefined();
+      expect(units[0].node.textContent).toBe('Text 1');
+      expect(units[1].node).toBeDefined();
+      expect(units[1].node.textContent).toBe('Text 2');
 
       // Crucial: The live DOM is clean of blockId dataset variables
       const block1El = container.querySelector('.block1');

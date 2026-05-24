@@ -320,6 +320,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
       inlineParentTags,
       mode: preWhitespace ? 'V2_PASSTHROUGH' : 'standard'
     });
+    unit.node = node;
 
     units.push(unit);
   }
