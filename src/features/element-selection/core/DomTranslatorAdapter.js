@@ -338,7 +338,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                             parsed.forEach(seg => {
                               this.translatedSegmentMap.set(seg.id, seg.text);
                             });
-                          } catch {}
+                          } catch {
+                            // Ignore split errors for shadow comparison
+                          }
                         } catch (error) {
                           this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                           this._rollbackBlockGroup(this.currentSessionId, group.blockId);
@@ -536,7 +538,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } else {
         parentDir = document.documentElement.dir || 'ltr';
       }
-    } catch (e) {}
+    } catch {
+      // Ignore style computation errors
+    }
     
     return detectedDir !== parentDir;
   }
@@ -653,7 +657,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                    parsed.forEach(seg => {
                      this.translatedSegmentMap.set(seg.id, seg.text);
                    });
-                 } catch {}
+                 } catch {
+                   // Ignore split errors for shadow comparison
+                 }
               } catch (error) {
                 this.logger.error(`[Reconstructor] Apply failed for block group ${group.blockId}:`, error);
                 this._rollbackBlockGroup(this.currentSessionId, group.blockId);

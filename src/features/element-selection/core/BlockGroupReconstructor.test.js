@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlockGroupReconstructor } from './BlockGroupReconstructor.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
-import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
+
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({

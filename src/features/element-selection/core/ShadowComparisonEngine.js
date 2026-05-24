@@ -3,10 +3,9 @@
  * Used in Phase 6 to validate the V3 Block Grouping pipeline against the V2 pipeline in memory.
  */
 
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'ShadowComparisonEngine');
+
+
 
 export class ShadowComparisonEngine {
   /**

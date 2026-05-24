@@ -90,9 +90,7 @@ vi.mock('./DomTranslatorState.js', async () => {
 });
 
 import { 
-  globalSelectElementState, 
-  revertSelectElementTranslation, 
-  getSelectElementTranslationState 
+  globalSelectElementState 
 } from './DomTranslatorState.js';
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({

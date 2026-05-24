@@ -156,7 +156,9 @@ export class BlockGroupReconstructor {
         const dirNode = el.closest('[dir]');
         if (dirNode) direction = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
         else direction = window.getComputedStyle(el).direction || 'ltr';
-      } catch (e) {}
+      } catch {
+        // Ignore errors in direction detection
+      }
       transactionCache.set(el, direction);
       return direction;
     };

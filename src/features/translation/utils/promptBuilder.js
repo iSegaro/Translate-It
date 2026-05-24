@@ -117,7 +117,9 @@ export async function buildPrompt(
       } else if (parsed && Array.isArray(parsed.translations)) {
         jsonCount = parsed.translations.length;
       }
-    } catch {}
+    } catch {
+      // Ignore JSON parsing errors for count estimation
+    }
 
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
