@@ -100,15 +100,16 @@ describe('ShadowComparisonEngine', () => {
       expect(result.reason).toContain('TagName mismatch');
     });
 
-    it('should detect mismatch for different attribute values', () => {
+    it('should treat different attribute values as non-fatal warnings (equivalent stays true)', () => {
       const elA = document.createElement('div');
       elA.innerHTML = '<span class="active">Hello</span>';
       const elB = document.createElement('div');
       elB.innerHTML = '<span class="disabled">Hello</span>';
 
       const result = ShadowComparisonEngine.compare(elA, elB);
-      expect(result.equivalent).toBe(false);
-      expect(result.reason).toContain('Attributes mismatch');
+      expect(result.equivalent).toBe(true);
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain('Attributes mismatch');
     });
 
     it('should detect mismatch for child counts', () => {

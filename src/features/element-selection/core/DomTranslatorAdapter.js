@@ -500,6 +500,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
           if (!comparison.equivalent) {
             this.logger.error(`[ShadowMode] Reconstruction anomaly detected!\nReason: ${comparison.reason}`);
+          } else if (comparison.warnings && comparison.warnings.length > 0) {
+            this.logger.debug(`[ShadowMode] Reconstruction validated with non-fatal attribute changes:\n${comparison.warnings.join('\n')}`);
           } else {
             this.logger.debug('[ShadowMode] Reconstruction perfectly validated. Semantic equivalence verified.');
           }

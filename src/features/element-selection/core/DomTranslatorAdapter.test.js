@@ -926,6 +926,56 @@ describe('DomTranslatorAdapter', () => {
       expect(result.success).toBe(true);
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction anomaly detected'));
     });
+
+    it('should log debug message on non-fatal attribute anomaly', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      // Mock equivalent: true but with warnings
+      vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ 
+        equivalent: true, 
+        reason: null, 
+        warnings: ['Mocked attribute mismatch'] 
+      });
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello';
+      div.appendChild(span1);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        node: span1.firstChild,
+        inlineParentTags: ['span']
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        setTimeout(() => {
+          callbacks.onStreamEnd({ success: true });
+        }, 10);
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const debugSpy = vi.spyOn(adapter.logger, 'debug');
+      const errorSpy = vi.spyOn(adapter.logger, 'error');
+
+      adapter.translatedSegmentMap.set('n1', 'مرحبا');
+      await adapter.translateElement(div);
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('non-fatal attribute changes'));
+    });
   });
 
   describe('Interactive Tag Exclusions', () => {

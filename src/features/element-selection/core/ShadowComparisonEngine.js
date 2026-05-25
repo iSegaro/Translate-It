@@ -13,15 +13,17 @@ export class ShadowComparisonEngine {
    *
    * @param {Node} nodeA - The V2 translated node clone
    * @param {Node} nodeB - The V3 translated node clone
-   * @returns {Object} { equivalent: boolean, reason: string | null }
+   * @param {string[]} warnings - Array to collect non-fatal warnings
+   * @returns {Object} { equivalent: boolean, reason: string | null, warnings: string[] }
    */
-  static compare(nodeA, nodeB) {
+  static compare(nodeA, nodeB, warnings = []) {
     // 1. Handle null/missing checks
-    if (!nodeA && !nodeB) return { equivalent: true, reason: null };
+    if (!nodeA && !nodeB) return { equivalent: true, reason: null, warnings };
     if (!nodeA || !nodeB) {
       return { 
         equivalent: false, 
-        reason: `Node mismatch: nodeA is ${nodeA ? 'present' : 'absent'}, nodeB is ${nodeB ? 'present' : 'absent'}` 
+        reason: `Node mismatch: nodeA is ${nodeA ? 'present' : 'absent'}, nodeB is ${nodeB ? 'present' : 'absent'}`,
+        warnings
       };
     }
 
@@ -29,7 +31,8 @@ export class ShadowComparisonEngine {
     if (nodeA.nodeType !== nodeB.nodeType) {
       return { 
         equivalent: false, 
-        reason: `NodeType mismatch: nodeA is ${nodeA.nodeType}, nodeB is ${nodeB.nodeType}` 
+        reason: `NodeType mismatch: nodeA is ${nodeA.nodeType}, nodeB is ${nodeB.nodeType}`,
+        warnings
       };
     }
 
@@ -40,10 +43,11 @@ export class ShadowComparisonEngine {
       if (textA !== textB) {
         return { 
           equivalent: false, 
-          reason: `Text content mismatch:\nNodeA: "${textA}"\nNodeB: "${textB}"` 
+          reason: `Text content mismatch:\nNodeA: "${textA}"\nNodeB: "${textB}"`,
+          warnings
         };
       }
-      return { equivalent: true, reason: null };
+      return { equivalent: true, reason: null, warnings };
     }
 
     // 4. Handle Element Nodes
@@ -52,20 +56,19 @@ export class ShadowComparisonEngine {
       if (nodeA.tagName !== nodeB.tagName) {
         return { 
           equivalent: false, 
-          reason: `TagName mismatch: nodeA is ${nodeA.tagName}, nodeB is ${nodeB.tagName}` 
+          reason: `TagName mismatch: nodeA is ${nodeA.tagName}, nodeB is ${nodeB.tagName}`,
+          warnings
         };
       }
 
-      // Compare non-framework Attributes
+      // Compare non-framework Attributes (Non-fatal)
       const attrsA = this.getCleanAttributes(nodeA);
       const attrsB = this.getCleanAttributes(nodeB);
       
       const attrsMatch = this.compareAttributes(attrsA, attrsB);
       if (!attrsMatch.equal) {
-        return { 
-          equivalent: false, 
-          reason: `Attributes mismatch on tag ${nodeA.tagName}: ${attrsMatch.reason}` 
-        };
+        // Collect attribute mismatches as non-fatal warnings instead of failing equivalence
+        warnings.push(`Attributes mismatch on tag ${nodeA.tagName}: ${attrsMatch.reason}`);
       }
 
       // Compare Child Nodes recursively
@@ -75,22 +78,23 @@ export class ShadowComparisonEngine {
       if (childrenA.length !== childrenB.length) {
         return { 
           equivalent: false, 
-          reason: `Child count mismatch on tag ${nodeA.tagName}: nodeA has ${childrenA.length}, nodeB has ${childrenB.length}` 
+          reason: `Child count mismatch on tag ${nodeA.tagName}: nodeA has ${childrenA.length}, nodeB has ${childrenB.length}`,
+          warnings
         };
       }
 
       for (let i = 0; i < childrenA.length; i++) {
-        const result = this.compare(childrenA[i], childrenB[i]);
+        const result = this.compare(childrenA[i], childrenB[i], warnings);
         if (!result.equivalent) {
           return result;
         }
       }
 
-      return { equivalent: true, reason: null };
+      return { equivalent: true, reason: null, warnings };
     }
 
     // Ignore other node types (comments, processing instructions, etc.)
-    return { equivalent: true, reason: null };
+    return { equivalent: true, reason: null, warnings };
   }
 
   /**
