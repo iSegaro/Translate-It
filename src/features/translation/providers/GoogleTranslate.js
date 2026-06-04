@@ -18,6 +18,7 @@ import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslate');
+const PARAGRAPH_BREAK_REGEX = /\n{2,}/;
 
 export class GoogleTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -36,6 +37,59 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
   constructor() {
     super(ProviderNames.GOOGLE_TRANSLATE);
+  }
+
+  async _createChunks(texts) {
+    const chunks = await super._createChunks(texts);
+    return this._isolateParagraphChunks(chunks);
+  }
+
+  _isolateParagraphChunks(chunks) {
+    const isolatedChunks = [];
+
+    for (const chunk of chunks) {
+      if (!chunk?.texts?.some(item => PARAGRAPH_BREAK_REGEX.test(getTextInfo(item).text))) {
+        isolatedChunks.push(chunk);
+        continue;
+      }
+
+      let currentTexts = [];
+
+      const flushCurrent = () => {
+        if (currentTexts.length === 0) return;
+        isolatedChunks.push({
+          ...chunk,
+          texts: currentTexts,
+          charCount: this._calculateChunkCharCount(currentTexts)
+        });
+        currentTexts = [];
+      };
+
+      for (const item of chunk.texts) {
+        const info = getTextInfo(item);
+        if (PARAGRAPH_BREAK_REGEX.test(info.text)) {
+          flushCurrent();
+          isolatedChunks.push({
+            ...chunk,
+            texts: [item],
+            charCount: info.length
+          });
+          continue;
+        }
+
+        currentTexts.push(item);
+      }
+
+      flushCurrent();
+    }
+
+    return isolatedChunks;
+  }
+
+  _calculateChunkCharCount(texts) {
+    const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
+    const textLength = texts.reduce((sum, item) => sum + getTextInfo(item).length, 0);
+    return textLength + (Math.max(0, texts.length - 1) * delimiterLength);
   }
 
   _getLangCode(lang) {

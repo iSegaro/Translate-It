@@ -217,7 +217,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         isRequestProgress: true // Flag to indicate this is API request count
       });
 
-      // 2. Prepare payload - CRITICAL: Must be 1:1 mapping with textNodesData
+      // 2. Prepare payload - keep the original node map stable with a 1:1 mapping.
       // Use abbreviated keys to save tokens: t=text, i=uid, b=blockId, r=role
       let textsToTranslate = [];
       if (isBlockGroupingEnabled) {
@@ -240,7 +240,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           }
         });
       } else {
-        textsToTranslate = textNodesData.map(data => ({ 
+        textsToTranslate = textNodesData.map((data) => ({
           t: data.text || '',
           i: data.uid,
           b: data.blockId,
@@ -321,6 +321,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     if (group.isV2Passthrough) {
                       const unit = group.units[0];
                       if (!processedUids.has(unit.id)) {
+                        const text = translatedItem?.t || translatedItem?.text || translatedItem;
                         this._applyTranslationToNode(unit.node, text, effectiveTargetLanguage, element);
                         processedUids.add(unit.id);
                         this.translatedSegmentMap.set(unit.id, text);
@@ -366,7 +367,6 @@ export class DomTranslatorAdapter extends ResourceTracker {
                     if (nodeData && !processedUids.has(nodeData.uid)) {
                       this._applyTranslationToNode(nodeData.node, text, effectiveTargetLanguage, element);
                       processedUids.add(nodeData.uid);
-                      this.translatedSegmentMap.set(nodeData.uid, text);
                     }
                   }
                 });
@@ -594,7 +594,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     } else {
       finalTranslation = finalTranslation.trim();
     }
-    
+
     // 1. Register original text before modification for Hover Tooltip
     hoverPreviewLookup.add(textNode, originalText);
 
@@ -691,10 +691,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
           if (!nodeData) {
             nodeData = textNodesData[i];
           }
-          if (nodeData && !processedUids.has(nodeData.uid)) {
+
+          if (nodeData) {
             this._applyTranslationToNode(nodeData.node, text, finalTargetLanguage, element);
-            processedUids.add(nodeData.uid);
-            this.translatedSegmentMap.set(nodeData.uid, text);
           }
         }
       });

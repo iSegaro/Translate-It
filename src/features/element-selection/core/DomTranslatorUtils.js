@@ -18,11 +18,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorU
  */
 const EXCLUDED_TAGS = [
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'TEXTAREA', 'INPUT', 
-  'HEAD', 'META', 'LINK', 'SVG', 'KBD', 'SAMP', 'TIME',
-  'RUBY', 'RT', 'RP', 'PRE', 'CODE'
+  'SELECT', 'OPTION', 'BUTTON',
+  'HEAD', 'META', 'LINK', 'SVG', 'TIME',
+  'RUBY', 'RT', 'RP', 'PRE', 'CODE', 'KBD', 'SAMP'
 ];
 
 const EXCLUDED_ROLES = ['textbox', 'searchbox', 'combobox', 'code'];
+const PREFORMATTED_TAGS = new Set(['PRE', 'CODE', 'KBD', 'SAMP']);
 
 /**
  * Finds the closest block-level parent for a node based on context boundaries
@@ -176,13 +178,16 @@ export function extractContextMetadata(element) {
  * @param {boolean} isRoot - Whether this is the root element being translated
  * @returns {boolean}
  */
-function isExcludedElement(el, isRoot = false) {
+function isExcludedElement(el, isRoot = false, options = {}) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
   
   const tagName = el.tagName.toUpperCase();
   
   // 1. Technical/Interactive tags
   if (EXCLUDED_TAGS.includes(tagName)) {
+    if (options.allowPreformatted && PREFORMATTED_TAGS.has(tagName)) {
+      return false;
+    }
     logger.debug(`[isExcludedElement] Rejected by tag: ${tagName}`, el);
     return true;
   }
@@ -231,6 +236,10 @@ function isExcludedElement(el, isRoot = false) {
  * @returns {boolean} True if the node should be excluded
  */
 export function isExcludedAncestor(node, isRoot = false) {
+  return isExcludedAncestorWithOptions(node, isRoot);
+}
+
+function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
   if (!node) return false;
   
   // Start from the node itself if it's an element, or its parent if it's text
@@ -238,7 +247,7 @@ export function isExcludedAncestor(node, isRoot = false) {
   let currentIsRoot = isRoot;
 
   while (curr) {
-    if (isExcludedElement(curr, currentIsRoot)) return true;
+    if (isExcludedElement(curr, currentIsRoot, options)) return true;
 
     // Cross Shadow DOM boundary
     if (curr.host) {
@@ -286,6 +295,10 @@ export function collectTextNodes(element) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
+      if (isExcludedAncestor(node)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
       const trimmed = node.textContent.trim();
       if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
         return NodeFilter.FILTER_REJECT;
@@ -366,7 +379,7 @@ export function collectTextNodes(element) {
  */
 export function collectBlockGroups(element, sessionContext = {}) {
   // 1. Entry check: If the starting element is already excluded, return empty
-  if (isExcludedAncestor(element, true)) {
+  if (isExcludedAncestorWithOptions(element, true, { allowPreformatted: true })) {
     return [];
   }
 
@@ -384,7 +397,7 @@ export function collectBlockGroups(element, sessionContext = {}) {
     // Branch Filtering (Elements)
     if (node.nodeType === Node.ELEMENT_NODE) {
       // Business logic exclusions (Tags, Class, Attributes, Editable, Roles)
-      if (isExcludedElement(node)) return NodeFilter.FILTER_REJECT;
+      if (isExcludedElement(node, false, { allowPreformatted: true })) return NodeFilter.FILTER_REJECT;
       
       // Visibility check
       try {
@@ -401,13 +414,12 @@ export function collectBlockGroups(element, sessionContext = {}) {
 
     // Leaf Filtering (Text Nodes)
     if (node.nodeType === Node.TEXT_NODE) {
-      const trimmed = node.textContent.trim();
-      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
+      if (isExcludedAncestorWithOptions(node, false, { allowPreformatted: true })) {
         return NodeFilter.FILTER_REJECT;
       }
-      
-      // Skip pure numbers, symbols, or whitespace (Line numbers, etc.)
-      if (DOM_FILTERS.NUMERIC_REGEX.test(trimmed) || /^[\d\s\p{P}\p{S}]+$/u.test(trimmed)) {
+
+      const trimmed = node.textContent.trim();
+      if (!trimmed || DOM_FILTERS.isTechnicalPattern(trimmed)) {
         return NodeFilter.FILTER_REJECT;
       }
 

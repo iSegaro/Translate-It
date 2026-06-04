@@ -270,6 +270,145 @@ describe('DomTranslatorAdapter', () => {
       expect(testElement.textContent).toContain('سلام');
     });
 
+    it('should keep traditional Select Element payload 1:1 for a paragraph-bearing node', async () => {
+      testElement.textContent = 'Paragraph one\n\nParagraph two';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated paragraph one\n\nTranslated paragraph two', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0]).toMatchObject({
+        t: 'Paragraph one\n\nParagraph two',
+        i: 'n1',
+        b: 'b1',
+        r: 'div'
+      });
+      expect(payload[0]).not.toHaveProperty('parentUid');
+      expect(payload[0]).not.toHaveProperty('partIndex');
+      expect(payload[0]).not.toHaveProperty('partCount');
+      expect(textNode.nodeValue).toContain('Translated paragraph one\n\nTranslated paragraph two');
+    });
+
+    it('should keep a three-paragraph node as a single provider payload item', async () => {
+      testElement.textContent = 'One\n\nTwo\n\nThree';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated one\n\nTranslated two\n\nTranslated three', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0].t).toBe('One\n\nTwo\n\nThree');
+      expect(textNode.nodeValue).toContain('Translated one\n\nTranslated two\n\nTranslated three');
+    });
+
+    it('should leave text without internal paragraph breaks unchanged in payload shape', async () => {
+      testElement.textContent = 'Hello world';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Hello translated', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0]).toMatchObject({ i: 'n1', t: 'Hello world', b: 'b1', r: 'div' });
+      expect(textNode.nodeValue).toContain('Hello translated');
+    });
+
+    it('should keep multiple Select Element nodes in original 1:1 mapping even when one has paragraphs', async () => {
+      const firstNode = document.createTextNode('First paragraph\n\nSecond line');
+      const secondNode = document.createTextNode('Another segment');
+      testElement.replaceChildren(firstNode, secondNode);
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: firstNode, text: firstNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: secondNode, text: secondNode.nodeValue, uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([
+          { t: 'First translated\n\nSecond paragraph translated', i: 'n1' },
+          { t: 'Second translated', i: 'n2' }
+        ])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(2);
+      expect(payload[0]).toMatchObject({ i: 'n1', t: 'First paragraph\n\nSecond line' });
+      expect(payload[1]).toMatchObject({ i: 'n2', t: 'Another segment' });
+      expect(payload[0]).not.toHaveProperty('parentUid');
+      expect(payload[1]).not.toHaveProperty('parentUid');
+      expect(firstNode.nodeValue).toContain('First translated\n\nSecond paragraph translated');
+      expect(secondNode.nodeValue).toContain('Second translated');
+    });
+
+    it('should not split AI provider payloads', async () => {
+      const { getEffectiveProviderAsync } = await import('@/config.js');
+      getEffectiveProviderAsync.mockResolvedValueOnce('gemini');
+
+      testElement.textContent = 'Paragraph one\n\nParagraph two';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated text', i: 'n1' }])
+      });
+
+      await adapter.translateElement(testElement);
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(payload).toHaveLength(1);
+      expect(payload[0].t).toBe('Paragraph one\n\nParagraph two');
+      expect(textNode.nodeValue).toContain('Translated text');
+    });
+
     it('should handle translation errors', async () => {
       contentScriptIntegration.sendTranslationRequest.mockRejectedValue(new Error('Network error'));
 
