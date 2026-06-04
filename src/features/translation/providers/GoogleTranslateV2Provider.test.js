@@ -232,4 +232,30 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
     ]);
     expect(chunks[1].texts[0]).toBe(paragraph);
   });
+
+  it('normalizes duplicated slash-dash artifacts in the single-segment sentences parser', async () => {
+    const sourceText = '+ /-';
+    const apiResponse = {
+      sentences: [
+        { trans: '+ //-', orig: sourceText }
+      ]
+    };
+
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse(apiResponse));
+
+    const result = await provider._translateChunk(
+      [sourceText],
+      'en',
+      'fa',
+      'select-element',
+      null,
+      0,
+      1,
+      0,
+      1,
+      {}
+    );
+
+    expect(result).toBe('+ /-');
+  });
 });

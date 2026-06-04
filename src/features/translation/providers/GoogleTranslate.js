@@ -15,6 +15,7 @@ import { getProviderLanguageCode } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { isolateNewlineChunks } from "./utils/NewlineChunkIsolation.js";
+import { normalizeGoogleSlashDashArtifact } from "./utils/GoogleSlashDashNormalization.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { getTranslationString } from "@/utils/i18n/i18n.js";
 
@@ -125,17 +126,26 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
 
         // For single segments, handle JSON and legacy formats
         if (chunkTexts.length === 1) {
+          const sourceText = getTextInfo(chunkTexts[0]).text;
+
           if (data.sentences) {
-            const translatedText = data.sentences
+            const translatedText = normalizeGoogleSlashDashArtifact(
+              data.sentences
               .filter(s => s.trans)
               .map(s => s.trans)
-              .join('');
+              .join(''),
+              sourceText
+            );
             
-            return { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+            const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+            return response;
           }
 
           if (Array.isArray(data[0])) {
-            const translatedText = data[0].map(segment => segment[0] || "").join('');
+            const translatedText = normalizeGoogleSlashDashArtifact(
+              data[0].map(segment => segment[0] || "").join(''),
+              sourceText
+            );
             
             let candidateText = "";
             if (shouldIncludeDictionary && data[1]) {
@@ -145,7 +155,6 @@ export class GoogleTranslateProvider extends BaseTranslateProvider {
                 return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
               }).join("");
             }
-
             return {
               translatedText,
               candidateText: candidateText.trim(),
