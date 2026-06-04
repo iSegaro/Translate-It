@@ -177,7 +177,8 @@ const getRawManifest = () => [
     importFunction: () => import("./CustomProvider.js").then(m => ({ default: m.CustomProvider })),
     features: ["translation", "subtitle", "text", "autoDetect", "context", "configurable", "dictionary", "bulk", "bilingual"],
     needsApiKey: true,
-    requiredSettings: ['CUSTOM_API_KEY', 'CUSTOM_API_URL', 'CUSTOM_API_MODEL'],
+    // Some OpenAI-compatible endpoints accept anonymous requests, so the API key is optional.
+    requiredSettings: ['CUSTOM_API_URL', 'CUSTOM_API_MODEL'],
     consumesTokens: true,
     supported: true,
   },

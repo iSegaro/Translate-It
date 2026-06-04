@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CustomProvider } from './CustomProvider.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getCustomApiKeysAsync } from '@/shared/config/config.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -44,6 +45,26 @@ describe('CustomProvider Error Handling', () => {
 
     const result = await provider._callAI('system', 'Hello World');
     expect(result).toBe('Custom AI Result');
+  });
+
+  it('should allow anonymous OpenAI-compatible requests without an API key', async () => {
+    vi.mocked(getCustomApiKeysAsync).mockResolvedValueOnce([]);
+
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Anonymous Custom AI Result' } }]
+      }),
+      clone: function() { return this; }
+    });
+
+    const result = await provider._callAI('system', 'Hello World');
+    const fetchOptions = proxyManager.fetch.mock.calls[0][1];
+
+    expect(result).toBe('Anonymous Custom AI Result');
+    expect(fetchOptions.headers.Authorization).toBeUndefined();
   });
 
   it('should detect API_ERROR wrapped in 200 OK response', async () => {
