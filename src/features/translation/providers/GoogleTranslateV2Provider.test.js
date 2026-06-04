@@ -124,6 +124,31 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
     ]);
   });
 
+  it('does not isolate whitespace-padded wrapper newlines', async () => {
+    const originalChunk = { texts: ['A', '\n      Pinned\n    ', 'C'], charCount: 3 };
+    baseCreateChunksSpy.mockResolvedValue([originalChunk]);
+
+    const chunks = await provider._createChunks(['A', '\n      Pinned\n    ', 'C']);
+
+    expect(chunks).toEqual([originalChunk]);
+  });
+
+  it('does not isolate indentation-only wrapper newlines around one content line', async () => {
+    const first = { i: 'n1', t: 'A' };
+    const wrapped = { i: 'n2', t: '\n        Webchat to API (Gemini)\n      ' };
+    const last = { i: 'n3', t: 'C' };
+    baseCreateChunksSpy.mockResolvedValue([
+      { texts: [first, wrapped, last], charCount: 3 }
+    ]);
+
+    const chunks = await provider._createChunks([first, wrapped, last]);
+
+    expect(chunks).toEqual([
+      { texts: [first, wrapped, last], charCount: 3 }
+    ]);
+    expect(chunks[0].texts[1]).toBe(wrapped);
+  });
+
   it('sends newline-bearing items to _translateChunk as single-item chunks', async () => {
     baseCreateChunksSpy.mockResolvedValue([
       { texts: ['A', 'B\n\nC', 'D'], charCount: 5 }
@@ -183,6 +208,34 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       [last]
     ]);
     expect(chunks[1].texts[0]).toBe(lineBreak);
+  });
+
+  it('isolates real single internal newlines', async () => {
+    baseCreateChunksSpy.mockResolvedValue([
+      { texts: ['A', 'Photo: Aryamhar\nBio: constitutional monarchist', 'C'], charCount: 3 }
+    ]);
+
+    const chunks = await provider._createChunks(['A', 'Photo: Aryamhar\nBio: constitutional monarchist', 'C']);
+
+    expect(chunks.map(chunk => chunk.texts)).toEqual([
+      ['A'],
+      ['Photo: Aryamhar\nBio: constitutional monarchist'],
+      ['C']
+    ]);
+  });
+
+  it('isolates paragraph double newlines', async () => {
+    baseCreateChunksSpy.mockResolvedValue([
+      { texts: ['A', 'Paragraph one\n\nParagraph two', 'C'], charCount: 3 }
+    ]);
+
+    const chunks = await provider._createChunks(['A', 'Paragraph one\n\nParagraph two', 'C']);
+
+    expect(chunks.map(chunk => chunk.texts)).toEqual([
+      ['A'],
+      ['Paragraph one\n\nParagraph two'],
+      ['C']
+    ]);
   });
 
   it('preserves result order across isolated and batched chunks', async () => {

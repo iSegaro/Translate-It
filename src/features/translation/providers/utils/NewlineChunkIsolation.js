@@ -1,13 +1,27 @@
 /**
  * Newline Chunk Isolation
- * Shared Google-provider helper that isolates newline-bearing text items
- * into their own translation chunks before provider-specific multi-segment parsing.
+ * Shared Google-provider helper that isolates text items with meaningful
+ * internal line breaks into their own translation chunks before provider-specific
+ * multi-segment parsing.
  */
 
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getTextInfo } from "./TraditionalTextProcessor.js";
 
 export const NEWLINE_REGEX = /\n+/;
+
+/**
+ * Detects whether a text contains a meaningful internal line break after
+ * trimming layout-only whitespace from the edges.
+ */
+export const hasMeaningfulInternalNewline = (text) => {
+  if (typeof text !== 'string') return false;
+
+  const trimmed = text.trim();
+  if (!trimmed.includes('\n')) return false;
+
+  return /\S[^\n]*\n+[^\n]*\S/.test(trimmed);
+};
 
 const calculateChunkCharCount = (texts) => {
   const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
@@ -19,7 +33,7 @@ export const isolateNewlineChunks = (chunks) => {
   const isolatedChunks = [];
 
   for (const chunk of chunks) {
-    if (!chunk?.texts?.some(item => NEWLINE_REGEX.test(getTextInfo(item).text))) {
+    if (!chunk?.texts?.some(item => hasMeaningfulInternalNewline(getTextInfo(item).text))) {
       isolatedChunks.push(chunk);
       continue;
     }
@@ -38,7 +52,7 @@ export const isolateNewlineChunks = (chunks) => {
 
     for (const item of chunk.texts) {
       const info = getTextInfo(item);
-      if (NEWLINE_REGEX.test(info.text)) {
+      if (hasMeaningfulInternalNewline(info.text)) {
         flushCurrent();
         isolatedChunks.push({
           ...chunk,
