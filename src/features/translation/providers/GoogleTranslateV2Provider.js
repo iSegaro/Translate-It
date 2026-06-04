@@ -3,7 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
-import { isolateParagraphChunks } from "./utils/ParagraphChunkIsolation.js";
+import { isolateNewlineChunks } from "./utils/NewlineChunkIsolation.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
@@ -54,7 +54,7 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
   async _createChunks(texts) {
     const chunks = await super._createChunks(texts);
-    return isolateParagraphChunks(chunks);
+    return isolateNewlineChunks(chunks);
   }
 
   _getLangCode(lang) {

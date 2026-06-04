@@ -1,13 +1,13 @@
 /**
- * Paragraph Chunk Isolation
- * Shared Google-provider helper that isolates paragraph-bearing text items
+ * Newline Chunk Isolation
+ * Shared Google-provider helper that isolates newline-bearing text items
  * into their own translation chunks before provider-specific multi-segment parsing.
  */
 
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { getTextInfo } from "./TraditionalTextProcessor.js";
 
-export const PARAGRAPH_BREAK_REGEX = /\n{2,}/;
+export const NEWLINE_REGEX = /\n+/;
 
 const calculateChunkCharCount = (texts) => {
   const delimiterLength = TRANSLATION_CONSTANTS.TEXT_DELIMITER?.length || 0;
@@ -15,11 +15,11 @@ const calculateChunkCharCount = (texts) => {
   return textLength + (Math.max(0, texts.length - 1) * delimiterLength);
 };
 
-export const isolateParagraphChunks = (chunks) => {
+export const isolateNewlineChunks = (chunks) => {
   const isolatedChunks = [];
 
   for (const chunk of chunks) {
-    if (!chunk?.texts?.some(item => PARAGRAPH_BREAK_REGEX.test(getTextInfo(item).text))) {
+    if (!chunk?.texts?.some(item => NEWLINE_REGEX.test(getTextInfo(item).text))) {
       isolatedChunks.push(chunk);
       continue;
     }
@@ -38,7 +38,7 @@ export const isolateParagraphChunks = (chunks) => {
 
     for (const item of chunk.texts) {
       const info = getTextInfo(item);
-      if (PARAGRAPH_BREAK_REGEX.test(info.text)) {
+      if (NEWLINE_REGEX.test(info.text)) {
         flushCurrent();
         isolatedChunks.push({
           ...chunk,

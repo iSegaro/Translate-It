@@ -82,7 +82,7 @@ vi.mock('@/utils/translation/TranslationSegmentMapper.js', () => ({
   }
 }));
 
-describe('GoogleTranslateV2Provider paragraph chunk isolation', () => {
+describe('GoogleTranslateV2Provider newline chunk isolation', () => {
   let provider;
   let baseCreateChunksSpy;
 
@@ -96,7 +96,7 @@ describe('GoogleTranslateV2Provider paragraph chunk isolation', () => {
     vi.restoreAllMocks();
   });
 
-  it('isolates paragraph-bearing items inside mixed multi-segment chunks', async () => {
+  it('isolates newline-bearing items inside mixed multi-segment chunks', async () => {
     baseCreateChunksSpy.mockResolvedValue([
       { texts: ['A', 'B\n\nC', 'D'], charCount: 5 }
     ]);
@@ -110,7 +110,21 @@ describe('GoogleTranslateV2Provider paragraph chunk isolation', () => {
     ]);
   });
 
-  it('sends paragraph-bearing items to _translateChunk as single-item chunks', async () => {
+  it('isolates line-break-bearing items inside mixed multi-segment chunks', async () => {
+    baseCreateChunksSpy.mockResolvedValue([
+      { texts: ['A', 'B\nC', 'D'], charCount: 5 }
+    ]);
+
+    const chunks = await provider._createChunks(['A', 'B\nC', 'D']);
+
+    expect(chunks.map(chunk => chunk.texts)).toEqual([
+      ['A'],
+      ['B\nC'],
+      ['D']
+    ]);
+  });
+
+  it('sends newline-bearing items to _translateChunk as single-item chunks', async () => {
     baseCreateChunksSpy.mockResolvedValue([
       { texts: ['A', 'B\n\nC', 'D'], charCount: 5 }
     ]);
@@ -153,6 +167,24 @@ describe('GoogleTranslateV2Provider paragraph chunk isolation', () => {
     expect(chunks).toEqual([originalChunk]);
   });
 
+  it('preserves Select Element object identity for line-break-bearing payloads', async () => {
+    const first = { i: 'n1', t: 'A' };
+    const lineBreak = { i: 'n2', t: 'B\nC' };
+    const last = { i: 'n3', t: 'D' };
+    baseCreateChunksSpy.mockResolvedValue([
+      { texts: [first, lineBreak, last], charCount: 5 }
+    ]);
+
+    const chunks = await provider._createChunks([first, lineBreak, last]);
+
+    expect(chunks.map(chunk => chunk.texts)).toEqual([
+      [first],
+      [lineBreak],
+      [last]
+    ]);
+    expect(chunks[1].texts[0]).toBe(lineBreak);
+  });
+
   it('preserves result order across isolated and batched chunks', async () => {
     baseCreateChunksSpy.mockResolvedValue([
       { texts: ['A', 'B\n\nC', 'D', 'E'], charCount: 7 }
@@ -183,7 +215,7 @@ describe('GoogleTranslateV2Provider paragraph chunk isolation', () => {
     ]);
   });
 
-  it('isolates paragraph-bearing Select Element object payloads without changing their identity', async () => {
+  it('isolates newline-bearing Select Element object payloads without changing their identity', async () => {
     const first = { i: 'n1', t: 'A' };
     const paragraph = { i: 'n2', t: 'B\n\nC' };
     const last = { i: 'n3', t: 'D' };
