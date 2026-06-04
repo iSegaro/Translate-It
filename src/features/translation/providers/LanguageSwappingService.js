@@ -81,9 +81,9 @@ export class LanguageSwappingService {
            if (originalSourceNorm !== AUTO_DETECT_VALUE && getCanonicalCode(originalSourceNorm) !== detectedLangCode) {
              newTargetLang = originalSourceNorm;
            } else {
-             // Fallback to English if original source was auto-detect or same as detected
-             // If detected is already English, fallback to Persian as a sensible default for this extension
-             newTargetLang = (detectedLangCode === 'en') ? 'fa' : 'en';
+             // Fallback to English when the original source was auto-detect or already matches the detected language.
+             // This prevents auto-detect flows from incorrectly routing English text to Persian.
+             newTargetLang = 'en';
            }
 
            const swapReason = shouldSwapForDictionary ? 'Dictionary swap' : 'Bilingual swap';

@@ -142,7 +142,7 @@ describe('LanguageSwappingService', () => {
       expect(tgt).toBe('en');
     });
 
-    it('should swap to Farsi when detected text is English and target is English', async () => {
+    it('should fallback to English when detected text is English and target is English', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
       
@@ -153,9 +153,9 @@ describe('LanguageSwappingService', () => {
         'Hello', 'auto', 'en', 'auto', { mode: 'selection' }
       );
 
-      // Expected: en -> fa (Smart fallback to Farsi for English input)
+      // Expected: en -> en (Fallback stays in English for auto-detect flows)
       expect(src).toBe('en');
-      expect(tgt).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should respect user manual source language as the new target after swapping', async () => {
@@ -185,9 +185,9 @@ describe('LanguageSwappingService', () => {
         'book', 'auto', 'en', 'en', { mode: 'dictionary' }
       );
 
-      // Expected: Still swaps because Dictionary mode requires it to get definitions
+      // Expected: Dictionary mode still swaps, but auto-source now falls back to English
       expect(src).toBe('en');
-      expect(tgt).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should return original languages if detection fails', async () => {
