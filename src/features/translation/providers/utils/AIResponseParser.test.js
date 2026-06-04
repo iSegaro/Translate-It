@@ -36,6 +36,36 @@ describe('AIResponseParser', () => {
       const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
       expect(result).toBe('Hello و World');
     });
+
+    it('should restore single newline markers in raw strings', () => {
+      const input = 'Hello<n1/>World';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('Hello\nWorld');
+    });
+
+    it('should restore double newline markers in raw strings', () => {
+      const input = 'Hello<n2/>World';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('Hello\n\nWorld');
+    });
+
+    it('should preserve empty parsed text as an empty string', () => {
+      const input = '{"text": ""}';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('');
+    });
+
+    it('should restore a marker-only empty-like string to a newline marker expansion', () => {
+      const input = '<n2/>';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('\n\n');
+    });
+
+    it('should leave normal text unchanged when no markers are present', () => {
+      const input = 'Hello World';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('Hello World');
+    });
   });
 
   describe('cleanAIResponse - JSON Format', () => {
@@ -56,6 +86,18 @@ describe('AIResponseParser', () => {
       const input = "{'translations': ['test']}";
       const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.JSON_OBJECT);
       expect(result).toEqual({ translations: ['test'] });
+    });
+
+    it('should restore newline markers when JSON string values are parsed through the string fallback', () => {
+      const input = '{"text":"Hello<n2/>World"}';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('Hello\n\nWorld');
+    });
+
+    it('should still fall back to stripped behavior for undefined-style malformed content', () => {
+      const input = 'undefined';
+      const result = AIResponseParser.cleanAIResponse(input, ResponseFormat.STRING);
+      expect(result).toBe('undefined');
     });
   });
 });

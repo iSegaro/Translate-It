@@ -128,11 +128,13 @@ export const AIResponseParser = {
           if (items && items.length > 0) {
             const firstItem = items[0];
             const { text } = this._extractItemData(firstItem);
-            if (text) return text;
+            if (typeof text === 'string') {
+              return NewlineManager.restore(text);
+            }
           }
         } catch { /* ignore and return stripped */ }
       }
-      return stripped;
+      return NewlineManager.restore(stripped);
     }
 
     // Strategy 2: Structured Data (JSON_ARRAY, JSON_OBJECT)
