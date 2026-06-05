@@ -30,7 +30,7 @@ export class VajehyabProvider extends BaseProvider {
    * Required by BaseProvider structure.
    */
   _getLangCode(lang) {
-    if (!lang || lang === AUTO_DETECT_VALUE) return "fa";
+    if (!lang || lang === AUTO_DETECT_VALUE) return AUTO_DETECT_VALUE;
     return getProviderLanguageCode(lang, 'VAJEHYAB');
   }
 
@@ -87,8 +87,9 @@ export class VajehyabProvider extends BaseProvider {
 
       const finalResult = this._formatDictionaryResponse(result.hit);
       
-      // Update last detected language for Coordinator
-      this.lastDetectedLanguage = sourceLang === 'auto' ? 'fa' : sourceLang;
+      // Preserve verified source language only.
+      // Auto requests must rely on the coordinator's real detection result instead of a fabricated fallback.
+      this.lastDetectedLanguage = sourceLang && sourceLang !== AUTO_DETECT_VALUE ? sourceLang : null;
 
       // Return array matching input texts (only first one translated)
       return texts.map((t, idx) => idx === 0 ? finalResult : t);

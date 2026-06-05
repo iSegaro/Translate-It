@@ -103,6 +103,24 @@ describe('ProviderCoordinator', () => {
       );
     });
 
+    it('should not register feedback for Vajehyab auto lookups without verified detection', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+
+      mockProvider.providerName = 'Vajehyab';
+      mockProvider.lastDetectedLanguage = null;
+      LanguageDetectionService.detect.mockResolvedValue('en');
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'test', AUTO_DETECT_VALUE, 'fa'
+      );
+
+      expect(LanguageDetectionService.registerDetectionResult).not.toHaveBeenCalled();
+      expect(mockProvider.translate).toHaveBeenCalledWith(
+        expect.anything(), 'en', 'fa', expect.anything()
+      );
+      expect(result.sourceLanguage).toBe('en');
+    });
+
     it('should correctly extract sample text from V3 objects for language swapping', async () => {
       const { LanguageSwappingService } = await import("@/features/translation/providers/LanguageSwappingService.js");
       
