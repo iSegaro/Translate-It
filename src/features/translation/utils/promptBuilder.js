@@ -17,6 +17,7 @@ import {
 } from "@/shared/config/config.js";
 
 import { getLanguageNameFromCode, getCanonicalCode } from '@/shared/config/languageConstants.js';
+import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -87,9 +88,10 @@ export async function buildPrompt(
   
   const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang);
   const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang);
+  const useAutoPrompt = await shouldUseAutoPromptAsync(sourceLang, translateMode);
 
   // Resolve instructions from template
-  const promptTemplate = sourceLang === 'auto'
+  const promptTemplate = useAutoPrompt
     ? await getPromptAutoAsync()
     : await getPromptAsync();
 
@@ -105,7 +107,7 @@ export async function buildPrompt(
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
     logger.debug('AI provider in Batch mode. Using AI batch prompt.');
-    const batchPromptTemplate = sourceLang === 'auto'
+    const batchPromptTemplate = useAutoPrompt
       ? await getPromptBASEAIBatchAutoAsync()
       : await getPromptBASEAIBatchAsync();
 
@@ -159,7 +161,7 @@ export async function buildPrompt(
     if (translateMode === TranslationMode.ScreenCapture) {
       promptBase = await getPromptBASEScreenCaptureAsync();
     } else {
-      promptBase = sourceLang === 'auto' 
+      promptBase = useAutoPrompt 
         ? await getPromptBASEFieldAutoAsync() 
         : await getPromptBASEFieldAsync();
     }
