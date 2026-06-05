@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { defineComponent, ref } from 'vue';
+import { ref } from 'vue';
 import SidepanelMainContent from './SidepanelMainContent.vue';
 import { TranslationMode } from '@/shared/config/config.js';
 
@@ -56,35 +56,35 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 }));
 
 vi.mock('@/components/shared/LanguageSelector.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'LanguageSelector',
     template: '<div class="language-selector-stub" />',
-  }),
+  },
 }));
 
 vi.mock('@/components/shared/ProviderSelector.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'ProviderSelector',
     template: '<div class="provider-selector-stub" />',
-  }),
+  },
 }));
 
 vi.mock('@/components/shared/TranslationInputField.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'TranslationInputField',
     template: '<div class="translation-input-stub" />',
-  }),
+  },
 }));
 
 vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'TranslationDisplay',
     props: {
       lastTranslation: { type: Object, default: null },
       mode: { type: String, default: '' },
     },
     template: '<div class="translation-display-stub" />',
-  }),
+  },
 }));
 
 vi.mock('webextension-polyfill', () => ({

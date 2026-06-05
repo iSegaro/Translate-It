@@ -1002,7 +1002,7 @@ describe('DomTranslatorAdapter', () => {
       const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
       
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
-      const compareSpy = vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ equivalent: false, reason: 'Mocked anomaly' });
+      vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ equivalent: false, reason: 'Mocked anomaly' });
 
       const div = document.createElement('div');
       const span1 = document.createElement('span');

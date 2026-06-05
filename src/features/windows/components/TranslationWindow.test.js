@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { defineComponent, ref } from 'vue';
+import { ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
 import { TranslationMode } from '@/shared/config/config.js';
 
@@ -81,7 +81,7 @@ vi.mock('@/utils/ui/styleInjector.js', () => ({
 }));
 
 vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'TranslationDisplay',
     props: {
       content: { type: String, default: '' },
@@ -89,31 +89,39 @@ vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
       lastTranslation: { type: Object, default: null },
     },
     template: '<div class="translation-display-stub" />',
-  }),
+  },
 }));
 
 vi.mock('@/components/shared/ProviderSelector.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'ProviderSelector',
+    props: {
+      modelValue: { type: String, default: '' },
+    },
     template: '<div class="provider-selector-stub" />',
-    props: ['modelValue'],
-  }),
+  },
 }));
 
 vi.mock('@/components/base/LoadingSpinner.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'LoadingSpinner',
+    props: {
+      size: { type: String, default: '' },
+    },
     template: '<div class="loading-spinner-stub" />',
-    props: ['size'],
-  }),
+  },
 }));
 
 vi.mock('@/components/shared/TTSButton.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'TTSButton',
+    props: {
+      text: { type: String, default: '' },
+      language: { type: String, default: '' },
+      isDictionary: { type: Boolean, default: false },
+    },
     template: '<button class="tts-button-stub" />',
-    props: ['text', 'language', 'isDictionary'],
-  }),
+  },
 }));
 
 describe('TranslationWindow.vue', () => {
