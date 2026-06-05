@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
-import { TranslationMode } from '@/shared/config/config.js';
 
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: {
@@ -153,25 +152,6 @@ describe('TranslationWindow.vue', () => {
         setDockMode: vi.fn(),
       },
     };
-  });
-
-  it('forwards dictionary metadata to TranslationDisplay in the in-page window path', async () => {
-    const wrapper = mount(TranslationWindow, {
-      props: {
-        ...baseProps,
-        translationMode: TranslationMode.Dictionary_Translation,
-      },
-    });
-
-    const display = wrapper.findComponent({ name: 'TranslationDisplay' });
-    expect(display.exists()).toBe(true);
-    expect(display.props('mode')).toBe('compact');
-    expect(display.props('lastTranslation')).toEqual({
-      sourceLanguage: 'en',
-      targetLanguage: 'fa',
-      provider: 'gemini',
-      mode: TranslationMode.Dictionary_Translation,
-    });
   });
 
   it('keeps compact window rendering unchanged when translation is not dictionary mode', async () => {

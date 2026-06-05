@@ -169,7 +169,6 @@
         :error="errorMessage"
         :error-type="props.errorType"
         :mode="'compact'"
-        :last-translation="translationDisplayLastTranslation"
         :placeholder="t('window_translation_placeholder')"
         :target-language="props.targetLanguage"
         :show-fade-in-animation="true"
@@ -298,16 +297,6 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
-const translationDisplayLastTranslation = computed(() => {
-  if (!props.translationMode) return null;
-
-  return {
-    sourceLanguage: props.sourceLanguage,
-    targetLanguage: props.targetLanguage,
-    provider: props.provider,
-    mode: props.translationMode,
-  };
-});
 
 // Check if current translation is in dictionary mode
 const isDictionary = computed(() => {
