@@ -355,7 +355,7 @@ export class SimpleMarkdown {
         if (matchStart > cursor) {
           const prefix = normalizedText.slice(cursor, matchStart);
           if (prefix) {
-            span.appendChild(document.createTextNode(prefix));
+            span.appendChild(this._parseInline(prefix));
           }
         }
 
@@ -364,11 +364,11 @@ export class SimpleMarkdown {
         span.appendChild(labelElement);
         span.appendChild(document.createTextNode(": "));
 
-        // Keep the raw content as text so dictionary payloads don't get
-        // reinterpreted as nested markdown.
+        // Allow safe inline markdown inside dictionary label content while
+        // keeping label detection itself isolated.
         const content = normalizedText.slice(matchEnd, nextMatchStart);
         if (content) {
-          span.appendChild(document.createTextNode(content));
+          span.appendChild(this._parseInline(content));
         }
 
         cursor = nextMatchStart;
@@ -394,10 +394,10 @@ export class SimpleMarkdown {
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
 
-    // Keep the raw content as text so dictionary payloads don't get
-    // reinterpreted as nested markdown.
+    // Allow safe inline markdown inside dictionary label content while
+    // keeping label detection itself isolated.
     if (content) {
-      span.appendChild(document.createTextNode(content));
+      span.appendChild(this._parseInline(content));
     }
 
     return span;

@@ -667,9 +667,14 @@ describe('SimpleMarkdown', () => {
 
       const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
       expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual([
+        '/ɪkˈspreʃnz/',
+        '/ɪkˈspreʃnz/',
+      ]);
       expect(result.innerHTML).toContain('<strong>UK</strong>');
       expect(result.innerHTML).toContain('<strong>US</strong>');
-      expect(result.textContent).not.toContain('**US**');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
     });
 
     it('should render multiple dictionary labels with colon inside the bold label', () => {
@@ -678,10 +683,11 @@ describe('SimpleMarkdown', () => {
 
       const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
       expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/', '/y/']);
       expect(result.innerHTML).toContain('<strong>UK</strong>');
       expect(result.innerHTML).toContain('<strong>US</strong>');
-      expect(result.textContent).not.toContain('**UK:**');
-      expect(result.textContent).not.toContain('**US:**');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
     });
 
     it('should render mixed bold-label forms on the same line', () => {
@@ -690,10 +696,11 @@ describe('SimpleMarkdown', () => {
 
       const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
       expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/', '/y/']);
       expect(result.innerHTML).toContain('<strong>UK</strong>');
       expect(result.innerHTML).toContain('<strong>US</strong>');
-      expect(result.textContent).not.toContain('**UK**');
-      expect(result.textContent).not.toContain('**US:**');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
     });
 
     it('should render Persian label lines', () => {
@@ -702,13 +709,15 @@ describe('SimpleMarkdown', () => {
     });
 
     it('should render a single bold label with colon inside the bold marker', () => {
-      const result = SimpleMarkdown.render('**UK:** `/x/`');
+      const result = SimpleMarkdown.render('**IPA:** `/x/`');
       expect(result).toBeTruthy();
 
       const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
-      expect(strongTexts).toEqual(['UK']);
-      expect(result.innerHTML).toContain('<strong>UK</strong>');
-      expect(result.textContent).not.toContain('**UK:**');
+      expect(strongTexts).toEqual(['IPA']);
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/']);
+      expect(result.innerHTML).toContain('<strong>IPA</strong>');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
     });
 
     it('should keep list label formatting working for dictionary items', () => {
