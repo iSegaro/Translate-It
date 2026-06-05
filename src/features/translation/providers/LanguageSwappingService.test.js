@@ -20,12 +20,17 @@ vi.mock("@/shared/services/LanguageDetectionService.js", () => ({
 
 vi.mock("@/shared/config/config.js", () => ({
   getBilingualTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
-  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({ selection: true, popup: true })),
+  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({
+    selection: true,
+    popup: true,
+    'select-element': true
+  })),
   TranslationMode: {
     Dictionary_Translation: 'dictionary',
     Field: 'content',
     Selection: 'selection',
-    Popup_Translate: 'popup'
+    Popup_Translate: 'popup',
+    Select_Element: 'select-element'
   }
 }));
 
@@ -40,8 +45,16 @@ vi.mock("@/shared/config/languageConstants.js", () => ({
 }));
 
 describe('LanguageSwappingService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    const { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } = await import('@/shared/config/config.js');
+    getBilingualTranslationEnabledAsync.mockResolvedValue(true);
+    getBilingualTranslationModesAsync.mockResolvedValue({
+      selection: true,
+      popup: true,
+      'select-element': true
+    });
   });
 
   describe('applyLanguageSwapping', () => {
@@ -142,7 +155,7 @@ describe('LanguageSwappingService', () => {
       expect(tgt).toBe('en');
     });
 
-    it('should swap to Farsi when detected text is English and target is English', async () => {
+    it('should fallback to English when detected text is English and target is English', async () => {
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
       const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
       
@@ -153,9 +166,9 @@ describe('LanguageSwappingService', () => {
         'Hello', 'auto', 'en', 'auto', { mode: 'selection' }
       );
 
-      // Expected: en -> fa (Smart fallback to Farsi for English input)
+      // Expected: en -> en (Fallback stays in English for auto-detect flows)
       expect(src).toBe('en');
-      expect(tgt).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should respect user manual source language as the new target after swapping', async () => {
@@ -173,6 +186,36 @@ describe('LanguageSwappingService', () => {
       expect(tgt).toBe('de'); // Should use 'de' instead of default 'en'
     });
 
+    it('should use the original source language as the swap target in Select Element mode when available', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'auto', 'fa', 'de', { mode: 'select-element' }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('de');
+    });
+
+    it('should keep the English fallback in Select Element mode when originalSourceLang is auto', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'auto', 'fa', 'auto', { mode: 'select-element' }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('en');
+    });
+
     it('should ALWAYS swap in Dictionary mode if detected matches target, even if bilingual is disabled for that mode', async () => {
       const { getBilingualTranslationModesAsync } = await import("@/shared/config/config.js");
       const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
@@ -185,9 +228,9 @@ describe('LanguageSwappingService', () => {
         'book', 'auto', 'en', 'en', { mode: 'dictionary' }
       );
 
-      // Expected: Still swaps because Dictionary mode requires it to get definitions
+      // Expected: Dictionary mode still swaps, but auto-source now falls back to English
       expect(src).toBe('en');
-      expect(tgt).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should return original languages if detection fails', async () => {

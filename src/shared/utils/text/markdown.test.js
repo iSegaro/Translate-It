@@ -186,6 +186,21 @@ describe('SimpleMarkdown', () => {
         expect(SimpleMarkdown._isLabelLine('Translations for Persian: آزمایش')).toBe(true);
       });
 
+      it('should reject normal bold markdown that is not a dictionary label', () => {
+        expect(SimpleMarkdown._isLabelLine('**Important** text without a colon')).toBe(false);
+        expect(SimpleMarkdown._isLabelLine('**foo** and **bar** are bold')).toBe(false);
+        expect(SimpleMarkdown._isLabelLine('**Important** note: keep this behavior unchanged')).toBe(false);
+        expect(SimpleMarkdown._isLabelLine('Visit https://example.com and read **Important** text')).toBe(false);
+      });
+
+      it('should recognize supported dictionary label formats', () => {
+        expect(SimpleMarkdown._isLabelLine('**UK** : `/x/`')).toBe(true);
+        expect(SimpleMarkdown._isLabelLine('**UK:** `/x/`')).toBe(true);
+        expect(SimpleMarkdown._isLabelLine('**UK** : `/x/`    **US:** `/y/`')).toBe(true);
+        expect(SimpleMarkdown._isLabelLine('**名词**: 表达方式')).toBe(true);
+        expect(SimpleMarkdown._isLabelLine('اسم: کتاب')).toBe(true);
+      });
+
       it('should extract content after pure bold label', () => {
         const input = '**Noun**: test, experiment';
         expect(SimpleMarkdown.getCleanTranslation(input)).toBe('test, experiment');
@@ -604,9 +619,113 @@ describe('SimpleMarkdown', () => {
       expect(result).toBeTruthy();
     });
 
+    it('should not treat bold text without a colon as a dictionary label', () => {
+      const result = SimpleMarkdown.render('**Important** text without a colon');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(['Important']);
+      expect(result.textContent).toBe('Important text without a colon');
+      expect(result.innerHTML).not.toContain('<strong>Important</strong>:');
+      expect(result.textContent).not.toContain('Important:');
+    });
+
+    it('should not treat multiple bold phrases without colons as dictionary labels', () => {
+      const result = SimpleMarkdown.render('**foo** and **bar** are bold');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['foo', 'bar']));
+      expect(result.textContent).toBe('foo and bar are bold');
+      expect(result.innerHTML).not.toContain('foo:');
+      expect(result.innerHTML).not.toContain('bar:');
+    });
+
+    it('should keep bold markdown normal when a colon appears later in the sentence', () => {
+      const result = SimpleMarkdown.render('**Important** note: keep this behavior unchanged');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(['Important']);
+      expect(result.textContent).toBe('Important note: keep this behavior unchanged');
+      expect(result.innerHTML).not.toContain('<strong>Important</strong>:');
+    });
+
+    it('should not treat URL colons as dictionary labels', () => {
+      const result = SimpleMarkdown.render('Visit https://example.com and read **Important** text');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(['Important']);
+      expect(result.textContent).toBe('Visit https://example.com and read Important text');
+      expect(result.innerHTML).not.toContain('<strong>Visit');
+    });
+
+    it('should render multiple dictionary labels on the same line', () => {
+      const result = SimpleMarkdown.render('**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual([
+        '/ɪkˈspreʃnz/',
+        '/ɪkˈspreʃnz/',
+      ]);
+      expect(result.innerHTML).toContain('<strong>UK</strong>');
+      expect(result.innerHTML).toContain('<strong>US</strong>');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
+    });
+
+    it('should render multiple dictionary labels with colon inside the bold label', () => {
+      const result = SimpleMarkdown.render('**UK:** `/x/`    **US:** `/y/`');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/', '/y/']);
+      expect(result.innerHTML).toContain('<strong>UK</strong>');
+      expect(result.innerHTML).toContain('<strong>US</strong>');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
+    });
+
+    it('should render mixed bold-label forms on the same line', () => {
+      const result = SimpleMarkdown.render('**UK** : `/x/`    **US:** `/y/`');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/', '/y/']);
+      expect(result.innerHTML).toContain('<strong>UK</strong>');
+      expect(result.innerHTML).toContain('<strong>US</strong>');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
+    });
+
     it('should render Persian label lines', () => {
       const result = SimpleMarkdown.render('اسم: کتاب, کتابچه');
       expect(result).toBeTruthy();
+    });
+
+    it('should render a single bold label with colon inside the bold marker', () => {
+      const result = SimpleMarkdown.render('**IPA:** `/x/`');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(['IPA']);
+      expect(Array.from(result.querySelectorAll('code')).map((node) => node.textContent)).toEqual(['/x/']);
+      expect(result.innerHTML).toContain('<strong>IPA</strong>');
+      expect(result.innerHTML).not.toContain('`');
+      expect(result.textContent).not.toContain('`');
+    });
+
+    it('should keep list label formatting working for dictionary items', () => {
+      const result = SimpleMarkdown.render('- **名词**: 表达方式, 词语\n- **同义词**: 词汇, 措辞');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['名词', '同义词']));
     });
 
     it('should handle mixed content', () => {

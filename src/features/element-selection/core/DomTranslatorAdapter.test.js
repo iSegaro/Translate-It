@@ -12,11 +12,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/config.js', () => ({
-  getTranslationApiAsync: vi.fn(() => Promise.resolve('google')),
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getTranslationApiAsync: vi.fn(() => Promise.resolve('gemini')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
-  getSourceLanguageAsync: vi.fn(() => Promise.resolve('en'))
+  getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
+  getFeatureSemanticBlockGroupingAsync: vi.fn(() => Promise.resolve(false))
 }));
 
 vi.mock('@/shared/config/constants.js', () => ({
@@ -29,7 +30,7 @@ vi.mock('@/shared/config/constants.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
+  getEffectiveProviderAsync: vi.fn(() => Promise.resolve('gemini')),
   TranslationMode: {
     Select_Element: 'select-element'
   }
@@ -72,18 +73,25 @@ vi.mock('./DomTranslatorUtils.js', () => ({
   collectTextNodes: vi.fn((el) => [
     { node: el.firstChild, text: 'Hello', uid: 'n1', blockId: 'b1', role: 'div' }
   ]),
+  collectBlockGroups: vi.fn((el) => [
+    { id: 'n1', blockId: 'g1', text: 'Hello', leadingWS: '', trailingWS: '', preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['div'], mode: 'standard', node: el.firstChild }
+  ]),
   generateElementId: vi.fn(() => 'test-el-id'),
   extractContextMetadata: vi.fn(() => ({ contextSummary: 'test context' }))
 }));
 
-vi.mock('./DomTranslatorState.js', () => ({
-  globalSelectElementState: {
-    translationHistory: [],
-    currentTranslation: null
-  },
-  revertSelectElementTranslation: vi.fn(),
-  getSelectElementTranslationState: vi.fn()
-}));
+vi.mock('./DomTranslatorState.js', async () => {
+  const actual = await vi.importActual('./DomTranslatorState.js');
+  return {
+    ...actual,
+    revertSelectElementTranslation: vi.fn(actual.revertSelectElementTranslation),
+    getSelectElementTranslationState: vi.fn(actual.getSelectElementTranslationState)
+  };
+});
+
+import { 
+  globalSelectElementState 
+} from './DomTranslatorState.js';
 
 vi.mock('@/features/shared/hover-preview/HoverPreviewLookup.js', () => ({
   hoverPreviewLookup: {
@@ -116,9 +124,9 @@ describe('DomTranslatorAdapter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    globalSelectElementState.translationHistory = [];
     adapter = new DomTranslatorAdapter();
-    testElement = document.createElement('div');
-    testElement.textContent = 'Hello';
+    testElement = document.createElement('div');    testElement.textContent = 'Hello';
     document.body.appendChild(testElement);
   });
 
@@ -152,6 +160,108 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceLanguage: 'auto'
+          })
+        })
+      );
+    });
+
+    it('should fallback to V2 node-by-node extraction for traditional providers even if Block Grouping is globally enabled', async () => {
+      const { getFeatureSemanticBlockGroupingAsync, getEffectiveProviderAsync } = await import('@/config.js');
+      const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+
+      // Enable Block Grouping globally but use a traditional provider (google)
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      getEffectiveProviderAsync.mockResolvedValueOnce('google');
+      
+      collectBlockGroups.mockClear();
+      collectTextNodes.mockClear();
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result.success).toBe(true);
+      // Should NOT use Block Grouping (V3)
+      expect(collectBlockGroups).not.toHaveBeenCalled();
+      // Should use traditional node extraction (V2)
+      expect(collectTextNodes).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve literal whitespace on revert when using Block Grouping', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const textNode = document.createTextNode('Welcome to '); // Trailing space
+      div.appendChild(textNode);
+      document.body.appendChild(div);
+
+      collectBlockGroups.mockReturnValueOnce([{
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Welcome to',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['div'],
+        mode: 'standard',
+        node: textNode
+      }]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'خوش آمدید', i: 'n1' }])
+      });
+
+      // Translate
+      await adapter.translateElement(div);
+      
+      // Verify translation applied (contains the translated text and the trailing space)
+      expect(textNode.nodeValue).toContain('خوش آمدید');
+      expect(textNode.nodeValue.endsWith(' ')).toBe(true);
+
+      // Revert
+      await revertSelectElementTranslation();
+
+      // Verify original literal text restored (including trailing space)
+      expect(textNode.nodeValue).toBe('Welcome to ');
+      
+      document.body.removeChild(div);
+    });
+
+    it('should route through collectBlockGroups when FEATURE_SEMANTIC_BLOCK_GROUPING is true', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectTextNodes, collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      collectBlockGroups.mockClear();
+      collectTextNodes.mockClear();
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result.success).toBe(true);
+      expect(collectBlockGroups).toHaveBeenCalledTimes(1);
+      expect(collectTextNodes).not.toHaveBeenCalledWith(testElement);
+      expect(testElement.textContent).toContain('سلام');
     });
 
     it('should handle direct (non-streaming) response', async () => {
@@ -165,6 +275,145 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+    });
+
+    it('should keep traditional Select Element payload 1:1 for a paragraph-bearing node', async () => {
+      testElement.textContent = 'Paragraph one\n\nParagraph two';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated paragraph one\n\nTranslated paragraph two', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0]).toMatchObject({
+        t: 'Paragraph one\n\nParagraph two',
+        i: 'n1',
+        b: 'b1',
+        r: 'div'
+      });
+      expect(payload[0]).not.toHaveProperty('parentUid');
+      expect(payload[0]).not.toHaveProperty('partIndex');
+      expect(payload[0]).not.toHaveProperty('partCount');
+      expect(textNode.nodeValue).toContain('Translated paragraph one\n\nTranslated paragraph two');
+    });
+
+    it('should keep a three-paragraph node as a single provider payload item', async () => {
+      testElement.textContent = 'One\n\nTwo\n\nThree';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated one\n\nTranslated two\n\nTranslated three', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0].t).toBe('One\n\nTwo\n\nThree');
+      expect(textNode.nodeValue).toContain('Translated one\n\nTranslated two\n\nTranslated three');
+    });
+
+    it('should leave text without internal paragraph breaks unchanged in payload shape', async () => {
+      testElement.textContent = 'Hello world';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Hello translated', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(1);
+      expect(payload[0]).toMatchObject({ i: 'n1', t: 'Hello world', b: 'b1', r: 'div' });
+      expect(textNode.nodeValue).toContain('Hello translated');
+    });
+
+    it('should keep multiple Select Element nodes in original 1:1 mapping even when one has paragraphs', async () => {
+      const firstNode = document.createTextNode('First paragraph\n\nSecond line');
+      const secondNode = document.createTextNode('Another segment');
+      testElement.replaceChildren(firstNode, secondNode);
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: firstNode, text: firstNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' },
+        { node: secondNode, text: secondNode.nodeValue, uid: 'n2', blockId: 'b2', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([
+          { t: 'First translated\n\nSecond paragraph translated', i: 'n1' },
+          { t: 'Second translated', i: 'n2' }
+        ])
+      });
+
+      const result = await adapter.translateElement(testElement, { provider: 'googlev2' });
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(result.success).toBe(true);
+      expect(payload).toHaveLength(2);
+      expect(payload[0]).toMatchObject({ i: 'n1', t: 'First paragraph\n\nSecond line' });
+      expect(payload[1]).toMatchObject({ i: 'n2', t: 'Another segment' });
+      expect(payload[0]).not.toHaveProperty('parentUid');
+      expect(payload[1]).not.toHaveProperty('parentUid');
+      expect(firstNode.nodeValue).toContain('First translated\n\nSecond paragraph translated');
+      expect(secondNode.nodeValue).toContain('Second translated');
+    });
+
+    it('should not split AI provider payloads', async () => {
+      const { getEffectiveProviderAsync } = await import('@/config.js');
+      getEffectiveProviderAsync.mockResolvedValueOnce('gemini');
+
+      testElement.textContent = 'Paragraph one\n\nParagraph two';
+      const textNode = testElement.firstChild;
+
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockReturnValueOnce([
+        { node: textNode, text: textNode.nodeValue, uid: 'n1', blockId: 'b1', role: 'div' }
+      ]);
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'Translated text', i: 'n1' }])
+      });
+
+      await adapter.translateElement(testElement);
+      const payload = JSON.parse(contentScriptIntegration.sendTranslationRequest.mock.calls[0][0].data.text);
+
+      expect(payload).toHaveLength(1);
+      expect(payload[0].t).toBe('Paragraph one\n\nParagraph two');
+      expect(textNode.nodeValue).toContain('Translated text');
     });
 
     it('should handle translation errors', async () => {
@@ -472,13 +721,18 @@ describe('DomTranslatorAdapter', () => {
 
     it('should apply LRM mark for LTR detection', async () => {
       const { detectDirectionFromContent } = await import('@/utils/dom/DomDirectionManager.js');
-      detectDirectionFromContent.mockReturnValueOnce('ltr');
+      detectDirectionFromContent.mockReturnValue('ltr');
+
+      testElement.setAttribute('dir', 'rtl');
 
       const textNode = testElement.firstChild;
       adapter._applyTranslationToNode(textNode, 'Hello', 'en', testElement);
 
       // LRM mark (\u200e) should be present
       expect(textNode.nodeValue).toContain('\u200eHello\u200e');
+
+      testElement.removeAttribute('dir');
+      detectDirectionFromContent.mockReturnValue('rtl');
     });
 
     it('should handle object formatted translated text', () => {
@@ -500,6 +754,414 @@ describe('DomTranslatorAdapter', () => {
       // Wait, let's check the code: it re-adds bidiMark
       expect(textNode.nodeValue).toContain(originalWithZWNJ);
       expect(textNode.nodeValue).toContain('\u200c');
+    });
+  });
+
+  describe('Strategy X Subtree Exclusion and V3 Rollback integration tests', () => {
+    it('should reject overlapping concurrent translation requests (Strategy X)', async () => {
+      let resolveFirst;
+      const firstPromise = new Promise((resolve) => {
+        resolveFirst = resolve;
+      });
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(() => firstPromise);
+
+      const firstCall = adapter.translateElement(testElement);
+
+      const childElement = document.createElement('span');
+      testElement.appendChild(childElement);
+
+      await expect(adapter.translateElement(childElement)).rejects.toThrow(
+        'Translation already in progress for this element'
+      );
+
+      resolveFirst({ success: true, streaming: false });
+      await firstCall;
+    });
+
+    it('should rollback to original immutable values if pre-apply connection validation fails', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          // Detach one node before applying translation
+          span2.firstChild.remove();
+
+          const sessionId = adapter.currentSessionId;
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(div)).rejects.toThrow(
+        /Stale or detached DOM node reference/
+      );
+
+      expect(span1.firstChild.nodeValue).toBe('Hello ');
+    });
+
+    it('should abort and rollback to original immutable values if marker corruption is detected', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: 'مرحبا بالعالم', i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      await expect(adapter.translateElement(div)).rejects.toThrow(
+        /Segment count mismatch/
+      );
+
+      expect(span1.firstChild.nodeValue).toBe('Hello ');
+      expect(span2.firstChild.nodeValue).toBe('world');
+    });
+
+    it('should run Shadow Mode validation and log debug on perfect equivalence', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+      const { collectTextNodes } = await import('./DomTranslatorUtils.js');
+      collectTextNodes.mockImplementationOnce((el) => [
+        { node: el.firstChild.firstChild, text: 'Hello', uid: 'n1' },
+        { node: el.lastChild.firstChild, text: 'world', uid: 'n2' }
+      ]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          const sessionId = adapter.currentSessionId;
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const debugSpy = vi.spyOn(adapter.logger, 'debug');
+
+      const result = await adapter.translateElement(div);
+
+      expect(result.success).toBe(true);
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction perfectly validated'));
+    });
+
+    it('should run Shadow Mode validation and log error on reconstruction anomaly', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ equivalent: false, reason: 'Mocked anomaly' });
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello ';
+      const span2 = document.createElement('span');
+      span2.textContent = 'world';
+      div.appendChild(span1);
+      div.appendChild(span2);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: ' ',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span1.firstChild
+      };
+      const unit2 = {
+        id: 'n2',
+        blockId: 'g1',
+        text: 'world',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: span2.firstChild
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1, unit2]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      let streamCallbacks;
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(async () => {
+        setTimeout(() => {
+          const sessionId = adapter.currentSessionId;
+          streamCallbacks.onStreamUpdate({
+            success: true,
+            data: [{ t: `مرحبا @@TI_SEG_${adapter.currentEntropy}_${sessionId}_n2@@بالعالم`, i: 'g1' }]
+          });
+          streamCallbacks.onStreamEnd({ success: true });
+        }, 10);
+        return { success: true, streaming: true };
+      });
+
+      const errorSpy = vi.spyOn(adapter.logger, 'error');
+
+      const resultPromise = adapter.translateElement(div);
+      
+      await new Promise(resolve => setTimeout(resolve, 5));
+      adapter.translatedSegmentMap.set('n1', 'مختلف');
+
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Reconstruction anomaly detected'));
+    });
+
+    it('should log debug message on non-fatal attribute anomaly', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      const { ShadowComparisonEngine } = await import('./ShadowComparisonEngine.js');
+      
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      // Mock equivalent: true but with warnings
+      vi.spyOn(ShadowComparisonEngine, 'compare').mockReturnValueOnce({ 
+        equivalent: true, 
+        reason: null, 
+        warnings: ['Mocked attribute mismatch'] 
+      });
+
+      const div = document.createElement('div');
+      const span1 = document.createElement('span');
+      span1.textContent = 'Hello';
+      div.appendChild(span1);
+      document.body.appendChild(div);
+
+      const unit1 = {
+        id: 'n1',
+        blockId: 'g1',
+        text: 'Hello',
+        node: span1.firstChild,
+        inlineParentTags: ['span']
+      };
+
+      collectBlockGroups.mockReturnValueOnce([unit1]);
+
+      const { contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      const { registerTranslation } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
+      
+      registerTranslation.mockImplementationOnce((id, callbacks) => {
+        setTimeout(() => {
+          callbacks.onStreamEnd({ success: true });
+        }, 10);
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const debugSpy = vi.spyOn(adapter.logger, 'debug');
+      const errorSpy = vi.spyOn(adapter.logger, 'error');
+
+      adapter.translatedSegmentMap.set('n1', 'مرحبا');
+      await adapter.translateElement(div);
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('non-fatal attribute changes'));
+    });
+  });
+
+  describe('Interactive Tag Exclusions', () => {
+    it('should reject interactive elements in isValidTextElement', async () => {
+      const { isValidTextElement } = await import('@/features/element-selection/utils/elementHelpers.js');
+      
+      const p = document.createElement('p');
+      p.textContent = 'This is valid translatable text.';
+      
+      const textarea = document.createElement('textarea');
+      textarea.value = 'Form input text area.';
+      
+      const input = document.createElement('input');
+      input.value = 'Form input text.';
+      
+      const select = document.createElement('select');
+      const option = document.createElement('option');
+      option.textContent = 'Option text';
+      select.appendChild(option);
+      
+      const button = document.createElement('button');
+      button.textContent = 'Click me';
+
+      // Mock getComputedStyle for valid check
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = vi.fn().mockReturnValue({
+        display: 'block',
+        visibility: 'visible',
+        opacity: '1'
+      });
+
+      try {
+        expect(isValidTextElement(p)).toBe(true);
+        expect(isValidTextElement(textarea)).toBe(false);
+        expect(isValidTextElement(input)).toBe(false);
+        expect(isValidTextElement(select)).toBe(true);
+        expect(isValidTextElement(button)).toBe(true);
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
     });
   });
 });

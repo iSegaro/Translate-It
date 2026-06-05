@@ -17,6 +17,7 @@ import {
 } from "@/shared/config/config.js";
 
 import { getLanguageNameFromCode, getCanonicalCode } from '@/shared/config/languageConstants.js';
+import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -87,9 +88,10 @@ export async function buildPrompt(
   
   const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang);
   const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang);
+  const useAutoPrompt = await shouldUseAutoPromptAsync(sourceLang, translateMode);
 
   // Resolve instructions from template
-  const promptTemplate = sourceLang === 'auto'
+  const promptTemplate = useAutoPrompt
     ? await getPromptAutoAsync()
     : await getPromptAsync();
 
@@ -105,14 +107,27 @@ export async function buildPrompt(
   // Handle AI provider batch translation for select_element or any JSON text
   if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
     logger.debug('AI provider in Batch mode. Using AI batch prompt.');
-    const batchPromptTemplate = sourceLang === 'auto'
+    const batchPromptTemplate = useAutoPrompt
       ? await getPromptBASEAIBatchAutoAsync()
       : await getPromptBASEAIBatchAsync();
+
+    let jsonCount = 1;
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        jsonCount = parsed.length;
+      } else if (parsed && Array.isArray(parsed.translations)) {
+        jsonCount = parsed.translations.length;
+      }
+    } catch {
+      // Ignore JSON parsing errors for count estimation
+    }
 
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
       .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+      .replace(/\$_{COUNT}/g, String(jsonCount))
       .replace(/\$_{TEXT}/g, text);
   }
 
@@ -146,7 +161,7 @@ export async function buildPrompt(
     if (translateMode === TranslationMode.ScreenCapture) {
       promptBase = await getPromptBASEScreenCaptureAsync();
     } else {
-      promptBase = sourceLang === 'auto' 
+      promptBase = useAutoPrompt 
         ? await getPromptBASEFieldAutoAsync() 
         : await getPromptBASEFieldAsync();
     }
@@ -156,7 +171,8 @@ export async function buildPrompt(
   let finalPromptWithInstructions = promptBase
     .replace(/\$_{SOURCE}/g, sourceName)
     .replace(/\$_{TARGET}/g, targetName)
-    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+    .replace(/\$_{COUNT}/g, '1');
 
   // Inject the actual text to be translated.
   // $_{TEXT} is now required in the prompt template, so we can safely replace it.

@@ -38,10 +38,15 @@ export class OptimizedJsonHandler {
       const level = await getProviderOptimizationLevelAsync(providerInstance.providerName);
       const providerConfig = getProviderConfiguration(providerInstance.providerName, level);
       
+      // Mode-specific overrides (Select Element)
+      const selectElementOverride = providerConfig?.batching?.modeOverrides?.select_element || {};
+      const optimalSize = selectElementOverride.optimalSize || providerConfig?.batching?.optimalSize || 25;
+      const characterLimit = selectElementOverride.characterLimit || providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000;
+
       const batches = engine.createIntelligentBatches(
         segments, 
-        providerConfig?.batching?.optimalSize || 25, 
-        providerConfig?.batching?.characterLimit || providerConfig?.batching?.maxChars || 5000
+        optimalSize, 
+        characterLimit
       );
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
@@ -130,7 +135,9 @@ export class OptimizedJsonHandler {
               options?.contextMetadata, 
               options?.contextSummary,
               engine,
-              sender
+              sender,
+              originalSourceLang,
+              originalTargetLang
             ),
             timeoutPromise
           ]);
@@ -238,7 +245,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -255,6 +262,7 @@ export class OptimizedJsonHandler {
       {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
         engine, sender, priority: 'high', rawJsonPayload: true,
+        originalSourceLang, originalTargetLang,
         expectedFormat
       }
     );
@@ -307,8 +315,13 @@ export class OptimizedJsonHandler {
       return text;
     });
 
-    if (results.length !== originalBatch.length && originalBatch.length > 1) {
-      logger.warn(`[JsonHandler] Result count mismatch: ${results.length} vs ${originalBatch.length}`);
+    if (results.length !== originalBatch.length) {
+      const errorMsg = `Segment count mismatch: expected ${originalBatch.length}, received ${results.length}`;
+      logger.error(`[JsonHandler] ${errorMsg}`);
+      const err = new Error(errorMsg);
+      err.isFatal = true;
+      err.type = ErrorTypes.VALIDATION_ERROR;
+      throw err;
     }
 
     return originalBatch.map((item, idx) => {

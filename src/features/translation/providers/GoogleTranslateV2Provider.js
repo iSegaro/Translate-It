@@ -3,6 +3,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { isolateNewlineChunks } from "./utils/NewlineChunkIsolation.js";
+import { normalizeGoogleSlashDashArtifact } from "./utils/GoogleSlashDashNormalization.js";
 import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import {
   getProviderLanguageCode
@@ -49,6 +51,11 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
   constructor() {
     super(ProviderNames.GOOGLE_TRANSLATE_V2);
+  }
+
+  async _createChunks(texts) {
+    const chunks = await super._createChunks(texts);
+    return isolateNewlineChunks(chunks);
   }
 
   _getLangCode(lang) {
@@ -169,19 +176,28 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
 
         // For single segments, keep existing stable behavior but add JSON support
         if (chunkTexts.length === 1) {
+          const sourceText = getTextInfo(chunkTexts[0]).text;
+
           // If dj=1 was used, data.sentences will exist
           if (data.sentences) {
-            const translatedText = data.sentences
+            const translatedText = normalizeGoogleSlashDashArtifact(
+              data.sentences
               .filter(s => s.trans)
               .map(s => s.trans)
-              .join('');
+              .join(''),
+              sourceText
+            );
             
             // Pass the whole data object for rich markdown formatting
-            return { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+            const response = { translatedText, candidateText: shouldIncludeDictionary ? data : "" };
+            return response;
           }
 
           // Fallback to legacy array format
-          const translatedText = data[0].map(segment => segment[0] || "").join('');
+          const translatedText = normalizeGoogleSlashDashArtifact(
+            data[0].map(segment => segment[0] || "").join(''),
+            sourceText
+          );
           
           let candidateText = "";
           if (shouldIncludeDictionary && data[1]) {
@@ -191,7 +207,6 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
               return `${pos}${pos !== "" ? ": " : ""}${terms.join(", ")}\n`;
             }).join("");
           }
-
           return { translatedText, candidateText: candidateText.trim() };
         }
 

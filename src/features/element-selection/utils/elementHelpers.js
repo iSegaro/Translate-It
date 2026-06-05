@@ -64,8 +64,12 @@ export function isValidTextElement(element) {
   if (!element) return false;
 
   // 1. Skip invalid tags
-  const invalidTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME'];
-  if (invalidTags.includes(element.tagName)) {
+  const invalidTags = [
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'IFRAME', 'TEXTAREA', 'INPUT', 
+    'SVG', 'KBD', 'SAMP', 'TIME', 'RUBY', 'RT', 'RP'
+  ];
+
+  if (invalidTags.includes(element.tagName.toUpperCase())) {
     return false;
   }
 
@@ -76,7 +80,17 @@ export function isValidTextElement(element) {
     return false;
   }
 
-  // 3. Skip invisible elements
+  // 3. Skip editable and interactive role elements
+  if (element.isContentEditable) {
+    return false;
+  }
+
+  const role = element.getAttribute?.('role')?.toLowerCase();
+  if (role && ['textbox', 'searchbox', 'combobox'].includes(role)) {
+    return false;
+  }
+
+  // 4. Skip invisible elements
   try {
     const style = window.getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
@@ -186,7 +200,7 @@ export function isInteractiveElement(element) {
 
   const interactiveTags = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
   return (
-    interactiveTags.includes(element.tagName) ||
+    interactiveTags.includes(element.tagName.toUpperCase()) ||
     element.getAttribute('role') === 'button' ||
     element.getAttribute('role') === 'link' ||
     element.onclick !== null ||

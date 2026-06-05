@@ -66,9 +66,9 @@ describe('VajehyabProvider', () => {
   });
 
   describe('_getLangCode', () => {
-    it('should map auto and empty to fa', () => {
-      expect(provider._getLangCode('auto')).toBe('fa');
-      expect(provider._getLangCode(null)).toBe('fa');
+    it('should preserve auto and empty as auto-detect', () => {
+      expect(provider._getLangCode('auto')).toBe('auto');
+      expect(provider._getLangCode(null)).toBe('auto');
     });
 
     it('should return correct codes for supported languages', () => {
@@ -89,12 +89,12 @@ describe('VajehyabProvider', () => {
       );
     });
 
-    it('should return formatted result on success', async () => {
+    it('should return formatted result on success without fabricating auto detection feedback', async () => {
       const result = await provider._batchTranslate(['سلام'], 'auto', 'fa');
 
       expect(result[0]).toContain('سلام');
       expect(result[0]).toContain('لغت‌نامه عمید');
-      expect(provider.lastDetectedLanguage).toBe('fa');
+      expect(provider.lastDetectedLanguage).toBeNull();
     });
 
     it('should return fallback message when word is not found', async () => {

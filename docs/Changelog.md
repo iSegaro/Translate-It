@@ -9,6 +9,8 @@
 ##### Fixed
 
 - Fixed an issue where the selected translation provider was not being saved correctly ([#133](https://github.com/iSegaro/Translate-It/issues/133))
+- Fixed an sidebar/popup compatibility issue that prevented parts of the extension UI from working correctly ([#140](https://github.com/iSegaro/Translate-It/issues/140))
+- Fixed `Vajehyab` dictionary lookups and related integration issues
 
 ---
 

@@ -81,6 +81,7 @@ export const CONFIG = {
   },
   THEME: "auto",
   selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
+  FEATURE_SEMANTIC_BLOCK_GROUPING: true,
 
   COPY_REPLACE: "replace", // "copy",
   REPLACE_SPECIAL_SITES: true,
@@ -284,7 +285,7 @@ export const CONFIG = {
   DICTIONARY_SHOW_EXAMPLES: false,
 
   // --- Versioning ---
-  PROMPTS_VERSION: 5, // Version of the prompt templates (localized labels for dictionary)
+  PROMPTS_VERSION: 6, // Version of the prompt templates (localized labels for dictionary)
 
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
@@ -479,13 +480,12 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Your response MUST be a valid JSON object containing a "translations" array with exactly $_{COUNT} items. 
 Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
-  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -499,13 +499,12 @@ $_{TEXT}
 Strictly follow these instructions:
 $_{PROMPT_INSTRUCTIONS}
 
-Your response MUST be a valid JSON object containing a "translations" array with the exact same number of items as the input. 
+Your response MUST be a valid JSON object containing a "translations" array with exactly $_{COUNT} items. 
 Each item MUST contain the "id" and the translated "text".
 
 CRITICAL - Formatting & Structure:
   - Strictly preserve all line breaks (\\n), indentation, and formatting.
-  - If you see markers like <n1/> or <n2/>, treat them as literal line break markers and preserve them exactly in their correct positions.
-  - If the text contains placeholders like [[AIWC-0]], copy them exactly as is.
+  - If the translated text contains segment markers like [--SEG:nN--], you MUST preserve them exactly as-is. Do not translate, modify, rearrange, or remove these markers.
 
 Return ONLY the JSON object, no additional text or markdown.
 
@@ -825,6 +824,10 @@ export const getSourceLanguageAsync = async () => {
 
 export const getTargetLanguageAsync = async () => {
   return getSettingValueAsync("TARGET_LANGUAGE", CONFIG.TARGET_LANGUAGE);
+};
+
+export const getFeatureSemanticBlockGroupingAsync = async () => {
+  return getSettingValueAsync("FEATURE_SEMANTIC_BLOCK_GROUPING", CONFIG.FEATURE_SEMANTIC_BLOCK_GROUPING);
 };
 
 export const getEnableDictionaryAsync = async () => {

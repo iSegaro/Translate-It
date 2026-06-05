@@ -7,7 +7,7 @@ import { buildPrompt } from "@/features/translation/utils/promptBuilder.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TRANSLATION_CONSTANTS } from '@/shared/config/translationConstants.js';
-import { 
+import {
   getPromptAsync,
   getPromptAutoAsync,
   getPromptBASEAIBatchAsync, 
@@ -19,6 +19,7 @@ import {
   getAIConversationHistoryEnabledAsync
 } from '@/shared/config/config.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
+import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
 
@@ -243,6 +244,7 @@ export const AIConversationHelper = {
     
     // Use consistent language name logic with capitalization (matches promptBuilder.js)
     const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const useAutoPrompt = await shouldUseAutoPromptAsync(sourceLang, translateMode);
     
     let actualSourceLang = sourceLang === 'auto' ? await getSourceLanguageAsync() : sourceLang;
     if (actualSourceLang === 'auto') {
@@ -277,7 +279,7 @@ export const AIConversationHelper = {
       // Prioritize custom prompt template from metadata (Subtitle mode)
       if (metadata?.promptTemplate) {
         promptTemplate = metadata.promptTemplate;
-      } else if (sourceLang === 'auto') {
+      } else if (useAutoPrompt) {
         promptTemplate = useFollowup
           ? await getPromptBASEAIFollowupAutoAsync()
           : await getPromptBASEAIBatchAutoAsync();
@@ -304,7 +306,7 @@ export const AIConversationHelper = {
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName);
     } else {
-      const promptInstructionsTemplate = sourceLang === 'auto'
+      const promptInstructionsTemplate = useAutoPrompt
         ? await getPromptAutoAsync()
         : await getPromptAsync();
 
@@ -317,6 +319,9 @@ export const AIConversationHelper = {
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName);
     }
+
+    const textsArray = Array.isArray(text) ? text : [text];
+    const textsCount = textsArray.length;
 
     // Use project standard placeholders: $_{SOURCE}, $_{TARGET}, $_{TEXT}, $_{PROMPT_INSTRUCTIONS} with global regex
     let systemPrompt;
@@ -337,13 +342,15 @@ export const AIConversationHelper = {
       systemPrompt = normalizedTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName)
-        .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions);
+        .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+        .replace(/\$_{COUNT}/g, String(textsCount));
     } else {
       // For non-batch prompts (from buildPrompt), the text is already injected
       // We only need to replace language placeholders if they haven't been replaced yet
       systemPrompt = promptTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
-        .replace(/\$_{TARGET}/g, targetName);
+        .replace(/\$_{TARGET}/g, targetName)
+        .replace(/\$_{COUNT}/g, '1');
     }
 
     // Determine if we should wrap the text in a JSON structure
@@ -352,7 +359,6 @@ export const AIConversationHelper = {
 
     let userText;
     if (shouldWrap) {
-      const textsArray = Array.isArray(text) ? text : [text];
       // Wrap into the structured JSON format expected by PROMPT_BASE_AI_BATCH
       // This ensures compatibility with strict AI models that expect 'translations' and 'id'
       userText = JSON.stringify({
