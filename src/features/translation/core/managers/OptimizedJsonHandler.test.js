@@ -214,6 +214,28 @@ describe('OptimizedJsonHandler', () => {
       );
     });
 
+    it('should forward original source language metadata to provider translate calls', async () => {
+      mockEngine.createIntelligentBatches = vi.fn((segments) => [segments]);
+
+      mockProvider.translate.mockResolvedValueOnce({
+        translatedText: ['t1', 't2'],
+        detectedLanguage: 'fa'
+      });
+
+      await handler.execute(mockEngine, mockData, mockProvider, 'de', 'fa', 'msg-1', mockSender);
+
+      expect(mockProvider.translate).toHaveBeenCalledTimes(1);
+      expect(mockProvider.translate).toHaveBeenCalledWith(
+        expect.any(Array),
+        'auto',
+        'fa',
+        expect.objectContaining({
+          originalSourceLang: 'de',
+          originalTargetLang: 'fa'
+        })
+      );
+    });
+
     it('should correctly scale and batch for Level 5 (Turbo) in an end-to-end flow', async () => {
       mockEngine.createIntelligentBatches = (segments, size, chars) => TranslationBatcher.createIntelligentBatches(segments, size, chars);
 

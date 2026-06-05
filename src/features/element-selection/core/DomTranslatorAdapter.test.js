@@ -160,6 +160,13 @@ describe('DomTranslatorAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(testElement.textContent).toContain('سلام');
+      expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceLanguage: 'auto'
+          })
+        })
+      );
     });
 
     it('should fallback to V2 node-by-node extraction for traditional providers even if Block Grouping is globally enabled', async () => {

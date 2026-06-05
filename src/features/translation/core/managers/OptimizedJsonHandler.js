@@ -135,7 +135,9 @@ export class OptimizedJsonHandler {
               options?.contextMetadata, 
               options?.contextSummary,
               engine,
-              sender
+              sender,
+              originalSourceLang,
+              originalTargetLang
             ),
             timeoutPromise
           ]);
@@ -243,7 +245,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -260,6 +262,7 @@ export class OptimizedJsonHandler {
       {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
         engine, sender, priority: 'high', rawJsonPayload: true,
+        originalSourceLang, originalTargetLang,
         expectedFormat
       }
     );

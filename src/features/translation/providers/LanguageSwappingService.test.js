@@ -20,12 +20,17 @@ vi.mock("@/shared/services/LanguageDetectionService.js", () => ({
 
 vi.mock("@/shared/config/config.js", () => ({
   getBilingualTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
-  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({ selection: true, popup: true })),
+  getBilingualTranslationModesAsync: vi.fn(() => Promise.resolve({
+    selection: true,
+    popup: true,
+    'select-element': true
+  })),
   TranslationMode: {
     Dictionary_Translation: 'dictionary',
     Field: 'content',
     Selection: 'selection',
-    Popup_Translate: 'popup'
+    Popup_Translate: 'popup',
+    Select_Element: 'select-element'
   }
 }));
 
@@ -40,8 +45,16 @@ vi.mock("@/shared/config/languageConstants.js", () => ({
 }));
 
 describe('LanguageSwappingService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    const { getBilingualTranslationEnabledAsync, getBilingualTranslationModesAsync } = await import('@/shared/config/config.js');
+    getBilingualTranslationEnabledAsync.mockResolvedValue(true);
+    getBilingualTranslationModesAsync.mockResolvedValue({
+      selection: true,
+      popup: true,
+      'select-element': true
+    });
   });
 
   describe('applyLanguageSwapping', () => {
@@ -171,6 +184,36 @@ describe('LanguageSwappingService', () => {
 
       expect(src).toBe('fa');
       expect(tgt).toBe('de'); // Should use 'de' instead of default 'en'
+    });
+
+    it('should use the original source language as the swap target in Select Element mode when available', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'auto', 'fa', 'de', { mode: 'select-element' }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('de');
+    });
+
+    it('should keep the English fallback in Select Element mode when originalSourceLang is auto', async () => {
+      const { LanguageDetectionService } = await import("@/shared/services/LanguageDetectionService.js");
+      const { getCanonicalCode } = await import("@/shared/config/languageConstants.js");
+
+      LanguageDetectionService.detect.mockResolvedValue('fa');
+      getCanonicalCode.mockImplementation(l => l);
+
+      const [src, tgt] = await LanguageSwappingService.applyLanguageSwapping(
+        'سلام', 'auto', 'fa', 'auto', { mode: 'select-element' }
+      );
+
+      expect(src).toBe('fa');
+      expect(tgt).toBe('en');
     });
 
     it('should ALWAYS swap in Dictionary mode if detected matches target, even if bilingual is disabled for that mode', async () => {
