@@ -333,12 +333,49 @@ export class SimpleMarkdown {
 
   static _parseLabelLine(text) {
     const span = document.createElement("span");
-    
-    // Robust regex to capture label and content regardless of bold marker position
-    // Group 1: Label part (including possible ** markers)
-    // Group 2: Content part (optional)
-    // Use negative lookahead to avoid matching URL protocols like https://
-    const match = text.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
+
+    const normalizedText = text.trim();
+    const boldLabelPattern = /\*\*([^*]+?)\*\*\s*:(?!\/\/)\s*/g;
+    const boldLabelMatches = [...normalizedText.matchAll(boldLabelPattern)];
+
+    if (boldLabelMatches.length > 1) {
+      let cursor = 0;
+
+      boldLabelMatches.forEach((match, index) => {
+        const matchStart = match.index ?? 0;
+        const matchEnd = matchStart + match[0].length;
+        const nextMatchStart = index + 1 < boldLabelMatches.length
+          ? (boldLabelMatches[index + 1].index ?? normalizedText.length)
+          : normalizedText.length;
+
+        if (matchStart > cursor) {
+          const prefix = normalizedText.slice(cursor, matchStart);
+          if (prefix) {
+            span.appendChild(document.createTextNode(prefix));
+          }
+        }
+
+        const labelElement = document.createElement("strong");
+        labelElement.textContent = this.strip(match[1].trim());
+        span.appendChild(labelElement);
+        span.appendChild(document.createTextNode(": "));
+
+        // Keep the raw content as text so dictionary payloads don't get
+        // reinterpreted as nested markdown.
+        const content = normalizedText.slice(matchEnd, nextMatchStart);
+        if (content) {
+          span.appendChild(document.createTextNode(content));
+        }
+
+        cursor = nextMatchStart;
+      });
+
+      return span;
+    }
+
+    // Single-label fallback keeps the existing behavior for normal
+    // dictionary lines like "**Noun**: ..." and "اسم: ...".
+    const match = normalizedText.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
 
     if (!match) {
       span.appendChild(this._parseInline(text));
@@ -348,18 +385,15 @@ export class SimpleMarkdown {
     const labelPart = match[1].trim();
     const content = match[2] ? match[2].trim() : "";
 
-    // Create a bold element for the label and strip any markdown markers
     const labelElement = document.createElement("strong");
     labelElement.textContent = this.strip(labelPart);
-
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
 
-    // Content after colon should NOT be parsed as markdown in dictionary context
-    // to prevent nested formatting issues.
+    // Keep the raw content as text so dictionary payloads don't get
+    // reinterpreted as nested markdown.
     if (content) {
-      const textNode = document.createTextNode(content);
-      span.appendChild(textNode);
+      span.appendChild(document.createTextNode(content));
     }
 
     return span;
@@ -628,4 +662,3 @@ export class SimpleMarkdown {
       .trim();
   }
 }
-

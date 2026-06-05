@@ -204,11 +204,14 @@ describe('TranslationWindow.vue dictionary rendering', () => {
     const text = windowMarkdownRoot.text();
 
     expect(text).not.toContain('**UK**');
+    expect(text).not.toContain('**US**');
     expect(windowHtml).toContain('<strong>UK</strong>');
+    expect(windowHtml).toContain('<strong>US</strong>');
+    expect(windowHtml).not.toContain('**US**');
     expect(windowMarkdownRoot.find('ul').exists()).toBe(true);
     expect(windowMarkdownRoot.findAll('li')).toHaveLength(3);
     expect(windowMarkdownRoot.findAll('strong').map((node) => node.text())).toEqual(
-      expect.arrayContaining(['UK', '名词', '同义词', '反义词']),
+      expect.arrayContaining(['UK', 'US', '名词', '同义词', '反义词']),
     );
     expect(windowHtml).toBe(baselineHtml);
   });

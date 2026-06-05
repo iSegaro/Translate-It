@@ -604,9 +604,28 @@ describe('SimpleMarkdown', () => {
       expect(result).toBeTruthy();
     });
 
+    it('should render multiple dictionary labels on the same line', () => {
+      const result = SimpleMarkdown.render('**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(result.innerHTML).toContain('<strong>UK</strong>');
+      expect(result.innerHTML).toContain('<strong>US</strong>');
+      expect(result.textContent).not.toContain('**US**');
+    });
+
     it('should render Persian label lines', () => {
       const result = SimpleMarkdown.render('اسم: کتاب, کتابچه');
       expect(result).toBeTruthy();
+    });
+
+    it('should keep list label formatting working for dictionary items', () => {
+      const result = SimpleMarkdown.render('- **名词**: 表达方式, 词语\n- **同义词**: 词汇, 措辞');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['名词', '同义词']));
     });
 
     it('should handle mixed content', () => {
