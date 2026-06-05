@@ -314,15 +314,19 @@ export class SimpleMarkdown {
     // - "تعاریف (Definitions):" (label with no content after colon)
     const trimmedText = text.trim().replace(/^[-*•]\s+/, "");
 
-    // 1. Check for markdown bold labels: **Label**: content (content is optional)
-    // We look for ** at start, some characters, then a colon (either inside or outside the last **)
-    const markdownLabelPattern = /^\*\*.*?\*\*(\s*:\s*.*|:\*\*.*|:)$/;
+    // 1. Check for markdown bold labels:
+    // - **Label** : content
+    // - **Label:** content
+    // Require the colon to be attached to the label form itself so ordinary
+    // bold prose like "**Important** text" is not treated as a dictionary line.
+    const markdownLabelPattern = /^(?:\*\*[^*]+\*\*\s*:(?!\/\/)(?:\s+.*)?|\*\*[^*]+:\*\*(?:\s+.*)?)$/;
 
     // 2. Check for regular labels with content: Label: Content
-    // Allow spaces in label but require content after colon. 
-    // Limit label length to 30 to avoid matching sentences.
+    // Allow spaces in label but require content after colon.
+    // Exclude markdown marker characters so bold prose like "**Important** text: ..."
+    // does not get misclassified as a dictionary label.
     // Use negative lookahead to avoid matching URL protocols like https://
-    const regularLabelPattern = /^[^:]{1,30}:(?!\/\/)\s*\S+.*$/;
+    const regularLabelPattern = /^[^:*]{1,30}:(?!\/\/)\s*\S+.*$/;
 
     // 3. Specifically allow lines ending in a colon (header-style labels)
     // Limit to 3 words (2 spaces) and 30 characters to avoid matching sentences.
@@ -335,7 +339,7 @@ export class SimpleMarkdown {
     const span = document.createElement("span");
 
     const normalizedText = text.trim();
-    const boldLabelPattern = /\*\*([^*]+?)\*\*\s*:(?!\/\/)\s*/g;
+    const boldLabelPattern = /\*\*([^*]+?)(?::)?\*\*\s*(?::\s*)?\s*/g;
     const boldLabelMatches = [...normalizedText.matchAll(boldLabelPattern)];
 
     if (boldLabelMatches.length > 1) {
@@ -356,7 +360,7 @@ export class SimpleMarkdown {
         }
 
         const labelElement = document.createElement("strong");
-        labelElement.textContent = this.strip(match[1].trim());
+        labelElement.textContent = this.strip(match[1].trim()).replace(/:$/, "");
         span.appendChild(labelElement);
         span.appendChild(document.createTextNode(": "));
 
@@ -375,7 +379,7 @@ export class SimpleMarkdown {
 
     // Single-label fallback keeps the existing behavior for normal
     // dictionary lines like "**Noun**: ..." and "اسم: ...".
-    const match = normalizedText.match(/^(\*\*.*?\*\*|[^:]+)\s*:(?!\/\/)\s*(.*)$/);
+    const match = normalizedText.match(/^(\*\*.*?(?::)?\*\*|[^:]+)\s*(?::\s*)?(.*)$/);
 
     if (!match) {
       span.appendChild(this._parseInline(text));
@@ -386,7 +390,7 @@ export class SimpleMarkdown {
     const content = match[2] ? match[2].trim() : "";
 
     const labelElement = document.createElement("strong");
-    labelElement.textContent = this.strip(labelPart);
+    labelElement.textContent = this.strip(labelPart).replace(/:$/, "");
     span.appendChild(labelElement);
     span.appendChild(document.createTextNode(": "));
 
