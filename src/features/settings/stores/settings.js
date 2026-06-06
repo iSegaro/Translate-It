@@ -204,11 +204,14 @@ export const useSettingsStore = defineStore('settings', () => {
   
   // Non-persisted UI state for the Options page
   const activeConfigProvider = ref(null)
+  const systemPrefersDark = ref(false)
+  let systemThemeMediaQuery = null
+  let removeSystemThemeListener = null
   
   // Getters
   const isDarkTheme = computed(() => {
     if (settings.value.THEME === 'auto') {
-      return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+      return systemPrefersDark.value
     }
     return settings.value.THEME === 'dark'
   })
@@ -794,6 +797,34 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  const setupSystemThemeListener = () => {
+    if (systemThemeMediaQuery || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !systemThemeMediaQuery) {
+        systemPrefersDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      return;
+    }
+
+    systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    systemPrefersDark.value = systemThemeMediaQuery.matches;
+
+    const handleSystemThemeChange = (event) => {
+      systemPrefersDark.value = !!event?.matches;
+    };
+
+    if (typeof systemThemeMediaQuery.addEventListener === 'function') {
+      systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
+      removeSystemThemeListener = () => {
+        systemThemeMediaQuery?.removeEventListener('change', handleSystemThemeChange);
+      };
+    } else if (typeof systemThemeMediaQuery.addListener === 'function') {
+      systemThemeMediaQuery.addListener(handleSystemThemeChange);
+      removeSystemThemeListener = () => {
+        systemThemeMediaQuery?.removeListener(handleSystemThemeChange);
+      };
+    }
+  }
+
   // Cleanup storage listener using StorageManager
   const cleanupStorageListener = async () => {
     if (!storageListener) return;
@@ -822,6 +853,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Initialize settings on store creation and setup listener
   loadSettings().then(async () => {
+    setupSystemThemeListener();
     // Initialize DebugModeBridge after settings are loaded
     try {
       const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js')
@@ -842,6 +874,11 @@ export const useSettingsStore = defineStore('settings', () => {
   if (instance) {
     onUnmounted(() => {
       cleanupStorageListener()
+      if (removeSystemThemeListener) {
+        removeSystemThemeListener();
+        removeSystemThemeListener = null;
+        systemThemeMediaQuery = null;
+      }
     })
   }
   // Note: If not in component context, cleanup will happen when browser extension unloads

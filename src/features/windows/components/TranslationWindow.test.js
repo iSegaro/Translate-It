@@ -1,7 +1,58 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
+
+let currentMediaQueryList = null;
+
+const createSettingsStore = () => {
+  const store = reactive({
+    settings: {
+      THEME: 'light',
+      WINDOW_IS_PINNED: false,
+      WINDOW_DOCK_MODE: 'none',
+      WINDOW_DOCKED_WIDTH: 350,
+    },
+    getSetting: vi.fn(),
+    updateSettingAndPersist: vi.fn(),
+  });
+
+  store.getSetting = vi.fn((key, fallback) => store.settings[key] ?? fallback);
+  store.updateSettingAndPersist = vi.fn((key, value) => {
+    store.settings[key] = value;
+  });
+
+  return store;
+};
+
+const createMediaQueryList = (matches = false) => {
+  const listeners = new Set();
+
+  return {
+    media: '(prefers-color-scheme: dark)',
+    matches,
+    addEventListener: vi.fn((event, handler) => {
+      if (event === 'change') {
+        listeners.add(handler);
+      }
+    }),
+    removeEventListener: vi.fn((event, handler) => {
+      if (event === 'change') {
+        listeners.delete(handler);
+      }
+    }),
+    addListener: vi.fn((handler) => {
+      listeners.add(handler);
+    }),
+    removeListener: vi.fn((handler) => {
+      listeners.delete(handler);
+    }),
+    dispatchChange(nextMatches) {
+      this.matches = nextMatches;
+      listeners.forEach((handler) => handler({ matches: nextMatches, media: this.media }));
+    },
+  };
+};
 
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: {
@@ -60,15 +111,7 @@ vi.mock('@/store/modules/mobile.js', () => ({
 }));
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
-  useSettingsStore: () => ({
-    settings: {
-      WINDOW_IS_PINNED: false,
-      WINDOW_DOCK_MODE: 'none',
-      WINDOW_DOCKED_WIDTH: 350,
-    },
-    getSetting: vi.fn((key, fallback) => fallback),
-    updateSettingAndPersist: vi.fn(),
-  }),
+  useSettingsStore: () => globalThis.__mockSettingsStore,
 }));
 
 vi.mock('@/core/content-scripts/chunks/lazy-styles.js', () => ({
@@ -146,6 +189,9 @@ describe('TranslationWindow.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('requestAnimationFrame', (cb) => cb());
+    globalThis.__mockSettingsStore = createSettingsStore();
+    currentMediaQueryList = createMediaQueryList(false);
+    vi.stubGlobal('matchMedia', vi.fn(() => currentMediaQueryList));
     window.windowsManagerInstance = {
       state: {
         setPinned: vi.fn(),
@@ -166,5 +212,63 @@ describe('TranslationWindow.vue', () => {
     expect(display.exists()).toBe(true);
     expect(display.props('mode')).toBe('compact');
     expect(display.props('lastTranslation')).toBeNull();
+  });
+
+  it('updates the open window shell when the settings theme changes', async () => {
+    const wrapper = mount(TranslationWindow, {
+      props: baseProps,
+    });
+
+    const windowRoot = wrapper.find('.translation-window');
+
+    expect(windowRoot.classes()).toContain('light');
+    expect(windowRoot.classes()).not.toContain('dark');
+
+    globalThis.__mockSettingsStore.settings.THEME = 'dark';
+    await nextTick();
+
+    expect(windowRoot.classes()).toContain('dark');
+    expect(windowRoot.classes()).not.toContain('light');
+  });
+
+  it('keeps pinned and docked classes intact while using live theme state', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_IS_PINNED = true;
+    globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE = 'left';
+
+    const wrapper = mount(TranslationWindow, {
+      props: baseProps,
+    });
+
+    const windowRoot = wrapper.find('.translation-window');
+
+    expect(windowRoot.classes()).toContain('light');
+    expect(windowRoot.classes()).toContain('is-pinned');
+    expect(windowRoot.classes()).toContain('is-docked');
+    expect(windowRoot.classes()).toContain('dock-left');
+  });
+
+  it('uses system theme for auto mode and updates without remounting', async () => {
+    globalThis.__mockSettingsStore.settings.THEME = 'auto';
+
+    const wrapper = mount(TranslationWindow, {
+      props: baseProps,
+    });
+
+    const windowRoot = wrapper.find('.translation-window');
+
+    expect(windowRoot.classes()).toContain('light');
+    expect(windowRoot.classes()).not.toContain('dark');
+
+    currentMediaQueryList.dispatchChange(true);
+    await nextTick();
+
+    expect(windowRoot.classes()).toContain('dark');
+    expect(windowRoot.classes()).not.toContain('light');
+
+    currentMediaQueryList.dispatchChange(false);
+    await nextTick();
+
+    expect(windowRoot.classes()).toContain('light');
+    expect(windowRoot.classes()).not.toContain('dark');
   });
 });

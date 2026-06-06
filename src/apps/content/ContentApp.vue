@@ -32,7 +32,6 @@
         :position="window.position"
         :selected-text="window.selectedText"
         :initial-translated-text="window.translatedText"
-        :theme="window.theme"
         :is-loading="window.isLoading"
         :is-streaming="window.isStreaming"
         :is-error="window.isError"

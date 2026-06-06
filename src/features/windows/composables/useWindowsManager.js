@@ -43,7 +43,6 @@ export function useWindowsManager() {
       selectedText: detail.selectedText,
       translatedText: detail.initialTranslatedText || detail.translatedText, // Support both property names
       position: detail.position,
-      theme: detail.theme || 'light',
       isError: detail.isError || false,
       errorType: detail.errorType || null,
       canRetry: detail.canRetry || false,
@@ -117,11 +116,13 @@ export function useWindowsManager() {
     if (existingWindowIndex >= 0) {
       const updatedWindows = [...translationWindows.value];
       const existingWindow = updatedWindows[existingWindowIndex];
+      const safeDetail = { ...detail };
+      delete safeDetail.theme;
       
       // Update the window data
       updatedWindows[existingWindowIndex] = {
         ...existingWindow,
-        ...detail,
+        ...safeDetail,
         translatedText: typeof detail.translatedText !== 'undefined' ? detail.translatedText : 
                        (typeof detail.initialTranslatedText !== 'undefined' ? detail.initialTranslatedText : existingWindow.translatedText),
         sourceLanguage: detail.sourceLanguage || detail.from || detail.sl || existingWindow.sourceLanguage,

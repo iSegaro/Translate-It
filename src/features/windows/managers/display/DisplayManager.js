@@ -383,14 +383,12 @@ export class DisplayManager {
     });
 
     const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const theme = this.themeManager.currentTheme || 'light';
     
     WindowsManagerEvents.showWindow({
       id: windowId,
       selectedText,
       position,
       mode: 'window',
-      theme,
       initialSize: 'small',
       isLoading: true,
       frameId: this.crossFrameManager.frameId

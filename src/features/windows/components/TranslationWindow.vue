@@ -5,7 +5,7 @@
     v-show="!isFullscreen"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host ti-loading-window"
-    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
+    :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
     :style="windowStyle"
     data-translate-ui="true"
     @mousedown="handleStartDrag"
@@ -24,7 +24,7 @@
     v-show="!isFullscreen"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host normal-window ti-host-container"
-    :class="[theme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
+    :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
     :style="windowStyle"
     data-translate-ui="true"
     @mousedown.stop
@@ -187,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
@@ -241,6 +241,20 @@ const mobileStore = useMobileStore();
 const settings = useSettingsStore();
 const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
 const tracker = useResourceTracker(`translation-window-${props.id}`);
+const systemThemeQuery = '(prefers-color-scheme: dark)';
+const systemPrefersDark = ref(false);
+let systemThemeMediaQuery = null;
+let removeSystemThemeListener = null;
+
+const resolveShellTheme = () => {
+  if (settings.settings.THEME === 'auto') {
+    return systemPrefersDark.value ? 'dark' : 'light';
+  }
+
+  return settings.settings.THEME === 'dark' ? 'dark' : 'light';
+};
+
+const shellTheme = computed(() => resolveShellTheme());
 
 // Pinned and Docked states
 const isPinned = ref(settings.getSetting('WINDOW_IS_PINNED', false));
@@ -264,13 +278,51 @@ watch(() => settings.settings.WINDOW_DOCKED_WIDTH, (newVal) => {
   }
 });
 
+const syncSystemTheme = (matches) => {
+  systemPrefersDark.value = matches;
+};
+
+const handleSystemThemeChange = (event) => {
+  const matches = typeof event?.matches === 'boolean'
+    ? event.matches
+    : !!systemThemeMediaQuery?.matches;
+
+  syncSystemTheme(matches);
+};
+
 // Update WindowsState with initial values
 onMounted(() => {
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    systemThemeMediaQuery = window.matchMedia(systemThemeQuery);
+    syncSystemTheme(systemThemeMediaQuery.matches);
+
+    if (typeof systemThemeMediaQuery.addEventListener === 'function') {
+      systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
+      removeSystemThemeListener = () => {
+        systemThemeMediaQuery?.removeEventListener('change', handleSystemThemeChange);
+      };
+    } else if (typeof systemThemeMediaQuery.addListener === 'function') {
+      systemThemeMediaQuery.addListener(handleSystemThemeChange);
+      removeSystemThemeListener = () => {
+        systemThemeMediaQuery?.removeListener(handleSystemThemeChange);
+      };
+    }
+  }
+
   const windowsManager = window.windowsManagerInstance;
   if (windowsManager && windowsManager.state) {
     windowsManager.state.setPinned(isPinned.value);
     windowsManager.state.setDockMode(dockMode.value);
   }
+});
+
+onUnmounted(() => {
+  if (removeSystemThemeListener) {
+    removeSystemThemeListener();
+    removeSystemThemeListener = null;
+  }
+
+  systemThemeMediaQuery = null;
 });
 
 const togglePin = () => {

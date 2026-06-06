@@ -8,6 +8,7 @@ import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { applyTheme } from '@/utils/ui/theme.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppLifecycle');
 
@@ -72,6 +73,8 @@ export function useContentAppLifecycle({
       await updateToastRTL();
       logger.debug('ContentApp: RTL initialized');
     }
+
+    applyTheme(settingsStore.settings.THEME || 'auto');
   };
 
   /**
@@ -111,6 +114,29 @@ export function useContentAppLifecycle({
     // Mounted Test Event
     tracker.addEventListener(pageEventBus, 'ui-host-mounted', () => {
       logger.info('Successfully received the ui-host-mounted test event!');
+    });
+
+    tracker.addEventListener(browser.runtime.onMessage, 'addListener', (message) => {
+      if (!message || message.action !== 'THEME_CHANGED') {
+        return false;
+      }
+
+      const theme = message.payload?.theme;
+      if (!theme) {
+        return false;
+      }
+
+      logger.debug('Theme changed from options:', theme);
+      settingsStore.updateSettingLocally('THEME', theme);
+      applyTheme(theme);
+      return false;
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    tracker.addEventListener(mediaQuery, 'change', () => {
+      if (settingsStore.settings.THEME === 'auto') {
+        applyTheme('auto');
+      }
     });
   };
 
