@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watchEffect } from 'vue';
 import browser from 'webextension-polyfill';
 import { ToastIntegration } from '@/shared/toast/ToastIntegration.js';
 import NotificationManager from '@/core/managers/core/NotificationManager.js';
@@ -31,6 +31,16 @@ export function useContentAppLifecycle({
 }) {
   let toastIntegration = null;
   let selectElementNotificationManager = null;
+
+  applyTheme(settingsStore.settings.THEME || 'auto');
+
+  watchEffect(() => {
+    if (!settingsStore.isInitialized) {
+      return;
+    }
+
+    applyTheme(settingsStore.isDarkTheme ? 'dark' : 'light');
+  });
 
   /**
    * Initializes all required managers and services
@@ -73,8 +83,6 @@ export function useContentAppLifecycle({
       await updateToastRTL();
       logger.debug('ContentApp: RTL initialized');
     }
-
-    applyTheme(settingsStore.settings.THEME || 'auto');
   };
 
   /**
@@ -132,12 +140,6 @@ export function useContentAppLifecycle({
       return false;
     });
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    tracker.addEventListener(mediaQuery, 'change', () => {
-      if (settingsStore.settings.THEME === 'auto') {
-        applyTheme('auto');
-      }
-    });
   };
 
   onMounted(async () => {

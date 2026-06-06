@@ -173,4 +173,38 @@ describe('Settings Store', () => {
     expect(secureStorage.prepareForExport).toHaveBeenCalled();
     expect(result._exported).toBe(true);
   });
+
+  it('should reactively update isDarkTheme in auto mode when system theme changes', async () => {
+    let mediaQueryListener = null;
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn((event, handler) => {
+        if (event === 'change') {
+          mediaQueryListener = handler;
+        }
+      }),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn((handler) => {
+        mediaQueryListener = handler;
+      }),
+      removeListener: vi.fn(),
+    }));
+
+    storageManager.get.mockResolvedValue({});
+    const store = useSettingsStore();
+    store.settings.THEME = 'auto';
+
+    await store.loadSettings();
+    await nextTick();
+
+    expect(store.isDarkTheme).toBe(false);
+
+    mediaQueryListener({ matches: true });
+    await nextTick();
+    expect(store.isDarkTheme).toBe(true);
+
+    mediaQueryListener({ matches: false });
+    await nextTick();
+    expect(store.isDarkTheme).toBe(false);
+  });
 });

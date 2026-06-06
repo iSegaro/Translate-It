@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { defineComponent, nextTick } from 'vue';
+import { defineComponent, nextTick, reactive, ref } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import { useContentAppLifecycle } from './useContentAppLifecycle.js';
 
@@ -8,17 +8,12 @@ const { applyThemeMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('webextension-polyfill', () => ({
-  default: (() => {
-    const runtimeOnMessage = {};
-    globalThis.__runtimeOnMessage = runtimeOnMessage;
-
-    return {
-      runtime: {
-        onMessage: runtimeOnMessage,
-        sendMessage: vi.fn(),
-      },
-    };
-  })(),
+  default: {
+    runtime: {
+      onMessage: {},
+      sendMessage: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('@/utils/ui/theme.js', () => ({
@@ -59,50 +54,27 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('useContentAppLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    globalThis.__runtimeOnMessage = null;
-    globalThis.__mediaQuery = null;
     window.pageEventBus = {};
-    window.matchMedia = vi.fn(() => {
-      const mediaQuery = {
-        addEventListener: vi.fn((event, handler) => {
-          if (event === 'change') {
-            globalThis.__mediaQueryChangeListener = handler;
-          }
-        }),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn((handler) => {
-          globalThis.__mediaQueryChangeListener = handler;
-        }),
-        removeListener: vi.fn(),
-        matches: false,
-      };
-      globalThis.__mediaQuery = mediaQuery;
-      return mediaQuery;
-    });
-    globalThis.__runtimeMessageListener = null;
-    globalThis.__mediaQueryChangeListener = null;
   });
 
-  it('syncs content theme from runtime updates and system auto changes', async () => {
-    const settingsStore = {
+  it('syncs content theme from runtime updates and store-driven theme changes', async () => {
+    const settingsStore = reactive({
       isInitialized: true,
       settings: {
         THEME: 'light',
       },
+      isDarkTheme: ref(false),
       loadSettings: vi.fn().mockResolvedValue(undefined),
       updateSettingLocally: vi.fn((key, value) => {
         settingsStore.settings[key] = value;
       }),
-    };
+    });
+    const updateSettingSpy = vi.spyOn(settingsStore, 'updateSettingLocally');
 
     const tracker = {
       addEventListener: vi.fn((target, eventName, handler) => {
         if (eventName === 'addListener') {
-          globalThis.__runtimeMessageListener = handler;
-        }
-
-        if (target === globalThis.__mediaQuery && eventName === 'change') {
-          globalThis.__mediaQueryChangeListener = handler;
+          tracker.runtimeListener = handler;
         }
       }),
     };
@@ -124,20 +96,29 @@ describe('useContentAppLifecycle', () => {
     await flushPromises();
     await nextTick();
 
-    expect(applyThemeMock).toHaveBeenCalledWith('light');
+    expect(tracker.runtimeListener).toBeTypeOf('function');
 
-    globalThis.__runtimeMessageListener({
+    tracker.runtimeListener({
       action: 'THEME_CHANGED',
       payload: { theme: 'dark' },
     });
 
-    expect(settingsStore.updateSettingLocally).toHaveBeenCalledWith('THEME', 'dark');
+    expect(updateSettingSpy).toHaveBeenCalledWith('THEME', 'dark');
     expect(applyThemeMock).toHaveBeenCalledWith('dark');
     expect(settingsStore.settings.THEME).toBe('dark');
 
-    settingsStore.settings.THEME = 'auto';
-    globalThis.__mediaQueryChangeListener({ matches: true });
+    applyThemeMock.mockClear();
+    settingsStore.isDarkTheme = true;
+    await flushPromises();
+    await nextTick();
 
-    expect(applyThemeMock).toHaveBeenCalledWith('auto');
+    expect(applyThemeMock).toHaveBeenCalledWith('dark');
+
+    applyThemeMock.mockClear();
+    settingsStore.isDarkTheme = false;
+    await flushPromises();
+    await nextTick();
+
+    expect(applyThemeMock).toHaveBeenCalledWith('light');
   });
 });
