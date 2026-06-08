@@ -7,21 +7,29 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
  */
 export function useLanguageDefaults() {
   const settingsStore = useSettingsStore()
+  const requestTokens = {
+    SOURCE_LANGUAGE: 0,
+    TARGET_LANGUAGE: 0
+  }
 
   const savedSourceLanguage = computed(() => settingsStore.settings?.SOURCE_LANGUAGE)
   const savedTargetLanguage = computed(() => settingsStore.settings?.TARGET_LANGUAGE)
   const isReady = computed(() => settingsStore.isInitialized)
 
   const persistLanguageDefault = async (key, language) => {
+    const requestToken = (requestTokens[key] || 0) + 1
+    requestTokens[key] = requestToken
     const previousValue = settingsStore.settings?.[key]
 
     try {
       await settingsStore.updateSettingAndPersist(key, language)
       return true
     } catch (error) {
-      // Revert the optimistic local store mutation so the UI only reflects
-      // a saved default after persistence succeeds.
-      settingsStore.updateSettingLocally(key, previousValue)
+      // Only roll back if this request is still the latest write for the key.
+      // Older failures must not overwrite a newer successful default.
+      if (requestTokens[key] === requestToken) {
+        settingsStore.updateSettingLocally(key, previousValue)
+      }
       throw error
     }
   }
@@ -37,4 +45,3 @@ export function useLanguageDefaults() {
     setTargetLanguageAsDefault
   }
 }
-
