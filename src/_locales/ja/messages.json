@@ -758,6 +758,27 @@
   "mobile_page_auto_close_tooltip": {
     "message": "翻訳開始後にダッシュボードを自動的に閉じます"
   },
+  "mobile_page_auto_translate_label": {
+    "message": "ページの自動翻訳"
+  },
+  "mobile_page_auto_translate_desc_add": {
+    "message": "このページを自動的に翻訳します"
+  },
+  "mobile_page_auto_translate_desc_remove": {
+    "message": "このページは自動的に翻訳されます"
+  },
+  "mobile_page_auto_translate_desc_inherited": {
+    "message": "設定内の広範なルールによって制御されています"
+  },
+  "mobile_page_auto_translate_aria_add": {
+    "message": "このページを自動翻訳ルールに追加"
+  },
+  "mobile_page_auto_translate_aria_remove": {
+    "message": "このページを自動翻訳ルールから削除"
+  },
+  "mobile_page_auto_translate_aria_inherited": {
+    "message": "このページは広範な自動翻訳ルールによって制御されています"
+  },
   "mobile_fab_alt": {
     "message": "翻訳"
   },

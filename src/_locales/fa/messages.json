@@ -761,6 +761,27 @@
   "mobile_page_auto_close_tooltip": {
     "message": "بستن خودکار دشبورد پس از شروع ترجمه"
   },
+  "mobile_page_auto_translate_label": {
+    "message": "ترجمه خودکار صفحه"
+  },
+  "mobile_page_auto_translate_desc_add": {
+    "message": "ترجمه خودکار این صفحه به‌محض ورود"
+  },
+  "mobile_page_auto_translate_desc_remove": {
+    "message": "این صفحه به طور خودکار ترجمه خواهد شد"
+  },
+  "mobile_page_auto_translate_desc_inherited": {
+    "message": "کنترل شده توسط یک قانون کلی در تنظیمات"
+  },
+  "mobile_page_auto_translate_aria_add": {
+    "message": "افزودن این صفحه به قوانین ترجمه خودکار"
+  },
+  "mobile_page_auto_translate_aria_remove": {
+    "message": "حذف این صفحه از قوانین ترجمه خودکار"
+  },
+  "mobile_page_auto_translate_aria_inherited": {
+    "message": "این صفحه توسط یک قانون کلی ترجمه خودکار کنترل می‌شود"
+  },
   "mobile_fab_alt": {
     "message": "ترجمه"
   },

@@ -11,6 +11,44 @@
   box-sizing: border-box !important;
   width: 100% !important;
   overflow-x: hidden !important;
+
+  .ti-m-setting-star-btn {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--ti-mobile-text-muted, #64748b) !important;
+    -webkit-tap-highlight-color: transparent !important;
+    transition: all 0.2s ease !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    svg {
+      display: block !important;
+    }
+
+    &:active {
+      transform: scale(0.92) !important;
+    }
+
+    &.is-active {
+      color: #ffb703 !important;
+    }
+
+    &.is-disabled {
+      opacity: 0.45 !important;
+      cursor: not-allowed !important;
+
+      &:active {
+        transform: none !important;
+      }
+    }
+  }
 }
 
 .ti-m-view-header {
