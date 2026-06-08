@@ -85,7 +85,7 @@ export const Is_Element_Need_to_RTL_Localize = (element) => {
 };
 
 export const openOptionsPage = (anchor = null) => {
-  browser.runtime
+  return browser.runtime
     .sendMessage({
       action: MessageActions.OPEN_OPTIONS_PAGE,
       data: { anchor: anchor },

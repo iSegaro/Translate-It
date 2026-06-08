@@ -7,6 +7,10 @@ const { openOptionsPageMock } = vi.hoisted(() => ({
   openOptionsPageMock: vi.fn(),
 }));
 
+const { loggerErrorMock } = vi.hoisted(() => ({
+  loggerErrorMock: vi.fn(),
+}));
+
 vi.mock('@/core/helpers.js', () => ({
   openOptionsPage: (...args) => openOptionsPageMock(...args),
 }));
@@ -78,7 +82,7 @@ vi.mock('@/composables/core/useResourceTracker.js', () => ({
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
-    error: vi.fn(),
+    error: loggerErrorMock,
     info: vi.fn(),
     debug: vi.fn(),
     warn: vi.fn(),
@@ -136,6 +140,7 @@ vi.mock('@iconify/vue', () => ({
 describe('SubtitleApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    loggerErrorMock.mockReset();
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: vi.fn(() => ({
@@ -148,6 +153,7 @@ describe('SubtitleApp', () => {
   });
 
   it('opens provider settings through the anchor-aware options helper', async () => {
+    openOptionsPageMock.mockResolvedValue({ success: true });
     const wrapper = mount(SubtitleApp, {
       attachTo: document.body,
       global: {
@@ -168,5 +174,29 @@ describe('SubtitleApp', () => {
 
     expect(openOptionsPageMock).toHaveBeenCalledTimes(1);
     expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
+  });
+
+  it('logs when provider settings opening fails', async () => {
+    openOptionsPageMock.mockResolvedValue({ success: false, error: 'failed to open' });
+    const wrapper = mount(SubtitleApp, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          transition: false,
+        },
+      },
+    });
+
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('button.subtitle-dropzone-stub').trigger('click');
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('button.settings-link-btn').trigger('click');
+
+    expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
+    expect(loggerErrorMock).toHaveBeenCalledWith('Failed to open provider settings:', 'failed to open');
   });
 });

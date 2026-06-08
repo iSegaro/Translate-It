@@ -238,7 +238,10 @@ const {
  */
 const goToProviderSettings = async () => {
   try {
-    openOptionsPage('providers');
+    const response = await openOptionsPage('providers');
+    if (response?.success === false) {
+      logger.error('Failed to open provider settings:', response.error || 'Unknown error');
+    }
   } catch (err) {
     logger.error('Failed to open provider settings:', err);
   }
