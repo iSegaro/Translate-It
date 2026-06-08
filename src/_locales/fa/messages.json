@@ -1194,10 +1194,10 @@
     "message": "ذخیره تنظیمات"
   },
   "whole_page_auto_translate_rules_label": {
-    "message": "ترجمه خودکار این سایت‌ها (با کاما جدا کنید)"
+    "message": "ترجمه خودکار این سایت‌ها (با کاما یا خط جدید جدا کنید)"
   },
   "whole_page_auto_translate_rules_description": {
-    "message": "آدرس‌ها یا دامنه‌هایی که با ورود به آن‌ها ترجمه کل صفحه به صورت خودکار آغاز می‌شود."
+    "message": "فرمت قوانین:\nexample.com           ← فقط صفحه ریشه سایت\nexample.com/*         ← تمامی صفحات سایت\n*.example.com         ← صفحات ریشه دامنه و زیردامنه‌ها\n*.example.com/*       ← تمامی صفحات دامنه و زیردامنه‌ها\nexample.com/docs      ← فقط همان صفحه\nexample.com/docs/*    ← تمامی صفحات زیر مسیر /docs"
   },
   "excluded_sites_label": {
     "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"

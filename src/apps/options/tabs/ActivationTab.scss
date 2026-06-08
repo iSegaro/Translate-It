@@ -389,6 +389,10 @@
   font-size: $font-size-sm !important;
 }
 
+.auto-translate-rules-description {
+  white-space: pre-line !important;
+}
+
 // Ensure ProviderSelector in legend looks good
 .base-fieldset__header-actions {
   .legend-actions-wrapper {

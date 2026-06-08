@@ -1194,10 +1194,10 @@
     "message": "Save Settings"
   },
   "whole_page_auto_translate_rules_label": {
-    "message": "Automatically translate these sites (comma separated)"
+    "message": "Automatically translate these sites (comma or newline separated)"
   },
   "whole_page_auto_translate_rules_description": {
-    "message": "URLs or domains that should automatically start Whole Page Translation when visited."
+    "message": "Rules format:\nexample.com           → root page only\nexample.com/*         → all pages on the site\n*.example.com         → root pages of the domain and subdomains\n*.example.com/*       → all pages on the domain and subdomains\nexample.com/docs      → exact page\nexample.com/docs/*    → all pages under /docs"
   },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"

@@ -168,13 +168,7 @@ export function matchesAutoTranslateRule(url, rule) {
     return url === ruleClean;
   }
 
-  // 2. Normalize leading wildcard (*.example.com -> example.com)
-  let normalizedRule = ruleClean;
-  if (normalizedRule.startsWith('*.')) {
-    normalizedRule = normalizedRule.slice(2);
-  }
-
-  // 3. Parse target URL
+  // 2. Parse target URL
   let targetUrl;
   try {
     targetUrl = new URL(url);
@@ -182,38 +176,60 @@ export function matchesAutoTranslateRule(url, rule) {
     return false;
   }
 
-  // 4. Parse rule URL (detect protocol)
-  const hasProtocol = /^[a-zA-Z0-9+-.]+:\/\//.test(normalizedRule);
+  // Target protocol must be http or https
+  if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+    return false;
+  }
+
+  // 3. Determine wildcard scopes
+  const hasWildcardHost = ruleClean.startsWith('*.');
+  const hasWildcardPath = ruleClean.endsWith('/*');
+
+  // Clean wildcards for URL parsing
+  let parsedRule = ruleClean;
+  if (hasWildcardHost) parsedRule = parsedRule.slice(2);
+  if (hasWildcardPath) parsedRule = parsedRule.slice(0, -2);
+
+  // Parse rule URL (detect protocol, ignoring http vs https distinction)
+  const hasProtocol = /^[a-zA-Z0-9+-.]+:\/\//.test(parsedRule);
   let ruleUrl;
   try {
     if (hasProtocol) {
-      ruleUrl = new URL(normalizedRule);
+      // Normalize to https protocol to ignore http vs https difference
+      const normalizedRuleProtocol = parsedRule.replace(/^[a-zA-Z0-9+-.]+:\/\//, 'https://');
+      ruleUrl = new URL(normalizedRuleProtocol);
     } else {
-      ruleUrl = new URL('https://' + normalizedRule);
+      ruleUrl = new URL('https://' + parsedRule);
     }
   } catch (e) {
     return false;
   }
 
-  // 5. Protocol check (if explicitly provided)
-  if (hasProtocol && targetUrl.protocol !== ruleUrl.protocol) {
-    return false;
-  }
-
-  // 6. Hostname check (exact or subdomain)
-  const ruleHost = ruleUrl.hostname.toLowerCase();
+  // 4. Hostname check
   const targetHost = targetUrl.hostname.toLowerCase();
-  const hostMatches = targetHost === ruleHost || targetHost.endsWith('.' + ruleHost);
-  if (!hostMatches) {
-    return false;
+  const ruleHost = ruleUrl.hostname.toLowerCase();
+  if (hasWildcardHost) {
+    const isSubdomainOrRoot = targetHost === ruleHost || targetHost.endsWith('.' + ruleHost);
+    if (!isSubdomainOrRoot) return false;
+  } else {
+    if (targetHost !== ruleHost) return false;
   }
 
-  // 7. Pathname prefix check (honoring segment boundaries)
-  const targetPath = targetUrl.pathname;
-  const rulePath = ruleUrl.pathname;
+  // 5. Pathname check
+  let targetPath = targetUrl.pathname;
+  let rulePath = ruleUrl.pathname;
 
-  const tPath = targetPath.endsWith('/') ? targetPath : targetPath + '/';
-  const rPath = rulePath.endsWith('/') ? rulePath : rulePath + '/';
+  // Normalize trailing slashes for comparisons
+  if (targetPath.endsWith('/') && targetPath.length > 1) targetPath = targetPath.slice(0, -1);
+  if (rulePath.endsWith('/') && rulePath.length > 1) rulePath = rulePath.slice(0, -1);
 
-  return tPath.startsWith(rPath);
+  if (hasWildcardPath) {
+    // Subtree segment matching (e.g. /docs matches /docs, /docs/page, but not /docs-archive)
+    const normalizedRulePath = rulePath === '/' ? '/' : rulePath + '/';
+    const normalizedTargetPath = targetPath === '/' ? '/' : targetPath + '/';
+    return normalizedTargetPath.startsWith(normalizedRulePath);
+  } else {
+    // Exact path match
+    return targetPath === rulePath;
+  }
 }

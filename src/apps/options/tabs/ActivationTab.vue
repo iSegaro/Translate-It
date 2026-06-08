@@ -430,7 +430,7 @@
             id="WHOLE_PAGE_AUTO_TRANSLATE_RULES"
             class="setting-group sub-setting-group vertical"
           >
-            <label class="setting-label">{{ t('whole_page_auto_translate_rules_label') || 'Automatically translate these sites (comma separated)' }}</label>
+            <label class="setting-label">{{ t('whole_page_auto_translate_rules_label') || 'Automatically translate these sites (comma or newline separated)' }}</label>
             <BaseTextarea
               v-model="wholePageAutoTranslateRules"
               :rows="3"
@@ -439,7 +439,7 @@
               class="auto-translate-rules-input"
               :disabled="!extensionEnabled"
             />
-            <span class="setting-description">
+            <span class="setting-description auto-translate-rules-description">
               {{ t('whole_page_auto_translate_rules_description') || 'URLs or domains that should automatically start Whole Page Translation when visited.' }}
             </span>
           </div>
