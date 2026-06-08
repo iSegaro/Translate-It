@@ -61,11 +61,19 @@
               :provider="currentProvider"
               :last-keyword="lastTranslation?.source"
               :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
+              show-default-actions
+              :default-actions-enabled="isReady"
+              :source-is-saved-default="sourceIsSavedDefault"
+              :target-is-saved-default="targetIsSavedDefault"
+              :source-default-title="sourceDefaultTitle"
+              :target-default-title="targetDefaultTitle"
               :source-title="t('popup_source_language_title') || 'زبان مبدا'"
               :target-title="t('popup_target_language_title') || 'زبان مقصد'"
               :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
               :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
               :auto-detect-label="'Auto-Detect'"
+              @set-default-source="handleSetDefaultSource"
+              @set-default-target="handleSetDefaultTarget"
             />
 
             <!-- Clear Button: Minimized clear fields button -->
@@ -117,6 +125,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTTSGlobal } from '@/features/tts/core/TTSGlobalManager.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js';
+import { useLanguageDefaults } from '@/features/settings/composables/useLanguageDefaults.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
@@ -152,6 +161,17 @@ const {
   clearTranslation,
   lastTranslation
 } = useUnifiedTranslation('popup');
+const {
+  savedSourceLanguage,
+  savedTargetLanguage,
+  isReady,
+  setSourceLanguageAsDefault,
+  setTargetLanguageAsDefault
+} = useLanguageDefaults()
+const sourceIsSavedDefault = computed(() => sourceLanguage.value === savedSourceLanguage.value)
+const targetIsSavedDefault = computed(() => targetLanguage.value === savedTargetLanguage.value)
+const sourceDefaultTitle = computed(() => t('popup_set_source_language_default_title', 'Set current source language as default'))
+const targetDefaultTitle = computed(() => t('popup_set_target_language_default_title', 'Set current target language as default'))
 
 // TTS Global Manager for cross-context lifecycle management
 const ttsGlobal = useTTSGlobal({ 
@@ -214,6 +234,22 @@ const handleClearFields = async () => {
   // Also dispatch global event if other components rely on it
   const event = new CustomEvent('clear-storage');
   document.dispatchEvent(event);
+}
+
+const handleSetDefaultSource = async () => {
+  try {
+    await setSourceLanguageAsDefault(sourceLanguage.value)
+  } catch (error) {
+    await handleError(error, 'popup-set-source-default')
+  }
+}
+
+const handleSetDefaultTarget = async () => {
+  try {
+    await setTargetLanguageAsDefault(targetLanguage.value)
+  } catch (error) {
+    await handleError(error, 'popup-set-target-default')
+  }
 }
 
 /**

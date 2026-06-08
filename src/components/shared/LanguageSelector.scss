@@ -12,6 +12,21 @@
   margin: 8px 12px 0 12px !important;
   box-sizing: border-box !important;
 
+  .ti-language-control-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+  }
+
+  .ti-language-control-shell {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
   /* Vertical layout for small sidepanel widths */
   &.ti-language-controls--vertical {
     flex-direction: column !important;
@@ -20,21 +35,35 @@
     padding: 4px 12px !important;
     min-height: fit-content !important;
 
-    .ti-language-select {
+    .ti-language-control-group {
       width: 100% !important;
       max-width: none !important;
       min-width: auto !important;
-      order: 1 !important;
 
-      &:first-of-type {
-        order: 3 !important;
+      .ti-language-control-shell {
+        width: 100% !important;
       }
+
+      .ti-language-select {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+      }
+    }
+
+    .ti-language-control-group--source {
+      order: 1 !important;
     }
 
     .ti-swap-button {
       order: 2 !important;
       align-self: center !important;
       margin: 1px 0 !important;
+    }
+
+    .ti-language-control-group--target {
+      order: 3 !important;
     }
   }
 
@@ -85,6 +114,16 @@
         filter: var(--ti-mobile-icon-filter, none) !important;
       }
     }
+
+    .ti-language-control-group--with-default-action .ti-language-select {
+      padding-inline-end: 34px !important;
+    }
+
+    .ti-default-action-button {
+      width: 22px !important;
+      height: 22px !important;
+      min-width: 22px !important;
+    }
   }
 }
 
@@ -127,6 +166,61 @@
     color: var(--text-disabled, #6c757d) !important;
     cursor: not-allowed !important;
   }
+
+  .ti-language-control-group--with-default-action & {
+    padding-inline-end: 2.5rem !important;
+  }
+
+  .ti-compact-mode .ti-language-control-group--with-default-action & {
+    padding-inline-end: 2.25rem !important;
+  }
+}
+
+.ti-default-action-button {
+  position: absolute !important;
+  inset-inline-end: 6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: var(--text-secondary, #6c757d) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease !important;
+  z-index: 1 !important;
+
+  &:hover:not(:disabled) {
+    background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
+    color: var(--primary-color, #007bff) !important;
+  }
+
+  &.is-active {
+    color: var(--primary-color, #007bff) !important;
+  }
+
+  &:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.45 !important;
+  }
+
+  &:focus {
+    outline: none !important;
+    border-color: var(--primary-color, #007bff) !important;
+  }
+}
+
+.ti-default-action-icon {
+  display: inline-block !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
 }
 
 .ti-swap-button {

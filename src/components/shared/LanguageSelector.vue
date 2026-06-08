@@ -10,21 +10,43 @@
     <!-- Regular Language Selection -->
     <template v-if="!isAutoLanguageProvider">
       <!-- Target Language Dropdown -->
-      <select
-        v-model="targetLanguage"
-        class="ti-language-select"
-        :title="targetTitle"
-        :disabled="disabled"
-        @click="handleDropdownClick"
+      <div
+        class="ti-language-control-group ti-language-control-group--target"
+        :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
       >
-        <option
-          v-for="language in targetLanguages"
-          :key="language.code"
-          :value="language.code"
+        <div class="ti-language-control-shell">
+        <select
+          v-model="targetLanguage"
+          class="ti-language-select"
+          :title="targetTitle"
+          :disabled="disabled"
+          @click="handleDropdownClick"
         >
-          {{ language.name }}
-        </option>
-      </select>
+          <option
+            v-for="language in targetLanguages"
+            :key="language.code"
+            :value="language.code"
+          >
+            {{ language.name }}
+          </option>
+        </select>
+          <button
+            v-if="showDefaultActions"
+            type="button"
+            class="ti-default-action-button"
+            :class="{ 'is-active': targetIsSavedDefault }"
+            :title="targetDefaultTitle || 'Set target as default'"
+            :aria-label="targetDefaultTitle || 'Set target as default'"
+            :disabled="disabled || !defaultActionsEnabled"
+            @click="emit('set-default-target')"
+          >
+            <span
+              aria-hidden="true"
+              class="ti-default-action-icon"
+            >{{ targetIsSavedDefault ? '★' : '☆' }}</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Swap Button -->
       <button
@@ -42,34 +64,56 @@
       </button>
 
       <!-- Source Language Dropdown -->
-      <select
-        v-model="sourceLanguage"
-        class="ti-language-select"
-        :title="sourceTitle"
-        :disabled="disabled"
-        @click="handleDropdownClick"
+      <div
+        class="ti-language-control-group ti-language-control-group--source"
+        :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
       >
-        <option 
-          v-if="!sourceLanguage" 
-          value="" 
-          disabled
+        <div class="ti-language-control-shell">
+        <select
+          v-model="sourceLanguage"
+          class="ti-language-select"
+          :title="sourceTitle"
+          :disabled="disabled"
+          @click="handleDropdownClick"
         >
-          {{ t('select_language_placeholder') || 'Select Language' }}
-        </option>
-        <option 
-          v-if="hasAutoDetect && allowAuto"
-          value="auto"
-        >
-          {{ autoDetectLabel }}
-        </option>
-        <option
-          v-for="language in availableLanguages"
-          :key="language.code"
-          :value="language.code"
-        >
-          {{ language.name }}
-        </option>
-      </select>
+          <option 
+            v-if="!sourceLanguage" 
+            value="" 
+            disabled
+          >
+            {{ t('select_language_placeholder') || 'Select Language' }}
+          </option>
+          <option 
+            v-if="hasAutoDetect && allowAuto"
+            value="auto"
+          >
+            {{ autoDetectLabel }}
+          </option>
+          <option
+            v-for="language in availableLanguages"
+            :key="language.code"
+            :value="language.code"
+          >
+            {{ language.name }}
+          </option>
+        </select>
+          <button
+            v-if="showDefaultActions"
+            type="button"
+            class="ti-default-action-button"
+            :class="{ 'is-active': sourceIsSavedDefault }"
+            :title="sourceDefaultTitle || 'Set source as default'"
+            :aria-label="sourceDefaultTitle || 'Set source as default'"
+            :disabled="disabled || !defaultActionsEnabled"
+            @click="emit('set-default-source')"
+          >
+            <span
+              aria-hidden="true"
+              class="ti-default-action-icon"
+            >{{ sourceIsSavedDefault ? '★' : '☆' }}</span>
+          </button>
+        </div>
+      </div>
     </template>
 
     <!-- Smart Language Indicator (e.g. for Vajehyab) -->
@@ -149,6 +193,22 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  showDefaultActions: {
+    type: Boolean,
+    default: false
+  },
+  defaultActionsEnabled: {
+    type: Boolean,
+    default: true
+  },
+  sourceIsSavedDefault: {
+    type: Boolean,
+    default: false
+  },
+  targetIsSavedDefault: {
+    type: Boolean,
+    default: false
+  },
   // i18n labels
   autoDetectLabel: {
     type: String,
@@ -169,6 +229,14 @@ const props = defineProps({
   swapAlt: {
     type: String,
     default: 'Swap'
+  },
+  sourceDefaultTitle: {
+    type: String,
+    default: ''
+  },
+  targetDefaultTitle: {
+    type: String,
+    default: ''
   },
   autoLanguageLabel: {
     type: String,
@@ -192,7 +260,9 @@ const props = defineProps({
 const emit = defineEmits([
   'update:sourceLanguage',
   'update:targetLanguage',
-  'swap-languages'
+  'swap-languages',
+  'set-default-source',
+  'set-default-target'
 ])
 
 // Computed

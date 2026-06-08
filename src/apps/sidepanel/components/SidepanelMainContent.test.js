@@ -31,6 +31,14 @@ const mockUnifiedTranslation = {
   loadLastTranslation: vi.fn().mockResolvedValue(undefined),
 };
 
+const mockLanguageDefaults = {
+  savedSourceLanguage: ref('en'),
+  savedTargetLanguage: ref('fa'),
+  isReady: ref(true),
+  setSourceLanguageAsDefault: vi.fn().mockResolvedValue(true),
+  setTargetLanguageAsDefault: vi.fn().mockResolvedValue(true),
+};
+
 vi.mock('@/features/translation/composables/useUnifiedTranslation.js', () => ({
   useUnifiedTranslation: () => mockUnifiedTranslation,
 }));
@@ -55,9 +63,32 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
   }),
 }));
 
+vi.mock('@/features/settings/composables/useLanguageDefaults.js', () => ({
+  useLanguageDefaults: () => mockLanguageDefaults,
+}));
+
 vi.mock('@/components/shared/LanguageSelector.vue', () => ({
   default: {
     name: 'LanguageSelector',
+    props: [
+      'sourceLanguage',
+      'targetLanguage',
+      'provider',
+      'lastKeyword',
+      'beta',
+      'showDefaultActions',
+      'defaultActionsEnabled',
+      'sourceIsSavedDefault',
+      'targetIsSavedDefault',
+      'sourceDefaultTitle',
+      'targetDefaultTitle',
+      'sourceTitle',
+      'targetTitle',
+      'swapTitle',
+      'swapAlt',
+      'autoDetectLabel'
+    ],
+    emits: ['set-default-source', 'set-default-target'],
     template: '<div class="language-selector-stub" />',
   },
 }));
@@ -115,5 +146,27 @@ describe('SidepanelMainContent.vue', () => {
       sourceLanguage: 'en',
       targetLanguage: 'fa',
     }));
+  });
+
+  it('passes default action props and forwards star events', async () => {
+    const wrapper = mount(SidepanelMainContent, {
+      props: {
+        provider: '',
+      },
+    });
+
+    const selector = wrapper.findComponent({ name: 'LanguageSelector' });
+    expect(selector.props('showDefaultActions')).not.toBe(false);
+    expect(selector.props('defaultActionsEnabled')).toBe(true);
+    expect(selector.props('sourceIsSavedDefault')).toBe(true);
+    expect(selector.props('targetIsSavedDefault')).toBe(true);
+
+    selector.vm.$emit('set-default-source');
+    selector.vm.$emit('set-default-target');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('en');
+    expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('fa');
   });
 });

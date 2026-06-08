@@ -79,10 +79,18 @@
           compact
           :provider="currentProvider"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
+          show-default-actions
+          :default-actions-enabled="isReady"
+          :source-is-saved-default="sourceIsSavedDefault"
+          :target-is-saved-default="targetIsSavedDefault"
+          :source-default-title="sourceDefaultTitle"
+          :target-default-title="targetDefaultTitle"
           :source-title="t('popup_source_language_title', 'Source')"
           :target-title="t('popup_target_language_title', 'Target')"
           :swap-title="t('popup_swap_languages_title', 'Swap')"
           :auto-detect-label="t('auto_detect', 'Auto-Detect')"
+          @set-default-source="handleSetDefaultSource"
+          @set-default-target="handleSetDefaultTarget"
         />
       </div>
       
@@ -147,6 +155,7 @@ import { ref, computed, watch } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useLanguageDefaults } from '@/features/settings/composables/useLanguageDefaults.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
@@ -166,9 +175,20 @@ const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
 const { sendMessage, createMessage } = useMessaging(MessageContexts.MOBILE_TRANSLATE)
-const { getErrorForDisplay } = useErrorHandler()
+const { getErrorForDisplay, handleError } = useErrorHandler()
 const tts = useTTSSmart()
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'InputView')
+const {
+  savedSourceLanguage,
+  savedTargetLanguage,
+  isReady,
+  setSourceLanguageAsDefault,
+  setTargetLanguageAsDefault
+} = useLanguageDefaults()
+const sourceIsSavedDefault = computed(() => sourceLang.value === savedSourceLanguage.value)
+const targetIsSavedDefault = computed(() => targetLang.value === savedTargetLanguage.value)
+const sourceDefaultTitle = computed(() => t('mobile_set_source_language_default_title', 'Set current source language as default'))
+const targetDefaultTitle = computed(() => t('mobile_set_target_language_default_title', 'Set current target language as default'))
 
 const inputText = ref(mobileStore.selectionData.text || '')
 const sourceLang = ref(mobileStore.selectionData.sourceLang || settingsStore.settings.SOURCE_LANGUAGE || 'auto')
@@ -319,6 +339,24 @@ const handleCancel = async () => {
     await sendMessage(cancelMessage);
   } catch (error) {
     logger.error('Failed to send cancel message:', error);
+  }
+}
+
+const handleSetDefaultSource = async () => {
+  try {
+    await setSourceLanguageAsDefault(sourceLang.value)
+  } catch (error) {
+    await handleError(error, 'mobile-input-set-source-default')
+    logger.error('Failed to persist source language default', error)
+  }
+}
+
+const handleSetDefaultTarget = async () => {
+  try {
+    await setTargetLanguageAsDefault(targetLang.value)
+  } catch (error) {
+    await handleError(error, 'mobile-input-set-target-default')
+    logger.error('Failed to persist target language default', error)
   }
 }
 
