@@ -229,47 +229,21 @@
   // Markdown Elements
   .simple-markdown {
     ul, ol {
-      list-style: none !important;
-      padding: 0 !important;
-      margin: 6px 0 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 4px !important;
+      list-style-position: outside !important;
+      padding-inline-start: 1.25em !important;
+      margin-block: 6px !important;
+      margin-inline: 0 !important;
     }
 
     li {
-      display: grid !important;
-      grid-template-columns: auto 1fr !important;
-      align-items: start !important;
-      gap: 0.5em !important;
+      display: list-item !important;
       line-height: 1.4 !important;
-      margin: 0 !important;
-      min-height: 1.2em !important;
-
-      &::before {
-        grid-column: 1 !important;
-        text-align: left !important;
-      }
-
-      & > * {
-        grid-column: 2 !important;
-      }
-    }
-
-    ul > li::before {
-      content: "•" !important;
-      font-weight: bold !important;
+      margin-block: 0.15em !important;
+      margin-inline: 0 !important;
     }
 
     ol {
-      counter-reset: list-counter !important;
-      & > li {
-        counter-increment: list-counter !important;
-        &::before {
-          content: counter(list-counter) "." !important;
-          min-width: 1.5em !important;
-        }
-      }
+      list-style-type: decimal !important;
     }
 
     h1, h2, h3 {
@@ -490,11 +464,6 @@
 
     &.has-error {
       text-align: center !important;
-    }
-
-    .simple-markdown {
-      li::before { text-align: right !important; }
-      ol > li::before { text-align: right !important; }
     }
   }
 
