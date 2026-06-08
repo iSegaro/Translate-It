@@ -1199,6 +1199,39 @@
   "whole_page_auto_translate_rules_description": {
     "message": "فرمت قوانین:\nexample.com           ← فقط صفحه ریشه سایت\nexample.com/*         ← تمامی صفحات سایت\n*.example.com         ← صفحات ریشه دامنه و زیردامنه‌ها\n*.example.com/*       ← تمامی صفحات دامنه و زیردامنه‌ها\nexample.com/docs      ← فقط همان صفحه\nexample.com/docs/*    ← تمامی صفحات زیر مسیر /docs"
   },
+  "whole_page_rules_label_clean": {
+    "message": "ترجمه خودکار سایت‌ها"
+  },
+  "whole_page_rules_desc_clean": {
+    "message": "الگوهای سایتی که باید هنگام ورود به آن‌ها به طور خودکار ترجمه شوند را مشخص کنید."
+  },
+  "whole_page_manage_rules_btn": {
+    "message": "مدیریت قوانین ⚙️"
+  },
+  "whole_page_rules_drawer_title": {
+    "message": "قوانین ترجمه خودکار صفحه"
+  },
+  "whole_page_rules_instruction_title": {
+    "message": "الگوهای قوانین ستاره‌دار (Wildcard)"
+  },
+  "whole_page_rules_add_placeholder": {
+    "message": "افزودن قانون جدید (مثال: *.example.com/*)..."
+  },
+  "whole_page_rules_btn_add": {
+    "message": "افزودن"
+  },
+  "whole_page_rules_empty": {
+    "message": "هنوز هیچ قانون ترجمه خودکاری اضافه نشده است."
+  },
+  "whole_page_rules_error_duplicate": {
+    "message": "این قانون از قبل وجود دارد."
+  },
+  "whole_page_rules_error_invalid": {
+    "message": "لطفاً یک الگوی قانون معتبر وارد کنید."
+  },
+  "whole_page_rules_confirm_reset": {
+    "message": "آیا مطمئن هستید که می‌خواهید تمام قوانین را حذف کنید؟"
+  },
   "excluded_sites_label": {
     "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"
   },

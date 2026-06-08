@@ -1193,6 +1193,45 @@
   "save_settings_button": {
     "message": "設定を保存"
   },
+  "whole_page_auto_translate_rules_label": {
+    "message": "自動翻訳するサイト（カンマまたは改行区切り）"
+  },
+  "whole_page_auto_translate_rules_description": {
+    "message": "ルール形式：\nexample.com           → ルートページのみ\nexample.com/*         → サイト内のすべてのページ\n*.example.com         → ドメインとサブドメインのルートページ\n*.example.com/*       → ドメインとサブドメインのすべてのページ\nexample.com/docs      → 正確なページ\nexample.com/docs/*    → /docs配下のすべてのページ"
+  },
+  "whole_page_rules_label_clean": {
+    "message": "サイトの自動翻訳"
+  },
+  "whole_page_rules_desc_clean": {
+    "message": "アクセス時に自動的に翻訳するサイトパターンを指定します。"
+  },
+  "whole_page_manage_rules_btn": {
+    "message": "ルールの管理 ⚙️"
+  },
+  "whole_page_rules_drawer_title": {
+    "message": "自動ページ翻訳ルール"
+  },
+  "whole_page_rules_instruction_title": {
+    "message": "ワイルドカードルールパターン"
+  },
+  "whole_page_rules_add_placeholder": {
+    "message": "新しいルールを追加 (例: *.example.com/*)..."
+  },
+  "whole_page_rules_btn_add": {
+    "message": "追加"
+  },
+  "whole_page_rules_empty": {
+    "message": "自動翻訳ルールがまだ追加されていません。"
+  },
+  "whole_page_rules_error_duplicate": {
+    "message": "このルールは既に存在します。"
+  },
+  "whole_page_rules_error_invalid": {
+    "message": "有効なルールパターンを入力してください。"
+  },
+  "whole_page_rules_confirm_reset": {
+    "message": "すべてのルールを削除してもよろしいですか？"
+  },
   "excluded_sites_label": {
     "message": "除外するサイト（カンマ区切り）"
   },
