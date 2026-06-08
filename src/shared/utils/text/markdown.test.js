@@ -82,6 +82,11 @@ describe('SimpleMarkdown', () => {
         expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.PRIMARY_ONLY)).toBe('اخبار');
         expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.FULL_TEXT)).toBe('اخباراسم: اخبار, خبر');
       });
+
+      it('should treat legacy one-line traditional provider output as primary translation only', () => {
+        const input = 'translation **Noun**: hello, hi';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('translation');
+      });
     });
 
     describe('Traditional Provider Format', () => {
@@ -647,7 +652,7 @@ describe('SimpleMarkdown', () => {
       expect(result.textContent).toContain('US: hi');
     });
 
-    it('should preprocess traditional one-line provider output', () => {
+    it('should preserve legacy one-line traditional provider triage behavior', () => {
       const result = SimpleMarkdown.render('translation **Noun**: hello, hi');
       expect(result).toBeTruthy();
 
