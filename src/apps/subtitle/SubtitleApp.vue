@@ -207,7 +207,7 @@ import { findProviderById } from '@/features/translation/providers/ProviderManif
 import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js';
 import { applyTheme } from '@/utils/ui/theme.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { useExtensionAPI } from '@/composables/core/useExtensionAPI.js';
+import { openOptionsPage } from '@/core/helpers.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -233,14 +233,12 @@ const {
   cleanup
 } = useSubtitleTranslation();
 
-const { focusOrCreateTab } = useExtensionAPI();
-
 /**
  * Redirects the user to the providers configuration page.
  */
 const goToProviderSettings = async () => {
   try {
-    await focusOrCreateTab('src/html/options.html#providers');
+    openOptionsPage('providers');
   } catch (err) {
     logger.error('Failed to open provider settings:', err);
   }
