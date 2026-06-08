@@ -15,21 +15,21 @@
         :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
       >
         <div class="ti-language-control-shell">
-        <select
-          v-model="targetLanguage"
-          class="ti-language-select"
-          :title="targetTitle"
-          :disabled="disabled"
-          @click="handleDropdownClick"
-        >
-          <option
-            v-for="language in targetLanguages"
-            :key="language.code"
-            :value="language.code"
+          <select
+            v-model="targetLanguage"
+            class="ti-language-select"
+            :title="targetTitle"
+            :disabled="disabled"
+            @click="handleDropdownClick"
           >
-            {{ language.name }}
-          </option>
-        </select>
+            <option
+              v-for="language in targetLanguages"
+              :key="language.code"
+              :value="language.code"
+            >
+              {{ language.name }}
+            </option>
+          </select>
           <button
             v-if="showDefaultActions"
             type="button"
@@ -69,34 +69,34 @@
         :class="{ 'ti-language-control-group--with-default-action': showDefaultActions }"
       >
         <div class="ti-language-control-shell">
-        <select
-          v-model="sourceLanguage"
-          class="ti-language-select"
-          :title="sourceTitle"
-          :disabled="disabled"
-          @click="handleDropdownClick"
-        >
-          <option 
-            v-if="!sourceLanguage" 
-            value="" 
-            disabled
+          <select
+            v-model="sourceLanguage"
+            class="ti-language-select"
+            :title="sourceTitle"
+            :disabled="disabled"
+            @click="handleDropdownClick"
           >
-            {{ t('select_language_placeholder') || 'Select Language' }}
-          </option>
-          <option 
-            v-if="hasAutoDetect && allowAuto"
-            value="auto"
-          >
-            {{ autoDetectLabel }}
-          </option>
-          <option
-            v-for="language in availableLanguages"
-            :key="language.code"
-            :value="language.code"
-          >
-            {{ language.name }}
-          </option>
-        </select>
+            <option 
+              v-if="!sourceLanguage" 
+              value="" 
+              disabled
+            >
+              {{ t('select_language_placeholder') || 'Select Language' }}
+            </option>
+            <option 
+              v-if="hasAutoDetect && allowAuto"
+              value="auto"
+            >
+              {{ autoDetectLabel }}
+            </option>
+            <option
+              v-for="language in availableLanguages"
+              :key="language.code"
+              :value="language.code"
+            >
+              {{ language.name }}
+            </option>
+          </select>
           <button
             v-if="showDefaultActions"
             type="button"
