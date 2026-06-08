@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleTranslateV2Provider } from './GoogleTranslateV2Provider.js';
 import { BaseTranslateProvider } from './BaseTranslateProvider.js';
+import {
+  getDictionaryShowPronunciationAsync,
+  getDictionaryShowPosAsync,
+  getDictionaryShowDefinitionsAsync,
+  getDictionaryShowExamplesAsync
+} from '@/shared/config/config.js';
 
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -147,6 +153,104 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       { texts: [first, wrapped, last], charCount: 3 }
     ]);
     expect(chunks[0].texts[1]).toBe(wrapped);
+  });
+
+  describe('_formatDictionaryAsMarkdown', () => {
+    beforeEach(() => {
+      vi.mocked(getDictionaryShowPronunciationAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowPosAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowDefinitionsAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowExamplesAsync).mockResolvedValue(true);
+    });
+
+    it('formats legacy string candidates as the current Markdown contract', async () => {
+      const result = await provider._formatDictionaryAsMarkdown(
+        'Noun: test, experiment\nVerb: try, attempt'
+      );
+
+      expect(result).toBe('Noun: test, experiment\nVerb: try, attempt');
+    });
+
+    it('formats dj=1 JSON candidates as the current Markdown contract', async () => {
+      const result = await provider._formatDictionaryAsMarkdown({
+        dict: [{ pos: 'Noun', terms: ['test', 'experiment'] }],
+        sentences: [{ src_translit: 'tɛst' }],
+        definitions: [{ pos: 'noun', entry: [{ gloss: 'a test' }] }],
+        examples: { example: [{ text: 'This is a test' }] }
+      });
+
+      expect(result).toBe(
+        'Noun: test, experiment\nPronunciation: /tɛst/\n\nDefinitions:\n- (noun) a test\n\nExamples:\n- This is a test'
+      );
+    });
+
+    it('returns an empty string for malformed or empty candidate data', async () => {
+      expect(await provider._formatDictionaryAsMarkdown(null)).toBe('');
+      expect(await provider._formatDictionaryAsMarkdown('')).toBe('');
+      expect(await provider._formatDictionaryAsMarkdown({})).toBe('');
+    });
+  });
+
+  describe('_translateChunk', () => {
+    beforeEach(() => {
+      vi.mocked(getDictionaryShowPronunciationAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowPosAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowDefinitionsAsync).mockResolvedValue(true);
+      vi.mocked(getDictionaryShowExamplesAsync).mockResolvedValue(true);
+    });
+
+    it('returns translation only when dictionary data is absent', async () => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+        opts.extractResponse({
+          sentences: [{ trans: 'translated text' }],
+          src: 'en'
+        })
+      );
+
+      const result = await provider._translateChunk(
+        ['hello'],
+        'en',
+        'fa',
+        'page',
+        null,
+        0,
+        1,
+        0,
+        1,
+        {}
+      );
+
+      expect(result).toBe('translated text');
+    });
+
+    it('appends single-segment dictionary output using the current Markdown contract', async () => {
+      vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+        opts.extractResponse({
+          sentences: [{ trans: 'translated text', src_translit: 'tɛst' }],
+          src: 'en',
+          dict: [{ pos: 'Noun', terms: ['test', 'experiment'] }],
+          definitions: [{ pos: 'noun', entry: [{ gloss: 'a test' }] }],
+          examples: { example: [{ text: 'This is a test' }] }
+        })
+      );
+
+      const result = await provider._translateChunk(
+        ['hello'],
+        'en',
+        'fa',
+        'dictionary',
+        null,
+        0,
+        1,
+        0,
+        1,
+        {}
+      );
+
+      expect(result).toBe(
+        'translated text\n\nNoun: test, experiment\nPronunciation: /tɛst/\n\nDefinitions:\n- (noun) a test\n\nExamples:\n- This is a test'
+      );
+    });
   });
 
   it('sends newline-bearing items to _translateChunk as single-item chunks', async () => {
