@@ -119,6 +119,43 @@
           <div class="ti-m-toggle-thumb" />
         </button>
       </div>
+
+      <!-- Settings Row (Exact Page Auto Translate) -->
+      <div 
+        v-if="isAutoTranslateToggleVisible"
+        class="ti-m-progress-settings-row"
+      >
+        <div class="ti-m-setting-info">
+          <span class="ti-m-setting-label">{{ t('mobile_page_auto_translate_label', 'Auto-Translate Page') }}</span>
+          <span class="ti-m-setting-desc">{{ autoTranslateToggleDesc }}</span>
+        </div>
+        <button 
+          class="ti-m-setting-star-btn"
+          :class="{ 
+            'is-active': isAutoTranslateToggleActive,
+            'is-disabled': isAutoTranslateToggleDisabled 
+          }"
+          :disabled="isAutoTranslateToggleDisabled"
+          :aria-label="autoTranslateToggleAria"
+          @click.stop="toggleAutoTranslateForCurrentPage"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            class="star-svg"
+          >
+            <path 
+              :fill="isAutoTranslateToggleActive ? 'currentColor' : 'none'" 
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -140,6 +177,7 @@ import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue'
+import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js'
 
 import wholePageIcon from '@/icons/ui/whole-page.png';
 import closeIcon from '@/icons/ui/close.png';
@@ -152,6 +190,33 @@ const { pageTranslationData } = storeToRefs(mobileStore)
 const { t } = useUnifiedI18n()
 const { handleError } = useErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'PageTranslationView')
+
+const currentUrl = computed(() => (typeof window !== 'undefined' ? window.location.href : ''));
+
+const {
+  isAutoTranslateToggleVisible,
+  isAutoTranslateToggleActive,
+  isAutoTranslateToggleDisabled,
+  toggleAutoTranslateForCurrentPage,
+} = useAutoTranslateRules({ currentUrl });
+
+const autoTranslateToggleDesc = computed(() => {
+  if (isAutoTranslateToggleDisabled.value) {
+    return t('mobile_page_auto_translate_desc_inherited', 'Controlled by a broader rule in settings');
+  }
+  return isAutoTranslateToggleActive.value
+    ? t('mobile_page_auto_translate_desc_remove', 'This exact page will be auto-translated')
+    : t('mobile_page_auto_translate_desc_add', 'Automatically translate this exact page');
+});
+
+const autoTranslateToggleAria = computed(() => {
+  if (isAutoTranslateToggleDisabled.value) {
+    return t('mobile_page_auto_translate_aria_inherited', 'This page is controlled by a broader auto-translate rule');
+  }
+  return isAutoTranslateToggleActive.value
+    ? t('mobile_page_auto_translate_aria_remove', 'Remove this page from auto-translate rules')
+    : t('mobile_page_auto_translate_aria_add', 'Add this page to auto-translate rules');
+});
 
 const pageProvider = computed(() => {
   return settingsStore.getEffectiveProvider(TranslationMode.Page);

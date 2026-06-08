@@ -761,6 +761,27 @@
   "mobile_page_auto_close_tooltip": {
     "message": "Close dashboard automatically after starting translation"
   },
+  "mobile_page_auto_translate_label": {
+    "message": "Auto-Translate Page"
+  },
+  "mobile_page_auto_translate_desc_add": {
+    "message": "Automatically translate this exact page"
+  },
+  "mobile_page_auto_translate_desc_remove": {
+    "message": "This exact page will be auto-translated"
+  },
+  "mobile_page_auto_translate_desc_inherited": {
+    "message": "Controlled by a broader rule in settings"
+  },
+  "mobile_page_auto_translate_aria_add": {
+    "message": "Add this page to auto-translate rules"
+  },
+  "mobile_page_auto_translate_aria_remove": {
+    "message": "Remove this page from auto-translate rules"
+  },
+  "mobile_page_auto_translate_aria_inherited": {
+    "message": "This page is controlled by a broader auto-translate rule"
+  },
   "mobile_fab_alt": {
     "message": "Translate"
   },
