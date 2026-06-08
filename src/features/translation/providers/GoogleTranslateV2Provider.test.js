@@ -168,7 +168,7 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
         'Noun: test, experiment\nVerb: try, attempt'
       );
 
-      expect(result).toBe('Noun: test, experiment\nVerb: try, attempt');
+      expect(result).toBe('**Noun**: test, experiment\n**Verb**: try, attempt');
     });
 
     it('formats dj=1 JSON candidates as the current Markdown contract', async () => {
@@ -180,7 +180,7 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       });
 
       expect(result).toBe(
-        'Noun: test, experiment\nPronunciation: /tɛst/\n\nDefinitions:\n- (noun) a test\n\nExamples:\n- This is a test'
+        '**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
       );
     });
 
@@ -248,7 +248,7 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
       );
 
       expect(result).toBe(
-        'translated text\n\nNoun: test, experiment\nPronunciation: /tɛst/\n\nDefinitions:\n- (noun) a test\n\nExamples:\n- This is a test'
+        'translated text\n\n**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
       );
     });
   });
