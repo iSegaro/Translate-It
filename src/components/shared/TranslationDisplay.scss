@@ -262,22 +262,33 @@
     }
 
     .md-label-list-group {
-      margin: 0 0 2px 0 !important;
+      margin: 0 0 4px 0 !important;
     }
 
     .md-label-list-group > p.md-label-paragraph {
-      margin-bottom: 0 !important;
+      margin: 0 0 1px 0 !important;
+      line-height: 1.25 !important;
     }
 
     .md-label-list-group > ul.md-label-list,
     .md-label-list-group > ol.md-label-list {
-      margin: 0 !important;
+      list-style-position: outside !important;
+      list-style-type: initial !important;
+      padding-block-start: 0 !important;
+      padding-block-end: 0 !important;
       padding-inline-start: 1.15em !important;
+      margin: 0 !important;
+    }
+
+    .md-label-list-group > ol.md-label-list {
+      list-style-type: decimal !important;
     }
 
     .md-label-list-group > ul.md-label-list > li,
     .md-label-list-group > ol.md-label-list > li {
-      margin-block: 0.1em !important;
+      display: list-item !important;
+      margin-block: 0.08em !important;
+      line-height: 1.35 !important;
     }
 
     code {

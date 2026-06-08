@@ -115,6 +115,7 @@ describe('TranslationDisplay.vue', () => {
     expect(paragraph.text()).toBe('Definitions:');
     expect(list.exists()).toBe(true);
     expect(list.text()).toBe('item');
+    expect(list.element.firstChild?.nodeType).toBe(Node.ELEMENT_NODE);
   });
 
   it('does not add label spacing classes for ordinary paragraph/list content', async () => {

@@ -394,6 +394,12 @@ const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
     paragraph.classList.add('md-label-paragraph');
     nextElement.classList.add('md-label-list');
 
+    Array.from(nextElement.childNodes).forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+        node.remove();
+      }
+    });
+
     paragraph.parentNode.insertBefore(group, paragraph);
     group.appendChild(paragraph);
     group.appendChild(nextElement);
