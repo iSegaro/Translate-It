@@ -120,18 +120,33 @@
       }
     }
 
-    .ti-language-control-group--with-default-action .ti-language-select {
-      padding-inline-end: calc(
-        var(--ti-language-select-default-action-inline-end) +
-        var(--ti-language-select-default-action-width) +
-        var(--ti-language-select-default-action-gap)
-      ) !important;
+    .ti-language-control-group--with-default-action {
+      width: 100% !important;
+
+      .ti-language-control-shell {
+        width: 100% !important;
+        gap: 4px !important;
+      }
+
+      .ti-language-select {
+        flex: 1 1 auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        padding-inline-end: 25px !important;
+      }
     }
 
     .ti-default-action-button {
       width: var(--ti-language-select-default-action-width) !important;
       height: var(--ti-language-select-default-action-width) !important;
       min-width: var(--ti-language-select-default-action-width) !important;
+      position: static !important;
+      inset-inline-end: auto !important;
+      top: auto !important;
+      transform: none !important;
+      z-index: auto !important;
+      margin-inline-start: 0 !important;
+      flex: 0 0 auto !important;
     }
   }
 }

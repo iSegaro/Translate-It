@@ -216,14 +216,27 @@ const closeSheet = () => {
   mobileStore.closeSheet()
 }
 
+const isNativeInteractiveControl = (target) => {
+  if (!target) return false
+  if (target.isContentEditable) return true
+
+  const tagName = target.tagName
+  if (!tagName) return false
+
+  if (['TEXTAREA', 'INPUT', 'SELECT', 'OPTION'].includes(tagName)) {
+    return true
+  }
+
+  // Defensive: some browsers may surface option descendants when interacting with a select.
+  return typeof target.closest === 'function' && !!target.closest('select')
+}
+
 const onSheetMouseDown = (e) => {
   // CRITICAL: Prevent focus shift from page to sheet to preserve selection
   const target = e.target;
   
-  // 1. Identify interactive elements that MUST gain focus (text inputs)
-  const isFocusable = target.tagName === 'TEXTAREA' || 
-                      target.tagName === 'INPUT' || 
-                      target.isContentEditable;
+  // 1. Identify native interactive controls that must keep their browser behavior
+  const isFocusable = isNativeInteractiveControl(target);
   
   // 2. Identify elements that should trigger clicks (Buttons, Links, etc.)
   // We don't want to preventDefault on touchstart for these to allow the sequence to complete.
