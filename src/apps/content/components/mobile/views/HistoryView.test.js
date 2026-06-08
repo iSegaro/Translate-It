@@ -70,18 +70,44 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('HistoryView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHistory.historyItems.value = [
+      {
+        sourceText: 'source text',
+        translatedText: vajehyabMarkdown,
+        sourceLanguage: 'fa',
+        targetLanguage: 'en',
+        timestamp: 0,
+        mode: 'dictionary',
+      },
+    ];
   });
 
-  it('displays translated text as plain truncated text, not rich HTML', async () => {
+  it('renders translated text as sanitized markdown preview while keeping source text plain', async () => {
+    const wrapper = mount(HistoryView);
+    await flushPromises();
+
+    const sourceText = wrapper.find('.ti-m-source-preview');
+    const translatedText = wrapper.find('.ti-m-target-preview');
+    expect(sourceText.exists()).toBe(true);
+    expect(sourceText.text()).toBe('source text');
+    expect(translatedText.exists()).toBe(true);
+    expect(translatedText.find('h3').exists()).toBe(true);
+    expect(translatedText.find('em').exists()).toBe(true);
+    expect(translatedText.html()).toContain('<strong>معنی</strong>');
+    expect(translatedText.html()).not.toContain('###');
+  });
+
+  it('sanitizes unsafe markdown/html in translated text previews', async () => {
+    mockHistory.historyItems.value[0].translatedText = '<img src=x onerror=alert(1)>';
+
     const wrapper = mount(HistoryView);
     await flushPromises();
 
     const translatedText = wrapper.find('.ti-m-target-preview');
     expect(translatedText.exists()).toBe(true);
-    expect(translatedText.text()).toBe('### سلام [salām]');
-    expect(translatedText.find('strong').exists()).toBe(false);
-    expect(translatedText.find('em').exists()).toBe(false);
-    expect(translatedText.html()).not.toContain('<strong>');
-    expect(translatedText.html()).not.toContain('<em>');
+    expect(translatedText.html()).not.toContain('onerror');
+    expect(translatedText.html()).not.toContain('alert(1)');
+    expect(translatedText.find('img').exists()).toBe(true);
+    expect(translatedText.element.querySelector('img')?.getAttribute('onerror')).toBeNull();
   });
 });

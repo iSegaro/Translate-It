@@ -226,19 +226,6 @@ export function useHistory() {
     return date.toLocaleDateString();
   };
 
-  // Create markdown content safely
-  const createMarkdownContent = (text) => {
-    if (!text) return null;
-
-    try {
-      const element = SimpleMarkdown.render(text);
-      return element ? element.outerHTML : null;
-    } catch (error) {
-      logger.error("Error parsing markdown", error);
-      return null;
-    }
-  };
-
   // Handle history item selection
   const selectHistoryItem = (item, onSelectCallback) => {
     if (onSelectCallback && typeof onSelectCallback === "function") {
@@ -326,6 +313,5 @@ export function useHistory() {
 
     // Utilities
     formatTime,
-    createMarkdownContent,
   };
 }

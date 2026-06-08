@@ -107,7 +107,7 @@
         class="ti-m-history-list-inner"
       >
         <div 
-          v-for="(item, index) in historyItems" 
+          v-for="(item, index) in previewHistoryItems" 
           :key="item.timestamp || index"
           class="ti-m-history-card"
           @click="selectItem(item)"
@@ -138,9 +138,8 @@
           <div 
             class="ti-m-target-preview" 
             :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
-          >
-            {{ truncateText(item.translatedText) }}
-          </div>
+            v-html="item.translatedPreviewHtml"
+          />
           
           <div class="ti-m-timestamp">
             {{ formatTime(item.timestamp) }}
@@ -153,12 +152,13 @@
 
 <script setup>
 import './HistoryView.scss'
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useMobileStore } from '@/store/modules/mobile.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
+import { renderMarkdownPreview } from '@/shared/utils/text/markdownPreview.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -179,6 +179,24 @@ const {
   exportHistory,
   formatTime
 } = useHistory()
+
+const previewHistoryItems = computed(() => {
+  return historyItems.value.map((item) => {
+    const rawSourceText = item.sourceText || ''
+    const rawTranslatedText = item.translatedText || ''
+
+    return {
+      ...item,
+      sourceText: rawSourceText,
+      translatedText: rawTranslatedText,
+      translatedPreviewHtml: renderMarkdownPreview(rawTranslatedText, {
+        fallbackDir: shouldApplyRtl(rawTranslatedText) ? 'rtl' : 'ltr',
+        isDictionary: String(item.mode || '').toLowerCase().includes('dictionary'),
+        enableMarkdown: true,
+      }),
+    }
+  })
+})
 
 onMounted(async () => {
   await languages.loadLanguages()

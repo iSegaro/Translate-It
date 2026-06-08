@@ -174,12 +174,11 @@
 <script setup>
 import './TranslationDisplay.scss';
 import { ref, computed, watch, onMounted } from "vue";
-import { marked } from "marked";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTextDirection } from "@/composables/shared/useTextDirection.js";
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import DOMPurify from "dompurify";
+import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
 import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
 import { useFont } from "@/composables/shared/useFont.js";
@@ -351,200 +350,6 @@ const containerRef = ref(null);
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
-const LEGACY_PLAIN_LABEL_RE = /^[^:*#>`\-\s][^:]{0,80}:\s+\S+/;
-const RTL_CHAR_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
-const NON_RTL_STRONG_CHAR_RE = /[a-zA-Z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g;
-
-const countMatches = (text, regex) => (text.match(regex) || []).length;
-
-const detectBlockDirection = (text, fallbackDir = 'ltr') => {
-  if (!text || typeof text !== 'string') {
-    return fallbackDir;
-  }
-
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return fallbackDir;
-  }
-
-  const labelSeparatorIndex = normalized.indexOf(':');
-  const hasLabelShape = labelSeparatorIndex > -1 && !normalized.includes('://');
-  const candidateText = hasLabelShape
-    ? normalized.slice(labelSeparatorIndex + 1).trim() || normalized
-    : normalized;
-
-  const rtlCount = countMatches(candidateText, RTL_CHAR_RE);
-  const ltrCount = countMatches(candidateText, NON_RTL_STRONG_CHAR_RE);
-
-  if (rtlCount === 0 && ltrCount === 0) {
-    return fallbackDir;
-  }
-
-  if (hasLabelShape && candidateText !== normalized) {
-    if (ltrCount > rtlCount) return 'ltr';
-    if (rtlCount > ltrCount) return 'rtl';
-    return fallbackDir;
-  }
-
-  if (ltrCount === 0) return 'rtl';
-  if (rtlCount === 0) return 'ltr';
-
-  if (ltrCount > rtlCount && (ltrCount - rtlCount >= 2 || ltrCount >= rtlCount * 1.5)) {
-    return 'ltr';
-  }
-
-  if (rtlCount > ltrCount && (rtlCount - ltrCount >= 2 || rtlCount >= ltrCount * 1.5)) {
-    return 'rtl';
-  }
-
-  if (/^[\u0590-\u08FF]/.test(normalized)) {
-    return fallbackDir;
-  }
-
-  if (/^[A-Za-z\u00C0-\u024F]/.test(normalized)) {
-    return 'ltr';
-  }
-
-  return fallbackDir;
-};
-
-const applyBlockDirection = (element, fallbackDir) => {
-  if (!element || element.nodeType !== Node.ELEMENT_NODE) {
-    return;
-  }
-
-  const direction = detectBlockDirection(element.textContent || '', fallbackDir);
-  element.setAttribute('dir', direction);
-};
-
-const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
-  if (!html || typeof html !== 'string') {
-    return '';
-  }
-
-  const sanitizedHtml = DOMPurify.sanitize(html);
-  if (!sanitizedHtml) {
-    return '';
-  }
-
-  const container = document.createElement('div');
-  container.innerHTML = wrapWithSimpleMarkdown
-    ? `<div class="simple-markdown">${sanitizedHtml}</div>`
-    : sanitizedHtml;
-
-  const root = container.querySelector('.simple-markdown') || container.firstElementChild || container;
-
-  if (!root) {
-    return '';
-  }
-
-  // Wrap dictionary label paragraphs and their following lists so CSS can treat them
-  // as a compact unit without changing provider output or markdown shape.
-  root.querySelectorAll('p').forEach((paragraph) => {
-    const nextElement = paragraph.nextElementSibling;
-    const isLabelParagraph = (
-      paragraph.textContent?.trim().endsWith(':') &&
-      paragraph.querySelector('strong') &&
-      nextElement &&
-      ['UL', 'OL'].includes(nextElement.tagName)
-    );
-
-    if (!isLabelParagraph) {
-      return;
-    }
-
-    const group = document.createElement('div');
-    group.className = 'md-label-list-group';
-    paragraph.classList.add('md-label-paragraph');
-    nextElement.classList.add('md-label-list');
-
-    Array.from(nextElement.childNodes).forEach((node) => {
-      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
-        node.remove();
-      }
-    });
-
-    paragraph.parentNode.insertBefore(group, paragraph);
-    group.appendChild(paragraph);
-    group.appendChild(nextElement);
-  });
-
-  root
-    .querySelectorAll('p, h1, h2, h3, h4, h5, h6, blockquote, pre, ul, ol, li, .md-label-list-group, .md-label-paragraph, .md-label-list')
-    .forEach((element) => {
-      applyBlockDirection(element, textDirection.value.dir);
-    });
-
-  root.querySelectorAll('a').forEach((link) => {
-    const href = (link.getAttribute('href') || '').trim();
-
-    if (!/^https?:\/\//i.test(href)) {
-      const textNode = document.createTextNode(link.textContent || '');
-      link.replaceWith(textNode);
-      return;
-    }
-
-    link.setAttribute('target', '_blank');
-    link.setAttribute('rel', 'noopener noreferrer');
-  });
-
-  if (root.classList && !root.classList.contains('simple-markdown')) {
-    root.classList.add('simple-markdown');
-  }
-
-  return DOMPurify.sanitize(root.outerHTML, {
-    ADD_ATTR: ['target', 'rel'],
-  });
-};
-
-const shouldUseLegacySimpleMarkdown = (content, isDictionary) => {
-  if (!content || typeof content !== 'string') {
-    return false;
-  }
-
-  const normalized = content.trim();
-  if (!normalized) {
-    return false;
-  }
-
-  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
-  if (lines.length === 0) {
-    return false;
-  }
-
-  if (lines.length === 1) {
-    const line = lines[0];
-
-    // Legacy one-line concatenated provider output:
-    // "translation **Noun**: hello, hi"
-    const oneLineLabelMatch = line.match(/^(.*?)\*\*.*?\*\*.*:(?!\/\/)/);
-    if (oneLineLabelMatch && oneLineLabelMatch[1].trim().length > 0) {
-      return true;
-    }
-
-    // Same-line multi-label legacy dictionary output:
-    // "**UK**: hello **US**: hi"
-    const boldLabelMatches = line.match(/\*\*[^*]+?\*\*/g) || [];
-    if (boldLabelMatches.length > 1 && line.includes(':')) {
-      return true;
-    }
-
-    // Plain label content only falls back in dictionary mode.
-    if (isDictionary && !line.includes('**') && LEGACY_PLAIN_LABEL_RE.test(line)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  // Multi-line plain label blocks are still legacy compatibility data.
-  if (isDictionary && !normalized.includes('**')) {
-    return lines.some((line) => LEGACY_PLAIN_LABEL_RE.test(line));
-  }
-
-  return false;
-};
-
 // Computed
 const hasContent = computed(
   () => (props.content && props.content.trim().length > 0 && !props.isLoading) || (props.isStreaming && props.content)
@@ -675,34 +480,11 @@ const renderedContent = computed(() => {
     return '';
   }
 
-  if (props.enableMarkdown) {
-    try {
-      if (shouldUseLegacySimpleMarkdown(props.content, isDictionary.value)) {
-        const markdownElement = SimpleMarkdown.render(props.content, textDirection.value.dir, {
-          enableLabelFormatting: isDictionary.value
-        });
-
-        if (markdownElement) {
-          return normalizeRenderedHtml(markdownElement.outerHTML, false);
-        }
-
-        return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
-      }
-
-      const markedHtml = marked.parse(props.content, {
-        gfm: true,
-        breaks: false,
-        mangle: false,
-      });
-
-      return normalizeRenderedHtml(markedHtml, true);
-    } catch (error) {
-      logger.warn("[TranslationDisplay] Markdown rendering failed:", error);
-      return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
-    }
-  } else {
-    return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
-  }
+  return renderMarkdownPreview(props.content, {
+    fallbackDir: textDirection.value.dir,
+    isDictionary: isDictionary.value,
+    enableMarkdown: props.enableMarkdown,
+  });
 });
 
 // Watchers

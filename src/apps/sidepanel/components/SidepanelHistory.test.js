@@ -32,7 +32,6 @@ const mockHistory = {
   clearAllHistory: vi.fn().mockResolvedValue(true),
   exportHistory: vi.fn(),
   formatTime: vi.fn(() => 'Just now'),
-  createMarkdownContent: vi.fn(() => '<div class="simple-markdown"><p>ignored</p></div>'),
 };
 
 vi.mock('@/features/history/composables/useHistory.js', () => ({
@@ -97,9 +96,48 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('SidepanelHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHistory.historyItems.value = [
+      {
+        sourceText: 'source text',
+        translatedText: googleMarkdown,
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        timestamp: 0,
+      },
+    ];
+    mockHistory.sortedHistoryItems.value = [
+      {
+        sourceText: 'source text',
+        translatedText: googleMarkdown,
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        timestamp: 0,
+      },
+    ];
   });
 
-  it('displays translated text as plain truncated text, not rich HTML', async () => {
+  it('renders translated text as sanitized markdown preview while keeping source text plain', async () => {
+    const wrapper = mount(SidepanelHistory, {
+      props: {
+        isVisible: true,
+      },
+    });
+
+    await flushPromises();
+
+    const translatedText = wrapper.find('.translated-text');
+    const sourceText = wrapper.find('.source-text');
+    expect(translatedText.exists()).toBe(true);
+    expect(sourceText.text()).toBe('source text');
+    expect(translatedText.find('strong').exists()).toBe(true);
+    expect(translatedText.html()).toContain('<strong>Noun</strong>');
+    expect(translatedText.html()).not.toContain('**Noun**');
+  });
+
+  it('sanitizes unsafe markdown/html in translated text previews', async () => {
+    mockHistory.historyItems.value[0].translatedText = '<img src=x onerror=alert(1)>';
+    mockHistory.sortedHistoryItems.value[0].translatedText = '<img src=x onerror=alert(1)>';
+
     const wrapper = mount(SidepanelHistory, {
       props: {
         isVisible: true,
@@ -110,10 +148,9 @@ describe('SidepanelHistory', () => {
 
     const translatedText = wrapper.find('.translated-text');
     expect(translatedText.exists()).toBe(true);
-    expect(translatedText.text()).toBe(googleMarkdown);
-    expect(translatedText.find('strong').exists()).toBe(false);
-    expect(translatedText.find('em').exists()).toBe(false);
-    expect(translatedText.html()).not.toContain('<strong>');
-    expect(translatedText.html()).not.toContain('<em>');
+    expect(translatedText.html()).not.toContain('onerror');
+    expect(translatedText.html()).not.toContain('alert(1)');
+    expect(translatedText.find('img').exists()).toBe(true);
+    expect(translatedText.element.querySelector('img')?.getAttribute('onerror')).toBeNull();
   });
 });

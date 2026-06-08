@@ -74,9 +74,8 @@
             <div 
               class="translated-text"
               :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
-            >
-              {{ truncateText(item.translatedText) || '[No translation]' }}
-            </div>
+              v-html="item.translatedPreviewHtml"
+            />
           </div>
         </div>
       </template>
@@ -160,6 +159,7 @@ import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
+import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -236,7 +236,6 @@ const {
   clearAllHistory,
   exportHistory,
   formatTime,
-  createMarkdownContent,
   loadHistory
 } = useHistory()
 
@@ -263,7 +262,11 @@ const formattedHistoryItems = computed(() => {
       formattedTime: formatTime(item.timestamp),
       sourceLanguageName: languages.getLanguageName(item.sourceLanguage) || item.sourceLanguage,
       targetLanguageName: languages.getLanguageName(item.targetLanguage) || item.targetLanguage,
-      markdownContent: createMarkdownContent(processedTranslatedText),
+      translatedPreviewHtml: renderMarkdownPreview(processedTranslatedText, {
+        fallbackDir: shouldApplyRtl(processedTranslatedText) ? 'rtl' : 'ltr',
+        isDictionary: String(item.mode || '').toLowerCase().includes('dictionary'),
+        enableMarkdown: true,
+      }),
       // Ensure we have normalized field names
       sourceText: processedSourceText,
       translatedText: processedTranslatedText
