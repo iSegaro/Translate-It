@@ -6,10 +6,16 @@ import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
 import { TranslationMode } from '@/shared/config/config.js';
 
 vi.mock('@/composables/shared/useTextDirection.js', () => ({
-  useTextDirection: () => ({
-    direction: ref('ltr'),
-    textAlign: ref('left'),
-  }),
+  useTextDirection: (contentRef) => {
+    const text = typeof contentRef?.value === 'string' ? contentRef.value : '';
+    const rtlCount = (text.match(/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g) || []).length;
+    const direction = rtlCount > 0 ? 'rtl' : 'ltr';
+
+    return {
+      direction: ref(direction),
+      textAlign: ref(direction === 'rtl' ? 'right' : 'left'),
+    };
+  },
 }));
 
 vi.mock('@/composables/shared/useFont.js', () => ({
@@ -67,7 +73,7 @@ describe('TranslationDisplay.vue', () => {
   it('renders normalized Google bold-label markdown through the modern marked path', async () => {
     const renderSpy = vi.spyOn(SimpleMarkdown, 'render');
     const wrapper = await mountDisplay({
-      content: '**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test',
+      content: 'بله\n\n**Pronunciation**: /yes/\n\n**Definitions**:\n- (علامت تعجب) used to give an affirmative response.\n\n**Examples**:\n- you think I perhaps killed Westbourne, yes?',
       lastTranslation: {
         mode: TranslationMode.Dictionary_Translation,
       },
@@ -76,9 +82,11 @@ describe('TranslationDisplay.vue', () => {
     expect(renderSpy).not.toHaveBeenCalled();
     const markdown = wrapper.find('.simple-markdown');
     expect(markdown.exists()).toBe(true);
-    expect(markdown.find('strong').text()).toBe('Noun');
-    expect(markdown.text()).toContain('Pronunciation');
-    expect(markdown.find('a').exists()).toBe(false);
+    const directParagraphs = Array.from(markdown.element.children).filter((el) => el.tagName === 'P');
+    expect(directParagraphs[0].getAttribute('dir')).toBe('rtl');
+    expect(directParagraphs[1].getAttribute('dir')).toBe('ltr');
+    expect(markdown.find('p.md-label-paragraph').attributes('dir')).toBe('ltr');
+    expect(markdown.find('ul.md-label-list > li').attributes('dir')).toBe('ltr');
   });
 
   it('renders Vajehyab markdown-like output through the modern marked path', async () => {
@@ -96,11 +104,13 @@ describe('TranslationDisplay.vue', () => {
     expect(markdown.find('h3').text()).toBe('سلام [salām]');
     expect(markdown.find('em').text()).toBe('اسم');
     expect(markdown.find('strong').text()).toBe('معنی (لغت‌نامه عمید)');
+    expect(markdown.find('h3').attributes('dir')).toBe('rtl');
+    expect(markdown.find('strong').element.parentElement?.getAttribute('dir')).toBe('rtl');
   });
 
   it('marks label paragraphs followed by lists for tighter spacing', async () => {
     const wrapper = await mountDisplay({
-      content: '**Definitions**:\n- item',
+      content: 'بله\n\n**Pronunciation**: /yes/\n\n**Definitions**:\n- (علامت تعجب) used to give an affirmative response.',
       lastTranslation: {
         mode: TranslationMode.Dictionary_Translation,
       },
@@ -114,8 +124,11 @@ describe('TranslationDisplay.vue', () => {
     expect(paragraph.exists()).toBe(true);
     expect(paragraph.text()).toBe('Definitions:');
     expect(list.exists()).toBe(true);
-    expect(list.text()).toBe('item');
+    expect(list.text()).toContain('used to give an affirmative response.');
     expect(list.element.firstChild?.nodeType).toBe(Node.ELEMENT_NODE);
+    expect(paragraph.attributes('dir')).toBe('ltr');
+    expect(list.attributes('dir')).toBe('ltr');
+    expect(list.find('li').attributes('dir')).toBe('ltr');
   });
 
   it('does not add label spacing classes for ordinary paragraph/list content', async () => {

@@ -352,6 +352,70 @@ const containerRef = ref(null);
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
 const LEGACY_PLAIN_LABEL_RE = /^[^:*#>`\-\s][^:]{0,80}:\s+\S+/;
+const RTL_CHAR_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+const NON_RTL_STRONG_CHAR_RE = /[a-zA-Z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g;
+
+const countMatches = (text, regex) => (text.match(regex) || []).length;
+
+const detectBlockDirection = (text, fallbackDir = 'ltr') => {
+  if (!text || typeof text !== 'string') {
+    return fallbackDir;
+  }
+
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return fallbackDir;
+  }
+
+  const labelSeparatorIndex = normalized.indexOf(':');
+  const hasLabelShape = labelSeparatorIndex > -1 && !normalized.includes('://');
+  const candidateText = hasLabelShape
+    ? normalized.slice(labelSeparatorIndex + 1).trim() || normalized
+    : normalized;
+
+  const rtlCount = countMatches(candidateText, RTL_CHAR_RE);
+  const ltrCount = countMatches(candidateText, NON_RTL_STRONG_CHAR_RE);
+
+  if (rtlCount === 0 && ltrCount === 0) {
+    return fallbackDir;
+  }
+
+  if (hasLabelShape && candidateText !== normalized) {
+    if (ltrCount > rtlCount) return 'ltr';
+    if (rtlCount > ltrCount) return 'rtl';
+    return fallbackDir;
+  }
+
+  if (ltrCount === 0) return 'rtl';
+  if (rtlCount === 0) return 'ltr';
+
+  if (ltrCount > rtlCount && (ltrCount - rtlCount >= 2 || ltrCount >= rtlCount * 1.5)) {
+    return 'ltr';
+  }
+
+  if (rtlCount > ltrCount && (rtlCount - ltrCount >= 2 || rtlCount >= ltrCount * 1.5)) {
+    return 'rtl';
+  }
+
+  if (/^[\u0590-\u08FF]/.test(normalized)) {
+    return fallbackDir;
+  }
+
+  if (/^[A-Za-z\u00C0-\u024F]/.test(normalized)) {
+    return 'ltr';
+  }
+
+  return fallbackDir;
+};
+
+const applyBlockDirection = (element, fallbackDir) => {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
+
+  const direction = detectBlockDirection(element.textContent || '', fallbackDir);
+  element.setAttribute('dir', direction);
+};
 
 const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
   if (!html || typeof html !== 'string') {
@@ -404,6 +468,12 @@ const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
     group.appendChild(paragraph);
     group.appendChild(nextElement);
   });
+
+  root
+    .querySelectorAll('p, h1, h2, h3, h4, h5, h6, blockquote, pre, ul, ol, li, .md-label-list-group, .md-label-paragraph, .md-label-list')
+    .forEach((element) => {
+      applyBlockDirection(element, textDirection.value.dir);
+    });
 
   root.querySelectorAll('a').forEach((link) => {
     const href = (link.getAttribute('href') || '').trim();
