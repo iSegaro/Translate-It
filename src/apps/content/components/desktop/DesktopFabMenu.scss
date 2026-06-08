@@ -264,6 +264,51 @@
         flex: 1 !important;
         letter-spacing: -0.01em !important;
       }
+
+      .fab-menu-item-secondary-btn {
+        background: none !important;
+        border: none !important;
+        padding: 4px !important;
+        margin-left: 6px !important;
+        margin-right: 2px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        color: var(--color-text-secondary, #64748b) !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+        pointer-events: auto !important;
+
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.05) !important;
+          color: #ffb703 !important;
+          transform: scale(1.1) !important;
+        }
+
+        &.is-active {
+          color: #ffb703 !important;
+        }
+
+        &.is-disabled {
+          opacity: 0.55 !important;
+          cursor: not-allowed !important;
+
+          &:hover {
+            background-color: transparent !important;
+            color: var(--color-text-secondary, #64748b) !important;
+            transform: none !important;
+          }
+
+          &.is-active {
+            color: #ffb703 !important;
+
+            &:hover {
+              color: #ffb703 !important;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -305,6 +350,38 @@
       .menu-icon-wrapper { background-color: rgba(255, 255, 255, 0.05) !important; }
       .fab-menu-item-text { color: #f8fafc !important; }
       .fab-menu-icon:not(.is-colored) { filter: brightness(0) invert(1) !important; }
+
+      .fab-menu-item-secondary-btn {
+        color: rgba(255, 255, 255, 0.45) !important;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          color: #ffc300 !important;
+        }
+
+        &.is-active {
+          color: #ffc300 !important;
+        }
+
+        &.is-disabled {
+          opacity: 0.45 !important;
+          cursor: not-allowed !important;
+
+          &:hover {
+            background-color: transparent !important;
+            color: rgba(255, 255, 255, 0.45) !important;
+            transform: none !important;
+          }
+
+          &.is-active {
+            color: #ffc300 !important;
+
+            &:hover {
+              color: #ffc300 !important;
+            }
+          }
+        }
+      }
     }
     .fab-settings-badge, .fab-tts-badge {
       background-color: rgba(50, 50, 50, 0.9) !important;
