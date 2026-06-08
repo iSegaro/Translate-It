@@ -135,14 +135,11 @@
           >
             {{ item.sourceText }}
           </div>
-          <!-- Sanitized HTML is produced by renderMarkdownPreview(). -->
-          <!-- eslint-disable vue/no-v-html -->
-          <div 
+          <SafeMarkdownPreview
             class="ti-m-target-preview" 
             :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
-            v-html="item.translatedPreviewHtml"
+            :html="item.translatedPreviewHtml"
           />
-          <!-- eslint-enable vue/no-v-html -->
           
           <div class="ti-m-timestamp">
             {{ formatTime(item.timestamp) }}
@@ -162,6 +159,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useHistory } from '@/features/history/composables/useHistory.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { renderMarkdownPreview } from '@/shared/utils/text/markdownPreview.js'
+import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { getScopedLogger } from '@/shared/logging/logger.js'

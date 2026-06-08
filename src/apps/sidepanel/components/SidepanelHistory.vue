@@ -71,14 +71,11 @@
             <div class="arrow">
               ↓
             </div>
-            <!-- Sanitized HTML is produced by renderMarkdownPreview(). -->
-            <!-- eslint-disable vue/no-v-html -->
-            <div 
+            <SafeMarkdownPreview
               class="translated-text"
               :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
-              v-html="item.translatedPreviewHtml"
+              :html="item.translatedPreviewHtml"
             />
-            <!-- eslint-enable vue/no-v-html -->
           </div>
         </div>
       </template>
@@ -163,6 +160,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useLanguages } from '@/composables/shared/useLanguages.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
+import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
