@@ -619,6 +619,42 @@ describe('SimpleMarkdown', () => {
       expect(result).toBeTruthy();
     });
 
+    it('should render plain label lines correctly', () => {
+      const result = SimpleMarkdown.render('Noun: test, experiment');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toContain('Noun');
+      expect(result.textContent).toContain('test, experiment');
+    });
+
+    it('should render header-style labels correctly', () => {
+      const result = SimpleMarkdown.render('Definitions:\n- test');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toContain('Definitions');
+      expect(result.textContent).toContain('Definitions: test');
+    });
+
+    it('should split multi-label same-line input', () => {
+      const result = SimpleMarkdown.render('**UK**: hello **US**: hi');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(result.textContent).toContain('UK: hello');
+      expect(result.textContent).toContain('US: hi');
+    });
+
+    it('should preprocess traditional one-line provider output', () => {
+      const result = SimpleMarkdown.render('translation **Noun**: hello, hi');
+      expect(result).toBeTruthy();
+
+      expect(result.querySelectorAll('strong').length).toBe(0);
+      expect(result.textContent).toBe('translation');
+    });
+
     it('should not treat bold text without a colon as a dictionary label', () => {
       const result = SimpleMarkdown.render('**Important** text without a colon');
       expect(result).toBeTruthy();
@@ -857,11 +893,30 @@ describe('SimpleMarkdown', () => {
       expect(result).toBe('کتاب');
     });
 
+    it('should preserve mixed-direction dictionary direction behavior', () => {
+      const rendered = SimpleMarkdown.render('Noun: آزمایش');
+      const paragraph = rendered.querySelector('p');
+      expect(paragraph).toBeTruthy();
+      expect(paragraph.getAttribute('dir')).toBe('rtl');
+      expect(rendered.textContent).toContain('Noun');
+      expect(rendered.textContent).toContain('آزمایش');
+    });
+
+    it('should strip pronunciation bracket guides from clean text', () => {
+      const text = 'گواهی [go(a)vāhi]';
+      expect(SimpleMarkdown.strip(text)).toBe('گواهی');
+    });
+
     it('should handle empty lines in input', () => {
       const text = '\n\n\nHello\n\n\nWorld\n\n\n';
       const result = SimpleMarkdown.getCleanTranslation(text);
       // Current implementation returns first non-empty line
       expect(result).toContain('Hello');
+    });
+
+    it('should keep old history-shaped dictionary strings clean for primary extraction', () => {
+      const input = 'translation\n\n**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test';
+      expect(SimpleMarkdown.getCleanTranslation(input)).toBe('translation');
     });
 
     it('should handle malformed markdown', () => {
