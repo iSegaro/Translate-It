@@ -174,6 +174,7 @@
 <script setup>
 import './TranslationDisplay.scss';
 import { ref, computed, watch, onMounted } from "vue";
+import { marked } from "marked";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTextDirection } from "@/composables/shared/useTextDirection.js";
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
@@ -350,6 +351,99 @@ const containerRef = ref(null);
 // Scoped logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
+const LEGACY_PLAIN_LABEL_RE = /^[^:*#>`\-\s][^:]{0,80}:\s+\S+/;
+
+const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
+  if (!html || typeof html !== 'string') {
+    return '';
+  }
+
+  const sanitizedHtml = DOMPurify.sanitize(html);
+  if (!sanitizedHtml) {
+    return '';
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = wrapWithSimpleMarkdown
+    ? `<div class="simple-markdown">${sanitizedHtml}</div>`
+    : sanitizedHtml;
+
+  const root = container.querySelector('.simple-markdown') || container.firstElementChild || container;
+
+  if (!root) {
+    return '';
+  }
+
+  root.querySelectorAll('a').forEach((link) => {
+    const href = (link.getAttribute('href') || '').trim();
+
+    if (!/^https?:\/\//i.test(href)) {
+      const textNode = document.createTextNode(link.textContent || '');
+      link.replaceWith(textNode);
+      return;
+    }
+
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+
+  if (root.classList && !root.classList.contains('simple-markdown')) {
+    root.classList.add('simple-markdown');
+  }
+
+  return DOMPurify.sanitize(root.outerHTML, {
+    ADD_ATTR: ['target', 'rel'],
+  });
+};
+
+const shouldUseLegacySimpleMarkdown = (content, isDictionary) => {
+  if (!content || typeof content !== 'string') {
+    return false;
+  }
+
+  const normalized = content.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) {
+    return false;
+  }
+
+  if (lines.length === 1) {
+    const line = lines[0];
+
+    // Legacy one-line concatenated provider output:
+    // "translation **Noun**: hello, hi"
+    const oneLineLabelMatch = line.match(/^(.*?)\*\*.*?\*\*.*:(?!\/\/)/);
+    if (oneLineLabelMatch && oneLineLabelMatch[1].trim().length > 0) {
+      return true;
+    }
+
+    // Same-line multi-label legacy dictionary output:
+    // "**UK**: hello **US**: hi"
+    const boldLabelMatches = line.match(/\*\*[^*]+?\*\*/g) || [];
+    if (boldLabelMatches.length > 1 && line.includes(':')) {
+      return true;
+    }
+
+    // Plain label content only falls back in dictionary mode.
+    if (isDictionary && !line.includes('**') && LEGACY_PLAIN_LABEL_RE.test(line)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Multi-line plain label blocks are still legacy compatibility data.
+  if (isDictionary && !normalized.includes('**')) {
+    return lines.some((line) => LEGACY_PLAIN_LABEL_RE.test(line));
+  }
+
+  return false;
+};
+
 // Computed
 const hasContent = computed(
   () => (props.content && props.content.trim().length > 0 && !props.isLoading) || (props.isStreaming && props.content)
@@ -472,7 +566,7 @@ try {
 
 // Sanitized content computed property
 const sanitizedContent = computed(() => {
-  return DOMPurify.sanitize(renderedContent.value);
+  return renderedContent.value;
 });
 
 const renderedContent = computed(() => {
@@ -482,21 +576,31 @@ const renderedContent = computed(() => {
 
   if (props.enableMarkdown) {
     try {
-      const markdownElement = SimpleMarkdown.render(props.content, textDirection.value.dir, {
-        enableLabelFormatting: isDictionary.value
-      });
-      if (markdownElement) {
-        // Return the outerHTML of the element instead of constructing a string with innerHTML
-        // This is safer for the linter as it's a direct property of the rendered element
-        return markdownElement.outerHTML;
+      if (shouldUseLegacySimpleMarkdown(props.content, isDictionary.value)) {
+        const markdownElement = SimpleMarkdown.render(props.content, textDirection.value.dir, {
+          enableLabelFormatting: isDictionary.value
+        });
+
+        if (markdownElement) {
+          return normalizeRenderedHtml(markdownElement.outerHTML, false);
+        }
+
+        return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
       }
-      return props.content.replace(/\n/g, "<br>");
+
+      const markedHtml = marked.parse(props.content, {
+        gfm: true,
+        breaks: false,
+        mangle: false,
+      });
+
+      return normalizeRenderedHtml(markedHtml, true);
     } catch (error) {
       logger.warn("[TranslationDisplay] Markdown rendering failed:", error);
-      return props.content.replace(/\n/g, "<br>");
+      return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
     }
   } else {
-    return props.content.replace(/\n/g, "<br>");
+    return normalizeRenderedHtml(props.content.replace(/\n/g, "<br>"), true);
   }
 });
 
