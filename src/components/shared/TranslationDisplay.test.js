@@ -4,6 +4,14 @@ import { nextTick, ref } from 'vue';
 import TranslationDisplay from './TranslationDisplay.vue';
 import { SimpleMarkdown } from '@/shared/utils/text/markdown.js';
 import { TranslationMode } from '@/shared/config/config.js';
+const pronunciationMarkdown = [
+  'Expression',
+  '',
+  '**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`',
+  '',
+  '- **Noun**: Expression, phrase, wording',
+  '- **Synonyms**: Phrase, wording, statement',
+].join('\n');
 
 vi.mock('@/composables/shared/useTextDirection.js', () => ({
   useTextDirection: (contentRef) => {
@@ -87,6 +95,26 @@ describe('TranslationDisplay.vue', () => {
     expect(directParagraphs[1].getAttribute('dir')).toBe('ltr');
     expect(markdown.find('p.md-label-paragraph').attributes('dir')).toBe('ltr');
     expect(markdown.find('ul.md-label-list > li').attributes('dir')).toBe('ltr');
+  });
+
+  it('keeps pronunciation labels and IPA text on the same rendered line', async () => {
+    const wrapper = await mountDisplay({
+      content: pronunciationMarkdown,
+      lastTranslation: {
+        mode: TranslationMode.Dictionary_Translation,
+      },
+    });
+
+    const paragraphs = wrapper.findAll('.simple-markdown > p');
+    expect(paragraphs.length).toBeGreaterThanOrEqual(2);
+
+    const pronunciationLine = paragraphs[1];
+    expect(pronunciationLine.text().replace(/\s+/g, ' ')).toContain('UK : /ɪkˈspreʃnz/ US : /ɪkˈspreʃnz/');
+    expect(pronunciationLine.findAll('strong')).toHaveLength(2);
+    expect(pronunciationLine.findAll('code')).toHaveLength(2);
+    expect(pronunciationLine.html()).toContain('<code>/ɪkˈspreʃnz/</code>');
+    expect(pronunciationLine.html()).not.toContain('<br>');
+    expect(pronunciationLine.attributes('dir')).toBe('ltr');
   });
 
   it('renders Vajehyab markdown-like output through the modern marked path', async () => {

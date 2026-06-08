@@ -4,6 +4,14 @@ import { ref } from 'vue';
 import SidepanelHistory from './SidepanelHistory.vue';
 
 const googleMarkdown = '**Noun**: test, experiment';
+const pronunciationMarkdown = [
+  'Expression',
+  '',
+  '**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`',
+  '',
+  '- **Noun**: Expression, phrase, wording',
+  '- **Synonyms**: Phrase, wording, statement',
+].join('\n');
 
 const mockHistory = {
   historyItems: ref([
@@ -132,6 +140,28 @@ describe('SidepanelHistory', () => {
     expect(translatedText.find('strong').exists()).toBe(true);
     expect(translatedText.html()).toContain('<strong>Noun</strong>');
     expect(translatedText.html()).not.toContain('**Noun**');
+  });
+
+  it('keeps the pronunciation line inline with bold labels and IPA code in history previews', async () => {
+    mockHistory.historyItems.value[0].translatedText = pronunciationMarkdown;
+    mockHistory.sortedHistoryItems.value[0].translatedText = pronunciationMarkdown;
+
+    const wrapper = mount(SidepanelHistory, {
+      props: {
+        isVisible: true,
+      },
+    });
+
+    await flushPromises();
+
+    const preview = wrapper.find('.translated-text .simple-markdown');
+    const paragraphs = preview.findAll('p');
+
+    expect(preview.exists()).toBe(true);
+    expect(paragraphs[1].text().replace(/\s+/g, ' ')).toContain('UK : /ɪkˈspreʃnz/ US : /ɪkˈspreʃnz/');
+    expect(paragraphs[1].findAll('strong')).toHaveLength(2);
+    expect(paragraphs[1].findAll('code')).toHaveLength(2);
+    expect(paragraphs[1].html()).toContain('<code>/ɪkˈspreʃnz/</code>');
   });
 
   it('sanitizes unsafe markdown/html in translated text previews', async () => {

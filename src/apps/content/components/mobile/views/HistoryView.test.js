@@ -4,6 +4,14 @@ import { ref } from 'vue';
 import HistoryView from './HistoryView.vue';
 
 const vajehyabMarkdown = '### سلام [salām]\n*اسم*\n\n---\n\n**معنی**:\nدرود';
+const pronunciationMarkdown = [
+  '表达方式',
+  '',
+  '**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`',
+  '',
+  '- **名词**: 表达方式, 词语, 表情, 算式',
+  '- **同义词**: 词汇, 措辞, 呈现',
+].join('\n');
 
 const mockHistory = {
   historyItems: ref([
@@ -95,6 +103,22 @@ describe('HistoryView', () => {
     expect(translatedText.find('em').exists()).toBe(true);
     expect(translatedText.html()).toContain('<strong>معنی</strong>');
     expect(translatedText.html()).not.toContain('###');
+  });
+
+  it('keeps the pronunciation line inline with bold labels and IPA code in history previews', async () => {
+    mockHistory.historyItems.value[0].translatedText = pronunciationMarkdown;
+
+    const wrapper = mount(HistoryView);
+    await flushPromises();
+
+    const preview = wrapper.find('.ti-m-target-preview .simple-markdown');
+    const paragraphs = preview.findAll('p');
+
+    expect(preview.exists()).toBe(true);
+    expect(paragraphs[1].text().replace(/\s+/g, ' ')).toContain('UK : /ɪkˈspreʃnz/ US : /ɪkˈspreʃnz/');
+    expect(paragraphs[1].findAll('strong')).toHaveLength(2);
+    expect(paragraphs[1].findAll('code')).toHaveLength(2);
+    expect(paragraphs[1].html()).toContain('<code>/ɪkˈspreʃnz/</code>');
   });
 
   it('sanitizes unsafe markdown/html in translated text previews', async () => {
