@@ -11,6 +11,11 @@
   background: var(--language-controls-bg-color, transparent) !important;
   margin: 8px 12px 0 12px !important;
   box-sizing: border-box !important;
+  --ti-language-select-arrow-inline-end: 8px;
+  --ti-language-select-arrow-width: 10px;
+  --ti-language-select-default-action-width: 22px;
+  --ti-language-select-default-action-gap: 2px;
+  --ti-language-select-default-action-inline-end: 18px;
 
   .ti-language-control-group {
     display: flex !important;
@@ -44,11 +49,11 @@
         width: 100% !important;
       }
 
-      .ti-language-select {
-        width: 100% !important;
-        max-width: none !important;
-        min-width: 0 !important;
-        flex: 1 1 auto !important;
+    .ti-language-select {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      flex: 1 1 auto !important;
       }
     }
 
@@ -87,7 +92,7 @@
       font-size: 15px !important;
       padding: 0 10px !important;
       color: var(--ti-mobile-text-secondary, #1c7ed6) !important;
-      background-position: right 8px center !important;
+      background-position: right var(--ti-language-select-arrow-inline-end) center !important;
       background-size: 10px 5px !important;
 
       option {
@@ -116,13 +121,17 @@
     }
 
     .ti-language-control-group--with-default-action .ti-language-select {
-      padding-inline-end: 34px !important;
+      padding-inline-end: calc(
+        var(--ti-language-select-default-action-inline-end) +
+        var(--ti-language-select-default-action-width) +
+        var(--ti-language-select-default-action-gap)
+      ) !important;
     }
 
     .ti-default-action-button {
-      width: 22px !important;
-      height: 22px !important;
-      min-width: 22px !important;
+      width: var(--ti-language-select-default-action-width) !important;
+      height: var(--ti-language-select-default-action-width) !important;
+      min-width: var(--ti-language-select-default-action-width) !important;
     }
   }
 }
@@ -141,8 +150,8 @@
   appearance: none !important;
   -webkit-appearance: none !important;
   background-repeat: no-repeat !important;
-  background-position: right 8px center !important;
-  background-size: 10px 5px !important;
+  background-position: right var(--ti-language-select-arrow-inline-end) center !important;
+  background-size: var(--ti-language-select-arrow-width) 5px !important;
   padding-right: 25px !important;
   vertical-align: middle !important;
   cursor: pointer !important;
@@ -168,25 +177,33 @@
   }
 
   .ti-language-control-group--with-default-action & {
-    padding-inline-end: 2.5rem !important;
+    padding-inline-end: calc(
+      var(--ti-language-select-default-action-inline-end) +
+      var(--ti-language-select-default-action-width) +
+      var(--ti-language-select-default-action-gap)
+    ) !important;
   }
 
   .ti-compact-mode .ti-language-control-group--with-default-action & {
-    padding-inline-end: 2.25rem !important;
+    padding-inline-end: calc(
+      var(--ti-language-select-default-action-inline-end) +
+      var(--ti-language-select-default-action-width) +
+      var(--ti-language-select-default-action-gap)
+    ) !important;
   }
 }
 
 .ti-default-action-button {
   position: absolute !important;
-  inset-inline-end: 6px !important;
+  inset-inline-end: var(--ti-language-select-default-action-inline-end) !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 22px !important;
-  height: 22px !important;
-  min-width: 22px !important;
+  width: var(--ti-language-select-default-action-width) !important;
+  height: var(--ti-language-select-default-action-width) !important;
+  min-width: var(--ti-language-select-default-action-width) !important;
   padding: 0 !important;
   border: 1px solid transparent !important;
   border-radius: 4px !important;
@@ -311,10 +328,20 @@
   }
 
   .ti-language-select {
-    padding: 0 22px 0 6px !important;
+    padding-block: 0 !important;
+    padding-inline-start: 6px !important;
+    padding-inline-end: 22px !important;
     font-size: 13px !important;
     max-width: 110px !important;
     height: 28px !important;
+  }
+
+  .ti-language-control-group--with-default-action .ti-language-select {
+    padding-inline-end: calc(
+      var(--ti-language-select-default-action-inline-end) +
+      var(--ti-language-select-default-action-width) +
+      var(--ti-language-select-default-action-gap)
+    ) !important;
   }
 
   .ti-swap-button {
@@ -348,11 +375,21 @@
   }
 
   .ti-language-select {
-    padding: 4px 30px 4px 10px !important;
+    padding-block: 4px !important;
+    padding-inline-start: 10px !important;
+    padding-inline-end: 30px !important;
     font-size: 14px !important;
     height: 34px !important;
     max-width: 140px !important;
     line-height: 1.4 !important;
+  }
+
+  .ti-language-control-group--with-default-action .ti-language-select {
+    padding-inline-end: calc(
+      var(--ti-language-select-default-action-inline-end) +
+      var(--ti-language-select-default-action-width) +
+      var(--ti-language-select-default-action-gap)
+    ) !important;
   }
 
   .ti-swap-button {
@@ -369,13 +406,13 @@
 /* RTL Adjustments */
 :is([dir="rtl"], html[dir="rtl"]) {
   .ti-language-select {
-    background-position: left 8px center !important;
-    padding-right: 8px !important;
-    padding-left: 25px !important;
+    background-position: left var(--ti-language-select-arrow-inline-end) center !important;
+    padding-inline-start: 25px !important;
+    padding-inline-end: 8px !important;
   }
   
   .ti-compact-mode .ti-language-select {
-    background-position: left 8px center !important;
+    background-position: left var(--ti-language-select-arrow-inline-end) center !important;
   }
 }
 
