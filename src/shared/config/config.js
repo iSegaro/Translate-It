@@ -334,6 +334,8 @@ export const CONFIG = {
   WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
   WHOLE_PAGE_SCROLL_STOP_DELAY: 500, // تاخیر برای توقف اسکرول (ms)
   WHOLE_PAGE_TOKEN_WARNING_HIDDEN: false, // پنهان کردن هشدار مصرف توکن در ترجمه صفحه
+  WHOLE_PAGE_AUTO_TRANSLATE_RULES: [], // قوانین شروع خودکار ترجمه کل صفحه (domain/URL)
+
 
   // --- Proxy Settings ---
   PROXY_ENABLED: false, // فعال بودن proxy
@@ -1433,6 +1435,14 @@ export const getWholePageTokenWarningHiddenAsync = async () => {
     CONFIG.WHOLE_PAGE_TOKEN_WARNING_HIDDEN
   );
 };
+
+export const getWholePageAutoTranslateRulesAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_AUTO_TRANSLATE_RULES",
+    CONFIG.WHOLE_PAGE_AUTO_TRANSLATE_RULES
+  );
+};
+
 
 // --- Character Limit Getters ---
 

@@ -142,6 +142,48 @@ async function initializeLogger(subComponent = 'Main') {
         // Start the multi-stage loading sequence (Interaction-driven lazy loading)
         featureLoader.startIntelligentLoading();
 
+        // 4. Auto-translation Check
+        (async () => {
+          try {
+            const { default: settingsManager } = await import('@/shared/managers/SettingsManager.js');
+            await settingsManager.initialize();
+
+            if (settingsManager.isExtensionEnabled() && settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true)) {
+              const autoRules = settingsManager.get('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
+              if (autoRules.length > 0) {
+                const { matchesAutoTranslateRule } = await import('@/utils/ui/exclusion.js');
+                const currentUrl = window.location.href;
+                const isMatch = autoRules.some(rule => matchesAutoTranslateRule(currentUrl, rule));
+
+                if (isMatch) {
+                  const { ExclusionChecker } = await import('@/features/exclusion/core/ExclusionChecker.js');
+                  const exclusionChecker = ExclusionChecker.getInstance();
+                  await exclusionChecker.initialize();
+
+                  const isAllowed = await exclusionChecker.isFeatureAllowed('pageTranslation');
+                  if (isAllowed) {
+                    scriptLogger.info('Current URL matches auto-translate rules. Starting auto page translation...');
+                    await featureLoader.loadFeature('pageTranslation', 'INTERACTIVE');
+                    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+                    const manager = FeatureManager.getInstance().getFeatureHandler('pageTranslation');
+                    if (manager) {
+                      if (!manager.isActive) {
+                        await manager.activate();
+                      }
+                      if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(currentUrl)) {
+                        const { pageEventBus } = await import('@/core/PageEventBus.js');
+                        pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: true });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            scriptLogger.error('Failed to run auto page translation check:', error);
+          }
+        })();
+
         if (process.env.NODE_ENV === 'development') {
           scriptLogger.info('Main frame content script initialized (Modular mode)');
         }

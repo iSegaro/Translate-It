@@ -149,3 +149,112 @@ export function isUrlExcluded(url, userExcludedSites = []) {
 
   return false;
 }
+
+/**
+ * Checks whether a URL matches a configured auto-translation rule.
+ *
+ * @param {string} url - Current page URL
+ * @param {string} rule - Configured auto-translate rule
+ * @returns {boolean} True if matched
+ */
+export function matchesAutoTranslateRule(url, rule) {
+  if (!url || !rule) return false;
+
+  const ruleClean = rule.trim();
+  if (!ruleClean) return false;
+
+  // 1. file:// rules: exact match only
+  if (ruleClean.startsWith('file://')) {
+    return url === ruleClean;
+  }
+
+  // 2. Parse target URL
+  let targetUrl;
+  try {
+    targetUrl = new URL(url);
+  } catch {
+    return false;
+  }
+
+  // Target protocol must be http or https
+  if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+    return false;
+  }
+
+  // 3. Determine wildcard scopes
+  const hasWildcardHost = ruleClean.startsWith('*.');
+  const hasWildcardPath = ruleClean.endsWith('/*');
+
+  // Clean wildcards for URL parsing
+  let parsedRule = ruleClean;
+  if (hasWildcardHost) parsedRule = parsedRule.slice(2);
+  if (hasWildcardPath) parsedRule = parsedRule.slice(0, -2);
+
+  // Parse rule URL (detect protocol, ignoring http vs https distinction)
+  const hasProtocol = /^[a-zA-Z0-9+-.]+:\/\//.test(parsedRule);
+  let ruleUrl;
+  try {
+    if (hasProtocol) {
+      // Normalize to https protocol to ignore http vs https difference
+      const normalizedRuleProtocol = parsedRule.replace(/^[a-zA-Z0-9+-.]+:\/\//, 'https://');
+      ruleUrl = new URL(normalizedRuleProtocol);
+    } else {
+      ruleUrl = new URL('https://' + parsedRule);
+    }
+  } catch {
+    return false;
+  }
+
+  // 4. Hostname check
+  const targetHost = targetUrl.hostname.toLowerCase();
+  const ruleHost = ruleUrl.hostname.toLowerCase();
+  if (hasWildcardHost) {
+    const isSubdomainOrRoot = targetHost === ruleHost || targetHost.endsWith('.' + ruleHost);
+    if (!isSubdomainOrRoot) return false;
+  } else {
+    if (targetHost !== ruleHost) return false;
+  }
+
+  // 5. Pathname check
+  let targetPath = targetUrl.pathname;
+  let rulePath = ruleUrl.pathname;
+
+  // Normalize trailing slashes for comparisons
+  if (targetPath.endsWith('/') && targetPath.length > 1) targetPath = targetPath.slice(0, -1);
+  if (rulePath.endsWith('/') && rulePath.length > 1) rulePath = rulePath.slice(0, -1);
+
+  if (hasWildcardPath) {
+    // Subtree segment matching (e.g. /docs matches /docs, /docs/page, but not /docs-archive)
+    const normalizedRulePath = rulePath === '/' ? '/' : rulePath + '/';
+    const normalizedTargetPath = targetPath === '/' ? '/' : targetPath + '/';
+    return normalizedTargetPath.startsWith(normalizedRulePath);
+  } else {
+    // Exact path match
+    return targetPath === rulePath;
+  }
+}
+
+/**
+ * Normalizes a URL for auto-translation rules.
+ * Only supports http:, https:, and file: protocols.
+ * Strips queries/hashes and canonicalizes http/https to https.
+ *
+ * @param {string} urlStr - The URL to normalize
+ * @returns {string} The normalized URL or empty string if unsupported/invalid
+ */
+export function normalizeAutoTranslateRuleUrl(urlStr) {
+  if (!urlStr) return '';
+  try {
+    const url = new URL(urlStr);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'file:') {
+      return '';
+    }
+    if (url.protocol === 'file:') {
+      return `file://${url.pathname}`;
+    }
+    // Normalize http/https to https to prevent duplicate rules representing the same logical page
+    return `https://${url.host}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}

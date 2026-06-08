@@ -101,6 +101,35 @@
             <span class="fab-menu-item-text">
               {{ item.label }}
             </span>
+
+            <!-- Secondary Action (Auto-Translate Star Toggle) -->
+            <button
+              v-if="item.secondaryAction"
+              class="fab-menu-item-secondary-btn"
+              :class="{ 
+                'is-active': item.secondaryAction.active,
+                'is-disabled': item.secondaryAction.disabled
+              }"
+              :disabled="item.secondaryAction.disabled"
+              :title="item.secondaryAction.title"
+              @click.stop="item.secondaryAction.handler()"
+            >
+              <svg 
+                viewBox="0 0 24 24" 
+                width="15" 
+                height="15" 
+                class="secondary-action-svg"
+              >
+                <path 
+                  :fill="item.secondaryAction.active ? 'currentColor' : 'none'" 
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                />
+              </svg>
+            </button>
           </div>
         </template>
       </div>
@@ -263,6 +292,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
+import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js';
 import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
@@ -444,6 +474,16 @@ const supportsBulk = (mode) => {
 const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element));
 const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page));
 
+const currentUrlStr = computed(() => typeof window !== 'undefined' ? window.location.href : '');
+
+const {
+  isAutoTranslateToggleVisible,
+  isAutoTranslateToggleActive,
+  isAutoTranslateToggleDisabled,
+  autoTranslateToggleTitle,
+  toggleAutoTranslateForCurrentPage
+} = useAutoTranslateRules({ currentUrl: currentUrlStr });
+
 const menuItems = computed(() => {
   const items = [];
 
@@ -527,6 +567,13 @@ const menuItems = computed(() => {
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
+  const pageSecondaryAction = isAutoTranslateToggleVisible.value ? {
+    active: isAutoTranslateToggleActive.value,
+    disabled: isAutoTranslateToggleDisabled.value,
+    title: autoTranslateToggleTitle.value,
+    handler: () => toggleAutoTranslateForCurrentPage()
+  } : null;
+
   if (status.isAuto || status.isTranslating) {
     items.push({
       id: 'page_translating_stop',
@@ -538,7 +585,8 @@ const menuItems = computed(() => {
       action: () => {
         logger.info('Stopping page translation from FAB');
         pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
-      }
+      },
+      secondaryAction: pageSecondaryAction
     });
   } else if (status.isCompleted) {
     items.push({
@@ -546,7 +594,8 @@ const menuItems = computed(() => {
       label: t('desktop_fab_restore_original_label'),
       icon: IconRestore,
       closeMenu: true,
-      action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE)
+      action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE),
+      secondaryAction: pageSecondaryAction
     });
   } else if (isPageTranslationAllowed) {
     const provider = settingsStore.getEffectiveProvider(TranslationMode.Page);
@@ -557,7 +606,8 @@ const menuItems = computed(() => {
       icon: IconTranslatePage,
       disabled: !isPageTranslationSupported.value,
       closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider })
+      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider }),
+      secondaryAction: pageSecondaryAction
     });
   }
 

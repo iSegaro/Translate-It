@@ -56,7 +56,7 @@ export const FEATURE_CONFIG = {
   },
 
   pageTranslation: {
-    settings: ['WHOLE_PAGE_TRANSLATION_ENABLED'],
+    settings: ['WHOLE_PAGE_TRANSLATION_ENABLED', 'WHOLE_PAGE_AUTO_TRANSLATE_RULES'],
     settingKey: 'WHOLE_PAGE_TRANSLATION_ENABLED'
   },
 

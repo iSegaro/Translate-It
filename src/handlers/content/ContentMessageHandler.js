@@ -724,7 +724,7 @@ export class ContentMessageHandler extends ResourceTracker {
     }
 
     try {
-      const result = await this.pageTranslationManager.restorePage();
+      const result = await this.pageTranslationManager.restorePage({ manual: true });
 
       this.logger.info('Page restore completed', {
         restoredCount: result.restoredCount

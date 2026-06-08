@@ -160,6 +160,35 @@
     >
       {{ message }}
     </div>
+
+    <!-- Auto-Translate Star Toggle -->
+    <button
+      v-if="showAutoTranslateToggle && isAutoTranslateToggleVisible"
+      class="page-translate-star-btn"
+      :class="{ 
+        'is-active': isAutoTranslateToggleActive,
+        'is-disabled': isAutoTranslateToggleDisabled 
+      }"
+      :disabled="isAutoTranslateToggleDisabled"
+      :title="autoTranslateToggleTitle"
+      @click.stop="toggleAutoTranslateForCurrentPage()"
+    >
+      <svg 
+        viewBox="0 0 24 24" 
+        width="14" 
+        height="14" 
+        class="star-svg"
+      >
+        <path 
+          :fill="isAutoTranslateToggleActive ? 'currentColor' : 'none'" 
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+        />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -172,6 +201,8 @@ import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { useActiveTabUrl } from '@/composables/core/useActiveTabUrl.js';
+import { useAutoTranslateRules } from '../composables/useAutoTranslateRules.js';
 
 const props = defineProps({
   compact: {
@@ -189,10 +220,24 @@ const props = defineProps({
   disabled: {
     type: Boolean,
     default: false
+  },
+  showAutoTranslateToggle: {
+    type: Boolean,
+    default: false
   }
 });
 
 const { t } = useUnifiedI18n();
+
+const { activeTabUrl } = useActiveTabUrl({ enabled: computed(() => props.showAutoTranslateToggle) });
+
+const {
+  isAutoTranslateToggleVisible,
+  isAutoTranslateToggleActive,
+  isAutoTranslateToggleDisabled,
+  autoTranslateToggleTitle,
+  toggleAutoTranslateForCurrentPage
+} = useAutoTranslateRules({ currentUrl: activeTabUrl });
 
 const {
   isTranslating,

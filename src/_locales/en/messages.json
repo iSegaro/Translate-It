@@ -642,7 +642,7 @@
     "message": "Restore Original"
   },
   "stop_auto_translating_label": {
-    "message": "Stop Auto Translating"
+    "message": "Stop Translating"
   },
   "select_element_label": {
     "message": "Select Element"
@@ -795,7 +795,7 @@
     "message": "Translate Selection"
   },
   "desktop_fab_stop_auto_translating_label": {
-    "message": "Stop Auto Translating"
+    "message": "Stop Translating"
   },
   "desktop_fab_restore_original_label": {
     "message": "Restore Original"
@@ -811,6 +811,15 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "Stop"
+  },
+  "page_translation_add_auto_translate_tooltip": {
+    "message": "Add to auto-translate rules"
+  },
+  "page_translation_remove_auto_translate_tooltip": {
+    "message": "Remove from auto-translate rules"
+  },
+  "page_translation_auto_translate_inherited_tooltip": {
+    "message": "This page is auto-translated by a broader rule. Change it in settings."
   },
   "mobile_ui_mode_auto": {
     "message": "Follow system (OS)"
@@ -1192,6 +1201,48 @@
   },
   "save_settings_button": {
     "message": "Save Settings"
+  },
+  "whole_page_auto_translate_rules_label": {
+    "message": "Automatically translate these sites (comma or newline separated)"
+  },
+  "whole_page_auto_translate_rules_description": {
+    "message": "Rules format:\nexample.com           → root page only\nexample.com/*         → all pages on the site\n*.example.com         → root pages of the domain and subdomains\n*.example.com/*       → all pages on the domain and subdomains\nexample.com/docs      → exact page\nexample.com/docs/*    → all pages under /docs"
+  },
+  "whole_page_rules_label_clean": {
+    "message": "Automatically Translate Sites"
+  },
+  "whole_page_rules_desc_clean": {
+    "message": "Specify site patterns that should be translated automatically upon navigation."
+  },
+  "whole_page_manage_rules_btn": {
+    "message": "Manage Rules ⚙️"
+  },
+  "whole_page_rules_drawer_title": {
+    "message": "Auto Page Translation Rules"
+  },
+  "whole_page_rules_instruction_title": {
+    "message": "Wildcard Rule Patterns"
+  },
+  "whole_page_rules_add_placeholder": {
+    "message": "Add new rule (e.g. *.example.com/*)..."
+  },
+  "whole_page_rules_btn_add": {
+    "message": "Add"
+  },
+  "whole_page_rules_empty": {
+    "message": "No auto-translate rules added yet."
+  },
+  "whole_page_rules_error_duplicate": {
+    "message": "This rule already exists."
+  },
+  "whole_page_rules_error_invalid": {
+    "message": "Please enter a valid rule pattern."
+  },
+  "whole_page_rules_confirm_reset": {
+    "message": "Are you sure you want to delete all rules?"
+  },
+  "whole_page_rules_btn_delete": {
+    "message": "Delete"
   },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"

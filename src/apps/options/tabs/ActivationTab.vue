@@ -425,6 +425,30 @@
               {{ t('whole_page_token_warning_description') || 'Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL).' }}
             </span>
           </div>
+
+          <div 
+            id="WHOLE_PAGE_AUTO_TRANSLATE_RULES"
+            class="setting-group sub-setting-group"
+          >
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label">{{ t('whole_page_rules_label_clean') || 'Automatically Translate Sites' }}</label>
+                <span class="setting-description">
+                  {{ t('whole_page_rules_desc_clean') || 'Specify site patterns that should be translated automatically upon navigation.' }}
+                </span>
+              </div>
+              <div class="setting-control">
+                <BaseButton
+                  id="WHOLE_PAGE_MANAGE_RULES_BTN"
+                  class="manage-rules-button"
+                  :disabled="!extensionEnabled"
+                  @click="openRulesDrawer"
+                >
+                  {{ t('whole_page_manage_rules_btn') || 'Manage Rules ⚙️' }}
+                </BaseButton>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -689,12 +713,127 @@
         </div>
       </div>
     </BaseFieldset>
+
+    <!-- Auto Page Translation Rules slide-out Drawer -->
+    <Transition name="drawer-fade">
+      <div 
+        v-if="isRulesDrawerOpen" 
+        class="drawer-overlay" 
+        @click="closeRulesDrawer" 
+      />
+    </Transition>
+    <Transition name="drawer-slide">
+      <div 
+        v-if="isRulesDrawerOpen" 
+        class="drawer-container"
+        :class="{ 'rtl': isRTL }"
+      >
+        <div class="drawer-header">
+          <h3>{{ t('whole_page_rules_drawer_title') || 'Auto Page Translation Rules' }}</h3>
+          <button 
+            class="drawer-close-btn" 
+            @click="closeRulesDrawer"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <!-- Rules Format Instruction Panel -->
+        <div class="drawer-instruction-panel">
+          <div class="instruction-header">
+            <h4>{{ t('whole_page_rules_instruction_title') || 'Wildcard Rule Patterns' }}</h4>
+          </div>
+          <pre
+            class="instruction-content"
+            :class="{ 'rtl-text': isRTL }"
+          >{{ rulesInstructionsText }}</pre>
+        </div>
+
+        <!-- Add New Rule Section -->
+        <div class="drawer-add-rule-section">
+          <div class="add-rule-input-wrapper">
+            <input
+              v-model="newRuleInput"
+              type="text"
+              class="add-rule-input"
+              :placeholder="t('whole_page_rules_add_placeholder') || 'Add new rule (e.g. *.example.com/*)...'"
+              dir="ltr"
+              @keydown.enter="addNewRule"
+            >
+            <BaseButton 
+              class="add-rule-btn" 
+              variant="primary"
+              size="sm"
+              @click="addNewRule"
+            >
+              {{ t('whole_page_rules_btn_add') || 'Add' }}
+            </BaseButton>
+          </div>
+          <div
+            v-if="ruleErrorMsg"
+            class="rule-error-message"
+          >
+            {{ ruleErrorMsg }}
+          </div>
+        </div>
+
+        <div class="drawer-body">
+          <div 
+            v-if="tempRules.length === 0" 
+            class="drawer-empty"
+          >
+            {{ t('whole_page_rules_empty') || 'No auto-translate rules added yet.' }}
+          </div>
+          <div 
+            v-else 
+            class="drawer-list"
+          >
+            <div
+              v-for="(rule, index) in tempRules"
+              :key="rule"
+              class="rule-item"
+            >
+              <span
+                class="rule-text"
+                dir="ltr"
+              >{{ rule }}</span>
+              <button 
+                class="delete-rule-btn" 
+                :title="t('whole_page_rules_btn_delete') || 'Delete'"
+                @click="deleteRule(index)"
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="drawer-footer">
+          <BaseButton 
+            variant="danger" 
+            size="sm" 
+            @click="resetAllRules"
+          >
+            {{ t('tts_reset_all') || 'Reset All' }}
+          </BaseButton>
+          <div class="drawer-footer-actions">
+            <BaseButton 
+              variant="primary" 
+              size="sm" 
+              @click="saveAndCloseRulesDrawer"
+            >
+              {{ t('tts_done') || 'Done' }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
 
 <script setup>
 import './ActivationTab.scss'
-import { computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -710,6 +849,7 @@ import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseRange from '@/components/base/BaseRange.vue'
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -800,6 +940,75 @@ const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HID
   transformGet: (v) => !v,
   transformSet: (v) => !v
 })
+// RTL check
+const isRTL = computed(() => {
+  try {
+    return t('IsRTL') === 'true'
+  } catch {
+    return false
+  }
+})
+
+// Rules Drawer State
+const isRulesDrawerOpen = ref(false)
+const newRuleInput = ref('')
+const ruleErrorMsg = ref('')
+const tempRules = ref([])
+
+const openRulesDrawer = () => {
+  newRuleInput.value = ''
+  ruleErrorMsg.value = ''
+  const currentRules = settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || []
+  tempRules.value = Array.isArray(currentRules) ? [...currentRules] : []
+  isRulesDrawerOpen.value = true
+}
+
+const closeRulesDrawer = () => {
+  isRulesDrawerOpen.value = false
+}
+
+const addNewRule = () => {
+  const rule = newRuleInput.value.trim()
+  if (!rule) {
+    ruleErrorMsg.value = t('whole_page_rules_error_invalid') || 'Please enter a valid rule pattern.'
+    return
+  }
+  
+  if (tempRules.value.includes(rule)) {
+    ruleErrorMsg.value = t('whole_page_rules_error_duplicate') || 'This rule already exists.'
+    return
+  }
+  
+  tempRules.value.push(rule)
+  newRuleInput.value = ''
+  ruleErrorMsg.value = ''
+}
+
+const deleteRule = (index) => {
+  tempRules.value.splice(index, 1)
+}
+
+const resetAllRules = () => {
+  if (confirm(t('whole_page_rules_confirm_reset') || 'Are you sure you want to delete all rules?')) {
+    tempRules.value = []
+  }
+}
+
+const saveAndCloseRulesDrawer = () => {
+  settingsStore.updateSettingLocally('WHOLE_PAGE_AUTO_TRANSLATE_RULES', [...tempRules.value])
+  isRulesDrawerOpen.value = false
+}
+
+const rulesInstructionsText = computed(() => {
+  return t('whole_page_auto_translate_rules_description') || 
+         `example.com           → root page only\nexample.com/*         → all pages on the site\n*.example.com         → root pages of the domain and subdomains\n*.example.com/*       → all pages on the domain and subdomains\nexample.com/docs      → exact page\nexample.com/docs/*    → all pages under /docs`
+})
+
+const handleKeyDown = (e) => {
+  if (e.key === 'Escape' && isRulesDrawerOpen.value) {
+    closeRulesDrawer()
+  }
+}
 
 // Mouse on Hover
 const mouseHoverEnabled = createSetting('MOUSE_HOVER_TRANSLATION_ENABLED', false)
@@ -859,10 +1068,12 @@ const handleValidationFeedback = (e) => {
 
 onMounted(async () => {
   window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+  window.addEventListener('keydown', handleKeyDown);
 })
 
 onUnmounted(() => {
   window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+  window.removeEventListener('keydown', handleKeyDown);
 })
 
 </script>

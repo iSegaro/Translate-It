@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('@/features/translation/providers/ProviderManifest.js', () => ({
+  findProviderById: vi.fn().mockReturnValue({ displayName: 'Google', consumesTokens: false })
+}));
+
 // 1. Mock webextension-polyfill FIRST
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -292,6 +296,73 @@ describe('PageTranslationManager', () => {
       expect(ctx1).not.toBeNull();
       expect(ctx2).not.toBeNull();
       expect(ctx1).not.toBe(ctx2);
+    });
+  });
+
+  describe('Auto Translation Rules Override', () => {
+    it('should set userRestoredOverride to true on manual restore', async () => {
+      await manager.activate();
+      expect(manager.userRestoredOverride).toBe(false);
+      await manager.restorePage({ manual: true });
+      expect(manager.userRestoredOverride).toBe(true);
+    });
+
+    it('should not set userRestoredOverride to true on non-manual/internal restore', async () => {
+      await manager.activate();
+      expect(manager.userRestoredOverride).toBe(false);
+      await manager.restorePage();
+      expect(manager.userRestoredOverride).toBe(false);
+
+      await manager.restorePage({ manual: false });
+      expect(manager.userRestoredOverride).toBe(false);
+    });
+
+    it('should reset userRestoredOverride when URL changes', async () => {
+      await manager.activate();
+      manager.userRestoredOverride = true;
+      manager.currentUrl = 'https://old.com';
+      
+      // Simulate URL change trigger via translatePage
+      vi.stubGlobal('location', { href: 'https://new.com' });
+      await manager.translatePage();
+      expect(manager.userRestoredOverride).toBe(false);
+    });
+
+    it('should add URL to autoStartCancelledUrls when token warning is declined on auto-start', async () => {
+      const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
+      findProviderById.mockReturnValueOnce({ displayName: 'AI Provider', consumesTokens: true });
+
+      // Mock _confirmTokenUsage to return false (user cancelled)
+      manager._confirmTokenUsage = vi.fn().mockResolvedValue(false);
+
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+
+      const result = await manager.translatePage({ isAuto: true });
+      expect(result.success).toBe(false);
+      expect(manager.autoStartCancelledUrls.has(window.location.href)).toBe(true);
+    });
+
+    it('should not add URL to autoStartCancelledUrls when token warning is declined on manual start', async () => {
+      const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
+      findProviderById.mockReturnValueOnce({ displayName: 'AI Provider', consumesTokens: true });
+
+      // Mock _confirmTokenUsage to return false (user cancelled)
+      manager._confirmTokenUsage = vi.fn().mockResolvedValue(false);
+
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+
+      const result = await manager.translatePage({ isAuto: false });
+      expect(result.success).toBe(false);
+      expect(manager.autoStartCancelledUrls.has(window.location.href)).toBe(false);
+    });
+
+    it('should support comma and newline parsing for auto translate rules', () => {
+      const parseRules = (v) => v.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+      const input = "example.com\n  google.com,   github.com  \n,apple.com";
+      const result = parseRules(input);
+      expect(result).toEqual(['example.com', 'google.com', 'github.com', 'apple.com']);
     });
   });
 });

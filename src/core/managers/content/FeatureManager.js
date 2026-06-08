@@ -548,6 +548,38 @@ export class FeatureManager extends ResourceTracker {
       // Re-evaluate features for new URL
       await this.reevaluateFeatures('url-change');
       
+      // Check auto-translation rules for the new URL
+      const { default: settingsManager } = await import('@/shared/managers/SettingsManager.js');
+      const isEnabled = settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
+      if (isEnabled && settingsManager.isExtensionEnabled()) {
+        const autoRules = settingsManager.get('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
+        if (autoRules.length > 0) {
+          const { matchesAutoTranslateRule } = await import('@/utils/ui/exclusion.js');
+          const isMatch = autoRules.some(rule => matchesAutoTranslateRule(newUrl, rule));
+          if (isMatch) {
+            const isAllowed = await this.exclusionChecker.isFeatureAllowed('pageTranslation');
+            if (isAllowed) {
+              const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+              const manager = await loadFeature('pageTranslation');
+              if (manager) {
+                // Ensure override is reset if URL actually changed
+                if (manager.currentUrl !== newUrl) {
+                  manager.userRestoredOverride = false;
+                }
+                if (!manager.isActive) {
+                  await manager.activate();
+                }
+                if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(newUrl)) {
+                  logger.info('Auto-translate rule matched on SPA URL change. Triggering translation...');
+                  const { pageEventBus } = await import('@/core/PageEventBus.js');
+                  const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+                  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: true });
+                }
+              }
+            }
+          }
+        }
+      }
     } catch (error) {
       logger.error('Error handling URL change:', error);
     }
