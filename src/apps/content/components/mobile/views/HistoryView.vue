@@ -135,11 +135,14 @@
           >
             {{ item.sourceText }}
           </div>
+          <!-- Sanitized HTML is produced by renderMarkdownPreview(). -->
+          <!-- eslint-disable vue/no-v-html -->
           <div 
             class="ti-m-target-preview" 
             :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
             v-html="item.translatedPreviewHtml"
           />
+          <!-- eslint-enable vue/no-v-html -->
           
           <div class="ti-m-timestamp">
             {{ formatTime(item.timestamp) }}
@@ -202,20 +205,6 @@ onMounted(async () => {
   await languages.loadLanguages()
   await loadHistory(true)
 })
-
-// Truncate long text for display and handle dictionary results
-const truncateText = (text, maxLength = 200) => {
-  if (!text) return ''
-  
-  if (text.includes('\n**')) {
-    const firstLine = text.split('\n')[0].trim()
-    if (firstLine) {
-      return firstLine.length > maxLength ? firstLine.substring(0, maxLength) + '...' : firstLine
-    }
-  }
-  
-  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-}
 
 const getLangName = (code) => {
   return languages.getLanguageName(code) || code

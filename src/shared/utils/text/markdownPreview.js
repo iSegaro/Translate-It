@@ -78,12 +78,16 @@ const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false, fallbackDir
     return "";
   }
 
-  const container = document.createElement("div");
-  container.innerHTML = wrapWithSimpleMarkdown
-    ? `<div class="simple-markdown">${sanitizedHtml}</div>`
-    : sanitizedHtml;
+  const parsedDocument = new DOMParser().parseFromString(
+    wrapWithSimpleMarkdown
+      ? `<div class="simple-markdown">${sanitizedHtml}</div>`
+      : sanitizedHtml,
+    "text/html",
+  );
 
-  const root = container.querySelector(".simple-markdown") || container.firstElementChild || container;
+  const root = parsedDocument.querySelector(".simple-markdown")
+    || parsedDocument.body.firstElementChild
+    || parsedDocument.body;
 
   if (!root) {
     return "";
@@ -141,7 +145,11 @@ const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false, fallbackDir
     root.classList.add("simple-markdown");
   }
 
-  return DOMPurify.sanitize(root.outerHTML, {
+  const renderedHtml = root === parsedDocument.body
+    ? parsedDocument.body.innerHTML
+    : root.outerHTML;
+
+  return DOMPurify.sanitize(renderedHtml, {
     ADD_ATTR: ["target", "rel"],
   });
 };

@@ -71,11 +71,14 @@
             <div class="arrow">
               ↓
             </div>
+            <!-- Sanitized HTML is produced by renderMarkdownPreview(). -->
+            <!-- eslint-disable vue/no-v-html -->
             <div 
               class="translated-text"
               :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
               v-html="item.translatedPreviewHtml"
             />
+            <!-- eslint-enable vue/no-v-html -->
           </div>
         </div>
       </template>
