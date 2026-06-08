@@ -28,17 +28,6 @@ vi.mock('@/shared/managers/SettingsManager.js', () => ({
   }
 }));
 
-vi.mock('@/shared/utils/text/markdown.js', () => ({
-  SimpleMarkdown: {
-    getCleanTranslation: vi.fn((t) => t)
-  },
-  ExtractionStrategy: {
-    FULL_TEXT: 'FULL_TEXT',
-    PRIMARY_ONLY: 'PRIMARY_ONLY',
-    CLEAN_DICT: 'CLEAN_DICT'
-  }
-}));
-
 describe('TranslationRenderer', () => {
   let renderer;
   let mockFactory;
@@ -128,16 +117,19 @@ describe('TranslationRenderer', () => {
   });
 
   describe('Copy functionality', () => {
-    it('should copy text to clipboard on icon click', async () => {
+    it('should copy cleaned markdown text to clipboard on icon click', async () => {
+      const cleanSpy = vi.spyOn(SimpleMarkdown, 'getCleanTranslation');
       const copyIcon = document.createElement('img');
       mockFactory.createCopyIcon.mockReturnValue(copyIcon);
       
-      renderer._createCopyIcon('text to copy');
+      renderer._createCopyIcon('**Noun**: test, experiment', 'Copy result', TranslationMode.Dictionary_Translation);
       
-      await copyIcon.dispatchEvent(new MouseEvent('click'));
+      copyIcon.dispatchEvent(new MouseEvent('click'));
+      await Promise.resolve();
+      await Promise.resolve();
       
-      expect(SimpleMarkdown.getCleanTranslation).toHaveBeenCalledWith('text to copy', 'FULL_TEXT');
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('text to copy');
+      expect(cleanSpy).toHaveBeenCalledWith('**Noun**: test, experiment', 'clean_dict');
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Noun: test, experiment');
     });
   });
 
