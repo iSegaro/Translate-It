@@ -1403,6 +1403,12 @@
   "popup_source_language_title": {
     "message": "زبان مبدا"
   },
+  "popup_set_source_language_default_title": {
+    "message": "زبان مبدا فعلی را به‌عنوان پیش‌فرض ذخیره کن"
+  },
+  "popup_set_target_language_default_title": {
+    "message": "زبان مقصد فعلی را به‌عنوان پیش‌فرض ذخیره کن"
+  },
   "popup_clear_source_language_title": {
     "message": "پاک کردن مبدا"
   },
@@ -1537,6 +1543,12 @@
   },
   "SIDEPANEL_TARGET_LANGUAGE_TITLE": {
     "message": "زبان مقصد"
+  },
+  "sidepanel_set_source_language_default_title": {
+    "message": "زبان مبدا فعلی را به‌عنوان پیش‌فرض ذخیره کن"
+  },
+  "sidepanel_set_target_language_default_title": {
+    "message": "زبان مقصد فعلی را به‌عنوان پیش‌فرض ذخیره کن"
   },
   "SIDEPANEL_COPY_SOURCE_ALT_ICON": {
     "message": "کپی"

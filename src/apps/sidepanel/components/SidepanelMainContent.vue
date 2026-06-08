@@ -14,11 +14,19 @@
           :provider="currentProviderLocal"
           :last-keyword="lastTranslation?.source"
           :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
+          show-default-actions
+          :default-actions-enabled="isReady"
+          :source-is-saved-default="sourceIsSavedDefault"
+          :target-is-saved-default="targetIsSavedDefault"
+          :source-default-title="sourceDefaultTitle"
+          :target-default-title="targetDefaultTitle"
           :source-title="t('SIDEPANEL_SOURCE_LANGUAGE_TITLE', 'زبان مبدا')"
           :target-title="t('SIDEPANEL_TARGET_LANGUAGE_TITLE', 'زبان مقصد')"
           :swap-title="t('SIDEPANEL_SWAP_LANGUAGES_TITLE', 'جابجایی زبان‌ها')"
           :swap-alt="t('SIDEPANEL_SWAP_LANGUAGES_ALT', 'Swap')"
           :auto-detect-label="'Auto-Detect'"
+          @set-default-source="handleSetDefaultSource"
+          @set-default-target="handleSetDefaultTarget"
         />
 
         <!-- Translate Button (shown alongside language selectors in wide layout) -->
@@ -142,6 +150,7 @@
 import './SidepanelMainContent.scss'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
+import { useLanguageDefaults } from '@/features/settings/composables/useLanguageDefaults.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -182,6 +191,17 @@ const {
   clearTranslation,
   loadLastTranslation
 } = useUnifiedTranslation('sidepanel');
+const {
+  savedSourceLanguage,
+  savedTargetLanguage,
+  isReady,
+  setSourceLanguageAsDefault,
+  setTargetLanguageAsDefault
+} = useLanguageDefaults()
+const sourceIsSavedDefault = computed(() => sourceLanguage.value === savedSourceLanguage.value)
+const targetIsSavedDefault = computed(() => targetLanguage.value === savedTargetLanguage.value)
+const sourceDefaultTitle = computed(() => t('sidepanel_set_source_language_default_title', 'Set current source language as default'))
+const targetDefaultTitle = computed(() => t('sidepanel_set_target_language_default_title', 'Set current target language as default'))
 const { handleError } = useErrorHandler()
 
 // Refs
@@ -315,6 +335,22 @@ const clearFields = async () => {
   logger.debug("Clearing fields and resetting languages");
   await clearTranslation();
 };
+
+const handleSetDefaultSource = async () => {
+  try {
+    await setSourceLanguageAsDefault(sourceLanguage.value)
+  } catch (error) {
+    await handleError(error, 'sidepanel-set-source-default')
+  }
+}
+
+const handleSetDefaultTarget = async () => {
+  try {
+    await setTargetLanguageAsDefault(targetLanguage.value)
+  } catch (error) {
+    await handleError(error, 'sidepanel-set-target-default')
+  }
+}
 
 // Expose methods and refs to the parent component
 defineExpose({

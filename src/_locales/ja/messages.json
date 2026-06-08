@@ -1403,6 +1403,12 @@
   "popup_source_language_title": {
     "message": "翻訳元言語"
   },
+  "popup_set_source_language_default_title": {
+    "message": "現在の翻訳元言語を既定として保存"
+  },
+  "popup_set_target_language_default_title": {
+    "message": "現在の翻訳先言語を既定として保存"
+  },
   "popup_clear_source_language_title": {
     "message": "翻訳元言語をクリア"
   },
@@ -1537,6 +1543,12 @@
   },
   "SIDEPANEL_TARGET_LANGUAGE_TITLE": {
     "message": "翻訳先言語"
+  },
+  "sidepanel_set_source_language_default_title": {
+    "message": "現在の翻訳元言語を既定として保存"
+  },
+  "sidepanel_set_target_language_default_title": {
+    "message": "現在の翻訳先言語を既定として保存"
   },
   "SIDEPANEL_COPY_SOURCE_ALT_ICON": {
     "message": "コピー"

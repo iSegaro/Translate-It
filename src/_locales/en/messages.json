@@ -1403,6 +1403,12 @@
   "popup_source_language_title": {
     "message": "Source language"
   },
+  "popup_set_source_language_default_title": {
+    "message": "Set current source language as default"
+  },
+  "popup_set_target_language_default_title": {
+    "message": "Set current target language as default"
+  },
   "popup_clear_source_language_title": {
     "message": "Clear source language"
   },
@@ -1537,6 +1543,12 @@
   },
   "SIDEPANEL_TARGET_LANGUAGE_TITLE": {
     "message": "Target Language"
+  },
+  "sidepanel_set_source_language_default_title": {
+    "message": "Set current source language as default"
+  },
+  "sidepanel_set_target_language_default_title": {
+    "message": "Set current target language as default"
   },
   "SIDEPANEL_COPY_SOURCE_ALT_ICON": {
     "message": "Copy"

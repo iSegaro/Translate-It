@@ -3,6 +3,7 @@
 ##### Added
 
 - Added [auto-translate rule](#/activation?highlight=WHOLE_PAGE_AUTO_TRANSLATE_RULES) toggle to both FAB Desktop, Mobile and Popup translation controls.
+- Added the ability to set the current source and target languages as defaults directly from Popup, Sidepanel, and Mobile language selectors.
 
 ---
 
