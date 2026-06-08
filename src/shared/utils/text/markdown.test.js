@@ -403,6 +403,7 @@ describe('SimpleMarkdown', () => {
       expect(SimpleMarkdown.strip('news [n(y)o͞oz]')).toBe('news');
       expect(SimpleMarkdown.strip('متعدد [mote(a)\'added]')).toBe('متعدد');
       expect(SimpleMarkdown.strip('word [phonetic] and more')).toBe('word  and more');
+      expect(SimpleMarkdown.strip("آزمایش ['āz[e]māyeš]")).toBe('آزمایش');
     });
 
     it('should handle mixed markdown', () => {
@@ -912,6 +913,11 @@ describe('SimpleMarkdown', () => {
       expect(SimpleMarkdown.strip(text)).toBe('گواهی');
     });
 
+    it('should strip Vajehyab nested-bracket pronunciation guides from clean text', () => {
+      const text = "آزمایش ['āz[e]māyeš]";
+      expect(SimpleMarkdown.strip(text)).toBe('آزمایش');
+    });
+
     it('should handle empty lines in input', () => {
       const text = '\n\n\nHello\n\n\nWorld\n\n\n';
       const result = SimpleMarkdown.getCleanTranslation(text);
@@ -922,6 +928,16 @@ describe('SimpleMarkdown', () => {
     it('should keep old history-shaped dictionary strings clean for primary extraction', () => {
       const input = 'translation\n\n**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test';
       expect(SimpleMarkdown.getCleanTranslation(input)).toBe('translation');
+    });
+
+    it('should remove Vajehyab nested-bracket pronunciation guides when extracting primary text', () => {
+      const input = "### آزمایش ['āz[e]māyeš]\n*اسم*\n\n---\n\n**معنی**:\nدرود";
+      expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.PRIMARY_ONLY)).toBe('آزمایش');
+    });
+
+    it('should preserve meaningful bracketed content that is not a pronunciation guide', () => {
+      const input = 'Refer to [Chapter 1] for details';
+      expect(SimpleMarkdown.strip(input)).toBe('Refer to [Chapter 1] for details');
     });
 
     it('should handle malformed markdown', () => {
