@@ -1,3 +1,11 @@
+#### v1.17.1 – Released on June XX, 2026
+
+##### Added
+
+- Added [auto-translate rule](#/activation?highlight=WHOLE_PAGE_AUTO_TRANSLATE_RULES) toggle to both FAB and Popup translation controls.
+
+---
+
 #### v1.17.0 – Released on June 06, 2026
 
 ##### Added
