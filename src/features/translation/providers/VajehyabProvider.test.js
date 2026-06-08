@@ -59,6 +59,10 @@ describe('VajehyabProvider', () => {
     });
   });
 
+  const mockLookupHit = (hit) => {
+    provider._executeApiCall.mockResolvedValue({ hit });
+  };
+
   it('should initialize with correct name and capabilities', () => {
     expect(provider.providerName).toBe(ProviderNames.VAJEHYAB);
     expect(VajehyabProvider.supportsDictionary).toBe(true);
@@ -97,12 +101,38 @@ describe('VajehyabProvider', () => {
       expect(provider.lastDetectedLanguage).toBeNull();
     });
 
+    it('should format successful lookups with pronunciation as the current Markdown contract', async () => {
+      mockLookupHit({
+        title: 'سلام',
+        kind: 'اسم',
+        pronunciation: 'salām',
+        description: 'درود، تحیت',
+        dictionarySlug: 'amid'
+      });
+
+      const result = await provider._batchTranslate(['سلام'], 'en', 'fa');
+
+      expect(result[0]).toBe('### سلام [salām]\n*اسم*\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nدرود، تحیت');
+    });
+
+    it('should format successful lookups without pronunciation using the current Markdown contract', async () => {
+      mockLookupHit({
+        title: 'سلام',
+        description: 'درود، تحیت',
+        dictionarySlug: 'amid'
+      });
+
+      const result = await provider._batchTranslate(['سلام'], 'en', 'fa');
+
+      expect(result[0]).toBe('### سلام\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nدرود، تحیت');
+    });
+
     it('should return fallback message when word is not found', async () => {
       vi.spyOn(provider, '_executeApiCall').mockResolvedValue({ hit: {} });
       
       const result = await provider._batchTranslate(['unknownword'], 'en', 'fa');
       
-      expect(result[0]).toContain('Word not found');
+      expect(result[0]).toBe('(Word not found in Vajehyab dictionary)');
     });
 
     it('should return original texts if target word is empty', async () => {
@@ -120,6 +150,32 @@ describe('VajehyabProvider', () => {
   });
 
   describe('_formatDictionaryResponse', () => {
+    it('should render a simple kind as italic in the current Markdown contract', () => {
+      const hit = {
+        title: 'سلام',
+        kind: 'اسم',
+        description: 'درود، تحیت',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe('### سلام\n*اسم*\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nدرود، تحیت');
+    });
+
+    it('should keep bracketed kinds unchanged in the current Markdown contract', () => {
+      const hit = {
+        title: 'سلام',
+        kind: '(صفت) [پهلوی: drust]',
+        description: 'درود، تحیت',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe('### سلام\n(صفت) [پهلوی: drust]\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nدرود، تحیت');
+    });
+
     it('should decode HTML entities in pronunciation', () => {
       const hit = {
         title: 'test',
@@ -143,17 +199,27 @@ describe('VajehyabProvider', () => {
       expect(result).toContain('لغت‌نامه دهخدا');
     });
 
+    it('should fall back to واژه‌یاب when dictionarySlug is missing', () => {
+      const hit = {
+        title: 'سلام',
+        description: 'درود، تحیت'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe('### سلام\n\n---\n\n**معنی (واژه‌یاب)**:\nدرود، تحیت');
+    });
+
     it('should clean up HTML tags in description', () => {
       const hit = {
         title: 'word',
-        description: '<p>Line 1<br>Line 2</p><div>Line 3</div>',
+        description: '<p>Line 1<br>Line 2</p>',
         dictionarySlug: 'wiki'
       };
       
       const result = provider._formatDictionaryResponse(hit);
-      expect(result).toContain('Line 1 Line 2 Line 3');
-      expect(result).not.toContain('<p>');
-      expect(result).not.toContain('<div>');
+
+      expect(result).toBe('### word\n\n---\n\n**معنی (ویکی‌پدیا)**:\nLine 1 Line 2');
     });
 
     it('should handle missing fields gracefully', () => {
@@ -178,6 +244,62 @@ describe('VajehyabProvider', () => {
       
       const result = provider._formatDictionaryResponse(hit);
       expect(result).toBe('### Word [word]\n*Noun*\n\n---\n\n**معنی (فرهنگ معین)**:\nA unit of language');
+    });
+
+    it('should preserve multiple parsed description sections with labels and unlabeled content', () => {
+      const hit = {
+        title: 'word',
+        description: 'main definition &lang; صرف: content &lang; second unlabeled',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe(
+        '### word\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nmain definition\n\n**صرف**:\ncontent\n\nsecond unlabeled'
+      );
+    });
+
+    it('should preserve labeled description sections as bold label blocks', () => {
+      const hit = {
+        title: 'word',
+        description: 'main definition &lang; صرف: content &lang; مصدر: root',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe(
+        '### word\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nmain definition\n\n**صرف**:\ncontent\n\n**مصدر**:\nroot'
+      );
+    });
+
+    it('should preserve unlabeled description sections as plain paragraphs', () => {
+      const hit = {
+        title: 'word',
+        description: 'main definition &lang; first unlabeled &lang; second unlabeled',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe(
+        '### word\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nmain definition\n\nfirst unlabeled\n\nsecond unlabeled'
+      );
+    });
+
+    it('should skip empty description sections', () => {
+      const hit = {
+        title: 'word',
+        description: 'main definition &lang; صرف: [param] = &lang; مصدر: = &lang; معنا: content',
+        dictionarySlug: 'amid'
+      };
+
+      const result = provider._formatDictionaryResponse(hit);
+
+      expect(result).toBe(
+        '### word\n\n---\n\n**معنی (لغت‌نامه عمید)**:\nmain definition\n\n**معنا**:\ncontent'
+      );
     });
   });
 });
