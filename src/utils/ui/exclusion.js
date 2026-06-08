@@ -149,3 +149,71 @@ export function isUrlExcluded(url, userExcludedSites = []) {
 
   return false;
 }
+
+/**
+ * Checks whether a URL matches a configured auto-translation rule.
+ *
+ * @param {string} url - Current page URL
+ * @param {string} rule - Configured auto-translate rule
+ * @returns {boolean} True if matched
+ */
+export function matchesAutoTranslateRule(url, rule) {
+  if (!url || !rule) return false;
+
+  const ruleClean = rule.trim();
+  if (!ruleClean) return false;
+
+  // 1. file:// rules: exact match only
+  if (ruleClean.startsWith('file://')) {
+    return url === ruleClean;
+  }
+
+  // 2. Normalize leading wildcard (*.example.com -> example.com)
+  let normalizedRule = ruleClean;
+  if (normalizedRule.startsWith('*.')) {
+    normalizedRule = normalizedRule.slice(2);
+  }
+
+  // 3. Parse target URL
+  let targetUrl;
+  try {
+    targetUrl = new URL(url);
+  } catch (e) {
+    return false;
+  }
+
+  // 4. Parse rule URL (detect protocol)
+  const hasProtocol = /^[a-zA-Z0-9+-.]+:\/\//.test(normalizedRule);
+  let ruleUrl;
+  try {
+    if (hasProtocol) {
+      ruleUrl = new URL(normalizedRule);
+    } else {
+      ruleUrl = new URL('https://' + normalizedRule);
+    }
+  } catch (e) {
+    return false;
+  }
+
+  // 5. Protocol check (if explicitly provided)
+  if (hasProtocol && targetUrl.protocol !== ruleUrl.protocol) {
+    return false;
+  }
+
+  // 6. Hostname check (exact or subdomain)
+  const ruleHost = ruleUrl.hostname.toLowerCase();
+  const targetHost = targetUrl.hostname.toLowerCase();
+  const hostMatches = targetHost === ruleHost || targetHost.endsWith('.' + ruleHost);
+  if (!hostMatches) {
+    return false;
+  }
+
+  // 7. Pathname prefix check (honoring segment boundaries)
+  const targetPath = targetUrl.pathname;
+  const rulePath = ruleUrl.pathname;
+
+  const tPath = targetPath.endsWith('/') ? targetPath : targetPath + '/';
+  const rPath = rulePath.endsWith('/') ? rulePath : rulePath + '/';
+
+  return tPath.startsWith(rPath);
+}

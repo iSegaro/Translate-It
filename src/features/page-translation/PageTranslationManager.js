@@ -50,6 +50,9 @@ export class PageTranslationManager extends ResourceTracker {
     this.sessionContext = null;
     this.isFatalErrorHandling = false;
     this._isCancelling = false;
+    this.userRestoredOverride = false;
+    this.autoStartCancelledUrls = new Set();
+
     
     this.scheduler = new PageTranslationScheduler();
     this.bridge = new PageTranslationBridge();
@@ -102,6 +105,7 @@ export class PageTranslationManager extends ResourceTracker {
     if (this.currentUrl !== window.location.href) {
       this.resetLocalState();
       this.currentUrl = window.location.href;
+      this.userRestoredOverride = false;
     }
 
     if (this.isTranslating || (this.isTranslated && !options.isAuto)) return { success: false, reason: ActionReasons.BUSY_OR_DONE };
@@ -143,6 +147,9 @@ export class PageTranslationManager extends ResourceTracker {
           this.logger.info('Page translation cancelled: User declined token usage');
           this.isTranslating = false;
           this.isAutoTranslating = false;
+          if (options.isAuto) {
+            this.autoStartCancelledUrls.add(window.location.href);
+          }
           return { success: false, reason: ActionReasons.USER_CANCELLED };
         }
       }
@@ -245,7 +252,10 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
-  async restorePage() {
+  async restorePage(options = {}) {
+    if (options.manual) {
+      this.userRestoredOverride = true;
+    }
     this._cleanupSession();
     this._removeLayoutFix();
     try {
@@ -334,13 +344,13 @@ export class PageTranslationManager extends ResourceTracker {
     }
   }
 
-  cancelTranslation() {
+  cancelTranslation(options = {}) {
     if (this._isCancelling) return;
     this._isCancelling = true;
 
     try {
       this._cleanupSession();
-      this.restorePage(); // Use full restore for cancel
+      this.restorePage(options); // Use full restore for cancel
       
       if (this.abortController) {
         this.abortController.abort();

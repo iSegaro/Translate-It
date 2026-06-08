@@ -425,6 +425,24 @@
               {{ t('whole_page_token_warning_description') || 'Display a confirmation dialog before translating the whole page if the provider uses credits/tokens (e.g. Gemini, OpenAI, DeepL).' }}
             </span>
           </div>
+
+          <div 
+            id="WHOLE_PAGE_AUTO_TRANSLATE_RULES"
+            class="setting-group sub-setting-group vertical"
+          >
+            <label class="setting-label">{{ t('whole_page_auto_translate_rules_label') || 'Automatically translate these sites (comma separated)' }}</label>
+            <BaseTextarea
+              v-model="wholePageAutoTranslateRules"
+              :rows="3"
+              placeholder="example.com, anotherdomain.org"
+              dir="ltr"
+              class="auto-translate-rules-input"
+              :disabled="!extensionEnabled"
+            />
+            <span class="setting-description">
+              {{ t('whole_page_auto_translate_rules_description') || 'URLs or domains that should automatically start Whole Page Translation when visited.' }}
+            </span>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -706,6 +724,7 @@ import { useHighlightManager } from '../composables/useHighlightManager.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseRadio from '@/components/base/BaseRadio.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseRange from '@/components/base/BaseRange.vue'
@@ -799,6 +818,10 @@ const wholePageScrollStopDelay = createSetting('WHOLE_PAGE_SCROLL_STOP_DELAY', 5
 const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HIDDEN', false, {
   transformGet: (v) => !v,
   transformSet: (v) => !v
+})
+const wholePageAutoTranslateRules = createSetting('WHOLE_PAGE_AUTO_TRANSLATE_RULES', [], {
+  transformGet: (v) => Array.isArray(v) ? v.join(', ') : v,
+  transformSet: (v) => v.split(/[,\n]+/).map(s => s.trim()).filter(Boolean)
 })
 
 // Mouse on Hover

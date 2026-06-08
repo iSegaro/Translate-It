@@ -126,7 +126,7 @@ async function setupIFrameMessageListeners(contentScriptCore) {
           manager.translatePage(data || {}).catch(() => {});
           break;
         case MessageActions.PAGE_RESTORE:
-          manager.restorePage().catch(() => {});
+          manager.restorePage({ manual: true }).catch(() => {});
           break;
         case MessageActions.PAGE_TRANSLATE_STOP_AUTO:
           manager.stopAutoTranslation().catch(() => {});

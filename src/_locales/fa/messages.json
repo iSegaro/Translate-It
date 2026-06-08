@@ -1193,6 +1193,12 @@
   "save_settings_button": {
     "message": "ذخیره تنظیمات"
   },
+  "whole_page_auto_translate_rules_label": {
+    "message": "ترجمه خودکار این سایت‌ها (با کاما جدا کنید)"
+  },
+  "whole_page_auto_translate_rules_description": {
+    "message": "آدرس‌ها یا دامنه‌هایی که با ورود به آن‌ها ترجمه کل صفحه به صورت خودکار آغاز می‌شود."
+  },
   "excluded_sites_label": {
     "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"
   },

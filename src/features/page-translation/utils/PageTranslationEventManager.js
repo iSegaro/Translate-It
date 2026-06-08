@@ -111,11 +111,11 @@ export class PageTranslationEventManager {
     });
 
     bus.on(MessageActions.PAGE_RESTORE, () => {
-      this.manager.restorePage().catch(() => {});
+      this.manager.restorePage({ manual: true }).catch(() => {});
     });
 
     bus.on(MessageActions.PAGE_TRANSLATE_CANCELLED, () => {
-      this.manager.cancelTranslation();
+      this.manager.cancelTranslation({ manual: true });
     });
 
     bus.on(MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {

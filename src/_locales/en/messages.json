@@ -1193,6 +1193,12 @@
   "save_settings_button": {
     "message": "Save Settings"
   },
+  "whole_page_auto_translate_rules_label": {
+    "message": "Automatically translate these sites (comma separated)"
+  },
+  "whole_page_auto_translate_rules_description": {
+    "message": "URLs or domains that should automatically start Whole Page Translation when visited."
+  },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
   },
