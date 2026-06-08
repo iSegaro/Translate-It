@@ -18,6 +18,7 @@
 - **[Messaging System](MessagingSystem.md)** - Race-condition-free inter-component communication with intelligent timeout management and Unified Translation Service integration
 - **[Translation System](TRANSLATION_SYSTEM.md)** - Unified Translation Service architecture with centralized coordination, duplicate prevention, and intelligent result routing
 - **[Provider Implementation Guide](PROVIDERS.md)** - Complete guide for implementing translation providers with BaseProvider, RateLimitManager, and Circuit Breaker
+- **[Markdown Rendering](MARKDOWN_RENDERING.md)** - Shared preview pipeline, SafeMarkdownPreview boundary, and extraction ownership
 - **[Error Management](ERROR_MANAGEMENT_SYSTEM.md)** - Centralized error handling and context safety
 - **[Testing Strategy](TESTING_STRATEGY.md)** - Guidelines and roadmap for unit and integration testing
 - **[Storage Manager](STORAGE_MANAGER.md)** - Unified storage API with caching and events
@@ -698,6 +699,8 @@ For implementation details and code examples, refer to the following system guid
 - **Shared Components**: Reusable feature-specific components that encapsulate common logic (e.g., `TranslationDisplay`).
 - **Layout Components**: Manage structural concerns and responsive positioning across different extension contexts.
 
+Markdown rendering for `TranslationDisplay` and history previews is centralized in `src/shared/utils/text/markdownPreview.js`. Providers must emit Markdown or plain text only and must not own final HTML shaping.
+
 ### Documentation
 For detailed information on UI hosting and in-page integration, refer to the following guides:
 - **[UI Host System Documentation](UI_HOST_SYSTEM.md)**
@@ -797,6 +800,7 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 
 ### Shared Components
 - `src/components/shared/TranslationDisplay.vue` - Translation result display
+- `src/components/shared/SafeMarkdownPreview.vue` - Controlled markdown HTML boundary for sanitized preview output
 - `src/components/shared/TranslationInputField.vue` - Translation input
 - `src/components/shared/actions/ActionToolbar.vue` - Action toolbar
 - `src/components/shared/LanguageSelector.vue` - Language selection

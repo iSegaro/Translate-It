@@ -79,6 +79,14 @@ Testing translation providers (Gemini, OpenAI, Google).
 - **Focus**: Payload construction and result parsing.
 - **Standard**: Mock the `fetch` or `ProviderRequestEngine` to return specific JSON artifacts.
 
+### E. Markdown Rendering & Extraction
+Testing the shared markdown preview and cleanup pipeline.
+- **Provider contract tests**: Verify Google, Vajehyab, and AI providers emit the expected markdown shapes.
+- **Preview rendering tests**: Verify `renderMarkdownPreview()` and `TranslationDisplay` render markdown safely and preserve dictionary/list/IPA structures.
+- **History preview tests**: Verify Sidepanel and Mobile history render only `translatedText` through the shared preview path.
+- **Extraction tests**: Verify `SimpleMarkdown` continues to power copy, export, and TTS cleanup behavior.
+- **Regression fixtures**: Use `MockProvider` samples to reproduce UI regressions such as IPA lines and dictionary label/list blocks.
+
 ---
 
 ## Handling Edge Cases

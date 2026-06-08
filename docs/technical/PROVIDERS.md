@@ -38,6 +38,23 @@ To prevent runtime crashes (like "split is not a function"), all providers (via 
 }
 ```
 
+## Markdown Output Contract
+
+Providers that emit dictionary-style or rich formatted output must follow a markdown-first contract:
+
+- emit Markdown or plain text only
+- never emit HTML
+- use bold-label Markdown for dictionary sections
+- use inline code for pronunciation / IPA snippets
+- avoid display-specific wrappers or layout-driven formatting
+- keep pronunciation metadata in the provider output only when it is part of the source content contract
+
+New provider dictionary shapes must be covered by:
+
+- provider contract tests
+- markdown preview rendering tests
+- extraction tests when the output affects TTS, copy, or export behavior
+
 ---
 
 ## Modularized Utilities (`src/features/translation/providers/utils/`)

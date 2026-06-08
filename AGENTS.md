@@ -114,6 +114,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**MessagingSystem.md**](docs/technical/MessagingSystem.md): **Messaging System** – Race-condition-free communication.
 - [**TRANSLATION_SYSTEM.md**](docs/technical/TRANSLATION_SYSTEM.md): **Translation Service** – Coordination and result routing.
 - [**PROVIDERS.md**](docs/technical/PROVIDERS.md): **Provider Implementation Guide** – BaseProvider and Circuit Breaker.
+- [**MARKDOWN_RENDERING.md**](docs/technical/MARKDOWN_RENDERING.md): Markdown rendering, preview pipeline, TTS extraction boundaries, and provider Markdown contracts.
 - [**ERROR_MANAGEMENT_SYSTEM.md**](docs/technical/ERROR_MANAGEMENT_SYSTEM.md): Centralized error management and context safety.
 - [**STORAGE_MANAGER.md**](docs/technical/STORAGE_MANAGER.md): **StorageCore Guide** – Unified storage API with caching.
 - [**LOGGING_SYSTEM.md**](docs/technical/LOGGING_SYSTEM.md): **Structured Logging** – Component-based levels and performance.

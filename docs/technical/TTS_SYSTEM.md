@@ -123,6 +123,11 @@ When searching for a voice, the system follows this priority:
 2.  **Neural Family Match**: Finds any available Neural voice in the same language group.
 3.  **Static Fallback**: Uses the hardcoded mapping in `ttsProviders.js` as a last resort.
 
+### Text Normalization for Speech
+- TTS uses `SimpleMarkdown.getCleanTranslation(...)` for the final speakable text.
+- Dictionary mode uses the `PRIMARY_ONLY` extraction strategy so pronunciation and metadata do not leak into speech.
+- Pronunciation-guide cleanup belongs in `SimpleMarkdown`, not in the display rendering pipeline.
+
 ---
 
 ## Lifecycle & State Management
