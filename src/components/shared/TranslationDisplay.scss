@@ -292,7 +292,7 @@
     }
 
     code {
-      background: var(--bg-secondary, #f8f9fa) !important;
+      background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%)) !important;
       padding: 2px 4px !important;
       border-radius: 3px !important;
       font-family: "Courier New", monospace !important;
@@ -300,7 +300,7 @@
     }
 
     pre {
-      background: var(--bg-secondary, #f8f9fa) !important;
+      background-color: var(--color-code-block-bg, rgb(0 0 0 / 5%)) !important;
       padding: 12px !important;
       border-radius: 4px !important;
       overflow-x: auto !important;
