@@ -98,6 +98,36 @@ describe('TranslationDisplay.vue', () => {
     expect(markdown.find('strong').text()).toBe('معنی (لغت‌نامه عمید)');
   });
 
+  it('marks label paragraphs followed by lists for tighter spacing', async () => {
+    const wrapper = await mountDisplay({
+      content: '**Definitions**:\n- item',
+      lastTranslation: {
+        mode: TranslationMode.Dictionary_Translation,
+      },
+    });
+
+    const group = wrapper.find('.md-label-list-group');
+    const paragraph = group.find('p.md-label-paragraph');
+    const list = group.find('ul.md-label-list');
+
+    expect(group.exists()).toBe(true);
+    expect(paragraph.exists()).toBe(true);
+    expect(paragraph.text()).toBe('Definitions:');
+    expect(list.exists()).toBe(true);
+    expect(list.text()).toBe('item');
+  });
+
+  it('does not add label spacing classes for ordinary paragraph/list content', async () => {
+    const wrapper = await mountDisplay({
+      content: 'Intro text\n\n- item',
+      lastTranslation: null,
+    });
+
+    expect(wrapper.find('.md-label-list-group').exists()).toBe(false);
+    expect(wrapper.find('p.md-label-paragraph').exists()).toBe(false);
+    expect(wrapper.find('ul.md-label-list').exists()).toBe(false);
+  });
+
   it('falls back to SimpleMarkdown for legacy one-line concatenated output', async () => {
     const renderSpy = vi
       .spyOn(SimpleMarkdown, 'render')

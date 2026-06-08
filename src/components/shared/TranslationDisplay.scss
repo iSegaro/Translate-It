@@ -231,7 +231,7 @@
     ul, ol {
       list-style-position: outside !important;
       padding-inline-start: 1.25em !important;
-      margin-block: 6px !important;
+      margin-block: 0 3px !important;
       margin-inline: 0 !important;
     }
 
@@ -257,8 +257,27 @@
     h3 { font-size: 15px !important; }
 
     p { 
-      margin-bottom: 8px !important; 
+      margin-bottom: 2px !important; 
       &:last-child { margin-bottom: 0 !important; }
+    }
+
+    .md-label-list-group {
+      margin: 0 0 2px 0 !important;
+    }
+
+    .md-label-list-group > p.md-label-paragraph {
+      margin-bottom: 0 !important;
+    }
+
+    .md-label-list-group > ul.md-label-list,
+    .md-label-list-group > ol.md-label-list {
+      margin: 0 !important;
+      padding-inline-start: 1.15em !important;
+    }
+
+    .md-label-list-group > ul.md-label-list > li,
+    .md-label-list-group > ol.md-label-list > li {
+      margin-block: 0.1em !important;
     }
 
     code {

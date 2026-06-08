@@ -374,6 +374,31 @@ const normalizeRenderedHtml = (html, wrapWithSimpleMarkdown = false) => {
     return '';
   }
 
+  // Wrap dictionary label paragraphs and their following lists so CSS can treat them
+  // as a compact unit without changing provider output or markdown shape.
+  root.querySelectorAll('p').forEach((paragraph) => {
+    const nextElement = paragraph.nextElementSibling;
+    const isLabelParagraph = (
+      paragraph.textContent?.trim().endsWith(':') &&
+      paragraph.querySelector('strong') &&
+      nextElement &&
+      ['UL', 'OL'].includes(nextElement.tagName)
+    );
+
+    if (!isLabelParagraph) {
+      return;
+    }
+
+    const group = document.createElement('div');
+    group.className = 'md-label-list-group';
+    paragraph.classList.add('md-label-paragraph');
+    nextElement.classList.add('md-label-list');
+
+    paragraph.parentNode.insertBefore(group, paragraph);
+    group.appendChild(paragraph);
+    group.appendChild(nextElement);
+  });
+
   root.querySelectorAll('a').forEach((link) => {
     const href = (link.getAttribute('href') || '').trim();
 
