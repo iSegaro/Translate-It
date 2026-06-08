@@ -233,3 +233,28 @@ export function matchesAutoTranslateRule(url, rule) {
     return targetPath === rulePath;
   }
 }
+
+/**
+ * Normalizes a URL for auto-translation rules.
+ * Only supports http:, https:, and file: protocols.
+ * Strips queries/hashes and canonicalizes http/https to https.
+ *
+ * @param {string} urlStr - The URL to normalize
+ * @returns {string} The normalized URL or empty string if unsupported/invalid
+ */
+export function normalizeAutoTranslateRuleUrl(urlStr) {
+  if (!urlStr) return '';
+  try {
+    const url = new URL(urlStr);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'file:') {
+      return '';
+    }
+    if (url.protocol === 'file:') {
+      return `file://${url.pathname}`;
+    }
+    // Normalize http/https to https to prevent duplicate rules representing the same logical page
+    return `https://${url.host}${url.pathname}`;
+  } catch (e) {
+    return '';
+  }
+}

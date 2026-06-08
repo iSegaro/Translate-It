@@ -812,13 +812,13 @@
   "desktop_fab_tts_stop_tooltip": {
     "message": "Stop"
   },
-  "desktop_fab_add_auto_translate_tooltip": {
+  "page_translation_add_auto_translate_tooltip": {
     "message": "Add to auto-translate rules"
   },
-  "desktop_fab_remove_auto_translate_tooltip": {
+  "page_translation_remove_auto_translate_tooltip": {
     "message": "Remove from auto-translate rules"
   },
-  "desktop_fab_auto_translate_inherited_tooltip": {
+  "page_translation_auto_translate_inherited_tooltip": {
     "message": "This page is auto-translated by a broader rule. Change it in settings."
   },
   "mobile_ui_mode_auto": {

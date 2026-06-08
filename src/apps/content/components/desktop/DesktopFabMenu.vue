@@ -292,7 +292,7 @@ import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue
 import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
-import { matchesAutoTranslateRule } from '@/utils/ui/exclusion.js';
+import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js';
 import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
@@ -474,57 +474,15 @@ const supportsBulk = (mode) => {
 const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element));
 const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page));
 
-// Normalize URL helper
-const getNormalizedUrl = (urlStr) => {
-  if (!urlStr) return '';
-  try {
-    const url = new URL(urlStr);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'file:') {
-      return '';
-    }
-    if (url.protocol === 'file:') {
-      return `file://${url.pathname}`;
-    }
-    // Normalize http/https to https to prevent duplicate rules representing the same logical page
-    return `https://${url.host}${url.pathname}`;
-  } catch (e) {
-    return '';
-  }
-};
-
 const currentUrlStr = computed(() => typeof window !== 'undefined' ? window.location.href : '');
-const normalizedPageUrl = computed(() => getNormalizedUrl(currentUrlStr.value));
 
-const hasExactAutoTranslateRule = computed(() => {
-  const url = normalizedPageUrl.value;
-  if (!url) return false;
-  const currentRules = settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || [];
-  return currentRules.includes(url);
-});
-
-const hasNonExactMatchingAutoTranslateRule = computed(() => {
-  const url = currentUrlStr.value;
-  if (!url) return false;
-  if (hasExactAutoTranslateRule.value) return false;
-  const currentRules = settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || [];
-  return currentRules.some(rule => matchesAutoTranslateRule(url, rule));
-});
-
-const toggleAutoTranslateForCurrentPage = async () => {
-  const url = normalizedPageUrl.value;
-  if (!url) return;
-
-  const currentRules = [...(settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || [])];
-  const exactIndex = currentRules.indexOf(url);
-
-  if (exactIndex > -1) {
-    currentRules.splice(exactIndex, 1);
-  } else {
-    currentRules.push(url);
-  }
-
-  await settingsStore.updateSettingAndPersist('WHOLE_PAGE_AUTO_TRANSLATE_RULES', currentRules);
-};
+const {
+  isAutoTranslateToggleVisible,
+  isAutoTranslateToggleActive,
+  isAutoTranslateToggleDisabled,
+  autoTranslateToggleTitle,
+  toggleAutoTranslateForCurrentPage
+} = useAutoTranslateRules({ currentUrl: currentUrlStr });
 
 const menuItems = computed(() => {
   const items = [];
@@ -609,14 +567,10 @@ const menuItems = computed(() => {
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
-  const pageSecondaryAction = normalizedPageUrl.value ? {
-    active: hasExactAutoTranslateRule.value || hasNonExactMatchingAutoTranslateRule.value,
-    disabled: hasNonExactMatchingAutoTranslateRule.value,
-    title: hasExactAutoTranslateRule.value 
-      ? (t('desktop_fab_remove_auto_translate_tooltip') || 'Remove from auto-translate rules') 
-      : hasNonExactMatchingAutoTranslateRule.value
-        ? (t('desktop_fab_auto_translate_inherited_tooltip') || 'This page is auto-translated by a broader rule. Change it in settings.')
-        : (t('desktop_fab_add_auto_translate_tooltip') || 'Add to auto-translate rules'),
+  const pageSecondaryAction = isAutoTranslateToggleVisible.value ? {
+    active: isAutoTranslateToggleActive.value,
+    disabled: isAutoTranslateToggleDisabled.value,
+    title: autoTranslateToggleTitle.value,
     handler: () => toggleAutoTranslateForCurrentPage()
   } : null;
 

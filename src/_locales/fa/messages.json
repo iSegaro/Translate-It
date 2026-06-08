@@ -812,13 +812,13 @@
   "desktop_fab_tts_stop_tooltip": {
     "message": "توقف"
   },
-  "desktop_fab_add_auto_translate_tooltip": {
+  "page_translation_add_auto_translate_tooltip": {
     "message": "افزودن به قوانین ترجمه خودکار"
   },
-  "desktop_fab_remove_auto_translate_tooltip": {
+  "page_translation_remove_auto_translate_tooltip": {
     "message": "حذف از قوانین ترجمه خودکار"
   },
-  "desktop_fab_auto_translate_inherited_tooltip": {
+  "page_translation_auto_translate_inherited_tooltip": {
     "message": "این صفحه بر اساس یک قانون کلی‌تر ترجمه خودکار می‌شود. آن را در تنظیمات تغییر دهید."
   },
   "mobile_ui_mode_auto": {

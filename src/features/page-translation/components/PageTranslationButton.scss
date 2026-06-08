@@ -1,6 +1,7 @@
 @use "@/assets/styles/base/mixins" as *;
 
 .page-translation-controls {
+  position: relative !important;
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
@@ -13,6 +14,7 @@
 
   &.text-only {
     width: auto !important;
+    display: inline-flex !important;
   }
 }
 
@@ -182,5 +184,87 @@
   &:disabled {
     opacity: 0.5 !important;
     background: none !important;
+  }
+}
+
+.page-translate-star-btn {
+  position: absolute !important;
+  bottom: -10px !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: var(--color-text-secondary, #64748b) !important;
+  transition: all 0.2s ease !important;
+  pointer-events: auto !important;
+  margin: 0 !important;
+
+  &:hover {
+    background: none !important;
+    color: #ffb703 !important;
+    transform: scale(1.1) !important;
+  }
+
+  &.is-active {
+    color: #ffb703 !important;
+  }
+
+  &.is-disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+
+    &:hover {
+      background: none !important;
+      color: var(--color-text-secondary, #64748b) !important;
+      transform: none !important;
+    }
+
+    &.is-active {
+      color: #ffb703 !important;
+
+      &:hover {
+        color: #ffb703 !important;
+      }
+    }
+  }
+
+  /* Specific Dark Mode overrides */
+  @at-root :global(.ti-dark-mode) &, 
+           :global(.theme-dark) & {
+    color: rgba(255, 255, 255, 0.45) !important;
+
+    &:hover {
+      background: none !important;
+      color: #ffc300 !important;
+    }
+
+    &.is-active {
+      color: #ffc300 !important;
+    }
+
+    &.is-disabled {
+      opacity: 0.45 !important;
+
+      &:hover {
+        background: none !important;
+        color: rgba(255, 255, 255, 0.45) !important;
+        transform: none !important;
+      }
+
+      &.is-active {
+        color: #ffc300 !important;
+
+        &:hover {
+          color: #ffc300 !important;
+        }
+      }
+    }
   }
 }

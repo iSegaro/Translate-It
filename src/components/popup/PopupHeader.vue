@@ -6,6 +6,7 @@
       text-only
       :target-language="targetLanguage"
       :disabled="!isPageTranslationSupported"
+      :show-auto-translate-toggle="true"
       class="ti-page-translate-btn"
     />
 
