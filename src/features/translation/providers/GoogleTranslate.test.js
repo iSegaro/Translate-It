@@ -8,6 +8,7 @@ import {
   getDictionaryShowDefinitionsAsync,
   getDictionaryShowExamplesAsync
 } from '@/shared/config/config.js';
+import { getTranslationString } from '@/utils/i18n/i18n.js';
 
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -157,26 +158,37 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
       vi.mocked(getDictionaryShowPosAsync).mockResolvedValue(true);
       vi.mocked(getDictionaryShowDefinitionsAsync).mockResolvedValue(true);
       vi.mocked(getDictionaryShowExamplesAsync).mockResolvedValue(true);
+      vi.mocked(getTranslationString).mockResolvedValue('');
     });
 
     it('formats legacy string candidates as the current Markdown contract', async () => {
       const result = await provider._formatDictionaryAsMarkdown(
-        'Noun: test, experiment\nVerb: try, attempt'
+        'Noun*Phrase: test, experiment\nVerb_(rare): try, attempt'
       );
 
-      expect(result).toBe('**Noun**: test, experiment\n**Verb**: try, attempt');
+      expect(result).toBe('**Noun\\*Phrase**: test, experiment\n**Verb\\_\\(rare\\)**: try, attempt');
     });
 
     it('formats dj=1 JSON candidates as the current Markdown contract', async () => {
+      vi.mocked(getTranslationString).mockImplementation(async (key) => {
+        const labels = {
+          dict_pronunciation: 'Pronou[nce](ment)*',
+          dict_definitions: 'Defi[nitions](set)*',
+          dict_examples: 'Exam[ples](list)*'
+        };
+
+        return labels[key] || '';
+      });
+
       const result = await provider._formatDictionaryAsMarkdown({
-        dict: [{ pos: 'Noun', terms: ['test', 'experiment'] }],
-        sentences: [{ src_translit: 'tɛst' }],
-        definitions: [{ pos: 'noun', entry: [{ gloss: 'a test' }] }],
-        examples: { example: [{ text: 'This is a test' }] }
+        dict: [{ pos: 'Noun*Phrase', terms: ['test', 'experiment'] }],
+        sentences: [{ src_translit: 'tɛst*' }],
+        definitions: [{ pos: 'noun', entry: [{ gloss: 'a *test* (example)' }] }],
+        examples: { example: [{ text: 'This *is* a [test]' }] }
       });
 
       expect(result).toBe(
-        '**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
+        '**Noun\\*Phrase**: test, experiment\n\n**Pronou\\[nce\\]\\(ment\\)\\***: /tɛst*/\n\n**Defi\\[nitions\\]\\(set\\)\\***:\n- (noun) a *test* (example)\n\n**Exam\\[ples\\]\\(list\\)\\***:\n- This *is* a [test]'
       );
     });
 
@@ -187,12 +199,22 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
     });
 
     it('matches Google Translate V2 for the same candidate fixture', async () => {
+      vi.mocked(getTranslationString).mockImplementation(async (key) => {
+        const labels = {
+          dict_pronunciation: 'Pronou[nce](ment)*',
+          dict_definitions: 'Defi[nitions](set)*',
+          dict_examples: 'Exam[ples](list)*'
+        };
+
+        return labels[key] || '';
+      });
+
       const v2Provider = new GoogleTranslateV2Provider();
       const candidate = {
-        dict: [{ pos: 'Noun', terms: ['test', 'experiment'] }],
-        sentences: [{ src_translit: 'tɛst' }],
-        definitions: [{ pos: 'noun', entry: [{ gloss: 'a test' }] }],
-        examples: { example: [{ text: 'This is a test' }] }
+        dict: [{ pos: 'Noun*Phrase', terms: ['test', 'experiment'] }],
+        sentences: [{ src_translit: 'tɛst*' }],
+        definitions: [{ pos: 'noun', entry: [{ gloss: 'a *test* (example)' }] }],
+        examples: { example: [{ text: 'This *is* a [test]' }] }
       };
 
       const classicResult = await provider._formatDictionaryAsMarkdown(candidate);
@@ -200,7 +222,7 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
 
       expect(classicResult).toBe(v2Result);
       expect(classicResult).toBe(
-        '**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
+        '**Noun\\*Phrase**: test, experiment\n\n**Pronou\\[nce\\]\\(ment\\)\\***: /tɛst*/\n\n**Defi\\[nitions\\]\\(set\\)\\***:\n- (noun) a *test* (example)\n\n**Exam\\[ples\\]\\(list\\)\\***:\n- This *is* a [test]'
       );
     });
   });
@@ -211,6 +233,7 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
       vi.mocked(getDictionaryShowPosAsync).mockResolvedValue(true);
       vi.mocked(getDictionaryShowDefinitionsAsync).mockResolvedValue(true);
       vi.mocked(getDictionaryShowExamplesAsync).mockResolvedValue(true);
+      vi.mocked(getTranslationString).mockResolvedValue('');
     });
 
     it('returns translation only when dictionary data is absent', async () => {
@@ -240,9 +263,9 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
     it('appends single-segment dictionary output using the current Markdown contract', async () => {
       vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) =>
         opts.extractResponse({
-          sentences: [{ trans: 'translated text', src_translit: 'tɛst' }],
+          sentences: [{ trans: 'translated text', src_translit: 'tɛst*' }],
           src: 'en',
-          dict: [{ pos: 'Noun', terms: ['test', 'experiment'] }],
+          dict: [{ pos: 'Noun*Phrase', terms: ['test', 'experiment'] }],
           definitions: [{ pos: 'noun', entry: [{ gloss: 'a test' }] }],
           examples: { example: [{ text: 'This is a test' }] }
         })
@@ -262,7 +285,7 @@ describe('GoogleTranslateProvider newline chunk isolation', () => {
       );
 
       expect(result).toBe(
-        'translated text\n\n**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
+        'translated text\n\n**Noun\\*Phrase**: test, experiment\n\n**Pronunciation**: /tɛst*/\n\n**Definitions**:\n- (noun) a test\n\n**Examples**:\n- This is a test'
       );
     });
   });
