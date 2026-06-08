@@ -576,7 +576,7 @@
     "message": "原文を表示"
   },
   "stop_auto_translating_label": {
-    "message": "自動翻訳を停止"
+    "message": "翻訳を停止"
   },
   "select_element_label": {
     "message": "要素を選択"
@@ -792,7 +792,7 @@
     "message": "選択範囲を翻訳"
   },
   "desktop_fab_stop_auto_translating_label": {
-    "message": "自動翻訳を停止"
+    "message": "翻訳を停止"
   },
   "desktop_fab_restore_original_label": {
     "message": "原文に戻す"
@@ -808,6 +808,15 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "停止"
+  },
+  "desktop_fab_add_auto_translate_tooltip": {
+    "message": "自動翻訳ルールに追加"
+  },
+  "desktop_fab_remove_auto_translate_tooltip": {
+    "message": "自動翻訳ルールから削除"
+  },
+  "desktop_fab_auto_translate_inherited_tooltip": {
+    "message": "このページは広範囲なルールによって自動翻訳されています。設定で変更してください。"
   },
   "mobile_ui_mode_auto": {
     "message": "システムに従う"
@@ -1231,6 +1240,9 @@
   },
   "whole_page_rules_confirm_reset": {
     "message": "すべてのルールを削除してもよろしいですか？"
+  },
+  "whole_page_rules_btn_delete": {
+    "message": "削除"
   },
   "excluded_sites_label": {
     "message": "除外するサイト（カンマ区切り）"

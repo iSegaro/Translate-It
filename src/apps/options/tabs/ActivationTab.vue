@@ -790,7 +790,7 @@
               <span class="rule-text" dir="ltr">{{ rule }}</span>
               <button 
                 class="delete-rule-btn" 
-                :title="t('delete') || 'Delete'"
+                :title="t('whole_page_rules_btn_delete') || 'Delete'"
                 @click="deleteRule(index)"
               >
                 🗑

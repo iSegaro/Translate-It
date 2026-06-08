@@ -642,7 +642,7 @@
     "message": "مشاهده متن اصلی"
   },
   "stop_auto_translating_label": {
-    "message": "توقف ترجمه خودکار"
+    "message": "توقف ترجمه"
   },
   "select_element_label": {
     "message": "انتخاب المان"
@@ -795,7 +795,7 @@
     "message": "ترجمه متن انتخاب شده"
   },
   "desktop_fab_stop_auto_translating_label": {
-    "message": "توقف ترجمه خودکار"
+    "message": "توقف ترجمه"
   },
   "desktop_fab_restore_original_label": {
     "message": "مشاهده متن اصلی"
@@ -811,6 +811,15 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "توقف"
+  },
+  "desktop_fab_add_auto_translate_tooltip": {
+    "message": "افزودن به قوانین ترجمه خودکار"
+  },
+  "desktop_fab_remove_auto_translate_tooltip": {
+    "message": "حذف از قوانین ترجمه خودکار"
+  },
+  "desktop_fab_auto_translate_inherited_tooltip": {
+    "message": "این صفحه بر اساس یک قانون کلی‌تر ترجمه خودکار می‌شود. آن را در تنظیمات تغییر دهید."
   },
   "mobile_ui_mode_auto": {
     "message": "پیروی از سیستم"
@@ -1231,6 +1240,9 @@
   },
   "whole_page_rules_confirm_reset": {
     "message": "آیا مطمئن هستید که می‌خواهید تمام قوانین را حذف کنید؟"
+  },
+  "whole_page_rules_btn_delete": {
+    "message": "حذف"
   },
   "excluded_sites_label": {
     "message": "نادیده گرفتن در این سایت‌ها (با کاما جدا کنید)"

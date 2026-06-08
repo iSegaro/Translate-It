@@ -642,7 +642,7 @@
     "message": "Restore Original"
   },
   "stop_auto_translating_label": {
-    "message": "Stop Auto Translating"
+    "message": "Stop Translating"
   },
   "select_element_label": {
     "message": "Select Element"
@@ -795,7 +795,7 @@
     "message": "Translate Selection"
   },
   "desktop_fab_stop_auto_translating_label": {
-    "message": "Stop Auto Translating"
+    "message": "Stop Translating"
   },
   "desktop_fab_restore_original_label": {
     "message": "Restore Original"
@@ -811,6 +811,15 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "Stop"
+  },
+  "desktop_fab_add_auto_translate_tooltip": {
+    "message": "Add to auto-translate rules"
+  },
+  "desktop_fab_remove_auto_translate_tooltip": {
+    "message": "Remove from auto-translate rules"
+  },
+  "desktop_fab_auto_translate_inherited_tooltip": {
+    "message": "This page is auto-translated by a broader rule. Change it in settings."
   },
   "mobile_ui_mode_auto": {
     "message": "Follow system (OS)"
@@ -1231,6 +1240,9 @@
   },
   "whole_page_rules_confirm_reset": {
     "message": "Are you sure you want to delete all rules?"
+  },
+  "whole_page_rules_btn_delete": {
+    "message": "Delete"
   },
   "excluded_sites_label": {
     "message": "Exclude these sites (comma separated)"
