@@ -172,7 +172,7 @@ export function matchesAutoTranslateRule(url, rule) {
   let targetUrl;
   try {
     targetUrl = new URL(url);
-  } catch (e) {
+  } catch {
     return false;
   }
 
@@ -201,7 +201,7 @@ export function matchesAutoTranslateRule(url, rule) {
     } else {
       ruleUrl = new URL('https://' + parsedRule);
     }
-  } catch (e) {
+  } catch {
     return false;
   }
 
@@ -254,7 +254,7 @@ export function normalizeAutoTranslateRuleUrl(urlStr) {
     }
     // Normalize http/https to https to prevent duplicate rules representing the same logical page
     return `https://${url.host}${url.pathname}`;
-  } catch (e) {
+  } catch {
     return '';
   }
 }

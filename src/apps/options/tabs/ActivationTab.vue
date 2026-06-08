@@ -743,7 +743,10 @@
           <div class="instruction-header">
             <h4>{{ t('whole_page_rules_instruction_title') || 'Wildcard Rule Patterns' }}</h4>
           </div>
-          <pre class="instruction-content" :class="{ 'rtl-text': isRTL }">{{ rulesInstructionsText }}</pre>
+          <pre
+            class="instruction-content"
+            :class="{ 'rtl-text': isRTL }"
+          >{{ rulesInstructionsText }}</pre>
         </div>
 
         <!-- Add New Rule Section -->
@@ -766,7 +769,10 @@
               {{ t('whole_page_rules_btn_add') || 'Add' }}
             </BaseButton>
           </div>
-          <div v-if="ruleErrorMsg" class="rule-error-message">
+          <div
+            v-if="ruleErrorMsg"
+            class="rule-error-message"
+          >
             {{ ruleErrorMsg }}
           </div>
         </div>
@@ -787,7 +793,10 @@
               :key="rule"
               class="rule-item"
             >
-              <span class="rule-text" dir="ltr">{{ rule }}</span>
+              <span
+                class="rule-text"
+                dir="ltr"
+              >{{ rule }}</span>
               <button 
                 class="delete-rule-btn" 
                 :title="t('whole_page_rules_btn_delete') || 'Delete'"
@@ -931,11 +940,6 @@ const wholePageTokenWarningEnabled = createSetting('WHOLE_PAGE_TOKEN_WARNING_HID
   transformGet: (v) => !v,
   transformSet: (v) => !v
 })
-const wholePageAutoTranslateRules = computed({
-  get: () => settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || [],
-  set: (val) => settingsStore.updateSettingLocally('WHOLE_PAGE_AUTO_TRANSLATE_RULES', val)
-})
-
 // RTL check
 const isRTL = computed(() => {
   try {
