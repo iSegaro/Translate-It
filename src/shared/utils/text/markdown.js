@@ -26,6 +26,49 @@ export class SimpleMarkdown {
   // Matches parenthesized RTL text at the start of a line (e.g., "(اسم)")
   static PARENTHESIZED_RTL_START = new RegExp(`^\\s*\\([${SimpleMarkdown.RTL_REGEX.source.slice(1, -1)}\\s]+\\)`);
 
+  static _isPronunciationGuideCandidate(text) {
+    if (!text || typeof text !== 'string') {
+      return false;
+    }
+
+    const normalized = text.trim();
+    if (!normalized || /\s/.test(normalized)) {
+      return false;
+    }
+
+    const hasNestedBrackets = normalized.includes('[') || normalized.includes(']');
+    // eslint-disable-next-line no-misleading-character-class -- intentionally groups adjacent phonetic ranges
+    const hasPhoneticMarks = /[\u00C0-\u024F\u0300-\u036F\u02B0-\u02FF\u0250-\u02AF]/.test(normalized);
+    const hasLatin = /[A-Za-z]/.test(normalized);
+    const hasPronunciationPunctuation = /[()'’.-]/.test(normalized);
+
+    return hasNestedBrackets || hasPhoneticMarks || (hasLatin && hasPronunciationPunctuation);
+  }
+
+  static stripPronunciationGuides(text) {
+    if (!text || typeof text !== 'string') {
+      return text;
+    }
+
+    return text
+      .split('\n')
+      .map((line) => {
+        const match = line.match(/^(.*?)(\s*\[((?:[^\]\n]|(?:\[[^\]\n]*\]))+)\])\s*$/);
+
+        if (!match) {
+          return line;
+        }
+
+        const guideText = match[3] || '';
+        if (!this._isPronunciationGuideCandidate(guideText)) {
+          return line;
+        }
+
+        return match[1].trimEnd();
+      })
+      .join('\n');
+  }
+
   static render(markdown, preferredDir = "auto", options = { enableLabelFormatting: true }) {
     if (!markdown || typeof markdown !== "string") {
       return "";
@@ -631,20 +674,24 @@ export class SimpleMarkdown {
       return "";
     }
 
-    return text
-      // Strip code blocks (```code```) - do this first to preserve content but remove markers
-      .replace(/```[\s\S]*?```/g, (match) => {
-        return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
-      })
-      // Strip markdown links [text](url) keeping only text
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    const pronunciationStripped = this.stripPronunciationGuides(
+      text
+        // Strip code blocks (```code```) - do this first to preserve content but remove markers
+        .replace(/```[\s\S]*?```/g, (match) => {
+          return match.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+        })
+        // Strip markdown links [text](url) keeping only text
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    );
+
+    return pronunciationStripped
       // Strip pronunciation guides like [go(a)vāhi] or [n(y)o͞oz]
       // Matches brackets that are NOT followed by (url)
-      // Range includes: basic latin, latin extended, combining diacritics, and phonetic extensions
-      // NOTE: We disable no-misleading-character-class because we intentionally include 
-      // combining diacritics (\u0300-\u036F) to strip them from pronunciation guides.
+      // Range includes: basic latin, latin extended, combining diacritics, and phonetic extensions.
+      // We intentionally avoid whitespace here so non-pronunciation bracketed phrases like
+      // "[Chapter 1]" are preserved.
       // eslint-disable-next-line no-misleading-character-class
-      .replace(/\[[a-zA-Z0-9()\s'\u00C0-\u017F\u0300-\u036F\u02B0-\u02FF]+\](?!\()/g, "")
+      .replace(/\[[a-zA-Z0-9()'\u00C0-\u017F\u0300-\u036F\u02B0-\u02FF]+\](?!\()/g, "")
       // Strip headers (# header)
       .replace(/^#+\s?/gm, "")
       // Strip blockquotes (> quote)

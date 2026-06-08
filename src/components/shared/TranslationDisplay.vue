@@ -178,7 +178,7 @@ import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTextDirection } from "@/composables/shared/useTextDirection.js";
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 import { TranslationMode } from "@/shared/config/config.js";
-import DOMPurify from "dompurify";
+import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
 import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
 import { useFont } from "@/composables/shared/useFont.js";
@@ -472,7 +472,7 @@ try {
 
 // Sanitized content computed property
 const sanitizedContent = computed(() => {
-  return DOMPurify.sanitize(renderedContent.value);
+  return renderedContent.value;
 });
 
 const renderedContent = computed(() => {
@@ -480,24 +480,11 @@ const renderedContent = computed(() => {
     return '';
   }
 
-  if (props.enableMarkdown) {
-    try {
-      const markdownElement = SimpleMarkdown.render(props.content, textDirection.value.dir, {
-        enableLabelFormatting: isDictionary.value
-      });
-      if (markdownElement) {
-        // Return the outerHTML of the element instead of constructing a string with innerHTML
-        // This is safer for the linter as it's a direct property of the rendered element
-        return markdownElement.outerHTML;
-      }
-      return props.content.replace(/\n/g, "<br>");
-    } catch (error) {
-      logger.warn("[TranslationDisplay] Markdown rendering failed:", error);
-      return props.content.replace(/\n/g, "<br>");
-    }
-  } else {
-    return props.content.replace(/\n/g, "<br>");
-  }
+  return renderMarkdownPreview(props.content, {
+    fallbackDir: textDirection.value.dir,
+    isDictionary: isDictionary.value,
+    enableMarkdown: props.enableMarkdown,
+  });
 });
 
 // Watchers

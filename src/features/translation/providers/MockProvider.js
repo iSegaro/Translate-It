@@ -21,6 +21,62 @@ export class MockProvider extends BaseAIProvider {
   static displayName = "Development Mock";
   static reliableJsonMode = true;
 
+  /**
+   * Returns a deterministic dictionary-style mock sample for known prompts.
+   * This keeps pronunciation-line regressions easy to reproduce in the UI and tests.
+   *
+   * @param {string} promptText
+   * @returns {string|null}
+   */
+  static getDictionaryMockSample(promptText) {
+    if (typeof promptText !== "string") {
+      return null;
+    }
+
+    const normalizedLines = promptText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (normalizedLines.some((line) => line === "Expression")) {
+      return [
+        "Expression",
+        "",
+        "**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`",
+        "",
+        "- **Noun**: Expression, phrase, wording",
+        "- **Synonyms**: Phrase, wording, statement",
+      ].join("\n");
+    }
+
+    if (normalizedLines.some((line) => line === "表达方式")) {
+      return [
+        "表达方式",
+        "",
+        "**UK** : `/ɪkˈspreʃnz/`    **US** : `/ɪkˈspreʃnz/`",
+        "",
+        "- **名词**: 表达方式, 词语, 表情, 算式",
+        "- **同义词**: 词汇, 措辞, 呈现",
+      ].join("\n");
+    }
+
+    return null;
+  }
+
+  /**
+   * Builds the effective prompt text seen by the mock response path.
+   *
+   * @param {string} systemPrompt
+   * @param {string} userText
+   * @returns {string}
+   */
+  static getEffectivePromptText(systemPrompt, userText) {
+    return [systemPrompt, userText]
+      .map((part) => (typeof part === "string" ? part : ""))
+      .filter(Boolean)
+      .join("\n");
+  }
+
   constructor() {
     super(ProviderNames.MOCK);
   }
@@ -86,6 +142,18 @@ export class MockProvider extends BaseAIProvider {
       }
 
       // 4. Fallback for plain text or failed parsing
+      if (!result) {
+        const dictionarySample = expectedFormat === ResponseFormat.STRING
+          ? this.constructor.getDictionaryMockSample(
+              this.constructor.getEffectivePromptText(systemPrompt, userText),
+            )
+          : null;
+
+        if (dictionarySample) {
+          result = dictionarySample;
+        }
+      }
+
       if (!result) {
         const textToTranslate = typeof userText === 'string' ? userText : JSON.stringify(userText);
         const translatedText = `[MOCK] ${textToTranslate}`;

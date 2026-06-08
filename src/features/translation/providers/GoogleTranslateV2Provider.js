@@ -14,12 +14,8 @@ import { getBrowserInfoSync } from "@/utils/browser/compatibility.js";
 import {
   TranslationMode,
   getGoogleTranslateV2UrlAsync,
-  getDictionaryShowPronunciationAsync,
-  getDictionaryShowPosAsync,
-  getDictionaryShowDefinitionsAsync,
-  getDictionaryShowExamplesAsync
 } from "@/shared/config/config.js";
-import { getTranslationString } from "@/utils/i18n/i18n.js";
+import { formatGoogleDictionaryMarkdown } from "./utils/GoogleDictionaryMarkdownFormatter.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleTranslateV2');
 
@@ -279,94 +275,6 @@ export class GoogleTranslateV2Provider extends BaseTranslateProvider {
   }
 
   async _formatDictionaryAsMarkdown(candidateData) {
-    if (!candidateData) return "";
-
-    // Load user display preferences
-    const [showPronunciation, showPos, showDefinitions, showExamples] = await Promise.all([
-      getDictionaryShowPronunciationAsync(),
-      getDictionaryShowPosAsync(),
-      getDictionaryShowDefinitionsAsync(),
-      getDictionaryShowExamplesAsync()
-    ]);
-
-    // Load translated labels
-    const labelPronunciation = await getTranslationString('dict_pronunciation') || 'Pronunciation';
-    const labelDefinitions = await getTranslationString('dict_definitions') || 'Definitions';
-    const labelExamples = await getTranslationString('dict_examples') || 'Examples';
-
-    // Support legacy string format (from array response)
-    if (typeof candidateData === "string") {
-      const lines = candidateData.trim().split("\n").filter((line) => line.trim() !== "");
-      if (lines.length === 0) return "";
-
-      let markdownOutput = "";
-      lines.forEach((line) => {
-        const colonIndex = line.indexOf(":");
-        if (colonIndex > 0) {
-          const partOfSpeech = line.substring(0, colonIndex).trim();
-          const terms = line.substring(colonIndex + 1).trim();
-          
-          // Check if POS should be shown
-          if (showPos && partOfSpeech && terms) {
-            markdownOutput += `${partOfSpeech}: ${terms}\n`;
-          }
-        } else if (line.trim()) {
-          markdownOutput += `${line.trim()}\n`;
-        }
-      });
-      return markdownOutput.trim();
-    }
-
-    // Support new JSON format (dj=1)
-    const data = candidateData;
-    let markdownOutput = "";
-
-    // 1. Dictionary Meanings (Parts of Speech & Synonyms)
-    if (showPos && data.dict && Array.isArray(data.dict)) {
-      data.dict.forEach((d) => {
-        const pos = d.pos || "";
-        const terms = d.terms || [];
-        if (pos && terms.length > 0) {
-          markdownOutput += `${pos}: ${terms.join(", ")}\n`;
-        }
-      });
-    }
-
-    // 2. Pronunciation (Moved to before Definitions)
-    if (showPronunciation) {
-      const pronunciation = data.sentences?.find(s => s.src_translit)?.src_translit;
-      if (pronunciation) {
-        markdownOutput += `${labelPronunciation}: /${pronunciation}/\n`;
-      }
-    }
-
-    // 3. Definitions
-    if (showDefinitions && data.definitions && Array.isArray(data.definitions)) {
-      if (markdownOutput) markdownOutput += "\n";
-      markdownOutput += `${labelDefinitions}:\n`;
-      data.definitions.forEach((d) => {
-        const pos = d.pos || "";
-        const entries = d.entry || [];
-        entries.forEach((entry) => {
-          if (entry.gloss) {
-            markdownOutput += `- ${pos ? `(${pos}) ` : ""}${entry.gloss}\n`;
-          }
-        });
-      });
-    }
-
-    // 4. Examples (with HTML stripping for safety)
-    if (showExamples && data.examples?.example && Array.isArray(data.examples.example)) {
-      if (markdownOutput) markdownOutput += "\n";
-      markdownOutput += `${labelExamples}:\n`;
-      data.examples.example.slice(0, 5).forEach((ex) => {
-        if (ex.text) {
-          const cleanText = ex.text.replace(/<[^>]*>?/gm, "");
-          markdownOutput += `- ${cleanText}\n`;
-        }
-      });
-    }
-
-    return markdownOutput.trim();
+    return formatGoogleDictionaryMarkdown(candidateData);
   }
 }

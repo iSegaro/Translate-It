@@ -82,6 +82,11 @@ describe('SimpleMarkdown', () => {
         expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.PRIMARY_ONLY)).toBe('اخبار');
         expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.FULL_TEXT)).toBe('اخباراسم: اخبار, خبر');
       });
+
+      it('should treat legacy one-line traditional provider output as primary translation only', () => {
+        const input = 'translation **Noun**: hello, hi';
+        expect(SimpleMarkdown.getCleanTranslation(input)).toBe('translation');
+      });
     });
 
     describe('Traditional Provider Format', () => {
@@ -398,6 +403,7 @@ describe('SimpleMarkdown', () => {
       expect(SimpleMarkdown.strip('news [n(y)o͞oz]')).toBe('news');
       expect(SimpleMarkdown.strip('متعدد [mote(a)\'added]')).toBe('متعدد');
       expect(SimpleMarkdown.strip('word [phonetic] and more')).toBe('word  and more');
+      expect(SimpleMarkdown.strip("آزمایش ['āz[e]māyeš]")).toBe('آزمایش');
     });
 
     it('should handle mixed markdown', () => {
@@ -617,6 +623,42 @@ describe('SimpleMarkdown', () => {
     it('should render label lines correctly', () => {
       const result = SimpleMarkdown.render('**Noun**: test, experiment');
       expect(result).toBeTruthy();
+    });
+
+    it('should render plain label lines correctly', () => {
+      const result = SimpleMarkdown.render('Noun: test, experiment');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toContain('Noun');
+      expect(result.textContent).toContain('test, experiment');
+    });
+
+    it('should render header-style labels correctly', () => {
+      const result = SimpleMarkdown.render('Definitions:\n- test');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toContain('Definitions');
+      expect(result.textContent).toContain('Definitions: test');
+    });
+
+    it('should split multi-label same-line input', () => {
+      const result = SimpleMarkdown.render('**UK**: hello **US**: hi');
+      expect(result).toBeTruthy();
+
+      const strongTexts = Array.from(result.querySelectorAll('strong')).map((node) => node.textContent);
+      expect(strongTexts).toEqual(expect.arrayContaining(['UK', 'US']));
+      expect(result.textContent).toContain('UK: hello');
+      expect(result.textContent).toContain('US: hi');
+    });
+
+    it('should preserve legacy one-line traditional provider triage behavior', () => {
+      const result = SimpleMarkdown.render('translation **Noun**: hello, hi');
+      expect(result).toBeTruthy();
+
+      expect(result.querySelectorAll('strong').length).toBe(0);
+      expect(result.textContent).toBe('translation');
     });
 
     it('should not treat bold text without a colon as a dictionary label', () => {
@@ -857,11 +899,45 @@ describe('SimpleMarkdown', () => {
       expect(result).toBe('کتاب');
     });
 
+    it('should preserve mixed-direction dictionary direction behavior', () => {
+      const rendered = SimpleMarkdown.render('Noun: آزمایش');
+      const paragraph = rendered.querySelector('p');
+      expect(paragraph).toBeTruthy();
+      expect(paragraph.getAttribute('dir')).toBe('rtl');
+      expect(rendered.textContent).toContain('Noun');
+      expect(rendered.textContent).toContain('آزمایش');
+    });
+
+    it('should strip pronunciation bracket guides from clean text', () => {
+      const text = 'گواهی [go(a)vāhi]';
+      expect(SimpleMarkdown.strip(text)).toBe('گواهی');
+    });
+
+    it('should strip Vajehyab nested-bracket pronunciation guides from clean text', () => {
+      const text = "آزمایش ['āz[e]māyeš]";
+      expect(SimpleMarkdown.strip(text)).toBe('آزمایش');
+    });
+
     it('should handle empty lines in input', () => {
       const text = '\n\n\nHello\n\n\nWorld\n\n\n';
       const result = SimpleMarkdown.getCleanTranslation(text);
       // Current implementation returns first non-empty line
       expect(result).toContain('Hello');
+    });
+
+    it('should keep old history-shaped dictionary strings clean for primary extraction', () => {
+      const input = 'translation\n\n**Noun**: test, experiment\n\n**Pronunciation**: /tɛst/\n\n**Definitions**:\n- (noun) a test';
+      expect(SimpleMarkdown.getCleanTranslation(input)).toBe('translation');
+    });
+
+    it('should remove Vajehyab nested-bracket pronunciation guides when extracting primary text', () => {
+      const input = "### آزمایش ['āz[e]māyeš]\n*اسم*\n\n---\n\n**معنی**:\nدرود";
+      expect(SimpleMarkdown.getCleanTranslation(input, ExtractionStrategy.PRIMARY_ONLY)).toBe('آزمایش');
+    });
+
+    it('should preserve meaningful bracketed content that is not a pronunciation guide', () => {
+      const input = 'Refer to [Chapter 1] for details';
+      expect(SimpleMarkdown.strip(input)).toBe('Refer to [Chapter 1] for details');
     });
 
     it('should handle malformed markdown', () => {
