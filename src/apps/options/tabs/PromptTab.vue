@@ -4,7 +4,10 @@
       <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
       
       <div class="setting-group prompt-template-group vertical">
-        <div class="prompt-selector-container">
+        <div
+          id="PROMPT_SELECTOR_SECTION"
+          class="prompt-selector-container"
+        >
           <label
             for="prompt-type-select"
             class="setting-label"
@@ -117,6 +120,7 @@
         <!-- Preview Prompts Section -->
         <div
           v-if="currentPromptMetadata.previewSupport"
+          id="PROMPT_PREVIEW_SECTION"
           class="prompt-preview-section"
         >
           <button

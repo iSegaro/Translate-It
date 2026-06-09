@@ -95,7 +95,7 @@ To make an element or a section "highlightable," follow these steps:
 
 #### 1. Assign a Unique ID
 Add a unique `id` attribute to the target Vue component or HTML element. 
-**Convention**: For individual settings, use the setting key name (e.g., `id="SHOW_DESKTOP_FAB"`). For sections, use a descriptive suffix (e.g., `id="PROXY_SECTION"`, `id="TTS_VOICES_TUNING_SECTION"`).
+**Convention**: For individual settings, use the setting key name (e.g., `id="SHOW_DESKTOP_FAB"`). For sections, use a descriptive suffix (e.g., `id="PROXY_SECTION"`, `id="TTS_VOICES_TUNING_SECTION"`, `id="PROMPT_SELECTOR_SECTION"`, `id="PROMPT_PREVIEW_SECTION"`).
 
 ```html
 <BaseCheckbox
