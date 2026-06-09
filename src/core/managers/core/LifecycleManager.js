@@ -213,7 +213,23 @@ class LifecycleManager {
 
       // Subtitle translation handlers
       [MessageActions.SUBTITLE_TRANSLATE]: Handlers.handleSubtitleTranslation,
-      [MessageActions.SUBTITLE_TRANSLATE_CANCEL]: Handlers.handleSubtitleTranslation
+      [MessageActions.SUBTITLE_TRANSLATE_CANCEL]: Handlers.handleSubtitleTranslation,
+
+      // Live Caption forwarder from popup to tab
+      [MessageActions.LIVE_CAPTION_START_REQUEST]: async (message, sender) => {
+        logger.debug("Forwarding LIVE_CAPTION_START_REQUEST to content script", message);
+        const targetTabId = message.data?.tabId || sender?.tab?.id;
+        if (targetTabId) {
+          try {
+            const response = await browser.tabs.sendMessage(targetTabId, message);
+            return response;
+          } catch (err) {
+            logger.error("Failed to forward LIVE_CAPTION_START_REQUEST:", err);
+            return { success: false, error: err.message };
+          }
+        }
+        return { success: false, error: "no_active_tab" };
+      }
     };
     
     // Add browser-specific handlers

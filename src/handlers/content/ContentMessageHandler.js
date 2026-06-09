@@ -214,6 +214,13 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.PAGE_RESTORE, this.handlePageRestore.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_STOP_AUTO, this.handlePageStopAuto.bind(this));
+
+    // Live Caption start request from popup
+    this.registerHandler(MessageActions.LIVE_CAPTION_START_REQUEST, async () => {
+      this.logger.debug('Live Caption start request handler invoked from message');
+      pageEventBus.emit('live-caption-start-request-popup');
+      return { success: true };
+    });
   }
 
   registerHandler(action, handler) {

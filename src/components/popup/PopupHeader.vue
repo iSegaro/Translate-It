@@ -59,6 +59,17 @@
       @click="handleScreenCapture"
     />
 
+    <!-- 6b. Live Caption -->
+    <IconButton
+      v-if="isLiveCaptionEnabled"
+      icon="live-caption.svg"
+      :alt="t('live_caption_fab_label') || 'کپشن زنده'"
+      :title="t('live_caption_fab_label') || 'کپشن زنده'"
+      type="toolbar"
+      class="ti-btn-live-caption"
+      @click="handleLiveCaption"
+    />
+
     <!-- 7. Select Element -->
     <IconButton
       v-if="isSelectElementEnabled"
@@ -200,11 +211,32 @@ const isScreenCaptureEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.ENABLE_SCREEN_CAPTURE ?? true)
 })
 
+const isLiveCaptionEnabled = computed(() => {
+  // Check if browser/platform is desktop (since tabCapture is only supported on desktop)
+  return isExtensionEnabledGlobal.value && !IsMobile.value && (settingsStore.settings?.LIVE_CAPTION_ENABLED ?? true);
+})
+
 const isWholePageEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.WHOLE_PAGE_TRANSLATION_ENABLED ?? true)
 })
 
 // Methods
+const handleLiveCaption = async () => {
+  logger.debug('Live Caption button clicked in Popup!');
+  try {
+    const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (activeTab?.id) {
+      await sendMessage({
+        action: MessageActions.LIVE_CAPTION_START_REQUEST,
+        data: { tabId: activeTab.id }
+      })
+      window.close()
+    }
+  } catch (error) {
+    await handleError(error, 'PopupHeader-liveCaption')
+  }
+}
+
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
 

@@ -915,13 +915,27 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         activeVideoFingerprint: this.currentVideoFingerprint
       });
 
-      await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_START, {
+      const response = await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_START, {
         tabId,
         sessionId: this.pageSession.sessionId,
         videoFingerprint: this.currentVideoFingerprint,
         reason: 'start',
         consentAccepted: Boolean(this.store?.consentAccepted)
       });
+
+      if (!response || !response.ok) {
+        const errState = createLiveCaptionErrorState(
+          response?.error || response?.message || 'Live-caption runtime start failed in background',
+          LIVE_CAPTION_CLEANUP_REASONS.ERROR
+        );
+        this.lastError = errState;
+        this.store?.setError?.(errState);
+        this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.ERROR, {
+          reason: 'background_start_failed'
+        });
+        logger.warn('Live-caption background runtime start failed', { response });
+        return this.getSnapshot();
+      }
 
       logger.info('Live-caption runtime started', {
         tabId,

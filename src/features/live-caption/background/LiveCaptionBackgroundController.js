@@ -301,6 +301,22 @@ export class LiveCaptionBackgroundController {
         return { success: true, tabId };
       }
     );
+    messageHandler.registerHandler(
+      'LIVE_CAPTION_OPEN_POPUP',
+      async () => {
+        const browserApi = this.offscreenBridge.browserApi;
+        if (browserApi?.action?.openPopup) {
+          try {
+            await browserApi.action.openPopup();
+            return { success: true };
+          } catch (err) {
+            logger.warn("chrome.action.openPopup failed:", err);
+            return { success: false, error: err.message };
+          }
+        }
+        return { success: false, error: "openPopup_unsupported" };
+      }
+    );
 
     logger.info("Live-caption runtime handlers registered", {
       actions: [
@@ -460,6 +476,8 @@ export class LiveCaptionBackgroundController {
         });
       } catch (captureError) {
         logger.error("Failed to capture media stream ID:", captureError);
+        const errMsg = captureError?.message || String(captureError);
+        const isActiveTabError = errMsg.includes("activeTab") || errMsg.includes("Extension has not been invoked");
         return this._buildFailClosedResponse(
           LIVE_CAPTION_RUNTIME_ACTIONS.START,
           captureError,
@@ -467,8 +485,11 @@ export class LiveCaptionBackgroundController {
             tabId,
             sessionId: data.sessionId ?? null,
             videoFingerprint: data.videoFingerprint ?? null,
-            code: "tab_capture_failed",
-            reason: "tab_capture_failure",
+            code: isActiveTabError ? "active_tab_permission_required" : "tab_capture_failed",
+            reason: isActiveTabError ? "active_tab_permission_required" : "tab_capture_failure",
+            message: isActiveTabError 
+              ? "To start Live Caption, please click the extension icon in the toolbar and start it from there to grant tab access." 
+              : errMsg
           },
         );
       }

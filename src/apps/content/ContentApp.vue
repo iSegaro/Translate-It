@@ -342,14 +342,36 @@ const handleLiveCaptionCancelConsent = async () => {
 };
 
 // Handle Live Caption start request from FAB
-const handleLiveCaptionStartRequestFromFAB = () => {
+const handleLiveCaptionStartRequestFromFAB = async () => {
   logger.debug('Live Caption start request received from FAB');
-  // Check if consent is already accepted
+  
+  // Directly redirect to Popup since content script clicks cannot grant tab capture permission
+  const toastEvent = window.pageEventBus;
+  if (toastEvent) {
+    toastEvent.emit('show_toast', {
+      message: 'To start Live Caption, please click the extension icon in the toolbar and start it from the popup.',
+      type: 'info',
+      duration: 7000
+    });
+  }
+
+  // Attempt to programmatically open the extension popup via background action if supported
+  try {
+    const browserRuntime = typeof browser !== 'undefined' ? browser.runtime : typeof chrome !== 'undefined' ? chrome.runtime : null;
+    if (browserRuntime?.sendMessage) {
+      await browserRuntime.sendMessage({ action: 'LIVE_CAPTION_OPEN_POPUP' });
+    }
+  } catch (err) {
+    logger.debug('Failed to open popup via background action:', err);
+  }
+};
+
+// Handle Live Caption start request from Popup
+const handleLiveCaptionStartRequestFromPopup = () => {
+  logger.debug('Live Caption start request received from Popup (activeTab granted)');
   if (liveCaptionStore.consentAccepted) {
-    // Consent already given, start directly
     handleLiveCaptionStart();
   } else {
-    // Show consent notice first
     liveCaptionStore.setConsentNoticeVisible(true);
     liveCaptionStore.setEnabled(true);
   }
@@ -359,6 +381,11 @@ const handleLiveCaptionStartRequestFromFAB = () => {
 tracker.trackResource(
   'live-caption-start-request',
   pageEventBus.on('live-caption-start-request', handleLiveCaptionStartRequestFromFAB)
+);
+
+tracker.trackResource(
+  'live-caption-start-request-popup',
+  pageEventBus.on('live-caption-start-request-popup', handleLiveCaptionStartRequestFromPopup)
 );
 
 // 8. Lifecycle & Cleanup Logic
