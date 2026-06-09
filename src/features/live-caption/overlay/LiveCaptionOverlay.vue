@@ -15,6 +15,10 @@
       <LiveCaptionConsentNotice
         v-if="showConsentPanel"
         :visible="showConsentPanel"
+        :notice="privacyNotice"
+        :is-incognito="isIncognito"
+        :browser-name="browserName"
+        :platform="platform"
         @accept="$emit('accept-consent')"
         @cancel="$emit('cancel-consent')"
       />
@@ -75,6 +79,22 @@ const props = defineProps({
   showConsentNotice: {
     type: Boolean,
     default: false
+  },
+  privacyNotice: {
+    type: Object,
+    default: null
+  },
+  isIncognito: {
+    type: Boolean,
+    default: false
+  },
+  browserName: {
+    type: String,
+    default: 'unknown'
+  },
+  platform: {
+    type: String,
+    default: 'desktop'
   },
   lastError: {
     type: Object,

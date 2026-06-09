@@ -96,6 +96,7 @@
         :caption-lines="liveCaptionStore.captionLines"
         :consent-accepted="liveCaptionStore.consentAccepted"
         :show-consent-notice="liveCaptionStore.consentNoticeVisible || !liveCaptionStore.consentAccepted"
+        :privacy-notice="liveCaptionStore.privacyNotice"
         :last-error="liveCaptionStore.lastError"
         :controls-state="liveCaptionStore.controlsState"
       />

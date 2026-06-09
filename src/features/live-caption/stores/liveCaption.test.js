@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import useLiveCaptionStore from './liveCaption.js';
 import { LIVE_CAPTION_SESSION_STATES } from '../constants/liveCaptionSessionStates.js';
+import { LIVE_CAPTION_CONSENT_STATES } from '../core/LiveCaptionConsentPolicy.js';
 
 describe('live-caption store shell', () => {
   beforeEach(() => {
@@ -14,8 +15,13 @@ describe('live-caption store shell', () => {
     expect(store.status).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
     expect(store.isEnabled).toBe(false);
     expect(store.overlayVisible).toBe(false);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.consentAccepted).toBe(false);
     expect(store.consentNoticeVisible).toBe(false);
+    expect(store.privacyNotice).toMatchObject({
+      title: expect.stringContaining('Live Caption'),
+      message: expect.stringContaining('tab audio')
+    });
     expect(store.sessionId).toBe(null);
     expect(store.isEnabled).toBe(false);
     expect(store.captionLines).toEqual([]);
@@ -32,6 +38,12 @@ describe('live-caption store shell', () => {
     store.setStatus(LIVE_CAPTION_SESSION_STATES.ACTIVE);
     store.setOverlayVisible(true);
     store.acceptConsent();
+    store.setPrivacyNotice({
+      title: 'Notice',
+      message: 'Custom notice',
+      details: []
+    });
+    store.setStartupDeniedReason('unsupported_browser', { browserName: 'firefox' });
     store.setContext({ tabId: 1, videoFingerprint: 'video-1', nextSessionId: 'session-1' });
     store.setLastError(new Error('boom'));
     store.setCaptions([{ sessionId: 'session-1', originalText: 'Hi', translatedText: 'سلام' }]);
@@ -41,8 +53,11 @@ describe('live-caption store shell', () => {
 
     expect(store.status).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
     expect(store.overlayVisible).toBe(false);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.consentAccepted).toBe(false);
     expect(store.consentNoticeVisible).toBe(false);
+    expect(store.startupDeniedReason).toBe(null);
+    expect(store.startupDeniedDetails).toBe(null);
     expect(store.sessionId).toBe(null);
     expect(store.activeTabId).toBe(null);
     expect(store.activeVideoFingerprint).toBe(null);
@@ -87,20 +102,41 @@ describe('live-caption store shell', () => {
 
     store.setConsentNoticeVisible(true);
     expect(store.consentNoticeVisible).toBe(true);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.PENDING);
 
     store.acceptConsent();
     expect(store.consentAccepted).toBe(true);
     expect(store.consentNoticeVisible).toBe(false);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.ACCEPTED);
+
+    store.cancelConsent();
+    expect(store.consentAccepted).toBe(false);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.CANCELED);
 
     store.revokeConsent();
     expect(store.consentAccepted).toBe(false);
     expect(store.consentNoticeVisible).toBe(true);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.REVOKED);
 
     store.resetOverlayState();
     expect(store.overlayVisible).toBe(false);
     expect(store.consentAccepted).toBe(false);
     expect(store.consentNoticeVisible).toBe(false);
+    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.captionLines).toEqual([]);
     expect(store.lastError).toBe(null);
+  });
+
+  it('tracks startup denial reasons without runtime behavior', () => {
+    const store = useLiveCaptionStore();
+
+    store.setStartupDeniedReason('unsupported_browser', { browserName: 'firefox' });
+
+    expect(store.startupDeniedReason).toBe('unsupported_browser');
+    expect(store.startupDeniedDetails).toEqual({ browserName: 'firefox' });
+
+    store.clearStartupDeniedReason();
+    expect(store.startupDeniedReason).toBe(null);
+    expect(store.startupDeniedDetails).toBe(null);
   });
 });

@@ -11,25 +11,37 @@
         id="live-caption-consent-title"
         class="live-caption-consent-notice__title"
       >
-        {{ title }}
+        {{ resolvedTitle }}
       </h2>
       <p class="live-caption-consent-notice__message">
-        {{ message }}
+        {{ resolvedNotice.message }}
       </p>
+      <ul
+        v-if="resolvedNotice.details?.length"
+        class="live-caption-consent-notice__details"
+      >
+        <li
+          v-for="detail in resolvedNotice.details"
+          :key="detail"
+          class="live-caption-consent-notice__detail"
+        >
+          {{ detail }}
+        </li>
+      </ul>
       <div class="live-caption-consent-notice__actions">
         <button
           type="button"
           class="live-caption-consent-notice__button live-caption-consent-notice__button--primary"
           @click="$emit('accept')"
         >
-          {{ acceptLabel }}
+          {{ resolvedAcceptLabel }}
         </button>
         <button
           type="button"
           class="live-caption-consent-notice__button"
           @click="$emit('cancel')"
         >
-          {{ cancelLabel }}
+          {{ resolvedCancelLabel }}
         </button>
       </div>
     </div>
@@ -37,28 +49,49 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue';
+import { createLiveCaptionPrivacyNotice } from '../core/LiveCaptionConsentPolicy.js';
+
+const props = defineProps({
   visible: {
     type: Boolean,
     default: true
   },
-  title: {
-    type: String,
-    default: 'Live Caption'
+  notice: {
+    type: Object,
+    default: null
   },
-  message: {
+  isIncognito: {
+    type: Boolean,
+    default: false
+  },
+  browserName: {
     type: String,
-    default: 'Captions require capturing tab audio. Confirm before continuing.'
+    default: 'unknown'
+  },
+  platform: {
+    type: String,
+    default: 'desktop'
   },
   acceptLabel: {
     type: String,
-    default: 'Allow'
+    default: null
   },
   cancelLabel: {
     type: String,
-    default: 'Cancel'
+    default: null
   }
 });
+
+const resolvedNotice = computed(() => props.notice || createLiveCaptionPrivacyNotice({
+  isIncognito: props.isIncognito,
+  browserName: props.browserName,
+  platform: props.platform
+}));
+
+const resolvedTitle = computed(() => resolvedNotice.value.title || 'Live Caption consent');
+const resolvedAcceptLabel = computed(() => props.acceptLabel || resolvedNotice.value.acceptLabel || 'Allow');
+const resolvedCancelLabel = computed(() => props.cancelLabel || resolvedNotice.value.cancelLabel || 'Cancel');
 
 defineEmits(['accept', 'cancel']);
 </script>
@@ -95,6 +128,18 @@ defineEmits(['accept', 'cancel']);
   font-size: 13px;
   line-height: 1.5;
   opacity: 0.92;
+}
+
+.live-caption-consent-notice__details {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.86;
+}
+
+.live-caption-consent-notice__detail + .live-caption-consent-notice__detail {
+  margin-top: 6px;
 }
 
 .live-caption-consent-notice__actions {

@@ -8,6 +8,17 @@ import {
   LIVE_CAPTION_CLEANUP_REASONS,
   createLiveCaptionSessionSnapshot,
   createVideoCaptionSessionSnapshot,
+  LIVE_CAPTION_CONSENT_STATES,
+  LIVE_CAPTION_CONSENT_DECISION_REASONS,
+  LIVE_CAPTION_PLATFORM_SUPPORT_REASONS,
+  LIVE_CAPTION_CONSENT_ACTION_RESULTS,
+  LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS,
+  createLiveCaptionPlatformSupportResult,
+  createLiveCaptionPrivacyNotice,
+  createLiveCaptionConsentActionResult,
+  createLiveCaptionRecoveryFailureResult,
+  evaluateLiveCaptionStartEligibility,
+  normalizeLiveCaptionConsentState,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager,
@@ -88,6 +99,17 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.cleanupReasons).toBe(LIVE_CAPTION_CLEANUP_REASONS);
     expect(LiveCaptionFeature.contracts.createLiveCaptionSessionSnapshot).toBe(createLiveCaptionSessionSnapshot);
     expect(LiveCaptionFeature.contracts.createVideoCaptionSessionSnapshot).toBe(createVideoCaptionSessionSnapshot);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CONSENT_STATES).toBe(LIVE_CAPTION_CONSENT_STATES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CONSENT_DECISION_REASONS).toBe(LIVE_CAPTION_CONSENT_DECISION_REASONS);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_PLATFORM_SUPPORT_REASONS).toBe(LIVE_CAPTION_PLATFORM_SUPPORT_REASONS);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CONSENT_ACTION_RESULTS).toBe(LIVE_CAPTION_CONSENT_ACTION_RESULTS);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS).toBe(LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionPlatformSupportResult).toBe(createLiveCaptionPlatformSupportResult);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionPrivacyNotice).toBe(createLiveCaptionPrivacyNotice);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionConsentActionResult).toBe(createLiveCaptionConsentActionResult);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRecoveryFailureResult).toBe(createLiveCaptionRecoveryFailureResult);
+    expect(LiveCaptionFeature.contracts.evaluateLiveCaptionStartEligibility).toBe(evaluateLiveCaptionStartEligibility);
+    expect(LiveCaptionFeature.contracts.normalizeLiveCaptionConsentState).toBe(normalizeLiveCaptionConsentState);
     expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
     expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
     expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);

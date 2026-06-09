@@ -66,10 +66,10 @@
 
 ## 10. Consent and Privacy Flow
 
-- [ ] 10.1 Define the privacy notice content and acceptance gate before capture
-- [ ] 10.2 Define explicit user activation requirements for session start
-- [ ] 10.3 Define incognito session-only behavior and storage restrictions
-- [ ] 10.4 Define fail-closed recovery behavior when the session cannot be reconciled after wakeup
+- [x] 10.1 Define the privacy notice content and acceptance gate before capture
+- [x] 10.2 Define explicit user activation requirements for session start
+- [x] 10.3 Define incognito session-only behavior and storage restrictions
+- [x] 10.4 Define fail-closed recovery behavior when the session cannot be reconciled after wakeup
 
 ## 11. Cleanup and Error Handling
 
