@@ -87,6 +87,18 @@
 
       <!-- Mouse on Hover Translation Tooltip -->
       <MouseHoverTooltip />
+
+      <!-- Live Caption Overlay -->
+      <LiveCaptionOverlay
+        v-if="liveCaptionStore.overlayVisible"
+        :visible="liveCaptionStore.overlayVisible"
+        :status="liveCaptionStore.status"
+        :caption-lines="liveCaptionStore.captionLines"
+        :consent-accepted="liveCaptionStore.consentAccepted"
+        :show-consent-notice="liveCaptionStore.consentNoticeVisible || !liveCaptionStore.consentAccepted"
+        :last-error="liveCaptionStore.lastError"
+        :controls-state="liveCaptionStore.controlsState"
+      />
     </template>
 
     <!-- 
@@ -135,6 +147,7 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import TextFieldIcon from '@/features/text-field-interaction/components/TextFieldIcon.vue';
 const ElementHighlightOverlay = defineAsyncComponent(() => import('./components/ElementHighlightOverlay.vue'));
 const ScreenSelector = defineAsyncComponent(() => import('@/components/content/ScreenSelector.vue'));
+const LiveCaptionOverlay = defineAsyncComponent(() => import('@/features/live-caption/overlay/LiveCaptionOverlay.vue'));
 
 // Lazy Loaded Components (Optimized Resource Usage)
 // These components are loaded on-demand or based on device type to reduce the initial JS footprint.
@@ -159,6 +172,7 @@ import { useContentAppNotifications } from './composables/useContentAppNotificat
 import { useContentAppTextFieldIcons } from './composables/useContentAppTextFieldIcons.js';
 import { useContentAppPageTranslation } from './composables/useContentAppPageTranslation.js';
 import { useContentAppLifecycle } from './composables/useContentAppLifecycle.js';
+import { useLiveCaptionStore } from '@/features/live-caption/stores/liveCaption.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
@@ -168,6 +182,7 @@ useUnifiedI18n();
 // 1. Core Stores & Resource Tracker
 const settingsStore = useSettingsStore();
 const mobileStore = useMobileStore();
+const liveCaptionStore = useLiveCaptionStore();
 const tracker = useResourceTracker('content-app');
 
 // 2. Localization & RTL Management

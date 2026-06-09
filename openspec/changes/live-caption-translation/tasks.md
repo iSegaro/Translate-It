@@ -52,10 +52,10 @@
 
 ## 8. Overlay and UI Host Integration
 
-- [ ] 8.1 Define the overlay component hierarchy inside the existing Shadow DOM host
-- [ ] 8.2 Define consent notice presentation and blocking behavior
-- [ ] 8.3 Define caption track and control UI responsibilities
-- [ ] 8.4 Define overlay update flow from session state to rendered captions
+- [x] 8.1 Define the overlay component hierarchy inside the existing Shadow DOM host
+- [x] 8.2 Define consent notice presentation and blocking behavior
+- [x] 8.3 Define caption track and control UI responsibilities
+- [x] 8.4 Define overlay update flow from session state to rendered captions
 
 ## 9. Cache and IndexedDB Implementation
 
@@ -90,6 +90,9 @@
 - [x] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
 - [x] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
 - [x] 12.10 Define startup tests for missing or invalid OpenAI credential handling
+- [x] 12.11 Define unit tests for overlay shell rendering, consent gating, and control emissions
+- [x] 12.12 Define unit tests for overlay positioning and cleanup behavior
+- [x] 12.13 Define integration tests confirming the overlay shell does not invoke runtime capture, STT, translation, or cache layers
 
 ## 13. Documentation
 
