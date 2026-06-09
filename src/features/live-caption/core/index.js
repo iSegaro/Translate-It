@@ -41,6 +41,14 @@ import {
   shouldPreserveCaptionsForReason
 } from './LiveCaptionCleanupCoordinator.js';
 import {
+  LiveCaptionVideoHandoffCoordinator,
+  LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS,
+  LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES,
+  LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES,
+  createLiveCaptionVideoHandoffPlan,
+  createLiveCaptionVideoHandoffResult
+} from './LiveCaptionVideoHandoffCoordinator.js';
+import {
   LIVE_CAPTION_CAPTION_DISPLAY_MODES,
   LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   normalizeLiveCaptionCaptionDisplayMode,
@@ -100,6 +108,14 @@ export {
   shouldPreserveCaptionsForReason
 } from './LiveCaptionCleanupCoordinator.js';
 export {
+  LiveCaptionVideoHandoffCoordinator,
+  LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS,
+  LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES,
+  LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES,
+  createLiveCaptionVideoHandoffPlan,
+  createLiveCaptionVideoHandoffResult
+} from './LiveCaptionVideoHandoffCoordinator.js';
+export {
   LIVE_CAPTION_CAPTION_DISPLAY_MODES,
   LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   normalizeLiveCaptionCaptionDisplayMode,
@@ -147,6 +163,12 @@ export default {
   createLiveCaptionFailClosedCleanupResult,
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason,
+  LiveCaptionVideoHandoffCoordinator,
+  LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS,
+  LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES,
+  LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES,
+  createLiveCaptionVideoHandoffPlan,
+  createLiveCaptionVideoHandoffResult,
   LIVE_CAPTION_CAPTION_DISPLAY_MODES,
   LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   normalizeLiveCaptionCaptionDisplayMode,

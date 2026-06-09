@@ -47,8 +47,9 @@ Live Caption Translation will live in `src/features/live-caption/` as a standalo
 The runtime model will use:
 - `PageLiveCaptionSession` for tab-scoped ownership.
 - `VideoCaptionSession` for per-video ownership.
+- `LiveCaptionVideoHandoffCoordinator` for deterministic active-video transition planning.
 
-`PageLiveCaptionSession` coordinates the tab-level lifecycle, consent state, active video selection, cleanup, and cache scope. `VideoCaptionSession` owns chunk sequencing, transcript accumulation, caption rendering state, and per-video persistence.
+`PageLiveCaptionSession` coordinates the tab-level lifecycle, consent state, active video selection, and cache scope. `VideoCaptionSession` owns chunk sequencing, transcript accumulation, caption rendering state, and per-video persistence. `LiveCaptionCleanupCoordinator` owns cleanup plan and result generation, while `LiveCaptionSessionManager` remains the tab-scoped registry and snapshot source.
 
 Active-video selection follows a deterministic MVP tie-break order:
 1. currently playing

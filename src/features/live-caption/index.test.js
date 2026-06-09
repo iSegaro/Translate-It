@@ -28,6 +28,12 @@ import {
   createLiveCaptionFailClosedCleanupResult,
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason,
+  LiveCaptionVideoHandoffCoordinator,
+  LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS,
+  LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES,
+  LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES,
+  createLiveCaptionVideoHandoffPlan,
+  createLiveCaptionVideoHandoffResult,
   LIVE_CAPTION_CAPTION_DISPLAY_MODES,
   LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   normalizeLiveCaptionCaptionDisplayMode,
@@ -134,6 +140,12 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.createLiveCaptionFailClosedCleanupResult).toBe(createLiveCaptionFailClosedCleanupResult);
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCleanupError).toBe(normalizeLiveCaptionCleanupError);
     expect(LiveCaptionFeature.contracts.shouldPreserveCaptionsForReason).toBe(shouldPreserveCaptionsForReason);
+    expect(LiveCaptionFeature.contracts.LiveCaptionVideoHandoffCoordinator).toBe(LiveCaptionVideoHandoffCoordinator);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS).toBe(LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES).toBe(LIVE_CAPTION_VIDEO_HANDOFF_RESULT_STATUSES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES).toBe(LIVE_CAPTION_VIDEO_HANDOFF_STEP_TYPES);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionVideoHandoffPlan).toBe(createLiveCaptionVideoHandoffPlan);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionVideoHandoffResult).toBe(createLiveCaptionVideoHandoffResult);
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTION_DISPLAY_MODES).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES);
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT);
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCaptionDisplayMode).toBe(normalizeLiveCaptionCaptionDisplayMode);
@@ -205,6 +217,7 @@ describe('live-caption feature shell', () => {
     expect(VideoCaptionSession).toBeTypeOf('function');
     expect(LiveCaptionSessionManager).toBeTypeOf('function');
     expect(LiveCaptionCleanupCoordinator).toBeTypeOf('function');
+    expect(LiveCaptionVideoHandoffCoordinator).toBeTypeOf('function');
     expect(BaseSTTProvider).toBeTypeOf('function');
     expect(STTProviderFactory).toBeTypeOf('function');
     expect(OpenAIWhisperProvider).toBeTypeOf('function');

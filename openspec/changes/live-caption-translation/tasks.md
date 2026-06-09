@@ -24,7 +24,7 @@
 - [x] 4.1 Specify deterministic active-video detection rules for multi-video pages
 - [x] 4.2 Define the video fingerprint strategy for per-video identity
 - [x] 4.3 Define cache key generation rules from tab and video identity
-- [ ] 4.4 Define active-video change handling and session handoff behavior
+- [x] 4.4 Define active-video change handling and session handoff behavior
 - [x] 4.5 Define and test the MVP active-video tie-break order
 
 ## 5. Offscreen Capture Bridge

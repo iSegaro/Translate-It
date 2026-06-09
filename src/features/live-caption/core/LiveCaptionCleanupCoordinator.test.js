@@ -126,13 +126,31 @@ describe('live-caption cleanup coordinator', () => {
     expect(result.error.code).toBe(LIVE_CAPTION_CLEANUP_ERROR_CODES.RECOVERY_RECONCILIATION_FAILED);
   });
 
+  it('does not silently mark errored cleanup results as completed', () => {
+    const result = createLiveCaptionCleanupResult({
+      reason: LIVE_CAPTION_CLEANUP_REASONS.STOP,
+      status: LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED,
+      error: new Error('cleanup failed'),
+      sessionSnapshot: { sessionId: 'session-1', tabId: 7, activeVideoFingerprint: 'video-1' }
+    });
+
+    expect(result.status).toBe(LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED);
+    expect(result.error).not.toBe(null);
+    expect(result.error.message).toBe('cleanup failed');
+  });
+
   it('supports session cleanup snapshots and manager cleanup snapshots', () => {
     const pageSession = new PageLiveCaptionSession({ tabId: 11, consentAccepted: true });
     const videoSession = new VideoCaptionSession({ tabId: 11, videoFingerprint: 'video-11' });
     const manager = new LiveCaptionSessionManager();
+    const coordinator = new LiveCaptionCleanupCoordinator();
 
     pageSession.attachVideoSession(videoSession);
     manager.createSession(11);
+    const cleanupResult = coordinator.createCleanupResult({
+      reason: LIVE_CAPTION_CLEANUP_REASONS.STOP,
+      sessionSnapshot: pageSession.getCleanupSnapshot()
+    });
 
     expect(pageSession.getCleanupSnapshot()).toMatchObject({
       tabId: 11,
@@ -145,6 +163,13 @@ describe('live-caption cleanup coordinator', () => {
     expect(manager.getCleanupSnapshot(11)).toMatchObject({
       tabId: 11
     });
+    expect(manager.getSessionCleanupSnapshot(11)).toMatchObject({
+      tabId: 11
+    });
+    expect(manager.getSessionCleanupSnapshot(11).status).toBe(undefined);
+    expect(manager.getSessionCleanupSnapshot(11).steps).toBe(undefined);
+    expect(cleanupResult.status).toBe(LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED);
+    expect(cleanupResult.steps).toEqual(expect.any(Array));
   });
 
   it('applies cleanup results to the live-caption store without runtime side effects', () => {

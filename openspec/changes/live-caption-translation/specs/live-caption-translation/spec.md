@@ -55,6 +55,21 @@ The system SHALL detect the active video element in the current tab and use it a
 - **WHEN** the detected active video changes
 - **THEN** the system SHALL update the caption session to follow the new video target
 
+### Requirement: Active-video handoff
+The system SHALL define a deterministic handoff contract for active-video changes so that the current video session can be preserved, replaced, or cleaned up without ambiguous ownership.
+
+#### Scenario: Same video remains active
+- **WHEN** the detected active video does not change
+- **THEN** the system SHALL produce a no-op handoff plan that preserves cache identity and leaves overlay state unchanged
+
+#### Scenario: Active video is replaced
+- **WHEN** the detected active video changes to a different video in the same tab
+- **THEN** the system SHALL produce a handoff plan that cleanly closes the current video session before creating the next one
+
+#### Scenario: Active video disappears
+- **WHEN** the current active video cannot be replaced by another active video target
+- **THEN** the system SHALL produce a cleanup-only handoff plan that clears volatile overlay state and releases the current video session
+
 ### Requirement: Deterministic active-video tie-break
 The system SHALL resolve multiple candidate videos using a deterministic MVP tie-break order.
 

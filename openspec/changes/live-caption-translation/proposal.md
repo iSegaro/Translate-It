@@ -99,6 +99,7 @@ This change introduces a new desktop MVP capability that can capture the active 
 
 - `PageLiveCaptionSession` is the tab-scoped coordinator and owns the lifetime of the live-caption experience for a page.
 - `VideoCaptionSession` is the per-video runtime unit and owns chunk sequencing, transcript accumulation, translation requests, and overlay output.
+- `LiveCaptionVideoHandoffCoordinator` will resolve active-video transitions deterministically so that a target change can be treated as a no-op, a replacement, or a cleanup-only transition without leaking ownership boundaries.
 - Session boundaries are keyed by tab identity and video fingerprint so that switching videos within the same page does not corrupt cache state.
 
 ### STT Separation

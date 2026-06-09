@@ -81,6 +81,36 @@ function shouldClearCacheForReason(reason, explicitClearCache = false) {
   return explicitClearCache && reason !== LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE;
 }
 
+function normalizeCleanupResultStatus(status) {
+  return Object.values(LIVE_CAPTION_CLEANUP_RESULT_STATUSES).includes(status) ? status : null;
+}
+
+function resolveCleanupResultStatus({ plan, status, error }) {
+  const explicitStatus = normalizeCleanupResultStatus(status);
+
+  if (error) {
+    if (plan.reason === LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE || explicitStatus === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED) {
+      return LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED;
+    }
+
+    if (explicitStatus === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED) {
+      return LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED;
+    }
+
+    return LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED;
+  }
+
+  if (explicitStatus && explicitStatus !== LIVE_CAPTION_CLEANUP_RESULT_STATUSES.PLANNED) {
+    return explicitStatus;
+  }
+
+  return plan.reason === LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE
+    ? LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED
+    : plan.reason === LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR || plan.reason === LIVE_CAPTION_CLEANUP_REASONS.ERROR
+      ? LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED
+      : LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED;
+}
+
 function createCleanupStep(type, overrides = {}) {
   return Object.freeze({
     type,
@@ -238,11 +268,11 @@ export function createLiveCaptionCleanupResult({
     clearCache,
     notifyContent
   });
-  const resolvedStatus = status ?? (normalizedPlan.reason === LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE
-    ? LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED
-    : normalizedPlan.reason === LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR || normalizedPlan.reason === LIVE_CAPTION_CLEANUP_REASONS.ERROR
-      ? LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED
-      : LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED);
+  const resolvedStatus = resolveCleanupResultStatus({
+    plan: normalizedPlan,
+    status,
+    error
+  });
   const sessionStatus = getSessionStatusForReason(normalizedPlan.reason);
   const normalizedErrorSource = error ?? (resolvedStatus === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED
     ? null

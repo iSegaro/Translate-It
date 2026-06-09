@@ -142,6 +142,10 @@ export class LiveCaptionSessionManager {
   }
 
   getCleanupSnapshot(tabId) {
+    return this.getSessionCleanupSnapshot(tabId);
+  }
+
+  getSessionCleanupSnapshot(tabId) {
     return this.getSessionSnapshot(tabId);
   }
 
