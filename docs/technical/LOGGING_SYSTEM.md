@@ -67,6 +67,9 @@ To change default verbosity permanently:
 2.  **Add**: A new key to the `LOG_COMPONENTS` object.
 3.  **Result**: The system automatically registers the component and adds it to the Options Page UI.
 
+#### Example: Live Caption
+For the live-caption feature, register `LOG_COMPONENTS.LIVE_CAPTION` with the value `LiveCaption` so feature modules can use a dedicated scoped logger immediately.
+
 ## Summary
 
 The logging system provides:

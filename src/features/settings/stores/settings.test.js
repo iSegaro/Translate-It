@@ -57,6 +57,17 @@ describe('Settings Store', () => {
     expect(store.settings.THEME).toBe('auto');
   });
 
+  it('should initialize live-caption scaffolding defaults', () => {
+    const store = useSettingsStore();
+    expect(store.settings.LIVE_CAPTION_ENABLED).toBe(false);
+    expect(store.settings.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
+    expect(store.settings.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
+    expect(store.settings.LIVE_CAPTION_CACHE_MAX_BYTES).toBe(10485760);
+    expect(store.settings.LIVE_CAPTION_STT_PROVIDER).toBe('openai_whisper');
+    expect(store.settings.LIVE_CAPTION_RETRY_LIMIT).toBe(2);
+    expect(store.settings.OPENAI_API_KEY).toBe('');
+  });
+
   it('should load settings from storage', async () => {
     storageManager.get.mockResolvedValue({ THEME: 'dark', API_KEY: 'test-key' });
     const store = useSettingsStore();

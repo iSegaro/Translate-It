@@ -262,6 +262,13 @@ export const CONFIG = {
   ENHANCED_TRIPLE_CLICK_DRAG: false, // فعال کردن پشتیبانی پیشرفته از triple-click + drag
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
+  // --- Live Caption Translation Scaffolding ---
+  LIVE_CAPTION_ENABLED: false, // Master toggle for the live-caption MVP scaffolding
+  LIVE_CAPTION_QUALITY_PROFILE: 'balanced', // fast, balanced, accurate
+  LIVE_CAPTION_CACHE_MAX_ITEMS: 500, // Maximum cached caption segments per video
+  LIVE_CAPTION_CACHE_MAX_BYTES: 10485760, // 10 MiB cap for live-caption cache data
+  LIVE_CAPTION_STT_PROVIDER: 'openai_whisper', // Hidden MVP provider identifier
+  LIVE_CAPTION_RETRY_LIMIT: 2, // Retry limit for transient live-caption failures
   OCR_DEFAULT_LANG: 'eng', // زبان پیش‌فرض OCR
   ACTIVE_SELECTION_ICON_ON_TEXTFIELDS: true, // فعال کردن دوبار کلیک روی متن در فیلدهای متنی
   EXCLUDED_SITES: [], // وب‌سایت‌هایی که افزونه در آن‌ها غیرفعال باشد

@@ -14,6 +14,7 @@ export class MessageContexts {
   static EVENT_HANDLER = "event-handler";
   static TTS_MANAGER = "tts-manager";
   static CAPTURE_MANAGER = "capture-manager";
+  static LIVE_CAPTION = "live-caption";
   static SELECTION_MANAGER = "selection-manager";
   static PAGE_TRANSLATION_BATCH = "page-translation-batch";
   static PAGE_TRANSLATION_UI = "page-translation-ui";

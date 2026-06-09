@@ -57,6 +57,15 @@ describe('Config Module', () => {
     it('should have basic app info in CONFIG', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
+
+    it('should include live-caption scaffolding defaults in CONFIG', () => {
+      expect(CONFIG.LIVE_CAPTION_ENABLED).toBe(false);
+      expect(CONFIG.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
+      expect(CONFIG.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
+      expect(CONFIG.LIVE_CAPTION_CACHE_MAX_BYTES).toBe(10485760);
+      expect(CONFIG.LIVE_CAPTION_STT_PROVIDER).toBe('openai_whisper');
+      expect(CONFIG.LIVE_CAPTION_RETRY_LIMIT).toBe(2);
+    });
   });
 
   describe('Async Getters', () => {

@@ -1,9 +1,9 @@
 ## 1. Manifest, Settings, and Logging Scaffolding
 
-- [ ] 1.1 Add the live-caption permissions and offscreen capture prerequisites to the manifest design surface
-- [ ] 1.2 Define live-caption settings keys and defaults for MVP behavior
-- [ ] 1.3 Register the dedicated `LiveCaption` logging component in the structured logging constants and component categories
-- [ ] 1.4 Define the live-caption logging scope usage pattern for feature modules and lifecycle events
+- [x] 1.1 Add the live-caption permissions and offscreen capture prerequisites to the manifest design surface
+- [x] 1.2 Define live-caption settings keys and defaults for MVP behavior
+- [x] 1.3 Register the dedicated `LiveCaption` logging component in the structured logging constants and component categories
+- [x] 1.4 Define the live-caption logging scope usage pattern for feature modules and lifecycle events
 
 ## 2. Live-Caption Feature Shell
 
@@ -92,6 +92,6 @@
 
 ## 13. Documentation
 
-- [ ] 13.1 Update technical documentation for the new live-caption architecture
-- [ ] 13.2 Document permissions, consent expectations, and supported platforms
-- [ ] 13.3 Document logging scope usage and operational visibility expectations
+- [x] 13.1 Update technical documentation for the new live-caption architecture
+- [x] 13.2 Document permissions, consent expectations, and supported platforms
+- [x] 13.3 Document logging scope usage and operational visibility expectations

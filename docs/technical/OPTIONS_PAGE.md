@@ -66,6 +66,15 @@ Add your new key and its default value to the `CONFIG` object in `src/shared/con
 Add the key to the `getDefaultSettings()` function in `src/features/settings/stores/settings.js`.
 **CRITICAL:** If you skip this step, the setting will not be reactive, and it will be lost whenever the extension reloads or the store initializes.
 
+#### Live Caption Scaffolding
+Live Caption Translation follows the same pattern:
+- Add live-caption defaults in `src/shared/config/config.js`.
+- Register the live-caption keys in `src/features/settings/stores/settings.js`.
+- Reuse the existing `OPENAI_API_KEY` setting for the MVP Whisper provider.
+- Do not introduce a separate STT credential UI for the scaffolding phase.
+- The MVP target remains Chrome/Edge desktop only; manifest wiring uses `activeTab` and `tabCapture` in the Chrome path only.
+- Consent remains a runtime capture gate and is not modeled as an Options page setting.
+
 ### 3. Create an Async Getter (Optional but Recommended)
 Add an async getter function in `src/shared/config/config.js` (e.g., `export const getMySettingAsync = ...`).
 *Why:* This allows background scripts and non-Vue logic to access the setting reliably using the `StorageManager`.

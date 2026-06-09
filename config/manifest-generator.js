@@ -122,6 +122,8 @@ function generateChromeManifest(baseManifest) {
     permissions: [
       ...baseManifest.permissions,
       'offscreen',
+      'activeTab',
+      'tabCapture',
       'contextMenus',
       'sidePanel'
     ],
@@ -243,7 +245,8 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox-specific web accessible resources format (stripping use_dynamic_url which is unsupported)
     web_accessible_resources: baseManifest.web_accessible_resources.map(resource => {
-      const { use_dynamic_url, ...rest } = resource;
+      const rest = { ...resource };
+      delete rest.use_dynamic_url;
       return rest;
     })
   };

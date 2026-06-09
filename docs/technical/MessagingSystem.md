@@ -184,6 +184,22 @@ MessageActions.TRANSLATION_RESULT_UPDATE    // Final result delivery
 MessageActions.GOOGLE_TTS_SPEAK
 MessageActions.TTS_STOP
 
+// Live Caption
+MessageActions.LIVE_CAPTION_START_REQUEST
+MessageActions.LIVE_CAPTION_PRIVACY_NOTICE
+MessageActions.LIVE_CAPTION_PRIVACY_ACCEPTED
+MessageActions.LIVE_CAPTION_START
+MessageActions.LIVE_CAPTION_STOP
+MessageActions.LIVE_CAPTION_AUDIO_CHUNK
+MessageActions.LIVE_CAPTION_STT_RESULT
+MessageActions.LIVE_CAPTION_TRANSLATE_REQUEST
+MessageActions.LIVE_CAPTION_TRANSLATE_RESULT
+MessageActions.LIVE_CAPTION_VIDEO_CHANGED
+MessageActions.LIVE_CAPTION_SEEK
+MessageActions.LIVE_CAPTION_STATUS
+MessageActions.LIVE_CAPTION_ERROR
+MessageActions.LIVE_CAPTION_CLEAR_CACHE
+
 // Sidepanel
 MessageActions.OPEN_SIDE_PANEL
 MessageActions.SELECTED_TEXT_FOR_SIDEPANEL
@@ -237,6 +253,7 @@ MessagingContexts.OPTIONS    // options.html
 MessagingContexts.BACKGROUND // background script
 MessagingContexts.CONTENT    // content script
 MessagingContexts.OFFSCREEN  // offscreen document
+MessagingContexts.LIVE_CAPTION // live-caption feature messages
 ```
 
 ## Best Practices
