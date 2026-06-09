@@ -171,6 +171,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.started = false;
     this.paused = false;
     this.destroyed = false;
+    this.startPromise = null;
     this.scanFrameId = null;
     this.mutationObserver = null;
     this.createdAt = Date.now();
@@ -494,6 +495,41 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     };
   }
 
+  _reconcileCleanupResult(cleanupResult, sessionCleanupMetadata = null) {
+    if (!cleanupResult || !sessionCleanupMetadata) {
+      return cleanupResult;
+    }
+
+    const metadataStatus = sessionCleanupMetadata.status ?? null;
+    const hasFailure = [
+      LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED,
+      LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED
+    ].includes(metadataStatus);
+
+    if (!hasFailure) {
+      return cleanupResult;
+    }
+
+    const reconciledStatus = metadataStatus;
+    const reconciledError = sessionCleanupMetadata.error ?? cleanupResult.error ?? null;
+    const reconciledResult = this.cleanupCoordinator.createCleanupResult({
+      reason: cleanupResult.reason,
+      status: reconciledStatus,
+      sessionSnapshot: cleanupResult.sessionSnapshot,
+      error: reconciledError,
+      clearCache: cleanupResult.clearCache,
+      notifyContent: cleanupResult.notifyContent
+    });
+
+    return {
+      ...reconciledResult,
+      sessionStatus: LIVE_CAPTION_SESSION_STATES.ERROR,
+      preserveCaptions: false,
+      clearCaptions: true,
+      notifyContent: true
+    };
+  }
+
   _normalizeConsentEligibility(eligibility = null) {
     if (eligibility) {
       return eligibility;
@@ -534,6 +570,10 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       return this.getSnapshot();
     }
 
+    if (this.startPromise) {
+      return this.startPromise;
+    }
+
     if (this.started && !this.paused) {
       logger.debug('Duplicate live-caption runtime start ignored', {
         tabId: this.tabId,
@@ -546,65 +586,78 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       return this.resume(options);
     }
 
-    const eligibility = this._normalizeConsentEligibility(options.startEligibility);
-    if (!eligibility.allowed) {
-      this._applyStartupDenial(eligibility);
-      return this.getSnapshot();
-    }
+    const startTask = (async () => {
+      const eligibility = this._normalizeConsentEligibility(options.startEligibility);
+      if (!eligibility.allowed) {
+        this._applyStartupDenial(eligibility);
+        return this.getSnapshot();
+      }
 
-    const tabId = await this.resolveTabId(options.tabId);
-    if (tabId == null) {
-      const error = createLiveCaptionErrorState(
-        new Error('Unable to resolve active tab for live caption runtime'),
-        LIVE_CAPTION_CLEANUP_REASONS.ERROR
-      );
-      this.lastError = error;
-      this.store?.setError?.(error);
-      this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.ERROR, {
-        reason: 'missing_tab_id'
+      const tabId = await this.resolveTabId(options.tabId);
+      if (tabId == null) {
+        const error = createLiveCaptionErrorState(
+          new Error('Unable to resolve active tab for live caption runtime'),
+          LIVE_CAPTION_CLEANUP_REASONS.ERROR
+        );
+        this.lastError = error;
+        this.store?.setError?.(error);
+        this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.ERROR, {
+          reason: 'missing_tab_id'
+        });
+        logger.warn('Live-caption runtime start failed: missing tab id');
+        return this.getSnapshot();
+      }
+
+      this.tabId = tabId;
+      this.pageSession = this.sessionManager.getOrCreateSession(tabId, {
+        consentAccepted: Boolean(this.store?.consentAccepted)
       });
-      logger.warn('Live-caption runtime start failed: missing tab id');
+      this.pageSession.setConsentAccepted(Boolean(this.store?.consentAccepted));
+      this.pageSession.start();
+
+      this.store?.clearStartupDeniedReason?.();
+      this.store?.setOverlayVisible?.(true);
+      this.store?.setEnabled?.(true);
+      this._setStoreContext(tabId, this.currentVideoFingerprint, this.pageSession.sessionId);
+      this.store?.setStatus?.(this.pageSession.lifecycleState);
+      this.store?.setActiveSessionState?.(this.pageSession.lifecycleState);
+      this.store?.setConsentNoticeVisible?.(!this.store?.consentAccepted);
+
+      this.started = true;
+      this.paused = false;
+      this.lastError = null;
+      this.lastCleanupResult = null;
+      this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.STARTING, {
+        tabId,
+        sessionId: this.pageSession.sessionId
+      });
+
+      this._setupObservers();
+      await this.syncActiveVideo('start');
+      this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
+        tabId,
+        sessionId: this.pageSession.sessionId,
+        activeVideoFingerprint: this.currentVideoFingerprint
+      });
+
+      logger.info('Live-caption runtime started', {
+        tabId,
+        sessionId: this.pageSession.sessionId,
+        activeVideoFingerprint: this.currentVideoFingerprint
+      });
+
       return this.getSnapshot();
+    })();
+
+    this.startPromise = startTask;
+
+    try {
+      return await startTask;
+    } finally {
+      if (this.startPromise === startTask) {
+        this.startPromise = null;
+      }
     }
-
-    this.tabId = tabId;
-    this.pageSession = this.sessionManager.getOrCreateSession(tabId, {
-      consentAccepted: Boolean(this.store?.consentAccepted)
-    });
-    this.pageSession.setConsentAccepted(Boolean(this.store?.consentAccepted));
-    this.pageSession.start();
-
-    this.store?.clearStartupDeniedReason?.();
-    this.store?.setOverlayVisible?.(true);
-    this.store?.setEnabled?.(true);
-    this._setStoreContext(tabId, this.currentVideoFingerprint, this.pageSession.sessionId);
-    this.store?.setStatus?.(this.pageSession.lifecycleState);
-    this.store?.setActiveSessionState?.(this.pageSession.lifecycleState);
-    this.store?.setConsentNoticeVisible?.(!this.store?.consentAccepted);
-
-    this.started = true;
-    this.paused = false;
-    this.lastError = null;
-    this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.STARTING, {
-      tabId,
-      sessionId: this.pageSession.sessionId
-    });
-
-    this._setupObservers();
-    await this.syncActiveVideo('start');
-    this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
-      tabId,
-      sessionId: this.pageSession.sessionId,
-      activeVideoFingerprint: this.currentVideoFingerprint
-    });
-
-    logger.info('Live-caption runtime started', {
-      tabId,
-      sessionId: this.pageSession.sessionId,
-      activeVideoFingerprint: this.currentVideoFingerprint
-    });
-
-    return this.getSnapshot();
   }
 
   async pause(reason = 'pause') {
@@ -733,16 +786,45 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       ?? this.sessionManager.getSessionCleanupSnapshot?.(this.tabId)
       ?? null;
 
-    const cleanupResult = this.cleanupCoordinator.createCleanupResult({
+    const cleanupPlan = this.cleanupCoordinator.createCleanupPlan({
       reason,
       session: this.pageSession,
       sessionSnapshot,
       notifyContent,
       clearCache
     });
+    const plannedCleanupResult = this.cleanupCoordinator.createCleanupResult({
+      plan: cleanupPlan
+    });
 
+    let sessionCleanupMetadata = null;
     if (this.tabId != null) {
-      this.sessionManager.cleanupByTabId(this.tabId, reason);
+      try {
+        this.sessionManager.cleanupByTabId(this.tabId, reason);
+      } catch (cleanupError) {
+        sessionCleanupMetadata = {
+          tabId: this.tabId,
+          sessionId: this.pageSession?.sessionId ?? null,
+          reason,
+          status: LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED,
+          error: this.cleanupCoordinator.normalizeError(cleanupError, {
+            stage: 'session_manager_cleanup',
+            reason,
+            cleanupReason: reason,
+            sessionId: this.pageSession?.sessionId ?? null,
+            tabId: this.tabId,
+            videoFingerprint: this.currentVideoFingerprint,
+            shouldStopCapture: false,
+            notifyContent,
+            clearVolatileState: true
+          }),
+          snapshot: sessionSnapshot,
+          updatedAt: Date.now()
+        };
+      }
+      sessionCleanupMetadata = sessionCleanupMetadata
+        ?? this.sessionManager.getSessionCleanupMetadata?.(this.tabId)
+        ?? null;
     }
 
     this._teardownObservers();
@@ -752,6 +834,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.pageSession = null;
     this.started = false;
     this.paused = false;
+    const cleanupResult = this._reconcileCleanupResult(plannedCleanupResult, sessionCleanupMetadata);
     this.lastCleanupResult = cleanupResult;
 
     this.store?.applyCleanupResult?.({

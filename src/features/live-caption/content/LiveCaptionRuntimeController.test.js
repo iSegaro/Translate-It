@@ -5,6 +5,7 @@ import { LiveCaptionRuntimeController } from './LiveCaptionRuntimeController.js'
 import { LIVE_CAPTION_RUNTIME_STATES } from '../constants/liveCaptionRuntimeStates.js';
 import { LIVE_CAPTION_CLEANUP_REASONS } from '../core/contracts.js';
 import { createVideoFingerprint } from '../core/VideoFingerprint.js';
+import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from '../core/LiveCaptionCleanupCoordinator.js';
 
 const mocks = vi.hoisted(() => ({
   offscreenBridge: vi.fn(),
@@ -130,6 +131,33 @@ describe('live-caption runtime controller', () => {
     expect(controller.sessionManager.getAllSessionSnapshots()).toHaveLength(1);
   });
 
+  it('shares the same in-flight promise for concurrent start calls', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    controller._setupObservers = vi.fn();
+    controller.syncActiveVideo = vi.fn().mockResolvedValue(controller.getSnapshot());
+
+    const firstStart = controller.start({ tabId: 11 });
+    const secondStart = controller.start({ tabId: 11 });
+
+    const [firstResult, secondResult] = await Promise.all([firstStart, secondStart]);
+
+    expect(controller._setupObservers).toHaveBeenCalledTimes(1);
+    expect(controller.syncActiveVideo).toHaveBeenCalledTimes(1);
+    expect(controller.sessionManager.getAllSessionSnapshots()).toHaveLength(1);
+    expect(firstResult.sessionId).toBe(secondResult.sessionId);
+    expect(firstResult.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    expect(secondResult.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+  });
+
   it('detects the active video and replaces the active session when the winner changes', async () => {
     const store = useLiveCaptionStore();
     store.acceptConsent();
@@ -233,6 +261,43 @@ describe('live-caption runtime controller', () => {
 
     expect(controller.destroyed).toBe(true);
     expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.DESTROYED);
+  });
+
+  it('reconciles fail-closed session-manager cleanup metadata into the final cleanup result', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    await controller.start({ tabId: 11 });
+
+    controller.sessionManager.cleanupByTabId = vi.fn(() => null);
+    controller.sessionManager.getSessionCleanupMetadata = vi.fn(() => ({
+      tabId: 11,
+      sessionId: controller.pageSession?.sessionId ?? null,
+      reason: LIVE_CAPTION_CLEANUP_REASONS.STOP,
+      status: LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED,
+      error: {
+        code: 'LIVE_CAPTION_SESSION_MANAGER_CLEANUP_FAILED',
+        message: 'cleanup failed'
+      },
+      snapshot: controller.pageSession?.getCleanupSnapshot?.() ?? null,
+      updatedAt: Date.now()
+    }));
+
+    const cleanupResult = await controller.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
+
+    expect(cleanupResult.status).toBe(LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED);
+    expect(cleanupResult.error).toMatchObject({
+      code: 'LIVE_CAPTION_SESSION_MANAGER_CLEANUP_FAILED',
+      message: 'cleanup failed'
+    });
+    expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.ERROR);
   });
 
   it('does not invoke capture, STT, translation, or offscreen modules', async () => {

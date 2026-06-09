@@ -4,6 +4,7 @@ import { VideoCaptionSession } from './VideoCaptionSession.js';
 import { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
 import { LIVE_CAPTION_SESSION_STATES } from '../constants/liveCaptionSessionStates.js';
 import { LIVE_CAPTION_CLEANUP_REASONS } from './contracts.js';
+import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from './LiveCaptionCleanupCoordinator.js';
 
 describe('live-caption session model', () => {
   it('initializes a page session with shell state', () => {
@@ -118,10 +119,17 @@ describe('live-caption session model', () => {
     };
 
     const snapshot = manager.failClosedCleanup(7, LIVE_CAPTION_CLEANUP_REASONS.MANUAL);
+    const cleanupMetadata = manager.getSessionCleanupMetadata(7);
 
     expect(snapshot.tabId).toBe(7);
     expect(manager.getSession(7)).toBe(null);
     expect(manager.hasSession(8)).toBe(true);
     expect(manager.removeSession(8)).toMatchObject({ tabId: 8 });
+    expect(cleanupMetadata).toMatchObject({
+      tabId: 7,
+      sessionId: first.sessionId,
+      status: LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED,
+      reason: LIVE_CAPTION_CLEANUP_REASONS.MANUAL
+    });
   });
 });
