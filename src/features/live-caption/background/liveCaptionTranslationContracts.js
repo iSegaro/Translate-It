@@ -39,8 +39,8 @@ function toNumberOrNull(value) {
 export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
   const sessionId = segment.sessionId ?? null;
   const videoFingerprint = segment.videoFingerprint ?? null;
-  const segmentStartMs = toNumberOrNull(segment.segmentStartMs);
-  const segmentEndMs = toNumberOrNull(segment.segmentEndMs);
+  const segmentStartMs = toNumberOrNull(segment.segmentStartMs ?? segment.startMs);
+  const segmentEndMs = toNumberOrNull(segment.segmentEndMs ?? segment.endMs);
   const originalText = normalizeTextValue(segment.originalText ?? segment.text ?? '');
 
   if (!sessionId || !videoFingerprint || segmentStartMs == null || segmentEndMs == null || !originalText) {

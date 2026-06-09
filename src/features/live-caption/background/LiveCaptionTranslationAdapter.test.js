@@ -223,4 +223,98 @@ describe('LiveCaptionTranslationAdapter', () => {
     expect(mocks.cacheFacade).not.toHaveBeenCalled();
     expect(mocks.handleTranslationRequest).toHaveBeenCalledTimes(1);
   });
+
+  it('handles contract compatibility with startMs/endMs segment format', async () => {
+    const adapter = new LiveCaptionTranslationAdapter({
+      targetLanguageResolver: vi.fn().mockResolvedValue('fa')
+    });
+
+    mocks.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      translatedText: 'سلام دنیا',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'google'
+    });
+
+    const result = await adapter.translateFinalizedSegment({
+      sessionId: 'session-compat',
+      videoFingerprint: 'video-compat',
+      startMs: 100,
+      endMs: 250,
+      text: 'Hello world',
+      sourceLanguage: 'en',
+      isFinal: true
+    });
+
+    expect(result.segmentStartMs).toBe(100);
+    expect(result.segmentEndMs).toBe(250);
+    expect(result.originalText).toBe('Hello world');
+    expect(result.translatedText).toBe('سلام دنیا');
+  });
+
+  it('aborts translation pre-flight if signal is already aborted', async () => {
+    const adapter = new LiveCaptionTranslationAdapter({
+      targetLanguageResolver: vi.fn().mockResolvedValue('fa')
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(adapter.translateFinalizedSegment({
+      sessionId: 'session-abort-pre',
+      videoFingerprint: 'video-abort-pre',
+      startMs: 100,
+      endMs: 250,
+      text: 'Hello world',
+      sourceLanguage: 'en',
+      isFinal: true
+    }, {
+      signal: controller.signal
+    })).rejects.toMatchObject({
+      type: 'USER_CANCELLED',
+      message: 'Aborted'
+    });
+
+    expect(mocks.handleTranslationRequest).not.toHaveBeenCalled();
+  });
+
+  it('aborts translation in-flight, calls cancelTranslation, and emits no segment', async () => {
+    const cancelMock = vi.fn().mockResolvedValue();
+    const mockEngine = {
+      cancelTranslation: cancelMock
+    };
+    const mockTranslationService = {
+      handleTranslationRequest: vi.fn().mockImplementation(() => {
+        controller.abort();
+        return Promise.resolve({ success: true, translatedText: 'سلام' });
+      }),
+      translationEngine: mockEngine
+    };
+
+    const adapter = new LiveCaptionTranslationAdapter({
+      translationService: mockTranslationService,
+      targetLanguageResolver: vi.fn().mockResolvedValue('fa')
+    });
+
+    const controller = new AbortController();
+
+    await expect(adapter.translateFinalizedSegment({
+      sessionId: 'session-abort-mid',
+      videoFingerprint: 'video-abort-mid',
+      startMs: 100,
+      endMs: 250,
+      text: 'Hello world',
+      sourceLanguage: 'en',
+      isFinal: true
+    }, {
+      signal: controller.signal
+    })).rejects.toMatchObject({
+      type: 'USER_CANCELLED',
+      message: 'Aborted'
+    });
+
+    expect(cancelMock).toHaveBeenCalledTimes(1);
+    expect(mockTranslationService.handleTranslationRequest).toHaveBeenCalledTimes(1);
+  });
 });

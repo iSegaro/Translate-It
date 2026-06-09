@@ -34,6 +34,20 @@ export class LiveCaptionTranslationAdapter {
         mode: options.mode || LIVE_CAPTION_TRANSLATION_MODE
       });
 
+      if (options.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+
+      let abortListener;
+      if (options.signal) {
+        abortListener = () => {
+          if (this.translationService?.translationEngine?.cancelTranslation) {
+            this.translationService.translationEngine.cancelTranslation(request.messageId).catch(() => {});
+          }
+        };
+        options.signal.addEventListener('abort', abortListener);
+      }
+
       logger.debug('Live-caption translation request', {
         sessionId: request.metadata.sessionId,
         videoFingerprint: request.metadata.videoFingerprint,
@@ -45,34 +59,44 @@ export class LiveCaptionTranslationAdapter {
         mode: request.data.mode
       });
 
-      const response = await this.translationService.handleTranslationRequest(request, options.sender);
+      try {
+        const response = await this.translationService.handleTranslationRequest(request, options.sender);
 
-      if (!response || response.success === false) {
-        throw normalizeLiveCaptionTranslationError(response, {
+        if (options.signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        if (!response || response.success === false) {
+          throw normalizeLiveCaptionTranslationError(response, {
+            ...request.metadata,
+            provider: request.data.provider ?? response?.provider ?? null
+          });
+        }
+
+        const captionSegment = createLiveCaptionTranslatedCaptionSegment(transcriptSegment, response, {
           ...request.metadata,
-          provider: request.data.provider ?? response?.provider ?? null
+          provider: response.provider ?? request.data.provider ?? null,
+          sourceLanguage: response.sourceLanguage ?? request.data.sourceLanguage,
+          targetLanguage: response.targetLanguage ?? request.data.targetLanguage
         });
+
+        logger.debug('Live-caption translation request completed', {
+          sessionId: captionSegment.sessionId,
+          videoFingerprint: captionSegment.videoFingerprint,
+          segmentStartMs: captionSegment.segmentStartMs,
+          segmentEndMs: captionSegment.segmentEndMs,
+          sourceLanguage: captionSegment.sourceLanguage,
+          targetLanguage: captionSegment.targetLanguage,
+          provider: captionSegment.provider,
+          translatedLength: captionSegment.translatedText.length
+        });
+
+        return captionSegment;
+      } finally {
+        if (options.signal && abortListener) {
+          options.signal.removeEventListener('abort', abortListener);
+        }
       }
-
-      const captionSegment = createLiveCaptionTranslatedCaptionSegment(transcriptSegment, response, {
-        ...request.metadata,
-        provider: response.provider ?? request.data.provider ?? null,
-        sourceLanguage: response.sourceLanguage ?? request.data.sourceLanguage,
-        targetLanguage: response.targetLanguage ?? request.data.targetLanguage
-      });
-
-      logger.debug('Live-caption translation request completed', {
-        sessionId: captionSegment.sessionId,
-        videoFingerprint: captionSegment.videoFingerprint,
-        segmentStartMs: captionSegment.segmentStartMs,
-        segmentEndMs: captionSegment.segmentEndMs,
-        sourceLanguage: captionSegment.sourceLanguage,
-        targetLanguage: captionSegment.targetLanguage,
-        provider: captionSegment.provider,
-        translatedLength: captionSegment.translatedText.length
-      });
-
-      return captionSegment;
     } catch (error) {
       const normalizedError = normalizeLiveCaptionTranslationError(error, {
         sessionId: transcriptSegment.sessionId,
