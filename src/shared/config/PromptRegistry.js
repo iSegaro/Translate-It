@@ -130,6 +130,36 @@ export const PROMPT_REGISTRY = {
     previewSupport: true
   },
 
+  // --- SUBTITLE PROMPTS ---
+  PROMPT_SUBTITLE_USER: {
+    key: 'PROMPT_SUBTITLE_USER',
+    labelKey: 'prompt_subtitle_user_label',
+    descKey: 'prompt_subtitle_user_desc',
+    category: PromptCategory.USER,
+    risk: PromptRisk.SAFE,
+    editable: true,
+    placeholders: ["$_{SOURCE}", "$_{TARGET}"],
+    previewSupport: false
+  },
+  PROMPT_SUBTITLE_BASE: {
+    key: 'PROMPT_SUBTITLE_BASE',
+    labelKey: 'prompt_subtitle_base_label',
+    category: PromptCategory.SYSTEM,
+    risk: PromptRisk.CRITICAL,
+    editable: false,
+    placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{BATCH_INSTRUCTION}", "$_{TEXT}"],
+    previewSupport: false
+  },
+  PROMPT_SUBTITLE_BATCH: {
+    key: 'PROMPT_SUBTITLE_BATCH',
+    labelKey: 'prompt_subtitle_batch_label',
+    category: PromptCategory.INTERNAL,
+    risk: PromptRisk.CRITICAL,
+    editable: false,
+    placeholders: ["$_{TARGET}", "$_{TEXT}"],
+    previewSupport: false
+  },
+
   // --- INTERNAL PROMPTS ---
   PROMPT_BASE_AI_FOLLOWUP: {
     key: 'PROMPT_BASE_AI_FOLLOWUP',

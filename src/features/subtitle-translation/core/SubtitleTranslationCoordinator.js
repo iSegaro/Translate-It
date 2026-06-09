@@ -5,8 +5,12 @@ import { SubtitleValidationService } from './SubtitleValidationService.js';
 import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { SubtitleContextBuilder } from './SubtitleContextBuilder.js';
 import { subtitleTextProtector } from '../formatting/SubtitleTextProtector.js';
-import { SUBTITLE_PROMPT_TEMPLATES } from '../prompts/subtitlePrompt.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { 
+  getPromptSubtitleBaseAsync, 
+  getPromptSubtitleUserAsync, 
+  getPromptSubtitleBatchAsync,
+  TranslationMode 
+} from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessagingBus } from '@/shared/messaging/core/MessagingBus.js';
@@ -141,7 +145,14 @@ export class SubtitleTranslationCoordinator {
     });
 
     try {
-      // 2. Request Translation via Unified Service
+      // 2. Resolve Prompts from Registry
+      const [promptTemplate, promptUser, promptBatch] = await Promise.all([
+        getPromptSubtitleBaseAsync(),
+        getPromptSubtitleUserAsync(),
+        getPromptSubtitleBatchAsync()
+      ]);
+
+      // 3. Request Translation via Unified Service
       const job = this.activeJobs.get(jobId);
       if (!job || job.status === 'cancelled') {
         throw new Error('Job cancelled before batch request');
@@ -153,8 +164,12 @@ export class SubtitleTranslationCoordinator {
         targetLanguage,
         providerId,
         mode: TranslationMode.Subtitle,
-        promptTemplate: SUBTITLE_PROMPT_TEMPLATES.SYSTEM,
-        instruction: SUBTITLE_PROMPT_TEMPLATES.BATCH_INSTRUCTION,
+        promptTemplate: promptTemplate,
+        instruction: promptUser,
+        // Optional: Some providers might use a specific batch instruction format
+        metadata: {
+          batchInstruction: promptBatch
+        },
         // Add batch-level context for DeepL (dialogue continuity)
         contextMetadata: batchContext ? { dialogueContext: batchContext } : null
       }, MessageContexts.TRANSLATION_SERVICE);

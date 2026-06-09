@@ -2781,7 +2781,13 @@
     "message": "قالب پایه تصویربرداری صفحه"
   },
   "prompt_base_screen_capture_desc": {
-    "message": "دستورات سطح سیستم برای استخراج متن از تصویر و ترجمه آن."
+    "message": "دستورالعمل‌های سطح سیستم برای استخراج متن از تصویر و ترجمه آن."
+  },
+  "prompt_subtitle_user_label": {
+    "message": "قوانین ترجمه زیرنویس"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "دستورالعمل‌های لحن و سبک برای ترجمه زیرنویس (ایجاز، سبک گفتگو)."
   },
   "prompt_risk_warning_title": {
     "message": "هشدار قالب‌بندی پیشرفته"

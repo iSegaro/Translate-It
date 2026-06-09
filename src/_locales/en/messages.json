@@ -2783,6 +2783,12 @@
   "prompt_base_screen_capture_desc": {
     "message": "The system-level instructions for image-based text extraction and translation."
   },
+  "prompt_subtitle_user_label": {
+    "message": "Subtitle Translation Rules"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "Tone and style instructions for subtitle translation (conciseness, dialogue style)."
+  },
   "prompt_risk_warning_title": {
     "message": "Advanced Formatting Warning"
   },

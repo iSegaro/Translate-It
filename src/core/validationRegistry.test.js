@@ -48,4 +48,19 @@ describe('OptionsValidator - PromptRegistry Integration', () => {
     expect(isValid).toBe(true);
     expect(validator.hasErrors()).toBe(false);
   });
+
+  it('validates PROMPT_SUBTITLE_USER with minimal placeholders', async () => {
+    // Requires only: SOURCE, TARGET (No TEXT required)
+    const template = 'Rules for $_{SOURCE} to $_{TARGET} translation.';
+    const isValid = await validator.validatePromptTemplate(template, 'PROMPT_SUBTITLE_USER');
+    expect(isValid).toBe(true);
+    expect(validator.hasErrors()).toBe(false);
+  });
+
+  it('fails PROMPT_SUBTITLE_USER when SOURCE or TARGET are missing', async () => {
+    const template = 'Missing target for $_{SOURCE}';
+    const isValid = await validator.validatePromptTemplate(template, 'PROMPT_SUBTITLE_USER');
+    expect(isValid).toBe(false);
+    expect(validator.getFieldErrors('promptTemplate')[0].params.placeholders).toContain('$_{TARGET}');
+  });
 });

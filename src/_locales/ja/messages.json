@@ -2783,6 +2783,12 @@
   "prompt_base_screen_capture_desc": {
     "message": "画像ベースのテキスト抽出および翻訳のためのシステムレベルの指示。"
   },
+  "prompt_subtitle_user_label": {
+    "message": "字幕翻訳ルール"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "字幕翻訳のためのトーンとスタイルの指示（簡潔さ、対話スタイル）。"
+  },
   "prompt_risk_warning_title": {
     "message": "高度なフォーマットに関する警告"
   },
