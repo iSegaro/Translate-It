@@ -2,6 +2,7 @@ import { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
 import { LIVE_CAPTION_SETTINGS_KEYS } from './constants/liveCaptionSettings.js';
 import { LIVE_CAPTION_DEFAULTS } from './constants/liveCaptionDefaults.js';
 import { LIVE_CAPTION_SESSION_STATES } from './constants/liveCaptionSessionStates.js';
+import { LIVE_CAPTION_RUNTIME_STATES } from './constants/liveCaptionRuntimeStates.js';
 import { useLiveCaptionStore } from './stores/liveCaption.js';
 import {
   LIVE_CAPTION_CACHE_DB_NAME,
@@ -97,6 +98,7 @@ import {
   LiveCaptionTranslationAdapter
 } from './background/index.js';
 import { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
+import { LiveCaptionRuntimeController } from './content/LiveCaptionRuntimeController.js';
 import {
   BaseSTTProvider,
   STT_PROVIDER_STATUS,
@@ -122,6 +124,7 @@ export { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
 export { LIVE_CAPTION_SETTINGS_KEYS } from './constants/liveCaptionSettings.js';
 export { LIVE_CAPTION_DEFAULTS } from './constants/liveCaptionDefaults.js';
 export { LIVE_CAPTION_SESSION_STATES } from './constants/liveCaptionSessionStates.js';
+export { LIVE_CAPTION_RUNTIME_STATES } from './constants/liveCaptionRuntimeStates.js';
 export { useLiveCaptionStore } from './stores/liveCaption.js';
 export {
   LIVE_CAPTION_CACHE_DB_NAME,
@@ -237,12 +240,14 @@ export {
   LiveCaptionTranslationAdapter
 } from './background/index.js';
 export { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
+export { LiveCaptionRuntimeController } from './content/LiveCaptionRuntimeController.js';
 
 export const LiveCaptionFeature = Object.freeze({
   actions: LIVE_CAPTION_ACTIONS,
   settings: LIVE_CAPTION_SETTINGS_KEYS,
   defaults: LIVE_CAPTION_DEFAULTS,
   states: LIVE_CAPTION_SESSION_STATES,
+  runtimeStates: LIVE_CAPTION_RUNTIME_STATES,
   cleanupReasons: LIVE_CAPTION_CLEANUP_REASONS,
   store: useLiveCaptionStore,
   contracts: {
@@ -333,6 +338,7 @@ export const LiveCaptionFeature = Object.freeze({
     normalizeLiveCaptionTranslationError,
     LiveCaptionTranslationAdapter,
     LiveCaptionContentController,
+    LiveCaptionRuntimeController,
     BaseSTTProvider,
     STT_PROVIDER_STATUS,
     STT_PROVIDER_ERROR_CODES,
@@ -351,6 +357,10 @@ export const LiveCaptionFeature = Object.freeze({
     isSTTProviderSupported,
     STTProviderFactory,
     OpenAIWhisperProvider
+  },
+  content: {
+    LiveCaptionContentController,
+    LiveCaptionRuntimeController
   }
 });
 

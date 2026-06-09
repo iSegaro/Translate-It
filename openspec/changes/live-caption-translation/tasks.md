@@ -101,3 +101,11 @@
 - [x] 13.1 Update technical documentation for the new live-caption architecture
 - [x] 13.2 Document permissions, consent expectations, and supported platforms
 - [x] 13.3 Document logging scope usage and operational visibility expectations
+
+## 14. Runtime Phase 1 - Content Runtime Wiring
+
+- [x] 14.1 Create the content-side runtime controller for active-video monitoring and handoff application
+- [x] 14.2 Wire the live-caption overlay and content app to runtime lifecycle hooks
+- [x] 14.3 Track runtime status, active session state, and active video state in the store
+- [x] 14.4 Apply active-video handoff plans to the page session and overlay store
+- [x] 14.5 Add runtime tests for start, stop, pause, resume, destroy, handoff, and cleanup

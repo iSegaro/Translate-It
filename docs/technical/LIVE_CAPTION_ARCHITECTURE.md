@@ -68,6 +68,7 @@ Overlay Rendering
 Owns:
 
 - active-video discovery and UI-side handoff inputs
+- the content-side `LiveCaptionRuntimeController` that observes videos and applies handoff plans
 - consent notice display and user interaction state
 - overlay rendering, position metadata, and display mode selection
 - page-local UI state in Pinia
@@ -446,6 +447,7 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 
 - architecture contracts
 - session model
+- content-side runtime controller
 - cache model
 - overlay shell and display-mode contract
 - consent and privacy policy
@@ -478,6 +480,7 @@ The next phase is runtime wiring only:
 ## Maintenance Notes
 
 - Keep `PageLiveCaptionSession`, `VideoCaptionSession`, `LiveCaptionSessionManager`, `LiveCaptionVideoHandoffCoordinator`, and `LiveCaptionCleanupCoordinator` aligned with the OpenSpec change before changing runtime code.
+- Keep `LiveCaptionRuntimeController` aligned with the content-side ownership model and avoid moving detection or handoff policy into the overlay.
 - Do not move capture ownership into the service worker.
 - Do not merge STT into the translation provider stack.
 - Do not store transcript and translation records in the same cache store.

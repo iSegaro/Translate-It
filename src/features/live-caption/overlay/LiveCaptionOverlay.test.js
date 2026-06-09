@@ -48,6 +48,11 @@ describe('live-caption overlay shell', () => {
       props: {
         visible: true,
         status: 'idle',
+        runtimeStatus: 'running',
+        activeSessionState: 'active',
+        activeVideoState: {
+          videoFingerprint: 'video-1'
+        },
         captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
         consentAccepted: true,
         showConsentNotice: false,
@@ -72,6 +77,9 @@ describe('live-caption overlay shell', () => {
     });
 
     expect(wrapper.attributes('data-status')).toBe('idle');
+    expect(wrapper.attributes('data-runtime-status')).toBe('running');
+    expect(wrapper.attributes('data-active-session-state')).toBe('active');
+    expect(wrapper.attributes('data-active-video-fingerprint')).toBe('video-1');
     expect(wrapper.find('.live-caption-caption-track').exists()).toBe(true);
     expect(wrapper.text()).toContain('سلام');
     expect(wrapper.text()).not.toContain('Hello');

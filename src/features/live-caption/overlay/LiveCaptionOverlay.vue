@@ -4,10 +4,14 @@
     class="live-caption-overlay"
     :class="[
       `live-caption-overlay--${status || 'idle'}`,
+      `live-caption-overlay--runtime-${runtimeStatus || 'idle'}`,
       { 'live-caption-overlay--blocked': showConsentPanel }
     ]"
     :style="resolvedPositionStyle"
     :data-status="status || 'idle'"
+    :data-runtime-status="runtimeStatus || 'idle'"
+    :data-active-session-state="activeSessionState || 'idle'"
+    :data-active-video-fingerprint="activeVideoState?.videoFingerprint || 'none'"
     role="region"
     aria-label="Live Caption overlay"
   >
@@ -70,6 +74,14 @@ const props = defineProps({
     type: String,
     default: 'idle'
   },
+  runtimeStatus: {
+    type: String,
+    default: 'idle'
+  },
+  activeSessionState: {
+    type: String,
+    default: 'idle'
+  },
   captionLines: {
     type: Array,
     default: () => []
@@ -115,6 +127,10 @@ const props = defineProps({
     default: null
   },
   videoElement: {
+    type: Object,
+    default: null
+  },
+  activeVideoState: {
     type: Object,
     default: null
   },

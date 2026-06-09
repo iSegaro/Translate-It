@@ -93,6 +93,9 @@
         v-if="liveCaptionStore.overlayVisible"
         :visible="liveCaptionStore.overlayVisible"
         :status="liveCaptionStore.status"
+        :runtime-status="liveCaptionStore.runtimeStatus"
+        :active-session-state="liveCaptionStore.activeSessionState"
+        :active-video-state="liveCaptionStore.activeVideoState"
         :caption-lines="liveCaptionStore.captionLines"
         :caption-display-mode="liveCaptionStore.captionDisplayMode"
         :consent-accepted="liveCaptionStore.consentAccepted"
@@ -100,6 +103,13 @@
         :privacy-notice="liveCaptionStore.privacyNotice"
         :last-error="liveCaptionStore.lastError"
         :controls-state="liveCaptionStore.controlsState"
+        :video-element="liveCaptionRuntimeController?.currentVideoElement || null"
+        @accept-consent="handleLiveCaptionAcceptConsent"
+        @cancel-consent="handleLiveCaptionCancelConsent"
+        @start="handleLiveCaptionStart"
+        @stop="handleLiveCaptionStop"
+        @retry="handleLiveCaptionRetry"
+        @clear-cache="handleLiveCaptionClearCache"
       />
     </template>
 
@@ -175,6 +185,8 @@ import { useContentAppTextFieldIcons } from './composables/useContentAppTextFiel
 import { useContentAppPageTranslation } from './composables/useContentAppPageTranslation.js';
 import { useContentAppLifecycle } from './composables/useContentAppLifecycle.js';
 import { useLiveCaptionStore } from '@/features/live-caption/stores/liveCaption.js';
+import { LiveCaptionRuntimeController } from '@/features/live-caption/content/index.js';
+import { LIVE_CAPTION_CLEANUP_REASONS } from '@/features/live-caption/core/contracts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
@@ -185,6 +197,7 @@ useUnifiedI18n();
 const settingsStore = useSettingsStore();
 const mobileStore = useMobileStore();
 const liveCaptionStore = useLiveCaptionStore();
+let liveCaptionRuntimeController = null;
 const tracker = useResourceTracker('content-app');
 
 // 2. Localization & RTL Management
@@ -249,8 +262,65 @@ setupEventListeners();
 // 7. Page Translation Sync Logic
 useContentAppPageTranslation(mobileStore, tracker);
 
+const ensureLiveCaptionRuntimeController = () => {
+  if (!liveCaptionRuntimeController) {
+    liveCaptionRuntimeController = new LiveCaptionRuntimeController({
+      store: liveCaptionStore
+    });
+  }
+
+  return liveCaptionRuntimeController;
+};
+
+const handleLiveCaptionStart = async () => {
+  liveCaptionStore.setEnabled(true);
+  const controller = ensureLiveCaptionRuntimeController();
+  await controller.start();
+};
+
+const handleLiveCaptionStop = async () => {
+  liveCaptionStore.setEnabled(false);
+
+  if (liveCaptionRuntimeController) {
+    await liveCaptionRuntimeController.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
+  }
+};
+
+const handleLiveCaptionRetry = async () => {
+  const controller = ensureLiveCaptionRuntimeController();
+  await controller.resume();
+  await controller.syncActiveVideo('retry');
+};
+
+const handleLiveCaptionClearCache = () => {
+  logger.debug('Live-caption clear-cache requested before runtime cache wiring');
+};
+
+const handleLiveCaptionAcceptConsent = async () => {
+  liveCaptionStore.acceptConsent();
+  const controller = ensureLiveCaptionRuntimeController();
+  await controller.start();
+};
+
+const handleLiveCaptionCancelConsent = async () => {
+  liveCaptionStore.cancelConsent();
+  liveCaptionStore.setEnabled(false);
+
+  if (liveCaptionRuntimeController) {
+    await liveCaptionRuntimeController.stop(LIVE_CAPTION_CLEANUP_REASONS.MANUAL, {
+      notifyContent: false
+    });
+  }
+};
+
 // 8. Lifecycle & Cleanup Logic
 const onNavigationCleanup = () => {
+  if (liveCaptionRuntimeController) {
+    void liveCaptionRuntimeController.destroy(LIVE_CAPTION_CLEANUP_REASONS.NAVIGATION);
+    liveCaptionRuntimeController = null;
+  }
+  liveCaptionStore.setEnabled(false);
+
   // Close all active translation windows
   if (translationWindows.value.length > 0) {
     translationWindows.value.forEach(window => {
@@ -286,6 +356,11 @@ useContentAppLifecycle({
 });
 
 onUnmounted(() => {
+  if (liveCaptionRuntimeController) {
+    void liveCaptionRuntimeController.destroy(LIVE_CAPTION_CLEANUP_REASONS.MANUAL);
+    liveCaptionRuntimeController = null;
+  }
+
   cleanupEventListeners();
   logger.debug('ContentApp unmounted, cleaned up WindowsManager listeners.');
 });

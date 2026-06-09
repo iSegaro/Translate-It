@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import useLiveCaptionStore from './liveCaption.js';
 import { LIVE_CAPTION_SESSION_STATES } from '../constants/liveCaptionSessionStates.js';
+import { LIVE_CAPTION_RUNTIME_STATES } from '../constants/liveCaptionRuntimeStates.js';
 import { LIVE_CAPTION_CONSENT_STATES } from '../core/LiveCaptionConsentPolicy.js';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODES } from '../core/LiveCaptionCaptionDisplayMode.js';
 
@@ -14,6 +15,9 @@ describe('live-caption store shell', () => {
     const store = useLiveCaptionStore();
 
     expect(store.status).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
+    expect(store.activeSessionState).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
+    expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
+    expect(store.isEnabled).toBe(false);
     expect(store.isEnabled).toBe(false);
     expect(store.overlayVisible).toBe(false);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
@@ -26,6 +30,7 @@ describe('live-caption store shell', () => {
     expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.sessionId).toBe(null);
     expect(store.isEnabled).toBe(false);
+    expect(store.activeVideoState).toBe(null);
     expect(store.captionLines).toEqual([]);
     expect(store.controlsState).toEqual({
       canStart: true,
@@ -38,6 +43,11 @@ describe('live-caption store shell', () => {
   it('resets shell state without runtime behavior', () => {
     const store = useLiveCaptionStore();
     store.setStatus(LIVE_CAPTION_SESSION_STATES.ACTIVE);
+    store.setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    store.setActiveVideoState({
+      videoFingerprint: 'video-1',
+      handoffAction: 'create_new_video_session'
+    });
     store.setOverlayVisible(true);
     store.acceptConsent();
     store.setPrivacyNotice({
@@ -54,6 +64,8 @@ describe('live-caption store shell', () => {
     store.reset();
 
     expect(store.status).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
+    expect(store.activeSessionState).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
+    expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
     expect(store.overlayVisible).toBe(false);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.consentAccepted).toBe(false);
@@ -63,6 +75,7 @@ describe('live-caption store shell', () => {
     expect(store.sessionId).toBe(null);
     expect(store.activeTabId).toBe(null);
     expect(store.activeVideoFingerprint).toBe(null);
+    expect(store.activeVideoState).toBe(null);
     expect(store.lastError).toBe(null);
     expect(store.isEnabled).toBe(false);
     expect(store.captionLines).toEqual([]);
@@ -100,6 +113,36 @@ describe('live-caption store shell', () => {
     expect(store.captionLines).toEqual([]);
   });
 
+  it('tracks runtime lifecycle state and active video metadata', () => {
+    const store = useLiveCaptionStore();
+
+    store.setEnabled(true);
+    expect(store.isEnabled).toBe(true);
+    expect(store.overlayVisible).toBe(true);
+
+    store.setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+
+    store.setActiveSessionState(LIVE_CAPTION_SESSION_STATES.ACTIVE);
+    expect(store.status).toBe(LIVE_CAPTION_SESSION_STATES.ACTIVE);
+    expect(store.activeSessionState).toBe(LIVE_CAPTION_SESSION_STATES.ACTIVE);
+
+    store.setActiveVideoState({
+      videoFingerprint: 'video-1',
+      videoSessionId: 'session-1',
+      handoffAction: 'create_new_video_session'
+    });
+
+    expect(store.activeVideoState).toMatchObject({
+      videoFingerprint: 'video-1',
+      videoSessionId: 'session-1',
+      handoffAction: 'create_new_video_session'
+    });
+
+    store.clearActiveVideoState();
+    expect(store.activeVideoState).toBe(null);
+  });
+
   it('controls consent visibility and overlay reset state', () => {
     const store = useLiveCaptionStore();
 
@@ -127,6 +170,9 @@ describe('live-caption store shell', () => {
     expect(store.consentAccepted).toBe(false);
     expect(store.consentNoticeVisible).toBe(false);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
+    expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
+    expect(store.activeSessionState).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
+    expect(store.isEnabled).toBe(false);
     expect(store.captionLines).toEqual([]);
     expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.lastError).toBe(null);

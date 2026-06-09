@@ -5,6 +5,7 @@ import {
   LIVE_CAPTION_SETTINGS_KEYS,
   LIVE_CAPTION_DEFAULTS,
   LIVE_CAPTION_SESSION_STATES,
+  LIVE_CAPTION_RUNTIME_STATES,
   LIVE_CAPTION_CLEANUP_REASONS,
   createLiveCaptionSessionSnapshot,
   createVideoCaptionSessionSnapshot,
@@ -101,7 +102,8 @@ import {
   getAvailableSTTProviders,
   isSTTProviderSupported,
   STTProviderFactory,
-  OpenAIWhisperProvider
+  OpenAIWhisperProvider,
+  LiveCaptionRuntimeController
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { CONFIG } from '@/shared/config/config.js';
@@ -114,10 +116,12 @@ describe('live-caption feature shell', () => {
     expect(LIVE_CAPTION_DEFAULTS.ENABLED).toBe(CONFIG.LIVE_CAPTION_ENABLED);
     expect(LIVE_CAPTION_DEFAULTS.OPENAI_API_KEY_SETTING).toBe('OPENAI_API_KEY');
     expect(LIVE_CAPTION_SESSION_STATES.IDLE).toBe('idle');
+    expect(LIVE_CAPTION_RUNTIME_STATES.IDLE).toBe('idle');
     expect(LIVE_CAPTION_CLEANUP_REASONS.STOP).toBe('stop');
     expect(LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR).toBe('provider_error');
     expect(LiveCaptionFeature.store).toBe(useLiveCaptionStore);
     expect(LiveCaptionFeature.cleanupReasons).toBe(LIVE_CAPTION_CLEANUP_REASONS);
+    expect(LiveCaptionFeature.runtimeStates).toBe(LIVE_CAPTION_RUNTIME_STATES);
     expect(LiveCaptionFeature.contracts.createLiveCaptionSessionSnapshot).toBe(createLiveCaptionSessionSnapshot);
     expect(LiveCaptionFeature.contracts.createVideoCaptionSessionSnapshot).toBe(createVideoCaptionSessionSnapshot);
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CONSENT_STATES).toBe(LIVE_CAPTION_CONSENT_STATES);
@@ -210,6 +214,7 @@ describe('live-caption feature shell', () => {
     expect(isSTTProviderSupported).toBe(LiveCaptionFeature.contracts.isSTTProviderSupported);
     expect(STTProviderFactory).toBe(LiveCaptionFeature.contracts.STTProviderFactory);
     expect(OpenAIWhisperProvider).toBe(LiveCaptionFeature.contracts.OpenAIWhisperProvider);
+    expect(LiveCaptionFeature.content.LiveCaptionRuntimeController).toBe(LiveCaptionRuntimeController);
   });
 
   it('exports session contracts without runtime wiring', () => {
