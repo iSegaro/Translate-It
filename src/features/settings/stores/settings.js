@@ -8,6 +8,7 @@ import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -661,18 +662,25 @@ export const useSettingsStore = defineStore('settings', () => {
       });
     }
     
-    // 4. Validate Prompt Templates
-    const prompt = settings.value.PROMPT_TEMPLATE;
-    if (!prompt || prompt.toString().trim() === '') {
-      errors.push('validation_prompt_template_empty');
-    } else if (!prompt.toString().includes('$_{TEXT}')) {
-      errors.push('validation_prompt_template_missing_placeholders');
-    }
-
-    const autoPrompt = settings.value.PROMPT_TEMPLATE_AUTO;
-    if (autoPrompt && autoPrompt.toString().trim() !== '' && !autoPrompt.toString().includes('$_{TEXT}')) {
-      errors.push('validation_prompt_template_missing_placeholders');
-    }
+    // 4. Validate Prompt Templates (Registry-Driven)
+    Object.values(PROMPT_REGISTRY).forEach(promptMeta => {
+      // Only validate editable prompts on save
+      if (promptMeta.editable) {
+        const template = settings.value[promptMeta.key];
+        
+        if (!template || template.toString().trim() === '') {
+          errors.push(`prompt:${promptMeta.key}:validation_prompt_template_empty`);
+        } else {
+          // Verify required placeholders from registry
+          const requiredPlaceholders = promptMeta.placeholders || ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"];
+          const missingPlaceholders = requiredPlaceholders.filter(p => !template.toString().includes(p));
+          
+          if (missingPlaceholders.length > 0) {
+            errors.push(`prompt:${promptMeta.key}:validation_prompt_template_missing_placeholders`);
+          }
+        }
+      }
+    });
     
     // 5. Validate Proxy
     if (settings.value.PROXY_ENABLED && (!settings.value.PROXY_HOST || settings.value.PROXY_HOST.trim() === '')) {

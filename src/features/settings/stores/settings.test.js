@@ -175,7 +175,27 @@ describe('Settings Store', () => {
       
       const result = store.validateSettings();
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('validation_prompt_template_missing_placeholders');
+      expect(result.errors).toContain('prompt:PROMPT_TEMPLATE:validation_prompt_template_missing_placeholders');
+    });
+
+    it('validateSettings should allow subtitle prompt without $_{TEXT}', () => {
+      const store = useSettingsStore();
+      // Only SOURCE and TARGET are required for subtitles in the registry
+      store.settings.PROMPT_SUBTITLE_USER = 'Translate from $_{SOURCE} to $_{TARGET}.';
+      
+      const result = store.validateSettings();
+      
+      // Filter out other potential errors to focus on the subtitle prompt
+      const subtitleErrors = result.errors.filter(e => e.includes('PROMPT_SUBTITLE_USER'));
+      expect(subtitleErrors).toHaveLength(0);
+    });
+
+    it('validateSettings should reject subtitle prompt missing required language placeholders', () => {
+      const store = useSettingsStore();
+      store.settings.PROMPT_SUBTITLE_USER = 'Translate this.'; // Missing SOURCE and TARGET
+      
+      const result = store.validateSettings();
+      expect(result.errors).toContain('prompt:PROMPT_SUBTITLE_USER:validation_prompt_template_missing_placeholders');
     });
   });
 

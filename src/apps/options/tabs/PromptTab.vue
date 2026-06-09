@@ -276,14 +276,12 @@ const refreshPreview = async () => {
 
 // Validation feedback listener
 const handleValidationFeedback = (e) => {
-  const { field } = e.detail || {};
+  const { field, promptKey } = e.detail || {};
   
-  if (field === 'prompt' || field === 'PROMPT_TEMPLATE' || field === 'PROMPT_TEMPLATE_AUTO') {
-    // If feedback is for the other template, switch to it first
-    if (field === 'PROMPT_TEMPLATE' && currentPromptKey.value !== 'PROMPT_TEMPLATE') {
-      currentPromptKey.value = 'PROMPT_TEMPLATE'
-    } else if (field === 'PROMPT_TEMPLATE_AUTO' && currentPromptKey.value !== 'PROMPT_TEMPLATE_AUTO') {
-      currentPromptKey.value = 'PROMPT_TEMPLATE_AUTO'
+  if (field === 'prompt' || promptKey) {
+    // Switch to specific prompt if provided, otherwise stick to current
+    if (promptKey && PROMPT_REGISTRY[promptKey]) {
+      currentPromptKey.value = promptKey;
     }
 
     // Explicitly trigger validation feedback display
