@@ -41,7 +41,17 @@ import {
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
-  normalizeLiveCaptionOffscreenResponse
+  normalizeLiveCaptionOffscreenResponse,
+  LIVE_CAPTION_TRANSLATION_CONTEXT,
+  LIVE_CAPTION_TRANSLATION_MODE,
+  LIVE_CAPTION_TRANSLATION_ERROR_CODES,
+  normalizeLiveCaptionTranscriptSegment,
+  createLiveCaptionTranscriptSegmentInput,
+  createLiveCaptionTranslationRequestMetadata,
+  createLiveCaptionTranslationRequest,
+  createLiveCaptionTranslatedCaptionSegment,
+  normalizeLiveCaptionTranslationError,
+  LiveCaptionTranslationAdapter
 } from './background/index.js';
 import { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
 import {
@@ -128,7 +138,17 @@ export {
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
-  normalizeLiveCaptionOffscreenResponse
+  normalizeLiveCaptionOffscreenResponse,
+  LIVE_CAPTION_TRANSLATION_CONTEXT,
+  LIVE_CAPTION_TRANSLATION_MODE,
+  LIVE_CAPTION_TRANSLATION_ERROR_CODES,
+  normalizeLiveCaptionTranscriptSegment,
+  createLiveCaptionTranscriptSegmentInput,
+  createLiveCaptionTranslationRequestMetadata,
+  createLiveCaptionTranslationRequest,
+  createLiveCaptionTranslatedCaptionSegment,
+  normalizeLiveCaptionTranslationError,
+  LiveCaptionTranslationAdapter
 } from './background/index.js';
 export { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
 
@@ -176,6 +196,16 @@ export const LiveCaptionFeature = Object.freeze({
     createLiveCaptionOffscreenSnapshotResponse,
     createLiveCaptionFailClosedResponse,
     normalizeLiveCaptionOffscreenResponse,
+    LIVE_CAPTION_TRANSLATION_CONTEXT,
+    LIVE_CAPTION_TRANSLATION_MODE,
+    LIVE_CAPTION_TRANSLATION_ERROR_CODES,
+    normalizeLiveCaptionTranscriptSegment,
+    createLiveCaptionTranscriptSegmentInput,
+    createLiveCaptionTranslationRequestMetadata,
+    createLiveCaptionTranslationRequest,
+    createLiveCaptionTranslatedCaptionSegment,
+    normalizeLiveCaptionTranslationError,
+    LiveCaptionTranslationAdapter,
     LiveCaptionContentController,
     STT_PROVIDER_STATUS,
     STT_PROVIDER_ERROR_CODES,

@@ -46,9 +46,9 @@
 
 ## 7. Translation Pipeline Integration
 
-- [ ] 7.1 Specify how finalized transcript text is handed off to the existing translation provider flow
-- [ ] 7.2 Specify how live-caption translation uses current translation settings without introducing a new selection UI
-- [ ] 7.3 Define how translation results are normalized for caption rendering and persistence
+- [x] 7.1 Specify how finalized transcript text is handed off to the existing translation provider flow
+- [x] 7.2 Specify how live-caption translation uses current translation settings without introducing a new selection UI
+- [x] 7.3 Define how translation results are normalized for caption rendering and persistence
 
 ## 8. Overlay and UI Host Integration
 
@@ -84,7 +84,7 @@
 - [x] 12.2 Define unit tests for active-video detection and fingerprint generation
 - [x] 12.3 Define unit tests for deterministic active-video tie-break ordering
 - [x] 12.4 Define unit tests for STT provider contracts and retry behavior
-- [ ] 12.5 Define integration tests for capture-to-translation request flow
+- [x] 12.5 Define integration tests for capture-to-translation request flow
 - [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
 - [x] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
 - [x] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling

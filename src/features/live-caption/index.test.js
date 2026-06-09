@@ -24,6 +24,14 @@ import {
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_TRANSLATION_CONTEXT,
+  LIVE_CAPTION_TRANSLATION_MODE,
+  LIVE_CAPTION_TRANSLATION_ERROR_CODES,
+  createLiveCaptionTranscriptSegmentInput,
+  createLiveCaptionTranslationRequestMetadata,
+  createLiveCaptionTranslationRequest,
+  createLiveCaptionTranslatedCaptionSegment,
+  normalizeLiveCaptionTranslationError,
   createLiveCaptionStartCaptureRequest,
   createLiveCaptionStopCaptureRequest,
   createLiveCaptionStatusRequest,
@@ -85,6 +93,14 @@ describe('live-caption feature shell', () => {
     expect(createLiveCaptionOffscreenSnapshotResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionOffscreenSnapshotResponse);
     expect(createLiveCaptionFailClosedResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionFailClosedResponse);
     expect(normalizeLiveCaptionOffscreenResponse).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionOffscreenResponse);
+    expect(LIVE_CAPTION_TRANSLATION_CONTEXT).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_TRANSLATION_CONTEXT);
+    expect(LIVE_CAPTION_TRANSLATION_MODE).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_TRANSLATION_MODE);
+    expect(LIVE_CAPTION_TRANSLATION_ERROR_CODES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_TRANSLATION_ERROR_CODES);
+    expect(createLiveCaptionTranscriptSegmentInput).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranscriptSegmentInput);
+    expect(createLiveCaptionTranslationRequestMetadata).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslationRequestMetadata);
+    expect(createLiveCaptionTranslationRequest).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslationRequest);
+    expect(createLiveCaptionTranslatedCaptionSegment).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslatedCaptionSegment);
+    expect(normalizeLiveCaptionTranslationError).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionTranslationError);
     expect(BaseSTTProvider).toBe(LiveCaptionFeature.contracts.BaseSTTProvider);
     expect(STT_PROVIDER_STATUS).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_STATUS);
     expect(STT_PROVIDER_ERROR_CODES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_ERROR_CODES);
