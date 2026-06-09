@@ -11,6 +11,7 @@ import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js'
+import { LiveCaptionBackgroundController } from '@/features/live-caption/background/LiveCaptionBackgroundController.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -134,6 +135,9 @@ registerAllProviders();
 
 const backgroundService = new LifecycleManager();
 globalThis.backgroundService = backgroundService;
+const liveCaptionBackgroundController = new LiveCaptionBackgroundController();
+backgroundService.liveCaptionBackgroundController = liveCaptionBackgroundController;
+liveCaptionBackgroundController.registerHandlers(backgroundService.messageHandler);
 
 
 // Handle extension installation
@@ -211,4 +215,3 @@ backgroundService.initialize().then(async () => {
 });
 
 export { backgroundService };
-

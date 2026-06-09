@@ -1,5 +1,21 @@
 import { LiveCaptionBackgroundController } from './LiveCaptionBackgroundController.js';
 import {
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  normalizeLiveCaptionRuntimeRequest,
+  createLiveCaptionRuntimeStartRequest,
+  createLiveCaptionRuntimeStopRequest,
+  createLiveCaptionRuntimeStatusRequest,
+  createLiveCaptionRuntimePauseRequest,
+  createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  createLiveCaptionRuntimeFailClosedResponse,
+  normalizeLiveCaptionRuntimeResponse
+} from './liveCaptionRuntimeContracts.js';
+import {
   LIVE_CAPTION_TRANSLATION_CONTEXT,
   LIVE_CAPTION_TRANSLATION_MODE,
   LIVE_CAPTION_TRANSLATION_ERROR_CODES,
@@ -28,6 +44,22 @@ import {
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 
 export { LiveCaptionBackgroundController } from './LiveCaptionBackgroundController.js';
+export {
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  normalizeLiveCaptionRuntimeRequest,
+  createLiveCaptionRuntimeStartRequest,
+  createLiveCaptionRuntimeStopRequest,
+  createLiveCaptionRuntimeStatusRequest,
+  createLiveCaptionRuntimePauseRequest,
+  createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  createLiveCaptionRuntimeFailClosedResponse,
+  normalizeLiveCaptionRuntimeResponse
+} from './liveCaptionRuntimeContracts.js';
 export {
   LIVE_CAPTION_TRANSLATION_CONTEXT,
   LIVE_CAPTION_TRANSLATION_MODE,
@@ -58,6 +90,20 @@ export { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.j
 
 export default {
   LiveCaptionBackgroundController,
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  normalizeLiveCaptionRuntimeRequest,
+  createLiveCaptionRuntimeStartRequest,
+  createLiveCaptionRuntimeStopRequest,
+  createLiveCaptionRuntimeStatusRequest,
+  createLiveCaptionRuntimePauseRequest,
+  createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  createLiveCaptionRuntimeFailClosedResponse,
+  normalizeLiveCaptionRuntimeResponse,
   LIVE_CAPTION_TRANSLATION_CONTEXT,
   LIVE_CAPTION_TRANSLATION_MODE,
   LIVE_CAPTION_TRANSLATION_ERROR_CODES,

@@ -6,6 +6,21 @@ import {
   LIVE_CAPTION_DEFAULTS,
   LIVE_CAPTION_SESSION_STATES,
   LIVE_CAPTION_RUNTIME_STATES,
+  LiveCaptionBackgroundController,
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  normalizeLiveCaptionRuntimeRequest,
+  createLiveCaptionRuntimeStartRequest,
+  createLiveCaptionRuntimeStopRequest,
+  createLiveCaptionRuntimeStatusRequest,
+  createLiveCaptionRuntimePauseRequest,
+  createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  createLiveCaptionRuntimeFailClosedResponse,
+  normalizeLiveCaptionRuntimeResponse,
   LIVE_CAPTION_CLEANUP_REASONS,
   createLiveCaptionSessionSnapshot,
   createVideoCaptionSessionSnapshot,
@@ -155,6 +170,21 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCaptionDisplayMode).toBe(normalizeLiveCaptionCaptionDisplayMode);
     expect(LiveCaptionFeature.contracts.resolveLiveCaptionCaptionLineDisplay).toBe(resolveLiveCaptionCaptionLineDisplay);
     expect(LiveCaptionFeature.contracts.selectLiveCaptionCaptionLines).toBe(selectLiveCaptionCaptionLines);
+    expect(LiveCaptionBackgroundController).toBe(LiveCaptionFeature.contracts.LiveCaptionBackgroundController);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_ACTIONS).toBe(LIVE_CAPTION_RUNTIME_ACTIONS);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_ERROR_CODES).toBe(LIVE_CAPTION_RUNTIME_ERROR_CODES);
+    expect(LiveCaptionFeature.contracts.normalizeLiveCaptionRuntimeRequest).toBe(normalizeLiveCaptionRuntimeRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeStartRequest).toBe(createLiveCaptionRuntimeStartRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeStopRequest).toBe(createLiveCaptionRuntimeStopRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeStatusRequest).toBe(createLiveCaptionRuntimeStatusRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimePauseRequest).toBe(createLiveCaptionRuntimePauseRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeResumeRequest).toBe(createLiveCaptionRuntimeResumeRequest);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeSuccessResponse).toBe(createLiveCaptionRuntimeSuccessResponse);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeNotImplementedResponse).toBe(createLiveCaptionRuntimeNotImplementedResponse);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeUnavailableResponse).toBe(createLiveCaptionRuntimeUnavailableResponse);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeFailClosedResponse).toBe(createLiveCaptionRuntimeFailClosedResponse);
+    expect(LiveCaptionFeature.contracts.normalizeLiveCaptionRuntimeResponse).toBe(normalizeLiveCaptionRuntimeResponse);
     expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
     expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
     expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);

@@ -54,7 +54,7 @@ Overlay Rendering
 ### Ownership Boundaries
 
 - **Content** consumes active-video selection results, renders the overlay, exposes consent UI, and holds UI-local state. It supplies UI-side handoff inputs but does not own active-video selection policy.
-- **Background Orchestration** owns the session manager, handoff coordinator, cleanup coordinator, and the offscreen bridge.
+- **Background Orchestration** owns the session manager, runtime message routing, handoff coordinator, cleanup coordinator, and the offscreen bridge.
 - **SessionManager** is background-owned and keeps one tab-scoped session registry while providing snapshots for recovery and cleanup.
 - **Offscreen Capture** owns the media stream and finalized audio chunks.
 - **STT Layer** owns transcription only.
@@ -87,6 +87,7 @@ Does not own:
 Owns:
 
 - session orchestration and registry access
+- runtime message routing and shell response normalization
 - handoff planning and cleanup coordination
 - STT dispatch
 - translation dispatch
@@ -456,6 +457,8 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - translation adapter
 - active-video detector
 - active-video handoff coordinator
+- background runtime controller and routing shell
+- runtime message contracts
 - structured logging scope
 
 ### Not Yet Implemented
@@ -465,17 +468,15 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - offscreen runtime capture
 - STT execution pipeline
 - translation execution pipeline
-- runtime message wiring
 - end-to-end caption execution
 
 ## Future Runtime Phases
 
-The next phase is runtime wiring only:
+The remaining runtime phases are media and execution only:
 
-1. connect content-side activation to the handoff/session contracts
-2. wire background listeners and offscreen capture ownership
-3. run finalized chunks through STT, translation, and overlay updates
-4. verify cleanup and recovery paths under real browser lifecycle events
+1. wire offscreen capture ownership to the actual tab-audio pipeline
+2. run finalized chunks through STT, translation, and overlay updates
+3. verify cleanup and recovery paths under real browser lifecycle events
 
 ## Maintenance Notes
 

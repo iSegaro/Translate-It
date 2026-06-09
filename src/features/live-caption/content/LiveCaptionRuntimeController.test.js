@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import useLiveCaptionStore from '../stores/liveCaption.js';
 import { LiveCaptionRuntimeController } from './LiveCaptionRuntimeController.js';
+import { LIVE_CAPTION_ACTIONS } from '../constants/liveCaptionActions.js';
 import { LIVE_CAPTION_RUNTIME_STATES } from '../constants/liveCaptionRuntimeStates.js';
 import { LIVE_CAPTION_CLEANUP_REASONS } from '../core/contracts.js';
 import { createVideoFingerprint } from '../core/VideoFingerprint.js';
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from '../core/LiveCaptionCleanupCoordinator.js';
+import { LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES } from '../background/liveCaptionRuntimeContracts.js';
 
 const mocks = vi.hoisted(() => ({
   offscreenBridge: vi.fn(),
@@ -47,6 +49,36 @@ function createSupportedPlatformSupport() {
     browserName: 'chrome',
     platform: 'desktop',
     isMobile: false
+  };
+}
+
+function createRuntimeBrowserApi() {
+  const sendMessage = vi.fn(async (request) => {
+    const runtimeStatusByAction = {
+      [LIVE_CAPTION_ACTIONS.RUNTIME_START]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.START_NOT_IMPLEMENTED,
+      [LIVE_CAPTION_ACTIONS.RUNTIME_STOP]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STOP_NOT_IMPLEMENTED,
+      [LIVE_CAPTION_ACTIONS.RUNTIME_STATUS]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STATUS_NOT_IMPLEMENTED,
+      [LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.PAUSE_NOT_IMPLEMENTED,
+      [LIVE_CAPTION_ACTIONS.RUNTIME_RESUME]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.RESUME_NOT_IMPLEMENTED
+    };
+
+    return {
+      success: true,
+      ok: true,
+      action: request.action,
+      status: runtimeStatusByAction[request.action] ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+      runtimeState: request.action === LIVE_CAPTION_ACTIONS.RUNTIME_STOP ? 'idle' : request.action === LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE ? 'paused' : 'running',
+      sessionId: request.data?.sessionId ?? null,
+      tabId: request.data?.tabId ?? null,
+      videoFingerprint: request.data?.videoFingerprint ?? null,
+      requestId: request.messageId ?? null
+    };
+  });
+
+  return {
+    runtime: {
+      sendMessage
+    }
   };
 }
 
@@ -156,6 +188,65 @@ describe('live-caption runtime controller', () => {
     expect(firstResult.sessionId).toBe(secondResult.sessionId);
     expect(firstResult.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
     expect(secondResult.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+  });
+
+  it('routes runtime lifecycle requests through the background messaging shell', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+    const browserApi = createRuntimeBrowserApi();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    await controller.start({ tabId: 11 });
+    const statusResponse = await controller.requestRuntimeStatus('manual-status');
+    await controller.pause();
+    await controller.resume();
+    await controller.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
+
+    expect(browserApi.runtime.sendMessage).toHaveBeenCalledTimes(5);
+    expect(browserApi.runtime.sendMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_START,
+        context: 'live-caption',
+        data: expect.objectContaining({
+          tabId: 11,
+          requestSource: 'content'
+        })
+      })
+    );
+    expect(browserApi.runtime.sendMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_STATUS
+      })
+    );
+    expect(browserApi.runtime.sendMessage).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE
+      })
+    );
+    expect(browserApi.runtime.sendMessage).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_RESUME
+      })
+    );
+    expect(browserApi.runtime.sendMessage).toHaveBeenNthCalledWith(
+      5,
+      expect.objectContaining({
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_STOP
+      })
+    );
+    expect(statusResponse.status).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STATUS_NOT_IMPLEMENTED);
+    expect(controller.lastRuntimeResponse.status).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STOP_NOT_IMPLEMENTED);
   });
 
   it('detects the active video and replaces the active session when the winner changes', async () => {

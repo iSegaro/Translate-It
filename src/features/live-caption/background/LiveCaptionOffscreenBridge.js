@@ -13,6 +13,12 @@ import {
   createLiveCaptionStopCaptureRequest,
   normalizeLiveCaptionOffscreenResponse
 } from './liveCaptionOffscreenContracts.js';
+import {
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  normalizeLiveCaptionRuntimeResponse
+} from './liveCaptionRuntimeContracts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenBridge');
 
@@ -23,8 +29,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscree
 export class LiveCaptionOffscreenBridge {
   constructor() {
     this.status = LIVE_CAPTION_CAPTURE_STATES.IDLE;
+    this.runtimeState = 'idle';
     this.lastRequest = null;
     this.lastResponse = null;
+    this.lastRuntimeRequest = null;
+    this.lastRuntimeResponse = null;
     this.lastSnapshot = null;
     this.lastUpdatedAt = Date.now();
 
@@ -47,6 +56,18 @@ export class LiveCaptionOffscreenBridge {
     });
 
     return this.status;
+  }
+
+  setRuntimeState(runtimeState, details = {}) {
+    this.runtimeState = runtimeState;
+    this.touch();
+
+    logger.debug('Live-caption offscreen runtime state updated', {
+      runtimeState,
+      ...details
+    });
+
+    return this.runtimeState;
   }
 
   createStartCaptureRequest(options = {}) {
@@ -113,6 +134,93 @@ export class LiveCaptionOffscreenBridge {
     return createLiveCaptionFailClosedResponse(options);
   }
 
+  createRuntimeStartResponse(options = {}) {
+    const response = createLiveCaptionRuntimeNotImplementedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.START, options);
+    this.lastRuntimeRequest = {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? 'starting', {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+      status: response.status
+    });
+    return response;
+  }
+
+  createRuntimeStopResponse(options = {}) {
+    const response = createLiveCaptionRuntimeNotImplementedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.STOP, options);
+    this.lastRuntimeRequest = {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? 'idle', {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+      status: response.status
+    });
+    return response;
+  }
+
+  createRuntimeStatusResponse(options = {}) {
+    const response = createLiveCaptionRuntimeNotImplementedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.STATUS, {
+      ...options,
+      runtimeState: options.runtimeState ?? this.runtimeState
+    });
+    this.lastRuntimeRequest = {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? this.runtimeState, {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
+      status: response.status
+    });
+    return response;
+  }
+
+  createRuntimePauseResponse(options = {}) {
+    const response = createLiveCaptionRuntimeNotImplementedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE, options);
+    this.lastRuntimeRequest = {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? 'paused', {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
+      status: response.status
+    });
+    return response;
+  }
+
+  createRuntimeResumeResponse(options = {}) {
+    const response = createLiveCaptionRuntimeNotImplementedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.RESUME, options);
+    this.lastRuntimeRequest = {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? 'running', {
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
+      status: response.status
+    });
+    return response;
+  }
+
+  createRuntimeUnavailableResponse(action, options = {}) {
+    const response = createLiveCaptionRuntimeUnavailableResponse(action, options);
+    this.lastRuntimeRequest = {
+      action,
+      ...options
+    };
+    this.lastRuntimeResponse = response;
+    this.setRuntimeState(options.runtimeState ?? response.runtimeState ?? 'error', {
+      action,
+      status: response.status
+    });
+    return response;
+  }
+
   normalizeResponse(response, context = {}) {
     const normalized = normalizeLiveCaptionOffscreenResponse(response, context);
     this.lastResponse = normalized;
@@ -146,11 +254,44 @@ export class LiveCaptionOffscreenBridge {
     return normalized;
   }
 
+  normalizeRuntimeResponse(response, context = {}) {
+    const normalized = normalizeLiveCaptionRuntimeResponse(response, context);
+    this.lastRuntimeResponse = normalized;
+    this.touch();
+
+    if (normalized?.success === false || normalized?.ok === false) {
+      this.setRuntimeState(normalized.runtimeState ?? 'error', {
+        reason: normalized.error?.reason || context.reason || 'runtime_failure'
+      });
+      return normalized;
+    }
+
+    if (normalized?.runtimeState) {
+      this.setRuntimeState(normalized.runtimeState, {
+        requestId: normalized.requestId ?? null,
+        sessionId: normalized.sessionId ?? null,
+        tabId: normalized.tabId ?? null
+      });
+    }
+
+    logger.debug('Live-caption runtime response normalized in offscreen bridge shell', {
+      action: normalized?.action ?? context.action ?? null,
+      status: normalized?.status ?? null,
+      runtimeState: normalized?.runtimeState ?? null,
+      success: normalized?.success !== false
+    });
+
+    return normalized;
+  }
+
   getSnapshot() {
     return {
       status: this.status,
+      runtimeState: this.runtimeState,
       lastRequest: this.lastRequest ? { ...this.lastRequest } : null,
       lastResponse: this.lastResponse ? { ...this.lastResponse } : null,
+      lastRuntimeRequest: this.lastRuntimeRequest ? { ...this.lastRuntimeRequest } : null,
+      lastRuntimeResponse: this.lastRuntimeResponse ? { ...this.lastRuntimeResponse } : null,
       lastSnapshot: this.lastSnapshot ? { ...this.lastSnapshot } : null,
       lastUpdatedAt: this.lastUpdatedAt
     };
@@ -170,5 +311,14 @@ export {
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse
 } from './liveCaptionOffscreenContracts.js';
+export {
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeNotImplementedResponse,
+  createLiveCaptionRuntimeUnavailableResponse,
+  createLiveCaptionRuntimeFailClosedResponse,
+  normalizeLiveCaptionRuntimeResponse
+} from './liveCaptionRuntimeContracts.js';
 
 export default LiveCaptionOffscreenBridge;

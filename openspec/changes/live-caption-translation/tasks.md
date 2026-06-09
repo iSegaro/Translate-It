@@ -109,3 +109,11 @@
 - [x] 14.3 Track runtime status, active session state, and active video state in the store
 - [x] 14.4 Apply active-video handoff plans to the page session and overlay store
 - [x] 14.5 Add runtime tests for start, stop, pause, resume, destroy, handoff, and cleanup
+
+## 15. Runtime Phase 2 - Background and Offscreen Routing Shell
+
+- [x] 15.1 Register the live-caption background runtime controller and route runtime actions through the message handler
+- [x] 15.2 Define runtime message contracts for start, stop, status, pause, and resume requests and responses
+- [x] 15.3 Extend the offscreen bridge and capture coordinator with runtime shell state and deterministic not-implemented responses
+- [x] 15.4 Connect the content runtime controller to background messaging for start, status, pause, resume, and stop requests
+- [x] 15.5 Add runtime shell tests for routing, payload validation, unknown actions, offscreen-unavailable responses, and runtime state transitions

@@ -1,5 +1,6 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LIVE_CAPTION_RUNTIME_STATES } from '../constants/liveCaptionRuntimeStates.js';
 import {
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
@@ -17,12 +18,15 @@ export class LiveCaptionCaptureCoordinator {
   constructor({ bridge = new LiveCaptionOffscreenBridge() } = {}) {
     this.bridge = bridge;
     this.status = LIVE_CAPTION_CAPTURE_STATES.IDLE;
+    this.runtimeState = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     this.sessionId = null;
     this.tabId = null;
     this.videoFingerprint = null;
     this.lastError = null;
     this.lastSnapshot = null;
     this.lastRequest = null;
+    this.lastRuntimeRequest = null;
+    this.lastRuntimeResponse = null;
     this.lastUpdatedAt = Date.now();
 
     logger.debug('Live-caption capture coordinator initialized', {
@@ -52,6 +56,18 @@ export class LiveCaptionCaptureCoordinator {
     });
 
     return this.status;
+  }
+
+  setRuntimeState(runtimeState, details = {}) {
+    this.runtimeState = runtimeState;
+    this.touch();
+
+    logger.debug('Live-caption capture coordinator runtime state updated', {
+      runtimeState,
+      ...details
+    });
+
+    return this.runtimeState;
   }
 
   startCapture({ sessionId, tabId, videoFingerprint, captureOptions = {} } = {}) {
@@ -97,6 +113,92 @@ export class LiveCaptionCaptureCoordinator {
 
     this.lastRequest = request;
     return request;
+  }
+
+  startRuntime({ sessionId = this.sessionId, tabId = this.tabId, videoFingerprint = this.videoFingerprint, reason = 'start' } = {}) {
+    this.setSessionContext({ sessionId, tabId, videoFingerprint });
+    this.lastRuntimeRequest = {
+      action: 'start',
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.STARTING, {
+      action: 'start',
+      reason
+    });
+    return this.getSnapshot();
+  }
+
+  pauseRuntime({ reason = 'pause' } = {}) {
+    this.lastRuntimeRequest = {
+      action: 'pause',
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.PAUSED, {
+      action: 'pause',
+      reason
+    });
+    return this.getSnapshot();
+  }
+
+  resumeRuntime({ reason = 'resume' } = {}) {
+    this.lastRuntimeRequest = {
+      action: 'resume',
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
+      action: 'resume',
+      reason
+    });
+    return this.getSnapshot();
+  }
+
+  stopRuntime({ reason = 'stop' } = {}) {
+    this.lastRuntimeRequest = {
+      action: 'stop',
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.STOPPING, {
+      action: 'stop',
+      reason
+    });
+    this.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.IDLE, {
+      action: 'stop',
+      reason
+    });
+    return this.getSnapshot();
+  }
+
+  requestRuntimeStatus({ reason = 'status' } = {}) {
+    this.lastRuntimeRequest = {
+      action: 'status',
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.lastRuntimeResponse = {
+      success: true,
+      status: this.runtimeState,
+      runtimeState: this.runtimeState,
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      reason
+    };
+    this.touch();
+    return this.getSnapshot();
   }
 
   createFinalizedChunkMessage({
@@ -203,6 +305,7 @@ export class LiveCaptionCaptureCoordinator {
       details
     };
     this.status = LIVE_CAPTION_CAPTURE_STATES.UNAVAILABLE;
+    this.runtimeState = LIVE_CAPTION_RUNTIME_STATES.ERROR;
     this.touch();
     logger.debug('Live-caption offscreen unavailable', {
       reason,
@@ -224,6 +327,7 @@ export class LiveCaptionCaptureCoordinator {
 
     this.lastError = response.error;
     this.status = LIVE_CAPTION_CAPTURE_STATES.ERROR;
+    this.runtimeState = LIVE_CAPTION_RUNTIME_STATES.ERROR;
     this.touch();
 
     logger.warn('Live-caption capture coordinator fail-closed', {
@@ -240,11 +344,14 @@ export class LiveCaptionCaptureCoordinator {
   getSnapshot() {
     return {
       status: this.status,
+      runtimeState: this.runtimeState,
       sessionId: this.sessionId,
       tabId: this.tabId,
       videoFingerprint: this.videoFingerprint,
       lastError: this.lastError ? { ...this.lastError } : null,
       lastRequest: this.lastRequest ? { ...this.lastRequest } : null,
+      lastRuntimeRequest: this.lastRuntimeRequest ? { ...this.lastRuntimeRequest } : null,
+      lastRuntimeResponse: this.lastRuntimeResponse ? { ...this.lastRuntimeResponse } : null,
       lastSnapshot: this.lastSnapshot ? { ...this.lastSnapshot } : null,
       lastUpdatedAt: this.lastUpdatedAt
     };
