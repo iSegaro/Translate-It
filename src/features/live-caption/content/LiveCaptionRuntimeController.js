@@ -197,6 +197,10 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         if (message.action === 'LIVE_CAPTION_TRANSLATE_RESULT') {
           const { sessionId, videoFingerprint, segment } = message.payload || {};
           this.handleTranslateResult({ sessionId, videoFingerprint, segment });
+        } else if (message.action === LIVE_CAPTION_ACTIONS.RUNTIME_STOP) {
+          const { reason } = message.payload || {};
+          logger.warn('Live-caption runtime forcefully stopped by background', { reason });
+          this.stop(reason, { notifyContent: false, forceLocal: true }).catch(() => {});
         }
       };
 
@@ -1053,7 +1057,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     return this.getSnapshot();
   }
 
-  async stop(reason = LIVE_CAPTION_CLEANUP_REASONS.STOP, { notifyContent = true, clearCache = false } = {}) {
+  async stop(reason = LIVE_CAPTION_CLEANUP_REASONS.STOP, { notifyContent = true, clearCache = false, forceLocal = false } = {}) {
     if ((this.destroyed && !this.pageSession) || (!this.started && !this.pageSession && !this.currentVideoElement)) {
       return this.getSnapshot();
     }
@@ -1070,14 +1074,16 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       clearCache
     });
 
-    await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_STOP, {
-      tabId: this.tabId,
-      sessionId: this.pageSession?.sessionId ?? null,
-      videoFingerprint: this.currentVideoFingerprint,
-      reason,
-      notifyContent,
-      clearCache
-    });
+    if (!forceLocal) {
+      await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_STOP, {
+        tabId: this.tabId,
+        sessionId: this.pageSession?.sessionId ?? null,
+        videoFingerprint: this.currentVideoFingerprint,
+        reason,
+        notifyContent,
+        clearCache
+      });
+    }
 
     if (this.tabId != null) {
       this.sessionManager.cleanupByTabId(this.tabId, reason);

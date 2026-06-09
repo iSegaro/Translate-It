@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { LiveCaptionBackgroundController } from "./LiveCaptionBackgroundController.js";
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
@@ -11,6 +11,7 @@ import {
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
 } from "./liveCaptionRuntimeContracts.js";
+import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
 
@@ -24,7 +25,10 @@ vi.mock("@/shared/logging/logger.js", () => ({
 }));
 
 describe("live-caption background controller", () => {
+  let activeControllers = [];
+
   beforeEach(() => {
+    activeControllers = [];
     globalThis.chrome = {
       runtime: {
         sendMessage: vi.fn(async (request) => {
@@ -68,11 +72,23 @@ describe("live-caption background controller", () => {
     };
   });
 
+  afterEach(() => {
+    activeControllers.forEach(c => c.destroy());
+    vi.useRealTimers();
+    vi.clearAllTimers();
+  });
+
+  function createController(options) {
+    const c = new LiveCaptionBackgroundController(options);
+    activeControllers.push(c);
+    return c;
+  }
+
   it("registers runtime handlers and routes shell requests without media work", async () => {
     const messageHandler = {
       registerHandler: vi.fn(),
     };
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
 
     controller.registerHandlers(messageHandler);
 
@@ -173,14 +189,14 @@ describe("live-caption background controller", () => {
 
   it("supports cache dependency injection", () => {
     const mockCache = { id: "mock-cache" };
-    const controller = new LiveCaptionBackgroundController({ cache: mockCache });
+    const controller = createController({ cache: mockCache });
     expect(controller.cache).toBe(mockCache);
     expect(controller.sttCoordinator.cache).toBe(mockCache);
     expect(controller.translationCoordinator.cache).toBe(mockCache);
   });
 
   it("hydrates session from cache on start", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     const mockTranscript = { segmentId: "t1", originalText: "Hello", segmentStartMs: 0, segmentEndMs: 1000 };
     const mockTranslation = { segmentId: "c1", translatedText: "سلام", segmentStartMs: 0, segmentEndMs: 1000 };
 
@@ -213,7 +229,7 @@ describe("live-caption background controller", () => {
   });
 
   it("handles incognito tabs by skipping persistent cache reads/writes", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     controller.cache.getTranscriptSegments = vi.fn().mockResolvedValue([]);
     controller.cache.getTranslatedCaptionSegments = vi.fn().mockResolvedValue([]);
 
@@ -235,8 +251,111 @@ describe("live-caption background controller", () => {
     expect(session.isIncognito).toBe(true);
   });
 
+  it("reconciles orphaned session when receiving a finalized chunk", async () => {
+    const controller = createController();
+    controller.sttCoordinator = { handleFinalizedChunk: vi.fn() };
+    controller.captureCoordinator = { recordSnapshot: vi.fn(), setRuntimeState: vi.fn() };
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockResolvedValue({
+      ok: true,
+      sessionSnapshot: { sessionId: "orphaned-session", tabId: 99 }
+    });
+    controller.offscreenBridge.browserApi = {
+      tabs: { get: vi.fn().mockResolvedValue({ id: 99, incognito: false }) }
+    };
+    
+    // Simulate empty session manager (SW restarted)
+    expect(controller.sessionManager.getSession(99)).toBe(null);
+
+    const chunkMessage = {
+      action: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
+      target: "background",
+      sessionId: "orphaned-session",
+      tabId: 99,
+      videoFingerprint: "orphaned-video",
+      chunkStartMs: 0,
+      chunkEndMs: 1000,
+      mimeType: "audio/webm",
+      chunkPayload: new Blob([""], { type: "audio/webm" })
+    };
+
+    const response = await controller.handleFinalizedChunk(chunkMessage);
+    
+    expect(response.success).toBe(true);
+    const recoveredSession = controller.sessionManager.getSession(99);
+    expect(recoveredSession).not.toBe(null);
+    expect(recoveredSession.sessionId).toBe("orphaned-session");
+    expect(controller.sttCoordinator.handleFinalizedChunk).toHaveBeenCalled();
+  });
+
+  it("fails closed when orphaned chunk reconciliation fails", async () => {
+    const controller = createController();
+    controller.sttCoordinator = { handleFinalizedChunk: vi.fn() };
+    controller.offscreenBridge.requestRuntimeStop = vi.fn().mockResolvedValue();
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockResolvedValue({
+      ok: false // Offscreen dead or reports error
+    });
+    controller.offscreenBridge.browserApi = {
+      tabs: { get: vi.fn().mockResolvedValue({ id: 99, incognito: false }), sendMessage: vi.fn().mockResolvedValue() }
+    };
+    
+    expect(controller.sessionManager.getSession(99)).toBe(null);
+
+    const chunkMessage = {
+      action: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
+      target: "background",
+      sessionId: "orphaned-session",
+      tabId: 99,
+      videoFingerprint: "orphaned-video",
+      chunkStartMs: 0,
+      chunkEndMs: 1000,
+      mimeType: "audio/webm",
+      chunkPayload: new Blob([""], { type: "audio/webm" })
+    };
+
+    const response = await controller.handleFinalizedChunk(chunkMessage);
+    
+    expect(response.success).toBe(false);
+    expect(controller.sessionManager.getSession(99)).toBe(null);
+    expect(controller.offscreenBridge.requestRuntimeStop).toHaveBeenCalled();
+    expect(controller.sttCoordinator.handleFinalizedChunk).not.toHaveBeenCalled();
+    expect(controller.offscreenBridge.browserApi.tabs.sendMessage).toHaveBeenCalledWith(
+      99, 
+      expect.objectContaining({ action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP })
+    );
+  });
+
+  it("fails closed when orphaned chunk reconciliation fails due to mismatched fingerprint", async () => {
+    const controller = createController();
+    controller.sttCoordinator = { handleFinalizedChunk: vi.fn() };
+    controller.offscreenBridge.requestRuntimeStop = vi.fn().mockResolvedValue();
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockResolvedValue({
+      ok: true,
+      sessionSnapshot: { sessionId: "orphaned-session", tabId: 99, activeVideoFingerprint: "other-video" }
+    });
+    controller.offscreenBridge.browserApi = {
+      tabs: { get: vi.fn().mockResolvedValue({ id: 99, incognito: false }), sendMessage: vi.fn().mockResolvedValue() }
+    };
+    
+    const chunkMessage = {
+      action: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
+      target: "background",
+      sessionId: "orphaned-session",
+      tabId: 99,
+      videoFingerprint: "orphaned-video",
+      chunkStartMs: 0,
+      chunkEndMs: 1000,
+      mimeType: "audio/webm",
+      chunkPayload: new Blob([""], { type: "audio/webm" })
+    };
+
+    const response = await controller.handleFinalizedChunk(chunkMessage);
+    
+    expect(response.success).toBe(false);
+    expect(controller.sessionManager.getSession(99)).toBe(null);
+  });
+
   it("fails closed for invalid runtime payloads", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     const response = await controller.handleRuntimeStart(
       { action: LIVE_CAPTION_RUNTIME_ACTIONS.START, data: {} },
       {},
@@ -250,7 +369,7 @@ describe("live-caption background controller", () => {
   });
 
   it("propagates fail-closed cleanup metadata into the runtime stop response", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     controller.sessionManager.cleanupByTabId = vi.fn(() => null);
     controller.sessionManager.getSessionCleanupMetadata = vi.fn(() => ({
       tabId: 7,
@@ -290,8 +409,12 @@ describe("live-caption background controller", () => {
   });
 
   it("handles finalized chunk messages cleanly without raw stream or side effects", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     const mockCallback = vi.fn();
+
+    // Create session to avoid reconciliation branch
+    const session = controller.sessionManager.getOrCreateSession(7, { consentAccepted: true });
+    session.sessionId = "session-1";
 
     controller.captureCoordinator.recordSnapshot = vi.fn();
 
@@ -322,7 +445,7 @@ describe("live-caption background controller", () => {
   });
 
   it("fails to handle finalized chunk with missing metadata", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     const mockCallback = vi.fn();
 
     // Missing sessionId
@@ -350,7 +473,7 @@ describe("live-caption background controller", () => {
   });
 
   it("handles capture error messages and sets coordinator to fail-closed", async () => {
-    const controller = new LiveCaptionBackgroundController();
+    const controller = createController();
     const mockCallback = vi.fn();
     controller.captureCoordinator.failClosed = vi.fn();
 
@@ -378,5 +501,63 @@ describe("live-caption background controller", () => {
       "error",
       expect.any(Object),
     );
+  });
+
+  it("handles offscreen health success without disruption", async () => {
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(1, { consentAccepted: true });
+    session.sessionId = "session-1";
+    session.lifecycleState = "active";
+    
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockResolvedValue({ ok: true, status: "OK" });
+
+    await controller._performHealthCheck();
+
+    expect(controller.offscreenBridge.requestRuntimeStatus).toHaveBeenCalled();
+    expect(controller.sessionManager.getSession(1)).toBe(session);
+    expect(session.lifecycleState).toBe("active");
+  });
+
+  it("handles offscreen health failure by failing closed", async () => {
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(2, { consentAccepted: true });
+    session.sessionId = "session-2";
+    session.lifecycleState = "active";
+
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockResolvedValue({ ok: false });
+    controller.offscreenBridge.requestRuntimeStop = vi.fn().mockResolvedValue();
+    controller.offscreenBridge.browserApi = { tabs: { sendMessage: vi.fn().mockResolvedValue() } };
+
+    await controller._performHealthCheck();
+
+    expect(controller.sessionManager.getSession(2)).toBe(null); // Failed closed and cleaned up
+    expect(controller.offscreenBridge.requestRuntimeStop).toHaveBeenCalledWith(expect.objectContaining({ reason: "health_check_failure" }));
+    expect(controller.offscreenBridge.browserApi.tabs.sendMessage).toHaveBeenCalledWith(
+      2, 
+      expect.objectContaining({ action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP })
+    );
+  });
+
+  it("fails closed when health check times out", async () => {
+    vi.useFakeTimers();
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(3, { consentAccepted: true });
+    session.sessionId = "session-3";
+    session.lifecycleState = "active";
+
+    controller.offscreenBridge.requestRuntimeStatus = vi.fn().mockReturnValue(new Promise(() => {})); // Never resolves
+    controller.offscreenBridge.requestRuntimeStop = vi.fn().mockResolvedValue();
+    controller.offscreenBridge.browserApi = { tabs: { sendMessage: vi.fn().mockResolvedValue() } };
+
+    const healthCheckPromise = controller._performHealthCheck();
+    
+    // Advance timers past the 5-second timeout
+    await vi.advanceTimersByTimeAsync(5000);
+    await healthCheckPromise;
+
+    expect(controller.sessionManager.getSession(3)).toBe(null);
+    expect(controller.offscreenBridge.requestRuntimeStop).toHaveBeenCalledWith(expect.objectContaining({ reason: "health_check_failure" }));
+    
+    vi.useRealTimers();
   });
 });

@@ -13,11 +13,13 @@ import { LiveCaptionSTTCoordinator } from "./LiveCaptionSTTCoordinator.js";
 import { LiveCaptionTranslationCoordinator } from "./LiveCaptionTranslationCoordinator.js";
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   normalizeLiveCaptionRuntimeRequest,
   createLiveCaptionRuntimeSuccessResponse,
   createLiveCaptionRuntimeFailClosedResponse,
 } from "./liveCaptionRuntimeContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
+import { LIVE_CAPTION_SESSION_STATES } from "../constants/liveCaptionSessionStates.js";
 import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
 import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
 
@@ -78,6 +80,8 @@ export class LiveCaptionBackgroundController {
     this.lastRequest = null;
     this.lastResponse = null;
 
+    this._startHealthMonitor();
+
     logger.debug("Live-caption background controller created", {
       createdAt: this.createdAt,
     });
@@ -85,6 +89,170 @@ export class LiveCaptionBackgroundController {
 
   touch() {
     this.updatedAt = Date.now();
+  }
+
+  _startHealthMonitor() {
+    if (this._healthInterval) return;
+    this._healthInterval = setInterval(() => this._performHealthCheck(), 15000);
+  }
+
+  destroy() {
+    if (this._healthInterval) {
+      clearInterval(this._healthInterval);
+      this._healthInterval = null;
+    }
+  }
+
+  async _performHealthCheck() {
+    const activeSessions = Array.from(this.sessionManager.sessions.values());
+    if (activeSessions.length === 0) return;
+
+    for (const session of activeSessions) {
+      if (session.lifecycleState !== LIVE_CAPTION_SESSION_STATES.ACTIVE) continue;
+
+      let timeoutId;
+      try {
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Health check timeout")), 5000);
+        });
+
+        const offscreenResponse = await Promise.race([
+          this.offscreenBridge.requestRuntimeStatus({
+            sessionId: session.sessionId,
+            tabId: session.tabId,
+            videoFingerprint: session.activeVideoFingerprint,
+            message: "Health check"
+          }),
+          timeoutPromise
+        ]);
+
+        if (!offscreenResponse || offscreenResponse.ok === false || offscreenResponse.status === LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OFFSCREEN_NOT_READY) {
+          throw new Error("Offscreen health check failed");
+        }
+      } catch (error) {
+        logger.error("Live-caption health check failed, failing closed", { 
+          tabId: session.tabId, 
+          sessionId: session.sessionId, 
+          error: error.message 
+        });
+
+        this.offscreenBridge.requestRuntimeStop({
+          sessionId: session.sessionId, 
+          tabId: session.tabId, 
+          videoFingerprint: session.activeVideoFingerprint, 
+          reason: "health_check_failure"
+        }).catch(() => {});
+
+        this.sessionManager.failClosedCleanup(session.tabId, LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE);
+
+        if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
+          this.offscreenBridge.browserApi.tabs.sendMessage(session.tabId, {
+            action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+            payload: {
+              sessionId: session.sessionId,
+              videoFingerprint: session.activeVideoFingerprint,
+              reason: "health_check_failure"
+            }
+          }).catch(() => {});
+        }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  async _reconcileOrphanedSession(chunk) {
+    const { tabId, sessionId, videoFingerprint } = chunk;
+    logger.info("Attempting to reconcile orphaned live-caption session", { tabId, sessionId, videoFingerprint });
+
+    try {
+      if (this.offscreenBridge.browserApi?.tabs?.get) {
+        try {
+          const tab = await this.offscreenBridge.browserApi.tabs.get(tabId);
+          if (!tab) throw new Error("Target tab is missing or closed");
+        } catch (err) {
+          throw new Error("Target tab verification failed");
+        }
+      }
+
+      const offscreenResponse = await this.offscreenBridge.requestRuntimeStatus({
+        sessionId,
+        tabId,
+        videoFingerprint,
+        message: "Reconciliation check"
+      });
+
+      if (!offscreenResponse || offscreenResponse.ok === false) {
+        throw new Error("Offscreen document unavailable or reported error");
+      }
+
+      const snapshot = offscreenResponse.sessionSnapshot;
+      if (!snapshot || snapshot.sessionId !== sessionId || snapshot.tabId !== tabId) {
+        throw new Error("Offscreen session mismatch or inactive");
+      }
+
+      if (snapshot.activeVideoFingerprint && snapshot.activeVideoFingerprint !== videoFingerprint) {
+        throw new Error("Offscreen video fingerprint mismatch");
+      }
+
+      let isIncognito = false;
+      if (this.offscreenBridge.browserApi?.tabs?.get) {
+         try {
+           const tab = await this.offscreenBridge.browserApi.tabs.get(tabId);
+           isIncognito = Boolean(tab.incognito);
+         } catch(e) {}
+      }
+
+      const recoveredSession = this.sessionManager.getOrCreateSession(tabId, {
+        consentAccepted: true,
+        isIncognito
+      });
+      recoveredSession.sessionId = sessionId;
+
+      const videoSession = new VideoCaptionSession({ tabId, videoFingerprint });
+      recoveredSession.attachVideoSession(videoSession);
+
+      if (this.cache) {
+        try {
+          const [transcripts, translations] = await Promise.all([
+            this.cache.getTranscriptSegments({ tabId, videoFingerprint, isIncognito }),
+            this.cache.getTranslatedCaptionSegments({ tabId, videoFingerprint, isIncognito })
+          ]);
+          transcripts.forEach(s => videoSession.addTranscriptSegment(s));
+          translations.forEach(s => videoSession.addTranslatedCaptionSegment(s));
+          logger.info("Reconciled session hydrated from cache", { tabId, transcriptCount: transcripts.length });
+        } catch (err) {
+          logger.warn("Cache hydration failed during reconciliation", { error: err.message });
+        }
+      }
+
+      recoveredSession.start();
+      this.captureCoordinator.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+
+      logger.info("Successfully reconciled orphaned live-caption session", { tabId, sessionId });
+      return recoveredSession;
+
+    } catch (error) {
+      logger.error("Failed to reconcile orphaned live-caption session, failing closed", { tabId, sessionId, error: error.message });
+
+      this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE);
+      this.offscreenBridge.requestRuntimeStop({
+        sessionId, tabId, videoFingerprint, reason: "recovery_failure"
+      }).catch(() => {});
+
+      if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
+        this.offscreenBridge.browserApi.tabs.sendMessage(tabId, {
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+          payload: {
+             sessionId,
+             videoFingerprint,
+             reason: "recovery_failure"
+          }
+        }).catch(() => {});
+      }
+
+      throw error;
+    }
   }
 
   registerHandlers(messageHandler) {
@@ -961,6 +1129,11 @@ export class LiveCaptionBackgroundController {
         throw new TypeError(
           "Missing required metadata fields in finalized chunk",
         );
+      }
+
+      let session = this.sessionManager.getSession(normalized.tabId);
+      if (!session || session.sessionId !== normalized.sessionId) {
+        session = await this._reconcileOrphanedSession(normalized);
       }
 
       logger.info("Live-caption finalized chunk received in background", {
