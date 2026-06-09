@@ -465,10 +465,10 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - `MediaRecorder` chunking runtime and offscreen runtime capture
 - finalized audio chunks delivery to background controller
 - STT execution pipeline
+- translation execution pipeline
 
 ### Not Yet Implemented
 
-- translation execution pipeline
 - end-to-end caption execution
 - cache persistence writes
 - transcript/overlay caption updates

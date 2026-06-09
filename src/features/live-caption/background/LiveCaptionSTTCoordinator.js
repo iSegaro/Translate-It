@@ -11,13 +11,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionSTTCoord
  * Manages FIFO queueing, transcription bounds, abort routing, and session state mapping.
  */
 export class LiveCaptionSTTCoordinator {
-  constructor({ sessionManager, captureCoordinator, sttFactory = null } = {}) {
+  constructor({ sessionManager, captureCoordinator, sttFactory = null, onTranscriptSegment = null } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionSTTCoordinator requires a sessionManager');
     }
     this.sessionManager = sessionManager;
     this.captureCoordinator = captureCoordinator;
     this.sttFactory = sttFactory || new STTProviderFactory();
+    this.onTranscriptSegment = onTranscriptSegment;
     this.sessionQueues = new Map();
     this.activeAbortControllers = new Map();
     this.maxPendingChunks = 5;
@@ -153,6 +154,12 @@ export class LiveCaptionSTTCoordinator {
           const activeVideoSession = pageSession.activeVideoSession;
           if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
             activeVideoSession.addTranscriptSegment(segment);
+          }
+
+          if (this.onTranscriptSegment) {
+            this.onTranscriptSegment(segment, { tabId }).catch((err) => {
+              logger.error('Error invoking onTranscriptSegment callback', { sessionId, error: err.message });
+            });
           }
 
           logger.info('Whisper chunk transcription completed and recorded', {

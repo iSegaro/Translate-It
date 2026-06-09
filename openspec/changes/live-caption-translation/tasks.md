@@ -139,3 +139,13 @@
 - [x] 18.4 Integrate with OpenAI Whisper provider and normalize transcript segments
 - [x] 18.5 Add unit and integration tests covering STT coordinator, FIFO queue, abort/cleanup behavior, and provider errors
 - [x] 18.6 Update documentation and validation results
+
+## 19. Runtime Phase 6 - Translation Execution Pipeline
+
+- [x] 19.1 Implement Translation Coordinator and FIFO queueing per active session
+- [x] 19.2 Integrate with LiveCaptionTranslationAdapter and UnifiedTranslationService
+- [x] 19.3 Implement AbortController cancellation during stop, pause, cleanup, and handoff
+- [x] 19.4 Enforce bounded translation queue length and fail-closed error transitions
+- [x] 19.5 Wire STT segment completion to the Translation Coordinator
+- [x] 19.6 Add unit and integration tests verifying order preservation, abort handling, and provider failure states
+- [x] 19.7 Update design specs, architecture logs, and validation results
