@@ -138,6 +138,8 @@ export const PROMPT_REGISTRY = {
     category: PromptCategory.USER,
     risk: PromptRisk.SAFE,
     editable: true,
+    // Note: $_{TEXT} is not required here because this prompt is injected into 
+    // PROMPT_SUBTITLE_BASE as instructions. The base wrapper handles the final text placement.
     placeholders: ["$_{SOURCE}", "$_{TARGET}"],
     previewSupport: true
   },

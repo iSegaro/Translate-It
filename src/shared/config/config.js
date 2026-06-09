@@ -646,9 +646,7 @@ $_{TEXT}`,
   PROMPT_SUBTITLE_USER: `- Translate movie/video subtitles from $_{SOURCE} to $_{TARGET}.
 - Maintain the exact tone and style of the original dialogue (informal, formal, slang, etc.).
 - Keep translations concise to ensure they fit within subtitle reading speed limits.
-- If a cue contains only sounds or music descriptions like [Music], translate it appropriately if necessary, or keep as is.
-
-$_{TEXT}`,
+- If a cue contains only sounds or music descriptions like [Music], translate it appropriately if necessary, or keep as is.`,
   /*--- End PROMPT_SUBTITLE_USER ---*/
 
   /*--- Start PROMPT_SUBTITLE_BASE ---*/
