@@ -86,10 +86,32 @@ vi.mock('@/features/translation/utils/NewlineManager.js', () => ({
   }
 }));
 
+// Mock Prompt Preview logic
+const mockPromptExamples = ref([]);
+const mockLoadingExamples = ref(false);
+
+vi.mock('../composables/usePromptPreview.js', () => ({
+  usePromptPreview: () => ({
+    promptExamples: mockPromptExamples,
+    loadingExamples: mockLoadingExamples,
+    generateExamples: vi.fn(async () => {
+      mockLoadingExamples.value = true;
+      mockPromptExamples.value = [
+        { mode: 'Field', description: 'desc', prompt: 'GENERATED PROMPT' }
+      ];
+      mockLoadingExamples.value = false;
+    })
+  })
+}));
+
 describe('PromptTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    
+    // Reset mock state
+    mockPromptExamples.value = [];
+    mockLoadingExamples.value = false;
     
     // Mock URL.createObjectURL for any potential calls
     global.URL.createObjectURL = vi.fn();
@@ -147,8 +169,17 @@ describe('PromptTab', () => {
     // Dictionary (MEDIUM risk, SYSTEM category)
     await select.setValue('PROMPT_BASE_DICTIONARY');
     expect(wrapper.find('.prompt-risk-banner').exists()).toBe(true);
+    // Dictionary has previewSupport: false in hardened registry
     expect(wrapper.find('.preview-disabled-note').exists()).toBe(true);
     expect(wrapper.find('#PROMPT_PREVIEW_BUTTON').exists()).toBe(false);
+  });
+
+  it('shows preview button for Subtitle user prompt', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    
+    await select.setValue('PROMPT_SUBTITLE_USER');
+    expect(wrapper.find('#PROMPT_PREVIEW_BUTTON').exists()).toBe(true);
   });
 
   it('clears stale preview when switching from Basic to Advanced', async () => {
@@ -213,7 +244,7 @@ describe('PromptTab', () => {
     });
 
     const example = wrapper.vm.promptExamples[0];
-    expect(example.prompt).toContain('CUSTOM GENERAL');
+    expect(example.prompt).toBe('GENERATED PROMPT');
 
     // Switch to Auto
     await select.setValue('PROMPT_TEMPLATE_AUTO');
@@ -222,7 +253,7 @@ describe('PromptTab', () => {
 
     await vi.waitFor(() => {
       const exampleGen = wrapper.vm.promptExamples[0];
-      expect(exampleGen.prompt).toContain('CUSTOM AUTO');
+      expect(exampleGen.prompt).toBe('GENERATED PROMPT');
     });
   });
 });

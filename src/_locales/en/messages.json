@@ -2564,6 +2564,12 @@
   "prompt_preview_desc_dictionary": {
     "message": "Brief word definitions and synonyms (Note: This mode uses a fixed format)"
   },
+  "prompt_preview_mode_subtitle": {
+    "message": "Subtitle Translation Workflow"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "Complete assembly of structural base wrapper, your style rules, and JSON batch schema."
+  },
   "screen_capture_label": {
     "message": "Capture"
   },

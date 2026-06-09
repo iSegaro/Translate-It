@@ -51,7 +51,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.SAFE,
     editable: true,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_FIELD_AUTO: {
     key: 'PROMPT_BASE_FIELD_AUTO',
@@ -61,7 +61,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.SAFE,
     editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_POPUP_TRANSLATE: {
     key: 'PROMPT_BASE_POPUP_TRANSLATE',
@@ -71,7 +71,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.SAFE,
     editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_BATCH: {
     key: 'PROMPT_BASE_BATCH',
@@ -80,7 +80,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.HIGH,
     editable: false,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_AI_BATCH: {
     key: 'PROMPT_BASE_AI_BATCH',
@@ -89,7 +89,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.CRITICAL,
     editable: false,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{COUNT}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_AI_BATCH_AUTO: {
     key: 'PROMPT_BASE_AI_BATCH_AUTO',
@@ -98,7 +98,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.CRITICAL,
     editable: false,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{COUNT}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_SELECT: {
     key: 'PROMPT_BASE_SELECT',
@@ -107,7 +107,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.CRITICAL,
     editable: false,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_DICTIONARY: {
     key: 'PROMPT_BASE_DICTIONARY',
@@ -117,7 +117,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.MEDIUM,
     editable: true,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
   PROMPT_BASE_SCREEN_CAPTURE: {
     key: 'PROMPT_BASE_SCREEN_CAPTURE',
@@ -127,7 +127,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.SAFE,
     editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
-    previewSupport: true
+    previewSupport: false
   },
 
   // --- SUBTITLE PROMPTS ---
@@ -139,7 +139,7 @@ export const PROMPT_REGISTRY = {
     risk: PromptRisk.SAFE,
     editable: true,
     placeholders: ["$_{SOURCE}", "$_{TARGET}"],
-    previewSupport: false
+    previewSupport: true
   },
   PROMPT_SUBTITLE_BASE: {
     key: 'PROMPT_SUBTITLE_BASE',

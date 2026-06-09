@@ -2562,7 +2562,13 @@
     "message": "ترجمه دیکشنری"
   },
   "prompt_preview_desc_dictionary": {
-    "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+    "message": "تعاریف کوتاه کلمات و مترادف‌ها (توجه: این حالت از قالب ثابت استفاده می‌کند)"
+  },
+  "prompt_preview_mode_subtitle": {
+    "message": "گردش‌کار ترجمه زیرنویس"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "ترکیب کامل قالب پایه ساختاری، قوانین سبک شما و ساختار دسته‌ای JSON."
   },
   "screen_capture_label": {
     "message": "ضبط"

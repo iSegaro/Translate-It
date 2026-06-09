@@ -2564,6 +2564,12 @@
   "prompt_preview_desc_dictionary": {
     "message": "単語の定義と類義語（注：このモードは固定形式を使用します）"
   },
+  "prompt_preview_mode_subtitle": {
+    "message": "字幕翻訳ワークフロー"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "構造ベースラッパー、ユーザースタイルルール、JSONバッチスキーマの完全なアセンブリ。"
+  },
   "screen_capture_label": {
     "message": "キャプチャ"
   },

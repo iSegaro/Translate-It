@@ -34,12 +34,15 @@ export function usePromptPreview(customLogger = null) {
       getPromptBASEBatchAsync,
       getPromptBASEAIBatchAsync,
       getPromptBASEAIBatchAutoAsync,
+      getPromptSubtitleBaseAsync,
+      getPromptSubtitleBatchAsync,
       getEnableDictionaryAsync,
       getPromptDictionaryAsync,
       getSourceLanguageAsync,
     } = await import('@/shared/config/config.js')
 
     const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js')
+    const { AIConversationHelper } = await import('@/features/translation/providers/utils/AIConversationHelper.js')
 
     const isSpecificTextJsonFormat = (obj) => {
       return (
@@ -78,6 +81,30 @@ export function usePromptPreview(customLogger = null) {
       .replace(/\n\s*$/g, '')
       .replace(/\$_{SOURCE}/g, sourceName)
       .replace(/\$_{TARGET}/g, targetName)
+
+    // Handle Subtitle Mode (High-Fidelity Preview)
+    if (translateMode === TranslationMode.Subtitle) {
+      const metadata = {
+        promptTemplate: await getPromptSubtitleBaseAsync(),
+        instruction: template,
+        batchInstruction: await getPromptSubtitleBatchAsync()
+      }
+
+      // Convert sample text (array of cue objects) for the helper
+      const cues = typeof text === 'string' ? JSON.parse(text) : text
+      
+      const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(
+        cues,
+        sourceLang,
+        targetLang,
+        translateMode,
+        'ai',
+        null,
+        metadata
+      )
+
+      return `[SYSTEM PROMPT]\n${systemPrompt}\n\n[USER MESSAGE (JSON)]\n${userText}`
+    }
 
     const shouldUseBatchPrompt = isAI && (
       translateMode === TranslationMode.Select_Element ||
@@ -131,17 +158,20 @@ export function usePromptPreview(customLogger = null) {
   /**
    * Generates a set of preview examples for various translation modes.
    */
-  const generateExamples = async ({ template, isAuto, sourceLang, targetLang, t }) => {
+  const generateExamples = async ({ template, templateKey, isAuto, sourceLang, targetLang, t }) => {
     const myGenerationId = ++lastGenerationId
     loadingExamples.value = true
     const examples = []
     
     // For Auto template preview, we force source language to 'auto' to see bidirectional logic
     const effectiveSourceLang = isAuto ? 'auto' : (sourceLang || 'en')
+    const isSubtitle = templateKey === 'PROMPT_SUBTITLE_USER'
 
     try {
       // Modes to generate
-      const modes = [
+      const modes = isSubtitle ? [
+        { mk: 'prompt_preview_mode_subtitle', dk: 'prompt_preview_desc_subtitle', m: TranslationMode.Subtitle, type: 'ai' }
+      ] : [
         { mk: 'prompt_preview_mode_field', dk: 'prompt_preview_desc_field', m: TranslationMode.Field, type: 'ai' },
         { mk: 'prompt_preview_mode_popup', dk: 'prompt_preview_desc_popup', m: TranslationMode.Popup_Translate, type: 'translate' },
         { mk: 'prompt_preview_mode_selection', dk: 'prompt_preview_desc_selection', m: TranslationMode.Selection, type: 'translate' },
@@ -153,7 +183,20 @@ export function usePromptPreview(customLogger = null) {
         // Abandon if a newer request has started
         if (myGenerationId !== lastGenerationId) return
 
-        const sample = modeSpec.m === TranslationMode.Select_Element ? SAMPLE_JSON : (modeSpec.m === TranslationMode.Dictionary_Translation ? SAMPLE_WORD : SAMPLE_TEXT)
+        let sample
+        if (modeSpec.m === TranslationMode.Subtitle) {
+          sample = JSON.stringify([
+            { i: 1, text: "Welcome to the @@SUB_TAG_0@@Translate It@@SUB_TAG_1@@ extension!" },
+            { i: 2, text: "Let's translate some movie subtitles." }
+          ])
+        } else if (modeSpec.m === TranslationMode.Select_Element) {
+          sample = SAMPLE_JSON
+        } else if (modeSpec.m === TranslationMode.Dictionary_Translation) {
+          sample = SAMPLE_WORD
+        } else {
+          sample = SAMPLE_TEXT
+        }
+
         const prompt = await buildPromptWithTemplate(template, sample, effectiveSourceLang, targetLang, modeSpec.m, modeSpec.type)
         
         examples.push({

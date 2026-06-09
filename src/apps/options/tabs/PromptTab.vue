@@ -116,7 +116,7 @@
 
         <!-- Preview Prompts Section -->
         <div
-          v-if="!isAdvancedPrompt"
+          v-if="currentPromptMetadata.previewSupport"
           class="prompt-preview-section"
         >
           <button
@@ -164,7 +164,7 @@
           </div>
         </div>
         <div
-          v-else
+          v-else-if="!currentPromptMetadata.previewSupport && currentPromptKey !== 'PROMPT_TEMPLATE'"
           class="preview-disabled-note"
         >
           ℹ️ {{ t('prompt_preview_disabled_advanced') || 'Preview is currently only available for Basic user templates.' }}
@@ -258,6 +258,7 @@ const showPreview = ref(false)
 const refreshExamples = async () => {
   await generateExamples({
     template: activeTemplateValue.value,
+    templateKey: currentPromptKey.value,
     isAuto: currentPromptKey.value === 'PROMPT_TEMPLATE_AUTO',
     sourceLang: settingsStore.settings?.SOURCE_LANGUAGE,
     targetLang: settingsStore.settings?.TARGET_LANGUAGE,
