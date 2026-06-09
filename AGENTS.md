@@ -142,6 +142,7 @@ Comprehensive documentation is available in the `docs/` folder:
 - [**SUBTITLE_TRANSLATION_SYSTEM.md**](docs/technical/SUBTITLE_TRANSLATION_SYSTEM.md): **Subtitle Translation** – Progressive batching and format preservation.
 - [**MOUSE_HOVER_SYSTEM.md**](docs/technical/MOUSE_HOVER_SYSTEM.md): **Mouse on Hover** – Optimized detection and tooltip coordination.
 - [**WHOLE_PAGE_TRANSLATION.md**](docs/technical/WHOLE_PAGE_TRANSLATION.md): **Page Translation** – Recursive batch processing.
+- [**LIVE_CAPTION_ARCHITECTURE.md**](docs/technical/LIVE_CAPTION_ARCHITECTURE.md): **Live Caption** – Session ownership, offscreen capture boundaries, STT separation, cache model, and cleanup contracts.
 - [**TEXT_ACTIONS_SYSTEM.md**](docs/technical/TEXT_ACTIONS_SYSTEM.md): **Text Actions** – Copy/paste/TTS logic integration.
 - [**UI_HOST_SYSTEM.md**](docs/technical/UI_HOST_SYSTEM.md): **Shadow DOM Host** – Centralized in-page UI management.
 - [**WINDOWS_MANAGER_UI_HOST_INTEGRATION.md**](docs/technical/WINDOWS_MANAGER_UI_HOST_INTEGRATION.md): **Facade Pattern** – Refactored window management.

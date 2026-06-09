@@ -45,6 +45,7 @@
 - **[Selection Coordinator](SELECTION_COORDINATOR.md)** - Pub/Sub model for selection events between managers (Windows, FAB, TTS)
 - **[UI Host System](UI_HOST_SYSTEM.md)** - Centralized Shadow DOM UI management
 - **[Whole Page Translation System](WHOLE_PAGE_TRANSLATION.md)** - Recursive translation of web pages with dynamic batching
+- **[Live Caption Architecture](LIVE_CAPTION_ARCHITECTURE.md)** - Live audio captioning architecture, session ownership, cache model, and cleanup contracts
 - **[Select Element System](SELECT_ELEMENT_SYSTEM.md)** - System for selecting and translating DOM elements
 - **[Screen Capture System](SCREEN_CAPTURE_SYSTEM.md)** - Interactive area capture with Tesseract.js OCR engine
 - **[Subtitle Translation System](SUBTITLE_TRANSLATION_SYSTEM.md)** - Standalone tool for translating `.srt` subtitle files with format preservation and progressive batching
