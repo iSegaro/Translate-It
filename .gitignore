@@ -15,4 +15,4 @@ tests/coverage/
 .codex/
 .agent/
 .gemini/
-openspec/
+_openspec/
