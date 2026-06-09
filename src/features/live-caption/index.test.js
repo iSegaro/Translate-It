@@ -16,9 +16,23 @@ import {
   ActiveVideoDetector,
   VideoFingerprint,
   LiveCaptionCacheKeys,
+  LIVE_CAPTION_CACHE_DB_NAME,
+  LIVE_CAPTION_CACHE_DB_VERSION,
+  LIVE_CAPTION_CACHE_STORE_NAMES,
+  LIVE_CAPTION_CACHE_STORE_DEFINITIONS,
+  createLiveCaptionSessionCacheKey,
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
   createLiveCaptionTranslatedSegmentCacheKey,
+  createLiveCaptionCacheSchema,
+  applyLiveCaptionCacheSchema,
+  createLiveCaptionCacheUnavailableError,
+  openLiveCaptionCacheDatabase,
+  LiveCaptionCache,
+  LiveCaptionTranscriptRepository,
+  LiveCaptionTranslationRepository,
+  normalizeLiveCaptionTranscriptSegment,
+  normalizeLiveCaptionTranslationSegment,
   LiveCaptionOffscreenBridge,
   LiveCaptionCaptureCoordinator,
   LIVE_CAPTION_CAPTURE_STATES,
@@ -77,9 +91,23 @@ describe('live-caption feature shell', () => {
     expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
     expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
     expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);
+    expect(LIVE_CAPTION_CACHE_DB_NAME).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CACHE_DB_NAME);
+    expect(LIVE_CAPTION_CACHE_DB_VERSION).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CACHE_DB_VERSION);
+    expect(LIVE_CAPTION_CACHE_STORE_NAMES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CACHE_STORE_NAMES);
+    expect(LIVE_CAPTION_CACHE_STORE_DEFINITIONS).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CACHE_STORE_DEFINITIONS);
+    expect(createLiveCaptionSessionCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionSessionCacheKey);
     expect(createLiveCaptionVideoCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionVideoCacheKey);
     expect(createLiveCaptionSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionSegmentCacheKey);
     expect(createLiveCaptionTranslatedSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslatedSegmentCacheKey);
+    expect(createLiveCaptionCacheSchema).toBe(LiveCaptionFeature.contracts.createLiveCaptionCacheSchema);
+    expect(applyLiveCaptionCacheSchema).toBe(LiveCaptionFeature.contracts.applyLiveCaptionCacheSchema);
+    expect(createLiveCaptionCacheUnavailableError).toBe(LiveCaptionFeature.contracts.createLiveCaptionCacheUnavailableError);
+    expect(openLiveCaptionCacheDatabase).toBe(LiveCaptionFeature.contracts.openLiveCaptionCacheDatabase);
+    expect(LiveCaptionCache).toBe(LiveCaptionFeature.contracts.LiveCaptionCache);
+    expect(LiveCaptionTranscriptRepository).toBe(LiveCaptionFeature.contracts.LiveCaptionTranscriptRepository);
+    expect(LiveCaptionTranslationRepository).toBe(LiveCaptionFeature.contracts.LiveCaptionTranslationRepository);
+    expect(normalizeLiveCaptionTranscriptSegment).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionTranscriptSegment);
+    expect(normalizeLiveCaptionTranslationSegment).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionTranslationSegment);
     expect(LiveCaptionOffscreenBridge).toBe(LiveCaptionFeature.contracts.LiveCaptionOffscreenBridge);
     expect(LiveCaptionCaptureCoordinator).toBe(LiveCaptionFeature.contracts.LiveCaptionCaptureCoordinator);
     expect(LIVE_CAPTION_CAPTURE_STATES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTURE_STATES);

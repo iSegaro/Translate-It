@@ -59,10 +59,10 @@
 
 ## 9. Cache and IndexedDB Implementation
 
-- [ ] 9.1 Define the in-memory session cache boundaries and invalidation rules
-- [ ] 9.2 Define the persistent IndexedDB schema for transcript records
-- [ ] 9.3 Define the persistent IndexedDB schema for translated caption records
-- [ ] 9.4 Define cache clearing and per-video reuse behavior
+- [x] 9.1 Define the in-memory session cache boundaries and invalidation rules
+- [x] 9.2 Define the persistent IndexedDB schema for transcript records
+- [x] 9.3 Define the persistent IndexedDB schema for translated caption records
+- [x] 9.4 Define cache clearing and per-video reuse behavior
 
 ## 10. Consent and Privacy Flow
 
@@ -85,7 +85,7 @@
 - [x] 12.3 Define unit tests for deterministic active-video tie-break ordering
 - [x] 12.4 Define unit tests for STT provider contracts and retry behavior
 - [x] 12.5 Define integration tests for capture-to-translation request flow
-- [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
+- [x] 12.6 Define integration tests for cache persistence and incognito session-only behavior
 - [x] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
 - [x] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
 - [x] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
