@@ -237,6 +237,8 @@ describe('live-caption overlay shell', () => {
         controlsState: {
           canStart: true,
           canStop: true,
+          canPause: true,
+          canResume: true,
           canRetry: true,
           canClearCache: true
         }
@@ -248,9 +250,13 @@ describe('live-caption overlay shell', () => {
     await buttons[1].trigger('click');
     await buttons[2].trigger('click');
     await buttons[3].trigger('click');
+    await buttons[4].trigger('click');
+    await buttons[5].trigger('click');
 
     expect(wrapper.emitted('start')).toHaveLength(1);
     expect(wrapper.emitted('stop')).toHaveLength(1);
+    expect(wrapper.emitted('pause')).toHaveLength(1);
+    expect(wrapper.emitted('resume')).toHaveLength(1);
     expect(wrapper.emitted('retry')).toHaveLength(1);
     expect(wrapper.emitted('clear-cache')).toHaveLength(1);
   });
@@ -271,5 +277,146 @@ describe('live-caption overlay shell', () => {
     expect(mocks.sttFactory).not.toHaveBeenCalled();
     expect(mocks.offscreenBridge).not.toHaveBeenCalled();
     expect(mocks.cacheFacade).not.toHaveBeenCalled();
+  });
+
+  it('updates reactively on new translated segments, formats per-line timing, and renders multiple lines', async () => {
+    const wrapper = mount(LiveCaptionOverlay, {
+      props: {
+        visible: true,
+        status: 'idle',
+        runtimeStatus: 'running',
+        activeSessionState: 'active',
+        consentAccepted: true,
+        showConsentNotice: false,
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 1000,
+            segmentEndMs: 3000,
+            originalText: 'Hello',
+            translatedText: 'سلام',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    expect(wrapper.text()).toContain('سلام');
+    expect(wrapper.text()).toContain('Hello');
+    expect(wrapper.text()).toContain('1s - 3s');
+    expect(wrapper.findAll('.live-caption-caption-line')).toHaveLength(1);
+
+    await wrapper.setProps({
+      captionLines: [
+        {
+          sessionId: 'session-1',
+          videoFingerprint: 'video-1',
+          startMs: 1000,
+          endMs: 3000,
+          originalText: 'Hello',
+          translatedText: 'سلام',
+          isFinal: true
+        },
+        {
+          sessionId: 'session-1',
+          videoFingerprint: 'video-1',
+          segmentStartMs: 4000,
+          segmentEndMs: 6000,
+          originalText: 'World',
+          translatedText: 'جهان',
+          isFinal: true
+        }
+      ]
+    });
+
+    expect(wrapper.text()).toContain('سلام');
+    expect(wrapper.text()).toContain('جهان');
+    expect(wrapper.text()).toContain('1s - 3s');
+    expect(wrapper.text()).toContain('4s - 6s');
+    expect(wrapper.findAll('.live-caption-caption-line')).toHaveLength(2);
+  });
+
+  it('filters empty, incomplete, or non-final segments', async () => {
+    const wrapper = mount(LiveCaptionOverlay, {
+      props: {
+        visible: true,
+        status: 'idle',
+        runtimeStatus: 'running',
+        activeSessionState: 'active',
+        consentAccepted: true,
+        showConsentNotice: false,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 1000,
+            segmentEndMs: 3000,
+            originalText: '',
+            translatedText: '  ',
+            isFinal: true
+          },
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 4000,
+            segmentEndMs: 6000,
+            originalText: 'Valid',
+            translatedText: 'معتبر',
+            isFinal: true
+          },
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 7000,
+            segmentEndMs: 9000,
+            originalText: 'Non-final',
+            translatedText: 'غیر نهایی',
+            isFinal: false
+          }
+        ]
+      }
+    });
+
+    expect(wrapper.text()).toContain('معتبر');
+    expect(wrapper.text()).not.toContain('Non-final');
+    expect(wrapper.findAll('.live-caption-caption-line')).toHaveLength(1);
+  });
+
+  it('forwards start, stop, pause, resume, and retry events from controls', async () => {
+    const wrapper = mount(LiveCaptionOverlay, {
+      props: {
+        visible: true,
+        status: 'idle',
+        runtimeStatus: 'running',
+        activeSessionState: 'active',
+        consentAccepted: true,
+        showConsentNotice: false,
+        controlsState: {
+          canStart: true,
+          canStop: true,
+          canPause: true,
+          canResume: true,
+          canRetry: true,
+          canClearCache: false
+        }
+      }
+    });
+
+    const controls = wrapper.findComponent(LiveCaptionControls);
+    expect(controls.exists()).toBe(true);
+
+    controls.vm.$emit('start');
+    controls.vm.$emit('stop');
+    controls.vm.$emit('pause');
+    controls.vm.$emit('resume');
+    controls.vm.$emit('retry');
+
+    expect(wrapper.emitted('start')).toHaveLength(1);
+    expect(wrapper.emitted('stop')).toHaveLength(1);
+    expect(wrapper.emitted('pause')).toHaveLength(1);
+    expect(wrapper.emitted('resume')).toHaveLength(1);
+    expect(wrapper.emitted('retry')).toHaveLength(1);
   });
 });

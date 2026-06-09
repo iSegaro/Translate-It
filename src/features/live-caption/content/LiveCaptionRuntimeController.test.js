@@ -419,4 +419,107 @@ describe('live-caption runtime controller', () => {
     expect(mocks.translationAdapter).not.toHaveBeenCalled();
     expect(mocks.cacheFacade).not.toHaveBeenCalled();
   });
+
+  it('handles LIVE_CAPTION_TRANSLATE_RESULT messages reactively and updates store captions', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+
+    let messageListener;
+    const browserApi = {
+      runtime: {
+        sendMessage: vi.fn(),
+        onMessage: {
+          addListener: vi.fn((listener) => {
+            messageListener = listener;
+          }),
+          removeListener: vi.fn()
+        }
+      }
+    };
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    await controller.start({ tabId: 11 });
+
+    const video = createVideo({ src: 'http://example.com/stream.mp4' });
+    document.body.appendChild(video);
+    await controller.syncActiveVideo('test');
+
+    const activeVideoSession = controller.pageSession.activeVideoSession;
+    expect(activeVideoSession).not.toBeNull();
+    const sessionId = controller.pageSession.sessionId;
+    const videoFingerprint = activeVideoSession.videoFingerprint;
+
+    const segment = {
+      sessionId,
+      videoFingerprint,
+      segmentStartMs: 1000,
+      segmentEndMs: 3000,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      isFinal: true
+    };
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment
+      }
+    });
+
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(activeVideoSession.translatedCaptionSegments[0]).toMatchObject({
+      originalText: 'Hello',
+      translatedText: 'سلام'
+    });
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0]).toMatchObject({
+      originalText: 'Hello',
+      translatedText: 'سلام'
+    });
+  });
+
+  it('updates canPause and canResume reactively in controlsState based on runtime status', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi: createRuntimeBrowserApi(),
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    expect(store.controlsState.canPause).toBe(false);
+    expect(store.controlsState.canResume).toBe(false);
+
+    await controller.start({ tabId: 11 });
+
+    expect(store.controlsState.canPause).toBe(true);
+    expect(store.controlsState.canResume).toBe(false);
+
+    await controller.pause();
+
+    expect(store.controlsState.canPause).toBe(false);
+    expect(store.controlsState.canResume).toBe(true);
+
+    await controller.resume();
+
+    expect(store.controlsState.canPause).toBe(true);
+    expect(store.controlsState.canResume).toBe(false);
+
+    await controller.stop();
+
+    expect(store.controlsState.canPause).toBe(false);
+    expect(store.controlsState.canResume).toBe(false);
+  });
 });

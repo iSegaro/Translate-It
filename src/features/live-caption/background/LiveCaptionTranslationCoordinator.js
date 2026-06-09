@@ -11,13 +11,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionTranslat
  * Manages FIFO queueing, translation request dispatch, abort routing, and session state mapping.
  */
 export class LiveCaptionTranslationCoordinator {
-  constructor({ sessionManager, captureCoordinator, translationAdapter = null } = {}) {
+  constructor({ sessionManager, captureCoordinator, translationAdapter = null, browserApi = null } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionTranslationCoordinator requires a sessionManager');
     }
     this.sessionManager = sessionManager;
     this.captureCoordinator = captureCoordinator;
     this.translationAdapter = translationAdapter || new LiveCaptionTranslationAdapter();
+    this.browserApi = browserApi || (typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null);
     this.sessionQueues = new Map();
     this.activeAbortControllers = new Map();
     this.maxPendingSegments = 5;
@@ -137,6 +138,24 @@ export class LiveCaptionTranslationCoordinator {
           const activeVideoSession = pageSession.activeVideoSession;
           if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
             activeVideoSession.addTranslatedCaptionSegment(captionSegment);
+
+            // Broadcast translate result to the content script in the target tab
+            if (tabId && this.browserApi?.tabs?.sendMessage) {
+              try {
+                this.browserApi.tabs.sendMessage(tabId, {
+                  action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+                  payload: {
+                    sessionId,
+                    videoFingerprint,
+                    segment: captionSegment
+                  }
+                }).catch((err) => {
+                  logger.debug('Failed to send translate result message to tab', { tabId, error: err.message });
+                });
+              } catch (err) {
+                logger.debug('Synchronous error broadcasting translate result to tab', { tabId, error: err.message });
+              }
+            }
           }
 
           logger.info('Translation segment completed and recorded', {

@@ -108,6 +108,8 @@
         @cancel-consent="handleLiveCaptionCancelConsent"
         @start="handleLiveCaptionStart"
         @stop="handleLiveCaptionStop"
+        @pause="handleLiveCaptionPause"
+        @resume="handleLiveCaptionResume"
         @retry="handleLiveCaptionRetry"
         @clear-cache="handleLiveCaptionClearCache"
       />
@@ -284,6 +286,16 @@ const handleLiveCaptionStop = async () => {
   if (liveCaptionRuntimeController) {
     await liveCaptionRuntimeController.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
   }
+};
+
+const handleLiveCaptionPause = async () => {
+  const controller = ensureLiveCaptionRuntimeController();
+  await controller.pause();
+};
+
+const handleLiveCaptionResume = async () => {
+  const controller = ensureLiveCaptionRuntimeController();
+  await controller.resume();
 };
 
 const handleLiveCaptionRetry = async () => {

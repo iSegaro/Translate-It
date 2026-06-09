@@ -45,6 +45,8 @@
           :controls-state="controlsState"
           @start="$emit('start')"
           @stop="$emit('stop')"
+          @pause="$emit('pause')"
+          @resume="$emit('resume')"
           @retry="$emit('retry')"
           @clear-cache="$emit('clear-cache')"
         />
@@ -144,7 +146,7 @@ const props = defineProps({
   }
 });
 
-defineEmits(['accept-consent', 'cancel-consent', 'start', 'stop', 'retry', 'clear-cache']);
+defineEmits(['accept-consent', 'cancel-consent', 'start', 'stop', 'pause', 'resume', 'retry', 'clear-cache']);
 
 const overlayAnchor = useLiveCaptionOverlay(
   () => props.videoElement,

@@ -40,6 +40,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     canStart: true,
     canStop: false,
     canRetry: false,
+    canPause: false,
+    canResume: false,
     canClearCache: false
   });
   const lastError = ref(null);
@@ -66,6 +68,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       canStart: true,
       canStop: false,
       canRetry: false,
+      canPause: false,
+      canResume: false,
       canClearCache: false
     };
     lastError.value = null;
@@ -209,6 +213,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       canStart: true,
       canStop: false,
       canRetry: false,
+      canPause: false,
+      canResume: false,
       canClearCache: false
     };
     lastError.value = null;
@@ -253,6 +259,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       canStart: true,
       canStop: false,
       canRetry: false,
+      canPause: false,
+      canResume: false,
       canClearCache: false
     };
     startupDeniedReason.value = null;

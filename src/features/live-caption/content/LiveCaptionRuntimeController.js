@@ -189,6 +189,24 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
 
+    if (this.browserApi?.runtime?.onMessage) {
+      const handleMessage = (message) => {
+        if (!message) return;
+
+        // Handle LIVE_CAPTION_TRANSLATE_RESULT action
+        if (message.action === 'LIVE_CAPTION_TRANSLATE_RESULT') {
+          const { sessionId, videoFingerprint, segment } = message.payload || {};
+          this.handleTranslateResult({ sessionId, videoFingerprint, segment });
+        }
+      };
+
+      this.browserApi.runtime.onMessage.addListener(handleMessage);
+
+      this.trackResource('live-caption-runtime-message-listener', () => {
+        this.browserApi.runtime.onMessage.removeListener(handleMessage);
+      });
+    }
+
     logger.info('Live-caption runtime controller created', {
       createdAt: this.createdAt
     });
@@ -276,10 +294,21 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       LIVE_CAPTION_RUNTIME_STATES.STOPPED
     ].includes(this.runtimeStatus);
 
+    const canPause = [
+      LIVE_CAPTION_RUNTIME_STATES.STARTING,
+      LIVE_CAPTION_RUNTIME_STATES.RUNNING
+    ].includes(this.runtimeStatus);
+
+    const canResume = [
+      LIVE_CAPTION_RUNTIME_STATES.PAUSED
+    ].includes(this.runtimeStatus);
+
     this.store?.setControlsState?.({
       canStart,
       canStop,
       canRetry,
+      canPause,
+      canResume,
       canClearCache: false
     });
   }
@@ -551,6 +580,49 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       consentState: this.store?.consentState ?? LIVE_CAPTION_CONSENT_STATES.NOT_ASKED,
       platformSupport: this.resolvePlatformSupport()
     });
+  }
+
+  handleTranslateResult({ sessionId, videoFingerprint, segment }) {
+    if (this.destroyed || !this.started || this.paused) {
+      return;
+    }
+
+    if (!segment || typeof segment !== 'object') {
+      return;
+    }
+
+    // Ignore incomplete or empty segments
+    const text = segment.translatedText || segment.originalText || '';
+    if (!text.trim()) {
+      logger.debug('Ignoring empty translated caption segment', { sessionId });
+      return;
+    }
+
+    const currentVideoSession = this.pageSession?.activeVideoSession ?? null;
+    if (
+      this.pageSession &&
+      this.pageSession.sessionId === sessionId &&
+      currentVideoSession &&
+      currentVideoSession.videoFingerprint === videoFingerprint
+    ) {
+      currentVideoSession.addTranslatedCaptionSegment(segment);
+      this.store?.setCaptions(currentVideoSession.translatedCaptionSegments);
+
+      logger.debug('Overlay caption updated with new translated segment', {
+        sessionId,
+        videoFingerprint,
+        lineCount: currentVideoSession.translatedCaptionSegments.length,
+        segmentTiming: segment.segmentStartMs != null || segment.startMs != null
+          ? `${segment.segmentStartMs ?? segment.startMs}ms - ${segment.segmentEndMs ?? segment.endMs}ms`
+          : 'none'
+      });
+    } else {
+      logger.debug('Ignoring translate result for non-active video session', {
+        sessionId,
+        videoFingerprint,
+        activeFingerprint: currentVideoSession?.videoFingerprint
+      });
+    }
   }
 
   _applyStartupDenial(denial) {

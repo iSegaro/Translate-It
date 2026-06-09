@@ -30,15 +30,21 @@ const props = defineProps({
 });
 
 const finalizedLines = computed(() => (Array.isArray(props.captionLines)
-  ? props.captionLines.filter((line) => line?.isFinal !== false)
+  ? props.captionLines.filter((line) => {
+      if (line?.isFinal === false) {
+        return false;
+      }
+      const text = line?.translatedText || line?.originalText || '';
+      return text.trim().length > 0;
+    })
   : []));
 
 function lineKey(line) {
   return [
     line?.sessionId || 'session',
     line?.videoFingerprint || 'video',
-    line?.segmentStartMs ?? 'start',
-    line?.segmentEndMs ?? 'end',
+    line?.segmentStartMs ?? line?.startMs ?? 'start',
+    line?.segmentEndMs ?? line?.endMs ?? 'end',
     line?.translatedText || line?.originalText || ''
   ].join(':');
 }

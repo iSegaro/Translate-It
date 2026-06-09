@@ -149,3 +149,14 @@
 - [x] 19.5 Wire STT segment completion to the Translation Coordinator
 - [x] 19.6 Add unit and integration tests verifying order preservation, abort handling, and provider failure states
 - [x] 19.7 Update design specs, architecture logs, and validation results
+
+## 20. Runtime Phase 7 - Overlay Caption Rendering
+
+- [x] 20.1 Render finalized translated captions from VideoCaptionSession state
+- [x] 20.2 Render per-line timing (startMs, endMs) if available
+- [x] 20.3 Render multiple lines per video session if available
+- [x] 20.4 Respect overlay shell visibility controlled by store
+- [x] 20.5 Do not modify overlay for non-active sessions
+- [x] 20.6 Wire pause and resume buttons in controls
+- [x] 20.7 Implement empty/incomplete segment filtering
+- [x] 20.8 Add unit and integration tests for reactive overlay updates, timing displays, event forwarding, and filtering

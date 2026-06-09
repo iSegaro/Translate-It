@@ -134,8 +134,18 @@ export function useLiveCaptionOverlay(target, options = {}) {
     });
   };
 
-  watch(() => resolveTargetElement(target), () => {
-    attach();
+  watch(() => {
+    const el = resolveTargetElement(target);
+    const vis = options.visible !== undefined
+      ? (typeof options.visible === 'function' ? options.visible() : unref(options.visible))
+      : true;
+    return el && vis ? el : null;
+  }, (el) => {
+    if (el) {
+      attach();
+    } else {
+      cleanup();
+    }
   }, { immediate: true });
 
   onBeforeUnmount(() => {

@@ -5,7 +5,7 @@
     :data-display-mode="resolvedDisplay.mode"
   >
     <div
-      v-if="props.line?.segmentStartMs != null || props.line?.segmentEndMs != null"
+      v-if="props.line?.segmentStartMs != null || props.line?.segmentEndMs != null || props.line?.startMs != null || props.line?.endMs != null"
       class="live-caption-caption-line__time"
     >
       {{ formatTimeRange(props.line) }}
@@ -45,8 +45,10 @@ const props = defineProps({
 const resolvedDisplay = computed(() => resolveLiveCaptionCaptionLineDisplay(props.line, props.captionDisplayMode));
 
 function formatTimeRange(line) {
-  const start = Number.isFinite(line?.segmentStartMs) ? `${Math.round(line.segmentStartMs / 1000)}s` : null;
-  const end = Number.isFinite(line?.segmentEndMs) ? `${Math.round(line.segmentEndMs / 1000)}s` : null;
+  const startMs = line?.segmentStartMs ?? line?.startMs;
+  const endMs = line?.segmentEndMs ?? line?.endMs;
+  const start = Number.isFinite(startMs) ? `${Math.round(startMs / 1000)}s` : null;
+  const end = Number.isFinite(endMs) ? `${Math.round(endMs / 1000)}s` : null;
 
   if (start && end) {
     return `${start} - ${end}`;

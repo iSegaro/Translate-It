@@ -51,7 +51,11 @@ export class LiveCaptionBackgroundController {
     this.offscreenBridge = offscreenBridge;
     this.translationCoordinator =
       translationCoordinator ||
-      new LiveCaptionTranslationCoordinator({ sessionManager, captureCoordinator });
+      new LiveCaptionTranslationCoordinator({
+        sessionManager,
+        captureCoordinator,
+        browserApi: offscreenBridge.browserApi
+      });
     this.sttCoordinator =
       sttCoordinator ||
       new LiveCaptionSTTCoordinator({

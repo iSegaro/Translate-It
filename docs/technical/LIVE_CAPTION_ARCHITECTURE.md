@@ -466,12 +466,11 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - finalized audio chunks delivery to background controller
 - STT execution pipeline
 - translation execution pipeline
+- overlay caption rendering and controls
 
 ### Not Yet Implemented
 
-- end-to-end caption execution
 - cache persistence writes
-- transcript/overlay caption updates
 
 ## Future Runtime Phases
 

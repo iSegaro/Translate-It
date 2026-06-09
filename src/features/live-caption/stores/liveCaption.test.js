@@ -36,6 +36,8 @@ describe('live-caption store shell', () => {
       canStart: true,
       canStop: false,
       canRetry: false,
+      canPause: false,
+      canResume: false,
       canClearCache: false
     });
   });
@@ -84,6 +86,8 @@ describe('live-caption store shell', () => {
       canStart: true,
       canStop: false,
       canRetry: false,
+      canPause: false,
+      canResume: false,
       canClearCache: false
     });
   });

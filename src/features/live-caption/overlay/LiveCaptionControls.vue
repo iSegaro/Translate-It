@@ -22,6 +22,22 @@
     <button
       type="button"
       class="live-caption-controls__button"
+      :disabled="Boolean(controlsState?.canPause === false)"
+      @click="$emit('pause')"
+    >
+      Pause
+    </button>
+    <button
+      type="button"
+      class="live-caption-controls__button"
+      :disabled="Boolean(controlsState?.canResume === false)"
+      @click="$emit('resume')"
+    >
+      Resume
+    </button>
+    <button
+      type="button"
+      class="live-caption-controls__button"
       :disabled="Boolean(controlsState?.canRetry === false)"
       @click="$emit('retry')"
     >
@@ -46,7 +62,7 @@ defineProps({
   }
 });
 
-defineEmits(['start', 'stop', 'retry', 'clear-cache']);
+defineEmits(['start', 'stop', 'pause', 'resume', 'retry', 'clear-cache']);
 </script>
 
 <style scoped>
