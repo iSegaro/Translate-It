@@ -441,7 +441,7 @@ onUnmounted(() => {
 // Validation function
 const validatePrompt = async (showFeedback = false) => {
   clearErrors()
-  const isValid = await validate(activeTemplateValue.value)
+  const isValid = await validate(activeTemplateValue.value, currentPromptKey.value)
   
   if (!isValid && showFeedback) {
     validationErrorKey.value = getFirstError('promptTemplate') || ''
