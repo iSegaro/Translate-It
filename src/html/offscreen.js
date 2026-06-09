@@ -119,9 +119,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const action = cleanMessage.action;
 
   if (Object.values(LIVE_CAPTION_RUNTIME_ACTIONS).includes(action)) {
-    const response = liveCaptionOffscreenRuntimeShell.handleMessage(cleanMessage, sender);
-    sendResponse(response);
-    return false;
+    Promise.resolve(liveCaptionOffscreenRuntimeShell.handleMessage(cleanMessage, sender))
+      .then((response) => {
+        sendResponse(response);
+      })
+      .catch((error) => {
+        logger.error('Error handling live caption runtime action in offscreen:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // keep async channel open
   }
   
   if (action === "TTS_SPEAK" && cleanMessage.data) {

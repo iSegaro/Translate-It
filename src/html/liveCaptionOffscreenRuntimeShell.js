@@ -37,6 +37,15 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.lastRequest = null;
     this.lastResponse = null;
     this.lastUpdatedAt = Date.now();
+
+    // Media capture state properties
+    this.mediaStream = null;
+    this.mediaRecorder = null;
+    this.audioCtx = null;
+    this.audioSource = null;
+    this.captureState = 'idle'; // idle | starting | capturing | paused | stopping | error
+    this.chunkTimeslice = 3000;
+    this.chunkStartMs = 0;
   }
 
   touch() {
@@ -142,11 +151,83 @@ export class LiveCaptionOffscreenRuntimeShell {
       videoFingerprint: this.videoFingerprint,
       lastRequest: this.lastRequest ? { ...this.lastRequest } : null,
       lastResponse: this.lastResponse ? { ...this.lastResponse } : null,
-      lastUpdatedAt: this.lastUpdatedAt
+      lastUpdatedAt: this.lastUpdatedAt,
+      captureState: this.captureState
     };
   }
 
-  handleRuntimeStart(message, sender) {
+  _stopCapture() {
+    this.captureState = 'stopping';
+    if (this.mediaRecorder) {
+      try {
+        if (this.mediaRecorder.state !== 'inactive') {
+          this.mediaRecorder.stop();
+        }
+      } catch (e) {
+        logger.warn('Error stopping MediaRecorder:', e);
+      }
+      this.mediaRecorder = null;
+    }
+
+    if (this.mediaStream) {
+      try {
+        this.mediaStream.getTracks().forEach((track) => track.stop());
+      } catch (e) {
+        logger.warn('Error stopping MediaStream tracks:', e);
+      }
+      this.mediaStream = null;
+    }
+
+    if (this.audioCtx) {
+      try {
+        this.audioCtx.close();
+      } catch (e) {
+        logger.warn('Error closing AudioContext:', e);
+      }
+      this.audioCtx = null;
+    }
+
+    if (this.audioSource) {
+      try {
+        this.audioSource.disconnect();
+      } catch (e) {
+        logger.warn('Error disconnecting AudioSource:', e);
+      }
+      this.audioSource = null;
+    }
+
+    this.captureState = 'idle';
+  }
+
+  _handleCaptureError(error) {
+    this._stopCapture();
+    this.captureState = 'error';
+    this._setState({
+      status: LIVE_CAPTION_RUNTIME_SHELL_STATES.ERROR,
+      runtimeState: LIVE_CAPTION_RUNTIME_STATES.ERROR
+    });
+
+    if (chrome?.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        action: 'live-caption/offscreen/capture-error',
+        target: 'background',
+        source: 'offscreen',
+        sessionId: this.sessionId,
+        tabId: this.tabId,
+        videoFingerprint: this.videoFingerprint,
+        error: {
+          code: 'capture_runtime_error',
+          message: error?.message || 'Capture runtime error',
+          reason: 'error',
+          details: error?.stack || null
+        }
+      }).catch((err) => {
+        logger.error('Failed to send capture error to background:', err);
+      });
+    }
+  }
+
+  async handleRuntimeStart(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.START);
       const sessionError = this._ensureConsistency(request, LIVE_CAPTION_RUNTIME_ACTIONS.START);
@@ -168,6 +249,121 @@ export class LiveCaptionOffscreenRuntimeShell {
         sessionId: request.data.sessionId,
         tabId: request.data.tabId
       });
+
+      // Stop any existing capture/recorder
+      this._stopCapture();
+
+      // Configure timeslice
+      this.chunkTimeslice = request.data.metadata?.chunkTimeslice ?? 3000;
+
+      // Start actual capture
+      const streamId = request.data.streamId;
+      if (!streamId) {
+        throw new Error('Capture stream ID is required to start live captioning');
+      }
+
+      this.captureState = 'starting';
+
+      let stream;
+      try {
+        if (!navigator?.mediaDevices?.getUserMedia) {
+          throw new Error('navigator.mediaDevices.getUserMedia is not available');
+        }
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            mandatory: {
+              chromeMediaSource: 'tab',
+              chromeMediaSourceId: streamId
+            }
+          }
+        });
+      } catch (err) {
+        logger.error('Failed to get media stream in offscreen:', err);
+        throw new Error(`getUserMedia failed: ${err.message}`);
+      }
+
+      this.mediaStream = stream;
+
+      // Route the captured stream to system speaker to unmute the tab for the user
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(audioCtx.destination);
+        this.audioCtx = audioCtx;
+        this.audioSource = source;
+      } catch (err) {
+        logger.warn('Failed to setup AudioContext loopback (tab may remain muted):', err);
+      }
+
+      // Initialize MediaRecorder
+      try {
+        const options = { mimeType: 'audio/webm;codecs=opus' };
+        let selectedMime = options.mimeType;
+        if (typeof MediaRecorder !== 'undefined') {
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            selectedMime = 'audio/webm';
+          }
+          if (!MediaRecorder.isTypeSupported(selectedMime)) {
+            selectedMime = ''; // Let browser decide
+          }
+
+          const mediaRecorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : {});
+          this.mediaRecorder = mediaRecorder;
+
+          this.chunkStartMs = 0;
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              const chunkPayload = event.data;
+              const chunkEndMs = this.chunkStartMs + this.chunkTimeslice;
+
+              logger.info('MediaRecorder chunk completed', {
+                sessionId: this.sessionId,
+                videoFingerprint: this.videoFingerprint,
+                chunkStartMs: this.chunkStartMs,
+                chunkEndMs,
+                sizeBytes: chunkPayload.size
+              });
+
+              if (chrome?.runtime?.sendMessage) {
+                chrome.runtime.sendMessage({
+                  action: 'live-caption/offscreen/finalized-chunk',
+                  target: 'background',
+                  source: 'offscreen',
+                  sessionId: this.sessionId,
+                  tabId: this.tabId,
+                  videoFingerprint: this.videoFingerprint,
+                  chunkStartMs: this.chunkStartMs,
+                  chunkEndMs,
+                  mimeType: mediaRecorder.mimeType || 'audio/webm',
+                  payloadKind: 'blob',
+                  chunkPayload
+                }).catch((err) => {
+                  logger.error('Failed to send finalized chunk to background:', err);
+                });
+              }
+
+              this.chunkStartMs = chunkEndMs;
+            } else {
+              logger.debug('Empty chunk ignored', { sessionId: this.sessionId });
+            }
+          };
+
+          mediaRecorder.onerror = (event) => {
+            logger.error('MediaRecorder runtime error:', event.error);
+            this._handleCaptureError(event.error || new Error('MediaRecorder runtime error'));
+          };
+
+          this.captureState = 'capturing';
+          mediaRecorder.start(this.chunkTimeslice);
+        } else {
+          throw new Error('MediaRecorder is not supported in this environment');
+        }
+      } catch (err) {
+        logger.error('Failed to setup MediaRecorder in offscreen:', err);
+        throw new Error(`MediaRecorder setup failed: ${err.message}`);
+      }
+
       this._setState({
         status: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
         runtimeState: LIVE_CAPTION_RUNTIME_STATES.RUNNING
@@ -197,12 +393,15 @@ export class LiveCaptionOffscreenRuntimeShell {
       });
       return response;
     } catch (error) {
+      this._stopCapture();
       return this._buildFailClosed(LIVE_CAPTION_RUNTIME_ACTIONS.START, error, {
         sessionId: message?.data?.sessionId ?? null,
         tabId: message?.data?.tabId ?? null,
         videoFingerprint: message?.data?.videoFingerprint ?? null,
         code: LIVE_CAPTION_RUNTIME_ERROR_CODES.INVALID_PAYLOAD,
-        reason: 'invalid_payload'
+        reason: 'invalid_payload',
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.ERROR,
+        status: LIVE_CAPTION_RUNTIME_SHELL_STATES.ERROR
       });
     }
   }
@@ -272,6 +471,15 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
+      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+        try {
+          this.mediaRecorder.pause();
+          this.captureState = 'paused';
+        } catch (e) {
+          logger.warn('Error pausing MediaRecorder:', e);
+        }
+      }
+
       this._setState({
         status: LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL,
         runtimeState: LIVE_CAPTION_RUNTIME_STATES.PAUSED
@@ -321,6 +529,15 @@ export class LiveCaptionOffscreenRuntimeShell {
           videoFingerprint: request.data.videoFingerprint,
           reason: 'inconsistent_session'
         });
+      }
+
+      if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+        try {
+          this.mediaRecorder.resume();
+          this.captureState = 'capturing';
+        } catch (e) {
+          logger.warn('Error resuming MediaRecorder:', e);
+        }
       }
 
       this._setState({
@@ -382,6 +599,8 @@ export class LiveCaptionOffscreenRuntimeShell {
         sessionId: request.data.sessionId,
         tabId: request.data.tabId
       });
+
+      this._stopCapture();
       this._clearSessionContext();
       this._setState({
         status: LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE,
@@ -409,6 +628,7 @@ export class LiveCaptionOffscreenRuntimeShell {
       });
       return response;
     } catch (error) {
+      this._stopCapture();
       return this._buildFailClosed(LIVE_CAPTION_RUNTIME_ACTIONS.STOP, error, {
         sessionId: message?.data?.sessionId ?? null,
         tabId: message?.data?.tabId ?? null,
@@ -448,10 +668,11 @@ export {
   LIVE_CAPTION_RUNTIME_ERROR_CODES,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   LIVE_CAPTION_RUNTIME_SHELL_STATES,
-  LIVE_CAPTION_RUNTIME_STATES,
   createLiveCaptionRuntimeFailClosedResponse,
   createLiveCaptionRuntimeShellResponse,
   normalizeLiveCaptionRuntimeRequest
 } from '@/features/live-caption/background/liveCaptionRuntimeContracts.js';
+
+export { LIVE_CAPTION_RUNTIME_STATES } from '@/features/live-caption/constants/liveCaptionRuntimeStates.js';
 
 export default LiveCaptionOffscreenRuntimeShell;

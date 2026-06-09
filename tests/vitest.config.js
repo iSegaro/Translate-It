@@ -17,6 +17,18 @@ export default defineConfig({
       }
     })
   ],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, '../src'),
+      '@components': resolve(__dirname, '../src/components'),
+      '@views': resolve(__dirname, '../src/apps'),
+      '@store': resolve(__dirname, '../src/store'),
+      '@composables': resolve(__dirname, '../src/composables'),
+      '@utils': resolve(__dirname, '../src/utils'),
+      '@providers': resolve(__dirname, '../src/features/translation/providers'),
+      '@assets': resolve(__dirname, '../src/assets')
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',

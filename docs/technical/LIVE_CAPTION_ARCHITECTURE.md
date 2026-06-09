@@ -461,15 +461,17 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - background runtime controller and routing shell
 - runtime message contracts
 - structured logging scope
+- `chrome.tabCapture` runtime and offscreen capture ownership
+- `MediaRecorder` chunking runtime and offscreen runtime capture
+- finalized audio chunks delivery to background controller
 
 ### Not Yet Implemented
 
-- `chrome.tabCapture` runtime
-- `MediaRecorder` runtime
-- offscreen runtime capture
 - STT execution pipeline
 - translation execution pipeline
 - end-to-end caption execution
+- cache persistence writes
+- transcript/overlay caption updates
 
 ## Future Runtime Phases
 

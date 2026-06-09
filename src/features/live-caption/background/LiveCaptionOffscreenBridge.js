@@ -62,6 +62,31 @@ export class LiveCaptionOffscreenBridge {
     return this.browserApi?.runtime ?? null;
   }
 
+  async ensureOffscreenDocument() {
+    const chrome = this.browserApi;
+    if (!chrome?.offscreen) {
+      return;
+    }
+
+    try {
+      const hasDoc = await chrome.offscreen.hasDocument().catch(() => false);
+      if (hasDoc) {
+        logger.debug('Recreating offscreen document to ensure USER_MEDIA reason...');
+        await chrome.offscreen.closeDocument().catch(() => {});
+      }
+
+      logger.debug('Creating new offscreen document...');
+      await chrome.offscreen.createDocument({
+        url: 'src/html/offscreen.html',
+        reasons: ['AUDIO_PLAYBACK', 'USER_MEDIA'],
+        justification: 'Live caption capture and TTS playback'
+      });
+    } catch (error) {
+      logger.error('Failed to ensure offscreen document:', error);
+      throw error;
+    }
+  }
+
   touch() {
     this.lastUpdatedAt = Date.now();
   }
