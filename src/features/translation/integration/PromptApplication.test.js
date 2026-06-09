@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import browser from 'webextension-polyfill';
 import { TranslationMode } from '@/shared/config/config.js';
-import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
 
 describe('Prompt Application Runtime Audit', () => {
   let mockStorageData = {};

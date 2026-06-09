@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { usePromptPreview } from './usePromptPreview.js'
-import { TranslationMode } from '@/shared/config/config.js'
 
 // Mocking config getters since they are imported dynamically
 vi.mock('@/shared/config/config.js', async (importOriginal) => {
