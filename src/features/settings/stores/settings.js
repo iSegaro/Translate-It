@@ -14,6 +14,8 @@ import { getFirstMissingSetting } from '@/features/translation/utils/providerVal
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js';
+import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
 // --- Helpers ------------------------------------------------------------
@@ -124,6 +126,7 @@ function getDefaultSettings() {
     ENABLE_DICTIONARY: CONFIG.ENABLE_DICTIONARY ?? true,
     ENABLE_SCREEN_CAPTURE: CONFIG.ENABLE_SCREEN_CAPTURE ?? true,
     LIVE_CAPTION_ENABLED: CONFIG.LIVE_CAPTION_ENABLED ?? false,
+    [LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE]: CONFIG[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE] || LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
     LIVE_CAPTION_QUALITY_PROFILE: CONFIG.LIVE_CAPTION_QUALITY_PROFILE || 'balanced',
     LIVE_CAPTION_CACHE_MAX_ITEMS: CONFIG.LIVE_CAPTION_CACHE_MAX_ITEMS || 500,
     LIVE_CAPTION_CACHE_MAX_BYTES: CONFIG.LIVE_CAPTION_CACHE_MAX_BYTES || 10485760,

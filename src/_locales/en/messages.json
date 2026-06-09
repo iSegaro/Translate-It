@@ -374,6 +374,69 @@
   "tts_voices_tuning_desc": {
     "message": "Customize regional accents, genders, and dialects for each supported language, and test them with real-time previews."
   },
+  "live_caption_tab_title": {
+    "message": "Live Caption"
+  },
+  "live_caption_tab_desc": {
+    "message": "Capture and translate audio from active tab videos using OpenAI Whisper. Chrome/Edge desktop only."
+  },
+  "live_caption_display_mode_label": {
+    "message": "Caption Display Mode"
+  },
+  "live_caption_display_mode_desc": {
+    "message": "Choose how captions are displayed in the overlay."
+  },
+  "live_caption_display_mode_translated_only": {
+    "message": "Translated Only"
+  },
+  "live_caption_display_mode_transcript_only": {
+    "message": "Transcript Only"
+  },
+  "live_caption_display_mode_bilingual": {
+    "message": "Bilingual (Both)"
+  },
+  "live_caption_cache_clear_button": {
+    "message": "Clear Live Caption Cache"
+  },
+  "live_caption_cache_clear_desc": {
+    "message": "Remove all cached transcripts and translations for Live Caption."
+  },
+  "live_caption_cache_clear_success": {
+    "message": "Live Caption cache cleared successfully."
+  },
+  "live_caption_privacy_note_title": {
+    "message": "Privacy & Platform Support"
+  },
+  "live_caption_privacy_note_desc": {
+    "message": "Live Caption captures the active tab's audio after your consent. Raw audio is never persisted. Transcripts and translated captions may be cached outside incognito mode."
+  },
+  "live_caption_platform_support": {
+    "message": "Platform Support"
+  },
+  "live_caption_platform_desc": {
+    "message": "Chrome and Edge desktop only. Not available on Firefox or mobile browsers."
+  },
+  "live_caption_unsupported_platform": {
+    "message": "Live Caption requires Chrome or Edge desktop browser."
+  },
+  "live_caption_requires_openai_key": {
+    "message": "Live Caption requires OpenAI API key to be configured in Providers tab."
+  },
+  "live_caption_fab_label": {
+    "message": "Live Caption"
+  },
+  "live_caption_fab_tooltip": {
+    "message": "Start Live Caption for current video"
+  },
+  "live_caption_supported_platform": {
+    "message": "Supported"
+  },
+  "clear_cache": {
+    "message": "Clear Cache"
+  },
+  "clearing": {
+    "message": "Clearing..."
+  },
   "tts_manage_voices_btn": {
     "message": "Manage Voices & Accents ⚙️"
   },

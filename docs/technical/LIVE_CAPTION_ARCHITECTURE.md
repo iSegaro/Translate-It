@@ -467,10 +467,19 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - STT execution pipeline
 - translation execution pipeline
 - overlay caption rendering and controls
+- cache persistence writes (Phase 8)
+- session hydration and recovery (Phase 9)
+- UI integration and user controls (Phase 10)
 
-### Not Yet Implemented
+## Phase 10: UI Integration (June 2026)
 
-- cache persistence writes
+Phase 10 completed the user-facing layer:
+- Desktop FAB menu entry for Live Caption
+- Options/LiveCaptionTab settings surface
+- Display mode configuration (translated_only, transcript_only, bilingual)
+- Cache clear controls
+- Platform detection and messaging
+- i18n strings for all UI elements
 
 ## Future Runtime Phases
 
@@ -499,4 +508,4 @@ The remaining runtime phases are media and execution only:
 - No implicit provider fallback for Live Caption.
 - No runtime execution in this document’s model beyond the architecture already implemented.
 
-**Last Updated**: June 2026
+**Last Updated**: June 2026 (Phase 10 UI Integration complete)

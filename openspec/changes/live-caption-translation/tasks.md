@@ -160,3 +160,42 @@
 - [x] 20.6 Wire pause and resume buttons in controls
 - [x] 20.7 Implement empty/incomplete segment filtering
 - [x] 20.8 Add unit and integration tests for reactive overlay updates, timing displays, event forwarding, and filtering
+
+## 21. Runtime Phase 8 - Cache Persistence and Hydration
+
+- [x] 21.1 Implement persistent storage of transcripts to IndexedDB
+- [x] 21.2 Implement persistent storage of translations to IndexedDB
+- [x] 21.3 Implement per-video cache keys using tabId + videoFingerprint
+- [x] 21.4 Implement cache hydration on session start/resume
+- [x] 21.5 Implement incognito-only cache behavior (no persistence)
+- [x] 21.6 Add unit and integration tests for cache persistence, hydration, and incognito behavior
+- [x] 21.7 Update architecture documentation
+
+## 22. Runtime Phase 9 - Runtime Recovery and Resilience
+
+- [x] 22.1 Implement orphaned session reconciliation after service worker restart
+- [x] 22.2 Implement offscreen health monitoring with 15s interval
+- [x] 22.3 Implement 5s timeout for health checks
+- [x] 22.4 Implement fail-closed cleanup on invalid state
+- [x] 22.5 Add unit and integration tests for orphan reconciliation, health monitoring, and fail-closed behavior
+- [x] 22.6 Update architecture documentation
+
+## 23. Runtime Phase 10 - UI Integration and User Controls
+
+- [x] 23.1 Add Live Caption menu item to DesktopFabMenu with platform detection (Chrome/Edge desktop only)
+- [x] 23.2 Implement ContentApp handler for live-caption-start-request event from FAB
+- [x] 23.3 Create LiveCaptionTab.vue options page with display mode selection
+- [x] 23.4 Register LiveCaptionTab in options router and navigation
+- [x] 23.5 Add cache clear button to options tab
+- [x] 23.6 Add platform support badge and messaging
+- [x] 23.7 Add i18n strings to messages.json for all Live Caption UI elements
+- [x] 23.8 Update architecture documentation to reflect Phase 10 completion
+- [x] 23.9 Run tests and validate UI integration
+
+**Phase 10 Status**: ✅ COMPLETE (June 2026)
+
+Live Caption is now fully integrated and accessible to users through:
+- Desktop FAB menu entry (Chrome/Edge only)
+- Options/Live Caption settings page
+- Display mode configuration (translated_only, transcript_only, bilingual)
+- Cache management controls

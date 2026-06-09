@@ -289,7 +289,7 @@ import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouse
 import useFabSelection from '@/apps/content/composables/useFabSelection.js';
 import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
-import { deviceDetector } from '@/utils/browser/compatibility.js';
+import { deviceDetector, getBrowserInfoSync } from '@/utils/browser/compatibility.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js';
@@ -306,6 +306,7 @@ import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
 import IconMouseHover from '@/icons/ui/mouse-hover.png';
 import IconTTS from '@/icons/ui/speaker.png';
+import IconLiveCaption from '@/icons/ui/subtitle.png';
 
 const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
 const mobileStore = useMobileStore();
@@ -320,7 +321,8 @@ const exclusionChecker = ExclusionChecker.getInstance();
 const allowedFeatures = ref({
   selectElement: true,
   pageTranslation: true,
-  screenCapture: true
+  screenCapture: true,
+  liveCaption: true
 });
 
 const updateAllowedFeatures = async () => {
@@ -331,6 +333,11 @@ const updateAllowedFeatures = async () => {
     allowedFeatures.value.screenCapture = status.features.screenCapture?.allowed ?? true;
     logger.debug('FAB allowed features updated', allowedFeatures.value);
   }
+
+  // Live Caption requires Chrome/Edge desktop and tabCapture API
+  const browserInfo = getBrowserInfoSync();
+  allowedFeatures.value.liveCaption = !browserInfo.isFirefox && !browserInfo.isMobile &&
+    typeof chrome !== 'undefined' && chrome.tabCapture;
 };
 
 const ANIMATION_CONFIG = {
@@ -547,16 +554,42 @@ const menuItems = computed(() => {
       closeMenu: true,
       action: async () => {
         try {
-          await sendMessage({ 
-            action: MessageActions.START_SCREEN_CAPTURE 
+          await sendMessage({
+            action: MessageActions.START_SCREEN_CAPTURE
           });
         } catch (err) {
           if (ExtensionContextManager.isContextError(err)) {
             ExtensionContextManager.handleContextError(err, 'desktop-fab:screen-capture');
           } else {
-            await handleError(err, { 
+            await handleError(err, {
               context: 'desktop-fab:screen-capture',
-              showToast: true 
+              showToast: true
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Live Caption - Chrome/Edge desktop only
+  if (allowedFeatures.value.liveCaption) {
+    items.push({
+      id: 'live_caption',
+      label: t('live_caption_fab_label'),
+      icon: IconLiveCaption,
+      closeMenu: true,
+      action: async () => {
+        try {
+          // Emit page event to trigger Live Caption start
+          // This will be handled by ContentApp's Live Caption overlay
+          pageEventBus.emit('live-caption-start-request');
+        } catch (err) {
+          if (ExtensionContextManager.isContextError(err)) {
+            ExtensionContextManager.handleContextError(err, 'desktop-fab:live-caption');
+          } else {
+            await handleError(err, {
+              context: 'desktop-fab:live-caption',
+              showToast: true
             });
           }
         }

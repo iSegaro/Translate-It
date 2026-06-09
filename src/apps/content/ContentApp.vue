@@ -189,6 +189,10 @@ import { useContentAppLifecycle } from './composables/useContentAppLifecycle.js'
 import { useLiveCaptionStore } from '@/features/live-caption/stores/liveCaption.js';
 import { LiveCaptionRuntimeController } from '@/features/live-caption/content/index.js';
 import { LIVE_CAPTION_CLEANUP_REASONS } from '@/features/live-caption/core/contracts.js';
+import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js';
+import {
+  normalizeLiveCaptionCaptionDisplayMode
+} from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
@@ -222,6 +226,17 @@ import { watch } from 'vue';
 watch(isScreenCaptureActive, (newVal) => {
   logger.info(`[ContentApp] isScreenCaptureActive changed: ${newVal}`);
 });
+
+// Synchronize Live Caption display mode setting to the live caption store
+watch(
+  () => settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE],
+  (newMode) => {
+    const validatedMode = normalizeLiveCaptionCaptionDisplayMode(newMode);
+    logger.debug(`[ContentApp] Syncing Live Caption display mode setting: ${newMode} (validated: ${validatedMode})`);
+    liveCaptionStore.setCaptionDisplayMode(validatedMode);
+  },
+  { immediate: true }
+);
 
 const onScreenAreaSelected = (result) => {
   logger.info('Screen area selected', result);
@@ -324,6 +339,25 @@ const handleLiveCaptionCancelConsent = async () => {
     });
   }
 };
+
+// Handle Live Caption start request from FAB
+const handleLiveCaptionStartRequestFromFAB = () => {
+  logger.debug('Live Caption start request received from FAB');
+  // Check if consent is already accepted
+  if (liveCaptionStore.consentAccepted) {
+    // Consent already given, start directly
+    handleLiveCaptionStart();
+  } else {
+    // Show consent notice first
+    liveCaptionStore.setConsentNoticeVisible(true);
+    liveCaptionStore.setEnabled(true);
+  }
+};
+
+// Listen for page events
+if (typeof window !== 'undefined' && window.pageEventBus) {
+  window.pageEventBus.on('live-caption-start-request', handleLiveCaptionStartRequestFromFAB);
+}
 
 // 8. Lifecycle & Cleanup Logic
 const onNavigationCleanup = () => {
