@@ -31,7 +31,24 @@ import {
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
-  normalizeLiveCaptionOffscreenResponse
+  normalizeLiveCaptionOffscreenResponse,
+  STT_PROVIDER_STATUS,
+  STT_PROVIDER_ERROR_CODES,
+  normalizeSTTResult,
+  createSTTProviderStatus,
+  createSTTProviderError,
+  isRetryableSTTError,
+  normalizeSTTProviderError,
+  STT_PROVIDER_IDS,
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_CAPABILITIES,
+  STT_PROVIDER_MANIFEST,
+  getDefaultSTTProviderId,
+  getSTTProviderDefinition,
+  getAvailableSTTProviders,
+  isSTTProviderSupported,
+  STTProviderFactory,
+  OpenAIWhisperProvider
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { CONFIG } from '@/shared/config/config.js';
@@ -68,6 +85,24 @@ describe('live-caption feature shell', () => {
     expect(createLiveCaptionOffscreenSnapshotResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionOffscreenSnapshotResponse);
     expect(createLiveCaptionFailClosedResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionFailClosedResponse);
     expect(normalizeLiveCaptionOffscreenResponse).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionOffscreenResponse);
+    expect(BaseSTTProvider).toBe(LiveCaptionFeature.contracts.BaseSTTProvider);
+    expect(STT_PROVIDER_STATUS).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_STATUS);
+    expect(STT_PROVIDER_ERROR_CODES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_ERROR_CODES);
+    expect(normalizeSTTResult).toBe(LiveCaptionFeature.contracts.normalizeSTTResult);
+    expect(createSTTProviderStatus).toBe(LiveCaptionFeature.contracts.createSTTProviderStatus);
+    expect(createSTTProviderError).toBe(LiveCaptionFeature.contracts.createSTTProviderError);
+    expect(isRetryableSTTError).toBe(LiveCaptionFeature.contracts.isRetryableSTTError);
+    expect(normalizeSTTProviderError).toBe(LiveCaptionFeature.contracts.normalizeSTTProviderError);
+    expect(STT_PROVIDER_IDS).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_IDS);
+    expect(STT_PROVIDER_MODES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_MODES);
+    expect(STT_PROVIDER_CAPABILITIES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_CAPABILITIES);
+    expect(STT_PROVIDER_MANIFEST).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_MANIFEST);
+    expect(getDefaultSTTProviderId).toBe(LiveCaptionFeature.contracts.getDefaultSTTProviderId);
+    expect(getSTTProviderDefinition).toBe(LiveCaptionFeature.contracts.getSTTProviderDefinition);
+    expect(getAvailableSTTProviders).toBe(LiveCaptionFeature.contracts.getAvailableSTTProviders);
+    expect(isSTTProviderSupported).toBe(LiveCaptionFeature.contracts.isSTTProviderSupported);
+    expect(STTProviderFactory).toBe(LiveCaptionFeature.contracts.STTProviderFactory);
+    expect(OpenAIWhisperProvider).toBe(LiveCaptionFeature.contracts.OpenAIWhisperProvider);
   });
 
   it('exports session contracts without runtime wiring', () => {
@@ -75,5 +110,7 @@ describe('live-caption feature shell', () => {
     expect(VideoCaptionSession).toBeTypeOf('function');
     expect(LiveCaptionSessionManager).toBeTypeOf('function');
     expect(BaseSTTProvider).toBeTypeOf('function');
+    expect(STTProviderFactory).toBeTypeOf('function');
+    expect(OpenAIWhisperProvider).toBeTypeOf('function');
   });
 });

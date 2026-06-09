@@ -37,12 +37,12 @@
 
 ## 6. STT Provider Infrastructure
 
-- [ ] 6.1 Define the `BaseSTTProvider` contract for batch transcription
-- [ ] 6.2 Define the `STTProviderFactory` and `STTProviderManifest` responsibilities
-- [ ] 6.3 Define the OpenAI Whisper provider contract and capability surface
-- [ ] 6.4 Define retry behavior for transient transcription failures
-- [ ] 6.5 Define OpenAI credential reuse and startup error behavior for missing or invalid keys
-- [ ] 6.6 Define the provider error surface when OpenAI credentials are missing or invalid
+- [x] 6.1 Define the `BaseSTTProvider` contract for batch transcription
+- [x] 6.2 Define the `STTProviderFactory` and `STTProviderManifest` responsibilities
+- [x] 6.3 Define the OpenAI Whisper provider contract and capability surface
+- [x] 6.4 Define retry behavior for transient transcription failures
+- [x] 6.5 Define OpenAI credential reuse and startup error behavior for missing or invalid keys
+- [x] 6.6 Define the provider error surface when OpenAI credentials are missing or invalid
 
 ## 7. Translation Pipeline Integration
 
@@ -83,13 +83,13 @@
 - [x] 12.1 Define unit tests for session ownership and lifecycle transitions
 - [x] 12.2 Define unit tests for active-video detection and fingerprint generation
 - [x] 12.3 Define unit tests for deterministic active-video tie-break ordering
-- [ ] 12.4 Define unit tests for STT provider contracts and retry behavior
+- [x] 12.4 Define unit tests for STT provider contracts and retry behavior
 - [ ] 12.5 Define integration tests for capture-to-translation request flow
 - [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
 - [x] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
 - [x] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
 - [x] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
-- [ ] 12.10 Define startup tests for missing or invalid OpenAI credential handling
+- [x] 12.10 Define startup tests for missing or invalid OpenAI credential handling
 
 ## 13. Documentation
 

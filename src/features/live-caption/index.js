@@ -24,7 +24,6 @@ import {
   VideoCaptionSession,
   LiveCaptionSessionManager
 } from './core/index.js';
-import { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 import { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 import { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
 import { LiveCaptionTranslationRepository } from './cache/LiveCaptionTranslationRepository.js';
@@ -45,12 +44,52 @@ import {
   normalizeLiveCaptionOffscreenResponse
 } from './background/index.js';
 import { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
+import {
+  BaseSTTProvider,
+  STT_PROVIDER_STATUS,
+  STT_PROVIDER_ERROR_CODES,
+  normalizeSTTResult,
+  createSTTProviderStatus,
+  createSTTProviderError,
+  isRetryableSTTError,
+  normalizeSTTProviderError,
+  STT_PROVIDER_IDS,
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_CAPABILITIES,
+  STT_PROVIDER_MANIFEST,
+  getDefaultSTTProviderId,
+  getSTTProviderDefinition,
+  getAvailableSTTProviders,
+  isSTTProviderSupported,
+  STTProviderFactory,
+  OpenAIWhisperProvider
+} from './stt/index.js';
 
 export { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
 export { LIVE_CAPTION_SETTINGS_KEYS } from './constants/liveCaptionSettings.js';
 export { LIVE_CAPTION_DEFAULTS } from './constants/liveCaptionDefaults.js';
 export { LIVE_CAPTION_SESSION_STATES } from './constants/liveCaptionSessionStates.js';
 export { useLiveCaptionStore } from './stores/liveCaption.js';
+export {
+  BaseSTTProvider,
+  STT_PROVIDER_STATUS,
+  STT_PROVIDER_ERROR_CODES,
+  normalizeSTTResult,
+  createSTTProviderStatus,
+  createSTTProviderError,
+  isRetryableSTTError,
+  normalizeSTTProviderError,
+  STT_PROVIDER_IDS,
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_CAPABILITIES,
+  STT_PROVIDER_MANIFEST,
+  getDefaultSTTProviderId,
+  getSTTProviderDefinition,
+  getAvailableSTTProviders,
+  isSTTProviderSupported,
+  STTProviderFactory,
+  OpenAIWhisperProvider
+} from './stt/index.js';
 export {
   LIVE_CAPTION_CLEANUP_REASONS,
   createLiveCaptionErrorState,
@@ -72,7 +111,6 @@ export {
   VideoCaptionSession,
   LiveCaptionSessionManager
 } from './core/index.js';
-export { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 export { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 export { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
 export { LiveCaptionTranslationRepository } from './cache/LiveCaptionTranslationRepository.js';
@@ -138,7 +176,24 @@ export const LiveCaptionFeature = Object.freeze({
     createLiveCaptionOffscreenSnapshotResponse,
     createLiveCaptionFailClosedResponse,
     normalizeLiveCaptionOffscreenResponse,
-    LiveCaptionContentController
+    LiveCaptionContentController,
+    STT_PROVIDER_STATUS,
+    STT_PROVIDER_ERROR_CODES,
+    normalizeSTTResult,
+    createSTTProviderStatus,
+    createSTTProviderError,
+    isRetryableSTTError,
+    normalizeSTTProviderError,
+    STT_PROVIDER_IDS,
+    STT_PROVIDER_MODES,
+    STT_PROVIDER_CAPABILITIES,
+    STT_PROVIDER_MANIFEST,
+    getDefaultSTTProviderId,
+    getSTTProviderDefinition,
+    getAvailableSTTProviders,
+    isSTTProviderSupported,
+    STTProviderFactory,
+    OpenAIWhisperProvider
   }
 });
 
