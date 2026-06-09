@@ -8,6 +8,7 @@ import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -47,11 +48,27 @@ function getDefaultSettings() {
     FEATURE_SEMANTIC_BLOCK_GROUPING: CONFIG.FEATURE_SEMANTIC_BLOCK_GROUPING ?? true,
     COPY_REPLACE: CONFIG.COPY_REPLACE || 'replace',
     REPLACE_SPECIAL_SITES: CONFIG.REPLACE_SPECIAL_SITES ?? true,
-    PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE || 'Please translate the following text from $_{SOURCE} to $_{TARGET}:\n\n$_{TEXT}',
-    PROMPT_TEMPLATE_AUTO: CONFIG.PROMPT_TEMPLATE_AUTO || '',
-    PROMPT_BASE_FIELD_AUTO: CONFIG.PROMPT_BASE_FIELD_AUTO || '',
-    PROMPT_BASE_AI_BATCH_AUTO: CONFIG.PROMPT_BASE_AI_BATCH_AUTO || '',
-    PROMPT_BASE_AI_FOLLOWUP_AUTO: CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO || '',
+    // --- Prompt Templates ---
+    // Keep all prompt templates in settings so existing overrides survive
+    // save/load, import/export, and prompt migrations. UI exposure is controlled
+    // separately by PromptRegistry.editable.
+    PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE,
+    PROMPT_TEMPLATE_AUTO: CONFIG.PROMPT_TEMPLATE_AUTO,
+    PROMPT_BASE_FIELD: CONFIG.PROMPT_BASE_FIELD,
+    PROMPT_BASE_FIELD_AUTO: CONFIG.PROMPT_BASE_FIELD_AUTO,
+    PROMPT_BASE_POPUP_TRANSLATE: CONFIG.PROMPT_BASE_POPUP_TRANSLATE,
+    PROMPT_BASE_DICTIONARY: CONFIG.PROMPT_BASE_DICTIONARY,
+    PROMPT_BASE_SCREEN_CAPTURE: CONFIG.PROMPT_BASE_SCREEN_CAPTURE,
+    PROMPT_BASE_SELECT: CONFIG.PROMPT_BASE_SELECT,
+    PROMPT_BASE_BATCH: CONFIG.PROMPT_BASE_BATCH,
+    PROMPT_BASE_AI_BATCH: CONFIG.PROMPT_BASE_AI_BATCH,
+    PROMPT_BASE_AI_BATCH_AUTO: CONFIG.PROMPT_BASE_AI_BATCH_AUTO,
+    PROMPT_BASE_AI_FOLLOWUP: CONFIG.PROMPT_BASE_AI_FOLLOWUP,
+    PROMPT_BASE_AI_FOLLOWUP_AUTO: CONFIG.PROMPT_BASE_AI_FOLLOWUP_AUTO,
+    // --- Subtitle Prompts ---
+    PROMPT_SUBTITLE_USER: CONFIG.PROMPT_SUBTITLE_USER,
+    PROMPT_SUBTITLE_BASE: CONFIG.PROMPT_SUBTITLE_BASE,
+    PROMPT_SUBTITLE_BATCH: CONFIG.PROMPT_SUBTITLE_BATCH,
     API_KEY: CONFIG.API_KEY || '',
     OPENAI_API_KEY: CONFIG.OPENAI_API_KEY || '',
     OPENAI_API_URL: CONFIG.OPENAI_API_URL || '',
@@ -645,18 +662,25 @@ export const useSettingsStore = defineStore('settings', () => {
       });
     }
     
-    // 4. Validate Prompt Templates
-    const prompt = settings.value.PROMPT_TEMPLATE;
-    if (!prompt || prompt.toString().trim() === '') {
-      errors.push('validation_prompt_template_empty');
-    } else if (!prompt.toString().includes('$_{TEXT}')) {
-      errors.push('validation_prompt_template_missing_placeholders');
-    }
-
-    const autoPrompt = settings.value.PROMPT_TEMPLATE_AUTO;
-    if (autoPrompt && autoPrompt.toString().trim() !== '' && !autoPrompt.toString().includes('$_{TEXT}')) {
-      errors.push('validation_prompt_template_missing_placeholders');
-    }
+    // 4. Validate Prompt Templates (Registry-Driven)
+    Object.values(PROMPT_REGISTRY).forEach(promptMeta => {
+      // Only validate editable prompts on save
+      if (promptMeta.editable) {
+        const template = settings.value[promptMeta.key];
+        
+        if (!template || template.toString().trim() === '') {
+          errors.push(`prompt:${promptMeta.key}:validation_prompt_template_empty`);
+        } else {
+          // Verify required placeholders from registry
+          const requiredPlaceholders = promptMeta.placeholders || ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"];
+          const missingPlaceholders = requiredPlaceholders.filter(p => !template.toString().includes(p));
+          
+          if (missingPlaceholders.length > 0) {
+            errors.push(`prompt:${promptMeta.key}:validation_prompt_template_missing_placeholders`);
+          }
+        }
+      }
+    });
     
     // 5. Validate Proxy
     if (settings.value.PROXY_ENABLED && (!settings.value.PROXY_HOST || settings.value.PROXY_HOST.trim() === '')) {

@@ -39,6 +39,7 @@ import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
@@ -131,14 +132,22 @@ const saveAllSettings = async () => {
     }
 
     // Handle prompt validation errors
-    if (validation.errors.some(e => e.includes('prompt'))) {
-      if (router.currentRoute.value.name !== 'prompt') {
-        await router.push({ name: 'prompt' })
+    const promptError = validation.errors.find(e => e.startsWith('prompt:'))
+    if (promptError) {
+      const parts = promptError.split(':')
+      const promptKey = parts.length >= 2 ? parts[1] : null
+      
+      if (promptKey && PROMPT_REGISTRY[promptKey]) {
+        if (router.currentRoute.value.name !== 'prompt') {
+          await router.push({ name: 'prompt' })
+        }
+        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
+          detail: { field: 'prompt', promptKey } 
+        }))
+        return
+      } else {
+        logger.warn('Received malformed or unknown prompt validation error:', promptError)
       }
-      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
-        detail: { field: 'prompt' } 
-      }))
-      return
     }
 
     // Handle activation tab validation errors (scroll delay)

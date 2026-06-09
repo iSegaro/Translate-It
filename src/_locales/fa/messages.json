@@ -932,8 +932,23 @@
   "prompt_section_title": {
     "message": "الگوی درخواست (Prompt)"
   },
+  "prompt_type_general": {
+    "message": "الگوی عمومی"
+  },
+  "prompt_type_auto": {
+    "message": "الگوی خودکار"
+  },
+  "prompt_help_general": {
+    "message": "این الگو برای ترجمه‌های استاندارد از یک زبان مبدا خاص استفاده می‌شود."
+  },
+  "prompt_help_auto": {
+    "message": "این الگو در حالت دوطرفه، زمانی که زبان مبدا روی «خودکار» تنظیم شده است، استفاده می‌شود."
+  },
   "prompt_template_label": {
     "message": "الگوی درخواست"
+  },
+  "prompt_template_auto_label": {
+    "message": "الگوی درخواست خودکار"
   },
   "prompt_template_info": {
     "message": "از کلیدواژه‌ها برای شخصی‌سازی درخواست خود استفاده کنید."
@@ -2547,7 +2562,13 @@
     "message": "ترجمه دیکشنری"
   },
   "prompt_preview_desc_dictionary": {
-    "message": "تعاریف کوتاه کلمات و مترادف‌ها (نکته: این حالت از فرمت ثابت استفاده می‌کند)"
+    "message": "تعاریف کوتاه کلمات و مترادف‌ها (توجه: این حالت از قالب ثابت استفاده می‌کند)"
+  },
+  "prompt_preview_mode_subtitle": {
+    "message": "گردش‌کار ترجمه زیرنویس"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "ترکیب کامل قالب پایه ساختاری، قوانین سبک شما و ساختار دسته‌ای JSON."
   },
   "screen_capture_label": {
     "message": "ضبط"
@@ -2728,5 +2749,59 @@
   },
   "set_as_default_tooltip": {
     "message": "تنظیم به عنوان سرویس پیش‌فرض"
+  },
+  "prompt_select_label": {
+    "message": "انتخاب پرومپت برای ویرایش"
+  },
+  "prompt_group_basic": {
+    "message": "پایه (قالب‌های کاربر)"
+  },
+  "prompt_group_advanced": {
+    "message": "پیشرفته (قالب‌های سیستمی)"
+  },
+  "prompt_base_field_label": {
+    "message": "قالب پایه فیلد"
+  },
+  "prompt_base_field_desc": {
+    "message": "دستورات سطح سیستم برای ترجمه استاندارد فیلدهای متنی."
+  },
+  "prompt_base_field_auto_label": {
+    "message": "قالب پایه فیلد (خودکار)"
+  },
+  "prompt_base_field_auto_desc": {
+    "message": "دستورات سطح سیستم برای ترجمه فیلدهای متنی زمانی که زبان مبدا روی 'خودکار' است."
+  },
+  "prompt_base_popup_label": {
+    "message": "قالب پایه پاپ‌آپ/پنل کناری"
+  },
+  "prompt_base_popup_desc": {
+    "message": "دستورات سطح سیستم برای ترجمه در پاپ‌آپ و پنل کناری."
+  },
+  "prompt_base_dictionary_label": {
+    "message": "قالب پایه دیکشنری"
+  },
+  "prompt_base_dictionary_desc": {
+    "message": "دستورات سطح سیستم برای ترجمه به سبک دیکشنری (معانی، مترادف‌ها)."
+  },
+  "prompt_base_screen_capture_label": {
+    "message": "قالب پایه تصویربرداری صفحه"
+  },
+  "prompt_base_screen_capture_desc": {
+    "message": "دستورالعمل‌های سطح سیستم برای استخراج متن از تصویر و ترجمه آن."
+  },
+  "prompt_subtitle_user_label": {
+    "message": "قوانین ترجمه زیرنویس"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "دستورالعمل‌های لحن و سبک برای ترجمه زیرنویس (ایجاز، سبک گفتگو)."
+  },
+  "prompt_risk_warning_title": {
+    "message": "هشدار قالب‌بندی پیشرفته"
+  },
+  "prompt_risk_warning_medium": {
+    "message": "این پرومپت برای نمایش صحیح در رابط کاربری به قالب‌بندی خاص Markdown وابسته است. تغییر در ساختار ممکن است نمایش را با مشکل مواجه کند."
+  },
+  "prompt_preview_disabled_advanced": {
+    "message": "پیش‌نمایش در حال حاضر فقط برای قالب‌های پایه کاربر در دسترس است."
   }
 }

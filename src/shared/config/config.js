@@ -641,6 +641,42 @@ $_{TEXT}`,
 
 $_{TEXT}`,
   /*--- End PROMPT_TEMPLATE_AUTO ---*/
+
+  /*--- Start PROMPT_SUBTITLE_USER ---*/
+  PROMPT_SUBTITLE_USER: `- Translate movie/video subtitles from $_{SOURCE} to $_{TARGET}.
+- Maintain the exact tone and style of the original dialogue (informal, formal, slang, etc.).
+- Keep translations concise to ensure they fit within subtitle reading speed limits.
+- If a cue contains only sounds or music descriptions like [Music], translate it appropriately if necessary, or keep as is.`,
+  /*--- End PROMPT_SUBTITLE_USER ---*/
+
+  /*--- Start PROMPT_SUBTITLE_BASE ---*/
+  PROMPT_SUBTITLE_BASE: `You are an expert subtitle translator. Your task is to accurately translate subtitles.
+
+Strictly follow these instructions:
+$_{PROMPT_INSTRUCTIONS}
+
+$_{BATCH_INSTRUCTION}
+
+CRITICAL RULES:
+1. PRESERVE all structure tokens like @@SUB_TAG_0@@ or @@SUB_NL_1@@ exactly in their correct relative positions.
+2. DO NOT translate the tokens themselves.
+3. Return a valid JSON object with the "translations" array.
+
+$_{TEXT}`,
+  /*--- End PROMPT_SUBTITLE_BASE ---*/
+
+  /*--- Start PROMPT_SUBTITLE_BATCH ---*/
+  PROMPT_SUBTITLE_BATCH: `Translate the following batch of subtitle cues into $_{TARGET}.
+
+Return the results as a JSON object:
+{
+  "translations": [
+    { "id": "cue-1", "text": "Translated text..." }
+  ]
+}
+
+$_{TEXT}`,
+  /*--- End PROMPT_SUBTITLE_BATCH ---*/
 };
 
 export const state = {
@@ -912,6 +948,18 @@ export const getPromptBASEFieldAsync = async () => {
 
 export const getPromptBASEFieldAutoAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_FIELD_AUTO", CONFIG.PROMPT_BASE_FIELD_AUTO);
+};
+
+export const getPromptSubtitleUserAsync = async () => {
+  return getSettingValueAsync("PROMPT_SUBTITLE_USER", CONFIG.PROMPT_SUBTITLE_USER);
+};
+
+export const getPromptSubtitleBaseAsync = async () => {
+  return getSettingValueAsync("PROMPT_SUBTITLE_BASE", CONFIG.PROMPT_SUBTITLE_BASE);
+};
+
+export const getPromptSubtitleBatchAsync = async () => {
+  return getSettingValueAsync("PROMPT_SUBTITLE_BATCH", CONFIG.PROMPT_SUBTITLE_BATCH);
 };
 
 export const getPromptBASEScreenCaptureAsync = async () => {

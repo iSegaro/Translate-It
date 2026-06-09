@@ -932,8 +932,23 @@
   "prompt_section_title": {
     "message": "Prompt Template"
   },
+  "prompt_type_general": {
+    "message": "General Template"
+  },
+  "prompt_type_auto": {
+    "message": "Auto Template"
+  },
+  "prompt_help_general": {
+    "message": "This template is used for standard translations from a specific source language."
+  },
+  "prompt_help_auto": {
+    "message": "This template is used in bidirectional mode when the source language is set to \"Auto\"."
+  },
   "prompt_template_label": {
     "message": "Prompt Template"
+  },
+  "prompt_template_auto_label": {
+    "message": "Auto Prompt Template"
   },
   "prompt_template_info": {
     "message": "Use keywords to customize your prompt..."
@@ -2549,6 +2564,12 @@
   "prompt_preview_desc_dictionary": {
     "message": "Brief word definitions and synonyms (Note: This mode uses a fixed format)"
   },
+  "prompt_preview_mode_subtitle": {
+    "message": "Subtitle Translation Workflow"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "Complete assembly of structural base wrapper, your style rules, and JSON batch schema."
+  },
   "screen_capture_label": {
     "message": "Capture"
   },
@@ -2728,5 +2749,59 @@
   },
   "set_as_default_tooltip": {
     "message": "Set as Default Service"
+  },
+  "prompt_select_label": {
+    "message": "Select Prompt to Edit"
+  },
+  "prompt_group_basic": {
+    "message": "Basic (User Templates)"
+  },
+  "prompt_group_advanced": {
+    "message": "Advanced (System Base Wrappers)"
+  },
+  "prompt_base_field_label": {
+    "message": "Field Base Wrapper"
+  },
+  "prompt_base_field_desc": {
+    "message": "The system-level instructions for standard text field translations."
+  },
+  "prompt_base_field_auto_label": {
+    "message": "Field Base Wrapper (Auto)"
+  },
+  "prompt_base_field_auto_desc": {
+    "message": "The system-level instructions for text field translations when source language is set to 'Auto'."
+  },
+  "prompt_base_popup_label": {
+    "message": "Popup/Sidepanel Base Wrapper"
+  },
+  "prompt_base_popup_desc": {
+    "message": "The system-level instructions for translations in the popup and sidepanel."
+  },
+  "prompt_base_dictionary_label": {
+    "message": "Dictionary Base Wrapper"
+  },
+  "prompt_base_dictionary_desc": {
+    "message": "The system-level instructions for dictionary-style translations (meanings, synonyms)."
+  },
+  "prompt_base_screen_capture_label": {
+    "message": "Screen Capture Base Wrapper"
+  },
+  "prompt_base_screen_capture_desc": {
+    "message": "The system-level instructions for image-based text extraction and translation."
+  },
+  "prompt_subtitle_user_label": {
+    "message": "Subtitle Translation Rules"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "Tone and style instructions for subtitle translation (conciseness, dialogue style)."
+  },
+  "prompt_risk_warning_title": {
+    "message": "Advanced Formatting Warning"
+  },
+  "prompt_risk_warning_medium": {
+    "message": "This prompt relies on specific Markdown formatting to render correctly in the UI. Modifying the structural markers may break the display."
+  },
+  "prompt_preview_disabled_advanced": {
+    "message": "Preview is currently only available for Basic user templates."
   }
 }

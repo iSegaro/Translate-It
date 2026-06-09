@@ -91,7 +91,7 @@ export class OptionsValidator {
   }
 
   // Validate prompt template
-  async validatePromptTemplate(template) {
+  async validatePromptTemplate(template, promptKey = null) {
     if (!template || !template.trim()) {
       this.addError("promptTemplate", "validation_prompt_template_empty");
       return false;
@@ -99,7 +99,13 @@ export class OptionsValidator {
 
     // Check for required placeholders
     const trimmedTemplate = template.trim();
-    const requiredPlaceholders = ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"];
+    
+    let requiredPlaceholders = ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"];
+    if (promptKey) {
+      const { getRequiredPlaceholders } = await import("@/shared/config/PromptRegistry.js");
+      requiredPlaceholders = getRequiredPlaceholders(promptKey);
+    }
+
     const missingPlaceholders = [];
 
     requiredPlaceholders.forEach((placeholder) => {

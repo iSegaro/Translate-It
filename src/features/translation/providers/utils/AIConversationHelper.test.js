@@ -68,4 +68,51 @@ describe('AIConversationHelper', () => {
     expect(systemPrompt).not.toContain('BATCH_AUTO');
     expect(userText).toContain('"translations"');
   });
+
+  it('correctly assembles subtitle prompt with base, user, and batch instructions', async () => {
+    const metadata = {
+      promptTemplate: 'BASE: $_{PROMPT_INSTRUCTIONS}\nFORMAT: $_{BATCH_INSTRUCTION}\nTEXT: $_{TEXT}',
+      instruction: 'USER: translate into $_{TARGET}',
+      batchInstruction: 'BATCH: return JSON for $_{TARGET}'
+    };
+
+    const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+      ['Subtitle line'],
+      'en',
+      'fa',
+      'subtitle',
+      'ai',
+      null,
+      metadata
+    );
+
+    expect(systemPrompt).toContain('BASE: USER: translate into Persian');
+    expect(systemPrompt).toContain('FORMAT: BATCH: return JSON for Persian');
+    expect(systemPrompt).toContain('TEXT: the text provided in the user message');
+  });
+
+  it('strips $_{TEXT} from custom instructions to prevent nesting', async () => {
+    const metadata = {
+      promptTemplate: 'BASE: $_{PROMPT_INSTRUCTIONS}\nBATCH: $_{BATCH_INSTRUCTION}\n$_{TEXT}',
+      instruction: 'USER RULE $_{TEXT}',
+      batchInstruction: 'BATCH RULE $_{TEXT}'
+    };
+
+    const { systemPrompt } = await AIConversationHelper.preparePromptAndText(
+      ['Text'],
+      'en',
+      'fa',
+      'subtitle',
+      'ai',
+      null,
+      metadata
+    );
+
+    // Should not contain duplicate "the text provided..."
+    const textReplacement = 'the text provided in the user message';
+    const occurrences = (systemPrompt.match(new RegExp(textReplacement, 'g')) || []).length;
+    expect(occurrences).toBe(1);
+    expect(systemPrompt).toContain('USER RULE ');
+    expect(systemPrompt).toContain('BATCH RULE ');
+  });
 });

@@ -133,6 +133,30 @@ describe('Settings Store', () => {
     expect(store.settings.translationHistory).toEqual(mockHistory);
   });
 
+  it('should persist and load advanced prompt templates', async () => {
+    const store = useSettingsStore();
+    const customPrompt = 'Custom Base Field Template $_{TEXT}';
+    
+    // 1. Update locally
+    store.updateSettingLocally('PROMPT_BASE_FIELD', customPrompt);
+    
+    // 2. Save
+    await store.saveAllSettings(true);
+    expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+      PROMPT_BASE_FIELD: customPrompt
+    }));
+    
+    // 3. Mock storage return for load
+    storageManager.get.mockResolvedValue({ PROMPT_BASE_FIELD: customPrompt });
+    
+    // 4. Reload
+    store.isInitialized = false;
+    await store.loadSettings();
+    await nextTick();
+    
+    expect(store.settings.PROMPT_BASE_FIELD).toBe(customPrompt);
+  });
+
   describe('Import & Migration Flow', () => {
     it('importSettings should merge defaults and run migrations', async () => {
       const mockImportData = { THEME: 'dark', TRANSLATION_API: 'google' };
@@ -151,7 +175,27 @@ describe('Settings Store', () => {
       
       const result = store.validateSettings();
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('validation_prompt_template_missing_placeholders');
+      expect(result.errors).toContain('prompt:PROMPT_TEMPLATE:validation_prompt_template_missing_placeholders');
+    });
+
+    it('validateSettings should allow subtitle prompt without $_{TEXT}', () => {
+      const store = useSettingsStore();
+      // Only SOURCE and TARGET are required for subtitles in the registry
+      store.settings.PROMPT_SUBTITLE_USER = 'Translate from $_{SOURCE} to $_{TARGET}.';
+      
+      const result = store.validateSettings();
+      
+      // Filter out other potential errors to focus on the subtitle prompt
+      const subtitleErrors = result.errors.filter(e => e.includes('PROMPT_SUBTITLE_USER'));
+      expect(subtitleErrors).toHaveLength(0);
+    });
+
+    it('validateSettings should reject subtitle prompt missing required language placeholders', () => {
+      const store = useSettingsStore();
+      store.settings.PROMPT_SUBTITLE_USER = 'Translate this.'; // Missing SOURCE and TARGET
+      
+      const result = store.validateSettings();
+      expect(result.errors).toContain('prompt:PROMPT_SUBTITLE_USER:validation_prompt_template_missing_placeholders');
     });
   });
 

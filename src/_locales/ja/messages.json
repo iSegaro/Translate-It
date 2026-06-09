@@ -929,8 +929,23 @@
   "prompt_section_title": {
     "message": "プロンプトテンプレート"
   },
+  "prompt_type_general": {
+    "message": "一般テンプレート"
+  },
+  "prompt_type_auto": {
+    "message": "自動テンプレート"
+  },
+  "prompt_help_general": {
+    "message": "このテンプレートは、特定の翻訳元言語からの標準的な翻訳に使用されます。"
+  },
+  "prompt_help_auto": {
+    "message": "このテンプレートは、翻訳元言語が「自動」に設定されている場合の双方向モードで使用されます。"
+  },
   "prompt_template_label": {
     "message": "プロンプトテンプレート"
+  },
+  "prompt_template_auto_label": {
+    "message": "自動プロンプトテンプレート"
   },
   "prompt_template_info": {
     "message": "キーワードを使ってプロンプトをカスタマイズ..."
@@ -2549,6 +2564,12 @@
   "prompt_preview_desc_dictionary": {
     "message": "単語の定義と類義語（注：このモードは固定形式を使用します）"
   },
+  "prompt_preview_mode_subtitle": {
+    "message": "字幕翻訳ワークフロー"
+  },
+  "prompt_preview_desc_subtitle": {
+    "message": "構造ベースラッパー、ユーザースタイルルール、JSONバッチスキーマの完全なアセンブリ。"
+  },
   "screen_capture_label": {
     "message": "キャプチャ"
   },
@@ -2728,5 +2749,59 @@
   },
   "set_as_default_tooltip": {
     "message": "デフォルトサービスとして設定"
+  },
+  "prompt_select_label": {
+    "message": "編集するプロンプトを選択"
+  },
+  "prompt_group_basic": {
+    "message": "基本 (ユーザーテンプレート)"
+  },
+  "prompt_group_advanced": {
+    "message": "高度な設定 (システムベースラッパー)"
+  },
+  "prompt_base_field_label": {
+    "message": "フィールドベースラッパー"
+  },
+  "prompt_base_field_desc": {
+    "message": "標準的なテキストフィールド翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_field_auto_label": {
+    "message": "フィールドベースラッパー (自動)"
+  },
+  "prompt_base_field_auto_desc": {
+    "message": "言語が「自動」に設定されている場合のテキストフィールド翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_popup_label": {
+    "message": "ポップアップ/サイドパネルベースラッパー"
+  },
+  "prompt_base_popup_desc": {
+    "message": "ポップアップおよびサイドパネルでの翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_dictionary_label": {
+    "message": "辞書ベースラッパー"
+  },
+  "prompt_base_dictionary_desc": {
+    "message": "辞書形式の翻訳 (意味、類義語) のためのシステムレベル의指示。"
+  },
+  "prompt_base_screen_capture_label": {
+    "message": "スクリーンキャプチャベースラッパー"
+  },
+  "prompt_base_screen_capture_desc": {
+    "message": "画像ベースのテキスト抽出および翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_subtitle_user_label": {
+    "message": "字幕翻訳ルール"
+  },
+  "prompt_subtitle_user_desc": {
+    "message": "字幕翻訳のためのトーンとスタイルの指示（簡潔さ、対話スタイル）。"
+  },
+  "prompt_risk_warning_title": {
+    "message": "高度なフォーマットに関する警告"
+  },
+  "prompt_risk_warning_medium": {
+    "message": "このプロンプトは、UIで正しく表示するために特定のMarkdown形式に依存しています。構造マーカーを変更すると、表示が崩れる可能性があります。"
+  },
+  "prompt_preview_disabled_advanced": {
+    "message": "現在、プレビューは基本ユーザーテンプレートでのみ利用可能です。"
   }
 }

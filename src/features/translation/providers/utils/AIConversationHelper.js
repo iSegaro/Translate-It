@@ -304,7 +304,9 @@ export const AIConversationHelper = {
       // Prioritize custom instructions from metadata (Subtitle mode)
       promptInstructions = metadata.instruction
         .replace(/\$_{SOURCE}/g, sourceName)
-        .replace(/\$_{TARGET}/g, targetName);
+        .replace(/\$_{TARGET}/g, targetName)
+        .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder to prevent nesting
+        .replace(/\n\s*$/g, '');        // Remove trailing empty lines
     } else {
       const promptInstructionsTemplate = useAutoPrompt
         ? await getPromptAutoAsync()
@@ -339,10 +341,17 @@ export const AIConversationHelper = {
         normalizedTemplate += "\n\n$_{TEXT}";
       }
 
+      // Handle batch-specific instructions (e.g. JSON schema examples)
+      const batchInstruction = metadata?.batchInstruction || '';
+      const processedBatchInstruction = batchInstruction
+        .replace(/\$_{TARGET}/g, targetName)
+        .replace(/\$_{TEXT}/g, ''); // Ensure TEXT is not double-nested
+
       systemPrompt = normalizedTemplate
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName)
         .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
+        .replace(/\$_{BATCH_INSTRUCTION}/g, processedBatchInstruction)
         .replace(/\$_{COUNT}/g, String(textsCount));
     } else {
       // For non-batch prompts (from buildPrompt), the text is already injected

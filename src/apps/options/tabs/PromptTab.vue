@@ -4,8 +4,61 @@
       <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
       
       <div class="setting-group prompt-template-group vertical">
+        <div
+          id="PROMPT_SELECTOR_SECTION"
+          class="prompt-selector-container"
+        >
+          <label
+            for="prompt-type-select"
+            class="setting-label"
+          >{{ t('prompt_select_label') || 'Select Prompt to Edit' }}</label>
+          <select
+            id="prompt-type-select"
+            v-model="currentPromptKey"
+            class="prompt-type-select"
+          >
+            <optgroup :label="t('prompt_group_basic') || 'Basic (User Templates)'">
+              <option
+                v-for="p in basicPrompts"
+                :key="p.key"
+                :value="p.key"
+              >
+                {{ t(p.labelKey) || p.key }}
+              </option>
+            </optgroup>
+            <optgroup :label="t('prompt_group_advanced') || 'Advanced (System Base Wrappers)'">
+              <option
+                v-for="p in advancedPrompts"
+                :key="p.key"
+                :value="p.key"
+              >
+                {{ t(p.labelKey) || p.key }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="prompt-type-help-text">
+          {{ t(currentPromptMetadata.descKey) || currentPromptMetadata.descKey }}
+        </div>
+
+        <div
+          v-if="hasRiskWarning"
+          class="prompt-risk-banner"
+        >
+          <div class="banner-title">
+            <span class="icon">⚠️</span>
+            <span>{{ t('prompt_risk_warning_title') || 'Advanced Formatting Warning' }}</span>
+          </div>
+          <div class="banner-content">
+            {{ t('prompt_risk_warning_' + currentPromptMetadata.risk.toLowerCase()) || t('prompt_risk_warning_medium') }}
+          </div>
+        </div>
+
         <div class="prompt-label-with-button">
-          <span class="setting-label">{{ t('prompt_template_label') || 'Prompt Template' }}</span>
+          <span class="setting-label">
+            {{ t(currentPromptMetadata.labelKey) || currentPromptMetadata.labelKey }}
+          </span>
           <button
             type="button"
             class="button-inline"
@@ -16,8 +69,8 @@
         </div>
         
         <BaseTextarea
-          id="PROMPT_TEMPLATE"
-          v-model="promptTemplate"
+          :id="currentPromptKey"
+          v-model="activeTemplateValue"
           :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
           :rows="10"
           class="prompt-template-input"
@@ -65,7 +118,11 @@
         </div>
 
         <!-- Preview Prompts Section -->
-        <div class="prompt-preview-section">
+        <div
+          v-if="currentPromptMetadata.previewSupport"
+          id="PROMPT_PREVIEW_SECTION"
+          class="prompt-preview-section"
+        >
           <button
             id="PROMPT_PREVIEW_BUTTON"
             type="button"
@@ -110,6 +167,12 @@
             </template>
           </div>
         </div>
+        <div
+          v-else-if="!currentPromptMetadata.previewSupport && currentPromptKey !== 'PROMPT_TEMPLATE'"
+          class="preview-disabled-note"
+        >
+          ℹ️ {{ t('prompt_preview_disabled_advanced') || 'Preview is currently only available for Basic user templates.' }}
+        </div>
       </div>
     </div>
   </section>
@@ -122,28 +185,71 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
 import { useValidation } from '@/core/validation.js'
-import { CONFIG, TranslationMode } from '@/shared/config/config.js'
+import { CONFIG } from '@/shared/config/config.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { usePromptPreview } from '../composables/usePromptPreview.js'
+import { PROMPT_REGISTRY, PromptCategory, PromptRisk } from '@/shared/config/PromptRegistry.js'
 
 // Components
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
-const logger = { debug: (...args) => console.debug('[PromptTab]', ...args) }
+const logger = { 
+  debug: (...args) => console.debug('[PromptTab]', ...args),
+  error: (...args) => console.error('[PromptTab]', ...args)
+}
 const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { highlightElement } = useHighlightManager()
+const { promptExamples, loadingExamples, generateExamples } = usePromptPreview(logger)
 
-// Default prompt template from config
-const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
+// Prompt Classification from Registry
+const editablePrompts = Object.values(PROMPT_REGISTRY).filter(p => p.editable)
+const basicPrompts = editablePrompts.filter(p => p.category === PromptCategory.USER)
+const advancedPrompts = editablePrompts.filter(p => p.category === PromptCategory.SYSTEM)
+
+// State
+const currentPromptKey = ref('PROMPT_TEMPLATE')
+
+// Pre-create settings for all editable prompts to ensure reactivity
+const promptSettings = {}
+editablePrompts.forEach(p => {
+  promptSettings[p.key] = createSetting(p.key, CONFIG[p.key])
+})
+
+// Metadata for current selection with safety fallback
+const currentPromptMetadata = computed(() => PROMPT_REGISTRY[currentPromptKey.value] || PROMPT_REGISTRY.PROMPT_TEMPLATE)
+const isAdvancedPrompt = computed(() => currentPromptMetadata.value?.category === PromptCategory.SYSTEM)
+const hasRiskWarning = computed(() => currentPromptMetadata.value?.risk && currentPromptMetadata.value?.risk !== PromptRisk.SAFE)
 
 // Validation State
 const validationErrorKey = ref('')
 const validationError = computed(() => validationErrorKey.value ? getFirstErrorTranslated('promptTemplate', t) : '')
 
-// Prompt template setting
-const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT)
+// Computed property for the active textarea binding with safety fallback
+const activeTemplateValue = computed({
+  get: () => promptSettings[currentPromptKey.value]?.value || '',
+  set: (val) => {
+    if (promptSettings[currentPromptKey.value]) {
+      promptSettings[currentPromptKey.value].value = val
+    }
+  }
+})
+
+// Watch for prompt type switch to clear validation state
+watch(currentPromptKey, async () => {
+  validationErrorKey.value = ''
+  clearErrors()
+  
+  if (isAdvancedPrompt.value) {
+    // Clear stale previews when switching to advanced prompts
+    showPreview.value = false
+    promptExamples.value = []
+  } else if (showPreview.value) {
+    await refreshExamples()
+  }
+})
 
 // Language names for help text
 const sourceLanguageName = computed(() => settingsStore.settings?.SOURCE_LANGUAGE || 'Auto')
@@ -151,215 +257,17 @@ const targetLanguageName = computed(() => settingsStore.settings?.TARGET_LANGUAG
 
 // Preview State
 const showPreview = ref(false)
-const promptExamples = ref([])
-const loadingExamples = ref(false)
 
-// Sample text for preview
-const SAMPLE_TEXT = "Hello, how are you today? This is a sample text for previewing translation prompts."
-const SAMPLE_WORD = "Discovery"
-
-// Sample JSON for Select Element mode
-const SAMPLE_JSON = JSON.stringify([
-  { id: "1", text: "Welcome to our website" },
-  { id: "2", text: "Click here to learn more" },
-  { id: "3", text: "Contact us for support" }
-])
-
-// Helper function to build prompt with current template value (not from storage)
-const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, translateMode, providerType) => {
-  // Import here to avoid circular dependency
-  const {
-    getPromptBASESelectAsync,
-    getPromptPopupTranslateAsync,
-    getPromptBASEFieldAsync,
-    getPromptBASEFieldAutoAsync,
-    getPromptBASEScreenCaptureAsync,
-    getPromptBASEBatchAsync,
-    getPromptBASEAIBatchAsync,
-    getPromptBASEAIBatchAutoAsync,
-    getEnableDictionaryAsync,
-    getPromptDictionaryAsync,
-    getSourceLanguageAsync,
-  } = await import('@/shared/config/config.js')
-
-  const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js')
-
-  // Helper function to check JSON format (same as in AIConversationHelper)
-  const isSpecificTextJsonFormat = (obj) => {
-    return (
-      Array.isArray(obj) &&
-      obj.length > 0 &&
-      obj.every(
-        (item) => typeof item === 'object' && item !== null && typeof item.text === 'string'
-      )
-    )
-  }
-
-  let isJsonMode = false
-  try {
-    const parsedText = JSON.parse(text)
-    if (isSpecificTextJsonFormat(parsedText)) {
-      isJsonMode = true
-    }
-  } catch {
-    // Not JSON
-  }
-
-  const isAI = providerType === 'ai'
-  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
-
-  let actualSourceLang = sourceLang === 'auto' ? await getSourceLanguageAsync() : sourceLang
-  if (actualSourceLang === 'auto') {
-    actualSourceLang = 'en'
-  }
-
-  const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang)
-  const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang)
-
-  // Use current template value from the input field (not from storage)
-  const currentPromptTemplate = promptTemplate.value
-
-  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
-  const promptInstructionsWithoutText = currentPromptTemplate
-    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
-    .replace(/\n\s*$/g, '')        // Remove trailing empty lines
-
-  const promptInstructions = promptInstructionsWithoutText
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName)
-
-  // Handle AI provider batch translation - MIRRORS AIConversationHelper logic
-  // Use batch prompt for Select_Element, Page, or JSON input (excluding dictionary)
-  const shouldUseBatchPrompt = isAI && (
-    translateMode === TranslationMode.Select_Element ||
-    translateMode === TranslationMode.Page ||
-    isJsonMode
-  )
-
-  if (shouldUseBatchPrompt) {
-    const batchPromptTemplate = sourceLang === 'auto'
-      ? await getPromptBASEAIBatchAutoAsync()
-      : await getPromptBASEAIBatchAsync()
-
-    return batchPromptTemplate
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-      .replace(/\$_{TEXT}/g, text)
-  }
-
-  // Select Element mode (non-JSON) - MIRRORS promptBuilder logic
-  if (translateMode === TranslationMode.Select_Element && !isJsonMode) {
-    const batchPromptTemplate = await getPromptBASEBatchAsync()
-    return batchPromptTemplate
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-      .replace(/\$_{TEXT}/g, text)
-  }
-
-  // Select appropriate base prompt - MIRRORS promptBuilder logic
-  let promptBase
-  if (isJsonMode) {
-    promptBase = await getPromptBASESelectAsync()
-  } else if (translateMode === TranslationMode.Popup_Translate || translateMode === TranslationMode.Sidepanel_Translate) {
-    promptBase = await getPromptPopupTranslateAsync()
-  } else if (await getEnableDictionaryAsync() && translateMode === TranslationMode.Dictionary_Translation) {
-    promptBase = await getPromptDictionaryAsync()
-  } else {
-    if (translateMode === TranslationMode.ScreenCapture) {
-      promptBase = await getPromptBASEScreenCaptureAsync()
-    } else {
-      promptBase = sourceLang === 'auto' ? await getPromptBASEFieldAutoAsync() : await getPromptBASEFieldAsync()
-    }
-  }
-
-  let finalPromptWithInstructions = promptBase
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName)
-    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-
-  // Replace text placeholder
-  const finalPrompt = finalPromptWithInstructions.replace(/\$_{TEXT}/g, text)
-
-  return finalPrompt
-}
-
-// Generate prompt examples for different modes
-const generatePromptExamples = async () => {
-  if (loadingExamples.value) return
-
-  loadingExamples.value = true
-  const examples = []
-  const sourceLang = settingsStore.settings?.SOURCE_LANGUAGE || 'en'
-  const targetLang = settingsStore.settings?.TARGET_LANGUAGE || 'en'
-
-  try {
-    /* Commented out as it's currently unused by any provider
-    // Field mode (translate provider)
-    examples.push({
-      mode: 'Field Translation (Low LLM Capability)',
-      description: 'Text field translation (e.g., input boxes, text areas)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'translate')
-    })
-    */
-
-    // Field mode
-    examples.push({
-      mode: t('prompt_preview_mode_field') || 'Field Translation',
-      description: t('prompt_preview_desc_field') || 'Text field translation (e.g., input boxes, text areas)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'ai')
-    })
-
-    // Popup / Sidepanel mode
-    examples.push({
-      mode: t('prompt_preview_mode_popup') || 'Popup / Sidepanel Translation',
-      description: t('prompt_preview_desc_popup') || 'Popup window or Sidepanel translation interface',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
-    })
-
-    // Selection mode
-    examples.push({
-      mode: t('prompt_preview_mode_selection') || 'Text Selection',
-      description: t('prompt_preview_desc_selection') || 'Selected text translation on the page',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Selection, 'translate')
-    })
-
-    // Select Element / Page mode (JSON)
-    examples.push({
-      mode: t('prompt_preview_mode_batch') || 'Select Element / Page Translate',
-      description: t('prompt_preview_desc_batch') || 'Multiple elements or whole page translation in JSON format',
-      prompt: await buildPromptWithCurrentTemplate(
-        SAMPLE_JSON,
-        sourceLang,
-        targetLang,
-        TranslationMode.Select_Element,
-        'ai'
-      )
-    })
-
-    /* Commented out as it's currently unused by any provider
-    // Screen Capture mode
-    examples.push({
-      mode: t('prompt_preview_mode_screen_capture') || 'Screen Capture',
-      description: t('prompt_preview_desc_screen_capture') || 'OCR and translation of text from images',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.ScreenCapture, 'translate')
-    })
-    */
-
-    // Dictionary mode
-    examples.push({
-      mode: t('prompt_preview_mode_dictionary') || 'Dictionary Translation',
-      description: t('prompt_preview_desc_dictionary') || 'Brief word definitions and synonyms (Note: This mode uses a fixed format)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_WORD, sourceLang, targetLang, TranslationMode.Dictionary_Translation, 'ai')
-    })
-
-    promptExamples.value = examples
-  } catch (error) {
-    logger.error('Error generating prompt examples:', error)
-  } finally {
-    loadingExamples.value = false
-  }
+// Helper to trigger example generation with current UI state
+const refreshExamples = async () => {
+  await generateExamples({
+    template: activeTemplateValue.value,
+    templateKey: currentPromptKey.value,
+    isAuto: currentPromptKey.value === 'PROMPT_TEMPLATE_AUTO',
+    sourceLang: settingsStore.settings?.SOURCE_LANGUAGE,
+    targetLang: settingsStore.settings?.TARGET_LANGUAGE,
+    t
+  })
 }
 
 // Refresh preview section
@@ -367,20 +275,25 @@ const refreshPreview = async () => {
   showPreview.value = true
   // Perform validation and (re)generate examples
   await validatePrompt()
-  await generatePromptExamples()
+  await refreshExamples()
 }
 
 // Validation feedback listener
 const handleValidationFeedback = (e) => {
-  const { field } = e.detail || {};
+  const { field, promptKey } = e.detail || {};
   
-  if (field === 'prompt' || field === 'PROMPT_TEMPLATE') {
+  if (field === 'prompt' || promptKey) {
+    // Switch to specific prompt if provided, otherwise stick to current
+    if (promptKey && PROMPT_REGISTRY[promptKey]) {
+      currentPromptKey.value = promptKey;
+    }
+
     // Explicitly trigger validation feedback display
     validatePrompt(true);
     
     // Focus and highlight logic
     setTimeout(() => {
-      highlightElement('PROMPT_TEMPLATE');
+      highlightElement(currentPromptKey.value);
     }, 400);
   }
 };
@@ -396,7 +309,7 @@ onUnmounted(() => {
 // Validation function
 const validatePrompt = async (showFeedback = false) => {
   clearErrors()
-  const isValid = await validate(promptTemplate.value)
+  const isValid = await validate(activeTemplateValue.value, currentPromptKey.value)
   
   if (!isValid && showFeedback) {
     validationErrorKey.value = getFirstError('promptTemplate') || ''
@@ -409,11 +322,12 @@ const validatePrompt = async (showFeedback = false) => {
 
 // Reset prompt to default
 const resetPrompt = async () => {
-  promptTemplate.value = DEFAULT_PROMPT
+  const defaultTemplate = CONFIG[currentPromptKey.value]
+  activeTemplateValue.value = defaultTemplate
   
-  if (showPreview.value) {
+  if (showPreview.value && !isAdvancedPrompt.value) {
     await validatePrompt()
-    await generatePromptExamples()
+    await refreshExamples()
   }
 
   // Add highlight effect
@@ -429,7 +343,7 @@ const resetPrompt = async () => {
 // Watch for UI language changes to refresh localized labels in examples
 watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, async (newVal, oldVal) => {
   if (newVal && oldVal && newVal !== oldVal && showPreview.value && !loadingExamples.value) {
-    await generatePromptExamples()
+    await refreshExamples()
   }
 })
 </script>
