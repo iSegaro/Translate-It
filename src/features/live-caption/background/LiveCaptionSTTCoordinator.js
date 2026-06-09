@@ -11,12 +11,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionSTTCoord
  * Manages FIFO queueing, transcription bounds, abort routing, and session state mapping.
  */
 export class LiveCaptionSTTCoordinator {
-  constructor({ sessionManager, captureCoordinator, sttFactory = null, onTranscriptSegment = null } = {}) {
+  constructor({ sessionManager, captureCoordinator, cache = null, sttFactory = null, onTranscriptSegment = null } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionSTTCoordinator requires a sessionManager');
     }
     this.sessionManager = sessionManager;
     this.captureCoordinator = captureCoordinator;
+    this.cache = cache;
     this.sttFactory = sttFactory || new STTProviderFactory();
     this.onTranscriptSegment = onTranscriptSegment;
     this.sessionQueues = new Map();
@@ -154,6 +155,22 @@ export class LiveCaptionSTTCoordinator {
           const activeVideoSession = pageSession.activeVideoSession;
           if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
             activeVideoSession.addTranscriptSegment(segment);
+          }
+
+          // Persist to cache
+          if (this.cache) {
+            this.cache.appendTranscriptSegment({
+              ...segment,
+              segmentStartMs: segment.startMs,
+              segmentEndMs: segment.endMs,
+              originalText: segment.text,
+              isIncognito: pageSession.isIncognito
+            }).catch((err) => {
+              logger.warn('Failed to persist transcript segment to cache', {
+                sessionId,
+                error: err.message
+              });
+            });
           }
 
           if (this.onTranscriptSegment) {

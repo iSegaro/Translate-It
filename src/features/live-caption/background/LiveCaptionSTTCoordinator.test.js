@@ -19,6 +19,7 @@ describe('live-caption STT coordinator', () => {
   let captureCoordinator;
   let mockProvider;
   let mockFactory;
+  let mockCache;
   let coordinator;
 
   beforeEach(() => {
@@ -34,10 +35,15 @@ describe('live-caption STT coordinator', () => {
       getProvider: vi.fn().mockResolvedValue(mockProvider)
     };
 
+    mockCache = {
+      appendTranscriptSegment: vi.fn().mockResolvedValue({})
+    };
+
     coordinator = new LiveCaptionSTTCoordinator({
       sessionManager,
       captureCoordinator,
-      sttFactory: mockFactory
+      sttFactory: mockFactory,
+      cache: mockCache
     });
   });
 
@@ -132,6 +138,14 @@ describe('live-caption STT coordinator', () => {
       text: 'Second Chunk',
       startMs: 3000,
       endMs: 6000
+    }));
+
+    expect(mockCache.appendTranscriptSegment).toHaveBeenCalledTimes(2);
+    expect(mockCache.appendTranscriptSegment).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'First Chunk',
+      segmentStartMs: 0,
+      segmentEndMs: 3000,
+      isIncognito: false
     }));
   });
 

@@ -45,11 +45,12 @@ function normalizeByteLimit(value, fallback) {
   return Number.isFinite(nextValue) && nextValue > 0 ? Math.floor(nextValue) : fallback;
 }
 
-function createBucketMeta({ tabId, videoFingerprint }) {
+function createBucketMeta({ tabId, videoFingerprint, isIncognito = false }) {
   return {
     sessionKey: createLiveCaptionSessionCacheKey(tabId, videoFingerprint),
     tabId,
     videoFingerprint,
+    isIncognito,
     transcripts: [],
     translations: [],
     transcriptBytes: 0,
@@ -242,10 +243,10 @@ export class LiveCaptionCache {
     this._buckets = new Map();
   }
 
-  _getBucket(tabId, videoFingerprint) {
+  _getBucket(tabId, videoFingerprint, isIncognito = false) {
     const sessionKey = createLiveCaptionSessionCacheKey(tabId, videoFingerprint);
     if (!this._buckets.has(sessionKey)) {
-      this._buckets.set(sessionKey, createBucketMeta({ tabId, videoFingerprint }));
+      this._buckets.set(sessionKey, createBucketMeta({ tabId, videoFingerprint, isIncognito }));
     }
     return this._buckets.get(sessionKey);
   }
@@ -258,13 +259,13 @@ export class LiveCaptionCache {
     return bucket;
   }
 
-  async _hydrateBucketFromPersistence(tabId, videoFingerprint) {
-    if (this.isIncognito) {
-      return this._getBucket(tabId, videoFingerprint);
+  async _hydrateBucketFromPersistence(tabId, videoFingerprint, isIncognito = false) {
+    if (this.isIncognito || isIncognito) {
+      return this._getBucket(tabId, videoFingerprint, isIncognito);
     }
 
     const sessionKey = createLiveCaptionSessionCacheKey(tabId, videoFingerprint);
-    const bucket = this._getBucket(tabId, videoFingerprint);
+    const bucket = this._getBucket(tabId, videoFingerprint, isIncognito);
 
     if (bucket.transcripts.length > 0 || bucket.translations.length > 0) {
       return bucket;
@@ -296,7 +297,7 @@ export class LiveCaptionCache {
   }
 
   async _syncPersistentBucket(bucket) {
-    if (this.isIncognito) {
+    if (this.isIncognito || bucket.isIncognito) {
       return;
     }
 
@@ -328,7 +329,7 @@ export class LiveCaptionCache {
 
   async appendTranscriptSegment(segment) {
     validateSegmentContext(segment, 'Transcript');
-    const bucket = this._getBucket(segment.tabId, segment.videoFingerprint);
+    const bucket = this._getBucket(segment.tabId, segment.videoFingerprint, segment.isIncognito);
     const record = normalizeLiveCaptionTranscriptSegment(segment);
     const memoryEntry = recordToMemoryEntry(record);
 
@@ -358,7 +359,7 @@ export class LiveCaptionCache {
 
   async appendTranslatedCaptionSegment(segment) {
     validateSegmentContext(segment, 'Translated caption');
-    const bucket = this._getBucket(segment.tabId, segment.videoFingerprint);
+    const bucket = this._getBucket(segment.tabId, segment.videoFingerprint, segment.isIncognito);
     const record = normalizeLiveCaptionTranslationSegment(segment);
     const memoryEntry = recordToMemoryEntry(record);
 
@@ -386,13 +387,13 @@ export class LiveCaptionCache {
     return cloneSegment(record);
   }
 
-  async getTranscriptSegments({ tabId, videoFingerprint }) {
-    const bucket = await this._hydrateBucketFromPersistence(tabId, videoFingerprint);
+  async getTranscriptSegments({ tabId, videoFingerprint, isIncognito = false }) {
+    const bucket = await this._hydrateBucketFromPersistence(tabId, videoFingerprint, isIncognito);
     return bucket.transcripts.map(({ record }) => cloneSegment(record));
   }
 
-  async getTranslatedCaptionSegments({ tabId, videoFingerprint }) {
-    const bucket = await this._hydrateBucketFromPersistence(tabId, videoFingerprint);
+  async getTranslatedCaptionSegments({ tabId, videoFingerprint, isIncognito = false }) {
+    const bucket = await this._hydrateBucketFromPersistence(tabId, videoFingerprint, isIncognito);
     return bucket.translations.map(({ record }) => cloneSegment(record));
   }
 

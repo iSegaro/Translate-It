@@ -16,6 +16,7 @@ describe('LiveCaptionTranslationCoordinator', () => {
   let sessionManager;
   let captureCoordinator;
   let mockAdapter;
+  let mockCache;
   let coordinator;
 
   beforeEach(() => {
@@ -39,10 +40,15 @@ describe('LiveCaptionTranslationCoordinator', () => {
       })
     };
 
+    mockCache = {
+      appendTranslatedCaptionSegment: vi.fn().mockResolvedValue({})
+    };
+
     coordinator = new LiveCaptionTranslationCoordinator({
       sessionManager,
       captureCoordinator,
-      translationAdapter: mockAdapter
+      translationAdapter: mockAdapter,
+      cache: mockCache
     });
   });
 
@@ -149,6 +155,12 @@ describe('LiveCaptionTranslationCoordinator', () => {
       translatedText: 'Translated Second',
       segmentStartMs: 3000,
       segmentEndMs: 6000
+    }));
+
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledTimes(2);
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledWith(expect.objectContaining({
+      translatedText: 'Translated First',
+      isIncognito: false
     }));
   });
 
@@ -325,7 +337,7 @@ describe('LiveCaptionTranslationCoordinator', () => {
     expect(captureCoordinator.status).toBe('error');
   });
 
-  it('does not write cache or update overlay', async () => {
+  it('persists translated segments to cache', async () => {
     const pageSession = sessionManager.getOrCreateSession(7);
     pageSession.sessionId = 'session-1';
     const mockVideoSession = {
@@ -345,9 +357,12 @@ describe('LiveCaptionTranslationCoordinator', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    // Confirm that NO overlay functions or storage facade is imported/called
-    // The coordinator only modifies activeVideoSession
     expect(mockAdapter.translateFinalizedSegment).toHaveBeenCalledTimes(1);
     expect(mockVideoSession.addTranslatedCaptionSegment).toHaveBeenCalledTimes(1);
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledTimes(1);
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledWith(expect.objectContaining({
+      originalText: 'Hi',
+      translatedText: 'Translated: Hi'
+    }));
   });
 });

@@ -1,6 +1,8 @@
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { LiveCaptionSessionManager } from "../core/LiveCaptionSessionManager.js";
+import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
+import { LiveCaptionCache } from "../cache/LiveCaptionCache.js";
 import {
   LiveCaptionCleanupCoordinator,
   LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
@@ -42,10 +44,12 @@ export class LiveCaptionBackgroundController {
     cleanupCoordinator = new LiveCaptionCleanupCoordinator(),
     captureCoordinator = new LiveCaptionCaptureCoordinator(),
     offscreenBridge = new LiveCaptionOffscreenBridge(),
+    cache = null,
     sttCoordinator = null,
     translationCoordinator = null,
   } = {}) {
     this.sessionManager = sessionManager;
+    this.cache = cache || new LiveCaptionCache();
     this.cleanupCoordinator = cleanupCoordinator;
     this.captureCoordinator = captureCoordinator;
     this.offscreenBridge = offscreenBridge;
@@ -54,6 +58,7 @@ export class LiveCaptionBackgroundController {
       new LiveCaptionTranslationCoordinator({
         sessionManager,
         captureCoordinator,
+        cache: this.cache,
         browserApi: offscreenBridge.browserApi
       });
     this.sttCoordinator =
@@ -61,6 +66,7 @@ export class LiveCaptionBackgroundController {
       new LiveCaptionSTTCoordinator({
         sessionManager,
         captureCoordinator,
+        cache: this.cache,
         onTranscriptSegment: async (segment, context) => {
           await this.translationCoordinator.handleTranscriptSegment(segment, context);
         }
@@ -321,9 +327,50 @@ export class LiveCaptionBackgroundController {
 
       const session = this.sessionManager.getOrCreateSession(tabId, {
         consentAccepted: Boolean(request.data.consentAccepted),
+        isIncognito: Boolean(sender?.tab?.incognito)
       });
 
       session.setConsentAccepted(Boolean(request.data.consentAccepted));
+
+      // Hydrate video session if fingerprint is provided
+      const videoFingerprint = request.data.videoFingerprint ?? session.activeVideoFingerprint;
+      if (videoFingerprint) {
+        if (!session.activeVideoSession || session.activeVideoSession.videoFingerprint !== videoFingerprint) {
+          const videoSession = new VideoCaptionSession({ tabId, videoFingerprint });
+          session.attachVideoSession(videoSession);
+        }
+
+        const activeVideoSession = session.activeVideoSession;
+        if (
+          activeVideoSession &&
+          activeVideoSession.transcriptSegments.length === 0 &&
+          activeVideoSession.translatedCaptionSegments.length === 0
+        ) {
+          try {
+            const [transcripts, translations] = await Promise.all([
+              this.cache.getTranscriptSegments({ tabId, videoFingerprint, isIncognito: session.isIncognito }),
+              this.cache.getTranslatedCaptionSegments({ tabId, videoFingerprint, isIncognito: session.isIncognito })
+            ]);
+
+            transcripts.forEach(s => activeVideoSession.addTranscriptSegment(s));
+            translations.forEach(s => activeVideoSession.addTranslatedCaptionSegment(s));
+
+            logger.info('Live-caption session hydrated from cache', {
+              tabId,
+              videoFingerprint,
+              transcriptCount: transcripts.length,
+              translationCount: translations.length
+            });
+          } catch (cacheError) {
+            logger.warn('Failed to hydrate live-caption session from cache', {
+              tabId,
+              videoFingerprint,
+              error: cacheError.message
+            });
+          }
+        }
+      }
+
       session.start();
 
       this.captureCoordinator.startRuntime({
@@ -488,6 +535,21 @@ export class LiveCaptionBackgroundController {
         tabId,
         request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
       );
+
+      // Clear persistent cache if requested
+      if (request.data.clearCache && this.cache) {
+        const videoFingerprint = request.data.videoFingerprint ?? sessionSnapshot?.activeVideoFingerprint;
+        if (videoFingerprint) {
+          this.cache.clearVideo({ tabId, videoFingerprint }).catch((err) => {
+            logger.warn('Failed to clear live-caption cache on stop', {
+              tabId,
+              videoFingerprint,
+              error: err.message
+            });
+          });
+        }
+      }
+
       const sessionCleanupMetadata =
         this.sessionManager.getSessionCleanupMetadata(tabId) ?? null;
       const cleanupResult = this.cleanupCoordinator.createCleanupResult({

@@ -471,6 +471,43 @@ describe('live-caption cache layer', () => {
     expect(getStore(indexedDbMock, 'transcripts')).toBeUndefined();
   });
 
+  it('supports per-bucket incognito state within a persistent cache instance', async () => {
+    const cache = new LiveCaptionCache({ isIncognito: false });
+
+    // Normal segment
+    await cache.appendTranscriptSegment({
+      tabId: 10,
+      videoFingerprint: 'normal-video',
+      sessionId: 'session-normal',
+      segmentStartMs: 1,
+      segmentEndMs: 2,
+      originalText: 'Normal',
+      sourceLanguage: 'en',
+      isIncognito: false
+    });
+
+    // Incognito segment
+    await cache.appendTranscriptSegment({
+      tabId: 11,
+      videoFingerprint: 'incognito-video',
+      sessionId: 'session-incognito',
+      segmentStartMs: 1,
+      segmentEndMs: 2,
+      originalText: 'Secret',
+      sourceLanguage: 'en',
+      isIncognito: true
+    });
+
+    await flush();
+
+    expect(await cache.getTranscriptSegments({ tabId: 10, videoFingerprint: 'normal-video' })).toHaveLength(1);
+    expect(await cache.getTranscriptSegments({ tabId: 11, videoFingerprint: 'incognito-video', isIncognito: true })).toHaveLength(1);
+
+    const store = getStore(indexedDbMock, 'transcripts');
+    expect(store.records.size).toBe(1); // Only normal segment persisted
+    expect([...store.records.values()][0].originalText).toBe('Normal');
+  });
+
   it('does not invoke capture stt translation or overlay layers', async () => {
     const cache = new LiveCaptionCache();
 

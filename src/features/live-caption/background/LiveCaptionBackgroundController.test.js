@@ -171,6 +171,70 @@ describe("live-caption background controller", () => {
     expect(globalThis.chrome.tabCapture.capture).not.toHaveBeenCalled();
   });
 
+  it("supports cache dependency injection", () => {
+    const mockCache = { id: "mock-cache" };
+    const controller = new LiveCaptionBackgroundController({ cache: mockCache });
+    expect(controller.cache).toBe(mockCache);
+    expect(controller.sttCoordinator.cache).toBe(mockCache);
+    expect(controller.translationCoordinator.cache).toBe(mockCache);
+  });
+
+  it("hydrates session from cache on start", async () => {
+    const controller = new LiveCaptionBackgroundController();
+    const mockTranscript = { segmentId: "t1", originalText: "Hello", segmentStartMs: 0, segmentEndMs: 1000 };
+    const mockTranslation = { segmentId: "c1", translatedText: "سلام", segmentStartMs: 0, segmentEndMs: 1000 };
+
+    controller.cache.getTranscriptSegments = vi.fn().mockResolvedValue([mockTranscript]);
+    controller.cache.getTranslatedCaptionSegments = vi.fn().mockResolvedValue([mockTranslation]);
+
+    const response = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+      }),
+      { tab: { id: 7, incognito: false } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(controller.cache.getTranscriptSegments).toHaveBeenCalledWith(expect.objectContaining({
+      tabId: 7,
+      videoFingerprint: "video-a",
+      isIncognito: false
+    }));
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.transcriptSegments).toHaveLength(1);
+    expect(session.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(session.activeVideoSession.transcriptSegments[0].originalText).toBe("Hello");
+    expect(session.activeVideoSession.translatedCaptionSegments[0].translatedText).toBe("سلام");
+    
+    expect(response.sessionSnapshot.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+  });
+
+  it("handles incognito tabs by skipping persistent cache reads/writes", async () => {
+    const controller = new LiveCaptionBackgroundController();
+    controller.cache.getTranscriptSegments = vi.fn().mockResolvedValue([]);
+    controller.cache.getTranslatedCaptionSegments = vi.fn().mockResolvedValue([]);
+
+    const response = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 8,
+        sessionId: "session-incognito",
+        videoFingerprint: "video-incognito",
+      }),
+      { tab: { id: 8, incognito: true } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(controller.cache.getTranscriptSegments).toHaveBeenCalledWith(expect.objectContaining({
+      isIncognito: true
+    }));
+
+    const session = controller.sessionManager.getSession(8);
+    expect(session.isIncognito).toBe(true);
+  });
+
   it("fails closed for invalid runtime payloads", async () => {
     const controller = new LiveCaptionBackgroundController();
     const response = await controller.handleRuntimeStart(

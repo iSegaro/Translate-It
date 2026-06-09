@@ -79,7 +79,21 @@ function createRuntimeBrowserApi() {
       sessionId: request.data?.sessionId ?? null,
       tabId: request.data?.tabId ?? null,
       videoFingerprint: request.data?.videoFingerprint ?? null,
-      requestId: request.messageId ?? null
+      requestId: request.messageId ?? null,
+      sessionSnapshot: request.action === LIVE_CAPTION_ACTIONS.RUNTIME_START ? {
+        sessionId: request.data?.sessionId ?? null,
+        tabId: request.data?.tabId ?? null,
+        activeVideoFingerprint: request.data?.videoFingerprint ?? null,
+        activeVideoSession: {
+          videoFingerprint: request.data?.videoFingerprint ?? null,
+          transcriptSegments: [
+            { segmentId: 'transcript-1', originalText: 'Hello', segmentStartMs: 0, segmentEndMs: 1000 }
+          ],
+          translatedCaptionSegments: [
+            { segmentId: 'hydrated-1', translatedText: 'سلام', originalText: 'Hello', segmentStartMs: 0, segmentEndMs: 1000 }
+          ]
+        }
+      } : null
     };
   });
 
@@ -521,5 +535,131 @@ describe('live-caption runtime controller', () => {
 
     expect(store.controlsState.canPause).toBe(false);
     expect(store.controlsState.canResume).toBe(false);
+  });
+
+  it('hydrates store captions and local video session from background response', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+    const browserApi = createRuntimeBrowserApi();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    const video = createVideo({ src: 'http://example.com/cached.mp4' });
+    document.body.appendChild(video);
+
+    await controller.start({ tabId: 11 });
+
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0].translatedText).toBe('سلام');
+    expect(controller.pageSession.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(controller.pageSession.activeVideoSession.translatedCaptionSegments[0].translatedText).toBe('سلام');
+    expect(controller.pageSession.activeVideoSession.transcriptSegments).toHaveLength(1);
+    expect(controller.pageSession.activeVideoSession.transcriptSegments[0].originalText).toBe('Hello');
+  });
+
+  it('hydrates store captions from transcripts only if translations are missing', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+    
+    const sendMessage = vi.fn(async (request) => ({
+      success: true,
+      ok: true,
+      action: request.action,
+      status: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+      runtimeState: 'running',
+      sessionId: request.data?.sessionId ?? null,
+      tabId: request.data?.tabId ?? null,
+      videoFingerprint: request.data?.videoFingerprint ?? null,
+      sessionSnapshot: {
+        sessionId: request.data?.sessionId ?? null,
+        tabId: request.data?.tabId ?? null,
+        activeVideoFingerprint: request.data?.videoFingerprint ?? null,
+        activeVideoSession: {
+          videoFingerprint: request.data?.videoFingerprint ?? null,
+          transcriptSegments: [
+            { segmentId: 'transcript-only-1', originalText: 'Only Transcript', segmentStartMs: 0, segmentEndMs: 1000 }
+          ],
+          translatedCaptionSegments: []
+        }
+      }
+    }));
+
+    const browserApi = { runtime: { sendMessage } };
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    const video = createVideo({ src: 'http://example.com/transcripts-only.mp4' });
+    document.body.appendChild(video);
+
+    await controller.start({ tabId: 11 });
+
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0].originalText).toBe('Only Transcript');
+    expect(controller.pageSession.activeVideoSession.transcriptSegments).toHaveLength(1);
+    expect(controller.pageSession.activeVideoSession.translatedCaptionSegments).toHaveLength(0);
+  });
+
+  it('merges translated and transcript segments safely during hydration', async () => {
+    const store = useLiveCaptionStore();
+    store.acceptConsent();
+    
+    const sendMessage = vi.fn(async (request) => ({
+      success: true,
+      ok: true,
+      action: request.action,
+      status: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+      runtimeState: 'running',
+      sessionId: request.data?.sessionId ?? null,
+      tabId: request.data?.tabId ?? null,
+      videoFingerprint: request.data?.videoFingerprint ?? null,
+      sessionSnapshot: {
+        sessionId: request.data?.sessionId ?? null,
+        tabId: request.data?.tabId ?? null,
+        activeVideoFingerprint: request.data?.videoFingerprint ?? null,
+        activeVideoSession: {
+          videoFingerprint: request.data?.videoFingerprint ?? null,
+          transcriptSegments: [
+            { segmentId: 't1', originalText: 'Translated text original', segmentStartMs: 0, segmentEndMs: 1000 },
+            { segmentId: 't2', originalText: 'Untranslated transcript', segmentStartMs: 1000, segmentEndMs: 2000 }
+          ],
+          translatedCaptionSegments: [
+            { segmentId: 'c1', translatedText: 'Translated', originalText: 'Translated text original', segmentStartMs: 0, segmentEndMs: 1000 }
+          ]
+        }
+      }
+    }));
+
+    const browserApi = { runtime: { sendMessage } };
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    const video = createVideo({ src: 'http://example.com/merged.mp4' });
+    document.body.appendChild(video);
+
+    await controller.start({ tabId: 11 });
+
+    expect(store.captionLines).toHaveLength(2);
+    expect(store.captionLines[0].translatedText).toBe('Translated');
+    expect(store.captionLines[0].originalText).toBe('Translated text original');
+    expect(store.captionLines[1].translatedText).toBeUndefined();
+    expect(store.captionLines[1].originalText).toBe('Untranslated transcript');
   });
 });

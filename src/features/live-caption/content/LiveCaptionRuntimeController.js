@@ -709,6 +709,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       });
 
       this.lastRuntimeResponse = normalized;
+      this._applyRuntimeResponse(normalized);
       logger.debug('Live-caption runtime request completed', {
         action,
         status: normalized.status,
@@ -737,6 +738,61 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       });
 
       return failed;
+    }
+  }
+
+  _applyRuntimeResponse(response) {
+    if (!response || !response.ok) {
+      return;
+    }
+
+    const snapshot = response.sessionSnapshot;
+    if (snapshot && snapshot.activeVideoSession) {
+      const translatedSegments = snapshot.activeVideoSession.translatedCaptionSegments || [];
+      const transcriptSegments = snapshot.activeVideoSession.transcriptSegments || [];
+      
+      // Merge for store display if needed, or just set if translated exist
+      // Usually captionLines in store is driven by translated segments if available
+      // but if only transcripts exist, we should show them.
+      if (translatedSegments.length > 0 || transcriptSegments.length > 0) {
+        // Merge translated and transcript segments safely
+        // translatedSegments already contain originalText.
+        // Append transcriptSegments that don't have a corresponding translatedSegment.
+        const translatedTimes = new Set(
+          translatedSegments.map((s) => `${s.segmentStartMs}-${s.segmentEndMs}`)
+        );
+
+        const unmergedTranscripts = transcriptSegments.filter(
+          (s) => !translatedTimes.has(`${s.segmentStartMs}-${s.segmentEndMs}`)
+        );
+
+        const displaySegments = [...translatedSegments, ...unmergedTranscripts].sort(
+          (a, b) => (a.segmentStartMs ?? 0) - (b.segmentStartMs ?? 0)
+        );
+
+        this.store?.setCaptions(displaySegments);
+
+        // Synchronize local video session segments if fingerprints match
+        const localVideoSession = this.pageSession?.activeVideoSession;
+        if (
+          localVideoSession &&
+          localVideoSession.videoFingerprint === snapshot.activeVideoFingerprint
+        ) {
+          if (localVideoSession.translatedCaptionSegments.length === 0) {
+            translatedSegments.forEach((s) => localVideoSession.addTranslatedCaptionSegment(s));
+          }
+          if (localVideoSession.transcriptSegments.length === 0) {
+            transcriptSegments.forEach((s) => localVideoSession.addTranscriptSegment(s));
+          }
+          
+          logger.debug('Local video session hydrated from runtime response', {
+            tabId: this.tabId,
+            videoFingerprint: snapshot.activeVideoFingerprint,
+            captionCount: displaySegments.length,
+            hasTranslations: translatedSegments.length > 0
+          });
+        }
+      }
     }
   }
 

@@ -19,7 +19,7 @@ function isPageLikeVideoSession(session) {
  * Owns consent state, the active video session reference, and page-level lifecycle state.
  */
 export class PageLiveCaptionSession {
-  constructor({ tabId, sessionId = createLiveCaptionSessionId('page', tabId), consentAccepted = false } = {}) {
+  constructor({ tabId, sessionId = createLiveCaptionSessionId('page', tabId), consentAccepted = false, isIncognito = false } = {}) {
     if (tabId == null) {
       throw new TypeError('PageLiveCaptionSession requires a tabId');
     }
@@ -30,6 +30,7 @@ export class PageLiveCaptionSession {
     this.updatedAt = this.createdAt;
     this.lifecycleState = LIVE_CAPTION_SESSION_STATES.IDLE;
     this.consentAccepted = Boolean(consentAccepted);
+    this.isIncognito = Boolean(isIncognito);
     this.activeVideoSession = null;
     this.activeVideoSessionId = null;
     this.activeVideoFingerprint = null;
@@ -39,7 +40,8 @@ export class PageLiveCaptionSession {
     logger.info('Page session created', {
       tabId: this.tabId,
       sessionId: this.sessionId,
-      consentAccepted: this.consentAccepted
+      consentAccepted: this.consentAccepted,
+      isIncognito: this.isIncognito
     });
   }
 
@@ -221,6 +223,7 @@ export class PageLiveCaptionSession {
       sessionId: this.sessionId,
       lifecycleState: this.lifecycleState,
       consentAccepted: this.consentAccepted,
+      isIncognito: this.isIncognito,
       activeVideoSessionId: this.activeVideoSessionId,
       activeVideoFingerprint: this.activeVideoFingerprint,
       hasActiveVideoSession: Boolean(this.activeVideoSession),

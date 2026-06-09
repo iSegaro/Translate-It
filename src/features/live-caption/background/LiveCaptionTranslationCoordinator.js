@@ -11,12 +11,13 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionTranslat
  * Manages FIFO queueing, translation request dispatch, abort routing, and session state mapping.
  */
 export class LiveCaptionTranslationCoordinator {
-  constructor({ sessionManager, captureCoordinator, translationAdapter = null, browserApi = null } = {}) {
+  constructor({ sessionManager, captureCoordinator, cache = null, translationAdapter = null, browserApi = null } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionTranslationCoordinator requires a sessionManager');
     }
     this.sessionManager = sessionManager;
     this.captureCoordinator = captureCoordinator;
+    this.cache = cache;
     this.translationAdapter = translationAdapter || new LiveCaptionTranslationAdapter();
     this.browserApi = browserApi || (typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null);
     this.sessionQueues = new Map();
@@ -138,6 +139,19 @@ export class LiveCaptionTranslationCoordinator {
           const activeVideoSession = pageSession.activeVideoSession;
           if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
             activeVideoSession.addTranslatedCaptionSegment(captionSegment);
+
+            // Persist to cache
+            if (this.cache) {
+              this.cache.appendTranslatedCaptionSegment({
+                ...captionSegment,
+                isIncognito: pageSession.isIncognito
+              }).catch((err) => {
+                logger.warn('Failed to persist translated caption segment to cache', {
+                  sessionId,
+                  error: err.message
+                });
+              });
+            }
 
             // Broadcast translate result to the content script in the target tab
             if (tabId && this.browserApi?.tabs?.sendMessage) {
