@@ -66,4 +66,24 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('BASE: INSTRUCTIONS: translate from English to Persian');
     expect(prompt).not.toContain('BASE_AUTO');
   });
+
+  it('uses the auto prompt when bilingual auto prompts are enabled', async () => {
+    const { getPromptAsync, getPromptAutoAsync, getPromptBASEFieldAsync, getPromptBASEFieldAutoAsync } = await import('@/shared/config/config.js');
+    const { shouldUseAutoPromptAsync } = await import('@/features/translation/utils/bilingualPromptHelper.js');
+
+    shouldUseAutoPromptAsync.mockResolvedValue(true);
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: translate from $_{SOURCE} to $_{TARGET}');
+    getPromptAutoAsync.mockResolvedValue('INSTRUCTIONS_AUTO: translate into $_{TARGET}');
+    getPromptBASEFieldAsync.mockResolvedValue('BASE: $_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+    getPromptBASEFieldAutoAsync.mockResolvedValue('BASE_AUTO: $_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+
+    const prompt = await buildPrompt('Hello', 'auto', 'fa', 'content', 'ai');
+
+    expect(getPromptAsync).not.toHaveBeenCalled();
+    expect(getPromptAutoAsync).toHaveBeenCalled();
+    expect(getPromptBASEFieldAsync).not.toHaveBeenCalled();
+    expect(getPromptBASEFieldAutoAsync).toHaveBeenCalled();
+    expect(prompt).toContain('BASE_AUTO: INSTRUCTIONS_AUTO: translate into Persian');
+    expect(prompt).not.toContain('BASE:');
+  });
 });

@@ -4,8 +4,37 @@
       <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
       
       <div class="setting-group prompt-template-group vertical">
+        <div class="prompt-type-selector">
+          <button 
+            type="button" 
+            :class="['selector-btn', { active: currentPromptKey === 'PROMPT_TEMPLATE' }]"
+            @click="currentPromptKey = 'PROMPT_TEMPLATE'"
+          >
+            {{ t('prompt_type_general') || 'General Template' }}
+          </button>
+          <button 
+            type="button" 
+            :class="['selector-btn', { active: currentPromptKey === 'PROMPT_TEMPLATE_AUTO' }]"
+            @click="currentPromptKey = 'PROMPT_TEMPLATE_AUTO'"
+          >
+            {{ t('prompt_type_auto') || 'Auto Template' }}
+          </button>
+        </div>
+
+        <div class="prompt-type-help-text">
+          {{ currentPromptKey === 'PROMPT_TEMPLATE' 
+            ? (t('prompt_help_general') || 'This template is used for standard translations from a specific source language.') 
+            : (t('prompt_help_auto') || 'This template is used in bidirectional mode when the source language is set to "Auto".') 
+          }}
+        </div>
+
         <div class="prompt-label-with-button">
-          <span class="setting-label">{{ t('prompt_template_label') || 'Prompt Template' }}</span>
+          <span class="setting-label">
+            {{ currentPromptKey === 'PROMPT_TEMPLATE' 
+              ? (t('prompt_template_label') || 'Prompt Template') 
+              : (t('prompt_template_auto_label') || 'Auto Prompt Template') 
+            }}
+          </span>
           <button
             type="button"
             class="button-inline"
@@ -16,8 +45,8 @@
         </div>
         
         <BaseTextarea
-          id="PROMPT_TEMPLATE"
-          v-model="promptTemplate"
+          :id="currentPromptKey"
+          v-model="activeTemplateValue"
           :placeholder="t('prompt_template_placeholder') || 'Enter your prompt template here. Use keywords like $_{SOURCE}, $_{TARGET}, and $_{TEXT}.'"
           :rows="10"
           class="prompt-template-input"
@@ -135,15 +164,39 @@ const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { highlightElement } = useHighlightManager()
 
+// State
+const currentPromptKey = ref('PROMPT_TEMPLATE')
+
 // Default prompt template from config
 const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
+const DEFAULT_PROMPT_AUTO = CONFIG.PROMPT_TEMPLATE_AUTO
 
 // Validation State
 const validationErrorKey = ref('')
 const validationError = computed(() => validationErrorKey.value ? getFirstErrorTranslated('promptTemplate', t) : '')
 
-// Prompt template setting
+// Prompt template settings
 const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT)
+const promptTemplateAuto = createSetting('PROMPT_TEMPLATE_AUTO', DEFAULT_PROMPT_AUTO)
+
+// Computed property for the active textarea binding
+const activeTemplateValue = computed({
+  get: () => currentPromptKey.value === 'PROMPT_TEMPLATE' ? promptTemplate.value : promptTemplateAuto.value,
+  set: (val) => {
+    if (currentPromptKey.value === 'PROMPT_TEMPLATE') promptTemplate.value = val
+    else promptTemplateAuto.value = val
+  }
+})
+
+// Watch for prompt type switch to clear validation state
+watch(currentPromptKey, () => {
+  validationErrorKey.value = ''
+  clearErrors()
+  
+  if (showPreview.value) {
+    generatePromptExamples()
+  }
+})
 
 // Language names for help text
 const sourceLanguageName = computed(() => settingsStore.settings?.SOURCE_LANGUAGE || 'Auto')
@@ -217,7 +270,7 @@ const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, tran
   const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang)
 
   // Use current template value from the input field (not from storage)
-  const currentPromptTemplate = promptTemplate.value
+  const currentPromptTemplate = activeTemplateValue.value
 
   // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
   const promptInstructionsWithoutText = currentPromptTemplate
@@ -291,19 +344,13 @@ const generatePromptExamples = async () => {
 
   loadingExamples.value = true
   const examples = []
-  const sourceLang = settingsStore.settings?.SOURCE_LANGUAGE || 'en'
+  
+  // For Auto template preview, we force source language to 'auto' to see the effect
+  const isAutoMode = currentPromptKey.value === 'PROMPT_TEMPLATE_AUTO'
+  const sourceLang = isAutoMode ? 'auto' : (settingsStore.settings?.SOURCE_LANGUAGE || 'en')
   const targetLang = settingsStore.settings?.TARGET_LANGUAGE || 'en'
 
   try {
-    /* Commented out as it's currently unused by any provider
-    // Field mode (translate provider)
-    examples.push({
-      mode: 'Field Translation (Low LLM Capability)',
-      description: 'Text field translation (e.g., input boxes, text areas)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'translate')
-    })
-    */
-
     // Field mode
     examples.push({
       mode: t('prompt_preview_mode_field') || 'Field Translation',
@@ -338,15 +385,6 @@ const generatePromptExamples = async () => {
       )
     })
 
-    /* Commented out as it's currently unused by any provider
-    // Screen Capture mode
-    examples.push({
-      mode: t('prompt_preview_mode_screen_capture') || 'Screen Capture',
-      description: t('prompt_preview_desc_screen_capture') || 'OCR and translation of text from images',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.ScreenCapture, 'translate')
-    })
-    */
-
     // Dictionary mode
     examples.push({
       mode: t('prompt_preview_mode_dictionary') || 'Dictionary Translation',
@@ -374,13 +412,20 @@ const refreshPreview = async () => {
 const handleValidationFeedback = (e) => {
   const { field } = e.detail || {};
   
-  if (field === 'prompt' || field === 'PROMPT_TEMPLATE') {
+  if (field === 'prompt' || field === 'PROMPT_TEMPLATE' || field === 'PROMPT_TEMPLATE_AUTO') {
+    // If feedback is for the other template, switch to it first
+    if (field === 'PROMPT_TEMPLATE' && currentPromptKey.value !== 'PROMPT_TEMPLATE') {
+      currentPromptKey.value = 'PROMPT_TEMPLATE'
+    } else if (field === 'PROMPT_TEMPLATE_AUTO' && currentPromptKey.value !== 'PROMPT_TEMPLATE_AUTO') {
+      currentPromptKey.value = 'PROMPT_TEMPLATE_AUTO'
+    }
+
     // Explicitly trigger validation feedback display
     validatePrompt(true);
     
     // Focus and highlight logic
     setTimeout(() => {
-      highlightElement('PROMPT_TEMPLATE');
+      highlightElement(currentPromptKey.value);
     }, 400);
   }
 };
@@ -396,7 +441,7 @@ onUnmounted(() => {
 // Validation function
 const validatePrompt = async (showFeedback = false) => {
   clearErrors()
-  const isValid = await validate(promptTemplate.value)
+  const isValid = await validate(activeTemplateValue.value)
   
   if (!isValid && showFeedback) {
     validationErrorKey.value = getFirstError('promptTemplate') || ''
@@ -409,7 +454,11 @@ const validatePrompt = async (showFeedback = false) => {
 
 // Reset prompt to default
 const resetPrompt = async () => {
-  promptTemplate.value = DEFAULT_PROMPT
+  if (currentPromptKey.value === 'PROMPT_TEMPLATE') {
+    promptTemplate.value = DEFAULT_PROMPT
+  } else {
+    promptTemplateAuto.value = DEFAULT_PROMPT_AUTO
+  }
   
   if (showPreview.value) {
     await validatePrompt()

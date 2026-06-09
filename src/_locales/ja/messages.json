@@ -929,8 +929,23 @@
   "prompt_section_title": {
     "message": "プロンプトテンプレート"
   },
+  "prompt_type_general": {
+    "message": "一般テンプレート"
+  },
+  "prompt_type_auto": {
+    "message": "自動テンプレート"
+  },
+  "prompt_help_general": {
+    "message": "このテンプレートは、特定の翻訳元言語からの標準的な翻訳に使用されます。"
+  },
+  "prompt_help_auto": {
+    "message": "このテンプレートは、翻訳元言語が「自動」に設定されている場合の双方向モードで使用されます。"
+  },
   "prompt_template_label": {
     "message": "プロンプトテンプレート"
+  },
+  "prompt_template_auto_label": {
+    "message": "自動プロンプトテンプレート"
   },
   "prompt_template_info": {
     "message": "キーワードを使ってプロンプトをカスタマイズ..."

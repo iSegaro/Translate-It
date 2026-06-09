@@ -12,6 +12,47 @@
     gap: $spacing-md;
     margin-top: $spacing-lg;
 
+    .prompt-type-selector {
+      display: flex;
+      gap: 4px;
+      background: var(--color-background-secondary);
+      padding: 4px;
+      border-radius: $border-radius-md;
+      width: fit-content;
+      margin-bottom: $spacing-sm;
+      border: 1px solid var(--color-border-light);
+
+      .selector-btn {
+        padding: 6px 16px;
+        font-size: 12px;
+        font-weight: $font-weight-medium;
+        border: none;
+        background: transparent;
+        color: var(--color-text-secondary);
+        border-radius: $border-radius-sm;
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+          color: var(--color-text);
+        }
+
+        &.active {
+          background: var(--color-surface);
+          color: var(--color-primary);
+          box-shadow: $shadow-sm;
+        }
+      }
+    }
+
+    .prompt-type-help-text {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      margin-bottom: $spacing-md;
+      padding: 0 4px;
+      line-height: 1.5;
+    }
+
     .prompt-label-with-button {
       display: flex;
       justify-content: space-between;

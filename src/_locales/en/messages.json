@@ -932,8 +932,23 @@
   "prompt_section_title": {
     "message": "Prompt Template"
   },
+  "prompt_type_general": {
+    "message": "General Template"
+  },
+  "prompt_type_auto": {
+    "message": "Auto Template"
+  },
+  "prompt_help_general": {
+    "message": "This template is used for standard translations from a specific source language."
+  },
+  "prompt_help_auto": {
+    "message": "This template is used in bidirectional mode when the source language is set to \"Auto\"."
+  },
   "prompt_template_label": {
     "message": "Prompt Template"
+  },
+  "prompt_template_auto_label": {
+    "message": "Auto Prompt Template"
   },
   "prompt_template_info": {
     "message": "Use keywords to customize your prompt..."

@@ -932,8 +932,23 @@
   "prompt_section_title": {
     "message": "الگوی درخواست (Prompt)"
   },
+  "prompt_type_general": {
+    "message": "الگوی عمومی"
+  },
+  "prompt_type_auto": {
+    "message": "الگوی خودکار"
+  },
+  "prompt_help_general": {
+    "message": "این الگو برای ترجمه‌های استاندارد از یک زبان مبدا خاص استفاده می‌شود."
+  },
+  "prompt_help_auto": {
+    "message": "این الگو در حالت دوطرفه، زمانی که زبان مبدا روی «خودکار» تنظیم شده است، استفاده می‌شود."
+  },
   "prompt_template_label": {
     "message": "الگوی درخواست"
+  },
+  "prompt_template_auto_label": {
+    "message": "الگوی درخواست خودکار"
   },
   "prompt_template_info": {
     "message": "از کلیدواژه‌ها برای شخصی‌سازی درخواست خود استفاده کنید."
