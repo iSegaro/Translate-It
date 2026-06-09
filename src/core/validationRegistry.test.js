@@ -40,4 +40,12 @@ describe('OptionsValidator - PromptRegistry Integration', () => {
     expect(errors[0].params.placeholders).toContain('$_{COUNT}');
     expect(errors[0].params.placeholders).toContain('$_{PROMPT_INSTRUCTIONS}');
   });
+
+  it('validates newly editable PROMPT_BASE_FIELD correctly', async () => {
+    // Requires: SOURCE, TARGET, PROMPT_INSTRUCTIONS, TEXT
+    const template = 'Translate from $_{SOURCE} to $_{TARGET}: $_{PROMPT_INSTRUCTIONS} \n\n $_{TEXT}';
+    const isValid = await validator.validatePromptTemplate(template, 'PROMPT_BASE_FIELD');
+    expect(isValid).toBe(true);
+    expect(validator.hasErrors()).toBe(false);
+  });
 });

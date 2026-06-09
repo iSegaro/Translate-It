@@ -12,36 +12,68 @@
     gap: $spacing-md;
     margin-top: $spacing-lg;
 
-    .prompt-type-selector {
+    .prompt-selector-container {
       display: flex;
-      gap: 4px;
-      background: var(--color-background-secondary);
-      padding: 4px;
-      border-radius: $border-radius-md;
-      width: fit-content;
+      flex-direction: column;
+      gap: $spacing-xs;
       margin-bottom: $spacing-sm;
-      border: 1px solid var(--color-border-light);
 
-      .selector-btn {
-        padding: 6px 16px;
-        font-size: 12px;
-        font-weight: $font-weight-medium;
-        border: none;
-        background: transparent;
-        color: var(--color-text-secondary);
-        border-radius: $border-radius-sm;
+      .prompt-type-select {
+        padding: $spacing-sm $spacing-md;
+        font-size: 14px;
+        background: var(--color-background-secondary);
+        color: var(--color-text);
+        border: 1px solid var(--color-border-light);
+        border-radius: $border-radius-md;
         cursor: pointer;
-        transition: all $transition-fast;
+        outline: none;
+        transition: border-color $transition-fast;
 
-        &:hover {
+        &:focus {
+          border-color: var(--color-primary);
+        }
+
+        optgroup {
+          font-weight: $font-weight-bold;
+          background: var(--color-background);
+          color: var(--color-text-secondary);
+          font-style: normal;
+        }
+
+        option {
+          font-weight: $font-weight-normal;
           color: var(--color-text);
+          padding: 4px;
         }
+      }
+    }
 
-        &.active {
-          background: var(--color-surface);
-          color: var(--color-primary);
-          box-shadow: $shadow-sm;
+    .prompt-risk-banner {
+      margin-bottom: $spacing-md;
+      padding: $spacing-md;
+      background-color: var(--color-warning-alpha);
+      border: 1px solid var(--color-warning-light);
+      border-radius: $border-radius-md;
+      border-inline-start: 4px solid var(--color-warning);
+
+      .banner-title {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        font-weight: $font-weight-bold;
+        color: var(--color-warning-dark, #856404);
+        font-size: 13px;
+        margin-bottom: 4px;
+
+        .icon {
+          font-size: 16px;
         }
+      }
+
+      .banner-content {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
       }
     }
 
@@ -376,6 +408,17 @@
         }
       }
     }
+  }
+
+  .preview-disabled-note {
+    margin-top: $spacing-xl;
+    padding: $spacing-md;
+    background-color: var(--color-background-secondary);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    text-align: center;
+    border-radius: $border-radius-md;
+    border: 1px dashed var(--color-border);
   }
 }
 

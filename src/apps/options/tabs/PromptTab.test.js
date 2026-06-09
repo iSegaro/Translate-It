@@ -35,7 +35,12 @@ vi.mock('../composables/useHighlightManager.js', () => ({
 vi.mock('@/shared/config/config.js', () => ({
   CONFIG: {
     PROMPT_TEMPLATE: 'GENERAL',
-    PROMPT_TEMPLATE_AUTO: 'AUTO'
+    PROMPT_TEMPLATE_AUTO: 'AUTO',
+    PROMPT_BASE_FIELD: 'BASE_FIELD',
+    PROMPT_BASE_FIELD_AUTO: 'BASE_FIELD_AUTO',
+    PROMPT_BASE_POPUP_TRANSLATE: 'BASE_POPUP',
+    PROMPT_BASE_DICTIONARY: 'BASE_DICTIONARY',
+    PROMPT_BASE_SCREEN_CAPTURE: 'BASE_SCREEN_CAPTURE'
   },
   TranslationMode: {
     Field: 'field',
@@ -90,73 +95,132 @@ describe('PromptTab', () => {
     global.URL.createObjectURL = vi.fn();
   });
 
-  it('switches between General and Auto templates', async () => {
+  it('dropdown lists only editable prompts from registry', async () => {
     const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    const options = select.findAll('option');
     
-    // Default is General
+    const optionValues = options.map(o => o.element.value);
+    
+    // Basic prompts
+    expect(optionValues).toContain('PROMPT_TEMPLATE');
+    expect(optionValues).toContain('PROMPT_TEMPLATE_AUTO');
+    
+    // Editable advanced prompts
+    expect(optionValues).toContain('PROMPT_BASE_FIELD');
+    expect(optionValues).toContain('PROMPT_BASE_DICTIONARY');
+    
+    // Locked prompts (should NOT be present)
+    expect(optionValues).not.toContain('PROMPT_BASE_SELECT');
+    expect(optionValues).not.toContain('PROMPT_BASE_AI_BATCH');
+  });
+
+  it('switches between Basic and Advanced templates using dropdown', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    
+    // Default is PROMPT_TEMPLATE
     expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
     expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
 
-    // Switch to Auto
-    const buttons = wrapper.findAll('.selector-btn');
-    const autoButton = buttons.find(b => b.text().includes('Auto Template') || b.text().includes('prompt_type_auto'));
-    await autoButton.trigger('click');
-
-    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE_AUTO');
-    expect(wrapper.vm.activeTemplateValue).toBe('AUTO');
+    // Switch to PROMPT_BASE_FIELD
+    await select.setValue('PROMPT_BASE_FIELD');
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_BASE_FIELD');
+    expect(wrapper.vm.activeTemplateValue).toBe('BASE_FIELD');
+    
+    // Switch to PROMPT_BASE_DICTIONARY
+    await select.setValue('PROMPT_BASE_DICTIONARY');
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_BASE_DICTIONARY');
+    expect(wrapper.vm.activeTemplateValue).toBe('BASE_DICTIONARY');
   });
 
-  it('resets only the active template', async () => {
+  it('shows risk warning and disables preview for advanced prompts', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    
+    // General (SAFE, USER category)
+    expect(wrapper.find('.prompt-risk-banner').exists()).toBe(false);
+    expect(wrapper.find('#PROMPT_PREVIEW_BUTTON').exists()).toBe(true);
+
+    // Dictionary (MEDIUM risk, SYSTEM category)
+    await select.setValue('PROMPT_BASE_DICTIONARY');
+    expect(wrapper.find('.prompt-risk-banner').exists()).toBe(true);
+    expect(wrapper.find('.preview-disabled-note').exists()).toBe(true);
+    expect(wrapper.find('#PROMPT_PREVIEW_BUTTON').exists()).toBe(false);
+  });
+
+  it('clears stale preview when switching from Basic to Advanced', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    
+    // 1. Show preview for Basic
+    await wrapper.find('#PROMPT_PREVIEW_BUTTON').trigger('click');
+    await vi.waitFor(() => {
+      expect(wrapper.vm.promptExamples.length).toBeGreaterThan(0);
+    });
+    expect(wrapper.vm.showPreview).toBe(true);
+
+    // 2. Switch to Advanced
+    await select.setValue('PROMPT_BASE_FIELD');
+    
+    // 3. Preview should be hidden and cleared
+    expect(wrapper.vm.showPreview).toBe(false);
+    expect(wrapper.vm.promptExamples.length).toBe(0);
+  });
+
+  it('handles invalid currentPromptKey gracefully without crashing', async () => {
     const wrapper = mount(PromptTab);
     
-    // Modify General
-    wrapper.vm.activeTemplateValue = 'MODIFIED GENERAL';
+    // Manually set to invalid key
+    wrapper.vm.currentPromptKey = 'INVALID_KEY';
     
-    // Switch to Auto and modify
-    wrapper.vm.currentPromptKey = 'PROMPT_TEMPLATE_AUTO';
-    wrapper.vm.activeTemplateValue = 'MODIFIED AUTO';
+    // These should not crash and return safe fallbacks
+    expect(wrapper.vm.currentPromptMetadata).toBeDefined();
+    expect(wrapper.vm.activeTemplateValue).toBe('');
     
-    // Reset Auto
+    // Risk check should be safe
+    expect(wrapper.vm.hasRiskWarning).toBe(false);
+  });
+
+  it('resets selected advanced prompt', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+    
+    // Select and modify Field prompt
+    await select.setValue('PROMPT_BASE_FIELD');
+    wrapper.vm.activeTemplateValue = 'MODIFIED FIELD';
+    
+    // Reset
     await wrapper.find('.button-inline').trigger('click');
     
-    expect(wrapper.vm.activeTemplateValue).toBe('AUTO');
-    
-    // Switch back to General, should still be modified
-    wrapper.vm.currentPromptKey = 'PROMPT_TEMPLATE';
-    expect(wrapper.vm.activeTemplateValue).toBe('MODIFIED GENERAL');
+    expect(wrapper.vm.activeTemplateValue).toBe('BASE_FIELD');
   });
 
-  it('preview uses the active template value', async () => {
+  it('preview works for basic prompts', async () => {
     const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
     
     // Modify General
     wrapper.vm.activeTemplateValue = 'CUSTOM GENERAL $_{TEXT}';
     
-    // Switch to Auto and modify
-    wrapper.vm.currentPromptKey = 'PROMPT_TEMPLATE_AUTO';
-    wrapper.vm.activeTemplateValue = 'CUSTOM AUTO $_{TEXT}';
-    
     // Refresh preview
     await wrapper.find('#PROMPT_PREVIEW_BUTTON').trigger('click');
     
-    // Check if promptExamples contain CUSTOM AUTO
-    // Note: promptExamples generation is async
     await vi.waitFor(() => {
       expect(wrapper.vm.promptExamples.length).toBeGreaterThan(0);
     });
 
     const example = wrapper.vm.promptExamples[0];
-    expect(example.prompt).toContain('CUSTOM AUTO');
-    expect(example.prompt).not.toContain('CUSTOM GENERAL');
+    expect(example.prompt).toContain('CUSTOM GENERAL');
 
-    // Switch back to General and preview
-    wrapper.vm.currentPromptKey = 'PROMPT_TEMPLATE';
+    // Switch to Auto
+    await select.setValue('PROMPT_TEMPLATE_AUTO');
+    wrapper.vm.activeTemplateValue = 'CUSTOM AUTO $_{TEXT}';
     await wrapper.find('#PROMPT_PREVIEW_BUTTON').trigger('click');
 
     await vi.waitFor(() => {
       const exampleGen = wrapper.vm.promptExamples[0];
-      expect(exampleGen.prompt).toContain('CUSTOM GENERAL');
-      expect(exampleGen.prompt).not.toContain('CUSTOM AUTO');
+      expect(exampleGen.prompt).toContain('CUSTOM AUTO');
     });
   });
 });

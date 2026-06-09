@@ -46,27 +46,30 @@ export const PROMPT_REGISTRY = {
   PROMPT_BASE_FIELD: {
     key: 'PROMPT_BASE_FIELD',
     labelKey: 'prompt_base_field_label',
+    descKey: 'prompt_base_field_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.SAFE,
-    editable: false,
+    editable: true,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
     previewSupport: true
   },
   PROMPT_BASE_FIELD_AUTO: {
     key: 'PROMPT_BASE_FIELD_AUTO',
     labelKey: 'prompt_base_field_auto_label',
+    descKey: 'prompt_base_field_auto_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.SAFE,
-    editable: false,
+    editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
     previewSupport: true
   },
   PROMPT_BASE_POPUP_TRANSLATE: {
     key: 'PROMPT_BASE_POPUP_TRANSLATE',
     labelKey: 'prompt_base_popup_label',
+    descKey: 'prompt_base_popup_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.SAFE,
-    editable: false,
+    editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
     previewSupport: true
   },
@@ -109,18 +112,20 @@ export const PROMPT_REGISTRY = {
   PROMPT_BASE_DICTIONARY: {
     key: 'PROMPT_BASE_DICTIONARY',
     labelKey: 'prompt_base_dictionary_label',
+    descKey: 'prompt_base_dictionary_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.MEDIUM,
-    editable: false,
+    editable: true,
     placeholders: ["$_{SOURCE}", "$_{TARGET}", "$_{TEXT}"],
     previewSupport: true
   },
   PROMPT_BASE_SCREEN_CAPTURE: {
     key: 'PROMPT_BASE_SCREEN_CAPTURE',
     labelKey: 'prompt_base_screen_capture_label',
+    descKey: 'prompt_base_screen_capture_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.SAFE,
-    editable: false,
+    editable: true,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
     previewSupport: true
   },

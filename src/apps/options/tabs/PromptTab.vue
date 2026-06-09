@@ -4,36 +4,57 @@
       <h2>{{ t('prompt_section_title') || 'Prompt Template' }}</h2>
       
       <div class="setting-group prompt-template-group vertical">
-        <div class="prompt-type-selector">
-          <button 
-            type="button" 
-            :class="['selector-btn', { active: currentPromptKey === 'PROMPT_TEMPLATE' }]"
-            @click="currentPromptKey = 'PROMPT_TEMPLATE'"
+        <div class="prompt-selector-container">
+          <label
+            for="prompt-type-select"
+            class="setting-label"
+          >{{ t('prompt_select_label') || 'Select Prompt to Edit' }}</label>
+          <select
+            id="prompt-type-select"
+            v-model="currentPromptKey"
+            class="prompt-type-select"
           >
-            {{ t('prompt_type_general') || 'General Template' }}
-          </button>
-          <button 
-            type="button" 
-            :class="['selector-btn', { active: currentPromptKey === 'PROMPT_TEMPLATE_AUTO' }]"
-            @click="currentPromptKey = 'PROMPT_TEMPLATE_AUTO'"
-          >
-            {{ t('prompt_type_auto') || 'Auto Template' }}
-          </button>
+            <optgroup :label="t('prompt_group_basic') || 'Basic (User Templates)'">
+              <option
+                v-for="p in basicPrompts"
+                :key="p.key"
+                :value="p.key"
+              >
+                {{ t(p.labelKey) || p.key }}
+              </option>
+            </optgroup>
+            <optgroup :label="t('prompt_group_advanced') || 'Advanced (System Base Wrappers)'">
+              <option
+                v-for="p in advancedPrompts"
+                :key="p.key"
+                :value="p.key"
+              >
+                {{ t(p.labelKey) || p.key }}
+              </option>
+            </optgroup>
+          </select>
         </div>
 
         <div class="prompt-type-help-text">
-          {{ currentPromptKey === 'PROMPT_TEMPLATE' 
-            ? (t('prompt_help_general') || 'This template is used for standard translations from a specific source language.') 
-            : (t('prompt_help_auto') || 'This template is used in bidirectional mode when the source language is set to "Auto".') 
-          }}
+          {{ t(currentPromptMetadata.descKey) || currentPromptMetadata.descKey }}
+        </div>
+
+        <div
+          v-if="hasRiskWarning"
+          class="prompt-risk-banner"
+        >
+          <div class="banner-title">
+            <span class="icon">⚠️</span>
+            <span>{{ t('prompt_risk_warning_title') || 'Advanced Formatting Warning' }}</span>
+          </div>
+          <div class="banner-content">
+            {{ t('prompt_risk_warning_' + currentPromptMetadata.risk.toLowerCase()) || t('prompt_risk_warning_medium') }}
+          </div>
         </div>
 
         <div class="prompt-label-with-button">
           <span class="setting-label">
-            {{ currentPromptKey === 'PROMPT_TEMPLATE' 
-              ? (t('prompt_template_label') || 'Prompt Template') 
-              : (t('prompt_template_auto_label') || 'Auto Prompt Template') 
-            }}
+            {{ t(currentPromptMetadata.labelKey) || currentPromptMetadata.labelKey }}
           </span>
           <button
             type="button"
@@ -94,7 +115,10 @@
         </div>
 
         <!-- Preview Prompts Section -->
-        <div class="prompt-preview-section">
+        <div
+          v-if="!isAdvancedPrompt"
+          class="prompt-preview-section"
+        >
           <button
             id="PROMPT_PREVIEW_BUTTON"
             type="button"
@@ -139,6 +163,12 @@
             </template>
           </div>
         </div>
+        <div
+          v-else
+          class="preview-disabled-note"
+        >
+          ℹ️ {{ t('prompt_preview_disabled_advanced') || 'Preview is currently only available for Basic user templates.' }}
+        </div>
       </div>
     </div>
   </section>
@@ -154,6 +184,7 @@ import { useValidation } from '@/core/validation.js'
 import { CONFIG, TranslationMode } from '@/shared/config/config.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { usePromptPreview } from '../composables/usePromptPreview.js'
+import { PROMPT_REGISTRY, PromptCategory, PromptRisk } from '@/shared/config/PromptRegistry.js'
 
 // Components
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
@@ -169,27 +200,36 @@ const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated
 const { highlightElement } = useHighlightManager()
 const { promptExamples, loadingExamples, generateExamples } = usePromptPreview(logger)
 
+// Prompt Classification from Registry
+const editablePrompts = Object.values(PROMPT_REGISTRY).filter(p => p.editable)
+const basicPrompts = editablePrompts.filter(p => p.category === PromptCategory.USER)
+const advancedPrompts = editablePrompts.filter(p => p.category === PromptCategory.SYSTEM)
+
 // State
 const currentPromptKey = ref('PROMPT_TEMPLATE')
 
-// Default prompt template from config
-const DEFAULT_PROMPT = CONFIG.PROMPT_TEMPLATE
-const DEFAULT_PROMPT_AUTO = CONFIG.PROMPT_TEMPLATE_AUTO
+// Pre-create settings for all editable prompts to ensure reactivity
+const promptSettings = {}
+editablePrompts.forEach(p => {
+  promptSettings[p.key] = createSetting(p.key, CONFIG[p.key])
+})
+
+// Metadata for current selection with safety fallback
+const currentPromptMetadata = computed(() => PROMPT_REGISTRY[currentPromptKey.value] || PROMPT_REGISTRY.PROMPT_TEMPLATE)
+const isAdvancedPrompt = computed(() => currentPromptMetadata.value?.category === PromptCategory.SYSTEM)
+const hasRiskWarning = computed(() => currentPromptMetadata.value?.risk && currentPromptMetadata.value?.risk !== PromptRisk.SAFE)
 
 // Validation State
 const validationErrorKey = ref('')
 const validationError = computed(() => validationErrorKey.value ? getFirstErrorTranslated('promptTemplate', t) : '')
 
-// Prompt template settings
-const promptTemplate = createSetting('PROMPT_TEMPLATE', DEFAULT_PROMPT)
-const promptTemplateAuto = createSetting('PROMPT_TEMPLATE_AUTO', DEFAULT_PROMPT_AUTO)
-
-// Computed property for the active textarea binding
+// Computed property for the active textarea binding with safety fallback
 const activeTemplateValue = computed({
-  get: () => currentPromptKey.value === 'PROMPT_TEMPLATE' ? promptTemplate.value : promptTemplateAuto.value,
+  get: () => promptSettings[currentPromptKey.value]?.value || '',
   set: (val) => {
-    if (currentPromptKey.value === 'PROMPT_TEMPLATE') promptTemplate.value = val
-    else promptTemplateAuto.value = val
+    if (promptSettings[currentPromptKey.value]) {
+      promptSettings[currentPromptKey.value].value = val
+    }
   }
 })
 
@@ -198,7 +238,11 @@ watch(currentPromptKey, async () => {
   validationErrorKey.value = ''
   clearErrors()
   
-  if (showPreview.value) {
+  if (isAdvancedPrompt.value) {
+    // Clear stale previews when switching to advanced prompts
+    showPreview.value = false
+    promptExamples.value = []
+  } else if (showPreview.value) {
     await refreshExamples()
   }
 })
@@ -275,13 +319,10 @@ const validatePrompt = async (showFeedback = false) => {
 
 // Reset prompt to default
 const resetPrompt = async () => {
-  if (currentPromptKey.value === 'PROMPT_TEMPLATE') {
-    promptTemplate.value = DEFAULT_PROMPT
-  } else {
-    promptTemplateAuto.value = DEFAULT_PROMPT_AUTO
-  }
+  const defaultTemplate = CONFIG[currentPromptKey.value]
+  activeTemplateValue.value = defaultTemplate
   
-  if (showPreview.value) {
+  if (showPreview.value && !isAdvancedPrompt.value) {
     await validatePrompt()
     await refreshExamples()
   }

@@ -2743,5 +2743,53 @@
   },
   "set_as_default_tooltip": {
     "message": "デフォルトサービスとして設定"
+  },
+  "prompt_select_label": {
+    "message": "編集するプロンプトを選択"
+  },
+  "prompt_group_basic": {
+    "message": "基本 (ユーザーテンプレート)"
+  },
+  "prompt_group_advanced": {
+    "message": "高度な設定 (システムベースラッパー)"
+  },
+  "prompt_base_field_label": {
+    "message": "フィールドベースラッパー"
+  },
+  "prompt_base_field_desc": {
+    "message": "標準的なテキストフィールド翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_field_auto_label": {
+    "message": "フィールドベースラッパー (自動)"
+  },
+  "prompt_base_field_auto_desc": {
+    "message": "言語が「自動」に設定されている場合のテキストフィールド翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_popup_label": {
+    "message": "ポップアップ/サイドパネルベースラッパー"
+  },
+  "prompt_base_popup_desc": {
+    "message": "ポップアップおよびサイドパネルでの翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_base_dictionary_label": {
+    "message": "辞書ベースラッパー"
+  },
+  "prompt_base_dictionary_desc": {
+    "message": "辞書形式の翻訳 (意味、類義語) のためのシステムレベル의指示。"
+  },
+  "prompt_base_screen_capture_label": {
+    "message": "スクリーンキャプチャベースラッパー"
+  },
+  "prompt_base_screen_capture_desc": {
+    "message": "画像ベースのテキスト抽出および翻訳のためのシステムレベルの指示。"
+  },
+  "prompt_risk_warning_title": {
+    "message": "高度なフォーマットに関する警告"
+  },
+  "prompt_risk_warning_medium": {
+    "message": "このプロンプトは、UIで正しく表示するために特定のMarkdown形式に依存しています。構造マーカーを変更すると、表示が崩れる可能性があります。"
+  },
+  "prompt_preview_disabled_advanced": {
+    "message": "現在、プレビューは基本ユーザーテンプレートでのみ利用可能です。"
   }
 }
