@@ -22,6 +22,7 @@ import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStat
 import { LIVE_CAPTION_SESSION_STATES } from "../constants/liveCaptionSessionStates.js";
 import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
 import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
+import { LIVE_CAPTION_ACTIONS } from "../constants/liveCaptionActions.js";
 
 const logger = getScopedLogger(
   LOG_COMPONENTS.LIVE_CAPTION,
@@ -291,6 +292,14 @@ export class LiveCaptionBackgroundController {
     messageHandler.registerHandler(
       LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.CAPTURE_ERROR,
       this.handleCaptureError.bind(this),
+    );
+    messageHandler.registerHandler(
+      LIVE_CAPTION_ACTIONS.GET_TAB_ID,
+      async (message, sender) => {
+        const tabId = sender?.tab?.id ?? null;
+        logger.debug("Resolved sender tabId:", tabId);
+        return { success: true, tabId };
+      }
     );
 
     logger.info("Live-caption runtime handlers registered", {

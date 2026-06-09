@@ -153,6 +153,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 // --- UI Components ---
 
@@ -354,10 +355,11 @@ const handleLiveCaptionStartRequestFromFAB = () => {
   }
 };
 
-// Listen for page events
-if (typeof window !== 'undefined' && window.pageEventBus) {
-  window.pageEventBus.on('live-caption-start-request', handleLiveCaptionStartRequestFromFAB);
-}
+// Listen for page events using standard PageEventBus and ResourceTracker
+tracker.trackResource(
+  'live-caption-start-request',
+  pageEventBus.on('live-caption-start-request', handleLiveCaptionStartRequestFromFAB)
+);
 
 // 8. Lifecycle & Cleanup Logic
 const onNavigationCleanup = () => {

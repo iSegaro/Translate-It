@@ -334,10 +334,9 @@ const updateAllowedFeatures = async () => {
     logger.debug('FAB allowed features updated', allowedFeatures.value);
   }
 
-  // Live Caption requires Chrome/Edge desktop and tabCapture API
+  // Live Caption requires Chrome/Edge desktop (background/offscreen handle tabCapture API)
   const browserInfo = getBrowserInfoSync();
-  allowedFeatures.value.liveCaption = !browserInfo.isFirefox && !browserInfo.isMobile &&
-    typeof chrome !== 'undefined' && chrome.tabCapture;
+  allowedFeatures.value.liveCaption = !browserInfo.isFirefox && !browserInfo.isMobile;
 };
 
 const ANIMATION_CONFIG = {

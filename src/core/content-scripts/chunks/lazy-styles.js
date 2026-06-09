@@ -42,3 +42,9 @@ export const sharedStyles = import.meta.glob([
   '!**/apps/content/components/mobile/**',
   '!**/_*.scss'
 ], { query: '?inline', import: 'default', eager: true });
+
+// 6. Live Caption UI styles
+export const liveCaptionUiStyles = import.meta.glob([
+  '@/features/live-caption/overlay/**/*.scss', 
+  '!**/_*.scss'
+], { query: '?inline', import: 'default', eager: true });

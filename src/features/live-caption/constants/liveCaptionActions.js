@@ -1,6 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 export const LIVE_CAPTION_ACTIONS = Object.freeze({
+  GET_TAB_ID: MessageActions.LIVE_CAPTION_GET_TAB_ID,
   START_REQUEST: MessageActions.LIVE_CAPTION_START_REQUEST,
   PRIVACY_NOTICE: MessageActions.LIVE_CAPTION_PRIVACY_NOTICE,
   PRIVACY_ACCEPTED: MessageActions.LIVE_CAPTION_PRIVACY_ACCEPTED,

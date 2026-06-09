@@ -49,11 +49,3 @@ function lineKey(line) {
   ].join(':');
 }
 </script>
-
-<style scoped>
-.live-caption-caption-track {
-  display: grid;
-  gap: 8px;
-  pointer-events: auto;
-}
-</style>

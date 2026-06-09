@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '../core/LiveCaptionCaptionDisplayMode.js';
@@ -64,6 +64,14 @@ import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
 import { useLiveCaptionOverlay } from './useLiveCaptionOverlay.js';
+import { liveCaptionUiStyles } from '@/core/content-scripts/chunks/lazy-styles.js';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
+
+onMounted(() => {
+  if (liveCaptionUiStyles && injectStylesToShadowRoot) {
+    injectStylesToShadowRoot(liveCaptionUiStyles, 'vue-live-caption-styles');
+  }
+});
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOverlay');
 
@@ -161,40 +169,3 @@ const showConsentPanel = computed(() => props.showConsentNotice || !props.consen
 
 logger.debug('Live-caption overlay shell initialized');
 </script>
-
-<style scoped>
-.live-caption-overlay {
-  position: fixed;
-  inset: auto auto 16px 16px;
-  width: min(92vw, 720px);
-  pointer-events: none;
-  z-index: 2147483647;
-  display: grid;
-}
-
-.live-caption-overlay__panel {
-  position: relative;
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 18px;
-  background: rgba(13, 16, 24, 0.78);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
-  pointer-events: none;
-}
-
-.live-caption-overlay--blocked .live-caption-overlay__panel {
-  min-height: 180px;
-}
-
-.live-caption-overlay__error {
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(156, 21, 21, 0.24);
-  color: #ffd9d9;
-  pointer-events: auto;
-}
-</style>

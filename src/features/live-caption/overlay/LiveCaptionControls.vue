@@ -64,26 +64,3 @@ defineProps({
 
 defineEmits(['start', 'stop', 'pause', 'resume', 'retry', 'clear-cache']);
 </script>
-
-<style scoped>
-.live-caption-controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  pointer-events: auto;
-}
-
-.live-caption-controls__button {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  padding: 8px 12px;
-  background: rgba(14, 18, 28, 0.84);
-  color: #f5f7fb;
-  cursor: pointer;
-}
-
-.live-caption-controls__button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-</style>

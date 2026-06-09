@@ -57,35 +57,3 @@ function formatTimeRange(line) {
   return start || end || '';
 }
 </script>
-
-<style scoped>
-.live-caption-caption-line {
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(9, 12, 18, 0.72);
-  color: #f7f9fc;
-}
-
-.live-caption-caption-line__time {
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  opacity: 0.72;
-}
-
-.live-caption-caption-line__text {
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.live-caption-caption-line__text--translated {
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 600;
-}
-
-.live-caption-caption-line__text--original {
-  opacity: 0.92;
-}
-</style>

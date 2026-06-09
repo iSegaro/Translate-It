@@ -249,6 +249,23 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       return this.store.activeTabId;
     }
 
+    // Try requesting active tab ID from background if running inside a content script
+    const browserRuntime = this.browserApi?.runtime;
+    if (browserRuntime?.sendMessage) {
+      try {
+        const response = await browserRuntime.sendMessage({
+          action: LIVE_CAPTION_ACTIONS.GET_TAB_ID,
+          messageId: `msg-${Date.now()}`,
+          timestamp: Date.now()
+        });
+        if (response && response.tabId != null) {
+          return response.tabId;
+        }
+      } catch (err) {
+        logger.debug('Failed to get tab info from background:', err);
+      }
+    }
+
     if (!this.browserApi?.tabs?.query) {
       return null;
     }

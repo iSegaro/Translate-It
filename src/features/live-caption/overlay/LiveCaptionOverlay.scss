@@ -1,0 +1,165 @@
+/* src/features/live-caption/overlay/LiveCaptionOverlay.scss */
+/* Styles are isolated inside the Shadow DOM UI Host container. */
+
+.live-caption-overlay {
+  position: fixed;
+  inset: auto auto 16px 16px;
+  width: min(92vw, 720px);
+  pointer-events: none;
+  z-index: 2147483647;
+  display: grid;
+}
+
+.live-caption-overlay__panel {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(13, 16, 24, 0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  pointer-events: none;
+}
+
+.live-caption-overlay--blocked .live-caption-overlay__panel {
+  min-height: 180px;
+}
+
+.live-caption-overlay__error {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(156, 21, 21, 0.24);
+  color: #ffd9d9;
+  pointer-events: auto;
+}
+
+/* --- Live Caption Consent Notice --- */
+.live-caption-consent-notice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: rgba(10, 12, 20, 0.72);
+  color: #f5f7fb;
+  z-index: 2;
+  border-radius: 18px;
+}
+
+.live-caption-consent-notice__body {
+  width: min(92vw, 420px);
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(18, 22, 34, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.live-caption-consent-notice__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.live-caption-consent-notice__message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.92;
+}
+
+.live-caption-consent-notice__details {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.86;
+}
+
+.live-caption-consent-notice__detail + .live-caption-consent-notice__detail {
+  margin-top: 6px;
+}
+
+.live-caption-consent-notice__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.live-caption-consent-notice__button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.live-caption-consent-notice__button--primary {
+  background: #ffffff;
+  color: #121826;
+}
+
+/* --- Live Caption Caption Track --- */
+.live-caption-caption-track {
+  display: grid;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* --- Live Caption Caption Line --- */
+.live-caption-caption-line {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(9, 12, 18, 0.72);
+  color: #f7f9fc;
+}
+
+.live-caption-caption-line__time {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+}
+
+.live-caption-caption-line__text {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.live-caption-caption-line__text--translated {
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.live-caption-caption-line__text--original {
+  opacity: 0.92;
+}
+
+/* --- Live Caption Controls --- */
+.live-caption-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  pointer-events: auto;
+}
+
+.live-caption-controls__button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(14, 18, 28, 0.84);
+  color: #f5f7fb;
+  cursor: pointer;
+}
+
+.live-caption-controls__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
