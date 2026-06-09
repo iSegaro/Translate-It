@@ -72,10 +72,24 @@ describe('usePromptPreview', () => {
     expect(batchExample.prompt).toContain('AI_BATCH:')
   })
 
-  it('prevents race conditions - latest request wins', async () => {
+  it('prevents race conditions - latest request wins even if older request finishes last', async () => {
     const { promptExamples, generateExamples, loadingExamples } = usePromptPreview()
     
-    // Start a "slow" request
+    // Create a way to control the timing of the first request
+    let resolveSlowRequest;
+    const slowRequestPromise = new Promise(resolve => {
+      resolveSlowRequest = resolve;
+    });
+
+    const { getPromptBASEFieldAsync } = await import('@/shared/config/config.js');
+    
+    // Setup the mock to be slow ONLY for the first call
+    vi.mocked(getPromptBASEFieldAsync).mockImplementationOnce(async () => {
+      await slowRequestPromise;
+      return 'FIELD: $_{PROMPT_INSTRUCTIONS}\n\n$_{TEXT}';
+    });
+
+    // 1. Start a "slow" request (Request A)
     const p1 = generateExamples({
       template: 'Slow Template',
       isAuto: false,
@@ -84,7 +98,8 @@ describe('usePromptPreview', () => {
       t: mockT
     })
 
-    // Start a "fast" request immediately
+    // 2. Start a "fast" request (Request B) immediately after
+    // This will increment lastGenerationId to 2
     const p2 = generateExamples({
       template: 'Fast Template',
       isAuto: false,
@@ -93,11 +108,17 @@ describe('usePromptPreview', () => {
       t: mockT
     })
 
-    await Promise.all([p1, p2])
+    // 3. Request B (Fast) should finish quickly because it's not blocked
+    await p2;
+    expect(promptExamples.value[0].prompt).toContain('Fast Template');
+    
+    // 4. Now resolve Request A (Slow)
+    resolveSlowRequest();
+    await p1;
 
-    // Results should match "Fast Template"
-    expect(promptExamples.value[0].prompt).toContain('Fast Template')
-    expect(promptExamples.value[0].prompt).not.toContain('Slow Template')
-    expect(loadingExamples.value).toBe(false)
+    // 5. Assert: Request A (Slow) MUST NOT have overwritten Request B (Fast)
+    expect(promptExamples.value[0].prompt).toContain('Fast Template');
+    expect(promptExamples.value[0].prompt).not.toContain('Slow Template');
+    expect(loadingExamples.value).toBe(false);
   })
 })
