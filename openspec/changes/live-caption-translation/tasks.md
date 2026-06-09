@@ -14,10 +14,10 @@
 
 ## 3. Session Model
 
-- [ ] 3.1 Define the `PageLiveCaptionSession` responsibilities and lifecycle contract
-- [ ] 3.2 Define the `VideoCaptionSession` responsibilities and lifecycle contract
-- [ ] 3.3 Specify the ownership boundaries between page-scoped and video-scoped state
-- [ ] 3.4 Define session cleanup behavior for stop, tab close, navigation, and video changes
+- [x] 3.1 Define the `PageLiveCaptionSession` responsibilities and lifecycle contract
+- [x] 3.2 Define the `VideoCaptionSession` responsibilities and lifecycle contract
+- [x] 3.3 Specify the ownership boundaries between page-scoped and video-scoped state
+- [x] 3.4 Define session cleanup behavior for stop, tab close, navigation, and video changes
 
 ## 4. Active Video Detection and Fingerprinting
 
@@ -80,7 +80,7 @@
 
 ## 12. Tests
 
-- [ ] 12.1 Define unit tests for session ownership and lifecycle transitions
+- [x] 12.1 Define unit tests for session ownership and lifecycle transitions
 - [ ] 12.2 Define unit tests for active-video detection and fingerprint generation
 - [ ] 12.3 Define unit tests for deterministic active-video tie-break ordering
 - [ ] 12.4 Define unit tests for STT provider contracts and retry behavior
@@ -88,7 +88,7 @@
 - [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
 - [ ] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
 - [ ] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
-- [ ] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
+- [x] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
 - [ ] 12.10 Define startup tests for missing or invalid OpenAI credential handling
 
 ## 13. Documentation

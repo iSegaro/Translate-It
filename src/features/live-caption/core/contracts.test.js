@@ -1,35 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createLiveCaptionNotImplementedError,
-  PageLiveCaptionSession,
-  VideoCaptionSession,
-  LiveCaptionSessionManager
+  LIVE_CAPTION_CLEANUP_REASONS,
+  createLiveCaptionErrorState,
+  createLiveCaptionSessionSnapshot,
+  createVideoCaptionSessionSnapshot
 } from './index.js';
-import { BaseSTTProvider } from '../stt/BaseSTTProvider.js';
-import { LiveCaptionCache } from '../cache/LiveCaptionCache.js';
-import { LiveCaptionBackgroundController } from '../background/LiveCaptionBackgroundController.js';
-import { LiveCaptionContentController } from '../content/LiveCaptionContentController.js';
+import { PageLiveCaptionSession } from './PageLiveCaptionSession.js';
+import { VideoCaptionSession } from './VideoCaptionSession.js';
 
-describe('live-caption placeholder contracts', () => {
-  it('creates a consistent not-implemented error', () => {
-    const error = createLiveCaptionNotImplementedError('TestContract');
-    expect(error.message).toBe('TestContract is not implemented yet');
-    expect(error.code).toBe('LIVE_CAPTION_NOT_IMPLEMENTED');
+describe('live-caption session contracts', () => {
+  it('exposes cleanup reasons', () => {
+    expect(LIVE_CAPTION_CLEANUP_REASONS.STOP).toBe('stop');
+    expect(LIVE_CAPTION_CLEANUP_REASONS.VIDEO_CHANGED).toBe('video_changed');
+    expect(LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE).toBe('recovery_failure');
   });
 
-  it('throws for session placeholders', () => {
-    expect(() => new PageLiveCaptionSession()).toThrow('PageLiveCaptionSession is not implemented yet');
-    expect(() => new VideoCaptionSession()).toThrow('VideoCaptionSession is not implemented yet');
-    expect(() => new LiveCaptionSessionManager()).toThrow('LiveCaptionSessionManager is not implemented yet');
+  it('normalizes error state data', () => {
+    const errorState = createLiveCaptionErrorState(new Error('boom'), LIVE_CAPTION_CLEANUP_REASONS.ERROR);
+
+    expect(errorState.message).toBe('boom');
+    expect(errorState.reason).toBe(LIVE_CAPTION_CLEANUP_REASONS.ERROR);
+    expect(errorState.name).toBe('Error');
   });
 
-  it('throws for controller and cache placeholders', () => {
-    expect(() => new LiveCaptionCache()).toThrow('LiveCaptionCache is not implemented yet');
-    expect(() => new LiveCaptionBackgroundController()).toThrow('LiveCaptionBackgroundController is not implemented yet');
-    expect(() => new LiveCaptionContentController()).toThrow('LiveCaptionContentController is not implemented yet');
-  });
+  it('builds page and video snapshots', () => {
+    const pageSession = new PageLiveCaptionSession({ tabId: 42, consentAccepted: true });
+    const videoSession = new VideoCaptionSession({ tabId: 42, videoFingerprint: 'video-42' });
 
-  it('keeps the STT base contract abstract', () => {
-    expect(() => new BaseSTTProvider()).toThrow('BaseSTTProvider is not implemented yet');
+    pageSession.attachVideoSession(videoSession);
+
+    const pageSnapshot = createLiveCaptionSessionSnapshot(pageSession);
+    const videoSnapshot = createVideoCaptionSessionSnapshot(videoSession);
+
+    expect(pageSnapshot.tabId).toBe(42);
+    expect(pageSnapshot.hasActiveVideoSession).toBe(true);
+    expect(pageSnapshot.activeVideoSession.videoFingerprint).toBe('video-42');
+    expect(videoSnapshot.tabId).toBe(42);
+    expect(videoSnapshot.videoFingerprint).toBe('video-42');
   });
 });

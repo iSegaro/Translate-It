@@ -5,6 +5,9 @@ import {
   LIVE_CAPTION_SETTINGS_KEYS,
   LIVE_CAPTION_DEFAULTS,
   LIVE_CAPTION_SESSION_STATES,
+  LIVE_CAPTION_CLEANUP_REASONS,
+  createLiveCaptionSessionSnapshot,
+  createVideoCaptionSessionSnapshot,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager,
@@ -22,10 +25,14 @@ describe('live-caption feature shell', () => {
     expect(LIVE_CAPTION_DEFAULTS.ENABLED).toBe(CONFIG.LIVE_CAPTION_ENABLED);
     expect(LIVE_CAPTION_DEFAULTS.OPENAI_API_KEY_SETTING).toBe('OPENAI_API_KEY');
     expect(LIVE_CAPTION_SESSION_STATES.IDLE).toBe('idle');
+    expect(LIVE_CAPTION_CLEANUP_REASONS.STOP).toBe('stop');
     expect(LiveCaptionFeature.store).toBe(useLiveCaptionStore);
+    expect(LiveCaptionFeature.cleanupReasons).toBe(LIVE_CAPTION_CLEANUP_REASONS);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionSessionSnapshot).toBe(createLiveCaptionSessionSnapshot);
+    expect(LiveCaptionFeature.contracts.createVideoCaptionSessionSnapshot).toBe(createVideoCaptionSessionSnapshot);
   });
 
-  it('exports placeholder contracts without side effects', () => {
+  it('exports session contracts without runtime wiring', () => {
     expect(PageLiveCaptionSession).toBeTypeOf('function');
     expect(VideoCaptionSession).toBeTypeOf('function');
     expect(LiveCaptionSessionManager).toBeTypeOf('function');

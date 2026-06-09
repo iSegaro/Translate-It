@@ -3,10 +3,16 @@ import { LIVE_CAPTION_SETTINGS_KEYS } from './constants/liveCaptionSettings.js';
 import { LIVE_CAPTION_DEFAULTS } from './constants/liveCaptionDefaults.js';
 import { LIVE_CAPTION_SESSION_STATES } from './constants/liveCaptionSessionStates.js';
 import { useLiveCaptionStore } from './stores/liveCaption.js';
-import { createLiveCaptionNotImplementedError, assertNotImplemented } from './core/contracts.js';
-import { PageLiveCaptionSession } from './core/PageLiveCaptionSession.js';
-import { VideoCaptionSession } from './core/VideoCaptionSession.js';
-import { LiveCaptionSessionManager } from './core/LiveCaptionSessionManager.js';
+import {
+  LIVE_CAPTION_CLEANUP_REASONS,
+  createLiveCaptionErrorState,
+  createLiveCaptionSessionId,
+  createLiveCaptionSessionSnapshot,
+  createVideoCaptionSessionSnapshot,
+  PageLiveCaptionSession,
+  VideoCaptionSession,
+  LiveCaptionSessionManager
+} from './core/index.js';
 import { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 import { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 import { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
@@ -18,13 +24,17 @@ export { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
 export { LIVE_CAPTION_SETTINGS_KEYS } from './constants/liveCaptionSettings.js';
 export { LIVE_CAPTION_DEFAULTS } from './constants/liveCaptionDefaults.js';
 export { LIVE_CAPTION_SESSION_STATES } from './constants/liveCaptionSessionStates.js';
-
 export { useLiveCaptionStore } from './stores/liveCaption.js';
-
-export { createLiveCaptionNotImplementedError, assertNotImplemented } from './core/contracts.js';
-export { PageLiveCaptionSession } from './core/PageLiveCaptionSession.js';
-export { VideoCaptionSession } from './core/VideoCaptionSession.js';
-export { LiveCaptionSessionManager } from './core/LiveCaptionSessionManager.js';
+export {
+  LIVE_CAPTION_CLEANUP_REASONS,
+  createLiveCaptionErrorState,
+  createLiveCaptionSessionId,
+  createLiveCaptionSessionSnapshot,
+  createVideoCaptionSessionSnapshot,
+  PageLiveCaptionSession,
+  VideoCaptionSession,
+  LiveCaptionSessionManager
+} from './core/index.js';
 export { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 export { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 export { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
@@ -37,10 +47,13 @@ export const LiveCaptionFeature = Object.freeze({
   settings: LIVE_CAPTION_SETTINGS_KEYS,
   defaults: LIVE_CAPTION_DEFAULTS,
   states: LIVE_CAPTION_SESSION_STATES,
+  cleanupReasons: LIVE_CAPTION_CLEANUP_REASONS,
   store: useLiveCaptionStore,
   contracts: {
-    createLiveCaptionNotImplementedError,
-    assertNotImplemented,
+    createLiveCaptionErrorState,
+    createLiveCaptionSessionId,
+    createLiveCaptionSessionSnapshot,
+    createVideoCaptionSessionSnapshot,
     PageLiveCaptionSession,
     VideoCaptionSession,
     LiveCaptionSessionManager,
