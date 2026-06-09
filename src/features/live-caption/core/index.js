@@ -40,6 +40,13 @@ import {
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason
 } from './LiveCaptionCleanupCoordinator.js';
+import {
+  LIVE_CAPTION_CAPTION_DISPLAY_MODES,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  normalizeLiveCaptionCaptionDisplayMode,
+  resolveLiveCaptionCaptionLineDisplay,
+  selectLiveCaptionCaptionLines
+} from './LiveCaptionCaptionDisplayMode.js';
 import { PageLiveCaptionSession } from './PageLiveCaptionSession.js';
 import { VideoCaptionSession } from './VideoCaptionSession.js';
 import { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
@@ -92,6 +99,13 @@ export {
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason
 } from './LiveCaptionCleanupCoordinator.js';
+export {
+  LIVE_CAPTION_CAPTION_DISPLAY_MODES,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  normalizeLiveCaptionCaptionDisplayMode,
+  resolveLiveCaptionCaptionLineDisplay,
+  selectLiveCaptionCaptionLines
+} from './LiveCaptionCaptionDisplayMode.js';
 export { PageLiveCaptionSession } from './PageLiveCaptionSession.js';
 export { VideoCaptionSession } from './VideoCaptionSession.js';
 export { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
@@ -133,6 +147,11 @@ export default {
   createLiveCaptionFailClosedCleanupResult,
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODES,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  normalizeLiveCaptionCaptionDisplayMode,
+  resolveLiveCaptionCaptionLineDisplay,
+  selectLiveCaptionCaptionLines,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager

@@ -154,6 +154,21 @@ The system SHALL render only finalized captions and SHALL NOT render partial or 
 - **WHEN** a transcript segment is still in progress
 - **THEN** the system SHALL NOT render it as a live partial caption
 
+### Requirement: Normalized caption display mode
+The system SHALL support a normalized caption display mode contract for translated-only, transcript-only, and bilingual presentation.
+
+#### Scenario: Default translated-only mode
+- **WHEN** live-caption rendering uses the default mode
+- **THEN** the system SHALL render translated-only captions
+
+#### Scenario: Transcript-only capability
+- **WHEN** the caption display mode is transcript-only
+- **THEN** the system SHALL render transcript text only without changing capture, STT, or translation behavior
+
+#### Scenario: Bilingual capability
+- **WHEN** the caption display mode is bilingual
+- **THEN** the system SHALL render both transcript and translated caption text while keeping transcript and translated stores separate
+
 ### Requirement: Shadow DOM overlay
 The system SHALL render live-caption UI inside the existing Shadow DOM UI Host.
 

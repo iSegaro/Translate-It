@@ -2,6 +2,7 @@
   <article
     class="live-caption-caption-line"
     :data-final="props.line?.isFinal !== false"
+    :data-display-mode="resolvedDisplay.mode"
   >
     <div
       v-if="props.line?.segmentStartMs != null || props.line?.segmentEndMs != null"
@@ -9,22 +10,39 @@
     >
       {{ formatTimeRange(props.line) }}
     </div>
-    <div class="live-caption-caption-line__original">
-      {{ props.line?.originalText || '' }}
-    </div>
-    <div class="live-caption-caption-line__translated">
-      {{ props.line?.translatedText || '' }}
+    <div
+      v-for="row in resolvedDisplay.rows"
+      :key="row.key"
+      :class="[
+        'live-caption-caption-line__text',
+        `live-caption-caption-line__text--${row.kind}`
+      ]"
+      :data-kind="row.kind"
+    >
+      {{ row.text }}
     </div>
   </article>
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import {
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  resolveLiveCaptionCaptionLineDisplay
+} from '../core/LiveCaptionCaptionDisplayMode.js';
+
 const props = defineProps({
   line: {
     type: Object,
     default: () => ({})
+  },
+  captionDisplayMode: {
+    type: String,
+    default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
   }
 });
+
+const resolvedDisplay = computed(() => resolveLiveCaptionCaptionLineDisplay(props.line, props.captionDisplayMode));
 
 function formatTimeRange(line) {
   const start = Number.isFinite(line?.segmentStartMs) ? `${Math.round(line.segmentStartMs / 1000)}s` : null;
@@ -54,14 +72,18 @@ function formatTimeRange(line) {
   opacity: 0.72;
 }
 
-.live-caption-caption-line__original {
+.live-caption-caption-line__text {
   font-size: 13px;
   line-height: 1.45;
 }
 
-.live-caption-caption-line__translated {
+.live-caption-caption-line__text--translated {
   font-size: 14px;
   line-height: 1.5;
   font-weight: 600;
+}
+
+.live-caption-caption-line__text--original {
+  opacity: 0.92;
 }
 </style>

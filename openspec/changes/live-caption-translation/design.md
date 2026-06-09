@@ -144,11 +144,13 @@ Transcript records and translated caption records will be stored separately. Cac
 ### 7. UI / Overlay Model
 
 The overlay will render through the existing UI Host and Shadow DOM infrastructure. The feature will introduce a dedicated live-caption overlay container, consent notice, caption track, and controls.
+Caption presentation will use a normalized display-mode contract with `translated_only` as the MVP default and architectural support for `transcript_only` and `bilingual`.
 
 **Why this decision**
 - The project already uses Shadow DOM isolation for in-page UI.
 - Reusing the UI Host keeps styling and lifecycle consistent.
 - The overlay must stay isolated from page CSS and page scripts.
+- The display-mode contract is presentational only; it must not alter capture, STT, translation routing, or cache ownership.
 
 **Alternatives considered**
 - A floating DOM overlay outside the UI Host: rejected because it breaks consistency and increases style leakage risk.

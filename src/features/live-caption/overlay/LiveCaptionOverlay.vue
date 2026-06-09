@@ -26,6 +26,7 @@
       <template v-else>
         <LiveCaptionCaptionTrack
           :caption-lines="captionLines"
+          :caption-display-mode="captionDisplayMode"
         />
 
         <div
@@ -52,6 +53,7 @@
 import { computed } from 'vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '../core/LiveCaptionCaptionDisplayMode.js';
 import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
@@ -71,6 +73,10 @@ const props = defineProps({
   captionLines: {
     type: Array,
     default: () => []
+  },
+  captionDisplayMode: {
+    type: String,
+    default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
   },
   consentAccepted: {
     type: Boolean,

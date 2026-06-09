@@ -7,6 +7,12 @@ import {
   createLiveCaptionPrivacyNotice,
   normalizeLiveCaptionConsentState
 } from '../core/LiveCaptionConsentPolicy.js';
+import {
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  normalizeLiveCaptionCaptionDisplayMode,
+  resolveLiveCaptionCaptionLineDisplay,
+  selectLiveCaptionCaptionLines
+} from '../core/LiveCaptionCaptionDisplayMode.js';
 
 export const useLiveCaptionStore = defineStore('liveCaption', () => {
   const status = ref(LIVE_CAPTION_SESSION_STATES.IDLE);
@@ -16,6 +22,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
   const consentAccepted = ref(false);
   const consentNoticeVisible = ref(false);
   const privacyNotice = ref(createLiveCaptionPrivacyNotice());
+  const captionDisplayMode = ref(LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT);
   const startupDeniedReason = ref(null);
   const startupDeniedDetails = ref(null);
   const sessionId = ref(null);
@@ -38,6 +45,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     consentAccepted.value = false;
     consentNoticeVisible.value = false;
     privacyNotice.value = createLiveCaptionPrivacyNotice();
+    captionDisplayMode.value = LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT;
     startupDeniedReason.value = null;
     startupDeniedDetails.value = null;
     sessionId.value = null;
@@ -72,6 +80,10 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
 
   const setPrivacyNotice = (notice) => {
     privacyNotice.value = notice ? { ...notice } : createLiveCaptionPrivacyNotice();
+  };
+
+  const setCaptionDisplayMode = (mode) => {
+    captionDisplayMode.value = normalizeLiveCaptionCaptionDisplayMode(mode);
   };
 
   const setStartupDeniedReason = (reason, details = null) => {
@@ -155,6 +167,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     consentNoticeVisible.value = false;
     consentAccepted.value = false;
     captionLines.value = [];
+    captionDisplayMode.value = LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT;
     controlsState.value = {
       canStart: true,
       canStop: false,
@@ -205,6 +218,14 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     lastError.value = error ? { ...error } : null;
   };
 
+  const getCaptionLinesForDisplayMode = (lines = captionLines.value, mode = captionDisplayMode.value) => {
+    return selectLiveCaptionCaptionLines(lines, mode);
+  };
+
+  const getCaptionLineDisplay = (line, mode = captionDisplayMode.value) => {
+    return resolveLiveCaptionCaptionLineDisplay(line, mode);
+  };
+
   return {
     status,
     isEnabled,
@@ -213,6 +234,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     consentAccepted,
     consentNoticeVisible,
     privacyNotice,
+    captionDisplayMode,
     startupDeniedReason,
     startupDeniedDetails,
     sessionId,
@@ -227,6 +249,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     setError,
     setOverlayVisible,
     setPrivacyNotice,
+    setCaptionDisplayMode,
     setStartupDeniedReason,
     clearStartupDeniedReason,
     setContext,
@@ -239,6 +262,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     appendFinalizedCaption,
     clearCaptions,
     setControlsState,
+    getCaptionLinesForDisplayMode,
+    getCaptionLineDisplay,
     applyCleanupResult,
     resetOverlayState
   };

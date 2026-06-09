@@ -94,6 +94,7 @@
         :visible="liveCaptionStore.overlayVisible"
         :status="liveCaptionStore.status"
         :caption-lines="liveCaptionStore.captionLines"
+        :caption-display-mode="liveCaptionStore.captionDisplayMode"
         :consent-accepted="liveCaptionStore.consentAccepted"
         :show-consent-notice="liveCaptionStore.consentNoticeVisible || !liveCaptionStore.consentAccepted"
         :privacy-notice="liveCaptionStore.privacyNotice"

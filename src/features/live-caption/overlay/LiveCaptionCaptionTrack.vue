@@ -8,18 +8,24 @@
       v-for="line in finalizedLines"
       :key="lineKey(line)"
       :line="line"
+      :caption-display-mode="captionDisplayMode"
     />
   </section>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '../core/LiveCaptionCaptionDisplayMode.js';
 import LiveCaptionCaptionLine from './LiveCaptionCaptionLine.vue';
 
 const props = defineProps({
   captionLines: {
     type: Array,
     default: () => []
+  },
+  captionDisplayMode: {
+    type: String,
+    default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
   }
 });
 

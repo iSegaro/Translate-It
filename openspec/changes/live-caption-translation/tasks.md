@@ -56,6 +56,7 @@
 - [x] 8.2 Define consent notice presentation and blocking behavior
 - [x] 8.3 Define caption track and control UI responsibilities
 - [x] 8.4 Define overlay update flow from session state to rendered captions
+- [x] 8.5 Define the normalized caption display-mode contract for translated-only, transcript-only, and bilingual rendering
 
 ## 9. Cache and IndexedDB Implementation
 
@@ -93,6 +94,7 @@
 - [x] 12.11 Define unit tests for overlay shell rendering, consent gating, and control emissions
 - [x] 12.12 Define unit tests for overlay positioning and cleanup behavior
 - [x] 12.13 Define integration tests confirming the overlay shell does not invoke runtime capture, STT, translation, or cache layers
+- [x] 12.14 Define unit tests for translated-only, transcript-only, and bilingual display-mode rendering
 
 ## 13. Documentation
 

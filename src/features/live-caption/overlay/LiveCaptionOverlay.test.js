@@ -4,6 +4,7 @@ import LiveCaptionOverlay from './LiveCaptionOverlay.vue';
 import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
+import { LIVE_CAPTION_CAPTION_DISPLAY_MODES } from '../core/LiveCaptionCaptionDisplayMode.js';
 
 const mocks = vi.hoisted(() => ({
   translationAdapter: vi.fn(),
@@ -47,6 +48,7 @@ describe('live-caption overlay shell', () => {
       props: {
         visible: true,
         status: 'idle',
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
         consentAccepted: true,
         showConsentNotice: false,
         captionLines: [
@@ -71,6 +73,8 @@ describe('live-caption overlay shell', () => {
 
     expect(wrapper.attributes('data-status')).toBe('idle');
     expect(wrapper.find('.live-caption-caption-track').exists()).toBe(true);
+    expect(wrapper.text()).toContain('سلام');
+    expect(wrapper.text()).not.toContain('Hello');
 
     await wrapper.setProps({ status: 'active' });
     expect(wrapper.attributes('data-status')).toBe('active');
@@ -84,6 +88,7 @@ describe('live-caption overlay shell', () => {
       props: {
         visible: true,
         status: 'idle',
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
         consentAccepted: false,
         showConsentNotice: true,
         captionLines: [
@@ -111,6 +116,7 @@ describe('live-caption overlay shell', () => {
   it('renders finalized caption lines only', () => {
     const wrapper = mount(LiveCaptionCaptionTrack, {
       props: {
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
         captionLines: [
           {
             sessionId: 'session-1',
@@ -135,8 +141,72 @@ describe('live-caption overlay shell', () => {
     });
 
     expect(wrapper.findAll('.live-caption-caption-line')).toHaveLength(1);
-    expect(wrapper.text()).toContain('Hello');
+    expect(wrapper.text()).toContain('سلام');
+    expect(wrapper.text()).not.toContain('Hello');
     expect(wrapper.text()).not.toContain('Partial');
+  });
+
+  it('renders transcript-only and bilingual caption display modes', () => {
+    const transcriptOnlyWrapper = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSCRIPT_ONLY,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 100,
+            segmentEndMs: 200,
+            originalText: 'Hello',
+            translatedText: 'سلام',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    expect(transcriptOnlyWrapper.text()).toContain('Hello');
+    expect(transcriptOnlyWrapper.text()).not.toContain('سلام');
+
+    const bilingualWrapper = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 100,
+            segmentEndMs: 200,
+            originalText: 'Hello',
+            translatedText: 'سلام',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    expect(bilingualWrapper.text()).toContain('Hello');
+    expect(bilingualWrapper.text()).toContain('سلام');
+  });
+
+  it('defaults to translated-only rendering when no display mode is supplied', () => {
+    const wrapper = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 100,
+            segmentEndMs: 200,
+            originalText: 'Hello',
+            translatedText: 'سلام',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    expect(wrapper.text()).toContain('سلام');
+    expect(wrapper.text()).not.toContain('Hello');
   });
 
   it('emits consent actions only', async () => {
@@ -182,6 +252,7 @@ describe('live-caption overlay shell', () => {
       props: {
         visible: true,
         status: 'idle',
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
         consentAccepted: true,
         showConsentNotice: false,
         captionLines: []

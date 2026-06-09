@@ -28,6 +28,11 @@ import {
   createLiveCaptionFailClosedCleanupResult,
   normalizeLiveCaptionCleanupError,
   shouldPreserveCaptionsForReason,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODES,
+  LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
+  normalizeLiveCaptionCaptionDisplayMode,
+  resolveLiveCaptionCaptionLineDisplay,
+  selectLiveCaptionCaptionLines,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager,
@@ -129,6 +134,11 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.createLiveCaptionFailClosedCleanupResult).toBe(createLiveCaptionFailClosedCleanupResult);
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCleanupError).toBe(normalizeLiveCaptionCleanupError);
     expect(LiveCaptionFeature.contracts.shouldPreserveCaptionsForReason).toBe(shouldPreserveCaptionsForReason);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTION_DISPLAY_MODES).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT);
+    expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCaptionDisplayMode).toBe(normalizeLiveCaptionCaptionDisplayMode);
+    expect(LiveCaptionFeature.contracts.resolveLiveCaptionCaptionLineDisplay).toBe(resolveLiveCaptionCaptionLineDisplay);
+    expect(LiveCaptionFeature.contracts.selectLiveCaptionCaptionLines).toBe(selectLiveCaptionCaptionLines);
     expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
     expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
     expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);

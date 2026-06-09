@@ -14,11 +14,13 @@ This change introduces a new desktop MVP capability that can capture the active 
 - Batch STT using OpenAI Whisper as the initial provider, reusing the existing OpenAI API key/settings path with no separate STT credential UI in MVP.
 - Translation via the existing Translation Provider System.
 - Final captions only, with no streaming or partial caption rendering.
+- A normalized caption display model supporting translated-only, transcript-only, and bilingual rendering, with translated-only as the MVP default.
 - One active video session per tab.
 - Per-video identity and cache boundaries.
 - In-memory session cache plus persistent IndexedDB cache.
 - Separate persistence for original transcript segments and translated caption segments.
 - Shadow DOM caption overlay integrated with the existing UI Host.
+- Normalized caption display-mode support for translated-only, transcript-only, and bilingual presentation without changing runtime capture behavior.
 - Privacy notice and explicit consent before any capture begins.
 - Retry support for transient failures.
 
@@ -45,6 +47,7 @@ This change introduces a new desktop MVP capability that can capture the active 
 - Adds offscreen status/snapshot reconciliation for MV3 wakeup and restart recovery.
 - Adds a Shadow DOM overlay for consent, controls, and rendered captions.
 - Adds a live-caption options surface for MVP settings and storage controls.
+- Adds a normalized caption display model that supports translated-only, transcript-only, and bilingual rendering, with translated-only as the MVP default and translation remaining optional for future phases.
 - Adds new messaging actions and lifecycle cleanup paths for start, stop, chunk completion, translation completion, and tab teardown.
 - Adds persistent cache storage for transcript segments and translated caption segments.
 - Introduces a dedicated Live Caption logging scope/component that integrates with the existing structured logging system.
@@ -63,6 +66,7 @@ This change introduces a new desktop MVP capability that can capture the active 
 - Transcript data and translated caption data must be stored separately.
 - Cache lookups must be per-video, not per-page.
 - The overlay must render inside the existing Shadow DOM UI host.
+- The overlay must support a normalized caption display mode with translated-only as the MVP default and transcript-only/bilingual as architectural capabilities.
 - Stop, retry, tab close, navigation, and video change must all cleanly tear down the session.
 
 ### Technical Requirements
@@ -134,12 +138,13 @@ This change introduces a new desktop MVP capability that can capture the active 
 
 - The overlay will mount through the existing UI Host and Shadow DOM infrastructure.
 - This preserves the current isolation model and avoids duplicating host logic.
+- Caption rendering must support translated-only, transcript-only, and bilingual display modes, while keeping transcript and translated stores separate.
 
 ## Acceptance Criteria
 
 - A user can start live captioning only after accepting a privacy notice.
 - Starting a session on a supported desktop browser captures the active tab's audio and renders final captions in the overlay.
-- The feature produces transcript segments first and translation segments second, with no partial captions shown.
+- The feature produces transcript segments first and translation segments second, with no partial captions shown, while the overlay can render translated-only, transcript-only, or bilingual views from the same stored data.
 - Only one active video is captioned per tab at any time.
 - Switching to a different active video ends the current video session and starts a new one.
 - Caption data is reused from cache when resuming the same video within the same tab scope.

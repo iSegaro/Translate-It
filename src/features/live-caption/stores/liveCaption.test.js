@@ -3,6 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import useLiveCaptionStore from './liveCaption.js';
 import { LIVE_CAPTION_SESSION_STATES } from '../constants/liveCaptionSessionStates.js';
 import { LIVE_CAPTION_CONSENT_STATES } from '../core/LiveCaptionConsentPolicy.js';
+import { LIVE_CAPTION_CAPTION_DISPLAY_MODES } from '../core/LiveCaptionCaptionDisplayMode.js';
 
 describe('live-caption store shell', () => {
   beforeEach(() => {
@@ -22,6 +23,7 @@ describe('live-caption store shell', () => {
       title: expect.stringContaining('Live Caption'),
       message: expect.stringContaining('tab audio')
     });
+    expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.sessionId).toBe(null);
     expect(store.isEnabled).toBe(false);
     expect(store.captionLines).toEqual([]);
@@ -64,6 +66,7 @@ describe('live-caption store shell', () => {
     expect(store.lastError).toBe(null);
     expect(store.isEnabled).toBe(false);
     expect(store.captionLines).toEqual([]);
+    expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.controlsState).toEqual({
       canStart: true,
       canStop: false,
@@ -100,6 +103,7 @@ describe('live-caption store shell', () => {
   it('controls consent visibility and overlay reset state', () => {
     const store = useLiveCaptionStore();
 
+    store.setCaptionDisplayMode(LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL);
     store.setConsentNoticeVisible(true);
     expect(store.consentNoticeVisible).toBe(true);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.PENDING);
@@ -124,7 +128,38 @@ describe('live-caption store shell', () => {
     expect(store.consentNoticeVisible).toBe(false);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.captionLines).toEqual([]);
+    expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.lastError).toBe(null);
+  });
+
+  it('normalizes and exposes display-mode aware caption helpers', () => {
+    const store = useLiveCaptionStore();
+
+    store.setCaptionDisplayMode(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSCRIPT_ONLY);
+
+    expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSCRIPT_ONLY);
+
+    const display = store.getCaptionLineDisplay({
+      originalText: 'Hello',
+      translatedText: 'سلام'
+    });
+
+    expect(display.mode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSCRIPT_ONLY);
+    expect(display.rows).toHaveLength(1);
+    expect(display.rows[0]).toMatchObject({
+      kind: 'original',
+      text: 'Hello'
+    });
+
+    const lines = store.getCaptionLinesForDisplayMode([
+      {
+        originalText: 'Hello',
+        translatedText: 'سلام'
+      }
+    ], LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL);
+
+    expect(lines[0].display.mode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL);
+    expect(lines[0].display.rows).toHaveLength(2);
   });
 
   it('tracks startup denial reasons without runtime behavior', () => {
