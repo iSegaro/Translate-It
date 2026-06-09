@@ -7,9 +7,10 @@
 
 ## 2. Live-Caption Feature Shell
 
-- [ ] 2.1 Create the `src/features/live-caption/` feature structure and module boundaries
-- [ ] 2.2 Define the public feature entry surface and internal constants for live-caption actions and settings
-- [ ] 2.3 Establish the feature-level state container and session registry boundaries
+- [x] 2.1 Create the `src/features/live-caption/` feature structure and module boundaries
+- [x] 2.2 Define the public feature entry surface and internal constants for live-caption actions and settings
+- [x] 2.3 Establish the feature-level state container and session registry boundaries
+- [x] 2.4 Add shell-only tests for exports, constants, store initialization, and placeholder contracts
 
 ## 3. Session Model
 
