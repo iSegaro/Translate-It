@@ -12,7 +12,13 @@ import {
   VideoCaptionSession,
   LiveCaptionSessionManager,
   BaseSTTProvider,
-  useLiveCaptionStore
+  useLiveCaptionStore,
+  ActiveVideoDetector,
+  VideoFingerprint,
+  LiveCaptionCacheKeys,
+  createLiveCaptionVideoCacheKey,
+  createLiveCaptionSegmentCacheKey,
+  createLiveCaptionTranslatedSegmentCacheKey
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { CONFIG } from '@/shared/config/config.js';
@@ -30,6 +36,12 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.cleanupReasons).toBe(LIVE_CAPTION_CLEANUP_REASONS);
     expect(LiveCaptionFeature.contracts.createLiveCaptionSessionSnapshot).toBe(createLiveCaptionSessionSnapshot);
     expect(LiveCaptionFeature.contracts.createVideoCaptionSessionSnapshot).toBe(createVideoCaptionSessionSnapshot);
+    expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
+    expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
+    expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);
+    expect(createLiveCaptionVideoCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionVideoCacheKey);
+    expect(createLiveCaptionSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionSegmentCacheKey);
+    expect(createLiveCaptionTranslatedSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslatedSegmentCacheKey);
   });
 
   it('exports session contracts without runtime wiring', () => {

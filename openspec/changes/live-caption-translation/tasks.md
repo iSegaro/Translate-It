@@ -21,11 +21,11 @@
 
 ## 4. Active Video Detection and Fingerprinting
 
-- [ ] 4.1 Specify deterministic active-video detection rules for multi-video pages
-- [ ] 4.2 Define the video fingerprint strategy for per-video identity
-- [ ] 4.3 Define cache key generation rules from tab and video identity
+- [x] 4.1 Specify deterministic active-video detection rules for multi-video pages
+- [x] 4.2 Define the video fingerprint strategy for per-video identity
+- [x] 4.3 Define cache key generation rules from tab and video identity
 - [ ] 4.4 Define active-video change handling and session handoff behavior
-- [ ] 4.5 Define and test the MVP active-video tie-break order
+- [x] 4.5 Define and test the MVP active-video tie-break order
 
 ## 5. Offscreen Capture Bridge
 
@@ -81,8 +81,8 @@
 ## 12. Tests
 
 - [x] 12.1 Define unit tests for session ownership and lifecycle transitions
-- [ ] 12.2 Define unit tests for active-video detection and fingerprint generation
-- [ ] 12.3 Define unit tests for deterministic active-video tie-break ordering
+- [x] 12.2 Define unit tests for active-video detection and fingerprint generation
+- [x] 12.3 Define unit tests for deterministic active-video tie-break ordering
 - [ ] 12.4 Define unit tests for STT provider contracts and retry behavior
 - [ ] 12.5 Define integration tests for capture-to-translation request flow
 - [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
