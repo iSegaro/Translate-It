@@ -7,6 +7,7 @@ import {
 } from "../core/LiveCaptionCleanupCoordinator.js";
 import { LiveCaptionCaptureCoordinator } from "./LiveCaptionCaptureCoordinator.js";
 import { LiveCaptionOffscreenBridge } from "./LiveCaptionOffscreenBridge.js";
+import { LiveCaptionSTTCoordinator } from "./LiveCaptionSTTCoordinator.js";
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   normalizeLiveCaptionRuntimeRequest,
@@ -40,11 +41,15 @@ export class LiveCaptionBackgroundController {
     cleanupCoordinator = new LiveCaptionCleanupCoordinator(),
     captureCoordinator = new LiveCaptionCaptureCoordinator(),
     offscreenBridge = new LiveCaptionOffscreenBridge(),
+    sttCoordinator = null,
   } = {}) {
     this.sessionManager = sessionManager;
     this.cleanupCoordinator = cleanupCoordinator;
     this.captureCoordinator = captureCoordinator;
     this.offscreenBridge = offscreenBridge;
+    this.sttCoordinator =
+      sttCoordinator ||
+      new LiveCaptionSTTCoordinator({ sessionManager, captureCoordinator });
     this.messageHandler = null;
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
@@ -460,6 +465,9 @@ export class LiveCaptionBackgroundController {
           reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
         });
 
+      // Stop/abort STT session
+      this.sttCoordinator.stopSession(session.sessionId);
+
       this.sessionManager.cleanupByTabId(
         tabId,
         request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
@@ -674,6 +682,9 @@ export class LiveCaptionBackgroundController {
           null,
         reason: request.data.reason ?? "pause",
       });
+
+      // Pause/abort STT session
+      this.sttCoordinator.pauseSession(session.sessionId);
       const offscreenResponse = await this.offscreenBridge.requestRuntimePause({
         sessionId: session.sessionId,
         tabId,
@@ -886,6 +897,9 @@ export class LiveCaptionBackgroundController {
 
       // Update capture coordinator state with the normalized response
       this.captureCoordinator.recordSnapshot(normalized);
+
+      // Dispatch to STT coordinator
+      await this.sttCoordinator.handleFinalizedChunk(normalized);
 
       const response = { success: true, message: "Chunk received" };
       if (sendResponse) {

@@ -124,3 +124,18 @@
 - [x] 16.2 Route background offscreen requests through the offscreen bridge and reconcile shell responses back into capture/runtime state
 - [x] 16.3 Add offscreen shell tests for deterministic responses, fail-closed handling, and inconsistent-session rejection
 - [x] 16.4 Update runtime status documentation to reflect the offscreen document shell
+
+## 17. Runtime Phase 4 - Tab Audio Capture and MediaRecorder Chunking (MVP)
+
+- [x] 17.1 Implement offscreen tabCapture stream path and MediaRecorder chunking MVP
+- [x] 17.2 Connect offscreen finalized audio chunk delivery to Background controller
+- [x] 17.3 Add tests validating offscreen tabCapture, MediaRecorder creation, chunk generation, and stop release behavior
+
+## 18. Runtime Phase 5 - STT Execution Pipeline (Whisper MVP)
+
+- [x] 18.1 Implement sequential FIFO audio chunk queuing per session
+- [x] 18.2 Implement queue limits and backpressure handling (max 5 chunks)
+- [x] 18.3 Implement AbortController-based cancellation support for pause, stop, and handoff
+- [x] 18.4 Integrate with OpenAI Whisper provider and normalize transcript segments
+- [x] 18.5 Add unit and integration tests covering STT coordinator, FIFO queue, abort/cleanup behavior, and provider errors
+- [x] 18.6 Update documentation and validation results

@@ -1,4 +1,5 @@
 import { LiveCaptionBackgroundController } from './LiveCaptionBackgroundController.js';
+import { LiveCaptionSTTCoordinator } from './LiveCaptionSTTCoordinator.js';
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
@@ -46,6 +47,7 @@ import {
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 
 export { LiveCaptionBackgroundController } from './LiveCaptionBackgroundController.js';
+export { LiveCaptionSTTCoordinator } from './LiveCaptionSTTCoordinator.js';
 export {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
@@ -132,5 +134,6 @@ export default {
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse,
-  LiveCaptionCaptureCoordinator
+  LiveCaptionCaptureCoordinator,
+  LiveCaptionSTTCoordinator
 };
