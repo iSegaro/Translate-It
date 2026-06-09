@@ -28,7 +28,22 @@ import { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 import { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 import { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
 import { LiveCaptionTranslationRepository } from './cache/LiveCaptionTranslationRepository.js';
-import { LiveCaptionBackgroundController } from './background/LiveCaptionBackgroundController.js';
+import {
+  LiveCaptionBackgroundController,
+  LiveCaptionOffscreenBridge,
+  LIVE_CAPTION_CAPTURE_STATES,
+  LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LiveCaptionCaptureCoordinator,
+  createLiveCaptionStartCaptureRequest,
+  createLiveCaptionStopCaptureRequest,
+  createLiveCaptionStatusRequest,
+  createLiveCaptionFinalizedChunkMessage,
+  createLiveCaptionCaptureErrorMessage,
+  createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionFailClosedResponse,
+  normalizeLiveCaptionOffscreenResponse
+} from './background/index.js';
 import { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
 
 export { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
@@ -61,7 +76,22 @@ export { BaseSTTProvider } from './stt/BaseSTTProvider.js';
 export { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 export { LiveCaptionTranscriptRepository } from './cache/LiveCaptionTranscriptRepository.js';
 export { LiveCaptionTranslationRepository } from './cache/LiveCaptionTranslationRepository.js';
-export { LiveCaptionBackgroundController } from './background/LiveCaptionBackgroundController.js';
+export {
+  LiveCaptionBackgroundController,
+  LiveCaptionOffscreenBridge,
+  LIVE_CAPTION_CAPTURE_STATES,
+  LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LiveCaptionCaptureCoordinator,
+  createLiveCaptionStartCaptureRequest,
+  createLiveCaptionStopCaptureRequest,
+  createLiveCaptionStatusRequest,
+  createLiveCaptionFinalizedChunkMessage,
+  createLiveCaptionCaptureErrorMessage,
+  createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionFailClosedResponse,
+  normalizeLiveCaptionOffscreenResponse
+} from './background/index.js';
 export { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
 
 export const LiveCaptionFeature = Object.freeze({
@@ -95,6 +125,19 @@ export const LiveCaptionFeature = Object.freeze({
     LiveCaptionTranscriptRepository,
     LiveCaptionTranslationRepository,
     LiveCaptionBackgroundController,
+    LiveCaptionOffscreenBridge,
+    LIVE_CAPTION_CAPTURE_STATES,
+    LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
+    LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+    LiveCaptionCaptureCoordinator,
+    createLiveCaptionStartCaptureRequest,
+    createLiveCaptionStopCaptureRequest,
+    createLiveCaptionStatusRequest,
+    createLiveCaptionFinalizedChunkMessage,
+    createLiveCaptionCaptureErrorMessage,
+    createLiveCaptionOffscreenSnapshotResponse,
+    createLiveCaptionFailClosedResponse,
+    normalizeLiveCaptionOffscreenResponse,
     LiveCaptionContentController
   }
 });

@@ -18,7 +18,20 @@ import {
   LiveCaptionCacheKeys,
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
-  createLiveCaptionTranslatedSegmentCacheKey
+  createLiveCaptionTranslatedSegmentCacheKey,
+  LiveCaptionOffscreenBridge,
+  LiveCaptionCaptureCoordinator,
+  LIVE_CAPTION_CAPTURE_STATES,
+  LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  createLiveCaptionStartCaptureRequest,
+  createLiveCaptionStopCaptureRequest,
+  createLiveCaptionStatusRequest,
+  createLiveCaptionFinalizedChunkMessage,
+  createLiveCaptionCaptureErrorMessage,
+  createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionFailClosedResponse,
+  normalizeLiveCaptionOffscreenResponse
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { CONFIG } from '@/shared/config/config.js';
@@ -42,6 +55,19 @@ describe('live-caption feature shell', () => {
     expect(createLiveCaptionVideoCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionVideoCacheKey);
     expect(createLiveCaptionSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionSegmentCacheKey);
     expect(createLiveCaptionTranslatedSegmentCacheKey).toBe(LiveCaptionFeature.contracts.createLiveCaptionTranslatedSegmentCacheKey);
+    expect(LiveCaptionOffscreenBridge).toBe(LiveCaptionFeature.contracts.LiveCaptionOffscreenBridge);
+    expect(LiveCaptionCaptureCoordinator).toBe(LiveCaptionFeature.contracts.LiveCaptionCaptureCoordinator);
+    expect(LIVE_CAPTION_CAPTURE_STATES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTURE_STATES);
+    expect(LIVE_CAPTION_OFFSCREEN_ERROR_CODES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_OFFSCREEN_ERROR_CODES);
+    expect(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES);
+    expect(createLiveCaptionStartCaptureRequest).toBe(LiveCaptionFeature.contracts.createLiveCaptionStartCaptureRequest);
+    expect(createLiveCaptionStopCaptureRequest).toBe(LiveCaptionFeature.contracts.createLiveCaptionStopCaptureRequest);
+    expect(createLiveCaptionStatusRequest).toBe(LiveCaptionFeature.contracts.createLiveCaptionStatusRequest);
+    expect(createLiveCaptionFinalizedChunkMessage).toBe(LiveCaptionFeature.contracts.createLiveCaptionFinalizedChunkMessage);
+    expect(createLiveCaptionCaptureErrorMessage).toBe(LiveCaptionFeature.contracts.createLiveCaptionCaptureErrorMessage);
+    expect(createLiveCaptionOffscreenSnapshotResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionOffscreenSnapshotResponse);
+    expect(createLiveCaptionFailClosedResponse).toBe(LiveCaptionFeature.contracts.createLiveCaptionFailClosedResponse);
+    expect(normalizeLiveCaptionOffscreenResponse).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionOffscreenResponse);
   });
 
   it('exports session contracts without runtime wiring', () => {

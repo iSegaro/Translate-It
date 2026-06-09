@@ -29,11 +29,11 @@
 
 ## 5. Offscreen Capture Bridge
 
-- [ ] 5.1 Define the offscreen document responsibilities for tab audio capture
-- [ ] 5.2 Define the capture start/stop request and response flow
-- [ ] 5.3 Define the audio chunk finalization and delivery contract to background orchestration
-- [ ] 5.4 Define offscreen cleanup and stream release behavior
-- [ ] 5.5 Define the offscreen session snapshot/status contract for MV3 recovery
+- [x] 5.1 Define the offscreen document responsibilities for tab audio capture
+- [x] 5.2 Define the capture start/stop request and response flow
+- [x] 5.3 Define the audio chunk finalization and delivery contract to background orchestration
+- [x] 5.4 Define offscreen cleanup and stream release behavior
+- [x] 5.5 Define the offscreen session snapshot/status contract for MV3 recovery
 
 ## 6. STT Provider Infrastructure
 
@@ -86,8 +86,8 @@
 - [ ] 12.4 Define unit tests for STT provider contracts and retry behavior
 - [ ] 12.5 Define integration tests for capture-to-translation request flow
 - [ ] 12.6 Define integration tests for cache persistence and incognito session-only behavior
-- [ ] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
-- [ ] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
+- [x] 12.7 Define integration tests for offscreen finalized chunk delivery and metadata contract
+- [x] 12.8 Define recovery tests for background wakeup reconciliation and fail-closed handling
 - [x] 12.9 Define cleanup tests for stop, tab close, navigation, and video change
 - [ ] 12.10 Define startup tests for missing or invalid OpenAI credential handling
 
