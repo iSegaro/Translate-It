@@ -54,7 +54,6 @@ describe('usePromptPreview', () => {
 
     const fieldExample = promptExamples.value.find(ex => ex.mode === 'prompt_preview_mode_field')
     expect(fieldExample.prompt).toContain('Auto Template')
-    // Should use FIELD_AUTO base because sourceLang is forced to 'auto'
     expect(fieldExample.prompt).toContain('FIELD_AUTO:')
   })
 
@@ -71,5 +70,34 @@ describe('usePromptPreview', () => {
 
     const batchExample = promptExamples.value.find(ex => ex.mode === 'prompt_preview_mode_batch')
     expect(batchExample.prompt).toContain('AI_BATCH:')
+  })
+
+  it('prevents race conditions - latest request wins', async () => {
+    const { promptExamples, generateExamples, loadingExamples } = usePromptPreview()
+    
+    // Start a "slow" request
+    const p1 = generateExamples({
+      template: 'Slow Template',
+      isAuto: false,
+      sourceLang: 'en',
+      targetLang: 'fa',
+      t: mockT
+    })
+
+    // Start a "fast" request immediately
+    const p2 = generateExamples({
+      template: 'Fast Template',
+      isAuto: false,
+      sourceLang: 'en',
+      targetLang: 'fa',
+      t: mockT
+    })
+
+    await Promise.all([p1, p2])
+
+    // Results should match "Fast Template"
+    expect(promptExamples.value[0].prompt).toContain('Fast Template')
+    expect(promptExamples.value[0].prompt).not.toContain('Slow Template')
+    expect(loadingExamples.value).toBe(false)
   })
 })

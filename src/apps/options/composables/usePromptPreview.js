@@ -9,6 +9,7 @@ export function usePromptPreview(customLogger = null) {
   const logger = customLogger || { error: (...args) => console.error('[usePromptPreview]', ...args) }
   const promptExamples = ref([])
   const loadingExamples = ref(false)
+  let lastGenerationId = 0
 
   // Sample data for previews
   const SAMPLE_TEXT = "Hello, how are you today? This is a sample text for previewing translation prompts."
@@ -131,8 +132,7 @@ export function usePromptPreview(customLogger = null) {
    * Generates a set of preview examples for various translation modes.
    */
   const generateExamples = async ({ template, isAuto, sourceLang, targetLang, t }) => {
-    if (loadingExamples.value) return
-
+    const myGenerationId = ++lastGenerationId
     loadingExamples.value = true
     const examples = []
     
@@ -140,46 +140,39 @@ export function usePromptPreview(customLogger = null) {
     const effectiveSourceLang = isAuto ? 'auto' : (sourceLang || 'en')
 
     try {
-      // Field mode
-      examples.push({
-        mode: t('prompt_preview_mode_field') || 'Field Translation',
-        description: t('prompt_preview_desc_field') || 'Text field translation (e.g., input boxes, text areas)',
-        prompt: await buildPromptWithTemplate(template, SAMPLE_TEXT, effectiveSourceLang, targetLang, TranslationMode.Field, 'ai')
-      })
+      // Modes to generate
+      const modes = [
+        { mk: 'prompt_preview_mode_field', dk: 'prompt_preview_desc_field', m: TranslationMode.Field, type: 'ai' },
+        { mk: 'prompt_preview_mode_popup', dk: 'prompt_preview_desc_popup', m: TranslationMode.Popup_Translate, type: 'translate' },
+        { mk: 'prompt_preview_mode_selection', dk: 'prompt_preview_desc_selection', m: TranslationMode.Selection, type: 'translate' },
+        { mk: 'prompt_preview_mode_batch', dk: 'prompt_preview_desc_batch', m: TranslationMode.Select_Element, type: 'ai' },
+        { mk: 'prompt_preview_mode_dictionary', dk: 'prompt_preview_desc_dictionary', m: TranslationMode.Dictionary_Translation, type: 'ai' }
+      ]
 
-      // Popup / Sidepanel mode
-      examples.push({
-        mode: t('prompt_preview_mode_popup') || 'Popup / Sidepanel Translation',
-        description: t('prompt_preview_desc_popup') || 'Popup window or Sidepanel translation interface',
-        prompt: await buildPromptWithTemplate(template, SAMPLE_TEXT, effectiveSourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
-      })
+      for (const modeSpec of modes) {
+        // Abandon if a newer request has started
+        if (myGenerationId !== lastGenerationId) return
 
-      // Selection mode
-      examples.push({
-        mode: t('prompt_preview_mode_selection') || 'Text Selection',
-        description: t('prompt_preview_desc_selection') || 'Selected text translation on the page',
-        prompt: await buildPromptWithTemplate(template, SAMPLE_TEXT, effectiveSourceLang, targetLang, TranslationMode.Selection, 'translate')
-      })
+        const sample = modeSpec.m === TranslationMode.Select_Element ? SAMPLE_JSON : (modeSpec.m === TranslationMode.Dictionary_Translation ? SAMPLE_WORD : SAMPLE_TEXT)
+        const prompt = await buildPromptWithTemplate(template, sample, effectiveSourceLang, targetLang, modeSpec.m, modeSpec.type)
+        
+        examples.push({
+          mode: t(modeSpec.mk) || modeSpec.mk,
+          description: t(modeSpec.dk) || modeSpec.dk,
+          prompt
+        })
+      }
 
-      // Select Element / Page mode (JSON)
-      examples.push({
-        mode: t('prompt_preview_mode_batch') || 'Select Element / Page Translate',
-        description: t('prompt_preview_desc_batch') || 'Multiple elements or whole page translation in JSON format',
-        prompt: await buildPromptWithTemplate(template, SAMPLE_JSON, effectiveSourceLang, targetLang, TranslationMode.Select_Element, 'ai')
-      })
-
-      // Dictionary mode
-      examples.push({
-        mode: t('prompt_preview_mode_dictionary') || 'Dictionary Translation',
-        description: t('prompt_preview_desc_dictionary') || 'Brief word definitions and synonyms',
-        prompt: await buildPromptWithTemplate(template, SAMPLE_WORD, effectiveSourceLang, targetLang, TranslationMode.Dictionary_Translation, 'ai')
-      })
-
-      promptExamples.value = examples
+      // Only apply if this is still the latest request
+      if (myGenerationId === lastGenerationId) {
+        promptExamples.value = examples
+        loadingExamples.value = false
+      }
     } catch (error) {
-      logger.error('Error generating examples:', error)
-    } finally {
-      loadingExamples.value = false
+      if (myGenerationId === lastGenerationId) {
+        logger.error('Error generating examples:', error)
+        loadingExamples.value = false
+      }
     }
   }
 
