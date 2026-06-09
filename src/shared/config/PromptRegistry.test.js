@@ -15,6 +15,7 @@ describe('PromptRegistry', () => {
     expect(PROMPT_REGISTRY.PROMPT_BASE_AI_BATCH_AUTO).toBeDefined();
     expect(PROMPT_REGISTRY.PROMPT_BASE_SELECT).toBeDefined();
     expect(PROMPT_REGISTRY.PROMPT_BASE_SCREEN_CAPTURE).toBeDefined();
+    expect(PROMPT_REGISTRY.PROMPT_BASE_SCREEN_CAPTURE.editable).toBe(false);
     expect(PROMPT_REGISTRY.PROMPT_BASE_POPUP_TRANSLATE).toBeDefined();
   });
 

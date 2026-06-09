@@ -125,7 +125,7 @@ export const PROMPT_REGISTRY = {
     descKey: 'prompt_base_screen_capture_desc',
     category: PromptCategory.SYSTEM,
     risk: PromptRisk.SAFE,
-    editable: true,
+    editable: false,
     placeholders: ["$_{TARGET}", "$_{PROMPT_INSTRUCTIONS}", "$_{TEXT}"],
     previewSupport: false
   },

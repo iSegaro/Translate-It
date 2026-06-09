@@ -137,6 +137,7 @@ describe('PromptTab', () => {
     expect(optionValues).not.toContain('PROMPT_BASE_AI_BATCH');
     expect(optionValues).not.toContain('PROMPT_BASE_AI_BATCH_AUTO');
     expect(optionValues).not.toContain('PROMPT_BASE_AI_FOLLOWUP_AUTO');
+    expect(optionValues).not.toContain('PROMPT_BASE_SCREEN_CAPTURE');
   });
 
   it('switches between Basic and Advanced templates using dropdown', async () => {
