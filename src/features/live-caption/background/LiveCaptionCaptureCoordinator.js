@@ -256,12 +256,20 @@ export class LiveCaptionCaptureCoordinator {
   }
 
   applyOffscreenResponse(response, context = {}) {
-    const normalized = this.bridge.normalizeResponse(response, {
-      sessionId: this.sessionId,
-      tabId: this.tabId,
-      videoFingerprint: this.videoFingerprint,
-      ...context
-    });
+    const isRuntimeResponse = response && typeof response === 'object' && response.type === undefined && response.action;
+    const normalized = isRuntimeResponse
+      ? this.bridge.normalizeRuntimeResponse(response, {
+          sessionId: this.sessionId,
+          tabId: this.tabId,
+          videoFingerprint: this.videoFingerprint,
+          ...context
+        })
+      : this.bridge.normalizeResponse(response, {
+          sessionId: this.sessionId,
+          tabId: this.tabId,
+          videoFingerprint: this.videoFingerprint,
+          ...context
+        });
 
     this.lastSnapshot = normalized;
     this.touch();

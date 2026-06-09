@@ -117,3 +117,10 @@
 - [x] 15.3 Extend the offscreen bridge and capture coordinator with runtime shell state and deterministic not-implemented responses
 - [x] 15.4 Connect the content runtime controller to background messaging for start, status, pause, resume, and stop requests
 - [x] 15.5 Add runtime shell tests for routing, payload validation, unknown actions, offscreen-unavailable responses, and runtime state transitions
+
+## 16. Runtime Phase 3 - Offscreen Document Runtime Shell
+
+- [x] 16.1 Add the Live Caption offscreen runtime branch with shell-only state handling for start, stop, status, pause, and resume
+- [x] 16.2 Route background offscreen requests through the offscreen bridge and reconcile shell responses back into capture/runtime state
+- [x] 16.3 Add offscreen shell tests for deterministic responses, fail-closed handling, and inconsistent-session rejection
+- [x] 16.4 Update runtime status documentation to reflect the offscreen document shell

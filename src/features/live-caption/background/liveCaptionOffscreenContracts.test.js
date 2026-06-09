@@ -3,6 +3,9 @@ import {
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_RUNTIME_ACTIONS,
+  LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_SHELL_STATES,
   LiveCaptionOffscreenBridge,
   LiveCaptionCaptureCoordinator,
   createLiveCaptionStartCaptureRequest,
@@ -12,7 +15,8 @@ import {
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
-  normalizeLiveCaptionOffscreenResponse
+  normalizeLiveCaptionOffscreenResponse,
+  createLiveCaptionRuntimeShellResponse
 } from './index.js';
 import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache.js';
 import { BaseSTTProvider } from '@/features/live-caption/stt/BaseSTTProvider.js';
@@ -42,6 +46,25 @@ vi.mock('@/shared/logging/logger.js', () => ({
 describe('live-caption offscreen contracts', () => {
   beforeEach(() => {
     globalThis.chrome = {
+      runtime: {
+        sendMessage: vi.fn(async (request) => createLiveCaptionRuntimeShellResponse(request.action, {
+          sessionId: request.data?.sessionId ?? null,
+          tabId: request.data?.tabId ?? null,
+          videoFingerprint: request.data?.videoFingerprint ?? null,
+          requestId: request.messageId ?? null,
+          status: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
+            ? LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL
+            : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
+              ? LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE
+              : LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+          runtimeState: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
+            ? 'paused'
+            : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
+              ? 'idle'
+              : 'running',
+          message: 'Live-caption offscreen shell response'
+        }))
+      },
       tabCapture: {
         capture: vi.fn()
       }
@@ -207,6 +230,61 @@ describe('live-caption offscreen contracts', () => {
     expect(failClosed.failClosed).toBe(true);
     expect(failClosed.error.reason).toBe('reconciliation_failed');
     expect(globalThis.chrome.tabCapture.capture).not.toHaveBeenCalled();
+  });
+
+  it('routes runtime shell requests through the offscreen bridge', async () => {
+    const bridge = new LiveCaptionOffscreenBridge();
+
+    const startResponse = await bridge.requestRuntimeStart({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+    const statusResponse = await bridge.requestRuntimeStatus({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+    const pauseResponse = await bridge.requestRuntimePause({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+    const resumeResponse = await bridge.requestRuntimeResume({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+    const stopResponse = await bridge.requestRuntimeStop({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(5);
+    expect(startResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL);
+    expect(statusResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL);
+    expect(pauseResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL);
+    expect(resumeResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL);
+    expect(stopResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE);
+  });
+
+  it('fails closed when offscreen runtime messaging is unavailable', async () => {
+    const bridge = new LiveCaptionOffscreenBridge({
+      browserApi: {
+        runtime: {}
+      }
+    });
+
+    const response = await bridge.requestRuntimeStart({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.status).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OFFSCREEN_NOT_READY);
+    expect(response.error.code).toBe(LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE);
   });
 
   it('does not route through STT, translation, or cache layers', () => {

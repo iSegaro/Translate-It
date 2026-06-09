@@ -170,7 +170,7 @@ export class LiveCaptionBackgroundController {
     return response;
   }
 
-  handleRuntimeStart(message, sender) {
+  async handleRuntimeStart(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.START);
       const tabId = normalizeTabId(request.data.tabId);
@@ -192,7 +192,7 @@ export class LiveCaptionBackgroundController {
         reason: request.data.reason ?? 'start'
       });
 
-      const offscreenResponse = this.offscreenBridge.createRuntimeStartResponse({
+      const offscreenResponse = await this.offscreenBridge.requestRuntimeStart({
         sessionId: session.sessionId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
@@ -201,16 +201,33 @@ export class LiveCaptionBackgroundController {
         message: 'Live-caption runtime shell only'
       });
 
+      const normalizedOffscreenResponse = this.captureCoordinator.applyOffscreenResponse(offscreenResponse, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        reason: request.data.reason ?? 'start'
+      });
+
+      if (normalizedOffscreenResponse.success === false || normalizedOffscreenResponse.ok === false) {
+        return this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.START, normalizedOffscreenResponse.error || new Error('Live-caption offscreen start failed'), {
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+          sessionId: session.sessionId,
+          tabId,
+          videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+          runtimeState: this.captureCoordinator.runtimeState,
+          message: normalizedOffscreenResponse.message,
+          reason: normalizedOffscreenResponse.error?.reason ?? request.data.reason ?? 'offscreen_failure'
+        });
+      }
+
       const response = this._buildShellResponse({
         action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
-        status: offscreenResponse.status,
+        status: normalizedOffscreenResponse.status,
         runtimeState: this.captureCoordinator.runtimeState,
         session,
-        offscreenResponse,
+        offscreenResponse: normalizedOffscreenResponse,
         requestId: request.messageId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
-        message: offscreenResponse.message
+        message: normalizedOffscreenResponse.message
       });
 
       logger.info('Live-caption runtime start routed', {
@@ -228,7 +245,7 @@ export class LiveCaptionBackgroundController {
     }
   }
 
-  handleRuntimeStop(message, sender) {
+  async handleRuntimeStop(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.STOP);
       const tabId = normalizeTabId(request.data.tabId);
@@ -255,13 +272,17 @@ export class LiveCaptionBackgroundController {
         reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP
       });
 
-      const offscreenResponse = this.offscreenBridge.createRuntimeStopResponse({
+      const offscreenResponse = await this.offscreenBridge.requestRuntimeStop({
         sessionId: session.sessionId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
         requestId: request.messageId,
         runtimeState: this.captureCoordinator.runtimeState,
         message: 'Live-caption runtime shell only'
+      });
+      const normalizedOffscreenResponse = this.captureCoordinator.applyOffscreenResponse(offscreenResponse, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+        reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP
       });
 
       this.sessionManager.cleanupByTabId(tabId, request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP);
@@ -288,26 +309,28 @@ export class LiveCaptionBackgroundController {
 
       const response = cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAIL_CLOSED
         || cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.FAILED
-        ? this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.STOP, cleanupResult.error || new Error('Live-caption cleanup failed'), {
+        || normalizedOffscreenResponse.success === false
+        || normalizedOffscreenResponse.ok === false
+        ? this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.STOP, cleanupResult.error || normalizedOffscreenResponse.error || new Error('Live-caption cleanup failed'), {
             action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
             sessionId: session.sessionId,
             tabId,
             videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
             runtimeState: this.captureCoordinator.runtimeState,
-            message: offscreenResponse.message,
-            reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP
+            message: normalizedOffscreenResponse.message,
+            reason: normalizedOffscreenResponse.error?.reason ?? request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP
           })
         : this._buildShellResponse({
             action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
-            status: offscreenResponse.status,
+            status: normalizedOffscreenResponse.status,
             runtimeState: this.captureCoordinator.runtimeState,
             session,
-            offscreenResponse,
+            offscreenResponse: normalizedOffscreenResponse,
             captureSnapshot: this.captureCoordinator.getSnapshot(),
             requestId: request.messageId,
             tabId,
             videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
-            message: offscreenResponse.message,
+            message: normalizedOffscreenResponse.message,
             details: {
               cleanupPlan,
               cleanupResult,
@@ -330,14 +353,14 @@ export class LiveCaptionBackgroundController {
     }
   }
 
-  handleRuntimeStatus(message, sender) {
+  async handleRuntimeStatus(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.STATUS);
       const tabId = normalizeTabId(request.data.tabId);
       const session = this.sessionManager.getOrCreateSession(tabId, {
         consentAccepted: Boolean(request.data.consentAccepted)
       });
-      const offscreenResponse = this.offscreenBridge.createRuntimeStatusResponse({
+      const offscreenResponse = await this.offscreenBridge.requestRuntimeStatus({
         sessionId: session.sessionId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
@@ -345,18 +368,34 @@ export class LiveCaptionBackgroundController {
         runtimeState: this.captureCoordinator.runtimeState,
         message: 'Live-caption runtime shell only'
       });
+      const normalizedOffscreenResponse = this.captureCoordinator.applyOffscreenResponse(offscreenResponse, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
+        reason: request.data.reason ?? 'status'
+      });
+
+      if (normalizedOffscreenResponse.success === false || normalizedOffscreenResponse.ok === false) {
+        return this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.STATUS, normalizedOffscreenResponse.error || new Error('Live-caption offscreen status failed'), {
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
+          sessionId: session.sessionId,
+          tabId,
+          videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+          runtimeState: this.captureCoordinator.runtimeState,
+          message: normalizedOffscreenResponse.message,
+          reason: normalizedOffscreenResponse.error?.reason ?? 'offscreen_failure'
+        });
+      }
 
       const response = this._buildShellResponse({
         action: LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
-        status: offscreenResponse.status,
+        status: normalizedOffscreenResponse.status,
         runtimeState: this.captureCoordinator.runtimeState,
         session,
-        offscreenResponse,
+        offscreenResponse: normalizedOffscreenResponse,
         captureSnapshot: this.captureCoordinator.getSnapshot(),
         requestId: request.messageId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
-        message: offscreenResponse.message,
+        message: normalizedOffscreenResponse.message,
         details: {
           sessionManagerSnapshot: this.sessionManager.getSessionCleanupSnapshot(tabId)
         }
@@ -377,7 +416,7 @@ export class LiveCaptionBackgroundController {
     }
   }
 
-  handleRuntimePause(message, sender) {
+  async handleRuntimePause(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE);
       const tabId = normalizeTabId(request.data.tabId);
@@ -391,7 +430,7 @@ export class LiveCaptionBackgroundController {
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
         reason: request.data.reason ?? 'pause'
       });
-      const offscreenResponse = this.offscreenBridge.createRuntimePauseResponse({
+      const offscreenResponse = await this.offscreenBridge.requestRuntimePause({
         sessionId: session.sessionId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
@@ -399,18 +438,34 @@ export class LiveCaptionBackgroundController {
         runtimeState: this.captureCoordinator.runtimeState,
         message: 'Live-caption runtime shell only'
       });
+      const normalizedOffscreenResponse = this.captureCoordinator.applyOffscreenResponse(offscreenResponse, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
+        reason: request.data.reason ?? 'pause'
+      });
+
+      if (normalizedOffscreenResponse.success === false || normalizedOffscreenResponse.ok === false) {
+        return this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE, normalizedOffscreenResponse.error || new Error('Live-caption offscreen pause failed'), {
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
+          sessionId: session.sessionId,
+          tabId,
+          videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+          runtimeState: this.captureCoordinator.runtimeState,
+          message: normalizedOffscreenResponse.message,
+          reason: normalizedOffscreenResponse.error?.reason ?? 'offscreen_failure'
+        });
+      }
 
       const response = this._buildShellResponse({
         action: LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
-        status: offscreenResponse.status,
+        status: normalizedOffscreenResponse.status,
         runtimeState: this.captureCoordinator.runtimeState,
         session,
-        offscreenResponse,
+        offscreenResponse: normalizedOffscreenResponse,
         captureSnapshot: this.captureCoordinator.getSnapshot(),
         requestId: request.messageId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
-        message: offscreenResponse.message
+        message: normalizedOffscreenResponse.message
       });
 
       logger.info('Live-caption runtime pause routed', {
@@ -428,7 +483,7 @@ export class LiveCaptionBackgroundController {
     }
   }
 
-  handleRuntimeResume(message, sender) {
+  async handleRuntimeResume(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.RESUME);
       const tabId = normalizeTabId(request.data.tabId);
@@ -442,7 +497,7 @@ export class LiveCaptionBackgroundController {
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
         reason: request.data.reason ?? 'resume'
       });
-      const offscreenResponse = this.offscreenBridge.createRuntimeResumeResponse({
+      const offscreenResponse = await this.offscreenBridge.requestRuntimeResume({
         sessionId: session.sessionId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
@@ -450,18 +505,34 @@ export class LiveCaptionBackgroundController {
         runtimeState: this.captureCoordinator.runtimeState,
         message: 'Live-caption runtime shell only'
       });
+      const normalizedOffscreenResponse = this.captureCoordinator.applyOffscreenResponse(offscreenResponse, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
+        reason: request.data.reason ?? 'resume'
+      });
+
+      if (normalizedOffscreenResponse.success === false || normalizedOffscreenResponse.ok === false) {
+        return this._buildFailClosedResponse(LIVE_CAPTION_RUNTIME_ACTIONS.RESUME, normalizedOffscreenResponse.error || new Error('Live-caption offscreen resume failed'), {
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
+          sessionId: session.sessionId,
+          tabId,
+          videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+          runtimeState: this.captureCoordinator.runtimeState,
+          message: normalizedOffscreenResponse.message,
+          reason: normalizedOffscreenResponse.error?.reason ?? 'offscreen_failure'
+        });
+      }
 
       const response = this._buildShellResponse({
         action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
-        status: offscreenResponse.status,
+        status: normalizedOffscreenResponse.status,
         runtimeState: this.captureCoordinator.runtimeState,
         session,
-        offscreenResponse,
+        offscreenResponse: normalizedOffscreenResponse,
         captureSnapshot: this.captureCoordinator.getSnapshot(),
         requestId: request.messageId,
         tabId,
         videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
-        message: offscreenResponse.message
+        message: normalizedOffscreenResponse.message
       });
 
       logger.info('Live-caption runtime resume routed', {

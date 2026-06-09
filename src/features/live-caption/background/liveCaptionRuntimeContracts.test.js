@@ -3,6 +3,7 @@ import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  LIVE_CAPTION_RUNTIME_SHELL_STATES,
   normalizeLiveCaptionRuntimeRequest,
   createLiveCaptionRuntimeStartRequest,
   createLiveCaptionRuntimeStopRequest,
@@ -10,6 +11,7 @@ import {
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
   createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeShellResponse,
   createLiveCaptionRuntimeNotImplementedResponse,
   createLiveCaptionRuntimeUnavailableResponse,
   createLiveCaptionRuntimeFailClosedResponse,
@@ -86,6 +88,20 @@ describe('live-caption runtime contracts', () => {
     expect(normalized.captureStatus).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.CAPTURE_NOT_AVAILABLE);
   });
 
+  it('normalizes shell responses with shell state status', () => {
+    const shell = createLiveCaptionRuntimeShellResponse(LIVE_CAPTION_RUNTIME_ACTIONS.START, {
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      status: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL
+    });
+
+    expect(shell.success).toBe(true);
+    expect(shell.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL);
+    expect(shell.runtimeState).toBe('running');
+    expect(shell.offscreenStatus).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK);
+  });
+
   it('creates fail-closed and unavailable responses', () => {
     const unavailable = createLiveCaptionRuntimeUnavailableResponse(LIVE_CAPTION_RUNTIME_ACTIONS.START, {
       sessionId: 'session-1',
@@ -114,5 +130,6 @@ describe('live-caption runtime contracts', () => {
     expect(failClosed.error.message).toBe('missing payload');
     expect(normalized.success).toBe(false);
     expect(normalized.error.code).toBe(LIVE_CAPTION_RUNTIME_ERROR_CODES.CONTROLLER_UNAVAILABLE);
+    expect(LIVE_CAPTION_RUNTIME_ERROR_CODES.INCONSISTENT_SESSION).toBe('inconsistent_session');
   });
 });

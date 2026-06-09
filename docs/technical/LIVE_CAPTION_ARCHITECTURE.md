@@ -457,6 +457,7 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - translation adapter
 - active-video detector
 - active-video handoff coordinator
+- offscreen document runtime shell
 - background runtime controller and routing shell
 - runtime message contracts
 - structured logging scope

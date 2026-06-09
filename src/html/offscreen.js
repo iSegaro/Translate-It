@@ -1,3 +1,7 @@
+import LiveCaptionOffscreenRuntimeShell, {
+  LIVE_CAPTION_RUNTIME_ACTIONS
+} from './liveCaptionOffscreenRuntimeShell.js';
+
 // src/public/offscreen.js
 // Chrome-specific offscreen script
 
@@ -76,6 +80,7 @@ class OffscreenResourceTracker {
 
 // Create global resource tracker for offscreen
 const resourceTracker = new OffscreenResourceTracker();
+const liveCaptionOffscreenRuntimeShell = new LiveCaptionOffscreenRuntimeShell();
 
 let currentAudio = null;
 let currentUtterance = null;
@@ -112,6 +117,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Handle different TTS and audio actions
   const action = cleanMessage.action;
+
+  if (Object.values(LIVE_CAPTION_RUNTIME_ACTIONS).includes(action)) {
+    const response = liveCaptionOffscreenRuntimeShell.handleMessage(cleanMessage, sender);
+    sendResponse(response);
+    return false;
+  }
   
   if (action === "TTS_SPEAK" && cleanMessage.data) {
     handleTTSSpeak(cleanMessage.data, sendResponse);

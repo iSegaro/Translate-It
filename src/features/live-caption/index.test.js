@@ -10,6 +10,7 @@ import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  LIVE_CAPTION_RUNTIME_SHELL_STATES,
   normalizeLiveCaptionRuntimeRequest,
   createLiveCaptionRuntimeStartRequest,
   createLiveCaptionRuntimeStopRequest,
@@ -17,6 +18,7 @@ import {
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
   createLiveCaptionRuntimeSuccessResponse,
+  createLiveCaptionRuntimeShellResponse,
   createLiveCaptionRuntimeNotImplementedResponse,
   createLiveCaptionRuntimeUnavailableResponse,
   createLiveCaptionRuntimeFailClosedResponse,
@@ -174,6 +176,8 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_ACTIONS).toBe(LIVE_CAPTION_RUNTIME_ACTIONS);
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES);
     expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_ERROR_CODES).toBe(LIVE_CAPTION_RUNTIME_ERROR_CODES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_RUNTIME_SHELL_STATES).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES);
+    expect(LIVE_CAPTION_RUNTIME_ERROR_CODES.INCONSISTENT_SESSION).toBe('inconsistent_session');
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionRuntimeRequest).toBe(normalizeLiveCaptionRuntimeRequest);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeStartRequest).toBe(createLiveCaptionRuntimeStartRequest);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeStopRequest).toBe(createLiveCaptionRuntimeStopRequest);
@@ -181,6 +185,7 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimePauseRequest).toBe(createLiveCaptionRuntimePauseRequest);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeResumeRequest).toBe(createLiveCaptionRuntimeResumeRequest);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeSuccessResponse).toBe(createLiveCaptionRuntimeSuccessResponse);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeShellResponse).toBe(createLiveCaptionRuntimeShellResponse);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeNotImplementedResponse).toBe(createLiveCaptionRuntimeNotImplementedResponse);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeUnavailableResponse).toBe(createLiveCaptionRuntimeUnavailableResponse);
     expect(LiveCaptionFeature.contracts.createLiveCaptionRuntimeFailClosedResponse).toBe(createLiveCaptionRuntimeFailClosedResponse);

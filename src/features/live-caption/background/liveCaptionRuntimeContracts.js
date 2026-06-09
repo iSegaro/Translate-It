@@ -35,7 +35,17 @@ export const LIVE_CAPTION_RUNTIME_ERROR_CODES = Object.freeze({
   UNKNOWN_ACTION: 'unknown_action',
   OFFSCREEN_NOT_READY: 'offscreen_not_ready',
   OFFSCREEN_UNAVAILABLE: 'offscreen_unavailable',
-  CONTROLLER_UNAVAILABLE: 'controller_unavailable'
+  CONTROLLER_UNAVAILABLE: 'controller_unavailable',
+  INCONSISTENT_SESSION: 'inconsistent_session'
+});
+
+export const LIVE_CAPTION_RUNTIME_SHELL_STATES = Object.freeze({
+  IDLE: 'idle',
+  STARTING: 'starting',
+  RUNNING_SHELL: 'running_shell',
+  PAUSED_SHELL: 'paused_shell',
+  STOPPING: 'stopping',
+  ERROR: 'error'
 });
 
 const REQUEST_REQUIRED_FIELDS = Object.freeze({
@@ -150,6 +160,24 @@ function buildRuntimeResponse({
   });
 }
 
+function resolveRuntimeStateFromShellState(shellState) {
+  switch (shellState) {
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.STARTING:
+      return LIVE_CAPTION_RUNTIME_STATES.STARTING;
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL:
+      return LIVE_CAPTION_RUNTIME_STATES.RUNNING;
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL:
+      return LIVE_CAPTION_RUNTIME_STATES.PAUSED;
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.STOPPING:
+      return LIVE_CAPTION_RUNTIME_STATES.STOPPING;
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.ERROR:
+      return LIVE_CAPTION_RUNTIME_STATES.ERROR;
+    case LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE:
+    default:
+      return LIVE_CAPTION_RUNTIME_STATES.IDLE;
+  }
+}
+
 export function createLiveCaptionRuntimeStartRequest(data = {}, messageId = null) {
   return MessageFormat.create(LIVE_CAPTION_RUNTIME_ACTIONS.START, data, MessageContexts.LIVE_CAPTION, messageId);
 }
@@ -174,6 +202,19 @@ export function createLiveCaptionRuntimeSuccessResponse(options = {}) {
   return buildRuntimeResponse({
     ...options,
     status: options.status ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK
+  });
+}
+
+export function createLiveCaptionRuntimeShellResponse(action, options = {}) {
+  const shellStatus = options.status ?? options.shellStatus ?? LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE;
+
+  return buildRuntimeResponse({
+    ...options,
+    action,
+    status: shellStatus,
+    runtimeState: options.runtimeState ?? resolveRuntimeStateFromShellState(shellStatus),
+    offscreenStatus: options.offscreenStatus ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+    captureStatus: options.captureStatus ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.CAPTURE_NOT_AVAILABLE
   });
 }
 
@@ -292,6 +333,8 @@ export default {
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
   createLiveCaptionRuntimeSuccessResponse,
+  LIVE_CAPTION_RUNTIME_SHELL_STATES,
+  createLiveCaptionRuntimeShellResponse,
   createLiveCaptionRuntimeNotImplementedResponse,
   createLiveCaptionRuntimeUnavailableResponse,
   createLiveCaptionRuntimeFailClosedResponse,
