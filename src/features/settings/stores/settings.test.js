@@ -133,6 +133,30 @@ describe('Settings Store', () => {
     expect(store.settings.translationHistory).toEqual(mockHistory);
   });
 
+  it('should persist and load advanced prompt templates', async () => {
+    const store = useSettingsStore();
+    const customPrompt = 'Custom Base Field Template $_{TEXT}';
+    
+    // 1. Update locally
+    store.updateSettingLocally('PROMPT_BASE_FIELD', customPrompt);
+    
+    // 2. Save
+    await store.saveAllSettings(true);
+    expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+      PROMPT_BASE_FIELD: customPrompt
+    }));
+    
+    // 3. Mock storage return for load
+    storageManager.get.mockResolvedValue({ PROMPT_BASE_FIELD: customPrompt });
+    
+    // 4. Reload
+    store.isInitialized = false;
+    await store.loadSettings();
+    await nextTick();
+    
+    expect(store.settings.PROMPT_BASE_FIELD).toBe(customPrompt);
+  });
+
   describe('Import & Migration Flow', () => {
     it('importSettings should merge defaults and run migrations', async () => {
       const mockImportData = { THEME: 'dark', TRANSLATION_API: 'google' };

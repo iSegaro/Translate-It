@@ -113,6 +113,8 @@ describe('PromptTab', () => {
     // Locked prompts (should NOT be present)
     expect(optionValues).not.toContain('PROMPT_BASE_SELECT');
     expect(optionValues).not.toContain('PROMPT_BASE_AI_BATCH');
+    expect(optionValues).not.toContain('PROMPT_BASE_AI_BATCH_AUTO');
+    expect(optionValues).not.toContain('PROMPT_BASE_AI_FOLLOWUP_AUTO');
   });
 
   it('switches between Basic and Advanced templates using dropdown', async () => {
