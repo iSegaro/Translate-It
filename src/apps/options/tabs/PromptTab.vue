@@ -153,16 +153,21 @@ import { useTabSettings } from '../composables/useTabSettings.js'
 import { useValidation } from '@/core/validation.js'
 import { CONFIG, TranslationMode } from '@/shared/config/config.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { usePromptPreview } from '../composables/usePromptPreview.js'
 
 // Components
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 
 const settingsStore = useSettingsStore()
 const { t } = useUnifiedI18n()
-const logger = { debug: (...args) => console.debug('[PromptTab]', ...args) }
+const logger = { 
+  debug: (...args) => console.debug('[PromptTab]', ...args),
+  error: (...args) => console.error('[PromptTab]', ...args)
+}
 const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { highlightElement } = useHighlightManager()
+const { promptExamples, loadingExamples, generateExamples } = usePromptPreview(logger)
 
 // State
 const currentPromptKey = ref('PROMPT_TEMPLATE')
@@ -189,12 +194,12 @@ const activeTemplateValue = computed({
 })
 
 // Watch for prompt type switch to clear validation state
-watch(currentPromptKey, () => {
+watch(currentPromptKey, async () => {
   validationErrorKey.value = ''
   clearErrors()
   
   if (showPreview.value) {
-    generatePromptExamples()
+    await refreshExamples()
   }
 })
 
@@ -204,200 +209,16 @@ const targetLanguageName = computed(() => settingsStore.settings?.TARGET_LANGUAG
 
 // Preview State
 const showPreview = ref(false)
-const promptExamples = ref([])
-const loadingExamples = ref(false)
 
-// Sample text for preview
-const SAMPLE_TEXT = "Hello, how are you today? This is a sample text for previewing translation prompts."
-const SAMPLE_WORD = "Discovery"
-
-// Sample JSON for Select Element mode
-const SAMPLE_JSON = JSON.stringify([
-  { id: "1", text: "Welcome to our website" },
-  { id: "2", text: "Click here to learn more" },
-  { id: "3", text: "Contact us for support" }
-])
-
-// Helper function to build prompt with current template value (not from storage)
-const buildPromptWithCurrentTemplate = async (text, sourceLang, targetLang, translateMode, providerType) => {
-  // Import here to avoid circular dependency
-  const {
-    getPromptBASESelectAsync,
-    getPromptPopupTranslateAsync,
-    getPromptBASEFieldAsync,
-    getPromptBASEFieldAutoAsync,
-    getPromptBASEScreenCaptureAsync,
-    getPromptBASEBatchAsync,
-    getPromptBASEAIBatchAsync,
-    getPromptBASEAIBatchAutoAsync,
-    getEnableDictionaryAsync,
-    getPromptDictionaryAsync,
-    getSourceLanguageAsync,
-  } = await import('@/shared/config/config.js')
-
-  const { getLanguageNameFromCode, getCanonicalCode } = await import('@/shared/config/languageConstants.js')
-
-  // Helper function to check JSON format (same as in AIConversationHelper)
-  const isSpecificTextJsonFormat = (obj) => {
-    return (
-      Array.isArray(obj) &&
-      obj.length > 0 &&
-      obj.every(
-        (item) => typeof item === 'object' && item !== null && typeof item.text === 'string'
-      )
-    )
-  }
-
-  let isJsonMode = false
-  try {
-    const parsedText = JSON.parse(text)
-    if (isSpecificTextJsonFormat(parsedText)) {
-      isJsonMode = true
-    }
-  } catch {
-    // Not JSON
-  }
-
-  const isAI = providerType === 'ai'
-  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
-
-  let actualSourceLang = sourceLang === 'auto' ? await getSourceLanguageAsync() : sourceLang
-  if (actualSourceLang === 'auto') {
-    actualSourceLang = 'en'
-  }
-
-  const sourceName = capitalize(getLanguageNameFromCode(getCanonicalCode(actualSourceLang)) || actualSourceLang)
-  const targetName = capitalize(getLanguageNameFromCode(getCanonicalCode(targetLang)) || targetLang)
-
-  // Use current template value from the input field (not from storage)
-  const currentPromptTemplate = activeTemplateValue.value
-
-  // Remove $_{TEXT} from prompt instructions since it will be replaced in the base prompt
-  const promptInstructionsWithoutText = currentPromptTemplate
-    .replace(/\$_{TEXT}\s*/g, '')  // Remove $_{TEXT} placeholder and trailing whitespace
-    .replace(/\n\s*$/g, '')        // Remove trailing empty lines
-
-  const promptInstructions = promptInstructionsWithoutText
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName)
-
-  // Handle AI provider batch translation - MIRRORS AIConversationHelper logic
-  // Use batch prompt for Select_Element, Page, or JSON input (excluding dictionary)
-  const shouldUseBatchPrompt = isAI && (
-    translateMode === TranslationMode.Select_Element ||
-    translateMode === TranslationMode.Page ||
-    isJsonMode
-  )
-
-  if (shouldUseBatchPrompt) {
-    const batchPromptTemplate = sourceLang === 'auto'
-      ? await getPromptBASEAIBatchAutoAsync()
-      : await getPromptBASEAIBatchAsync()
-
-    return batchPromptTemplate
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-      .replace(/\$_{TEXT}/g, text)
-  }
-
-  // Select Element mode (non-JSON) - MIRRORS promptBuilder logic
-  if (translateMode === TranslationMode.Select_Element && !isJsonMode) {
-    const batchPromptTemplate = await getPromptBASEBatchAsync()
-    return batchPromptTemplate
-      .replace(/\$_{SOURCE}/g, sourceName)
-      .replace(/\$_{TARGET}/g, targetName)
-      .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-      .replace(/\$_{TEXT}/g, text)
-  }
-
-  // Select appropriate base prompt - MIRRORS promptBuilder logic
-  let promptBase
-  if (isJsonMode) {
-    promptBase = await getPromptBASESelectAsync()
-  } else if (translateMode === TranslationMode.Popup_Translate || translateMode === TranslationMode.Sidepanel_Translate) {
-    promptBase = await getPromptPopupTranslateAsync()
-  } else if (await getEnableDictionaryAsync() && translateMode === TranslationMode.Dictionary_Translation) {
-    promptBase = await getPromptDictionaryAsync()
-  } else {
-    if (translateMode === TranslationMode.ScreenCapture) {
-      promptBase = await getPromptBASEScreenCaptureAsync()
-    } else {
-      promptBase = sourceLang === 'auto' ? await getPromptBASEFieldAutoAsync() : await getPromptBASEFieldAsync()
-    }
-  }
-
-  let finalPromptWithInstructions = promptBase
-    .replace(/\$_{SOURCE}/g, sourceName)
-    .replace(/\$_{TARGET}/g, targetName)
-    .replace(/\$_{PROMPT_INSTRUCTIONS}/g, promptInstructions)
-
-  // Replace text placeholder
-  const finalPrompt = finalPromptWithInstructions.replace(/\$_{TEXT}/g, text)
-
-  return finalPrompt
-}
-
-// Generate prompt examples for different modes
-const generatePromptExamples = async () => {
-  if (loadingExamples.value) return
-
-  loadingExamples.value = true
-  const examples = []
-  
-  // For Auto template preview, we force source language to 'auto' to see the effect
-  const isAutoMode = currentPromptKey.value === 'PROMPT_TEMPLATE_AUTO'
-  const sourceLang = isAutoMode ? 'auto' : (settingsStore.settings?.SOURCE_LANGUAGE || 'en')
-  const targetLang = settingsStore.settings?.TARGET_LANGUAGE || 'en'
-
-  try {
-    // Field mode
-    examples.push({
-      mode: t('prompt_preview_mode_field') || 'Field Translation',
-      description: t('prompt_preview_desc_field') || 'Text field translation (e.g., input boxes, text areas)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Field, 'ai')
-    })
-
-    // Popup / Sidepanel mode
-    examples.push({
-      mode: t('prompt_preview_mode_popup') || 'Popup / Sidepanel Translation',
-      description: t('prompt_preview_desc_popup') || 'Popup window or Sidepanel translation interface',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Popup_Translate, 'translate')
-    })
-
-    // Selection mode
-    examples.push({
-      mode: t('prompt_preview_mode_selection') || 'Text Selection',
-      description: t('prompt_preview_desc_selection') || 'Selected text translation on the page',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_TEXT, sourceLang, targetLang, TranslationMode.Selection, 'translate')
-    })
-
-    // Select Element / Page mode (JSON)
-    examples.push({
-      mode: t('prompt_preview_mode_batch') || 'Select Element / Page Translate',
-      description: t('prompt_preview_desc_batch') || 'Multiple elements or whole page translation in JSON format',
-      prompt: await buildPromptWithCurrentTemplate(
-        SAMPLE_JSON,
-        sourceLang,
-        targetLang,
-        TranslationMode.Select_Element,
-        'ai'
-      )
-    })
-
-    // Dictionary mode
-    examples.push({
-      mode: t('prompt_preview_mode_dictionary') || 'Dictionary Translation',
-      description: t('prompt_preview_desc_dictionary') || 'Brief word definitions and synonyms (Note: This mode uses a fixed format)',
-      prompt: await buildPromptWithCurrentTemplate(SAMPLE_WORD, sourceLang, targetLang, TranslationMode.Dictionary_Translation, 'ai')
-    })
-
-    promptExamples.value = examples
-  } catch (error) {
-    logger.error('Error generating prompt examples:', error)
-  } finally {
-    loadingExamples.value = false
-  }
+// Helper to trigger example generation with current UI state
+const refreshExamples = async () => {
+  await generateExamples({
+    template: activeTemplateValue.value,
+    isAuto: currentPromptKey.value === 'PROMPT_TEMPLATE_AUTO',
+    sourceLang: settingsStore.settings?.SOURCE_LANGUAGE,
+    targetLang: settingsStore.settings?.TARGET_LANGUAGE,
+    t
+  })
 }
 
 // Refresh preview section
@@ -405,7 +226,7 @@ const refreshPreview = async () => {
   showPreview.value = true
   // Perform validation and (re)generate examples
   await validatePrompt()
-  await generatePromptExamples()
+  await refreshExamples()
 }
 
 // Validation feedback listener
@@ -462,7 +283,7 @@ const resetPrompt = async () => {
   
   if (showPreview.value) {
     await validatePrompt()
-    await generatePromptExamples()
+    await refreshExamples()
   }
 
   // Add highlight effect
@@ -478,7 +299,7 @@ const resetPrompt = async () => {
 // Watch for UI language changes to refresh localized labels in examples
 watch(() => settingsStore.settings?.APPLICATION_LOCALIZE, async (newVal, oldVal) => {
   if (newVal && oldVal && newVal !== oldVal && showPreview.value && !loadingExamples.value) {
-    await generatePromptExamples()
+    await refreshExamples()
   }
 })
 </script>
