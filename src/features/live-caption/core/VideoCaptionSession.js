@@ -254,6 +254,10 @@ export class VideoCaptionSession {
   getSnapshot() {
     return this.toSnapshot();
   }
+
+  getCleanupSnapshot() {
+    return this.toSnapshot();
+  }
 }
 
 export default VideoCaptionSession;

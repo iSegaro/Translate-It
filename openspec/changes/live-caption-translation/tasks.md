@@ -73,10 +73,10 @@
 
 ## 11. Cleanup and Error Handling
 
-- [ ] 11.1 Define deterministic teardown on stop, tab close, navigation, and video change
-- [ ] 11.2 Define cleanup ordering for capture, session state, cache flush, and overlay teardown
-- [ ] 11.3 Define retry handling and error recovery boundaries without provider fallback
-- [ ] 11.4 Define logging expectations for session lifecycle and failure states
+- [x] 11.1 Define deterministic teardown on stop, tab close, navigation, and video change
+- [x] 11.2 Define cleanup ordering for capture, session state, cache flush, and overlay teardown
+- [x] 11.3 Define retry handling and error recovery boundaries without provider fallback
+- [x] 11.4 Define logging expectations for session lifecycle and failure states
 
 ## 12. Tests
 

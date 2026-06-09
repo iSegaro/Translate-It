@@ -167,6 +167,44 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     startupDeniedDetails.value = null;
   };
 
+  const applyCleanupResult = ({
+    sessionStatus = LIVE_CAPTION_SESSION_STATES.IDLE,
+    preserveCaptions = false,
+    clearCaptions = !preserveCaptions,
+    clearSessionIdentity = true,
+    clearConsent = true,
+    error = null
+  } = {}) => {
+    overlayVisible.value = false;
+    consentNoticeVisible.value = false;
+    consentAccepted.value = false;
+
+    if (clearConsent) {
+      consentState.value = LIVE_CAPTION_CONSENT_STATES.NOT_ASKED;
+    }
+
+    if (clearCaptions) {
+      captionLines.value = [];
+    }
+
+    if (clearSessionIdentity) {
+      sessionId.value = null;
+      activeTabId.value = null;
+      activeVideoFingerprint.value = null;
+    }
+
+    controlsState.value = {
+      canStart: true,
+      canStop: false,
+      canRetry: false,
+      canClearCache: false
+    };
+    startupDeniedReason.value = null;
+    startupDeniedDetails.value = null;
+    status.value = sessionStatus;
+    lastError.value = error ? { ...error } : null;
+  };
+
   return {
     status,
     isEnabled,
@@ -201,6 +239,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     appendFinalizedCaption,
     clearCaptions,
     setControlsState,
+    applyCleanupResult,
     resetOverlayState
   };
 });

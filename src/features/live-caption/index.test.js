@@ -19,6 +19,15 @@ import {
   createLiveCaptionRecoveryFailureResult,
   evaluateLiveCaptionStartEligibility,
   normalizeLiveCaptionConsentState,
+  LiveCaptionCleanupCoordinator,
+  LIVE_CAPTION_CLEANUP_STEP_TYPES,
+  LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
+  LIVE_CAPTION_CLEANUP_ERROR_CODES,
+  createLiveCaptionCleanupPlan,
+  createLiveCaptionCleanupResult,
+  createLiveCaptionFailClosedCleanupResult,
+  normalizeLiveCaptionCleanupError,
+  shouldPreserveCaptionsForReason,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager,
@@ -95,6 +104,7 @@ describe('live-caption feature shell', () => {
     expect(LIVE_CAPTION_DEFAULTS.OPENAI_API_KEY_SETTING).toBe('OPENAI_API_KEY');
     expect(LIVE_CAPTION_SESSION_STATES.IDLE).toBe('idle');
     expect(LIVE_CAPTION_CLEANUP_REASONS.STOP).toBe('stop');
+    expect(LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR).toBe('provider_error');
     expect(LiveCaptionFeature.store).toBe(useLiveCaptionStore);
     expect(LiveCaptionFeature.cleanupReasons).toBe(LIVE_CAPTION_CLEANUP_REASONS);
     expect(LiveCaptionFeature.contracts.createLiveCaptionSessionSnapshot).toBe(createLiveCaptionSessionSnapshot);
@@ -110,6 +120,15 @@ describe('live-caption feature shell', () => {
     expect(LiveCaptionFeature.contracts.createLiveCaptionRecoveryFailureResult).toBe(createLiveCaptionRecoveryFailureResult);
     expect(LiveCaptionFeature.contracts.evaluateLiveCaptionStartEligibility).toBe(evaluateLiveCaptionStartEligibility);
     expect(LiveCaptionFeature.contracts.normalizeLiveCaptionConsentState).toBe(normalizeLiveCaptionConsentState);
+    expect(LiveCaptionFeature.contracts.LiveCaptionCleanupCoordinator).toBe(LiveCaptionCleanupCoordinator);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CLEANUP_STEP_TYPES).toBe(LIVE_CAPTION_CLEANUP_STEP_TYPES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CLEANUP_RESULT_STATUSES).toBe(LIVE_CAPTION_CLEANUP_RESULT_STATUSES);
+    expect(LiveCaptionFeature.contracts.LIVE_CAPTION_CLEANUP_ERROR_CODES).toBe(LIVE_CAPTION_CLEANUP_ERROR_CODES);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionCleanupPlan).toBe(createLiveCaptionCleanupPlan);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionCleanupResult).toBe(createLiveCaptionCleanupResult);
+    expect(LiveCaptionFeature.contracts.createLiveCaptionFailClosedCleanupResult).toBe(createLiveCaptionFailClosedCleanupResult);
+    expect(LiveCaptionFeature.contracts.normalizeLiveCaptionCleanupError).toBe(normalizeLiveCaptionCleanupError);
+    expect(LiveCaptionFeature.contracts.shouldPreserveCaptionsForReason).toBe(shouldPreserveCaptionsForReason);
     expect(ActiveVideoDetector).toBe(LiveCaptionFeature.contracts.ActiveVideoDetector);
     expect(VideoFingerprint).toBe(LiveCaptionFeature.contracts.VideoFingerprint);
     expect(LiveCaptionCacheKeys).toBe(LiveCaptionFeature.contracts.LiveCaptionCacheKeys);
@@ -175,6 +194,7 @@ describe('live-caption feature shell', () => {
     expect(PageLiveCaptionSession).toBeTypeOf('function');
     expect(VideoCaptionSession).toBeTypeOf('function');
     expect(LiveCaptionSessionManager).toBeTypeOf('function');
+    expect(LiveCaptionCleanupCoordinator).toBeTypeOf('function');
     expect(BaseSTTProvider).toBeTypeOf('function');
     expect(STTProviderFactory).toBeTypeOf('function');
     expect(OpenAIWhisperProvider).toBeTypeOf('function');

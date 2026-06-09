@@ -237,6 +237,10 @@ export class PageLiveCaptionSession {
   getSnapshot() {
     return this.toSnapshot();
   }
+
+  getCleanupSnapshot() {
+    return this.toSnapshot();
+  }
 }
 
 export default PageLiveCaptionSession;

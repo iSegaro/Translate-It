@@ -29,6 +29,17 @@ import {
   evaluateLiveCaptionStartEligibility,
   normalizeLiveCaptionConsentState
 } from './LiveCaptionConsentPolicy.js';
+import {
+  LiveCaptionCleanupCoordinator,
+  LIVE_CAPTION_CLEANUP_STEP_TYPES,
+  LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
+  LIVE_CAPTION_CLEANUP_ERROR_CODES,
+  createLiveCaptionCleanupPlan,
+  createLiveCaptionCleanupResult,
+  createLiveCaptionFailClosedCleanupResult,
+  normalizeLiveCaptionCleanupError,
+  shouldPreserveCaptionsForReason
+} from './LiveCaptionCleanupCoordinator.js';
 import { PageLiveCaptionSession } from './PageLiveCaptionSession.js';
 import { VideoCaptionSession } from './VideoCaptionSession.js';
 import { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
@@ -70,6 +81,17 @@ export {
   evaluateLiveCaptionStartEligibility,
   normalizeLiveCaptionConsentState
 } from './LiveCaptionConsentPolicy.js';
+export {
+  LiveCaptionCleanupCoordinator,
+  LIVE_CAPTION_CLEANUP_STEP_TYPES,
+  LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
+  LIVE_CAPTION_CLEANUP_ERROR_CODES,
+  createLiveCaptionCleanupPlan,
+  createLiveCaptionCleanupResult,
+  createLiveCaptionFailClosedCleanupResult,
+  normalizeLiveCaptionCleanupError,
+  shouldPreserveCaptionsForReason
+} from './LiveCaptionCleanupCoordinator.js';
 export { PageLiveCaptionSession } from './PageLiveCaptionSession.js';
 export { VideoCaptionSession } from './VideoCaptionSession.js';
 export { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
@@ -102,6 +124,15 @@ export default {
   createLiveCaptionRecoveryFailureResult,
   evaluateLiveCaptionStartEligibility,
   normalizeLiveCaptionConsentState,
+  LiveCaptionCleanupCoordinator,
+  LIVE_CAPTION_CLEANUP_STEP_TYPES,
+  LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
+  LIVE_CAPTION_CLEANUP_ERROR_CODES,
+  createLiveCaptionCleanupPlan,
+  createLiveCaptionCleanupResult,
+  createLiveCaptionFailClosedCleanupResult,
+  normalizeLiveCaptionCleanupError,
+  shouldPreserveCaptionsForReason,
   PageLiveCaptionSession,
   VideoCaptionSession,
   LiveCaptionSessionManager

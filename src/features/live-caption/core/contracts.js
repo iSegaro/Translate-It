@@ -4,6 +4,7 @@ export const LIVE_CAPTION_CLEANUP_REASONS = Object.freeze({
   NAVIGATION: 'navigation',
   VIDEO_CHANGED: 'video_changed',
   ERROR: 'error',
+  PROVIDER_ERROR: 'provider_error',
   MANUAL: 'manual',
   RECOVERY_FAILURE: 'recovery_failure'
 });
