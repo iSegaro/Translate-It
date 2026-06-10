@@ -82,6 +82,24 @@ const saveAllSettings = async () => {
   if (!validation.isValid) {
     logger.debug('Cannot save settings: Validation failed', validation.errors)
     
+    // Set user-visible error feedback globally for all validation failures
+    statusType.value = 'error'
+    const firstError = validation.errors[0]
+    
+    // Specific translation logic for prompt-based validation keys
+    if (firstError && firstError.startsWith('prompt:')) {
+      const parts = firstError.split(':')
+      const subError = parts.length >= 3 ? parts[2] : 'validation_prompt_template_empty'
+      statusMessage.value = t(subError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+    } else {
+      statusMessage.value = t(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+    }
+    
+    setTimeout(() => {
+      statusMessage.value = ''
+      statusType.value = ''
+    }, 5000)
+
     // Check if it's a provider configuration error
     const globalProvider = settingsStore.settings.TRANSLATION_API;
     const missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
@@ -183,14 +201,6 @@ const saveAllSettings = async () => {
       return
     }
 
-    // For other errors, show the specific error message to help debugging
-    statusType.value = 'error'
-    const firstError = validation.errors[0]
-    
-    // Try to translate the error key, or use a default if it fails
-    statusMessage.value = t(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
-    
-    setTimeout(() => { statusMessage.value = ''; statusType.value = ''; }, 5000)
     return
   }
 
