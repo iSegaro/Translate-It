@@ -1667,6 +1667,9 @@
   "OPTIONS_STATUS_SAVED_SUCCESS": {
     "message": "保存しました :)"
   },
+  "OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS": {
+    "message": "設定は保存されましたが、無効なプロンプトテンプレートは保存されませんでした。"
+  },
   "OPTIONS_STATUS_SAVED_FAILED": {
     "message": "保存に失敗しました :("
   },

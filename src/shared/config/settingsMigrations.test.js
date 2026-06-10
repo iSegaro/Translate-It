@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runSettingsMigrations } from './settingsMigrations.js';
+import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { CONFIG, TranslationMode } from './config.js';
 
 // Mock logger
@@ -50,29 +51,6 @@ describe('Settings Migrations', () => {
     expect(logs.some(l => l.includes('Reset GEMINI_MODEL'))).toBe(true);
   });
 
-  it('should NOT update prompt templates if version is same', async () => {
-    const customPrompt = 'My custom prompt $_{TEXT}';
-    const currentSettings = {
-      PROMPT_TEMPLATE: customPrompt,
-      PROMPTS_VERSION: CONFIG.PROMPTS_VERSION
-    };
-    
-    const { updates } = await runSettingsMigrations(currentSettings);
-    expect(updates.PROMPT_TEMPLATE).toBeUndefined();
-  });
-
-  it('should FORCE update prompt templates if version increases', async () => {
-    const customPrompt = 'My custom prompt $_{TEXT}';
-    const currentSettings = {
-      PROMPT_TEMPLATE: customPrompt,
-      PROMPTS_VERSION: (CONFIG.PROMPTS_VERSION || 1) - 1
-    };
-    
-    const { updates, logs } = await runSettingsMigrations(currentSettings);
-    expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
-    expect(logs.some(l => l.includes('Updated prompt template'))).toBe(true);
-  });
-
   it('should migrate API_KEY to GEMINI_API_KEY', async () => {
     const currentSettings = {
       API_KEY: 'my-old-key',
@@ -93,5 +71,103 @@ describe('Settings Migrations', () => {
     
     const { updates } = await runSettingsMigrations(currentSettings);
     expect(updates.translationHistory).toBeUndefined(); // Should not be in updates (no change)
+  });
+
+  // --- Safe Prompt Migration Tests ---
+
+  it('should add current default when prompt key is missing', async () => {
+    const currentSettings = {
+      THEME: 'light'
+    };
+    // Ensure PROMPT_TEMPLATE is missing in currentSettings
+    delete currentSettings.PROMPT_TEMPLATE;
+
+    const { updates, logs } = await runSettingsMigrations(currentSettings);
+    expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+    expect(logs).toContain('Added missing prompt setting: PROMPT_TEMPLATE');
+  });
+
+  it('should restore current default when prompt template is empty', async () => {
+    const currentSettings = {
+      PROMPT_TEMPLATE: '   '
+    };
+
+    const { updates, logs } = await runSettingsMigrations(currentSettings);
+    expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+    expect(logs.some(l => l.includes('Restored empty/missing prompt PROMPT_TEMPLATE to default'))).toBe(true);
+  });
+
+  it('should leave prompt unchanged when it exactly matches current default', async () => {
+    const currentSettings = {
+      PROMPT_TEMPLATE: CONFIG.PROMPT_TEMPLATE
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+    expect(updates.PROMPT_TEMPLATE).toBeUndefined();
+  });
+
+  it('should migrate historical legacy defaults (string format) to current default', async () => {
+    // Add a temporary mock historical default to test matching
+    const testOldDefault = 'legacy old default template _{SOURCE} _{TARGET} _{TEXT}';
+    if (!HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE) {
+      HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE = [];
+    }
+    HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.push(testOldDefault);
+
+    try {
+      const currentSettings = {
+        PROMPT_TEMPLATE: testOldDefault
+      };
+
+      const { updates, logs } = await runSettingsMigrations(currentSettings);
+      expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+      expect(logs.some(l => l.includes('Upgraded legacy default prompt PROMPT_TEMPLATE to latest version'))).toBe(true);
+    } finally {
+      // Clean up to ensure test isolation
+      const index = HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.indexOf(testOldDefault);
+      if (index > -1) {
+        HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.splice(index, 1);
+      }
+    }
+  });
+
+  it('should migrate historical legacy defaults (object format) to current default', async () => {
+    // Add a temporary mock historical default in object format to test matching
+    const testOldDefaultObj = {
+      version: 'v1.17.0',
+      reason: 'Legacy default to migrate',
+      value: 'legacy old default template in object format _{SOURCE} _{TARGET} _{TEXT}'
+    };
+    if (!HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE) {
+      HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE = [];
+    }
+    HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.push(testOldDefaultObj);
+
+    try {
+      const currentSettings = {
+        PROMPT_TEMPLATE: testOldDefaultObj.value
+      };
+
+      const { updates, logs } = await runSettingsMigrations(currentSettings);
+      expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+      expect(logs.some(l => l.includes('Upgraded legacy default prompt PROMPT_TEMPLATE to latest version'))).toBe(true);
+    } finally {
+      // Clean up to ensure test isolation
+      const index = HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.indexOf(testOldDefaultObj);
+      if (index > -1) {
+        HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.splice(index, 1);
+      }
+    }
+  });
+
+  it('should preserve customized prompt during migration', async () => {
+    const customPrompt = 'My custom customized prompt $_{SOURCE} $_{TARGET} $_{TEXT}';
+    const currentSettings = {
+      PROMPT_TEMPLATE: customPrompt
+    };
+
+    const { updates } = await runSettingsMigrations(currentSettings);
+    // Custom template must be preserved (not overwritten/reverted)
+    expect(updates.PROMPT_TEMPLATE).toBeUndefined();
   });
 });

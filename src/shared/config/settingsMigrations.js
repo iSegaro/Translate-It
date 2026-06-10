@@ -1,17 +1,24 @@
 /**
  * Settings Migration System
- * Handles automatic migrations for user settings when extension is updated
  *
- * This system automatically:
- * 1. Adds any missing settings from CONFIG to user settings
- * 2. Updates model lists while preserving user selections
- * 3. Updates prompt templates only if user hasn't customized them
- * 4. Preserves user data, API keys, and customizations
+ * Handles automatic migrations for user settings when the extension is updated.
  *
- * Migration is triggered only on extension update via InstallHandler
+ * Responsibilities:
+ * 1. Add newly introduced settings with their default values.
+ * 2. Migrate legacy setting formats and keys.
+ * 3. Synchronize configuration-driven option lists.
+ * 4. Apply safe prompt template migrations.
+ * 5. Preserve user data, API keys, history, and customizations.
+ *
+ * Prompt migration details and historical prompt defaults are maintained in:
+ *   promptHistoricalDefaults.js
+ *
+ * Migration is executed during extension update and settings import flows.
  */
 
 import { CONFIG, TranslationMode } from './config.js';
+import { PROMPT_REGISTRY } from './PromptRegistry.js';
+import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -144,10 +151,10 @@ function runMainMigration(currentSettings) {
   });
 
   // 3. Dynamic Prompt Detection
-  // Automatically identifies all prompt templates to ensure they stay updated
-  const PROMPT_TEMPLATES = Object.keys(CONFIG).filter(key => 
-    key.startsWith('PROMPT_BASE_') || key === 'PROMPT_TEMPLATE'
-  );
+  // Automatically identifies all editable prompt templates from the registry
+  const PROMPT_TEMPLATES = Object.values(PROMPT_REGISTRY)
+    .filter(p => p.editable)
+    .map(p => p.key);
 
   // 4. Synchronized Option Lists (UI Options that should always match CONFIG)
   const OPTION_LISTS = [
@@ -187,35 +194,55 @@ function runMainMigration(currentSettings) {
     }
   });
 
-  // C. Handle prompt templates - update to latest version
-  // We only force update if the PROMPTS_VERSION has increased.
-  // This allows us to push critical prompt updates (like logical batching) 
-  // while preserving user customizations during minor version updates.
-  const currentPromptsVersion = currentSettings.PROMPTS_VERSION || 1;
-  const targetPromptsVersion = CONFIG.PROMPTS_VERSION || 1;
-  const forceUpdatePrompts = targetPromptsVersion > currentPromptsVersion;
+  // C. Handle prompt templates - safe update using historical defaults
 
   PROMPT_TEMPLATES.forEach(key => {
-    if (!(key in currentSettings)) return;
-
-    const userPrompt = currentSettings[key];
     const defaultPrompt = CONFIG[key];
 
-    // Only update if versions differ OR if user somehow has a missing/invalid prompt
-    if (forceUpdatePrompts || userPrompt !== defaultPrompt) {
-      // If forceUpdatePrompts is false but prompts differ, it means the user 
-      // likely customized it, so we SHOULD NOT overwrite unless forceUpdatePrompts is true.
-      if (forceUpdatePrompts || !userPrompt) {
-        updates[key] = defaultPrompt;
-        migrationLog.push(`Updated prompt template ${key} to version ${targetPromptsVersion}`);
-      }
+    // Safety check: skip if key doesn't exist in CONFIG
+    if (defaultPrompt === undefined) {
+      logger.warn(`Prompt key ${key} is defined in registry but missing in CONFIG.`);
+      return;
     }
-  });
 
-  // Ensure PROMPTS_VERSION is updated in storage
-  if (forceUpdatePrompts) {
-    updates.PROMPTS_VERSION = targetPromptsVersion;
-  }
+    // 1. If key is completely missing in user settings, add it
+    if (!(key in currentSettings)) {
+      updates[key] = defaultPrompt;
+      migrationLog.push(`Added missing prompt setting: ${key}`);
+      return;
+    }
+
+    const userPrompt = currentSettings[key];
+
+    // 2. If stored prompt is empty or null, restore it to current default
+    if (!userPrompt || userPrompt.toString().trim() === '') {
+      updates[key] = defaultPrompt;
+      migrationLog.push(`Restored empty/missing prompt ${key} to default`);
+      return;
+    }
+
+    // 3. If stored prompt exactly matches current default, leave it
+    if (userPrompt === defaultPrompt) {
+      return;
+    }
+
+    // 4. If stored prompt matches a known historical default, upgrade to current default
+    const historicals = HISTORICAL_PROMPT_DEFAULTS[key] || [];
+    const isHistorical = historicals.some(entry =>
+      typeof entry === 'string'
+        ? entry === userPrompt
+        : entry?.value === userPrompt
+    );
+    
+    if (isHistorical) {
+      updates[key] = defaultPrompt;
+      migrationLog.push(`Upgraded legacy default prompt ${key} to latest version`);
+      return;
+    }
+
+    // 5. Otherwise, treat as user-customized and preserve
+    logger.debug(`Preserved user customized prompt: ${key}`);
+  });
 
   // D. Synchronize Option Lists
   OPTION_LISTS.forEach(key => {
