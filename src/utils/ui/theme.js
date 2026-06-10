@@ -1,13 +1,14 @@
 // src/utils/theme.js
 
 /**
- * Applies the specified theme to the document root.
+ * Applies the specified theme to the target element (defaults to document.documentElement).
  * If theme is "auto", it determines the theme based on system preference.
  * @param {string} theme - The theme to apply ('auto', 'light', 'dark').
+ * @param {Element} [targetElement=document.documentElement] - The element to apply the class to.
  */
-export function applyTheme(theme) {
-  const root = document.documentElement;
-  root.classList.remove("theme-light", "theme-dark");
+export function applyTheme(theme, targetElement = document.documentElement) {
+  if (!targetElement) return;
+  targetElement.classList.remove("theme-light", "theme-dark");
 
   let effectiveTheme = theme;
   if (theme === "auto") {
@@ -20,7 +21,7 @@ export function applyTheme(theme) {
   if (effectiveTheme !== "light" && effectiveTheme !== "dark") {
     effectiveTheme = "light"; // Default to light if something unexpected happens
   }
-  root.classList.add(`theme-${effectiveTheme}`);
+  targetElement.classList.add(`theme-${effectiveTheme}`);
 }
 
 /**
