@@ -431,6 +431,12 @@
   "live_caption_supported_platform": {
     "message": "Supported"
   },
+  "live_caption_stt_provider_label": {
+    "message": "[DEBUG] STT Provider"
+  },
+  "live_caption_stt_provider_desc": {
+    "message": "Select the Speech-to-Text provider. Mock STT is for development testing."
+  },
   "clear_cache": {
     "message": "Clear Cache"
   },

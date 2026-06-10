@@ -15,6 +15,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js';
+import { STT_PROVIDER_IDS } from '@/features/live-caption/stt/STTProviderManifest.js';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
@@ -432,6 +433,18 @@ export const useSettingsStore = defineStore('settings', () => {
           if (hasChanges) {
             updates['MODE_PROVIDERS'] = { ...settings.value.MODE_PROVIDERS };
           }
+        }
+
+        // Cleanup Live Caption STT Provider
+        if (settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] === STT_PROVIDER_IDS.MOCK) {
+          const defaultStt = STT_PROVIDER_IDS.OPENAI_WHISPER;
+          settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = defaultStt;
+          updates[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = defaultStt;
+          hasChanges = true;
+          logger.info('Debug mode disabled: reverted Live Caption STT provider', {
+            from: STT_PROVIDER_IDS.MOCK,
+            to: STT_PROVIDER_IDS.OPENAI_WHISPER
+          });
         }
       }
 

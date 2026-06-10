@@ -57,6 +57,31 @@
         </div>
       </div>
 
+      <!-- STT Provider Selection (Debug Mode Only) -->
+      <div
+        v-if="isSupportedPlatform && settingsStore.settings?.DEBUG_MODE"
+        id="LIVE_CAPTION_STT_PROVIDER_SECTION"
+        class="setting-group debug-only-setting"
+      >
+        <div class="section-separator" />
+        <div class="setting-row">
+          <div class="setting-info">
+            <label class="setting-label">{{ t('live_caption_stt_provider_label') || '[DEBUG] STT Provider' }}</label>
+            <p class="setting-description">
+              {{ t('live_caption_stt_provider_desc') || 'Select the Speech-to-Text provider. Mock STT is for development testing.' }}
+            </p>
+          </div>
+          <div class="setting-control">
+            <BaseSelect
+              id="LIVE_CAPTION_STT_PROVIDER"
+              v-model="sttProvider"
+              :options="sttProviderOptions"
+              class="live-caption-stt-provider-select"
+            />
+          </div>
+        </div>
+      </div>
+
       <div
         v-if="isSupportedPlatform"
         class="section-separator"
@@ -124,6 +149,10 @@ import {
   LIVE_CAPTION_CAPTION_DISPLAY_MODES,
   normalizeLiveCaptionCaptionDisplayMode
 } from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js'
+import {
+  STT_PROVIDER_IDS,
+  getAvailableSTTProviders
+} from '@/features/live-caption/stt/STTProviderManifest.js'
 import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js'
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js'
 import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache.js'
@@ -138,6 +167,7 @@ const settingsStore = useSettingsStore()
 
 // State
 const displayMode = ref(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY)
+const sttProvider = ref(STT_PROVIDER_IDS.OPENAI_WHISPER)
 const isClearingCache = ref(false)
 const hasOpenAIKey = ref(false)
 
@@ -161,6 +191,14 @@ const displayModeOptions = computed(() => [
     label: t('live_caption_display_mode_bilingual') || 'Bilingual (Both)'
   }
 ])
+
+const sttProviderOptions = computed(() => {
+  const isDebug = settingsStore.settings?.DEBUG_MODE || false
+  return getAvailableSTTProviders(isDebug).map(p => ({
+    value: p.id,
+    label: p.displayName
+  }))
+})
 
 // Methods
 const handleClearCache = async () => {
@@ -199,6 +237,11 @@ const loadSettings = () => {
   if (settingsStore.settings && settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE]) {
     displayMode.value = normalizeLiveCaptionCaptionDisplayMode(settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE])
   }
+
+  // Load STT provider from settings if available
+  if (settingsStore.settings && settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]) {
+    sttProvider.value = settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]
+  }
 }
 
 // Watch for display mode changes and save to settings
@@ -211,6 +254,16 @@ const saveDisplayMode = async (newMode) => {
   }
 }
 
+// Watch for STT provider changes and save to settings
+const saveSTTProvider = async (newProvider) => {
+  try {
+    await settingsStore.updateSettingAndPersist(LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER, newProvider)
+    logger.debug('Live Caption STT provider saved:', newProvider)
+  } catch (error) {
+    logger.error('Failed to save Live Caption STT provider:', error)
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   loadSettings()
@@ -220,6 +273,11 @@ onMounted(() => {
 // Watch display mode changes
 watch(displayMode, (newMode) => {
   saveDisplayMode(newMode)
+})
+
+// Watch STT provider changes
+watch(sttProvider, (newProvider) => {
+  saveSTTProvider(newProvider)
 })
 </script>
 

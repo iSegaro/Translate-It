@@ -5,6 +5,8 @@ import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
 import { SelectionTranslationMode } from '@/shared/config/config.js';
+import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js';
+import { STT_PROVIDER_IDS } from '@/features/live-caption/stt/STTProviderManifest.js';
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -59,7 +61,7 @@ describe('Settings Store', () => {
 
   it('should initialize live-caption scaffolding defaults', () => {
     const store = useSettingsStore();
-    expect(store.settings.LIVE_CAPTION_ENABLED).toBe(true);
+    expect(store.settings.LIVE_CAPTION_ENABLED).toBe(false);
     expect(store.settings.LIVE_CAPTION_DISPLAY_MODE).toBe('translated_only');
     expect(store.settings.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
     expect(store.settings.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
@@ -228,6 +230,43 @@ describe('Settings Store', () => {
     
     expect(secureStorage.prepareForExport).toHaveBeenCalled();
     expect(result._exported).toBe(true);
+  });
+
+  describe('Debug Mode Cleanup', () => {
+    it('should revert Live Caption STT provider from Mock to Whisper when Debug Mode is disabled', async () => {
+      const store = useSettingsStore();
+      
+      // Set to mock while debug is enabled
+      store.settings.DEBUG_MODE = true;
+      store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.MOCK;
+      await nextTick();
+
+      // Disable debug mode
+      await store.updateSettingAndPersist('DEBUG_MODE', false);
+      await nextTick();
+
+      expect(store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]).toBe(STT_PROVIDER_IDS.OPENAI_WHISPER);
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+        [LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]: STT_PROVIDER_IDS.OPENAI_WHISPER
+      }));
+    });
+
+    it('should not change STT provider when Debug Mode is disabled if not using Mock', async () => {
+      const store = useSettingsStore();
+      
+      store.settings.DEBUG_MODE = true;
+      store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.OPENAI_WHISPER;
+      await nextTick();
+
+      storageManager.set.mockClear();
+      await store.updateSettingAndPersist('DEBUG_MODE', false);
+      await nextTick();
+
+      expect(store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]).toBe(STT_PROVIDER_IDS.OPENAI_WHISPER);
+      // Ensure STT_PROVIDER was NOT part of the update call
+      const setCall = storageManager.set.mock.calls[0][0];
+      expect(setCall).not.toHaveProperty(LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER);
+    });
   });
 
   it('should reactively update isDarkTheme in auto mode when system theme changes', async () => {

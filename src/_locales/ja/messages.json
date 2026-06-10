@@ -1286,6 +1286,12 @@
   "advance_debug_mode_label": {
     "message": "デバッグモード"
   },
+  "live_caption_stt_provider_label": {
+    "message": "[DEBUG] STTプロバイダー"
+  },
+  "live_caption_stt_provider_desc": {
+    "message": "音声認識（STT）プロバイダーを選択します。Mock STTは開発テスト用です。"
+  },
   "debug_section_description": {
     "message": "特定のコンポーネントの詳細なログを有効にします。グローバルのログレベルを上書きします。"
   },

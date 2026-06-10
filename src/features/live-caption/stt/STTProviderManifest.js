@@ -72,27 +72,30 @@ export function getSTTProviderDefinition(providerId) {
   return STT_PROVIDER_MANIFEST[providerId] || null;
 }
 
-export function isSTTProviderSupported(providerId) {
+export function isSTTProviderSupported(providerId, debugMode = null) {
   const definition = getSTTProviderDefinition(providerId);
   if (!definition || definition.supported === false) {
     return false;
   }
 
   // Hide development-only providers if not in debug mode
-  if (definition.developmentOnly && !CONFIG.DEBUG_MODE) {
+  const isDebug = debugMode !== null ? debugMode : CONFIG.DEBUG_MODE;
+  if (definition.developmentOnly && !isDebug) {
     return false;
   }
 
   return true;
 }
 
-export function getAvailableSTTProviders() {
+export function getAvailableSTTProviders(debugMode = null) {
+  const isDebug = debugMode !== null ? debugMode : CONFIG.DEBUG_MODE;
+  
   return Object.values(STT_PROVIDER_MANIFEST).filter((provider) => {
     if (provider.supported === false) {
       return false;
     }
 
-    if (provider.developmentOnly && !CONFIG.DEBUG_MODE) {
+    if (provider.developmentOnly && !isDebug) {
       return false;
     }
 
