@@ -191,7 +191,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.updatedAt = this.createdAt;
 
     if (this.browserApi?.runtime?.onMessage) {
-      const handleMessage = (message) => {
+      this._handleBackgroundMessage = (message) => {
         if (!message) return;
 
         // CRITICAL: Filter messages by target.
@@ -205,23 +205,33 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
           const { sessionId, videoFingerprint, segment } = message.payload || {};
           this.handleTranslateResult({ sessionId, videoFingerprint, segment });
         } else if (message.action === LIVE_CAPTION_ACTIONS.RUNTIME_STOP) {
+          const { reason, error, sessionId } = message.payload || {};
+          
+          logger.debug('Received RUNTIME_STOP notification from background', { 
+            reason,
+            sessionId,
+            currentSessionId: this.pageSession?.sessionId
+          });
+
           // Payload is REQUIRED for STOP notifications sent to content.
-          // This allows us to ignore the broad offscreen stop broadcast which uses 'data'.
           if (!message.payload) {
             return;
           }
 
-          const { reason, error } = message.payload;
-          logger.warn('Live-caption runtime forcefully stopped by background', { reason, error });
-          this.stop(reason, { notifyContent: false, forceLocal: true, error }).catch(() => {});
+          let finalError = error;
+          
+          // CRITICAL: If reason is provider_error but error is missing, synthesize one
+          // to ensure the overlay preservation logic in stop() is triggered.
+          if (reason === LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR && !finalError) {
+            finalError = { message: 'Live Caption transcription failed' };
+            logger.warn('Synthesized error for provider_error stop');
+          }
+
+          this.stop(reason, { notifyContent: false, forceLocal: true, error: finalError }).catch(() => {});
         }
       };
 
-      this.browserApi.runtime.onMessage.addListener(handleMessage);
-
-      this.trackResource('live-caption-runtime-message-listener', () => {
-        this.browserApi.runtime.onMessage.removeListener(handleMessage);
-      });
+      this.browserApi.runtime.onMessage.addListener(this._handleBackgroundMessage);
     }
 
     logger.info('Live-caption runtime controller created', {
@@ -897,11 +907,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       }
 
       this.tabId = tabId;
-      this.pageSession = this.sessionManager.getOrCreateSession(tabId, {
+      this.pageSession = this.sessionManager.createSession(tabId, {
         consentAccepted: Boolean(this.store?.consentAccepted)
       });
       this.pageSession.setConsentAccepted(Boolean(this.store?.consentAccepted));
       this.pageSession.start();
+      const sessionIdAtStart = this.pageSession.sessionId;
 
       this.store?.clearStartupDeniedReason?.();
       this.store?.setError?.(null);
@@ -923,11 +934,11 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
       this._setupObservers();
       await this.syncActiveVideo('start');
-      this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
-        tabId,
-        sessionId: this.pageSession.sessionId,
-        activeVideoFingerprint: this.currentVideoFingerprint
-      });
+      
+      // Safety check: Stop might have occurred during sync
+      if (!this.started || this.pageSession?.sessionId !== sessionIdAtStart) {
+        return this.getSnapshot();
+      }
 
       const response = await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_START, {
         tabId,
@@ -936,6 +947,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         reason: 'start',
         consentAccepted: Boolean(this.store?.consentAccepted)
       });
+
+      // CRITICAL: Check if we were stopped or replaced while waiting for background
+      if (!this.started || this.pageSession?.sessionId !== sessionIdAtStart) {
+        logger.info('Start aborted: session was stopped or replaced during background request');
+        return this.getSnapshot();
+      }
 
       if (!response || !response.ok) {
         const errState = createLiveCaptionErrorState(
@@ -950,6 +967,13 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         logger.warn('Live-caption background runtime start failed', { response });
         return this.getSnapshot();
       }
+
+      // Only transition to RUNNING after background confirms success
+      this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
+        tabId,
+        sessionId: this.pageSession.sessionId,
+        activeVideoFingerprint: this.currentVideoFingerprint
+      });
 
       logger.info('Live-caption runtime started', {
         tabId,
@@ -1134,6 +1158,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       this.sessionManager.cleanupByTabId(this.tabId, reason);
     }
 
+    // CRITICAL: Clear startPromise so subsequent starts don't wait for a dead task
+    if (this.startPromise) {
+      logger.info('Clearing startPromise during stop', { reason });
+      this.startPromise = null;
+    }
+
     const sessionCleanupMetadata = this.tabId != null
       ? this.sessionManager.getSessionCleanupMetadata?.(this.tabId) ?? null
       : null;
@@ -1167,6 +1197,11 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     } : null;
 
     const hasError = Boolean(friendlyError || error);
+    logger.debug('RuntimeController.stop applying state', { 
+      reason, 
+      hasError, 
+      cleanupStatus: cleanupResult.status 
+    });
 
     this.store?.applyCleanupResult?.({
       sessionStatus: cleanupResult.sessionStatus,
@@ -1211,6 +1246,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
     await this.stop(reason, { notifyContent: false });
     this.destroyed = true;
+
+    if (this._handleBackgroundMessage && this.browserApi?.runtime?.onMessage) {
+      this.browserApi.runtime.onMessage.removeListener(this._handleBackgroundMessage);
+      this._handleBackgroundMessage = null;
+    }
+
     this._teardownObservers();
     this.store?.setEnabled?.(false);
     this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.DESTROYED, {

@@ -315,9 +315,8 @@ const handleLiveCaptionResume = async () => {
 };
 
 const handleLiveCaptionRetry = async () => {
-  const controller = ensureLiveCaptionRuntimeController();
-  await controller.resume();
-  await controller.syncActiveVideo('retry');
+  logger.info('Retrying Live Caption after error');
+  await handleLiveCaptionStart();
 };
 
 const handleLiveCaptionClearCache = () => {

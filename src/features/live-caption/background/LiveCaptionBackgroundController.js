@@ -165,13 +165,13 @@ export class LiveCaptionBackgroundController {
   }
 
   handleCoordinatorError(error, { sessionId, tabId, videoFingerprint }) {
-    // 1. Guard against duplicate notification or missing session
-    const session = this.sessionManager.getSession(tabId);
-    if (!session || (sessionId && session.sessionId !== sessionId)) {
-      logger.debug("Ignoring coordinator error for inactive or mismatching session", { 
+    // 1. Guard against mismatching session (if session still exists)
+    const currentSession = this.sessionManager.getSession(tabId);
+    if (currentSession && sessionId && currentSession.sessionId !== sessionId) {
+      logger.debug("Ignoring coordinator error for mismatching session", { 
         tabId, 
         sessionId,
-        currentSessionId: session?.sessionId 
+        currentSessionId: currentSession.sessionId 
       });
       return;
     }
@@ -184,21 +184,13 @@ export class LiveCaptionBackgroundController {
       message: error?.message
     });
 
-    // Ensure session is cleaned up in manager
-    this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR, error);
-
-    // Stop offscreen capture
-    this.offscreenBridge.requestRuntimeStop({
-      sessionId,
-      tabId,
-      videoFingerprint,
-      reason: "coordinator_error"
-    }).catch(() => {});
-
-    // Notify content script
+    // 2. Notify content script IMMEDIATELY before we destroy the session state
     if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
-      this.offscreenBridge.browserApi.tabs.sendMessage(tabId, {
-        action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+      const targetTabId = Number(tabId);
+      logger.debug("Sending error notification to content tab", { targetTabId, sessionId });
+      
+      this.offscreenBridge.browserApi.tabs.sendMessage(targetTabId, {
+        action: LIVE_CAPTION_ACTIONS.RUNTIME_STOP, // Use standard action constant
         payload: {
           sessionId,
           videoFingerprint,
@@ -210,13 +202,26 @@ export class LiveCaptionBackgroundController {
             providerId: error?.providerId || null
           }
         }
+      }).then(() => {
+        logger.debug("Error notification delivered to content tab", { targetTabId });
       }).catch((err) => {
         logger.warn("Failed to send error notification to content tab", {
-          tabId,
+          tabId: targetTabId,
           error: err.message
         });
       });
     }
+
+    // 3. Perform internal cleanup
+    this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR, error);
+
+    // 4. Stop offscreen capture
+    this.offscreenBridge.requestRuntimeStop({
+      sessionId,
+      tabId,
+      videoFingerprint,
+      reason: "coordinator_error"
+    }).catch(() => {});
   }
 
   async _reconcileOrphanedSession(chunk) {
@@ -581,6 +586,7 @@ export class LiveCaptionBackgroundController {
       await this.offscreenBridge.ensureOffscreenDocument();
 
       const session = this.sessionManager.getOrCreateSession(tabId, {
+        sessionId: request.data.sessionId,
         consentAccepted: Boolean(request.data.consentAccepted),
         isIncognito: Boolean(sender?.tab?.incognito)
       });
