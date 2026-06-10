@@ -1,91 +1,28 @@
 /**
  * Settings Migration System
- * 
- * Registry of historical default prompt templates used for safe prompt migrations.
  *
- * If a user's prompt matches one of these historical defaults, it is assumed
- * that the prompt was never customized and can be safely upgraded to the
- * latest CONFIG default.
+ * Handles automatic migrations for user settings when the extension is updated.
  *
- * Migration rules:
- * - Missing prompt -> replaced with current CONFIG default.
- * - Empty prompt -> replaced with current CONFIG default.
- * - Historical default -> upgraded to current CONFIG default.
- * - Any other value -> treated as a user customization and preserved.
+ * Responsibilities:
+ * 1. Add newly introduced settings with their default values.
+ * 2. Migrate legacy setting formats and keys.
+ * 3. Synchronize configuration-driven option lists.
+ * 4. Apply safe prompt template migrations.
+ * 5. Preserve user data, API keys, history, and customizations.
  *
- * IMPORTANT:
- * Whenever a default prompt template is changed in CONFIG, the previous
- * default value MUST be added to the corresponding array below.
+ * Prompt migration details and historical prompt defaults are maintained in:
+ *   promptHistoricalDefaults.js
  *
- * Example:
- *
- * Before:
- * CONFIG.PROMPT_TEMPLATE = "Prompt A"
- *
- * After:
- * CONFIG.PROMPT_TEMPLATE = "Prompt B"
- *
- * Add:
- * HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.push("Prompt A")
- *
- * This allows users who still have the old unmodified default to receive
- * the new version automatically, while preserving customized prompts.
- *
- * Versioning Notes:
- * - Keep historical defaults grouped by release/version when possible.
- * - Do not remove old entries unless you are certain no supported upgrade
- *   path can reference them anymore.
- * - Users may upgrade across multiple versions, so migrations must support
- *   direct upgrades from older releases.
- *
- * Example:
- *
- * PROMPT_TEMPLATE: [
- *   // v1.17.0 default
- *   "Prompt A",
- *
- *   // v1.18.0 default
- *   "Prompt B"
- * ]
- *
- * NOTE:
- * PROMPTS_VERSION must not be used to force-overwrite prompt templates.
- * User customizations must always be preserved.
+ * Migration is executed during extension update and settings import flows.
  */
 
 import { CONFIG, TranslationMode } from './config.js';
 import { PROMPT_REGISTRY } from './PromptRegistry.js';
+import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
-
-/**
- * Registry of historical default prompt templates to identify unmodified user prompts.
- * If a user's prompt matches one of these, it means they never customized it, 
- * so it is safe to auto-upgrade to the latest default template.
- */
-export const HISTORICAL_PROMPT_DEFAULTS = {
-  // Example:
-  // PROMPT_TEMPLATE: [
-  // v1.17.0 default
-  //   `Old prompt...`,
-  //
-  // v1.18.0 default
-  //   `Previous prompt...`
-  // ],
-  //
-  // When changing a default prompt in CONFIG, add the previous
-  // default value here before replacing it.
-
-  PROMPT_TEMPLATE: [],
-  PROMPT_TEMPLATE_AUTO: [],
-  PROMPT_BASE_FIELD: [],
-  PROMPT_BASE_FIELD_AUTO: [],
-  PROMPT_BASE_POPUP_TRANSLATE: [],
-  PROMPT_BASE_DICTIONARY: [],
-  PROMPT_SUBTITLE_USER: []
-};
 
 /**
  * Migrate MODE_PROVIDERS keys from old format (underscore) to new format (hyphenated/MessageContexts)
@@ -293,7 +230,11 @@ function runMainMigration(currentSettings) {
 
     // 4. If stored prompt matches a known historical default, upgrade to current default
     const historicals = HISTORICAL_PROMPT_DEFAULTS[key] || [];
-    const isHistorical = historicals.some(hist => hist === userPrompt);
+    const isHistorical = historicals.some(entry =>
+      typeof entry === 'string'
+        ? entry === userPrompt
+        : entry?.value === userPrompt
+    );
     
     if (isHistorical) {
       updates[key] = defaultPrompt;

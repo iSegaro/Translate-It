@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runSettingsMigrations, HISTORICAL_PROMPT_DEFAULTS } from './settingsMigrations.js';
+import { runSettingsMigrations } from './settingsMigrations.js';
+import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { CONFIG, TranslationMode } from './config.js';
 
 // Mock logger
@@ -105,7 +106,7 @@ describe('Settings Migrations', () => {
     expect(updates.PROMPT_TEMPLATE).toBeUndefined();
   });
 
-  it('should migrate historical legacy defaults to current default', async () => {
+  it('should migrate historical legacy defaults (string format) to current default', async () => {
     // Add a temporary mock historical default to test matching
     const testOldDefault = 'legacy old default template _{SOURCE} _{TARGET} _{TEXT}';
     if (!HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE) {
@@ -124,6 +125,35 @@ describe('Settings Migrations', () => {
     } finally {
       // Clean up to ensure test isolation
       const index = HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.indexOf(testOldDefault);
+      if (index > -1) {
+        HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.splice(index, 1);
+      }
+    }
+  });
+
+  it('should migrate historical legacy defaults (object format) to current default', async () => {
+    // Add a temporary mock historical default in object format to test matching
+    const testOldDefaultObj = {
+      version: 'v1.17.0',
+      reason: 'Legacy default to migrate',
+      value: 'legacy old default template in object format _{SOURCE} _{TARGET} _{TEXT}'
+    };
+    if (!HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE) {
+      HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE = [];
+    }
+    HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.push(testOldDefaultObj);
+
+    try {
+      const currentSettings = {
+        PROMPT_TEMPLATE: testOldDefaultObj.value
+      };
+
+      const { updates, logs } = await runSettingsMigrations(currentSettings);
+      expect(updates.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+      expect(logs.some(l => l.includes('Upgraded legacy default prompt PROMPT_TEMPLATE to latest version'))).toBe(true);
+    } finally {
+      // Clean up to ensure test isolation
+      const index = HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.indexOf(testOldDefaultObj);
       if (index > -1) {
         HISTORICAL_PROMPT_DEFAULTS.PROMPT_TEMPLATE.splice(index, 1);
       }
