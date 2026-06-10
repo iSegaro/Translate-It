@@ -298,12 +298,20 @@ const handleValidationFeedback = (e) => {
   }
 };
 
+// Save feedback listener
+const handleSettingsSaved = () => {
+  validationErrorKey.value = ''
+  clearErrors()
+}
+
 onMounted(() => {
   window.addEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+  window.addEventListener('options-settings-saved', handleSettingsSaved);
 })
 
 onUnmounted(() => {
   window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
+  window.removeEventListener('options-settings-saved', handleSettingsSaved);
 })
 
 // Validation function
@@ -322,6 +330,9 @@ const validatePrompt = async (showFeedback = false) => {
 
 // Reset prompt to default
 const resetPrompt = async () => {
+  validationErrorKey.value = ''
+  clearErrors()
+
   const defaultTemplate = CONFIG[currentPromptKey.value]
   activeTemplateValue.value = defaultTemplate
   

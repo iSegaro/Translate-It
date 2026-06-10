@@ -17,12 +17,17 @@ vi.mock('../composables/useTabSettings.js', () => ({
   })
 }));
 
+const mockValidatePromptTemplate = vi.fn().mockResolvedValue(true);
+const mockGetFirstError = vi.fn();
+const mockGetFirstErrorTranslated = vi.fn();
+const mockClearErrors = vi.fn();
+
 vi.mock('@/core/validation.js', () => ({
   useValidation: () => ({
-    validatePromptTemplate: vi.fn().mockResolvedValue(true),
-    getFirstError: vi.fn(),
-    getFirstErrorTranslated: vi.fn(),
-    clearErrors: vi.fn()
+    validatePromptTemplate: mockValidatePromptTemplate,
+    getFirstError: mockGetFirstError,
+    getFirstErrorTranslated: mockGetFirstErrorTranslated,
+    clearErrors: mockClearErrors
   })
 }));
 
@@ -256,5 +261,64 @@ describe('PromptTab', () => {
       const exampleGen = wrapper.vm.promptExamples[0];
       expect(exampleGen.prompt).toBe('GENERATED PROMPT');
     });
+  });
+
+  it('reset clears existing prompt validation error', async () => {
+    mockGetFirstErrorTranslated.mockReturnValue('validation_prompt_template_empty');
+    const wrapper = mount(PromptTab);
+    wrapper.vm.validationErrorKey = 'validation_prompt_template_empty';
+    expect(wrapper.vm.validationError).toBe('validation_prompt_template_empty');
+
+    await wrapper.find('.button-inline').trigger('click');
+    expect(wrapper.vm.validationError).toBe('');
+    expect(mockClearErrors).toHaveBeenCalled();
+  });
+
+  it('successful save clears previous validation error', async () => {
+    mockGetFirstErrorTranslated.mockReturnValue('validation_prompt_template_empty');
+    const wrapper = mount(PromptTab);
+    wrapper.vm.validationErrorKey = 'validation_prompt_template_empty';
+    expect(wrapper.vm.validationError).toBe('validation_prompt_template_empty');
+
+    // Simulate options-settings-saved event
+    window.dispatchEvent(new CustomEvent('options-settings-saved'));
+    expect(wrapper.vm.validationError).toBe('');
+    expect(mockClearErrors).toHaveBeenCalled();
+  });
+
+  it('failed validation still shows error', async () => {
+    // Mock validation failure
+    mockValidatePromptTemplate.mockResolvedValue(false);
+    mockGetFirstError.mockReturnValue('validation_prompt_template_empty');
+    mockGetFirstErrorTranslated.mockReturnValue('Template cannot be empty');
+
+    const wrapper = mount(PromptTab);
+
+    // Dispatch feedback event (triggers validatePrompt)
+    window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+      detail: { field: 'prompt', promptKey: 'PROMPT_TEMPLATE' }
+    }));
+    
+    // Wait for the asynchronous validation function to complete
+    await vi.waitFor(() => {
+      expect(mockValidatePromptTemplate).toHaveBeenCalled();
+      expect(wrapper.vm.validationErrorKey).toBe('validation_prompt_template_empty');
+    });
+    expect(wrapper.vm.validationError).toBe('Template cannot be empty');
+  });
+
+  it('does not clear prompt error on partial save / validation failure', async () => {
+    mockGetFirstErrorTranslated.mockReturnValue('validation_prompt_template_empty');
+    const wrapper = mount(PromptTab);
+    wrapper.vm.validationErrorKey = 'validation_prompt_template_empty';
+    expect(wrapper.vm.validationError).toBe('validation_prompt_template_empty');
+
+    // Simulate validation feedback (partial save/save failure still dispatches trigger-validation-feedback)
+    window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+      detail: { field: 'prompt', promptKey: 'PROMPT_TEMPLATE' }
+    }));
+    
+    // The settings-saved event is NOT dispatched during a partial save, so we assert the error remains visible
+    expect(wrapper.vm.validationErrorKey).toBe('validation_prompt_template_empty');
   });
 });

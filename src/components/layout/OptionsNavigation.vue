@@ -323,6 +323,9 @@ const saveAllSettings = async () => {
     // Trigger post-save notifications
     await postSaveNotify()
 
+    // Dispatch event to clear validation states in child components/tabs
+    window.dispatchEvent(new CustomEvent('options-settings-saved'))
+
     statusType.value = 'success'
     statusMessage.value = t('OPTIONS_STATUS_SAVED_SUCCESS') || 'Settings saved successfully!'
     
