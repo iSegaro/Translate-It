@@ -195,8 +195,6 @@ function runMainMigration(currentSettings) {
   });
 
   // C. Handle prompt templates - safe update using historical defaults
-  const currentPromptsVersion = currentSettings.PROMPTS_VERSION || 1;
-  const targetPromptsVersion = CONFIG.PROMPTS_VERSION || 1;
 
   PROMPT_TEMPLATES.forEach(key => {
     const defaultPrompt = CONFIG[key];
@@ -245,11 +243,6 @@ function runMainMigration(currentSettings) {
     // 5. Otherwise, treat as user-customized and preserve
     logger.debug(`Preserved user customized prompt: ${key}`);
   });
-
-  // Ensure PROMPTS_VERSION is updated in storage as metadata
-  if (targetPromptsVersion > currentPromptsVersion) {
-    updates.PROMPTS_VERSION = targetPromptsVersion;
-  }
 
   // D. Synchronize Option Lists
   OPTION_LISTS.forEach(key => {

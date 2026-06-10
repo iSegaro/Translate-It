@@ -160,17 +160,14 @@ describe('Settings Migrations', () => {
     }
   });
 
-  it('should preserve customized prompt even if prompts version increases', async () => {
+  it('should preserve customized prompt during migration', async () => {
     const customPrompt = 'My custom customized prompt $_{SOURCE} $_{TARGET} $_{TEXT}';
     const currentSettings = {
-      PROMPT_TEMPLATE: customPrompt,
-      PROMPTS_VERSION: (CONFIG.PROMPTS_VERSION || 1) - 1
+      PROMPT_TEMPLATE: customPrompt
     };
 
     const { updates } = await runSettingsMigrations(currentSettings);
     // Custom template must be preserved (not overwritten/reverted)
     expect(updates.PROMPT_TEMPLATE).toBeUndefined();
-    // But metadata version should still be updated
-    expect(updates.PROMPTS_VERSION).toBe(CONFIG.PROMPTS_VERSION);
   });
 });

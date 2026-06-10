@@ -284,9 +284,6 @@ export const CONFIG = {
   DICTIONARY_SHOW_DEFINITIONS: false,
   DICTIONARY_SHOW_EXAMPLES: false,
 
-  // --- Versioning ---
-  PROMPTS_VERSION: 6, // Version of the prompt templates (localized labels for dictionary)
-
   // --- AI Optimization Settings ---
   OPTIMIZATION_LEVEL: 3, // Default global optimization level (1-5: Cost vs Speed)
   PROVIDER_OPTIMIZATION_LEVELS: {}, // Per-provider level overrides { Gemini: 5, OpenAI: 2 }
