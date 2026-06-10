@@ -59,12 +59,18 @@ export class LiveCaptionSTTCoordinator {
       const errorMsg = `Queue overflow: pending chunks count reached limit of ${this.maxPendingChunks}`;
       logger.error(errorMsg, { sessionId, tabId });
       
+      // Use configured provider for accurate error attribution.
+      // Note: At this early stage (ingestion), we haven't fetched the provider instance yet,
+      // so we rely on the global configuration from the factory.
+      const providerId = this.sttFactory.getDefaultProviderId();
+      const definition = this.sttFactory.getProviderDefinition(providerId);
+
       const error = createSTTProviderError(
         STT_PROVIDER_ERROR_CODES.INVALID_AUDIO_CHUNK,
         errorMsg,
         {
-          providerId: 'openai_whisper',
-          providerName: 'OpenAI Whisper',
+          providerId: providerId,
+          providerName: definition?.displayName || providerId,
           stage: 'transcription',
           type: ErrorTypes.API_RESPONSE_INVALID,
           retryable: false
@@ -114,7 +120,8 @@ export class LiveCaptionSTTCoordinator {
         const abortController = new AbortController();
         this.activeAbortControllers.set(sessionId, abortController);
 
-        logger.debug('Starting Whisper dispatch for chunk', {
+        logger.debug('Starting transcription dispatch for chunk', {
+          providerId: provider.providerId,
           sessionId,
           chunkStartMs: chunk.chunkStartMs,
           chunkEndMs: chunk.chunkEndMs
@@ -180,7 +187,8 @@ export class LiveCaptionSTTCoordinator {
             });
           }
 
-          logger.info('Whisper chunk transcription completed and recorded', {
+          logger.info('Chunk transcription completed and recorded', {
+            providerId: provider.providerId,
             sessionId,
             chunkStartMs: chunk.chunkStartMs,
             chunkEndMs: chunk.chunkEndMs,

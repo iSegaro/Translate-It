@@ -1,4 +1,4 @@
-import { getOpenAIApiKeyAsync } from '@/shared/config/config.js';
+import { getOpenAIApiKeyAsync, CONFIG } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -29,11 +29,23 @@ export class STTProviderFactory {
 
   async getProvider(providerId = getDefaultSTTProviderId(), options = {}) {
     const resolvedProviderId = providerId || getDefaultSTTProviderId();
+    const definition = getSTTProviderDefinition(resolvedProviderId);
 
-    if (!isSTTProviderSupported(resolvedProviderId)) {
+    if (!definition || definition.supported === false) {
       throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${resolvedProviderId}' is not registered`, {
         providerId: resolvedProviderId,
         providerName: resolvedProviderId,
+        stage: 'startup',
+        retryable: false,
+        type: ErrorTypes.API_CONFIG_INVALID
+      });
+    }
+
+    // Defensive Check: Enforce Debug Mode for development-only providers
+    if (definition.developmentOnly && !CONFIG.DEBUG_MODE) {
+      throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${resolvedProviderId}' is restricted to debug mode`, {
+        providerId: resolvedProviderId,
+        providerName: definition.displayName,
         stage: 'startup',
         retryable: false,
         type: ErrorTypes.API_CONFIG_INVALID
@@ -88,13 +100,17 @@ export class STTProviderFactory {
       mode: definition.mode
     });
 
-    if (providerId === STT_PROVIDER_IDS.OPENAI_WHISPER) {
+    const ProviderClass = definition.providerClass;
+    let providerOptions = { ...options };
+
+    // Resolve API Key if required by manifest
+    if (definition.needsApiKey) {
       const apiKey = typeof options.apiKey === 'string'
         ? options.apiKey.trim()
         : (await this.settingsLoader())?.trim?.() || '';
 
       if (!apiKey) {
-        throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.MISSING_API_KEY, 'OpenAI API key is required for live-caption transcription', {
+        throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.MISSING_API_KEY, `${definition.displayName} API key is required for live-caption transcription`, {
           providerId,
           providerName: definition.displayName,
           stage: 'startup',
@@ -102,38 +118,17 @@ export class STTProviderFactory {
           type: ErrorTypes.API_KEY_MISSING
         });
       }
-
-      const ProviderClass = definition.providerClass;
-      const provider = new ProviderClass({
-        ...options,
-        apiKey
-      });
-
-      if (cacheKey) {
-        this.providerInstances.set(cacheKey, provider);
-      }
-
-      return provider;
+      
+      providerOptions.apiKey = apiKey;
     }
 
-    if (providerId === STT_PROVIDER_IDS.MOCK) {
-      const ProviderClass = definition.providerClass;
-      const provider = new ProviderClass(options);
+    const provider = new ProviderClass(providerOptions);
 
-      if (cacheKey) {
-        this.providerInstances.set(cacheKey, provider);
-      }
-
-      return provider;
+    if (cacheKey) {
+      this.providerInstances.set(cacheKey, provider);
     }
 
-    throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${providerId}' is not supported`, {
-      providerId,
-      providerName: definition.displayName,
-      stage: 'startup',
-      retryable: false,
-      type: ErrorTypes.API_CONFIG_INVALID
-    });
+    return provider;
   }
 
   getDefaultProviderId() {
