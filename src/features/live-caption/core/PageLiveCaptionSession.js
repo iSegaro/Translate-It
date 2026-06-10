@@ -201,8 +201,18 @@ export class PageLiveCaptionSession {
   cleanup(reason = LIVE_CAPTION_CLEANUP_REASONS.STOP) {
     const snapshot = this.toSnapshot();
 
+    const isError = reason === LIVE_CAPTION_CLEANUP_REASONS.ERROR || 
+                    reason === LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR ||
+                    reason === LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE;
+
     this.stop(reason);
-    this.revokeConsent();
+    
+    // ONLY revoke consent if it's NOT an error.
+    // We want the user to stay in the captions track to see the error.
+    if (!isError) {
+      this.revokeConsent();
+    }
+
     this.clearVideoSession(reason, false);
     this.lastError = null;
     this.lastCleanupReason = reason;

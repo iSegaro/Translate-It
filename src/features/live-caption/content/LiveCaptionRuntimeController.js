@@ -194,12 +194,24 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       const handleMessage = (message) => {
         if (!message) return;
 
+        // CRITICAL: Filter messages by target.
+        // We must ignore requests intended for the Offscreen document.
+        if (message.target === 'offscreen') {
+          return;
+        }
+
         // Handle LIVE_CAPTION_TRANSLATE_RESULT action
         if (message.action === 'LIVE_CAPTION_TRANSLATE_RESULT') {
           const { sessionId, videoFingerprint, segment } = message.payload || {};
           this.handleTranslateResult({ sessionId, videoFingerprint, segment });
         } else if (message.action === LIVE_CAPTION_ACTIONS.RUNTIME_STOP) {
-          const { reason, error } = message.payload || {};
+          // Payload is REQUIRED for STOP notifications sent to content.
+          // This allows us to ignore the broad offscreen stop broadcast which uses 'data'.
+          if (!message.payload) {
+            return;
+          }
+
+          const { reason, error } = message.payload;
           logger.warn('Live-caption runtime forcefully stopped by background', { reason, error });
           this.stop(reason, { notifyContent: false, forceLocal: true, error }).catch(() => {});
         }
@@ -1135,9 +1147,15 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     });
 
     this._teardownObservers();
-    this.currentVideoElement = null;
-    this.currentVideoFingerprint = null;
-    this.currentVideoCandidate = null;
+
+    // Preserve video references if we are showing an error
+    // This allows the overlay to maintain its anchor position over the video
+    if (!cleanupError) {
+      this.currentVideoElement = null;
+      this.currentVideoFingerprint = null;
+      this.currentVideoCandidate = null;
+    }
+
     this.pageSession = null;
     this.started = false;
     this.paused = false;
@@ -1148,6 +1166,8 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       message: getFriendlyLiveCaptionError(cleanupResult.error)
     } : null;
 
+    const hasError = Boolean(friendlyError || error);
+
     this.store?.applyCleanupResult?.({
       sessionStatus: cleanupResult.sessionStatus,
       runtimeState: cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED
@@ -1156,22 +1176,13 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       preserveCaptions: cleanupResult.preserveCaptions,
       clearCaptions: cleanupResult.clearCaptions,
       clearSessionIdentity: true,
-      clearConsent: true,
-      error: friendlyError
+      clearConsent: !hasError, // Preserve consent state if showing an error
+      error: friendlyError || error
     });
 
-    const hasError = Boolean(friendlyError);
     this.store?.setOverlayVisible?.(hasError);
     this.store?.setEnabled?.(false);
-    this.store?.clearActiveVideoState?.();
-    this.store?.setRuntimeStatus?.(
-      cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED
-        ? LIVE_CAPTION_RUNTIME_STATES.STOPPED
-        : LIVE_CAPTION_RUNTIME_STATES.ERROR
-    );
-    this.store?.setStatus?.(cleanupResult.sessionStatus);
-    this.store?.setActiveSessionState?.(cleanupResult.sessionStatus);
-    this.store?.setContext?.({ tabId: null, videoFingerprint: null, nextSessionId: null });
+    
     this._setRuntimeStatus(
       cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED
         ? LIVE_CAPTION_RUNTIME_STATES.STOPPED

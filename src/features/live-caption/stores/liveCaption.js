@@ -99,7 +99,9 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
 
   const setEnabled = (enabled) => {
     isEnabled.value = Boolean(enabled);
-    overlayVisible.value = Boolean(enabled);
+    if (enabled) {
+      overlayVisible.value = true;
+    }
   };
 
   const setRuntimeStatus = (nextStatus) => {
@@ -235,12 +237,13 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     clearConsent = true,
     error = null
   } = {}) => {
+    const hasError = Boolean(error);
     isEnabled.value = false;
-    overlayVisible.value = Boolean(error);
+    overlayVisible.value = hasError;
     consentNoticeVisible.value = false;
-    consentAccepted.value = false;
 
     if (clearConsent) {
+      consentAccepted.value = false;
       consentState.value = LIVE_CAPTION_CONSENT_STATES.NOT_ASKED;
     }
 
