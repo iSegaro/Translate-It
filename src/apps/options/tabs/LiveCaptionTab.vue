@@ -157,6 +157,8 @@ import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/li
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js'
 import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache.js'
 import browser from 'webextension-polyfill'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LiveCaptionTab')
