@@ -84,16 +84,30 @@ export async function loadVueApp(contentCore) {
     throw error;
   }
 }
-
 async function createMountPoint() {
   const isTopFrame = window === window.top;
   const hostId = isTopFrame ? UI_HOST_IDS.MAIN : UI_HOST_IDS.IFRAME;
   let hostElement = document.getElementById(hostId);
-
   if (!hostElement) {
     hostElement = document.createElement('div');
     hostElement.id = hostId;
     hostElement.classList.add('notranslate');
+    
+    // Apply layout-neutral inline styles before appending
+    Object.assign(hostElement.style, {
+      position: 'fixed',
+      width: '0',
+      height: '0',
+      overflow: 'visible',
+      top: '0',
+      left: '0',
+      zIndex: '2147483647',
+      margin: '0',
+      padding: '0',
+      border: 'none',
+      pointerEvents: 'none'
+    });
+
     const shadowRoot = hostElement.attachShadow({ mode: 'open' });
     const appContainer = document.createElement('div');
     appContainer.id = UI_HOST_IDS.APP_CONTAINER;

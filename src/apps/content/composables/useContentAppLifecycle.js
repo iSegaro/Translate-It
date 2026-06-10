@@ -8,6 +8,7 @@ import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { applyTheme } from '@/utils/ui/theme.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppLifecycle');
@@ -32,14 +33,23 @@ export function useContentAppLifecycle({
   let toastIntegration = null;
   let selectElementNotificationManager = null;
 
-  applyTheme(settingsStore.settings.THEME || 'auto');
+  const getHostElement = () => document.getElementById(UI_HOST_IDS.MAIN) || document.getElementById(UI_HOST_IDS.IFRAME);
+
+  // Apply theme specifically to our shadow host element, not the host page document root
+  const host = getHostElement();
+  if (host) {
+    applyTheme(settingsStore.settings.THEME || 'auto', host);
+  }
 
   watchEffect(() => {
     if (!settingsStore.isInitialized) {
       return;
     }
 
-    applyTheme(settingsStore.isDarkTheme ? 'dark' : 'light');
+    const hostEl = getHostElement();
+    if (hostEl) {
+      applyTheme(settingsStore.isDarkTheme ? 'dark' : 'light', hostEl);
+    }
   });
 
   /**
@@ -136,7 +146,10 @@ export function useContentAppLifecycle({
 
       logger.debug('Theme changed from options:', theme);
       settingsStore.updateSettingLocally('THEME', theme);
-      applyTheme(theme);
+      const hostEl = getHostElement();
+      if (hostEl) {
+        applyTheme(theme, hostEl);
+      }
       return false;
     });
 
