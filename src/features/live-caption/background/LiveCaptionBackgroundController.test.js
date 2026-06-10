@@ -92,7 +92,7 @@ describe("live-caption background controller", () => {
 
     controller.registerHandlers(messageHandler);
 
-    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(7);
+    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(9);
     expect(messageHandler.registerHandler).toHaveBeenCalledWith(
       LIVE_CAPTION_RUNTIME_ACTIONS.START,
       expect.any(Function),

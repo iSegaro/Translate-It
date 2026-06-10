@@ -310,37 +310,72 @@ export class LiveCaptionOffscreenRuntimeShell {
           const mediaRecorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : {});
           this.mediaRecorder = mediaRecorder;
 
-          this.chunkStartMs = 0;
-
           mediaRecorder.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
               const chunkPayload = event.data;
-              const chunkEndMs = this.chunkStartMs + this.chunkTimeslice;
+              const chunkStartMsVal = this.chunkStartMs;
+              const chunkEndMs = chunkStartMsVal + this.chunkTimeslice;
+
+              const sessionSnapshot = {
+                sessionId: this.sessionId,
+                tabId: this.tabId,
+                videoFingerprint: this.videoFingerprint
+              };
+
+              if (!sessionSnapshot.sessionId || !sessionSnapshot.tabId || !sessionSnapshot.videoFingerprint) {
+                logger.debug('Skipping finalized-chunk message: Session metadata is incomplete (post-stop chunk)', sessionSnapshot);
+                return;
+              }
 
               logger.info('MediaRecorder chunk completed', {
-                sessionId: this.sessionId,
-                videoFingerprint: this.videoFingerprint,
-                chunkStartMs: this.chunkStartMs,
+                sessionId: sessionSnapshot.sessionId,
+                videoFingerprint: sessionSnapshot.videoFingerprint,
+                chunkStartMs: chunkStartMsVal,
                 chunkEndMs,
                 sizeBytes: chunkPayload.size
               });
 
-              if (chrome?.runtime?.sendMessage) {
-                chrome.runtime.sendMessage({
-                  action: 'live-caption/offscreen/finalized-chunk',
-                  target: 'background',
-                  source: 'offscreen',
-                  sessionId: this.sessionId,
-                  tabId: this.tabId,
-                  videoFingerprint: this.videoFingerprint,
-                  chunkStartMs: this.chunkStartMs,
-                  chunkEndMs,
-                  mimeType: mediaRecorder.mimeType || 'audio/webm',
-                  payloadKind: 'blob',
-                  chunkPayload
-                }).catch((err) => {
-                  logger.error('Failed to send finalized chunk to background:', err);
-                });
+              if (chunkPayload instanceof Blob) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64Payload = reader.result;
+                  if (chrome?.runtime?.sendMessage) {
+                    chrome.runtime.sendMessage({
+                      action: 'live-caption/offscreen/finalized-chunk',
+                      target: 'background',
+                      source: 'offscreen',
+                      sessionId: sessionSnapshot.sessionId,
+                      tabId: sessionSnapshot.tabId,
+                      videoFingerprint: sessionSnapshot.videoFingerprint,
+                      chunkStartMs: chunkStartMsVal,
+                      chunkEndMs,
+                      mimeType: mediaRecorder.mimeType || 'audio/webm',
+                      payloadKind: 'base64',
+                      chunkPayload: base64Payload
+                    }).catch((err) => {
+                      logger.error('Failed to send finalized chunk to background:', err);
+                    });
+                  }
+                };
+                reader.readAsDataURL(chunkPayload);
+              } else {
+                if (chrome?.runtime?.sendMessage) {
+                  chrome.runtime.sendMessage({
+                    action: 'live-caption/offscreen/finalized-chunk',
+                    target: 'background',
+                    source: 'offscreen',
+                    sessionId: sessionSnapshot.sessionId,
+                    tabId: sessionSnapshot.tabId,
+                    videoFingerprint: sessionSnapshot.videoFingerprint,
+                    chunkStartMs: chunkStartMsVal,
+                    chunkEndMs,
+                    mimeType: mediaRecorder.mimeType || 'audio/webm',
+                    payloadKind: 'blob',
+                    chunkPayload
+                  }).catch((err) => {
+                    logger.error('Failed to send finalized chunk to background:', err);
+                  });
+                }
               }
 
               this.chunkStartMs = chunkEndMs;

@@ -114,4 +114,53 @@ describe('OpenAIWhisperProvider', () => {
       });
     expect(requestImpl).toHaveBeenCalledTimes(2);
   });
+
+  it('converts dataURL audio chunk to Blob with correct mime/size', async () => {
+    requestImpl.mockResolvedValue({ text: 'parsed data url' });
+    const provider = new OpenAIWhisperProvider({
+      apiKey: 'test-key',
+      requestImpl
+    });
+
+    // "hello" in base64 is aGVsbG8=
+    const dataUrl = 'data:audio/webm;base64,aGVsbG8=';
+    const result = await provider.transcribeChunk(dataUrl);
+
+    expect(requestImpl).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe('parsed data url');
+    
+    // Inspect that buildRequest gets called with correct blob properties
+    const lastRequest = requestImpl.mock.calls[0][0];
+    const fileBlob = lastRequest.body.get('file');
+    expect(fileBlob.type).toBe('audio/webm');
+    expect(fileBlob.size).toBe(5); // "hello" is 5 bytes
+  });
+
+  it('fails with INVALID_AUDIO_CHUNK for invalid base64 payload', async () => {
+    const provider = new OpenAIWhisperProvider({
+      apiKey: 'test-key',
+      requestImpl
+    });
+
+    // Invalid base64 characters
+    await expect(provider.transcribeChunk('data:audio/webm;base64,!!!invalid!!!'))
+      .rejects.toMatchObject({
+        code: STT_PROVIDER_ERROR_CODES.INVALID_AUDIO_CHUNK
+      });
+    expect(requestImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty audio blob with INVALID_AUDIO_CHUNK before API call', async () => {
+    const provider = new OpenAIWhisperProvider({
+      apiKey: 'test-key',
+      requestImpl
+    });
+
+    const emptyBlob = new Blob([], { type: 'audio/webm' });
+    await expect(provider.transcribeChunk(emptyBlob))
+      .rejects.toMatchObject({
+        code: STT_PROVIDER_ERROR_CODES.INVALID_AUDIO_CHUNK
+      });
+    expect(requestImpl).not.toHaveBeenCalled();
+  });
 });

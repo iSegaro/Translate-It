@@ -167,6 +167,7 @@ describe('live-caption runtime controller', () => {
       store,
       documentRef: document,
       windowRef: window,
+      browserApi: createRuntimeBrowserApi(),
       platformSupport: createSupportedPlatformSupport()
     });
 
@@ -193,6 +194,7 @@ describe('live-caption runtime controller', () => {
       store,
       documentRef: document,
       windowRef: window,
+      browserApi: createRuntimeBrowserApi(),
       platformSupport: createSupportedPlatformSupport()
     });
 

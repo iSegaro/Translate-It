@@ -62,7 +62,8 @@ export class LiveCaptionBackgroundController {
         sessionManager,
         captureCoordinator,
         cache: this.cache,
-        browserApi: offscreenBridge.browserApi
+        browserApi: offscreenBridge.browserApi,
+        onError: (error, context) => this.handleCoordinatorError(error, context)
       });
     this.sttCoordinator =
       sttCoordinator ||
@@ -72,7 +73,8 @@ export class LiveCaptionBackgroundController {
         cache: this.cache,
         onTranscriptSegment: async (segment, context) => {
           await this.translationCoordinator.handleTranscriptSegment(segment, context);
-        }
+        },
+        onError: (error, context) => this.handleCoordinatorError(error, context)
       });
     this.messageHandler = null;
     this.createdAt = Date.now();
@@ -159,6 +161,61 @@ export class LiveCaptionBackgroundController {
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
+    }
+  }
+
+  handleCoordinatorError(error, { sessionId, tabId, videoFingerprint }) {
+    // 1. Guard against duplicate notification or missing session
+    const session = this.sessionManager.getSession(tabId);
+    if (!session || (sessionId && session.sessionId !== sessionId)) {
+      logger.debug("Ignoring coordinator error for inactive or mismatching session", { 
+        tabId, 
+        sessionId,
+        currentSessionId: session?.sessionId 
+      });
+      return;
+    }
+
+    logger.error("Live-caption coordinator error, failing closed", {
+      tabId,
+      sessionId,
+      errorCode: error?.code,
+      errorType: error?.type,
+      message: error?.message
+    });
+
+    // Ensure session is cleaned up in manager
+    this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR, error);
+
+    // Stop offscreen capture
+    this.offscreenBridge.requestRuntimeStop({
+      sessionId,
+      tabId,
+      videoFingerprint,
+      reason: "coordinator_error"
+    }).catch(() => {});
+
+    // Notify content script
+    if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
+      this.offscreenBridge.browserApi.tabs.sendMessage(tabId, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+        payload: {
+          sessionId,
+          videoFingerprint,
+          reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
+          error: {
+            code: error?.code || "unknown_error",
+            message: error?.message || "Live Caption transcription failed",
+            type: error?.type || "unknown",
+            providerId: error?.providerId || null
+          }
+        }
+      }).catch((err) => {
+        logger.warn("Failed to send error notification to content tab", {
+          tabId,
+          error: err.message
+        });
+      });
     }
   }
 
@@ -1144,14 +1201,26 @@ export class LiveCaptionBackgroundController {
       });
 
       if (!normalized.ok) {
+        // Check if this is likely a late chunk after intentional stop
+        const { tabId, sessionId } = normalized;
+        if (tabId != null && sessionId) {
+          const cleanupMetadata = this.sessionManager.cleanupMetadataByTab.get(tabId);
+          if (cleanupMetadata && cleanupMetadata.sessionId === sessionId) {
+            logger.debug("Ignoring late finalized chunk for recently cleaned up session", { tabId, sessionId });
+            const response = { success: true, message: "Ignored late chunk" };
+            if (sendResponse) sendResponse(response);
+            return response;
+          }
+        }
         throw normalized.error || new Error("Invalid chunk response");
       }
 
       // Validate metadata fields explicitly
+      const { tabId, sessionId, videoFingerprint } = normalized;
       if (
-        !normalized.sessionId ||
-        !normalized.tabId ||
-        !normalized.videoFingerprint ||
+        !sessionId ||
+        !tabId ||
+        !videoFingerprint ||
         normalized.chunkStartMs == null ||
         normalized.chunkEndMs == null ||
         !normalized.mimeType
@@ -1161,8 +1230,17 @@ export class LiveCaptionBackgroundController {
         );
       }
 
-      let session = this.sessionManager.getSession(normalized.tabId);
-      if (!session || session.sessionId !== normalized.sessionId) {
+      let session = this.sessionManager.getSession(tabId);
+      if (!session || session.sessionId !== sessionId) {
+        // Check cleanup metadata before attempting reconciliation
+        const cleanupMetadata = this.sessionManager.cleanupMetadataByTab.get(tabId);
+        if (cleanupMetadata && cleanupMetadata.sessionId === sessionId) {
+          logger.debug("Ignoring late finalized chunk (session mismatch) for recently cleaned up session", { tabId, sessionId });
+          const response = { success: true, message: "Ignored late chunk" };
+          if (sendResponse) sendResponse(response);
+          return response;
+        }
+
         session = await this._reconcileOrphanedSession(normalized);
       }
 

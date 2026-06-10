@@ -11,36 +11,70 @@ const DEFAULT_MODEL = 'whisper-1';
 export const OPENAI_WHISPER_PROVIDER_ID = 'openai_whisper';
 
 function toBlob(audioChunk, mimeType = 'audio/webm') {
+  let blob = null;
+
   if (audioChunk instanceof Blob) {
-    return audioChunk;
+    blob = audioChunk;
+  } else if (audioChunk?.blob instanceof Blob) {
+    blob = audioChunk.blob;
+  } else if (audioChunk?.payload instanceof Blob) {
+    blob = audioChunk.payload;
+  } else if (audioChunk instanceof ArrayBuffer) {
+    blob = new Blob([audioChunk], { type: mimeType });
+  } else if (ArrayBuffer.isView(audioChunk)) {
+    blob = new Blob([audioChunk], { type: mimeType });
+  } else if (audioChunk?.arrayBuffer && typeof audioChunk.arrayBuffer === 'function') {
+    blob = audioChunk;
+  } else {
+    let chunkStr = null;
+    if (typeof audioChunk === 'string') {
+      chunkStr = audioChunk;
+    } else if (typeof audioChunk?.chunkPayload === 'string') {
+      chunkStr = audioChunk.chunkPayload;
+    } else if (typeof audioChunk?.payload === 'string') {
+      chunkStr = audioChunk.payload;
+    }
+
+    if (chunkStr) {
+      if (chunkStr.startsWith('data:')) {
+        try {
+          const parts = chunkStr.split(',');
+          const base64 = parts[1];
+          const mime = parts[0].split(';')[0].split(':')[1] || mimeType;
+          const binary = atob(base64);
+          const array = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+          }
+          blob = new Blob([array], { type: mime });
+        } catch (e) {
+          // Parse fail
+        }
+      } else {
+        try {
+          const binary = atob(chunkStr);
+          const array = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+          }
+          blob = new Blob([array], { type: mimeType });
+        } catch (e) {
+          // Not base64
+        }
+      }
+    }
   }
 
-  if (audioChunk?.blob instanceof Blob) {
-    return audioChunk.blob;
+  if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+    throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.INVALID_AUDIO_CHUNK, 'Live caption audio chunk is invalid or empty', {
+      providerId: OPENAI_WHISPER_PROVIDER_ID,
+      providerName: 'OpenAI Whisper',
+      type: ErrorTypes.API_RESPONSE_INVALID,
+      retryable: false
+    });
   }
 
-  if (audioChunk?.payload instanceof Blob) {
-    return audioChunk.payload;
-  }
-
-  if (audioChunk instanceof ArrayBuffer) {
-    return new Blob([audioChunk], { type: mimeType });
-  }
-
-  if (ArrayBuffer.isView(audioChunk)) {
-    return new Blob([audioChunk], { type: mimeType });
-  }
-
-  if (audioChunk?.arrayBuffer && typeof audioChunk.arrayBuffer === 'function') {
-    return audioChunk;
-  }
-
-  throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.INVALID_AUDIO_CHUNK, 'Live caption audio chunk is invalid', {
-    providerId: OPENAI_WHISPER_PROVIDER_ID,
-    providerName: 'OpenAI Whisper',
-    type: ErrorTypes.API_RESPONSE_INVALID,
-    retryable: false
-  });
+  return blob;
 }
 
 function normalizeOpenAIError(error, providerId = OPENAI_WHISPER_PROVIDER_ID) {
@@ -113,7 +147,18 @@ export class OpenAIWhisperProvider extends BaseSTTProvider {
   }
 
   async transcribeChunk(audioChunk, options = {}) {
-    const chunk = toBlob(audioChunk, options.mimeType || audioChunk?.mimeType || 'audio/webm');
+    let chunk;
+    try {
+      chunk = toBlob(audioChunk, options.mimeType || audioChunk?.mimeType || 'audio/webm');
+    } catch (err) {
+      this.logger.error(`[${this.providerName}] Failed to parse audio chunk`, {
+        providerId: this.providerId,
+        sessionId: options.sessionId ?? null,
+        error: err.message,
+        errorCode: err.code
+      });
+      throw err;
+    }
     const retryLimit = options.retryLimit ?? this.retryLimit;
 
     this.logger.debug(`[${this.providerName}] Starting transcription request`, {
@@ -122,12 +167,28 @@ export class OpenAIWhisperProvider extends BaseSTTProvider {
       videoFingerprint: options.videoFingerprint ?? null,
       chunkStartMs: options.chunkStartMs ?? null,
       chunkEndMs: options.chunkEndMs ?? null,
+      audioSizeBytes: chunk.size,
+      audioMimeType: chunk.type,
       retryLimit
     });
 
     const result = await this.executeWithRetry(async () => {
-      const rawResponse = await this.requestImpl(this._buildRequest(chunk, options), options);
-      return this._normalizeTranscriptionResult(rawResponse, options);
+      try {
+        const rawResponse = await this.requestImpl(this._buildRequest(chunk, options), options);
+        return this._normalizeTranscriptionResult(rawResponse, options);
+      } catch (err) {
+        this.logger.warn(`[${this.providerName}] Attempt execution failed`, {
+          providerId: this.providerId,
+          sessionId: options.sessionId ?? null,
+          videoFingerprint: options.videoFingerprint ?? null,
+          statusCode: err.statusCode ?? err.status ?? null,
+          errorType: err.type ?? null,
+          errorMessage: err.message ?? null,
+          audioSizeBytes: chunk.size,
+          audioMimeType: chunk.type
+        });
+        throw err;
+      }
     }, {
       retryLimit,
       sessionId: options.sessionId ?? null,
@@ -207,10 +268,14 @@ export class OpenAIWhisperProvider extends BaseSTTProvider {
       const error = new Error(typeof payload === 'string' ? payload : payload?.error?.message || response.statusText || 'OpenAI Whisper request failed');
       error.statusCode = response.status;
       error.response = payload;
+      
+      const msg = (error.message || '').toLowerCase();
+      const isQuotaError = msg.includes('quota') || msg.includes('balance') || msg.includes('insufficient');
+
       error.type = response.status === 401 || response.status === 403
         ? ErrorTypes.API_KEY_INVALID
         : response.status === 429
-          ? ErrorTypes.RATE_LIMIT_REACHED
+          ? (isQuotaError ? ErrorTypes.QUOTA_EXCEEDED : ErrorTypes.RATE_LIMIT_REACHED)
           : response.status >= 500
             ? ErrorTypes.SERVER_ERROR
             : ErrorTypes.API_RESPONSE_INVALID;

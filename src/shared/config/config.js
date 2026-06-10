@@ -266,7 +266,7 @@ export const CONFIG = {
   ENABLE_DICTIONARY: true, // با مکانیزم تشخیص کلمه، بعنوان دیکشنری پاسخ را نمایش میدهد
   ENABLE_SCREEN_CAPTURE: true, // فعال کردن قابلیت Screen Capture Translator
   // --- Live Caption Translation Scaffolding ---
-  LIVE_CAPTION_ENABLED: true, // Master toggle for the live-caption MVP scaffolding
+  LIVE_CAPTION_ENABLED: false, // Master toggle for the live-caption MVP scaffolding
   [LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE]: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   LIVE_CAPTION_QUALITY_PROFILE: 'balanced', // fast, balanced, accurate
   LIVE_CAPTION_CACHE_MAX_ITEMS: 500, // Maximum cached caption segments per video

@@ -236,7 +236,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     error = null
   } = {}) => {
     isEnabled.value = false;
-    overlayVisible.value = false;
+    overlayVisible.value = Boolean(error);
     consentNoticeVisible.value = false;
     consentAccepted.value = false;
 
@@ -257,8 +257,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
 
     controlsState.value = {
       canStart: true,
-      canStop: false,
-      canRetry: false,
+      canStop: Boolean(error), // Allow closing the error overlay via Stop
+      canRetry: Boolean(error),
       canPause: false,
       canResume: false,
       canClearCache: false

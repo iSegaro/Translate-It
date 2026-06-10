@@ -18,7 +18,6 @@ describe('live-caption store shell', () => {
     expect(store.activeSessionState).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
     expect(store.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
     expect(store.isEnabled).toBe(false);
-    expect(store.isEnabled).toBe(false);
     expect(store.overlayVisible).toBe(false);
     expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.consentAccepted).toBe(false);
@@ -29,7 +28,6 @@ describe('live-caption store shell', () => {
     });
     expect(store.captionDisplayMode).toBe(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY);
     expect(store.sessionId).toBe(null);
-    expect(store.isEnabled).toBe(false);
     expect(store.activeVideoState).toBe(null);
     expect(store.captionLines).toEqual([]);
     expect(store.controlsState).toEqual({

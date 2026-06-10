@@ -37,6 +37,7 @@ import {
   createLiveCaptionRuntimeFailClosedResponse
 } from '../background/liveCaptionRuntimeContracts.js';
 import { useLiveCaptionStore } from '../stores/liveCaption.js';
+import { getFriendlyLiveCaptionError } from '../utils/liveCaptionErrorUtils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionRuntimeController');
 
@@ -198,9 +199,9 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
           const { sessionId, videoFingerprint, segment } = message.payload || {};
           this.handleTranslateResult({ sessionId, videoFingerprint, segment });
         } else if (message.action === LIVE_CAPTION_ACTIONS.RUNTIME_STOP) {
-          const { reason } = message.payload || {};
-          logger.warn('Live-caption runtime forcefully stopped by background', { reason });
-          this.stop(reason, { notifyContent: false, forceLocal: true }).catch(() => {});
+          const { reason, error } = message.payload || {};
+          logger.warn('Live-caption runtime forcefully stopped by background', { reason, error });
+          this.stop(reason, { notifyContent: false, forceLocal: true, error }).catch(() => {});
         }
       };
 
@@ -891,6 +892,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       this.pageSession.start();
 
       this.store?.clearStartupDeniedReason?.();
+      this.store?.setError?.(null);
       this.store?.setOverlayVisible?.(true);
       this.store?.setEnabled?.(true);
       this._setStoreContext(tabId, this.currentVideoFingerprint, this.pageSession.sessionId);
@@ -1088,7 +1090,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     return this.getSnapshot();
   }
 
-  async stop(reason = LIVE_CAPTION_CLEANUP_REASONS.STOP, { notifyContent = true, clearCache = false, forceLocal = false } = {}) {
+  async stop(reason = LIVE_CAPTION_CLEANUP_REASONS.STOP, { notifyContent = true, clearCache = false, forceLocal = false, error = null } = {}) {
     if ((this.destroyed && !this.pageSession) || (!this.started && !this.pageSession && !this.currentVideoElement)) {
       return this.getSnapshot();
     }
@@ -1123,10 +1125,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     const sessionCleanupMetadata = this.tabId != null
       ? this.sessionManager.getSessionCleanupMetadata?.(this.tabId) ?? null
       : null;
+    
+    const cleanupError = error || sessionCleanupMetadata?.error || null;
     const cleanupResult = this.cleanupCoordinator.createCleanupResult({
       plan: cleanupPlan,
       status: sessionCleanupMetadata?.status ?? null,
-      error: sessionCleanupMetadata?.error ?? null,
+      error: cleanupError,
       sessionSnapshot: sessionCleanupMetadata?.snapshot ?? sessionSnapshot ?? null
     });
 
@@ -1139,6 +1143,11 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.paused = false;
     this.lastCleanupResult = cleanupResult;
 
+    const friendlyError = cleanupResult.error ? {
+      ...cleanupResult.error,
+      message: getFriendlyLiveCaptionError(cleanupResult.error)
+    } : null;
+
     this.store?.applyCleanupResult?.({
       sessionStatus: cleanupResult.sessionStatus,
       runtimeState: cleanupResult.status === LIVE_CAPTION_CLEANUP_RESULT_STATUSES.COMPLETED
@@ -1148,10 +1157,11 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       clearCaptions: cleanupResult.clearCaptions,
       clearSessionIdentity: true,
       clearConsent: true,
-      error: cleanupResult.error
+      error: friendlyError
     });
 
-    this.store?.setOverlayVisible?.(false);
+    const hasError = Boolean(friendlyError);
+    this.store?.setOverlayVisible?.(hasError);
     this.store?.setEnabled?.(false);
     this.store?.clearActiveVideoState?.();
     this.store?.setRuntimeStatus?.(

@@ -155,8 +155,8 @@ describe('ContentApp - Live Caption Consent Notice Integration', () => {
     expect(store.overlayVisible).toBe(false);
     expect(store.consentNoticeVisible).toBe(false);
 
-    // Simulate clicking FAB (emits event on pageEventBus)
-    pageEventBus.emit('live-caption-start-request');
+    // Simulate clicking Popup start (emits event on pageEventBus)
+    pageEventBus.emit('live-caption-start-request-popup');
     await nextTick();
 
     // Verify that store states are correctly updated to show consent notice first

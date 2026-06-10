@@ -11,7 +11,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionTranslat
  * Manages FIFO queueing, translation request dispatch, abort routing, and session state mapping.
  */
 export class LiveCaptionTranslationCoordinator {
-  constructor({ sessionManager, captureCoordinator, cache = null, translationAdapter = null, browserApi = null } = {}) {
+  constructor({ sessionManager, captureCoordinator, cache = null, translationAdapter = null, browserApi = null, onError = null } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionTranslationCoordinator requires a sessionManager');
     }
@@ -20,6 +20,7 @@ export class LiveCaptionTranslationCoordinator {
     this.cache = cache;
     this.translationAdapter = translationAdapter || new LiveCaptionTranslationAdapter();
     this.browserApi = browserApi || (typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null);
+    this.onError = onError;
     this.sessionQueues = new Map();
     this.activeAbortControllers = new Map();
     this.maxPendingSegments = 5;
@@ -244,6 +245,14 @@ export class LiveCaptionTranslationCoordinator {
 
     if (this.captureCoordinator && this.captureCoordinator.sessionId === sessionId) {
       this.captureCoordinator.failClosed('translation_failure', error);
+    }
+
+    if (this.onError) {
+      this.onError(error, { 
+        sessionId, 
+        tabId, 
+        videoFingerprint: pageSession?.activeVideoFingerprint || this.captureCoordinator?.videoFingerprint 
+      });
     }
   }
 

@@ -59,7 +59,7 @@ describe('Settings Store', () => {
 
   it('should initialize live-caption scaffolding defaults', () => {
     const store = useSettingsStore();
-    expect(store.settings.LIVE_CAPTION_ENABLED).toBe(false);
+    expect(store.settings.LIVE_CAPTION_ENABLED).toBe(true);
     expect(store.settings.LIVE_CAPTION_DISPLAY_MODE).toBe('translated_only');
     expect(store.settings.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
     expect(store.settings.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
