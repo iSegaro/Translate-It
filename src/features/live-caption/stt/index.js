@@ -20,6 +20,7 @@ import {
 } from './STTProviderManifest.js';
 import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
+import { MockSTTProvider } from './providers/MockSTTProvider.js';
 
 export {
   BaseSTTProvider,
@@ -43,6 +44,7 @@ export {
 } from './STTProviderManifest.js';
 export { STTProviderFactory } from './STTProviderFactory.js';
 export { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
+export { MockSTTProvider } from './providers/MockSTTProvider.js';
 
 export default {
   BaseSTTProvider,
@@ -62,5 +64,6 @@ export default {
   getAvailableSTTProviders,
   isSTTProviderSupported,
   STTProviderFactory,
-  OpenAIWhisperProvider
+  OpenAIWhisperProvider,
+  MockSTTProvider
 };

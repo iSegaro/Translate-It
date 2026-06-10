@@ -116,6 +116,17 @@ export class STTProviderFactory {
       return provider;
     }
 
+    if (providerId === STT_PROVIDER_IDS.MOCK) {
+      const ProviderClass = definition.providerClass;
+      const provider = new ProviderClass(options);
+
+      if (cacheKey) {
+        this.providerInstances.set(cacheKey, provider);
+      }
+
+      return provider;
+    }
+
     throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${providerId}' is not supported`, {
       providerId,
       providerName: definition.displayName,

@@ -1,0 +1,22 @@
+{
+  "success": [
+    "Welcome to the demonstration of our new speech-to-text capabilities.",
+    "The system is currently processing audio chunks in real-time.",
+    "Live captioning allows users to follow along with video content more easily.",
+    "We are testing the sequential playback of these mock transcripts.",
+    "This provider simulates a high-quality transcription service without network overhead.",
+    "The quick brown fox jumps over the lazy dog.",
+    "Artificial intelligence is transforming how we interact with media.",
+    "Thank you for using the Translate It extension."
+  ],
+  "error": {
+    "message": "Simulated Mock STT transcription failure",
+    "code": "transcription_failed"
+  },
+  "slow": [
+    "This is a simulated slow transcription response...",
+    "Wait for it... still processing the audio stream.",
+    "Latency simulation is important for testing UI responsiveness."
+  ],
+  "empty": []
+}
