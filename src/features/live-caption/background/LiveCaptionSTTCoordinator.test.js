@@ -14,6 +14,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
+vi.mock('@/shared/config/config.js', () => ({
+  getLiveCaptionSttProviderAsync: vi.fn().mockResolvedValue('openai_whisper')
+}));
+
 describe('live-caption STT coordinator', () => {
   let sessionManager;
   let captureCoordinator;
@@ -32,7 +36,9 @@ describe('live-caption STT coordinator', () => {
     };
 
     mockFactory = {
-      getProvider: vi.fn().mockResolvedValue(mockProvider)
+      getProvider: vi.fn().mockResolvedValue(mockProvider),
+      getDefaultProviderId: vi.fn().mockReturnValue('openai_whisper'),
+      getProviderDefinition: vi.fn().mockReturnValue({ displayName: 'OpenAI Whisper' })
     };
 
     mockCache = {
@@ -112,10 +118,12 @@ describe('live-caption STT coordinator', () => {
 
     // Send first chunk
     await coordinator.handleFinalizedChunk(chunk1);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // flush async config lookup microtasks
     expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(1);
 
     // Send second chunk while first is in-flight
     await coordinator.handleFinalizedChunk(chunk2);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     // Should not call transcribeChunk yet since queue is processing chunk1
     expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(1);
 
@@ -225,6 +233,8 @@ describe('live-caption STT coordinator', () => {
       chunkPayload: { size: 100 }
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     // Stop coordinator session
     coordinator.stopSession('session-1');
 
@@ -261,6 +271,8 @@ describe('live-caption STT coordinator', () => {
       mimeType: 'audio/webm',
       chunkPayload: { size: 100 }
     });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     coordinator.pauseSession('session-1');
 
@@ -299,6 +311,8 @@ describe('live-caption STT coordinator', () => {
       mimeType: 'audio/webm',
       chunkPayload: { size: 100 }
     });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Wait a brief moment for async queue loop to execute catch block
     await new Promise((resolve) => setTimeout(resolve, 10));

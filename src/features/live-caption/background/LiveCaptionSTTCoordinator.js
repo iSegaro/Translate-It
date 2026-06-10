@@ -4,6 +4,8 @@ import { STTProviderFactory } from '../stt/STTProviderFactory.js';
 import { createSTTProviderError, STT_PROVIDER_ERROR_CODES } from '../stt/BaseSTTProvider.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
+import { getLiveCaptionSttProviderAsync } from '@/shared/config/config.js';
+
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionSTTCoordinator');
 
 /**
@@ -120,20 +122,21 @@ export class LiveCaptionSTTCoordinator {
         const abortController = new AbortController();
         this.activeAbortControllers.set(sessionId, abortController);
 
+        let provider;
+        try {
+          const configuredProviderId = await getLiveCaptionSttProviderAsync();
+          provider = await this.sttFactory.getProvider(configuredProviderId);
+        } catch (factoryError) {
+          this.failClosed(sessionId, tabId, factoryError);
+          throw factoryError;
+        }
+
         logger.debug('Starting transcription dispatch for chunk', {
           providerId: provider.providerId,
           sessionId,
           chunkStartMs: chunk.chunkStartMs,
           chunkEndMs: chunk.chunkEndMs
         });
-
-        let provider;
-        try {
-          provider = await this.sttFactory.getProvider();
-        } catch (factoryError) {
-          this.failClosed(sessionId, tabId, factoryError);
-          throw factoryError;
-        }
 
         try {
           const result = await provider.transcribeChunk(chunk.chunkPayload, {

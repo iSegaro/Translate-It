@@ -977,6 +977,13 @@ export const getPromptBASEScreenCaptureAsync = async () => {
   return getSettingValueAsync("PROMPT_BASE_SCREEN_CAPTURE", CONFIG.PROMPT_BASE_SCREEN_CAPTURE);
 };
 
+export const getLiveCaptionSttProviderAsync = async () => {
+  return getSettingValueAsync(
+    LIVE_CAPTION_SETTINGS_KEYS?.STT_PROVIDER || 'LIVE_CAPTION_STT_PROVIDER', 
+    CONFIG.LIVE_CAPTION_STT_PROVIDER || 'openai_whisper'
+  );
+};
+
 export const getTranslationApiAsync = async () => {
   const result = await getSettingValueAsync("TRANSLATION_API", CONFIG.TRANSLATION_API);
   // Translation API retrieved - logged at TRACE level for detailed debugging
