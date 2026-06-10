@@ -291,4 +291,21 @@ describe('TranslationDisplay.vue', () => {
     expect(link.attributes('target')).toBe('_blank');
     expect(link.attributes('rel')).toBe('noopener noreferrer');
   });
+
+  it('renders a code block (pre) inside simple-markdown', async () => {
+    const wrapper = await mountDisplay({
+      content: '```js\nconst x = 1;\n```',
+      lastTranslation: null,
+    });
+    expect(wrapper.find('.simple-markdown pre').exists()).toBe(true);
+    expect(wrapper.find('.simple-markdown pre code').exists()).toBe(true);
+  });
+
+  it('renders plain text with line breaks as br tags or paragraphs', async () => {
+    const wrapper = await mountDisplay({
+      content: 'Line 1\nLine 2',
+      enableMarkdown: false,
+    });
+    expect(wrapper.html()).toContain('Line 1<br>Line 2');
+  });
 });

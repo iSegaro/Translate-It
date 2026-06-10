@@ -228,6 +228,8 @@
 
   // Markdown Elements
   .simple-markdown {
+    white-space: normal !important;
+
     ul, ol {
       list-style-position: outside !important;
       padding-inline-start: 1.25em !important;
@@ -292,6 +294,7 @@
     }
 
     code {
+      white-space: normal !important;
       background-color: var(--color-code-inline-bg, rgb(0 0 0 / 10%)) !important;
       padding: 2px 4px !important;
       border-radius: 3px !important;
@@ -300,6 +303,7 @@
     }
 
     pre {
+      white-space: pre !important;
       background-color: var(--color-code-block-bg, rgb(0 0 0 / 5%)) !important;
       padding: 12px !important;
       border-radius: 4px !important;
@@ -307,6 +311,10 @@
       font-family: "Courier New", monospace !important;
       font-size: 13px !important;
       margin: 8px 0 !important;
+
+      code {
+        white-space: pre !important;
+      }
     }
 
     blockquote {

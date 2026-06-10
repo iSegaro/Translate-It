@@ -10,6 +10,19 @@
   line-height: 1.6;
   color: var(--color-text);
 
+  // Safely reset white-space on simple-markdown to collapse inter-element spacing
+  &.simple-markdown {
+    white-space: normal;
+
+    pre {
+      white-space: pre;
+
+      code {
+        white-space: pre;
+      }
+    }
+  }
+
   // Headers with consistent spacing
   h1, h2, h3, h4, h5, h6 {
     color: var(--color-text);
