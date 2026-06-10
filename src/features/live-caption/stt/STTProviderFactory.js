@@ -1,4 +1,4 @@
-import { getOpenAIApiKeyAsync, CONFIG } from '@/shared/config/config.js';
+import { getOpenAIApiKeyAsync, CONFIG, IsDebug } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -42,7 +42,8 @@ export class STTProviderFactory {
     }
 
     // Defensive Check: Enforce Debug Mode for development-only providers
-    if (definition.developmentOnly && !CONFIG.DEBUG_MODE) {
+    const isDebug = await IsDebug();
+    if (definition.developmentOnly && !isDebug) {
       throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${resolvedProviderId}' is restricted to debug mode`, {
         providerId: resolvedProviderId,
         providerName: definition.displayName,

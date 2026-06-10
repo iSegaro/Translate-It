@@ -19,7 +19,8 @@ vi.mock('@/shared/config/config.js', () => ({
     LIVE_CAPTION_RETRY_LIMIT: 2,
     LIVE_CAPTION_STT_PROVIDER: 'openai_whisper'
   },
-  getOpenAIApiKeyAsync: vi.fn().mockResolvedValue('test-openai-key')
+  getOpenAIApiKeyAsync: vi.fn().mockResolvedValue('test-openai-key'),
+  IsDebug: vi.fn().mockResolvedValue(false)
 }));
 
 vi.mock('@/features/translation/providers/ProviderFactory.js', () => ({
