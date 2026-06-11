@@ -479,6 +479,31 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     for (const eventName of documentEvents) {
       this.addEventListener(this.documentRef, eventName, (event) => {
         this._markVideoInteractionFromEvent(event);
+        
+        const target = event?.target;
+        if (target && target === this.currentVideoElement) {
+          if (event.type === 'pause' || event.type === 'ended') {
+            if (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.RUNNING) {
+              const reason = event.type === 'ended' ? 'video_ended' : 'video_pause';
+              logger.info('Active video paused or ended; pausing live-caption runtime', {
+                reason,
+                sessionId: this.pageSession?.sessionId ?? null,
+                videoFingerprint: this.currentVideoFingerprint
+              });
+              this.pause(reason).catch(() => {});
+            }
+          } else if (event.type === 'play' || event.type === 'playing') {
+            if (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.PAUSED) {
+              logger.info('Active video resumed; resuming live-caption runtime', {
+                reason: event.type,
+                sessionId: this.pageSession?.sessionId ?? null,
+                videoFingerprint: this.currentVideoFingerprint
+              });
+              this.resume().catch(() => {});
+            }
+          }
+        }
+
         this._scheduleScan(eventName);
       }, true);
     }

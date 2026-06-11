@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import useLiveCaptionStore from '../stores/liveCaption.js';
 import { LiveCaptionRuntimeController } from './LiveCaptionRuntimeController.js';
@@ -663,5 +663,122 @@ describe('live-caption runtime controller', () => {
     expect(store.captionLines[0].originalText).toBe('Translated text original');
     expect(store.captionLines[1].translatedText).toBeUndefined();
     expect(store.captionLines[1].originalText).toBe('Untranslated transcript');
+  });
+
+  describe('playback synchronization', () => {
+    let store;
+    let browserApi;
+    let controller;
+    let activeVideo;
+    let nonActiveVideo;
+
+    beforeEach(async () => {
+      store = useLiveCaptionStore();
+      store.acceptConsent();
+      browserApi = createRuntimeBrowserApi();
+      
+      controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi,
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      activeVideo = createVideo({ src: 'http://example.com/active.mp4', paused: false });
+      nonActiveVideo = createVideo({ src: 'http://example.com/non-active.mp4', paused: false });
+      
+      document.body.appendChild(activeVideo);
+      document.body.appendChild(nonActiveVideo);
+
+      // Rank candidates so activeVideo is ranked 1st
+      Object.defineProperty(activeVideo, 'paused', { value: false, configurable: true });
+      Object.defineProperty(nonActiveVideo, 'paused', { value: true, configurable: true });
+
+      await controller.start({ tabId: 11 });
+      
+      // Spy on pause and resume
+      vi.spyOn(controller, 'pause');
+      vi.spyOn(controller, 'resume');
+    });
+
+    afterEach(() => {
+      activeVideo.remove();
+      nonActiveVideo.remove();
+    });
+
+    it('pauses runtime when active video pauses', async () => {
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+      
+      // Simulate pause event on active video
+      const pauseEvent = new Event('pause', { bubbles: true });
+      Object.defineProperty(pauseEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(pauseEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.pause).toHaveBeenCalledWith('video_pause');
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
+
+    it('pauses runtime when active video ends', async () => {
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+      
+      // Simulate ended event on active video
+      const endedEvent = new Event('ended', { bubbles: true });
+      Object.defineProperty(endedEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(endedEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.pause).toHaveBeenCalledWith('video_ended');
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
+
+    it('resumes runtime when active video plays/resumes', async () => {
+      // First pause it
+      const pauseEvent = new Event('pause', { bubbles: true });
+      Object.defineProperty(pauseEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(pauseEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      
+      // Simulate play event on active video
+      const playEvent = new Event('play', { bubbles: true });
+      Object.defineProperty(playEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(playEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.resume).toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    });
+
+    it('ignores playback events from non-active videos', async () => {
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+      
+      // Simulate pause event on non-active video
+      const pauseEvent = new Event('pause', { bubbles: true });
+      Object.defineProperty(pauseEvent, 'target', { value: nonActiveVideo, configurable: true });
+      document.dispatchEvent(pauseEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.pause).not.toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    });
+
+    it('does not duplicate resume if already running', async () => {
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+      
+      const playEvent = new Event('play', { bubbles: true });
+      Object.defineProperty(playEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(playEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.resume).not.toHaveBeenCalled();
+    });
   });
 });
