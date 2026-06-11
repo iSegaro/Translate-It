@@ -1286,6 +1286,12 @@
   "advance_debug_mode_label": {
     "message": "حالت اشکال‌زدایی (Debug Mode)"
   },
+  "live_caption_enable_label": {
+    "message": "فعال‌سازی کپشن زنده"
+  },
+  "live_caption_enable_desc": {
+    "message": "نمایش دکمه میانبر کپشن زنده در پاپ‌آپ افزونه و فعال‌سازی ترجمه کپشن‌ها."
+  },
   "live_caption_stt_provider_label": {
     "message": "[DEBUG] سرویس‌دهنده STT"
   },

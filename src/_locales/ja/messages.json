@@ -1286,6 +1286,12 @@
   "advance_debug_mode_label": {
     "message": "デバッグモード"
   },
+  "live_caption_enable_label": {
+    "message": "ライブキャプションを有効にする"
+  },
+  "live_caption_enable_desc": {
+    "message": "拡張機能ポップアップにライブキャプションのショートカットボタンを表示し、字幕の翻訳を許可します。"
+  },
   "live_caption_stt_provider_label": {
     "message": "[DEBUG] STTプロバイダー"
   },

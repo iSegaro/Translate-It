@@ -33,6 +33,28 @@
 
       <div class="section-separator" />
 
+      <!-- Master Enable Toggle -->
+      <div
+        v-if="isSupportedPlatform"
+        id="LIVE_CAPTION_ENABLED_SECTION"
+        class="setting-group"
+      >
+        <div class="setting-row">
+          <div class="setting-info">
+            <BaseCheckbox
+              id="LIVE_CAPTION_ENABLED"
+              v-model="liveCaptionEnabled"
+              :label="t('live_caption_enable_label') || 'Enable Live Caption'"
+            />
+            <p class="setting-description">
+              {{ t('live_caption_enable_desc') || 'Display Live Caption shortcut button in the extension popup and allow caption translation.' }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="isSupportedPlatform" class="section-separator" />
+
       <!-- Display Mode Selection -->
       <div
         v-if="isSupportedPlatform"
@@ -159,6 +181,7 @@ import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache
 import browser from 'webextension-polyfill'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 
 // Logger
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LiveCaptionTab')
@@ -168,6 +191,7 @@ const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 
 // State
+const liveCaptionEnabled = ref(false)
 const displayMode = ref(LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY)
 const sttProvider = ref(STT_PROVIDER_IDS.OPENAI_WHISPER)
 const isClearingCache = ref(false)
@@ -234,7 +258,14 @@ const checkOpenAIKey = async () => {
   }
 }
 
+let isHydrating = true
+
 const loadSettings = () => {
+  // Load enabled status from settings if available
+  if (settingsStore.settings && settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.ENABLED] !== undefined) {
+    liveCaptionEnabled.value = !!settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.ENABLED]
+  }
+
   // Load display mode from settings if available
   if (settingsStore.settings && settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE]) {
     displayMode.value = normalizeLiveCaptionCaptionDisplayMode(settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE])
@@ -243,6 +274,18 @@ const loadSettings = () => {
   // Load STT provider from settings if available
   if (settingsStore.settings && settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]) {
     sttProvider.value = settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]
+  }
+
+  isHydrating = false
+}
+
+// Watch for enable changes and save to settings
+const saveEnabled = async (newVal) => {
+  try {
+    await settingsStore.updateSettingAndPersist(LIVE_CAPTION_SETTINGS_KEYS.ENABLED, newVal)
+    logger.debug('Live Caption enabled state saved', { enabled: newVal })
+  } catch (error) {
+    logger.error('Failed to save Live Caption enabled state', { error })
   }
 }
 
@@ -272,13 +315,21 @@ onMounted(() => {
   checkOpenAIKey()
 })
 
+// Watch enable changes
+watch(liveCaptionEnabled, (newVal) => {
+  if (isHydrating) return
+  saveEnabled(newVal)
+})
+
 // Watch display mode changes
 watch(displayMode, (newMode) => {
+  if (isHydrating) return
   saveDisplayMode(newMode)
 })
 
 // Watch STT provider changes
 watch(sttProvider, (newProvider) => {
+  if (isHydrating) return
   saveSTTProvider(newProvider)
 })
 </script>

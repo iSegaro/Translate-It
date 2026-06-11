@@ -380,6 +380,12 @@
   "live_caption_tab_desc": {
     "message": "Capture and translate audio from active tab videos using OpenAI Whisper. Chrome/Edge desktop only."
   },
+  "live_caption_enable_label": {
+    "message": "Enable Live Caption"
+  },
+  "live_caption_enable_desc": {
+    "message": "Display Live Caption shortcut button in the extension popup and allow caption translation."
+  },
   "live_caption_display_mode_label": {
     "message": "Caption Display Mode"
   },
