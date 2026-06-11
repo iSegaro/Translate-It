@@ -419,4 +419,52 @@ describe('live-caption overlay shell', () => {
     expect(wrapper.emitted('resume')).toHaveLength(1);
     expect(wrapper.emitted('retry')).toHaveLength(1);
   });
+
+  it('limits rendering to the most recent 2 caption segments and keeps bilingual pairs together', () => {
+    const wrapper = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 1000,
+            segmentEndMs: 2000,
+            originalText: 'Line 1 Original',
+            translatedText: 'Line 1 Translation',
+            isFinal: true
+          },
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 2000,
+            segmentEndMs: 3000,
+            originalText: 'Line 2 Original',
+            translatedText: 'Line 2 Translation',
+            isFinal: true
+          },
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 3000,
+            segmentEndMs: 4000,
+            originalText: 'Line 3 Original',
+            translatedText: 'Line 3 Translation',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    const lines = wrapper.findAll('.live-caption-caption-line');
+    expect(lines).toHaveLength(2);
+
+    // Should only contain Line 2 and Line 3 (the most recent ones)
+    expect(wrapper.text()).not.toContain('Line 1 Original');
+    expect(wrapper.text()).not.toContain('Line 1 Translation');
+    expect(wrapper.text()).toContain('Line 2 Original');
+    expect(wrapper.text()).toContain('Line 2 Translation');
+    expect(wrapper.text()).toContain('Line 3 Original');
+    expect(wrapper.text()).toContain('Line 3 Translation');
+  });
 });

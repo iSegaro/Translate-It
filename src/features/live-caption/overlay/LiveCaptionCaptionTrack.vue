@@ -29,15 +29,19 @@ const props = defineProps({
   }
 });
 
-const finalizedLines = computed(() => (Array.isArray(props.captionLines)
-  ? props.captionLines.filter((line) => {
-      if (line?.isFinal === false) {
-        return false;
-      }
-      const text = line?.translatedText || line?.originalText || '';
-      return text.trim().length > 0;
-    })
-  : []));
+const MAX_VISIBLE_CAPTION_SEGMENTS = 2;
+
+const finalizedLines = computed(() => {
+  if (!Array.isArray(props.captionLines)) return [];
+  const lines = props.captionLines.filter((line) => {
+    if (line?.isFinal === false) {
+      return false;
+    }
+    const text = line?.translatedText || line?.originalText || '';
+    return text.trim().length > 0;
+  });
+  return lines.slice(-MAX_VISIBLE_CAPTION_SEGMENTS);
+});
 
 function lineKey(line) {
   return [
