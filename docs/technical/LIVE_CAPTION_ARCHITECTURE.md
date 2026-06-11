@@ -28,7 +28,7 @@ It exists as a separate feature because its execution model differs from text se
 - **Session ownership**: `PageLiveCaptionSession` is the tab-scoped owner; `VideoCaptionSession` is the per-video owner.
 - **STT/translation separation**: `BaseSTTProvider` and the STT factory/manifest are separate from the translation provider stack. Translation reuses `UnifiedTranslationService`.
 - **Per-video cache ownership**: Cache keys are based on tab identity plus video fingerprint. Transcript and translated caption data remain separate.
-- **Privacy-first design**: Consent is explicit, session-scoped, and required before capture begins. Incognito sessions remain session-only.
+- **User-triggered start flow**: Live Caption starts directly from user action in popup/FAB/options-enabled UI. Browser tab-capture permission, extension permissions, and browser user-gesture requirements remain the capture boundary. The extension does not maintain a separate consent state. Incognito sessions remain session-only.
 - **Fail-closed lifecycle behavior**: If recovery or ownership reconciliation cannot be trusted, the feature stops capture, clears volatile state, and notifies content rather than guessing.
 
 ## High-Level Architecture
@@ -53,13 +53,13 @@ Overlay Rendering
 
 ### Ownership Boundaries
 
-- **Content** consumes active-video selection results, renders the overlay, exposes consent UI, and holds UI-local state. It supplies UI-side handoff inputs but does not own active-video selection policy.
+- **Content** consumes active-video selection results, renders the overlay, and holds UI-local state. It supplies UI-side handoff inputs but does not own active-video selection policy, platform support policy, or runtime permission policy.
 - **Background Orchestration** owns the session manager, runtime message routing, handoff coordinator, cleanup coordinator, and the offscreen bridge.
 - **SessionManager** is background-owned and keeps one tab-scoped session registry while providing snapshots for recovery and cleanup.
 - **Offscreen Capture** owns the media stream and finalized audio chunks.
 - **STT Layer** owns transcription only.
 - **Translation Adapter** hands finalized transcript text to the existing translation provider flow and normalizes the result for caption rendering.
-- **Overlay Rendering** presents finalized caption lines and consent state inside the Shadow DOM host.
+- **Overlay Rendering** presents finalized caption lines inside the Shadow DOM host.
 
 ## Runtime Ownership Model
 
@@ -69,7 +69,6 @@ Owns:
 
 - active-video discovery and UI-side handoff inputs
 - the content-side `LiveCaptionRuntimeController` that observes videos and applies handoff plans
-- consent notice display and user interaction state
 - overlay rendering, position metadata, and display mode selection
 - page-local UI state in Pinia
 
@@ -100,7 +99,7 @@ Does not own:
 - overlay rendering
 - active-video detection
 - direct DOM access
-- permanent consent storage
+- browser permission prompting
 
 ### Offscreen
 
@@ -124,7 +123,6 @@ Does not own:
 Owns:
 
 - tab-scoped session identity
-- consent state
 - active video session reference
 - page-level lifecycle state
 - cleanup snapshot generation
@@ -232,7 +230,7 @@ Does not own:
 
 | Component | Idle | Active | Error | Cleanup |
 | --- | --- | --- | --- | --- |
-| `PageLiveCaptionSession` | consent/session idle | page session active | page error state | clears page-scoped state |
+| `PageLiveCaptionSession` | session idle | page session active | page error state | clears page-scoped state |
 | `VideoCaptionSession` | per-video idle | video session active | video error state | clears video-scoped state |
 | `LiveCaptionVideoHandoffCoordinator` | no plan | replace/no-op plan | does not execute runtime state | emits cleanup-only or replacement plan |
 | `LiveCaptionCleanupCoordinator` | no cleanup work | cleanup planned | fail-closed normalization | generates cleanup result |
@@ -245,7 +243,7 @@ The runtime model uses:
 - `VideoCaptionSession` for per-video ownership
 - `LiveCaptionVideoHandoffCoordinator` for deterministic active-video transition planning
 
-`PageLiveCaptionSession` coordinates the tab-level lifecycle, consent state, active-video ownership, and cache scope. `VideoCaptionSession` owns chunk sequencing, transcript accumulation, caption rendering state, and per-video persistence metadata. `LiveCaptionCleanupCoordinator` owns cleanup plan and result generation, while `LiveCaptionSessionManager` remains the tab-scoped registry and snapshot source.
+`PageLiveCaptionSession` coordinates the tab-level lifecycle, active-video ownership, and cache scope. `VideoCaptionSession` owns chunk sequencing, transcript accumulation, caption rendering state, and per-video persistence metadata. `LiveCaptionCleanupCoordinator` owns cleanup plan and result generation, while `LiveCaptionSessionManager` remains the tab-scoped registry and snapshot source.
 
 Active-video selection follows a deterministic MVP tie-break order:
 
@@ -258,7 +256,7 @@ Active-video selection follows a deterministic MVP tie-break order:
 
 ### Session Lifecycle
 
-- The page session is created only after explicit consent and supported-platform gating.
+- The page session is created from a user-triggered start action after supported-platform gating.
 - The page session owns one active video session at a time.
 - When the active video changes, the handoff coordinator produces a pure plan that either no-ops, replaces the current video session, or tears down the current target.
 - Recovery reconciliation uses session snapshots and offscreen status snapshots rather than trusting service-worker memory as the source of truth.
@@ -317,17 +315,16 @@ The overlay is rendered inside the existing Shadow DOM UI host and is intentiona
 ### Components
 
 - `LiveCaptionOverlay.vue`
-- `LiveCaptionConsentNotice.vue`
 - `LiveCaptionCaptionTrack.vue`
 - `LiveCaptionCaptionLine.vue`
 - `LiveCaptionControls.vue`
 - `useLiveCaptionOverlay.js`
 
-### Consent Flow
+### Start Flow
 
-- Consent is blocking.
-- Consent is session-scoped and required before capture starts.
-- The notice explains tab audio capture and the cache implications for normal mode and incognito mode.
+- Live Caption starts from explicit user action in the extension UI.
+- No custom extension-level consent overlay is rendered.
+- Browser permission prompts and user-gesture constraints remain the capture boundary.
 
 ### Caption Rendering
 
@@ -377,25 +374,9 @@ This avoids page-URL-only identity, which is too coarse for media sessions.
 - Persistent reads are disabled or return empty for incognito sessions.
 - In-memory session cache remains available during the current session.
 
-## Consent and Privacy
+## Privacy and Data Handling
 
-Live Caption uses session-scoped consent.
-
-### Privacy Notice
-
-The notice states:
-
-- tab audio will be captured
-- raw audio is not persisted
-- captions/transcripts may be cached outside incognito
-- incognito sessions remain session-only
-
-### Fail-Closed Rules
-
-- No capture begins without explicit acceptance.
-- Unsupported platform/browser combinations are denied deterministically.
-- Recovery reconciliation failure instructs the system to stop capture and notify content.
-- Consent is not treated as permanent state.
+Live Caption captures tab audio for STT processing after the user starts the feature. Raw audio is not persisted. Transcript and translated caption data may be cached outside incognito, while incognito sessions remain session-only. Unsupported platform/browser combinations are denied deterministically. Recovery reconciliation failure instructs the system to stop capture and notify content.
 
 ## Cleanup and Recovery
 
@@ -451,7 +432,7 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - content-side runtime controller
 - cache model
 - overlay shell and display-mode contract
-- consent and privacy policy
+- privacy and data-handling model
 - cleanup and recovery contracts
 - STT infrastructure
 - translation adapter
@@ -497,13 +478,14 @@ The remaining runtime phases are media and execution only:
 - Do not merge STT into the translation provider stack.
 - Do not store transcript and translation records in the same cache store.
 - Do not add provider fallback semantics that are unique to Live Caption.
+- Do not reintroduce a custom extension-level consent overlay.
 - Keep overlay code presentation-only; business logic should stay in core/session modules.
 
 ## Do Not Violate
 
 - No raw stream handoff to background.
 - No service-worker-local long-lived media ownership.
-- No permanent consent storage.
+- No custom extension-level consent overlay.
 - No page-URL-only cache identity.
 - No implicit provider fallback for Live Caption.
 - No runtime execution in this document’s model beyond the architecture already implemented.
