@@ -101,7 +101,62 @@ describe('useLiveCaptionOverlay', () => {
     });
     expect(wrapper.vm.overlayStyle).toMatchObject({
       position: 'fixed',
-      top: '448px',
+      top: '468px', // rect.bottom (460px) + gap (8px)
+      left: '58px',
+      width: '624px',
+      maxWidth: '624px',
+      bottom: 'auto',
+      transform: 'none',
+      zIndex: 2147483647,
+      pointerEvents: 'none'
+    });
+  });
+
+  it('computes fullscreen position metadata correctly', async () => {
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        fullscreenElement: null
+      },
+      getBoundingClientRect: vi.fn(() => ({
+        top: 100,
+        left: 50,
+        width: 640,
+        height: 360,
+        right: 690,
+        bottom: 460
+      }))
+    };
+    videoElement.ownerDocument.fullscreenElement = videoElement;
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget, {
+          offsetBottom: 12,
+          offsetHorizontal: 8
+        });
+
+        return {
+          overlay,
+          overlayStyle: overlay.overlayStyle,
+          overlayRect: overlay.overlayRect,
+          isVisible: overlay.isVisible
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.vm.isVisible).toBe(true);
+    expect(wrapper.vm.overlayStyle).toMatchObject({
+      position: 'fixed',
+      top: '448px', // rect.bottom (460px) - offsetBottom (12px)
       left: '58px',
       width: '624px',
       maxWidth: '624px',
@@ -152,5 +207,63 @@ describe('useLiveCaptionOverlay', () => {
     expect(removeWindowSpy).toHaveBeenCalledWith('resize', expect.any(Function), { passive: true });
     expect(removeDocumentSpy).toHaveBeenCalledWith('scroll', expect.any(Function), { passive: true });
     expect(disconnectSpy).toHaveBeenCalled();
+  });
+
+  it('detects fullscreen when a parent wrapper is fullscreen', async () => {
+    const videoTarget = ref(null);
+    let videoElement;
+    const fullscreenWrapper = {
+      contains: vi.fn(() => true)
+    };
+    videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        fullscreenElement: fullscreenWrapper
+      },
+      getBoundingClientRect: vi.fn(() => ({
+        top: 100,
+        left: 50,
+        width: 640,
+        height: 360,
+        right: 690,
+        bottom: 460
+      }))
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget, {
+          offsetBottom: 12,
+          offsetHorizontal: 8
+        });
+
+        return {
+          overlay,
+          overlayStyle: overlay.overlayStyle,
+          overlayRect: overlay.overlayRect,
+          isVisible: overlay.isVisible
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.vm.isVisible).toBe(true);
+    expect(wrapper.vm.overlayStyle).toMatchObject({
+      position: 'fixed',
+      top: '448px', // rect.bottom (460px) - offsetBottom (12px)
+      left: '58px',
+      width: '624px',
+      maxWidth: '624px',
+      bottom: 'auto',
+      transform: 'translateY(-100%)',
+      zIndex: 2147483647,
+      pointerEvents: 'none'
+    });
   });
 });

@@ -26,19 +26,42 @@ function getRectFromElement(element) {
   return element.getBoundingClientRect();
 }
 
-function buildOverlayStyle(rect, options = {}) {
+const LIVE_CAPTION_OVERLAY_BELOW_VIDEO_GAP = 8;
+
+function buildOverlayStyle(rect, element, options = {}) {
   const offsetBottom = Number.isFinite(options.offsetBottom) ? options.offsetBottom : 16;
   const offsetHorizontal = Number.isFinite(options.offsetHorizontal) ? options.offsetHorizontal : 16;
   const maxWidth = Math.max(0, rect.width - offsetHorizontal * 2);
 
+  const doc = element?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  const fullscreenEl = doc?.fullscreenElement;
+  const isFullscreen = Boolean(
+    fullscreenEl &&
+    (fullscreenEl === element || (typeof fullscreenEl.contains === 'function' && fullscreenEl.contains(element)))
+  );
+
+  if (isFullscreen) {
+    return Object.freeze({
+      position: 'fixed',
+      top: `${Math.max(0, rect.top + rect.height - offsetBottom)}px`,
+      left: `${Math.max(0, rect.left + offsetHorizontal)}px`,
+      width: `${maxWidth}px`,
+      maxWidth: `${maxWidth}px`,
+      bottom: 'auto',
+      transform: 'translateY(-100%)',
+      zIndex: 2147483647,
+      pointerEvents: 'none'
+    });
+  }
+
   return Object.freeze({
     position: 'fixed',
-    top: `${Math.max(0, rect.top + rect.height - offsetBottom)}px`,
+    top: `${Math.max(0, rect.top + rect.height + LIVE_CAPTION_OVERLAY_BELOW_VIDEO_GAP)}px`,
     left: `${Math.max(0, rect.left + offsetHorizontal)}px`,
     width: `${maxWidth}px`,
     maxWidth: `${maxWidth}px`,
     bottom: 'auto',
-    transform: 'translateY(-100%)',
+    transform: 'none',
     zIndex: 2147483647,
     pointerEvents: 'none'
   });
@@ -71,7 +94,7 @@ export function useLiveCaptionOverlay(target, options = {}) {
       width: rect.width,
       height: rect.height
     });
-    overlayStyle.value = buildOverlayStyle(rect, options);
+    overlayStyle.value = buildOverlayStyle(rect, element, options);
     isVisible.value = true;
   };
 
