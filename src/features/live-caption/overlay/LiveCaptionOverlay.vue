@@ -1,6 +1,6 @@
 <template>
   <section
-    v-show="visible"
+    v-show="shouldShowOverlay"
     class="live-caption-overlay"
     :class="[
       `live-caption-overlay--${status || 'idle'}`,
@@ -166,6 +166,11 @@ const overlayAnchor = useLiveCaptionOverlay(
 
 const resolvedPositionStyle = computed(() => props.positionStyle || overlayAnchor.overlayStyle.value || null);
 const showConsentPanel = computed(() => props.showConsentNotice || !props.consentAccepted);
+const shouldShowOverlay = computed(() => {
+  if (!props.visible) return false;
+  if (!props.videoElement) return true;
+  return overlayAnchor.isVisible.value;
+});
 
 logger.debug('Live-caption overlay shell initialized');
 </script>

@@ -253,7 +253,6 @@ describe('useLiveCaptionOverlay', () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.vm.isVisible).toBe(true);
     expect(wrapper.vm.overlayStyle).toMatchObject({
       position: 'fixed',
       top: '448px', // rect.bottom (460px) - offsetBottom (12px)
@@ -265,5 +264,118 @@ describe('useLiveCaptionOverlay', () => {
       zIndex: 2147483647,
       pointerEvents: 'none'
     });
+  });
+
+  it('hides the overlay when the video is offscreen', async () => {
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        defaultView: {
+          innerWidth: 1024,
+          innerHeight: 768
+        }
+      },
+      getBoundingClientRect: vi.fn()
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return {
+          overlay,
+          isVisible: overlay.isVisible
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+
+    // 1. Video is above the viewport
+    videoElement.getBoundingClientRect.mockReturnValue({
+      top: -400,
+      left: 100,
+      width: 640,
+      height: 360,
+      right: 740,
+      bottom: -40
+    });
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(false);
+
+    // 2. Video is below the viewport
+    videoElement.getBoundingClientRect.mockReturnValue({
+      top: 800,
+      left: 100,
+      width: 640,
+      height: 360,
+      right: 740,
+      bottom: 1160
+    });
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(false);
+
+    // 3. Video is to the left of the viewport
+    videoElement.getBoundingClientRect.mockReturnValue({
+      top: 100,
+      left: -700,
+      width: 640,
+      height: 360,
+      right: -60,
+      bottom: 460
+    });
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(false);
+
+    // 4. Video is to the right of the viewport
+    videoElement.getBoundingClientRect.mockReturnValue({
+      top: 100,
+      left: 1100,
+      width: 640,
+      height: 360,
+      right: 1740,
+      bottom: 460
+    });
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(false);
+
+    // 5. Video is in the viewport
+    videoElement.getBoundingClientRect.mockReturnValue({
+      top: 100,
+      left: 100,
+      width: 640,
+      height: 360,
+      right: 740,
+      bottom: 460
+    });
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(true);
+  });
+
+  it('sets isVisible to false when video is null or disconnected', async () => {
+    const videoTarget = ref(null);
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return {
+          overlay,
+          isVisible: overlay.isVisible
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    wrapper.vm.overlay.updateOverlayPosition();
+    await nextTick();
+    expect(wrapper.vm.isVisible).toBe(false);
   });
 });

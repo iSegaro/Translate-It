@@ -88,6 +88,17 @@ export function useLiveCaptionOverlay(target, options = {}) {
       return;
     }
 
+    const win = element.ownerDocument?.defaultView || window;
+    const viewportWidth = win.innerWidth || win.document?.documentElement?.clientWidth || 0;
+    const viewportHeight = win.innerHeight || win.document?.documentElement?.clientHeight || 0;
+
+    const isOffscreen = (
+      rect.bottom <= 0 ||
+      rect.top >= viewportHeight ||
+      rect.right <= 0 ||
+      rect.left >= viewportWidth
+    );
+
     overlayRect.value = Object.freeze({
       top: rect.top,
       left: rect.left,
@@ -95,7 +106,7 @@ export function useLiveCaptionOverlay(target, options = {}) {
       height: rect.height
     });
     overlayStyle.value = buildOverlayStyle(rect, element, options);
-    isVisible.value = true;
+    isVisible.value = !isOffscreen;
   };
 
   const scheduleUpdate = () => {
@@ -128,6 +139,7 @@ export function useLiveCaptionOverlay(target, options = {}) {
     }
 
     isAttached.value = false;
+    isVisible.value = false;
   };
 
   const attach = () => {
