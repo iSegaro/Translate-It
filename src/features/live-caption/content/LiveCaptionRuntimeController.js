@@ -183,6 +183,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.runtimeStatus = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     this.started = false;
     this.paused = false;
+    this.lastPauseReason = null;
     this.destroyed = false;
     this.startPromise = null;
     this.scanFrameId = null;
@@ -493,7 +494,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
               this.pause(reason).catch(() => {});
             }
           } else if (event.type === 'play' || event.type === 'playing') {
-            if (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.PAUSED) {
+            if (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.PAUSED && this.lastPauseReason === 'video_pause') {
               logger.info('Active video resumed; resuming live-caption runtime', {
                 reason: event.type,
                 sessionId: this.pageSession?.sessionId ?? null,
@@ -1025,6 +1026,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       return this.getSnapshot();
     }
 
+    this.lastPauseReason = reason;
     this.paused = true;
     this._teardownMutationObserver();
     this._clearScheduledScan();
@@ -1065,6 +1067,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     }
 
     this.paused = false;
+    this.lastPauseReason = null;
     this._setupObservers();
     this._scheduleScan('resume');
     this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
@@ -1155,6 +1158,8 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     if ((this.destroyed && !this.pageSession) || (!this.started && !this.pageSession && !this.currentVideoElement)) {
       return this.getSnapshot();
     }
+
+    this.lastPauseReason = null;
 
     const sessionSnapshot = this.pageSession?.getCleanupSnapshot?.()
       ?? this.sessionManager.getSessionCleanupSnapshot?.(this.tabId)

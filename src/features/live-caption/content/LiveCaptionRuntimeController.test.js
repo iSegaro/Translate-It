@@ -735,14 +735,15 @@ describe('live-caption runtime controller', () => {
       expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
     });
 
-    it('resumes runtime when active video plays/resumes', async () => {
-      // First pause it
+    it('resumes runtime when active video plays/resumes only if paused due to video_pause', async () => {
+      // First pause due to video_pause
       const pauseEvent = new Event('pause', { bubbles: true });
       Object.defineProperty(pauseEvent, 'target', { value: activeVideo, configurable: true });
       document.dispatchEvent(pauseEvent);
       
       await new Promise(resolve => setTimeout(resolve, 0));
       expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      expect(controller.lastPauseReason).toBe('video_pause');
       
       // Simulate play event on active video
       const playEvent = new Event('play', { bubbles: true });
@@ -753,6 +754,53 @@ describe('live-caption runtime controller', () => {
       
       expect(controller.resume).toHaveBeenCalled();
       expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    });
+
+    it('does not resume on active video play if manually paused', async () => {
+      // Manually pause
+      await controller.pause('manual_pause');
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      expect(controller.lastPauseReason).toBe('manual_pause');
+      
+      // Simulate play event on active video
+      const playEvent = new Event('play', { bubbles: true });
+      Object.defineProperty(playEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(playEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.resume).not.toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
+
+    it('does not resume on active video play if paused due to video_ended', async () => {
+      // Simulate ended event on active video
+      const endedEvent = new Event('ended', { bubbles: true });
+      Object.defineProperty(endedEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(endedEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      expect(controller.lastPauseReason).toBe('video_ended');
+      
+      // Simulate play event on active video
+      const playEvent = new Event('play', { bubbles: true });
+      Object.defineProperty(playEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(playEvent);
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      expect(controller.resume).not.toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
+
+    it('resume button/method still resumes when manually paused', async () => {
+      await controller.pause('manual_pause');
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      
+      await controller.resume();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+      expect(controller.lastPauseReason).toBeNull();
     });
 
     it('ignores playback events from non-active videos', async () => {
