@@ -21,6 +21,7 @@ import {
 import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MockSTTProvider } from './providers/MockSTTProvider.js';
+import { BrowserSpeechSTTProvider } from './providers/BrowserSpeechSTTProvider.js';
 
 export {
   BaseSTTProvider,
@@ -45,6 +46,7 @@ export {
 export { STTProviderFactory } from './STTProviderFactory.js';
 export { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 export { MockSTTProvider } from './providers/MockSTTProvider.js';
+export { BrowserSpeechSTTProvider } from './providers/BrowserSpeechSTTProvider.js';
 
 export default {
   BaseSTTProvider,
@@ -65,5 +67,6 @@ export default {
   isSTTProviderSupported,
   STTProviderFactory,
   OpenAIWhisperProvider,
-  MockSTTProvider
+  MockSTTProvider,
+  BrowserSpeechSTTProvider
 };

@@ -236,7 +236,7 @@ describe('live-caption STT coordinator', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Stop coordinator session
-    coordinator.stopSession('session-1');
+    await coordinator.stopSession('session-1');
 
     expect(aborted).toBe(true);
     expect(coordinator.sessionQueues.has('session-1')).toBe(false);
@@ -274,7 +274,7 @@ describe('live-caption STT coordinator', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    coordinator.pauseSession('session-1');
+    await coordinator.pauseSession('session-1');
 
     expect(aborted).toBe(true);
     expect(coordinator.sessionQueues.has('session-1')).toBe(false);
@@ -320,5 +320,101 @@ describe('live-caption STT coordinator', () => {
     expect(pageSession.lifecycleState).toBe('error');
     expect(captureCoordinator.status).toBe('error');
     expect(coordinator.sessionQueues.has('session-1')).toBe(false);
+  });
+
+  it('starts and stops a session provider once per live-caption session', async () => {
+    const { getLiveCaptionSttProviderAsync } = await import('@/shared/config/config.js');
+    getLiveCaptionSttProviderAsync.mockResolvedValue('browser_speech');
+
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranscriptSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+
+    const sessionProvider = {
+      providerId: 'browser_speech',
+      state: 'ready',
+      startSession: vi.fn().mockImplementation(async () => {
+        sessionProvider.state = 'transcribing';
+        return { state: 'transcribing' };
+      }),
+      stopSession: vi.fn().mockResolvedValue({ state: 'ready' }),
+      abortSession: vi.fn().mockImplementation(async () => {
+        sessionProvider.state = 'ready';
+        return { state: 'ready' };
+      }),
+      dispose: vi.fn().mockResolvedValue({ state: 'disposed' }),
+      getStatus: vi.fn().mockResolvedValue({ state: 'ready' })
+    };
+
+    mockFactory.getProvider = vi.fn().mockResolvedValue(sessionProvider);
+    mockFactory.getProviderDefinition = vi.fn().mockReturnValue({ displayName: 'Browser Speech', mode: 'session' });
+
+    await coordinator.startSession('session-1', {
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(mockFactory.getProvider).toHaveBeenCalledTimes(1);
+    expect(sessionProvider.startSession).toHaveBeenCalledTimes(1);
+
+    await coordinator.pauseSession('session-1');
+    expect(sessionProvider.abortSession).toHaveBeenCalledTimes(1);
+
+    await coordinator.stopSession('session-1');
+    expect(sessionProvider.stopSession).not.toHaveBeenCalled();
+    expect(sessionProvider.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('restarts a paused session provider cleanly on resume', async () => {
+    const { getLiveCaptionSttProviderAsync } = await import('@/shared/config/config.js');
+    getLiveCaptionSttProviderAsync.mockResolvedValue('browser_speech');
+
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    pageSession.activeVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranscriptSegment: vi.fn()
+    };
+
+    const sessionProvider = {
+      providerId: 'browser_speech',
+      state: 'ready',
+      startSession: vi.fn().mockImplementation(async () => {
+        sessionProvider.state = 'transcribing';
+        return { state: 'transcribing' };
+      }),
+      stopSession: vi.fn().mockResolvedValue({ state: 'ready' }),
+      abortSession: vi.fn().mockImplementation(async () => {
+        sessionProvider.state = 'ready';
+        return { state: 'ready' };
+      }),
+      dispose: vi.fn().mockResolvedValue({ state: 'disposed' }),
+      getStatus: vi.fn().mockResolvedValue({ state: 'ready' })
+    };
+
+    mockFactory.getProvider = vi.fn().mockResolvedValue(sessionProvider);
+    mockFactory.getProviderDefinition = vi.fn().mockReturnValue({ displayName: 'Browser Speech', mode: 'session' });
+
+    await coordinator.startSession('session-1', {
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    await coordinator.pauseSession('session-1');
+
+    await coordinator.startSession('session-1', {
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(sessionProvider.startSession).toHaveBeenCalledTimes(2);
+    expect(sessionProvider.abortSession).toHaveBeenCalledTimes(1);
+    expect(sessionProvider.stopSession).not.toHaveBeenCalled();
   });
 });

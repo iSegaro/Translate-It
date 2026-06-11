@@ -8,6 +8,7 @@ import {
 } from './BaseSTTProvider.js';
 import {
   STT_PROVIDER_IDS,
+  STT_PROVIDER_MODES,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
   getAvailableSTTProviders,
@@ -16,7 +17,11 @@ import {
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'STTProviderFactory');
 
-function shouldMemoize(options = {}) {
+function shouldMemoize(options = {}, definition = null) {
+  if (definition?.mode === STT_PROVIDER_MODES.SESSION) {
+    return false;
+  }
+
   return !options.requestImpl && !options.responseParser && !options.apiKey && !options.endpointUrl && !options.model && options.memoize !== false;
 }
 
@@ -41,6 +46,16 @@ export class STTProviderFactory {
       });
     }
 
+    if (definition.providerClass?.isSupported && !definition.providerClass.isSupported()) {
+      throw createSTTProviderError(STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND, `STT provider '${resolvedProviderId}' is not supported in this browser`, {
+        providerId: resolvedProviderId,
+        providerName: definition.displayName,
+        stage: 'startup',
+        retryable: false,
+        type: ErrorTypes.API_CONFIG_INVALID
+      });
+    }
+
     // Defensive Check: Enforce Debug Mode for development-only providers
     const isDebug = await IsDebug();
     if (definition.developmentOnly && !isDebug) {
@@ -53,7 +68,7 @@ export class STTProviderFactory {
       });
     }
 
-    const cacheKey = shouldMemoize(options) ? resolvedProviderId : null;
+    const cacheKey = shouldMemoize(options, definition) ? resolvedProviderId : null;
 
     if (cacheKey && this.providerInstances.has(cacheKey)) {
       return this.providerInstances.get(cacheKey);

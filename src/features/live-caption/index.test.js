@@ -113,6 +113,8 @@ import {
   isSTTProviderSupported,
   STTProviderFactory,
   OpenAIWhisperProvider,
+  MockSTTProvider,
+  BrowserSpeechSTTProvider,
   LiveCaptionRuntimeController
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
@@ -235,6 +237,8 @@ describe('live-caption feature shell', () => {
     expect(isSTTProviderSupported).toBe(LiveCaptionFeature.contracts.isSTTProviderSupported);
     expect(STTProviderFactory).toBe(LiveCaptionFeature.contracts.STTProviderFactory);
     expect(OpenAIWhisperProvider).toBe(LiveCaptionFeature.contracts.OpenAIWhisperProvider);
+    expect(MockSTTProvider).toBe(LiveCaptionFeature.contracts.MockSTTProvider);
+    expect(BrowserSpeechSTTProvider).toBe(LiveCaptionFeature.contracts.BrowserSpeechSTTProvider);
     expect(LiveCaptionFeature.content.LiveCaptionRuntimeController).toBe(LiveCaptionRuntimeController);
   });
 

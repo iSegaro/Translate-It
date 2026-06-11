@@ -149,9 +149,9 @@
           <div class="setting-info full-width">
             <label class="setting-label">{{ t('live_caption_privacy_note_title') || 'Privacy & Platform Support' }}</label>
             <p class="setting-description">
-              {{ t('live_caption_privacy_note_desc') || 'Live Caption captures the active tab\'s audio after your consent. Raw audio is never persisted. Transcripts and translated captions may be cached outside incognito mode.' }}
+              {{ t('live_caption_privacy_note_desc') || 'Live Caption captures the active tab\'s audio after you start it. Raw audio is never persisted. Transcripts and translated captions may be cached outside incognito mode.' }}
             </p>
-            <p v-if="!hasOpenAIKey" class="setting-warning">
+            <p v-if="shouldShowOpenAIKeyWarning" class="setting-warning">
               ⚠️ {{ t('live_caption_requires_openai_key') || 'Live Caption requires OpenAI API key to be configured in Providers tab.' }}
             </p>
           </div>
@@ -173,7 +173,8 @@ import {
 } from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js'
 import {
   STT_PROVIDER_IDS,
-  getAvailableSTTProviders
+  getAvailableSTTProviders,
+  getSTTProviderDefinition
 } from '@/features/live-caption/stt/STTProviderManifest.js'
 import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js'
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js'
@@ -224,6 +225,12 @@ const sttProviderOptions = computed(() => {
     value: p.id,
     label: p.displayName
   }))
+})
+
+const selectedSttProviderDefinition = computed(() => getSTTProviderDefinition(sttProvider.value))
+
+const shouldShowOpenAIKeyWarning = computed(() => {
+  return Boolean(selectedSttProviderDefinition.value?.needsApiKey) && !hasOpenAIKey.value
 })
 
 // Methods
