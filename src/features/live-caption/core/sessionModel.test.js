@@ -12,20 +12,14 @@ describe('live-caption session model', () => {
 
     expect(session.tabId).toBe(7);
     expect(session.lifecycleState).toBe(LIVE_CAPTION_SESSION_STATES.IDLE);
-    expect(session.consentAccepted).toBe(false);
     expect(session.activeVideoSession).toBe(null);
     expect(session.getStatus().hasActiveVideoSession).toBe(false);
   });
 
-  it('transitions consent state and attaches, replaces, and clears a video session', () => {
+  it('attaches, replaces, and clears a video session', () => {
     const pageSession = new PageLiveCaptionSession({ tabId: 7 });
     const firstVideoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
     const secondVideoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-b' });
-
-    expect(pageSession.acceptConsent()).toBe(true);
-    expect(pageSession.consentAccepted).toBe(true);
-    expect(pageSession.revokeConsent()).toBe(false);
-    expect(pageSession.consentAccepted).toBe(false);
 
     pageSession.attachVideoSession(firstVideoSession);
     expect(pageSession.activeVideoSession).toBe(firstVideoSession);
@@ -44,7 +38,7 @@ describe('live-caption session model', () => {
   });
 
   it('models lifecycle transitions for page and video sessions', () => {
-    const pageSession = new PageLiveCaptionSession({ tabId: 7, consentAccepted: true });
+    const pageSession = new PageLiveCaptionSession({ tabId: 7 });
     const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
 
     pageSession.attachVideoSession(videoSession);

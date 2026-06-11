@@ -161,7 +161,6 @@ describe('live-caption runtime controller', () => {
 
   it('starts lazily and protects against duplicate start requests', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const controller = new LiveCaptionRuntimeController({
       store,
@@ -188,7 +187,6 @@ describe('live-caption runtime controller', () => {
 
   it('shares the same in-flight promise for concurrent start calls', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const controller = new LiveCaptionRuntimeController({
       store,
@@ -216,7 +214,6 @@ describe('live-caption runtime controller', () => {
 
   it('routes runtime lifecycle requests through the background messaging shell', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
     const browserApi = createRuntimeBrowserApi();
 
     const controller = new LiveCaptionRuntimeController({
@@ -275,7 +272,6 @@ describe('live-caption runtime controller', () => {
 
   it('detects the active video and replaces the active session when the winner changes', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const firstVideo = createVideo({
       src: 'https://example.com/a.mp4',
@@ -339,7 +335,6 @@ describe('live-caption runtime controller', () => {
 
   it('pauses, resumes, and destroys cleanup-safe runtime state', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const video = createVideo({
       src: 'https://example.com/a.mp4',
@@ -380,7 +375,6 @@ describe('live-caption runtime controller', () => {
 
   it('reconciles fail-closed session-manager cleanup metadata into the final cleanup result', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const controller = new LiveCaptionRuntimeController({
       store,
@@ -417,7 +411,6 @@ describe('live-caption runtime controller', () => {
 
   it('does not invoke capture, STT, translation, or offscreen modules', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const controller = new LiveCaptionRuntimeController({
       store,
@@ -438,7 +431,6 @@ describe('live-caption runtime controller', () => {
 
   it('handles LIVE_CAPTION_TRANSLATE_RESULT messages reactively and updates store captions', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     let messageListener;
     const browserApi = {
@@ -505,7 +497,6 @@ describe('live-caption runtime controller', () => {
 
   it('updates canPause and canResume reactively in controlsState based on runtime status', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
 
     const controller = new LiveCaptionRuntimeController({
       store,
@@ -541,7 +532,6 @@ describe('live-caption runtime controller', () => {
 
   it('hydrates store captions and local video session from background response', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
     const browserApi = createRuntimeBrowserApi();
 
     const controller = new LiveCaptionRuntimeController({
@@ -567,7 +557,6 @@ describe('live-caption runtime controller', () => {
 
   it('hydrates store captions from transcripts only if translations are missing', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
     
     const sendMessage = vi.fn(async (request) => ({
       success: true,
@@ -615,7 +604,6 @@ describe('live-caption runtime controller', () => {
 
   it('merges translated and transcript segments safely during hydration', async () => {
     const store = useLiveCaptionStore();
-    store.acceptConsent();
     
     const sendMessage = vi.fn(async (request) => ({
       success: true,
@@ -674,7 +662,6 @@ describe('live-caption runtime controller', () => {
 
     beforeEach(async () => {
       store = useLiveCaptionStore();
-      store.acceptConsent();
       browserApi = createRuntimeBrowserApi();
       
       controller = new LiveCaptionRuntimeController({

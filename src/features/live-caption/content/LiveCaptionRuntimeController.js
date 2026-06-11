@@ -8,11 +8,7 @@ import {
   LIVE_CAPTION_CLEANUP_REASONS,
   createLiveCaptionErrorState
 } from '../core/contracts.js';
-import {
-  LIVE_CAPTION_CONSENT_STATES,
-  createLiveCaptionPlatformSupportResult,
-  evaluateLiveCaptionStartEligibility
-} from '../core/LiveCaptionConsentPolicy.js';
+
 import {
   rankActiveVideoCandidates
 } from '../core/ActiveVideoDetector.js';
@@ -254,11 +250,42 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       return this.platformSupport;
     }
 
-    return createLiveCaptionPlatformSupportResult({
-      browserName: detectBrowserName(this.windowRef),
-      platform: detectPlatform(this.windowRef),
-      isMobile: detectIsMobile(this.windowRef)
-    });
+    const browserName = detectBrowserName(this.windowRef);
+    const platform = detectPlatform(this.windowRef);
+    const isMobile = detectIsMobile(this.windowRef);
+
+    const normalizedBrowser = String(browserName || '').trim().toLowerCase();
+    const normalizedPlatform = String(platform || 'desktop').trim().toLowerCase();
+    const mobileDetected = Boolean(isMobile) || ['android', 'ios', 'mobile'].includes(normalizedPlatform);
+
+    let supported = true;
+    let reason = 'supported';
+    let message = 'Live Caption is supported on Chrome or Edge desktop.';
+
+    if (mobileDetected) {
+      supported = false;
+      reason = 'mobile_unsupported';
+      message = 'Live Caption is not supported on mobile platforms.';
+    } else if (normalizedBrowser === 'firefox') {
+      supported = false;
+      reason = 'firefox_unsupported';
+      message = 'Live Caption is not supported on Firefox in the MVP.';
+    } else if (!['chrome', 'edge'].includes(normalizedBrowser)) {
+      supported = false;
+      reason = 'unknown_browser';
+      message = 'Live Caption is limited to Chrome and Edge desktop in the MVP.';
+    }
+
+    this.platformSupport = {
+      supported,
+      reason,
+      message,
+      browserName: normalizedBrowser || 'unknown',
+      platform: normalizedPlatform,
+      isMobile: mobileDetected
+    };
+
+    return this.platformSupport;
   }
 
   async resolveTabId(explicitTabId = null) {
@@ -642,16 +669,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     };
   }
 
-  _normalizeConsentEligibility(eligibility = null) {
-    if (eligibility) {
-      return eligibility;
-    }
 
-    return evaluateLiveCaptionStartEligibility({
-      consentState: this.store?.consentState ?? LIVE_CAPTION_CONSENT_STATES.NOT_ASKED,
-      platformSupport: this.resolvePlatformSupport()
-    });
-  }
 
   handleTranslateResult({ sessionId, videoFingerprint, segment }) {
     if (this.destroyed || !this.started || this.paused) {
@@ -696,29 +714,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     }
   }
 
-  _applyStartupDenial(denial) {
-    this.store?.setOverlayVisible?.(true);
-    this.store?.setConsentNoticeVisible?.(true);
-    this.store?.setStartupDeniedReason?.(denial?.reason ?? 'consent_required', {
-      consentState: denial?.consentState ?? this.store?.consentState ?? LIVE_CAPTION_CONSENT_STATES.NOT_ASKED,
-      platformSupport: denial?.platformSupport ?? null,
-      recoveryFailure: denial?.recoveryFailure ?? null
-    });
-    this.store?.setRuntimeStatus?.(LIVE_CAPTION_RUNTIME_STATES.IDLE);
-    this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.IDLE, {
-      reason: denial?.reason ?? 'consent_required'
-    });
 
-    this.lastError = null;
-
-    logger.debug('Live-caption runtime start denied', {
-      reason: denial?.reason ?? null,
-      consentState: denial?.consentState ?? null,
-      platformSupportReason: denial?.platformSupport?.reason ?? null
-    });
-
-    return denial;
-  }
 
   _buildRuntimeRequest(action, data = {}, messageId = null) {
     const requestBuilders = {
@@ -912,9 +908,17 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     }
 
     const startTask = (async () => {
-      const eligibility = this._normalizeConsentEligibility(options.startEligibility);
-      if (!eligibility.allowed) {
-        this._applyStartupDenial(eligibility);
+      const support = this.resolvePlatformSupport();
+      if (!support.supported) {
+        const error = createLiveCaptionErrorState(
+          new Error(support.message || 'Platform not supported'),
+          LIVE_CAPTION_CLEANUP_REASONS.ERROR
+        );
+        this.lastError = error;
+        this.store?.setError?.(error);
+        this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.ERROR, {
+          reason: 'unsupported_platform'
+        });
         return this.getSnapshot();
       }
 
@@ -934,21 +938,16 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       }
 
       this.tabId = tabId;
-      this.pageSession = this.sessionManager.createSession(tabId, {
-        consentAccepted: Boolean(this.store?.consentAccepted)
-      });
-      this.pageSession.setConsentAccepted(Boolean(this.store?.consentAccepted));
+      this.pageSession = this.sessionManager.createSession(tabId);
       this.pageSession.start();
       const sessionIdAtStart = this.pageSession.sessionId;
 
-      this.store?.clearStartupDeniedReason?.();
       this.store?.setError?.(null);
       this.store?.setOverlayVisible?.(true);
       this.store?.setEnabled?.(true);
       this._setStoreContext(tabId, this.currentVideoFingerprint, this.pageSession.sessionId);
       this.store?.setStatus?.(this.pageSession.lifecycleState);
       this.store?.setActiveSessionState?.(this.pageSession.lifecycleState);
-      this.store?.setConsentNoticeVisible?.(!this.store?.consentAccepted);
 
       this.started = true;
       this.paused = false;
@@ -971,8 +970,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         tabId,
         sessionId: this.pageSession.sessionId,
         videoFingerprint: this.currentVideoFingerprint,
-        reason: 'start',
-        consentAccepted: Boolean(this.store?.consentAccepted)
+        reason: 'start'
       });
 
       // CRITICAL: Check if we were stopped or replaced while waiting for background
@@ -1255,7 +1253,6 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       preserveCaptions: cleanupResult.preserveCaptions,
       clearCaptions: cleanupResult.clearCaptions,
       clearSessionIdentity: true,
-      clearConsent: !hasError, // Preserve consent state if showing an error
       error: friendlyError || error
     });
 

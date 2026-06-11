@@ -1,5 +1,4 @@
 import LiveCaptionOverlay from './LiveCaptionOverlay.vue';
-import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionCaptionLine from './LiveCaptionCaptionLine.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
@@ -14,7 +13,6 @@ import {
 
 export {
   LiveCaptionOverlay,
-  LiveCaptionConsentNotice,
   LiveCaptionCaptionTrack,
   LiveCaptionCaptionLine,
   LiveCaptionControls,
@@ -28,7 +26,6 @@ export {
 
 export default {
   LiveCaptionOverlay,
-  LiveCaptionConsentNotice,
   LiveCaptionCaptionTrack,
   LiveCaptionCaptionLine,
   LiveCaptionControls,

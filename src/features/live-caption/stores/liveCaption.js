@@ -7,11 +7,6 @@ import {
 } from '../constants/liveCaptionRuntimeStates.js';
 import { LIVE_CAPTION_DEFAULTS } from '../constants/liveCaptionDefaults.js';
 import {
-  LIVE_CAPTION_CONSENT_STATES,
-  createLiveCaptionPrivacyNotice,
-  normalizeLiveCaptionConsentState
-} from '../core/LiveCaptionConsentPolicy.js';
-import {
   LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
   normalizeLiveCaptionCaptionDisplayMode,
   resolveLiveCaptionCaptionLineDisplay,
@@ -24,13 +19,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
   const runtimeStatus = ref(LIVE_CAPTION_RUNTIME_STATES.IDLE);
   const isEnabled = ref(LIVE_CAPTION_DEFAULTS.ENABLED);
   const overlayVisible = ref(false);
-  const consentState = ref(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
-  const consentAccepted = ref(false);
-  const consentNoticeVisible = ref(false);
-  const privacyNotice = ref(createLiveCaptionPrivacyNotice());
   const captionDisplayMode = ref(LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT);
-  const startupDeniedReason = ref(null);
-  const startupDeniedDetails = ref(null);
   const sessionId = ref(null);
   const activeTabId = ref(null);
   const activeVideoFingerprint = ref(null);
@@ -52,13 +41,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     runtimeStatus.value = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     isEnabled.value = LIVE_CAPTION_DEFAULTS.ENABLED;
     overlayVisible.value = false;
-    consentState.value = LIVE_CAPTION_CONSENT_STATES.NOT_ASKED;
-    consentAccepted.value = false;
-    consentNoticeVisible.value = false;
-    privacyNotice.value = createLiveCaptionPrivacyNotice();
     captionDisplayMode.value = LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT;
-    startupDeniedReason.value = null;
-    startupDeniedDetails.value = null;
     sessionId.value = null;
     activeTabId.value = null;
     activeVideoFingerprint.value = null;
@@ -120,69 +103,14 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     activeVideoState.value = null;
   };
 
-  const setPrivacyNotice = (notice) => {
-    privacyNotice.value = notice ? { ...notice } : createLiveCaptionPrivacyNotice();
-  };
-
   const setCaptionDisplayMode = (mode) => {
     captionDisplayMode.value = normalizeLiveCaptionCaptionDisplayMode(mode);
-  };
-
-  const setStartupDeniedReason = (reason, details = null) => {
-    startupDeniedReason.value = reason || null;
-    startupDeniedDetails.value = details ? { ...details } : null;
-  };
-
-  const clearStartupDeniedReason = () => {
-    startupDeniedReason.value = null;
-    startupDeniedDetails.value = null;
   };
 
   const setContext = ({ tabId = null, videoFingerprint = null, nextSessionId = null } = {}) => {
     activeTabId.value = tabId;
     activeVideoFingerprint.value = videoFingerprint;
     sessionId.value = nextSessionId;
-  };
-
-  const acceptConsent = () => {
-    consentState.value = LIVE_CAPTION_CONSENT_STATES.ACCEPTED;
-    consentAccepted.value = true;
-    consentNoticeVisible.value = false;
-    clearStartupDeniedReason();
-  };
-
-  const cancelConsent = () => {
-    consentState.value = LIVE_CAPTION_CONSENT_STATES.CANCELED;
-    consentAccepted.value = false;
-    consentNoticeVisible.value = false;
-  };
-
-  const revokeConsent = () => {
-    consentState.value = LIVE_CAPTION_CONSENT_STATES.REVOKED;
-    consentAccepted.value = false;
-    consentNoticeVisible.value = true;
-  };
-
-  const setConsentNoticeVisible = (visible) => {
-    consentNoticeVisible.value = Boolean(visible);
-    if (visible && consentState.value === LIVE_CAPTION_CONSENT_STATES.NOT_ASKED) {
-      consentState.value = LIVE_CAPTION_CONSENT_STATES.PENDING;
-    }
-  };
-
-  const setConsentState = (nextState) => {
-    const normalizedState = normalizeLiveCaptionConsentState(nextState);
-    consentState.value = normalizedState;
-
-    if (normalizedState === LIVE_CAPTION_CONSENT_STATES.ACCEPTED) {
-      consentAccepted.value = true;
-      consentNoticeVisible.value = false;
-    } else if (
-      normalizedState === LIVE_CAPTION_CONSENT_STATES.CANCELED ||
-      normalizedState === LIVE_CAPTION_CONSENT_STATES.REVOKED
-    ) {
-      consentAccepted.value = false;
-    }
   };
 
   const setCaptions = (lines = []) => {
@@ -207,8 +135,6 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
   const resetOverlayState = () => {
     isEnabled.value = false;
     overlayVisible.value = false;
-    consentNoticeVisible.value = false;
-    consentAccepted.value = false;
     captionLines.value = [];
     captionDisplayMode.value = LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT;
     controlsState.value = {
@@ -220,9 +146,6 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       canClearCache: false
     };
     lastError.value = null;
-    consentState.value = LIVE_CAPTION_CONSENT_STATES.NOT_ASKED;
-    startupDeniedReason.value = null;
-    startupDeniedDetails.value = null;
     activeVideoState.value = null;
     runtimeStatus.value = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     activeSessionState.value = LIVE_CAPTION_SESSION_STATES.IDLE;
@@ -234,18 +157,11 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     preserveCaptions = false,
     clearCaptions = !preserveCaptions,
     clearSessionIdentity = true,
-    clearConsent = true,
     error = null
   } = {}) => {
     const hasError = Boolean(error);
     isEnabled.value = false;
     overlayVisible.value = hasError;
-    consentNoticeVisible.value = false;
-
-    if (clearConsent) {
-      consentAccepted.value = false;
-      consentState.value = LIVE_CAPTION_CONSENT_STATES.NOT_ASKED;
-    }
 
     if (clearCaptions) {
       captionLines.value = [];
@@ -260,14 +176,12 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
 
     controlsState.value = {
       canStart: true,
-      canStop: Boolean(error), // Allow closing the error overlay via Stop
+      canStop: Boolean(error),
       canRetry: Boolean(error),
       canPause: false,
       canResume: false,
       canClearCache: false
     };
-    startupDeniedReason.value = null;
-    startupDeniedDetails.value = null;
     status.value = sessionStatus;
     activeSessionState.value = sessionStatus;
     runtimeStatus.value = normalizeLiveCaptionRuntimeState(runtimeState);
@@ -288,13 +202,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     runtimeStatus,
     isEnabled,
     overlayVisible,
-    consentState,
-    consentAccepted,
-    consentNoticeVisible,
-    privacyNotice,
     captionDisplayMode,
-    startupDeniedReason,
-    startupDeniedDetails,
     sessionId,
     activeTabId,
     activeVideoFingerprint,
@@ -310,18 +218,10 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     setError,
     setOverlayVisible,
     setEnabled,
-    setPrivacyNotice,
     setCaptionDisplayMode,
-    setStartupDeniedReason,
-    clearStartupDeniedReason,
     setContext,
     setActiveVideoState,
     clearActiveVideoState,
-    acceptConsent,
-    cancelConsent,
-    revokeConsent,
-    setConsentNoticeVisible,
-    setConsentState,
     setCaptions,
     appendFinalizedCaption,
     clearCaptions,

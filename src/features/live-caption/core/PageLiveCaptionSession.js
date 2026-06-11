@@ -16,10 +16,10 @@ function isPageLikeVideoSession(session) {
 
 /**
  * Lightweight tab-scoped session model for live captioning.
- * Owns consent state, the active video session reference, and page-level lifecycle state.
+ * Owns the active video session reference and page-level lifecycle state.
  */
 export class PageLiveCaptionSession {
-  constructor({ tabId, sessionId = createLiveCaptionSessionId('page', tabId), consentAccepted = false, isIncognito = false } = {}) {
+  constructor({ tabId, sessionId = createLiveCaptionSessionId('page', tabId), isIncognito = false } = {}) {
     if (tabId == null) {
       throw new TypeError('PageLiveCaptionSession requires a tabId');
     }
@@ -29,7 +29,6 @@ export class PageLiveCaptionSession {
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
     this.lifecycleState = LIVE_CAPTION_SESSION_STATES.IDLE;
-    this.consentAccepted = Boolean(consentAccepted);
     this.isIncognito = Boolean(isIncognito);
     this.activeVideoSession = null;
     this.activeVideoSessionId = null;
@@ -40,7 +39,6 @@ export class PageLiveCaptionSession {
     logger.info('Page session created', {
       tabId: this.tabId,
       sessionId: this.sessionId,
-      consentAccepted: this.consentAccepted,
       isIncognito: this.isIncognito
     });
   }
@@ -49,26 +47,7 @@ export class PageLiveCaptionSession {
     this.updatedAt = Date.now();
   }
 
-  setConsentAccepted(accepted = true) {
-    this.consentAccepted = Boolean(accepted);
-    this.touch();
 
-    logger.debug('Consent state updated', {
-      tabId: this.tabId,
-      sessionId: this.sessionId,
-      consentAccepted: this.consentAccepted
-    });
-
-    return this.consentAccepted;
-  }
-
-  acceptConsent() {
-    return this.setConsentAccepted(true);
-  }
-
-  revokeConsent() {
-    return this.setConsentAccepted(false);
-  }
 
   start() {
     this.lifecycleState = LIVE_CAPTION_SESSION_STATES.ACTIVE;
@@ -207,11 +186,6 @@ export class PageLiveCaptionSession {
 
     this.stop(reason);
     
-    // ONLY revoke consent if it's NOT an error.
-    // We want the user to stay in the captions track to see the error.
-    if (!isError) {
-      this.revokeConsent();
-    }
 
     this.clearVideoSession(reason, false);
     this.lastError = null;
@@ -232,7 +206,6 @@ export class PageLiveCaptionSession {
       tabId: this.tabId,
       sessionId: this.sessionId,
       lifecycleState: this.lifecycleState,
-      consentAccepted: this.consentAccepted,
       isIncognito: this.isIncognito,
       activeVideoSessionId: this.activeVideoSessionId,
       activeVideoFingerprint: this.activeVideoFingerprint,

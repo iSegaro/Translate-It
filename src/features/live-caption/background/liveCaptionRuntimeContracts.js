@@ -89,7 +89,6 @@ function normalizeRuntimeData(data = {}) {
     notifyContent: data.notifyContent !== false,
     clearCache: Boolean(data.clearCache),
     requestSource: data.requestSource ?? 'content',
-    consentAccepted: Boolean(data.consentAccepted),
     metadata: data.metadata ? { ...data.metadata } : null,
     streamId: data.streamId ?? null
   };

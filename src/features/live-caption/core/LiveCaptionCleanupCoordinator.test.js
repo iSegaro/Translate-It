@@ -16,7 +16,6 @@ import { VideoCaptionSession } from './VideoCaptionSession.js';
 import { LiveCaptionSessionManager } from './LiveCaptionSessionManager.js';
 import useLiveCaptionStore from '../stores/liveCaption.js';
 import { LIVE_CAPTION_SESSION_STATES } from '../constants/liveCaptionSessionStates.js';
-import { LIVE_CAPTION_CONSENT_STATES } from './LiveCaptionConsentPolicy.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -140,7 +139,7 @@ describe('live-caption cleanup coordinator', () => {
   });
 
   it('supports session cleanup snapshots and manager cleanup snapshots', () => {
-    const pageSession = new PageLiveCaptionSession({ tabId: 11, consentAccepted: true });
+    const pageSession = new PageLiveCaptionSession({ tabId: 11 });
     const videoSession = new VideoCaptionSession({ tabId: 11, videoFingerprint: 'video-11' });
     const manager = new LiveCaptionSessionManager();
     const coordinator = new LiveCaptionCleanupCoordinator();
@@ -176,8 +175,6 @@ describe('live-caption cleanup coordinator', () => {
     const store = useLiveCaptionStore();
 
     store.setContext({ tabId: 11, videoFingerprint: 'video-11', nextSessionId: 'session-11' });
-    store.acceptConsent();
-    store.setConsentNoticeVisible(true);
     store.setCaptions([
       {
         sessionId: 'session-11',
@@ -190,7 +187,6 @@ describe('live-caption cleanup coordinator', () => {
       }
     ]);
     store.setOverlayVisible(true);
-    store.setStartupDeniedReason('unsupported_browser', { browserName: 'firefox' });
 
     store.applyCleanupResult({
       sessionStatus: LIVE_CAPTION_SESSION_STATES.IDLE,
@@ -201,7 +197,6 @@ describe('live-caption cleanup coordinator', () => {
 
     expect(store.overlayVisible).toBe(false);
     expect(store.captionLines).toHaveLength(1);
-    expect(store.consentState).toBe(LIVE_CAPTION_CONSENT_STATES.NOT_ASKED);
     expect(store.sessionId).toBe(null);
     expect(store.activeTabId).toBe(null);
     expect(store.lastError).toBe(null);

@@ -98,14 +98,9 @@
         :active-video-state="liveCaptionStore.activeVideoState"
         :caption-lines="liveCaptionStore.captionLines"
         :caption-display-mode="liveCaptionStore.captionDisplayMode"
-        :consent-accepted="liveCaptionStore.consentAccepted"
-        :show-consent-notice="liveCaptionStore.consentNoticeVisible || !liveCaptionStore.consentAccepted"
-        :privacy-notice="liveCaptionStore.privacyNotice"
         :last-error="liveCaptionStore.lastError"
         :controls-state="liveCaptionStore.controlsState"
         :video-element="liveCaptionRuntimeController?.currentVideoElement || null"
-        @accept-consent="handleLiveCaptionAcceptConsent"
-        @cancel-consent="handleLiveCaptionCancelConsent"
         @start="handleLiveCaptionStart"
         @stop="handleLiveCaptionStop"
         @pause="handleLiveCaptionPause"
@@ -323,22 +318,7 @@ const handleLiveCaptionClearCache = () => {
   logger.debug('Live-caption clear-cache requested before runtime cache wiring');
 };
 
-const handleLiveCaptionAcceptConsent = async () => {
-  liveCaptionStore.acceptConsent();
-  const controller = ensureLiveCaptionRuntimeController();
-  await controller.start();
-};
 
-const handleLiveCaptionCancelConsent = async () => {
-  liveCaptionStore.cancelConsent();
-  liveCaptionStore.setEnabled(false);
-
-  if (liveCaptionRuntimeController.value) {
-    await liveCaptionRuntimeController.value.stop(LIVE_CAPTION_CLEANUP_REASONS.MANUAL, {
-      notifyContent: false
-    });
-  }
-};
 
 // Handle Live Caption start request from FAB
 const handleLiveCaptionStartRequestFromFAB = async () => {
@@ -368,12 +348,7 @@ const handleLiveCaptionStartRequestFromFAB = async () => {
 // Handle Live Caption start request from Popup
 const handleLiveCaptionStartRequestFromPopup = () => {
   logger.debug('Live Caption start request received from Popup (activeTab granted)');
-  if (liveCaptionStore.consentAccepted) {
-    handleLiveCaptionStart();
-  } else {
-    liveCaptionStore.setConsentNoticeVisible(true);
-    liveCaptionStore.setEnabled(true);
-  }
+  handleLiveCaptionStart();
 };
 
 // Listen for page events using standard PageEventBus and ResourceTracker

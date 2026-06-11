@@ -17,19 +17,6 @@ import {
   createLiveCaptionTranslatedSegmentCacheKey
 } from './LiveCaptionCacheKeys.js';
 import {
-  LIVE_CAPTION_CONSENT_STATES,
-  LIVE_CAPTION_CONSENT_DECISION_REASONS,
-  LIVE_CAPTION_PLATFORM_SUPPORT_REASONS,
-  LIVE_CAPTION_CONSENT_ACTION_RESULTS,
-  LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS,
-  createLiveCaptionPlatformSupportResult,
-  createLiveCaptionPrivacyNotice,
-  createLiveCaptionConsentActionResult,
-  createLiveCaptionRecoveryFailureResult,
-  evaluateLiveCaptionStartEligibility,
-  normalizeLiveCaptionConsentState
-} from './LiveCaptionConsentPolicy.js';
-import {
   LiveCaptionCleanupCoordinator,
   LIVE_CAPTION_CLEANUP_STEP_TYPES,
   LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
@@ -84,19 +71,6 @@ export {
   createLiveCaptionTranslatedSegmentCacheKey
 } from './LiveCaptionCacheKeys.js';
 export {
-  LIVE_CAPTION_CONSENT_STATES,
-  LIVE_CAPTION_CONSENT_DECISION_REASONS,
-  LIVE_CAPTION_PLATFORM_SUPPORT_REASONS,
-  LIVE_CAPTION_CONSENT_ACTION_RESULTS,
-  LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS,
-  createLiveCaptionPlatformSupportResult,
-  createLiveCaptionPrivacyNotice,
-  createLiveCaptionConsentActionResult,
-  createLiveCaptionRecoveryFailureResult,
-  evaluateLiveCaptionStartEligibility,
-  normalizeLiveCaptionConsentState
-} from './LiveCaptionConsentPolicy.js';
-export {
   LiveCaptionCleanupCoordinator,
   LIVE_CAPTION_CLEANUP_STEP_TYPES,
   LIVE_CAPTION_CLEANUP_RESULT_STATUSES,
@@ -143,17 +117,6 @@ export default {
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
   createLiveCaptionTranslatedSegmentCacheKey,
-  LIVE_CAPTION_CONSENT_STATES,
-  LIVE_CAPTION_CONSENT_DECISION_REASONS,
-  LIVE_CAPTION_PLATFORM_SUPPORT_REASONS,
-  LIVE_CAPTION_CONSENT_ACTION_RESULTS,
-  LIVE_CAPTION_RECOVERY_FAILURE_ACTIONS,
-  createLiveCaptionPlatformSupportResult,
-  createLiveCaptionPrivacyNotice,
-  createLiveCaptionConsentActionResult,
-  createLiveCaptionRecoveryFailureResult,
-  evaluateLiveCaptionStartEligibility,
-  normalizeLiveCaptionConsentState,
   LiveCaptionCleanupCoordinator,
   LIVE_CAPTION_CLEANUP_STEP_TYPES,
   LIVE_CAPTION_CLEANUP_RESULT_STATUSES,

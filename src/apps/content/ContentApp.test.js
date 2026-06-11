@@ -13,7 +13,7 @@ vi.mock('vue', async (importOriginal) => {
     defineAsyncComponent: (loader) => {
       return {
         name: 'AsyncComponentStub',
-        props: ['visible', 'showConsentNotice', 'consentAccepted'],
+        props: ['visible'],
         template: '<div class="async-stub"><slot></slot></div>'
       };
     }
@@ -125,7 +125,7 @@ vi.mock('@/features/live-caption/content/index.js', () => ({
   })
 }));
 
-describe('ContentApp - Live Caption Consent Notice Integration', () => {
+describe('ContentApp - Live Caption Integration', () => {
   let store;
 
   beforeEach(() => {
@@ -135,7 +135,7 @@ describe('ContentApp - Live Caption Consent Notice Integration', () => {
     vi.clearAllMocks();
   });
 
-  it('handles live-caption-start-request event and registers consent notice flow', async () => {
+  it('handles live-caption-start-request event and starts directly', async () => {
     const wrapper = mount(ContentApp, {
       global: {
         stubs: {
@@ -151,34 +151,15 @@ describe('ContentApp - Live Caption Consent Notice Integration', () => {
     await flushPromises();
     await nextTick();
 
-    // Verify initial state: overlay and consent are hidden
+    // Verify initial state: overlay is hidden
     expect(store.overlayVisible).toBe(false);
-    expect(store.consentNoticeVisible).toBe(false);
 
     // Simulate clicking Popup start (emits event on pageEventBus)
     pageEventBus.emit('live-caption-start-request-popup');
     await nextTick();
 
-    // Verify that store states are correctly updated to show consent notice first
+    // Verify that overlay is visible and controller.start() gets called directly
     expect(store.overlayVisible).toBe(true);
-    expect(store.consentNoticeVisible).toBe(true);
-    expect(store.consentAccepted).toBe(false);
-    expect(mockStart).not.toHaveBeenCalled();
-
-    // Verify LiveCaptionOverlay displays consent panel
-    // Note: Since all defineAsyncComponent components are resolved to AsyncComponentStub,
-    // we find the stub representing the overlay.
-    const overlays = wrapper.findAll('.async-stub');
-    // LiveCaptionOverlay is rendered when overlayVisible is true
-    expect(overlays.length).toBeGreaterThan(0);
-
-    // Emulating the events directly from our store callbacks as the stub UI doesn't render full markup
-    await wrapper.vm.handleLiveCaptionAcceptConsent();
-    await nextTick();
-
-    // Verify consent states are updated and controller.start() gets called
-    expect(store.consentAccepted).toBe(true);
-    expect(store.consentNoticeVisible).toBe(false);
     expect(mockStart).toHaveBeenCalled();
   });
 });

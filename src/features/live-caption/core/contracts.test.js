@@ -24,7 +24,7 @@ describe('live-caption session contracts', () => {
   });
 
   it('builds page and video snapshots', () => {
-    const pageSession = new PageLiveCaptionSession({ tabId: 42, consentAccepted: true });
+    const pageSession = new PageLiveCaptionSession({ tabId: 42 });
     const videoSession = new VideoCaptionSession({ tabId: 42, videoFingerprint: 'video-42' });
 
     pageSession.attachVideoSession(videoSession);

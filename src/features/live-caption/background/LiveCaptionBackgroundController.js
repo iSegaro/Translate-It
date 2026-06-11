@@ -267,7 +267,6 @@ export class LiveCaptionBackgroundController {
       }
 
       const recoveredSession = this.sessionManager.getOrCreateSession(tabId, {
-        consentAccepted: true,
         isIncognito
       });
       recoveredSession.sessionId = sessionId;
@@ -587,11 +586,8 @@ export class LiveCaptionBackgroundController {
 
       const session = this.sessionManager.getOrCreateSession(tabId, {
         sessionId: request.data.sessionId,
-        consentAccepted: Boolean(request.data.consentAccepted),
         isIncognito: Boolean(sender?.tab?.incognito)
       });
-
-      session.setConsentAccepted(Boolean(request.data.consentAccepted));
 
       // Hydrate video session if fingerprint is provided
       const videoFingerprint = request.data.videoFingerprint ?? session.activeVideoFingerprint;
@@ -741,9 +737,7 @@ export class LiveCaptionBackgroundController {
         LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
       );
       const tabId = normalizeTabId(request.data.tabId);
-      const session = this.sessionManager.getOrCreateSession(tabId, {
-        consentAccepted: Boolean(request.data.consentAccepted),
-      });
+      const session = this.sessionManager.getOrCreateSession(tabId);
       const sessionSnapshot =
         session.getCleanupSnapshot?.() ?? session.getSnapshot?.() ?? null;
       const cleanupPlan = this.cleanupCoordinator.createCleanupPlan({
@@ -915,9 +909,7 @@ export class LiveCaptionBackgroundController {
         LIVE_CAPTION_RUNTIME_ACTIONS.STATUS,
       );
       const tabId = normalizeTabId(request.data.tabId);
-      const session = this.sessionManager.getOrCreateSession(tabId, {
-        consentAccepted: Boolean(request.data.consentAccepted),
-      });
+      const session = this.sessionManager.getOrCreateSession(tabId);
       const offscreenResponse = await this.offscreenBridge.requestRuntimeStatus(
         {
           sessionId: session.sessionId,
@@ -1008,9 +1000,7 @@ export class LiveCaptionBackgroundController {
         LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE,
       );
       const tabId = normalizeTabId(request.data.tabId);
-      const session = this.sessionManager.getOrCreateSession(tabId, {
-        consentAccepted: Boolean(request.data.consentAccepted),
-      });
+      const session = this.sessionManager.getOrCreateSession(tabId);
 
       this.captureCoordinator.pauseRuntime({
         sessionId: session.sessionId,
@@ -1109,9 +1099,7 @@ export class LiveCaptionBackgroundController {
         LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
       );
       const tabId = normalizeTabId(request.data.tabId);
-      const session = this.sessionManager.getOrCreateSession(tabId, {
-        consentAccepted: Boolean(request.data.consentAccepted),
-      });
+      const session = this.sessionManager.getOrCreateSession(tabId);
 
       this.captureCoordinator.resumeRuntime({
         sessionId: session.sessionId,

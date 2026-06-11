@@ -93,7 +93,6 @@ export function createLiveCaptionSessionSnapshot(session) {
     sessionId: session.sessionId,
     tabId: session.tabId,
     lifecycleState: session.lifecycleState,
-    consentAccepted: session.consentAccepted,
     isIncognito: Boolean(session.isIncognito),
     activeVideoSessionId: session.activeVideoSessionId ?? null,
     activeVideoFingerprint: session.activeVideoFingerprint ?? null,

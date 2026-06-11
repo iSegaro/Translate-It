@@ -413,7 +413,7 @@ describe("live-caption background controller", () => {
     const mockCallback = vi.fn();
 
     // Create session to avoid reconciliation branch
-    const session = controller.sessionManager.getOrCreateSession(7, { consentAccepted: true });
+    const session = controller.sessionManager.getOrCreateSession(7);
     session.sessionId = "session-1";
 
     controller.captureCoordinator.recordSnapshot = vi.fn();
@@ -505,7 +505,7 @@ describe("live-caption background controller", () => {
 
   it("handles offscreen health success without disruption", async () => {
     const controller = createController();
-    const session = controller.sessionManager.getOrCreateSession(1, { consentAccepted: true });
+    const session = controller.sessionManager.getOrCreateSession(1);
     session.sessionId = "session-1";
     session.lifecycleState = "active";
     
@@ -520,7 +520,7 @@ describe("live-caption background controller", () => {
 
   it("handles offscreen health failure by failing closed", async () => {
     const controller = createController();
-    const session = controller.sessionManager.getOrCreateSession(2, { consentAccepted: true });
+    const session = controller.sessionManager.getOrCreateSession(2);
     session.sessionId = "session-2";
     session.lifecycleState = "active";
 
@@ -541,7 +541,7 @@ describe("live-caption background controller", () => {
   it("fails closed when health check times out", async () => {
     vi.useFakeTimers();
     const controller = createController();
-    const session = controller.sessionManager.getOrCreateSession(3, { consentAccepted: true });
+    const session = controller.sessionManager.getOrCreateSession(3);
     session.sessionId = "session-3";
     session.lifecycleState = "active";
 

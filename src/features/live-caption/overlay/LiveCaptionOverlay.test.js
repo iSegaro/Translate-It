@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LiveCaptionOverlay from './LiveCaptionOverlay.vue';
-import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODES } from '../core/LiveCaptionCaptionDisplayMode.js';
@@ -54,8 +53,6 @@ describe('live-caption overlay shell', () => {
           videoFingerprint: 'video-1'
         },
         captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
-        consentAccepted: true,
-        showConsentNotice: false,
         captionLines: [
           {
             sessionId: 'session-1',
@@ -89,36 +86,6 @@ describe('live-caption overlay shell', () => {
 
     await wrapper.setProps({ status: 'error', lastError: { message: 'boom' } });
     expect(wrapper.find('.live-caption-overlay__error').text()).toBe('boom');
-  });
-
-  it('blocks captions until consent is accepted', async () => {
-    const wrapper = mount(LiveCaptionOverlay, {
-      props: {
-        visible: true,
-        status: 'idle',
-        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
-        consentAccepted: false,
-        showConsentNotice: true,
-        captionLines: [
-          {
-            sessionId: 'session-1',
-            videoFingerprint: 'video-1',
-            segmentStartMs: 100,
-            segmentEndMs: 200,
-            originalText: 'Hello',
-            translatedText: 'سلام',
-            isFinal: true
-          }
-        ]
-      }
-    });
-
-    expect(wrapper.findComponent(LiveCaptionConsentNotice).exists()).toBe(true);
-    expect(wrapper.findComponent(LiveCaptionCaptionTrack).exists()).toBe(false);
-
-    await wrapper.setProps({ showConsentNotice: false, consentAccepted: true });
-    expect(wrapper.findComponent(LiveCaptionConsentNotice).exists()).toBe(false);
-    expect(wrapper.findComponent(LiveCaptionCaptionTrack).exists()).toBe(true);
   });
 
   it('renders finalized caption lines only', () => {
@@ -217,19 +184,6 @@ describe('live-caption overlay shell', () => {
     expect(wrapper.text()).not.toContain('Hello');
   });
 
-  it('emits consent actions only', async () => {
-    const wrapper = mount(LiveCaptionConsentNotice, {
-      props: {
-        visible: true
-      }
-    });
-
-    await wrapper.findAll('button')[0].trigger('click');
-    await wrapper.findAll('button')[1].trigger('click');
-
-    expect(wrapper.emitted('accept')).toHaveLength(1);
-    expect(wrapper.emitted('cancel')).toHaveLength(1);
-  });
 
   it('emits control actions only', async () => {
     const wrapper = mount(LiveCaptionControls, {
@@ -267,8 +221,6 @@ describe('live-caption overlay shell', () => {
         visible: true,
         status: 'idle',
         captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSLATED_ONLY,
-        consentAccepted: true,
-        showConsentNotice: false,
         captionLines: []
       }
     });
@@ -286,8 +238,6 @@ describe('live-caption overlay shell', () => {
         status: 'idle',
         runtimeStatus: 'running',
         activeSessionState: 'active',
-        consentAccepted: true,
-        showConsentNotice: false,
         captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.BILINGUAL,
         captionLines: [
           {
@@ -345,8 +295,6 @@ describe('live-caption overlay shell', () => {
         status: 'idle',
         runtimeStatus: 'running',
         activeSessionState: 'active',
-        consentAccepted: true,
-        showConsentNotice: false,
         captionLines: [
           {
             sessionId: 'session-1',
@@ -391,8 +339,6 @@ describe('live-caption overlay shell', () => {
         status: 'idle',
         runtimeStatus: 'running',
         activeSessionState: 'active',
-        consentAccepted: true,
-        showConsentNotice: false,
         controlsState: {
           canStart: true,
           canStop: true,

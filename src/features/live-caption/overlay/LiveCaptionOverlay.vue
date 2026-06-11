@@ -4,8 +4,7 @@
     class="live-caption-overlay"
     :class="[
       `live-caption-overlay--${status || 'idle'}`,
-      `live-caption-overlay--runtime-${runtimeStatus || 'idle'}`,
-      { 'live-caption-overlay--blocked': showConsentPanel }
+      `live-caption-overlay--runtime-${runtimeStatus || 'idle'}`
     ]"
     :style="resolvedPositionStyle"
     :data-status="status || 'idle'"
@@ -16,41 +15,28 @@
     aria-label="Live Caption overlay"
   >
     <div class="live-caption-overlay__panel">
-      <LiveCaptionConsentNotice
-        v-if="showConsentPanel"
-        :visible="showConsentPanel"
-        :notice="privacyNotice"
-        :is-incognito="isIncognito"
-        :browser-name="browserName"
-        :platform="platform"
-        @accept="$emit('accept-consent')"
-        @cancel="$emit('cancel-consent')"
+      <LiveCaptionCaptionTrack
+        :caption-lines="captionLines"
+        :caption-display-mode="captionDisplayMode"
       />
 
-      <template v-else>
-        <LiveCaptionCaptionTrack
-          :caption-lines="captionLines"
-          :caption-display-mode="captionDisplayMode"
-        />
+      <div
+        v-if="lastError"
+        class="live-caption-overlay__error"
+        role="alert"
+      >
+        {{ lastError?.message || 'Live Caption error' }}
+      </div>
 
-        <div
-          v-if="lastError"
-          class="live-caption-overlay__error"
-          role="alert"
-        >
-          {{ lastError?.message || 'Live Caption error' }}
-        </div>
-
-        <LiveCaptionControls
-          :controls-state="controlsState"
-          @start="$emit('start')"
-          @stop="$emit('stop')"
-          @pause="$emit('pause')"
-          @resume="$emit('resume')"
-          @retry="$emit('retry')"
-          @clear-cache="$emit('clear-cache')"
-        />
-      </template>
+      <LiveCaptionControls
+        :controls-state="controlsState"
+        @start="$emit('start')"
+        @stop="$emit('stop')"
+        @pause="$emit('pause')"
+        @resume="$emit('resume')"
+        @retry="$emit('retry')"
+        @clear-cache="$emit('clear-cache')"
+      />
     </div>
   </section>
 </template>
@@ -60,7 +46,6 @@ import { computed, onMounted } from 'vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '../core/LiveCaptionCaptionDisplayMode.js';
-import LiveCaptionConsentNotice from './LiveCaptionConsentNotice.vue';
 import LiveCaptionCaptionTrack from './LiveCaptionCaptionTrack.vue';
 import LiveCaptionControls from './LiveCaptionControls.vue';
 import { useLiveCaptionOverlay } from './useLiveCaptionOverlay.js';
@@ -100,22 +85,6 @@ const props = defineProps({
     type: String,
     default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
   },
-  consentAccepted: {
-    type: Boolean,
-    default: false
-  },
-  showConsentNotice: {
-    type: Boolean,
-    default: false
-  },
-  privacyNotice: {
-    type: Object,
-    default: null
-  },
-  isIncognito: {
-    type: Boolean,
-    default: false
-  },
   browserName: {
     type: String,
     default: 'unknown'
@@ -154,7 +123,7 @@ const props = defineProps({
   }
 });
 
-defineEmits(['accept-consent', 'cancel-consent', 'start', 'stop', 'pause', 'resume', 'retry', 'clear-cache']);
+defineEmits(['start', 'stop', 'pause', 'resume', 'retry', 'clear-cache']);
 
 const overlayAnchor = useLiveCaptionOverlay(
   () => props.videoElement,
@@ -165,7 +134,6 @@ const overlayAnchor = useLiveCaptionOverlay(
 );
 
 const resolvedPositionStyle = computed(() => props.positionStyle || overlayAnchor.overlayStyle.value || null);
-const showConsentPanel = computed(() => props.showConsentNotice || !props.consentAccepted);
 const shouldShowOverlay = computed(() => {
   if (!props.visible) return false;
   if (!props.videoElement) return true;
