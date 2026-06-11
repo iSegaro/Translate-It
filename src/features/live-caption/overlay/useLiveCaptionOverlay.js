@@ -37,6 +37,8 @@ function buildOverlayStyle(rect, options = {}) {
     left: `${Math.max(0, rect.left + offsetHorizontal)}px`,
     width: `${maxWidth}px`,
     maxWidth: `${maxWidth}px`,
+    bottom: 'auto',
+    transform: 'translateY(-100%)',
     zIndex: 2147483647,
     pointerEvents: 'none'
   });

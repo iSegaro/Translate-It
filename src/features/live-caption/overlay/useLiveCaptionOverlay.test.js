@@ -105,6 +105,8 @@ describe('useLiveCaptionOverlay', () => {
       left: '58px',
       width: '624px',
       maxWidth: '624px',
+      bottom: 'auto',
+      transform: 'translateY(-100%)',
       zIndex: 2147483647,
       pointerEvents: 'none'
     });
