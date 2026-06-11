@@ -51,6 +51,13 @@ vi.mock('@/shared/logging/logger.js', () => ({
   })),
 }));
 
+vi.mock('@/apps/content/ContentApp.vue', () => ({
+  default: {
+    name: 'ContentApp',
+    render: () => null,
+  },
+}));
+
 describe('useContentAppLifecycle', () => {
   let mainHost;
 
@@ -69,7 +76,14 @@ describe('useContentAppLifecycle', () => {
     document.body.appendChild(mainHost);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      const { cleanupVueApp } = await import('@/core/content-scripts/chunks/lazy-vue-app.js');
+      cleanupVueApp();
+    } catch {
+      // Ignore cleanup error if lazy-vue-app cannot be imported/parsed
+    }
+
     if (mainHost) {
       mainHost.remove();
       mainHost = null;
