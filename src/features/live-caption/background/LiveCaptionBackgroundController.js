@@ -347,6 +347,10 @@ export class LiveCaptionBackgroundController {
       this.handleRuntimeResume.bind(this),
     );
     messageHandler.registerHandler(
+      LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+      this.handleVideoChanged.bind(this),
+    );
+    messageHandler.registerHandler(
       LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
       this.handleFinalizedChunk.bind(this),
     );
@@ -1184,6 +1188,150 @@ export class LiveCaptionBackgroundController {
         {
           action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
         },
+      );
+    }
+  }
+
+  async handleVideoChanged(message, sender) {
+    const data = message?.data || {};
+    const senderTabId = sender?.tab?.id ?? null;
+    const tabId = data.tabId ?? senderTabId ?? null;
+
+    if (tabId == null) {
+      return this._buildFailClosedResponse(
+        LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+        new TypeError("Live-caption video changed requires tabId"),
+        {
+          sessionId: data.sessionId ?? null,
+          tabId: null,
+          videoFingerprint: data.videoFingerprint ?? null,
+          code: "missing_tab_id",
+          reason: "invalid_payload",
+        },
+      );
+    }
+
+    try {
+      const request = this._normalizeRequest(
+        message,
+        sender,
+        LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+      );
+
+      const session = this.sessionManager.getSession(tabId);
+      if (!session) {
+        return this._buildFailClosedResponse(
+          LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+          new Error("No active page session found for tab to retarget video"),
+          {
+            sessionId: data.sessionId ?? null,
+            tabId,
+            videoFingerprint: data.videoFingerprint ?? null,
+            code: "no_active_session",
+            reason: "no_active_session",
+          }
+        );
+      }
+
+      const videoFingerprint = request.data.videoFingerprint;
+      const offscreenResponse = await this.offscreenBridge.requestVideoChanged({
+        sessionId: session.sessionId,
+        tabId,
+        videoFingerprint,
+        requestId: request.messageId,
+        message: "Live-caption active video changed"
+      });
+
+      if (!offscreenResponse || offscreenResponse.ok !== true) {
+        return this._buildFailClosedResponse(
+          LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+          offscreenResponse?.error || new Error("Live-caption offscreen video retarget failed"),
+          {
+            sessionId: session.sessionId,
+            tabId,
+            videoFingerprint,
+            code: "offscreen_retarget_failed",
+            reason: "offscreen_retarget_failed",
+            runtimeState: this.captureCoordinator.runtimeState,
+            status: offscreenResponse?.status ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED,
+            message: offscreenResponse?.message ?? "Live-caption offscreen video retarget failed"
+          }
+        );
+      }
+
+      if (videoFingerprint) {
+        if (!session.activeVideoSession || session.activeVideoSession.videoFingerprint !== videoFingerprint) {
+          logger.info("Retargeting active video session in background", {
+            tabId,
+            sessionId: session.sessionId,
+            oldFingerprint: session.activeVideoFingerprint,
+            newFingerprint: videoFingerprint
+          });
+          const videoSession = new VideoCaptionSession({ tabId, videoFingerprint });
+          session.replaceVideoSession(videoSession, LIVE_CAPTION_CLEANUP_REASONS.VIDEO_CHANGED);
+          session.start();
+
+          // Hydrate from cache
+          try {
+            const [transcripts, translations] = await Promise.all([
+              this.cache.getTranscriptSegments({ tabId, videoFingerprint, isIncognito: session.isIncognito }),
+              this.cache.getTranslatedCaptionSegments({ tabId, videoFingerprint, isIncognito: session.isIncognito })
+            ]);
+
+            transcripts.forEach(s => videoSession.addTranscriptSegment(s));
+            translations.forEach(s => videoSession.addTranslatedCaptionSegment(s));
+
+            logger.info('Live-caption handoff session hydrated from cache', {
+              tabId,
+              videoFingerprint,
+              transcriptCount: transcripts.length,
+              translationCount: translations.length
+            });
+          } catch (cacheError) {
+            logger.warn('Failed to hydrate handoff session from cache', {
+              tabId,
+              videoFingerprint,
+              error: cacheError.message
+            });
+          }
+        }
+      }
+
+      this.captureCoordinator.setSessionContext({
+        sessionId: session.sessionId,
+        tabId,
+        videoFingerprint
+      });
+
+      const sessionSnapshot = session.getSnapshot();
+      const successResponse = createLiveCaptionRuntimeSuccessResponse({
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+        sessionId: session.sessionId,
+        tabId,
+        videoFingerprint,
+        runtimeState: this.captureCoordinator.runtimeState,
+        sessionSnapshot
+      });
+
+      this.lastResponse = successResponse;
+      this.touch();
+      return successResponse;
+    } catch (error) {
+      logger.error('handleVideoChanged caught error', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code
+      });
+      return this._buildFailClosedResponse(
+        LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+        error,
+        {
+          sessionId: data.sessionId ?? null,
+          tabId,
+          videoFingerprint: data.videoFingerprint ?? null,
+          code: "handoff_failed",
+          reason: "handoff_failure"
+        }
       );
     }
   }

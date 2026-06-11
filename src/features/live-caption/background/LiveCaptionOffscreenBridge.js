@@ -21,6 +21,7 @@ import {
   createLiveCaptionRuntimeStatusRequest,
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeVideoChangedRequest,
   createLiveCaptionRuntimeUnavailableResponse,
   normalizeLiveCaptionRuntimeResponse
 } from './liveCaptionRuntimeContracts.js';
@@ -185,7 +186,8 @@ export class LiveCaptionOffscreenBridge {
       [LIVE_CAPTION_RUNTIME_ACTIONS.STOP]: createLiveCaptionRuntimeStopRequest,
       [LIVE_CAPTION_RUNTIME_ACTIONS.STATUS]: createLiveCaptionRuntimeStatusRequest,
       [LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE]: createLiveCaptionRuntimePauseRequest,
-      [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: createLiveCaptionRuntimeResumeRequest
+      [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: createLiveCaptionRuntimeResumeRequest,
+      [LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED]: createLiveCaptionRuntimeVideoChangedRequest
     };
 
     const buildRequest = requestBuilders[action];
@@ -337,6 +339,13 @@ export class LiveCaptionOffscreenBridge {
     return this._sendRuntimeRequest(LIVE_CAPTION_RUNTIME_ACTIONS.START, {
       ...options,
       runtimeState: LIVE_CAPTION_RUNTIME_STATES.STARTING
+    });
+  }
+
+  requestVideoChanged(options = {}) {
+    return this._sendRuntimeRequest(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED, {
+      ...options,
+      runtimeState: options.runtimeState ?? this.runtimeState
     });
   }
 

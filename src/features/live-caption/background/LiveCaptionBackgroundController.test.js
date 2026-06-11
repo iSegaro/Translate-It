@@ -10,10 +10,12 @@ import {
   createLiveCaptionRuntimeStatusRequest,
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeVideoChangedRequest,
 } from "./liveCaptionRuntimeContracts.js";
 import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
+import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -92,7 +94,11 @@ describe("live-caption background controller", () => {
 
     controller.registerHandlers(messageHandler);
 
-    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(9);
+    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(10);
+    expect(messageHandler.registerHandler).toHaveBeenCalledWith(
+      LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+      expect.any(Function),
+    );
     expect(messageHandler.registerHandler).toHaveBeenCalledWith(
       LIVE_CAPTION_RUNTIME_ACTIONS.START,
       expect.any(Function),
@@ -559,5 +565,129 @@ describe("live-caption background controller", () => {
     expect(controller.offscreenBridge.requestRuntimeStop).toHaveBeenCalledWith(expect.objectContaining({ reason: "health_check_failure" }));
     
     vi.useRealTimers();
+  });
+
+  it("handles active-video handoff via handleVideoChanged without recreating page session", async () => {
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.lifecycleState = "active";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-old",
+    }));
+    controller.captureCoordinator.setSessionContext({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-old",
+    });
+
+    controller.offscreenBridge.requestVideoChanged = vi.fn().mockResolvedValue({ ok: true });
+
+    const response = await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-new"
+      }),
+      { tab: { id: 7 } }
+    );
+
+    expect(response.ok).toBe(true);
+    expect(controller.sessionManager.getSession(7)).toBe(session); // session not recreated
+    expect(session.activeVideoFingerprint).toBe("video-new"); // fingerprint updated
+    expect(controller.captureCoordinator.videoFingerprint).toBe("video-new"); // capture coordinator updated
+    expect(controller.offscreenBridge.requestVideoChanged).toHaveBeenCalledWith(expect.objectContaining({
+      videoFingerprint: "video-new",
+      sessionId: "session-1",
+      tabId: 7
+    }));
+  });
+
+  it("fails active-video handoff if neither tabId nor sessionId matches any active session", async () => {
+    const controller = createController();
+    controller.offscreenBridge.requestVideoChanged = vi.fn().mockResolvedValue({ ok: true });
+
+    const response = await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 999,
+        sessionId: "session-non-existent",
+        videoFingerprint: "video-new-3"
+      }),
+      { tab: { id: 999 } }
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe("FAIL_CLOSED");
+  });
+
+  it("fails active-video handoff closed when offscreen retarget fails without mutating session state", async () => {
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.lifecycleState = "active";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-old",
+    }));
+    controller.captureCoordinator.setSessionContext({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-old",
+    });
+
+    controller.offscreenBridge.requestVideoChanged = vi.fn().mockResolvedValue({
+      ok: false,
+      status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED,
+      message: "offscreen retarget failed"
+    });
+
+    const response = await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-new"
+      }),
+      { tab: { id: 7 } }
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED);
+    expect(session.activeVideoFingerprint).toBe("video-old");
+    expect(controller.captureCoordinator.videoFingerprint).toBe("video-old");
+    expect(controller.offscreenBridge.requestVideoChanged).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-new"
+    }));
+  });
+
+  it("finalized chunks are attributed to the new videoFingerprint after retargeting", async () => {
+    const controller = createController();
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.lifecycleState = "active";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-old",
+    }));
+    controller.captureCoordinator.setSessionContext({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-old",
+    });
+
+    controller.offscreenBridge.requestVideoChanged = vi.fn().mockResolvedValue({ ok: true });
+
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-new"
+      }),
+      { tab: { id: 7 } }
+    );
+
+    expect(controller.captureCoordinator.videoFingerprint).toBe("video-new");
   });
 });

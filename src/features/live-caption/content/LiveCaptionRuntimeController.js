@@ -30,6 +30,7 @@ import {
   createLiveCaptionRuntimeStatusRequest,
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeVideoChangedRequest,
   normalizeLiveCaptionRuntimeResponse,
   createLiveCaptionRuntimeFailClosedResponse
 } from '../background/liveCaptionRuntimeContracts.js';
@@ -185,6 +186,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.startPromise = null;
     this.scanFrameId = null;
     this.mutationObserver = null;
+    this.runtimeStartCompleted = false;
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
 
@@ -722,7 +724,8 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       [LIVE_CAPTION_ACTIONS.RUNTIME_STOP]: createLiveCaptionRuntimeStopRequest,
       [LIVE_CAPTION_ACTIONS.RUNTIME_STATUS]: createLiveCaptionRuntimeStatusRequest,
       [LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE]: createLiveCaptionRuntimePauseRequest,
-      [LIVE_CAPTION_ACTIONS.RUNTIME_RESUME]: createLiveCaptionRuntimeResumeRequest
+      [LIVE_CAPTION_ACTIONS.RUNTIME_RESUME]: createLiveCaptionRuntimeResumeRequest,
+      [LIVE_CAPTION_ACTIONS.VIDEO_CHANGED]: createLiveCaptionRuntimeVideoChangedRequest
     };
 
     const buildRequest = requestBuilders[action];
@@ -994,6 +997,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       }
 
       // Only transition to RUNNING after background confirms success
+      this.runtimeStartCompleted = true;
       this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
         tabId,
         sessionId: this.pageSession.sessionId,
@@ -1146,6 +1150,62 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       nextVideoSession,
       fingerprint: selectedFingerprint
     });
+    if (
+      this.started &&
+      this.runtimeStartCompleted &&
+      (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.RUNNING || this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.PAUSED) &&
+      currentFingerprint !== null &&
+      selectedFingerprint &&
+      selectedFingerprint !== currentFingerprint &&
+      (handoffPlan.action === LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS.REPLACE_ACTIVE_VIDEO ||
+       handoffPlan.action === LIVE_CAPTION_VIDEO_HANDOFF_ACTIONS.CREATE_NEW_VIDEO_SESSION)
+    ) {
+      logger.info('Notifying background of active video changed', {
+        action: handoffPlan.action,
+        videoFingerprint: selectedFingerprint
+      });
+
+      // We do NOT clear captions immediately to avoid blanking the screen if the handoff fails or while it is in progress.
+      try {
+        const response = await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, {
+          tabId: this.tabId,
+          sessionId: this.pageSession?.sessionId ?? null,
+          videoFingerprint: selectedFingerprint,
+          reason: 'video_changed'
+        });
+
+        if (response && response.ok) {
+          const snapshot = response.sessionSnapshot;
+          const activeVid = snapshot?.activeVideoSession;
+          const hasCaptions = (activeVid?.translatedCaptionSegments?.length > 0) ||
+                              (activeVid?.transcriptSegments?.length > 0);
+          if (!hasCaptions) {
+            this.store?.setCaptions([]);
+          }
+        } else {
+          logger.error('Failed to notify background of video changed', {
+            action: handoffPlan.action,
+            videoFingerprint: selectedFingerprint,
+            status: response?.status,
+            error: response?.message || 'Handoff response failed'
+          });
+
+          if (response?.error) {
+            const errorState = createLiveCaptionErrorState(
+              new Error(response.message || 'Active-video handoff failed'),
+              LIVE_CAPTION_CLEANUP_REASONS.ERROR
+            );
+            this.store?.setError?.(errorState);
+          }
+        }
+      } catch (err) {
+        logger.error('Exception notifying background of video changed', {
+          videoFingerprint: selectedFingerprint,
+          error: err.message,
+          stack: err.stack
+        });
+      }
+    }
 
     if (
       this.paused &&
@@ -1231,6 +1291,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.pageSession = null;
     this.started = false;
     this.paused = false;
+    this.runtimeStartCompleted = false;
     this.lastCleanupResult = cleanupResult;
 
     const friendlyError = cleanupResult.error ? {

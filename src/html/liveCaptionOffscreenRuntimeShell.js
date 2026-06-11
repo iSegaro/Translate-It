@@ -674,6 +674,53 @@ export class LiveCaptionOffscreenRuntimeShell {
     }
   }
 
+  async handleVideoChanged(message, sender) {
+    try {
+      const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED);
+      const sessionError = this._ensureConsistency(request, LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED);
+      if (sessionError) {
+        return this._buildFailClosed(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED, sessionError, {
+          sessionId: request.data.sessionId,
+          tabId: request.data.tabId,
+          videoFingerprint: request.data.videoFingerprint,
+          reason: 'inconsistent_session'
+        });
+      }
+
+      const oldFingerprint = this.videoFingerprint;
+      const newFingerprint = request.data.videoFingerprint;
+
+      logger.info('Offscreen shell retargeting video fingerprint', {
+        sessionId: this.sessionId,
+        tabId: this.tabId,
+        oldFingerprint,
+        newFingerprint
+      });
+
+      this._setSessionContext(request.data);
+
+      const response = createLiveCaptionRuntimeShellResponse(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED, {
+        status: this.status,
+        runtimeState: this.runtimeState,
+        sessionId: this.sessionId,
+        tabId: this.tabId,
+        videoFingerprint: this.videoFingerprint
+      });
+
+      this.lastResponse = response;
+      this.touch();
+      return response;
+    } catch (error) {
+      return this._buildFailClosed(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED, error, {
+        sessionId: message?.data?.sessionId ?? this.sessionId,
+        tabId: message?.data?.tabId ?? this.tabId,
+        videoFingerprint: message?.data?.videoFingerprint ?? this.videoFingerprint,
+        code: 'handoff_failed',
+        reason: 'error'
+      });
+    }
+  }
+
   handleMessage(message, sender) {
     const action = message?.action ?? null;
 
@@ -688,6 +735,8 @@ export class LiveCaptionOffscreenRuntimeShell {
         return this.handleRuntimeResume(message, sender);
       case LIVE_CAPTION_RUNTIME_ACTIONS.STOP:
         return this.handleRuntimeStop(message, sender);
+      case LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED:
+        return this.handleVideoChanged(message, sender);
       default:
         return this._buildFailClosed(action, new TypeError(`Unknown live-caption offscreen runtime action: ${String(action)}`), {
           code: LIVE_CAPTION_RUNTIME_ERROR_CODES.UNKNOWN_ACTION,

@@ -104,6 +104,56 @@ function createRuntimeBrowserApi() {
   };
 }
 
+function createRuntimeResponse(action, data = {}, overrides = {}) {
+  const runtimeStateByAction = {
+    [LIVE_CAPTION_ACTIONS.RUNTIME_START]: 'running',
+    [LIVE_CAPTION_ACTIONS.RUNTIME_STOP]: 'idle',
+    [LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE]: 'paused',
+    [LIVE_CAPTION_ACTIONS.RUNTIME_RESUME]: 'running',
+    [LIVE_CAPTION_ACTIONS.VIDEO_CHANGED]: overrides.runtimeState ?? 'running'
+  };
+
+  const statusByAction = {
+    [LIVE_CAPTION_ACTIONS.RUNTIME_START]: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+    [LIVE_CAPTION_ACTIONS.RUNTIME_STOP]: LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE,
+    [LIVE_CAPTION_ACTIONS.RUNTIME_PAUSE]: LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL,
+    [LIVE_CAPTION_ACTIONS.RUNTIME_RESUME]: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+    [LIVE_CAPTION_ACTIONS.VIDEO_CHANGED]: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL
+  };
+
+  const sessionSnapshot = action === LIVE_CAPTION_ACTIONS.RUNTIME_START
+    ? {
+        sessionId: data.sessionId ?? null,
+        tabId: data.tabId ?? null,
+        activeVideoFingerprint: data.videoFingerprint ?? null,
+        activeVideoSession: {
+          videoFingerprint: data.videoFingerprint ?? null,
+          transcriptSegments: [
+            { segmentId: 'transcript-1', originalText: 'Hello', segmentStartMs: 0, segmentEndMs: 1000 }
+          ],
+          translatedCaptionSegments: [
+            { segmentId: 'caption-1', translatedText: 'سلام', originalText: 'Hello', segmentStartMs: 0, segmentEndMs: 1000 }
+          ]
+        }
+      }
+    : overrides.sessionSnapshot ?? null;
+
+  return {
+    success: overrides.success ?? true,
+    ok: overrides.ok ?? true,
+    action,
+    status: overrides.status ?? statusByAction[action] ?? LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE,
+    runtimeState: overrides.runtimeState ?? runtimeStateByAction[action] ?? 'running',
+    sessionId: data.sessionId ?? null,
+    tabId: data.tabId ?? null,
+    videoFingerprint: data.videoFingerprint ?? null,
+    requestId: data.requestId ?? null,
+    message: overrides.message ?? null,
+    sessionSnapshot,
+    error: overrides.error ?? null
+  };
+}
+
 function createVideo({
   src,
   paused = false,
@@ -293,7 +343,12 @@ describe('live-caption runtime controller', () => {
       store,
       documentRef: document,
       windowRef: window,
+      browserApi: createRuntimeBrowserApi(),
       platformSupport: createSupportedPlatformSupport()
+    });
+
+    const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+      return createRuntimeResponse(action, data);
     });
 
     await controller.start({ tabId: 11 });
@@ -306,6 +361,9 @@ describe('live-caption runtime controller', () => {
       videoFingerprint: firstFingerprint,
       handoffAction: 'create_new_video_session'
     });
+
+    expect(sendRequestSpy).toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.RUNTIME_START, expect.any(Object));
+    sendRequestSpy.mockClear();
 
     Object.defineProperty(firstVideo, 'paused', {
       configurable: true,
@@ -331,6 +389,11 @@ describe('live-caption runtime controller', () => {
       videoFingerprint: secondFingerprint,
       handoffAction: 'replace_active_video'
     });
+
+    expect(sendRequestSpy).toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.objectContaining({
+      tabId: 11,
+      videoFingerprint: secondFingerprint
+    }));
   });
 
   it('pauses, resumes, and destroys cleanup-safe runtime state', async () => {
@@ -847,6 +910,255 @@ describe('live-caption runtime controller', () => {
       expect(controller.currentVideoElement).toBe(nonActiveVideo);
       expect(controller.resume).not.toHaveBeenCalled();
       expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
+  });
+
+  describe('active video handoff and VIDEO_CHANGED propagation', () => {
+    it('VIDEO_CHANGED success clears captions if new session has no captions', async () => {
+      const store = useLiveCaptionStore();
+      store.setCaptions([{ segmentId: 'old-1', translatedText: 'Old text' }]);
+      
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data, {
+          sessionSnapshot: {
+            activeVideoFingerprint: 'new-video',
+            activeVideoSession: {
+              translatedCaptionSegments: [],
+              transcriptSegments: []
+            }
+          }
+        });
+      });
+
+      await controller.start({ tabId: 11 });
+      
+      const newVideo = createVideo({ src: 'https://example.com/new.mp4', paused: false });
+      document.body.append(newVideo);
+      
+      // Make first video paused so newVideo is the ranked candidate
+      Object.defineProperty(firstVideo, 'paused', { value: true, configurable: true });
+      await controller.syncActiveVideo('video-change');
+      
+      expect(store.captionLines).toEqual([]);
+    });
+
+    it('VIDEO_CHANGED failure does not clear captions and sets store error', async () => {
+      const store = useLiveCaptionStore();
+      const initialCaptions = [{ segmentId: 'old-1', translatedText: 'Old text' }];
+      store.setCaptions(initialCaptions);
+      
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        if (action === LIVE_CAPTION_ACTIONS.VIDEO_CHANGED) {
+          return {
+            success: false,
+            ok: false,
+            action,
+            status: 'FAIL_CLOSED',
+            runtimeState: 'error',
+            sessionId: data.sessionId ?? null,
+            tabId: data.tabId ?? null,
+            videoFingerprint: data.videoFingerprint ?? null,
+            message: 'VIDEO_CHANGED failed',
+            error: new Error('VIDEO_CHANGED failed')
+          };
+        }
+
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      expect(controller.runtimeStartCompleted).toBe(true);
+      
+      const newVideo = createVideo({ src: 'https://example.com/new.mp4', paused: false });
+      document.body.append(newVideo);
+      
+      Object.defineProperty(firstVideo, 'paused', { value: true, configurable: true });
+      await controller.syncActiveVideo('video-change');
+      
+      expect(controller._sendRuntimeRequest).toHaveBeenCalledWith(
+        LIVE_CAPTION_ACTIONS.VIDEO_CHANGED,
+        expect.objectContaining({
+          tabId: 11,
+          sessionId: expect.any(String),
+          videoFingerprint: expect.any(String)
+        })
+      );
+      expect(store.captionLines).toEqual(initialCaptions);
+      expect(store.lastError).not.toBeNull();
+    });
+
+    it('no_op does not send VIDEO_CHANGED', async () => {
+      const store = useLiveCaptionStore();
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      await controller.start({ tabId: 11 });
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest');
+
+      await controller.syncActiveVideo('scan');
+
+      expect(sendRequestSpy).not.toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
+    });
+
+    it('initial start/create_new_video_session does not send VIDEO_CHANGED', async () => {
+      const store = useLiveCaptionStore();
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+
+      // RUNTIME_START should be called, but VIDEO_CHANGED should NOT be called during start sequence
+      expect(sendRequestSpy).toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.RUNTIME_START, expect.any(Object));
+      expect(sendRequestSpy).not.toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
+    });
+
+    it('VIDEO_CHANGED is not sent before background session exists (while status is STARTING)', async () => {
+      const store = useLiveCaptionStore();
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+
+      // We simulate STARTING state by manually setting runtimeStatus, without starting properly
+      controller.started = true;
+      controller.runtimeStatus = LIVE_CAPTION_RUNTIME_STATES.STARTING;
+      controller.runtimeStartCompleted = false;
+
+      const newVideo = createVideo({ src: 'https://example.com/new.mp4', paused: false });
+      document.body.append(newVideo);
+      Object.defineProperty(firstVideo, 'paused', { value: true, configurable: true });
+
+      await controller.syncActiveVideo('video-change');
+
+      // Should not send request since runtimeStartCompleted is false
+      expect(sendRequestSpy).not.toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
+    });
+
+    it('failed RUNTIME_START leaves runtimeStartCompleted false and prevents VIDEO_CHANGED handoff', async () => {
+      const store = useLiveCaptionStore();
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        if (action === LIVE_CAPTION_ACTIONS.RUNTIME_START) {
+          return {
+            success: false,
+            ok: false,
+            action,
+            status: 'FAIL_CLOSED',
+            runtimeState: 'error',
+            sessionId: data.sessionId ?? null,
+            tabId: data.tabId ?? null,
+            videoFingerprint: data.videoFingerprint ?? null,
+            message: 'background start failed',
+            error: new Error('background start failed')
+          };
+        }
+
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+
+      expect(controller.runtimeStartCompleted).toBe(false);
+
+      const newVideo = createVideo({ src: 'https://example.com/new.mp4', paused: false });
+      document.body.append(newVideo);
+      Object.defineProperty(firstVideo, 'paused', { value: true, configurable: true });
+
+      await controller.syncActiveVideo('video-change');
+
+      expect(sendRequestSpy).not.toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
+    });
+
+    it('paused handoff after start still sends VIDEO_CHANGED', async () => {
+      const store = useLiveCaptionStore();
+      const firstVideo = createVideo({ src: 'https://example.com/first.mp4', paused: false });
+      document.body.append(firstVideo);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      await controller.pause('video_pause');
+
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+      sendRequestSpy.mockClear();
+
+      const newVideo = createVideo({ src: 'https://example.com/new.mp4', paused: false });
+      document.body.append(newVideo);
+      Object.defineProperty(firstVideo, 'paused', { value: true, configurable: true });
+
+      await controller.syncActiveVideo('video-change');
+
+      // When paused, handoff to a playing video should still send VIDEO_CHANGED
+      expect(sendRequestSpy).toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
     });
   });
 });

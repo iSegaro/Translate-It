@@ -12,7 +12,8 @@ export const LIVE_CAPTION_RUNTIME_ACTIONS = Object.freeze({
   STOP: MessageActions.LIVE_CAPTION_RUNTIME_STOP,
   STATUS: MessageActions.LIVE_CAPTION_RUNTIME_STATUS,
   PAUSE: MessageActions.LIVE_CAPTION_RUNTIME_PAUSE,
-  RESUME: MessageActions.LIVE_CAPTION_RUNTIME_RESUME
+  RESUME: MessageActions.LIVE_CAPTION_RUNTIME_RESUME,
+  VIDEO_CHANGED: MessageActions.LIVE_CAPTION_VIDEO_CHANGED
 });
 
 export const LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES = Object.freeze({
@@ -53,7 +54,8 @@ const REQUEST_REQUIRED_FIELDS = Object.freeze({
   [LIVE_CAPTION_RUNTIME_ACTIONS.STOP]: ['tabId'],
   [LIVE_CAPTION_RUNTIME_ACTIONS.STATUS]: ['tabId'],
   [LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE]: ['tabId'],
-  [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: ['tabId']
+  [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: ['tabId'],
+  [LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED]: ['tabId', 'videoFingerprint']
 });
 
 function assertAction(action) {
@@ -104,7 +106,8 @@ export function normalizeLiveCaptionRuntimeRequest(message = {}, context = {}) {
   assertRequiredFields(
     {
       tabId: normalizedTabId,
-      sessionId: normalizedSessionId
+      sessionId: normalizedSessionId,
+      videoFingerprint: data.videoFingerprint
     },
     REQUEST_REQUIRED_FIELDS[action],
     action
@@ -198,6 +201,10 @@ export function createLiveCaptionRuntimeResumeRequest(data = {}, messageId = nul
   return MessageFormat.create(LIVE_CAPTION_RUNTIME_ACTIONS.RESUME, data, MessageContexts.LIVE_CAPTION, messageId);
 }
 
+export function createLiveCaptionRuntimeVideoChangedRequest(data = {}, messageId = null) {
+  return MessageFormat.create(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED, data, MessageContexts.LIVE_CAPTION, messageId);
+}
+
 export function createLiveCaptionRuntimeSuccessResponse(options = {}) {
   return buildRuntimeResponse({
     ...options,
@@ -224,7 +231,8 @@ export function createLiveCaptionRuntimeNotImplementedResponse(action, options =
     [LIVE_CAPTION_RUNTIME_ACTIONS.STOP]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STOP_NOT_IMPLEMENTED,
     [LIVE_CAPTION_RUNTIME_ACTIONS.STATUS]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.STATUS_NOT_IMPLEMENTED,
     [LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.PAUSE_NOT_IMPLEMENTED,
-    [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.RESUME_NOT_IMPLEMENTED
+    [LIVE_CAPTION_RUNTIME_ACTIONS.RESUME]: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.RESUME_NOT_IMPLEMENTED,
+    [LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED]: 'VIDEO_CHANGED_NOT_IMPLEMENTED'
   }[action] ?? LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK;
 
   return buildRuntimeResponse({
