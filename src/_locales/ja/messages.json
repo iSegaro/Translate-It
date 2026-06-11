@@ -930,16 +930,16 @@
     "message": "プロンプトテンプレート"
   },
   "prompt_type_general": {
-    "message": "一般テンプレート"
+    "message": "翻訳指示"
   },
   "prompt_type_auto": {
-    "message": "自動テンプレート"
+    "message": "自動検出翻訳指示"
   },
   "prompt_help_general": {
-    "message": "このテンプレートは、特定の翻訳元言語からの標準的な翻訳に使用されます。"
+    "message": "カスタム翻訳ルール"
   },
   "prompt_help_auto": {
-    "message": "このテンプレートは、翻訳元言語が「自動」に設定されている場合の双方向モードで使用されます。"
+    "message": "言語が自動検出された場合のカスタム翻訳ルール"
   },
   "prompt_template_label": {
     "message": "プロンプトテンプレート"
@@ -2763,16 +2763,16 @@
     "message": "高度な設定 (システムベースラッパー)"
   },
   "prompt_base_field_label": {
-    "message": "フィールドベースラッパー"
+    "message": "翻訳ラッパー"
   },
   "prompt_base_field_desc": {
-    "message": "標準的なテキストフィールド翻訳のためのシステムレベルの指示。"
+    "message": "高度なプロンプト構造"
   },
   "prompt_base_field_auto_label": {
-    "message": "フィールドベースラッパー (自動)"
+    "message": "自動検出翻訳ラッパー"
   },
   "prompt_base_field_auto_desc": {
-    "message": "言語が「自動」に設定されている場合のテキストフィールド翻訳のためのシステムレベルの指示。"
+    "message": "自動検出された翻訳元言語のための高度なプロンプト構造"
   },
   "prompt_base_popup_label": {
     "message": "ポップアップ/サイドパネルベースラッパー"

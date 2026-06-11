@@ -933,16 +933,16 @@
     "message": "Prompt Template"
   },
   "prompt_type_general": {
-    "message": "General Template"
+    "message": "Translation Instructions"
   },
   "prompt_type_auto": {
-    "message": "Auto Template"
+    "message": "Auto-Detect Translation Instructions"
   },
   "prompt_help_general": {
-    "message": "This template is used for standard translations from a specific source language."
+    "message": "Custom translation rules"
   },
   "prompt_help_auto": {
-    "message": "This template is used in bidirectional mode when the source language is set to \"Auto\"."
+    "message": "Custom translation rules when source language is auto-detected"
   },
   "prompt_template_label": {
     "message": "Prompt Template"
@@ -2763,16 +2763,16 @@
     "message": "Advanced (System Base Wrappers)"
   },
   "prompt_base_field_label": {
-    "message": "Field Base Wrapper"
+    "message": "Translation Wrapper"
   },
   "prompt_base_field_desc": {
-    "message": "The system-level instructions for standard text field translations."
+    "message": "Advanced prompt structure"
   },
   "prompt_base_field_auto_label": {
-    "message": "Field Base Wrapper (Auto)"
+    "message": "Auto-Detect Translation Wrapper"
   },
   "prompt_base_field_auto_desc": {
-    "message": "The system-level instructions for text field translations when source language is set to 'Auto'."
+    "message": "Advanced prompt structure for auto-detected source languages"
   },
   "prompt_base_popup_label": {
     "message": "Popup/Sidepanel Base Wrapper"
