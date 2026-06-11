@@ -146,7 +146,7 @@
 
 <script setup>
 import './ContentApp.scss'
-import { onUnmounted, defineAsyncComponent } from 'vue';
+import { onUnmounted, defineAsyncComponent, shallowRef } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
@@ -204,7 +204,7 @@ useUnifiedI18n();
 const settingsStore = useSettingsStore();
 const mobileStore = useMobileStore();
 const liveCaptionStore = useLiveCaptionStore();
-let liveCaptionRuntimeController = null;
+const liveCaptionRuntimeController = shallowRef(null);
 const tracker = useResourceTracker('content-app');
 
 // 2. Localization & RTL Management
@@ -281,13 +281,13 @@ setupEventListeners();
 useContentAppPageTranslation(mobileStore, tracker);
 
 const ensureLiveCaptionRuntimeController = () => {
-  if (!liveCaptionRuntimeController) {
-    liveCaptionRuntimeController = new LiveCaptionRuntimeController({
+  if (!liveCaptionRuntimeController.value) {
+    liveCaptionRuntimeController.value = new LiveCaptionRuntimeController({
       store: liveCaptionStore
     });
   }
 
-  return liveCaptionRuntimeController;
+  return liveCaptionRuntimeController.value;
 };
 
 const handleLiveCaptionStart = async () => {
@@ -299,8 +299,8 @@ const handleLiveCaptionStart = async () => {
 const handleLiveCaptionStop = async () => {
   liveCaptionStore.setEnabled(false);
 
-  if (liveCaptionRuntimeController) {
-    await liveCaptionRuntimeController.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
+  if (liveCaptionRuntimeController.value) {
+    await liveCaptionRuntimeController.value.stop(LIVE_CAPTION_CLEANUP_REASONS.STOP);
   }
 };
 
@@ -333,8 +333,8 @@ const handleLiveCaptionCancelConsent = async () => {
   liveCaptionStore.cancelConsent();
   liveCaptionStore.setEnabled(false);
 
-  if (liveCaptionRuntimeController) {
-    await liveCaptionRuntimeController.stop(LIVE_CAPTION_CLEANUP_REASONS.MANUAL, {
+  if (liveCaptionRuntimeController.value) {
+    await liveCaptionRuntimeController.value.stop(LIVE_CAPTION_CLEANUP_REASONS.MANUAL, {
       notifyContent: false
     });
   }

@@ -1,3 +1,4 @@
+import { shallowRef } from 'vue';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -171,7 +172,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
     this.pageSession = null;
     this.tabId = store?.activeTabId ?? null;
-    this.currentVideoElement = null;
+    this._currentVideoElementRef = shallowRef(null);
     this.currentVideoFingerprint = null;
     this.currentVideoCandidate = null;
     this.lastHandoffPlan = null;
@@ -401,7 +402,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
   }
 
   _scheduleScan(reason = 'scan') {
-    if (this.destroyed || !this.started || this.paused) {
+    if (this.destroyed || !this.started) {
       return;
     }
 
@@ -1028,9 +1029,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
     this.lastPauseReason = reason;
     this.paused = true;
-    this._teardownMutationObserver();
-    this._clearScheduledScan();
-    this.cleanup();
+    // Keep observers and listeners running while paused to detect other videos playing
     this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.PAUSED, {
       tabId: this.tabId,
       sessionId: this.pageSession?.sessionId ?? null,
@@ -1068,7 +1067,6 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
     this.paused = false;
     this.lastPauseReason = null;
-    this._setupObservers();
     this._scheduleScan('resume');
     this._setRuntimeStatus(LIVE_CAPTION_RUNTIME_STATES.RUNNING, {
       tabId: this.tabId,
@@ -1091,7 +1089,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
   }
 
   async syncActiveVideo(reason = 'scan') {
-    if (this.destroyed || !this.started || this.paused) {
+    if (this.destroyed || !this.started) {
       return this.getSnapshot();
     }
 
@@ -1150,6 +1148,22 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       nextVideoSession,
       fingerprint: selectedFingerprint
     });
+
+    if (
+      this.paused &&
+      selectedFingerprint &&
+      selectedFingerprint !== currentFingerprint &&
+      selectedCandidate?.playing &&
+      (this.lastPauseReason === 'video_pause' || this.lastPauseReason === 'video_ended')
+    ) {
+      logger.info('Auto-resuming runtime after active video handoff to playing video', {
+        videoFingerprint: selectedFingerprint,
+        lastPauseReason: this.lastPauseReason
+      });
+      void this.resume().catch((error) => {
+        logger.warn('Failed to auto-resume on video play handoff', { error });
+      });
+    }
 
     return this.getSnapshot();
   }
@@ -1297,6 +1311,14 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     });
 
     return this.getSnapshot();
+  }
+
+  get currentVideoElement() {
+    return this._currentVideoElementRef.value;
+  }
+
+  set currentVideoElement(val) {
+    this._currentVideoElementRef.value = val;
   }
 
   getSnapshot() {

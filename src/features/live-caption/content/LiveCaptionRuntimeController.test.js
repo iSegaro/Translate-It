@@ -828,5 +828,38 @@ describe('live-caption runtime controller', () => {
       
       expect(controller.resume).not.toHaveBeenCalled();
     });
+
+    it('triggers handoff and resumes when a different video plays while paused due to video_pause', async () => {
+      const pauseEvent = new Event('pause', { bubbles: true });
+      Object.defineProperty(pauseEvent, 'target', { value: activeVideo, configurable: true });
+      document.dispatchEvent(pauseEvent);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+
+      Object.defineProperty(activeVideo, 'paused', { value: true, configurable: true });
+      Object.defineProperty(nonActiveVideo, 'paused', { value: false, configurable: true });
+
+      await controller.syncActiveVideo('play');
+
+      expect(controller.currentVideoElement).toBe(nonActiveVideo);
+      expect(controller.resume).toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    });
+
+    it('triggers handoff but remains paused when a different video plays while manually paused', async () => {
+      await controller.pause('manual_pause');
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+
+      controller.resume.mockClear();
+
+      Object.defineProperty(activeVideo, 'paused', { value: true, configurable: true });
+      Object.defineProperty(nonActiveVideo, 'paused', { value: false, configurable: true });
+
+      await controller.syncActiveVideo('play');
+
+      expect(controller.currentVideoElement).toBe(nonActiveVideo);
+      expect(controller.resume).not.toHaveBeenCalled();
+      expect(controller.runtimeStatus).toBe(LIVE_CAPTION_RUNTIME_STATES.PAUSED);
+    });
   });
 });
