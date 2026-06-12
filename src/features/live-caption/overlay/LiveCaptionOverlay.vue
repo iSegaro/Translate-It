@@ -1,5 +1,6 @@
 <template>
   <section
+    ref="overlayElement"
     v-show="shouldShowOverlay"
     class="live-caption-overlay"
     :class="[
@@ -132,6 +133,8 @@ const overlayAnchor = useLiveCaptionOverlay(
     offsetHorizontal: props.offsetHorizontal
   }
 );
+
+const overlayElement = overlayAnchor.overlayElement;
 
 const resolvedPositionStyle = computed(() => props.positionStyle || overlayAnchor.overlayStyle.value || null);
 const shouldShowOverlay = computed(() => {

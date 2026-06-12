@@ -496,9 +496,63 @@ describe('computeOverlayPlacement', () => {
     expect(result.top).toBe(571);
     expect(result.left).toBe(16);
   });
+
+  it('uses overlayHeight option when provided', () => {
+    const rect = { top: 0, left: 0, width: 375, height: 600, bottom: 600, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, { ...defaultOptions, overlayHeight: 200 });
+
+    // spaceBelow = 667 - 600 = 67, which is < 200 + 8
+    // So: top = 600 - 200 - 16 = 384, insideVideo = true
+    expect(result.top).toBe(384);
+    expect(result.insideVideo).toBe(true);
+    expect(result.left + result.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('falls back to estimated height when overlayHeight is 0 or null', () => {
+    const rect = { top: 0, left: 0, width: 375, height: 667, bottom: 667, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const resultZero = computeOverlayPlacement(rect, viewport, { ...defaultOptions, overlayHeight: 0 });
+    const resultNull = computeOverlayPlacement(rect, viewport, { ...defaultOptions, overlayHeight: null });
+    const resultDefault = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // All should use the fallback estimate (80)
+    expect(resultZero.top).toBe(resultDefault.top);
+    expect(resultNull.top).toBe(resultDefault.top);
+    expect(resultZero.insideVideo).toBe(resultDefault.insideVideo);
+  });
+
+  it('long overlay height stays inside viewport', () => {
+    const rect = { top: 0, left: 0, width: 375, height: 667, bottom: 667, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, { ...defaultOptions, overlayHeight: 400 });
+
+    // spaceBelow = 0, overlay inside video
+    // top = 667 - 400 - 16 = 251
+    // 251 + 400 = 651 <= 667, no clamp needed
+    expect(result.top).toBe(251);
+    expect(result.insideVideo).toBe(true);
+    expect(result.top + 400).toBeLessThanOrEqual(viewport.height);
+  });
+
+  it('very tall overlay is clamped to fit viewport', () => {
+    const rect = { top: 400, left: 0, width: 375, height: 200, bottom: 600, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, { ...defaultOptions, overlayHeight: 350 });
+
+    // spaceBelow = 667 - 600 = 67, which is < 350 + 8
+    // top = 600 - 350 - 16 = 234
+    // 234 + 350 = 584 <= 667, no clamp needed
+    expect(result.top).toBe(234);
+    expect(result.insideVideo).toBe(true);
+  });
 });
 
-describe('useLiveCaptionOverlay - viewport-aware maxHeight', () => {
+describe('useLiveCaptionOverlay - overlay measurement', () => {
   let originalResizeObserver;
   let originalGetBoundingClientRect;
 
@@ -622,5 +676,113 @@ describe('useLiveCaptionOverlay - viewport-aware maxHeight', () => {
     expect(style).not.toBeNull();
     expect(style.maxHeight).toBeUndefined();
     expect(style.overflowY).toBeUndefined();
+  });
+
+  it('uses fallback estimated height before measurement', async () => {
+    Object.defineProperty(HTMLVideoElement.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: vi.fn(() => ({
+        top: 0,
+        left: 0,
+        width: 375,
+        height: 667,
+        right: 375,
+        bottom: 667
+      }))
+    });
+
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        defaultView: {
+          innerWidth: 375,
+          innerHeight: 667
+        }
+      },
+      getBoundingClientRect: HTMLVideoElement.prototype.getBoundingClientRect
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return {
+          overlay,
+          overlayStyle: overlay.overlayStyle
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    // Before measurement, overlayHeight = null, fallback = 80
+    // top = 667 - 80 - 16 = 571
+    const style = wrapper.vm.overlayStyle;
+    expect(style.top).toBe('571px');
+    expect(style.maxHeight).toBe('calc(100vh - 571px)');
+  });
+
+  it('disconnects both ResizeObservers on cleanup', async () => {
+    let observerCount = 0;
+    const disconnectFn = vi.fn();
+    globalThis.ResizeObserver = class {
+      constructor() {
+        observerCount++;
+      }
+      observe = vi.fn();
+      disconnect = disconnectFn;
+    };
+
+    Object.defineProperty(HTMLVideoElement.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: vi.fn(() => ({
+        top: 0,
+        left: 0,
+        width: 375,
+        height: 667,
+        right: 375,
+        bottom: 667
+      }))
+    });
+
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        defaultView: {
+          innerWidth: 375,
+          innerHeight: 667
+        }
+      },
+      getBoundingClientRect: HTMLVideoElement.prototype.getBoundingClientRect
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return { overlay };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    // Both video and overlay observers should be created
+    expect(observerCount).toBe(2);
+
+    wrapper.vm.overlay.cleanup();
+    await nextTick();
+
+    // disconnect called for both observers
+    expect(disconnectFn).toHaveBeenCalledTimes(2);
   });
 });

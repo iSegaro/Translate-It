@@ -43,8 +43,8 @@ const OVERLAY_ESTIMATED_HEIGHT = 80;
  *   Video element bounding rect.
  * @param {{ width: number, height: number }} viewport
  *   Viewport dimensions.
- * @param {{ isFullscreen?: boolean, offsetBottom?: number, offsetHorizontal?: number }} options
- * @returns {{ top: number, left: number, width: number, position: string, transform: string }}
+ * @param {{ isFullscreen?: boolean, offsetBottom?: number, offsetHorizontal?: number, overlayHeight?: number }} options
+ * @returns {{ top: number, left: number, width: number, position: string, transform: string, insideVideo: boolean }}
  */
 export function computeOverlayPlacement(rect, viewport, options = {}) {
   const offsetBottom = Number.isFinite(options.offsetBottom) ? options.offsetBottom : 16;
@@ -63,8 +63,11 @@ export function computeOverlayPlacement(rect, viewport, options = {}) {
     };
   }
 
+  const overlayHeight = (Number.isFinite(options.overlayHeight) && options.overlayHeight > 0)
+    ? options.overlayHeight
+    : OVERLAY_ESTIMATED_HEIGHT;
+
   const spaceBelow = viewport.height - rect.bottom;
-  const overlayHeight = OVERLAY_ESTIMATED_HEIGHT;
   let top;
   let insideVideo = false;
 
@@ -143,10 +146,40 @@ export function useLiveCaptionOverlay(target, options = {}) {
   const overlayRect = ref(null);
   const isAttached = ref(false);
   const isVisible = ref(false);
+  const overlayElement = ref(null);
+  const measuredOverlayHeight = ref(null);
 
-  let resizeObserver = null;
+  let videoResizeObserver = null;
+  let overlayResizeObserver = null;
   let scrollHandler = null;
   let rafId = null;
+
+  const measureOverlayHeight = () => {
+    const el = unref(overlayElement);
+    if (!el) return;
+    const rect = getRectFromElement(el);
+    if (rect && rect.height > 0) {
+      measuredOverlayHeight.value = rect.height;
+    }
+  };
+
+  const startOverlayObserver = () => {
+    stopOverlayObserver();
+    const el = unref(overlayElement);
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    overlayResizeObserver = new ResizeObserver(() => {
+      measureOverlayHeight();
+      scheduleUpdate();
+    });
+    overlayResizeObserver.observe(el);
+  };
+
+  const stopOverlayObserver = () => {
+    if (overlayResizeObserver) {
+      overlayResizeObserver.disconnect();
+      overlayResizeObserver = null;
+    }
+  };
 
   const updateOverlayPosition = () => {
     const element = resolveTargetElement(target);
@@ -176,7 +209,10 @@ export function useLiveCaptionOverlay(target, options = {}) {
       width: rect.width,
       height: rect.height
     });
-    overlayStyle.value = buildOverlayStyle(rect, element, options);
+    overlayStyle.value = buildOverlayStyle(rect, element, {
+      ...options,
+      overlayHeight: measuredOverlayHeight.value
+    });
     isVisible.value = !isOffscreen;
   };
 
@@ -197,10 +233,12 @@ export function useLiveCaptionOverlay(target, options = {}) {
       rafId = null;
     }
 
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
+    if (videoResizeObserver) {
+      videoResizeObserver.disconnect();
+      videoResizeObserver = null;
     }
+
+    stopOverlayObserver();
 
     if (scrollHandler) {
       window.removeEventListener('scroll', scrollHandler, { passive: true });
@@ -224,6 +262,7 @@ export function useLiveCaptionOverlay(target, options = {}) {
 
     isAttached.value = true;
     updateOverlayPosition();
+    startOverlayObserver();
 
     scrollHandler = () => scheduleUpdate();
     window.addEventListener('scroll', scrollHandler, { passive: true });
@@ -231,14 +270,15 @@ export function useLiveCaptionOverlay(target, options = {}) {
     window.addEventListener('resize', scrollHandler, { passive: true });
 
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
+      videoResizeObserver = new ResizeObserver(() => {
         scheduleUpdate();
       });
-      resizeObserver.observe(element);
+      videoResizeObserver.observe(element);
     }
 
     logger.debug('Live-caption overlay attached', {
-      hasResizeObserver: Boolean(resizeObserver)
+      hasVideoResizeObserver: Boolean(videoResizeObserver),
+      hasOverlayResizeObserver: Boolean(overlayResizeObserver)
     });
   };
 
@@ -262,6 +302,7 @@ export function useLiveCaptionOverlay(target, options = {}) {
   });
 
   return {
+    overlayElement,
     overlayStyle: computed(() => overlayStyle.value),
     overlayRect: computed(() => overlayRect.value),
     isAttached: computed(() => isAttached.value),
