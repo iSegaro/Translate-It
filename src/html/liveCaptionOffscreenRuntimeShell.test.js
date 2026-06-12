@@ -299,7 +299,7 @@ describe("live-caption offscreen runtime shell", () => {
           tabId: 7,
           videoFingerprint: "video-a",
           streamId: "mock-stream-id",
-          metadata: { chunkTimeslice: 2000 },
+          metadata: { chunkTimeslice: 10000 },
         },
       },
       {},
@@ -318,7 +318,7 @@ describe("live-caption offscreen runtime shell", () => {
     recorderInstance.ondataavailable({ data: bufferedBlob });
     expect(mockSendMessage).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(10000);
     await Promise.resolve();
 
     expect(recorderInstance.stopCount).toBe(1);
@@ -333,7 +333,7 @@ describe("live-caption offscreen runtime shell", () => {
         tabId: 7,
         videoFingerprint: "video-a",
         chunkStartMs: 0,
-        chunkEndMs: 2000,
+        chunkEndMs: 10000,
         mimeType: "audio/webm;codecs=opus",
         sizeBytes: expect.any(Number),
         chunkPayload: expect.stringMatching(/^data:audio\/webm(;codecs=opus)?;base64,/),
@@ -345,7 +345,7 @@ describe("live-caption offscreen runtime shell", () => {
     expect(typeof emittedMessage.chunkPayload).toBe("string");
     expect(emittedMessage.chunkPayload.startsWith("data:audio/webm")).toBe(true);
     expect(emittedMessage.sizeBytes).toBeGreaterThanOrEqual(bufferedBlob.size);
-    expect(shell.chunkStartMs).toBe(2000);
+    expect(shell.chunkStartMs).toBe(10000);
   });
 
   it("skips zero and tiny finalized segments before forwarding", async () => {
@@ -373,7 +373,7 @@ describe("live-caption offscreen runtime shell", () => {
     recorderInstance.ondataavailable({ data: { size: 0 } });
     recorderInstance.ondataavailable({ data: new Blob([new Uint8Array(16).fill(1)], { type: "audio/webm" }) });
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(10000);
     await Promise.resolve();
 
     expect(mockSendMessage).not.toHaveBeenCalled();

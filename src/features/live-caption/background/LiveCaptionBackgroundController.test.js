@@ -16,6 +16,7 @@ import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenCont
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
 import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
+import { getLiveCaptionSttProviderAsync } from "@/shared/config/config.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -26,11 +27,20 @@ vi.mock("@/shared/logging/logger.js", () => ({
   })),
 }));
 
+vi.mock("@/shared/config/config.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getLiveCaptionSttProviderAsync: vi.fn().mockResolvedValue("openai_whisper"),
+  };
+});
+
 describe("live-caption background controller", () => {
   let activeControllers = [];
 
   beforeEach(() => {
     activeControllers = [];
+    getLiveCaptionSttProviderAsync.mockResolvedValue("openai_whisper");
     globalThis.chrome = {
       runtime: {
         sendMessage: vi.fn(async (request) => {
@@ -232,6 +242,46 @@ describe("live-caption background controller", () => {
     expect(session.activeVideoSession.translatedCaptionSegments[0].translatedText).toBe("سلام");
     
     expect(response.sessionSnapshot.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+  });
+
+  it("applies a longer chunkTimeslice only for local_whisper runtime start", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.action === LIVE_CAPTION_RUNTIME_ACTIONS.START)?.[0];
+    expect(startRequest).toBeTruthy();
+    expect(startRequest.data.metadata).toMatchObject({
+      chunkTimeslice: 10000
+    });
+  });
+
+  it("keeps default runtime start metadata unchanged for openai_whisper", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("openai_whisper");
+
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.action === LIVE_CAPTION_RUNTIME_ACTIONS.START)?.[0];
+    expect(startRequest).toBeTruthy();
+    expect(startRequest.data.metadata?.chunkTimeslice).toBeUndefined();
   });
 
   it("handles incognito tabs by skipping persistent cache reads/writes", async () => {

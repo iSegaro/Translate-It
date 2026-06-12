@@ -23,6 +23,9 @@ import { LIVE_CAPTION_SESSION_STATES } from "../constants/liveCaptionSessionStat
 import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
 import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_ACTIONS } from "../constants/liveCaptionActions.js";
+import { getLiveCaptionSttProviderAsync } from "@/shared/config/config.js";
+
+const LOCAL_WHISPER_CHUNK_TIMESLICE_MS = 10000;
 
 const logger = getScopedLogger(
   LOG_COMPONENTS.LIVE_CAPTION,
@@ -35,6 +38,17 @@ function normalizeTabId(tabId) {
   }
 
   return tabId;
+}
+
+async function resolveRuntimeStartMetadata(metadata = {}) {
+  const normalizedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+  const providerId = await getLiveCaptionSttProviderAsync();
+
+  if (providerId === 'local_whisper') {
+    normalizedMetadata.chunkTimeslice = LOCAL_WHISPER_CHUNK_TIMESLICE_MS;
+  }
+
+  return normalizedMetadata;
 }
 
 /**
@@ -92,6 +106,10 @@ export class LiveCaptionBackgroundController {
 
   touch() {
     this.updatedAt = Date.now();
+  }
+
+  async _resolveRuntimeStartMetadata(metadata = {}) {
+    return resolveRuntimeStartMetadata(metadata);
   }
 
   _startHealthMonitor() {
@@ -661,6 +679,7 @@ export class LiveCaptionBackgroundController {
         requestId: request.messageId,
         runtimeState: this.captureCoordinator.runtimeState,
         streamId, // Forward the stream ID!
+        metadata: await this._resolveRuntimeStartMetadata(request.data.metadata),
         message: "Live-caption runtime start",
       });
 
