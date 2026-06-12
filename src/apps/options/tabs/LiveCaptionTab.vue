@@ -283,6 +283,11 @@ const loadSettings = () => {
     sttProvider.value = settingsStore.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]
   }
 
+  const availableProviderValues = sttProviderOptions.value.map((provider) => provider.value)
+  if (!availableProviderValues.includes(sttProvider.value)) {
+    sttProvider.value = availableProviderValues[0] || STT_PROVIDER_IDS.OPENAI_WHISPER
+  }
+
   isHydrating = false
 }
 

@@ -13,6 +13,7 @@ import {
   createLiveCaptionStatusRequest,
   normalizeLiveCaptionOffscreenResponse
 } from './liveCaptionOffscreenContracts.js';
+import { BROWSER_SPEECH_PROBE_ACTION } from '@/html/liveCaptionBrowserSpeechProbe.js';
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
@@ -325,6 +326,53 @@ export class LiveCaptionOffscreenBridge {
         sessionId: unavailable.error?.sessionId ?? null,
         tabId: unavailable.error?.tabId ?? null,
         videoFingerprint: unavailable.error?.videoFingerprint ?? null
+      });
+      return unavailable;
+    }
+  }
+
+  async requestBrowserSpeechProbe(options = {}) {
+    const runtime = this.getBrowserRuntime();
+    const request = {
+      action: BROWSER_SPEECH_PROBE_ACTION,
+      target: 'offscreen',
+      forwardedFromBackground: true,
+      requestId: options.requestId ?? null,
+      sentAt: options.sentAt ?? Date.now(),
+      data: {
+        timeoutMs: options.timeoutMs ?? 750
+      }
+    };
+
+    this.lastRuntimeRequest = request;
+
+    if (!runtime?.sendMessage) {
+      const unavailable = createLiveCaptionRuntimeUnavailableResponse(BROWSER_SPEECH_PROBE_ACTION, {
+        code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+        reason: 'offscreen_unavailable',
+        message: 'Live-caption offscreen bridge is unavailable',
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.ERROR
+      });
+
+      this.lastRuntimeResponse = unavailable;
+      return unavailable;
+    }
+
+    try {
+      const response = await runtime.sendMessage(request);
+      this.lastRuntimeResponse = response;
+      return response;
+    } catch (error) {
+      const unavailable = createLiveCaptionRuntimeUnavailableResponse(BROWSER_SPEECH_PROBE_ACTION, {
+        code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+        reason: 'offscreen_unavailable',
+        message: error?.message ?? 'Browser speech probe failed',
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.ERROR
+      });
+
+      this.lastRuntimeResponse = unavailable;
+      logger.warn('Live-caption browser speech probe request threw', {
+        error: error?.message ?? String(error)
       });
       return unavailable;
     }

@@ -59,7 +59,7 @@ describe('Config Module', () => {
     });
 
     it('should include live-caption scaffolding defaults in CONFIG', () => {
-      expect(CONFIG.LIVE_CAPTION_ENABLED).toBe(true);
+      expect(CONFIG.LIVE_CAPTION_ENABLED).toBe(false);
       expect(CONFIG.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
       expect(CONFIG.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
       expect(CONFIG.LIVE_CAPTION_CACHE_MAX_BYTES).toBe(10485760);
@@ -114,6 +114,13 @@ describe('Config Module', () => {
       const keys = await getOpenAIApiKeysAsync();
 
       expect(keys).toEqual(['key1', 'key2']);
+    });
+
+    it('getLiveCaptionSttProviderAsync should fall back to OpenAI Whisper when the stored provider is invalid', async () => {
+      storageManager.get.mockResolvedValue({ LIVE_CAPTION_STT_PROVIDER: 'browser_speech' });
+      const { getLiveCaptionSttProviderAsync } = await import('./config.js');
+
+      await expect(getLiveCaptionSttProviderAsync()).resolves.toBe('openai_whisper');
     });
   });
 

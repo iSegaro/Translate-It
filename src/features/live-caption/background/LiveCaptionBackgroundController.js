@@ -696,59 +696,6 @@ export class LiveCaptionBackgroundController {
         );
       }
 
-      try {
-        await this.sttCoordinator.startSession(session.sessionId, {
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-        });
-      } catch (speechStartError) {
-        await this.sttCoordinator.stopSession(session.sessionId).catch(() => {});
-        this.captureCoordinator.stopRuntime({
-          sessionId: session.sessionId,
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-          reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-        });
-        await this.offscreenBridge.requestRuntimeStop({
-          sessionId: session.sessionId,
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-          requestId: request.messageId,
-          runtimeState: this.captureCoordinator.runtimeState,
-          reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-          message: "Live-caption runtime shell only",
-        }).catch(() => {});
-        this.sessionManager.failClosedCleanup(
-          tabId,
-          LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-        );
-        return this._buildFailClosedResponse(
-          LIVE_CAPTION_RUNTIME_ACTIONS.START,
-          speechStartError,
-          {
-            action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
-            sessionId: session.sessionId,
-            tabId,
-            videoFingerprint:
-              request.data.videoFingerprint ??
-              session.activeVideoFingerprint ??
-              null,
-            runtimeState: this.captureCoordinator.runtimeState,
-            reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-            message: speechStartError?.message,
-          },
-        );
-      }
-
       const response = this._buildShellResponse({
         action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
         status: normalizedOffscreenResponse.status,
@@ -1206,59 +1153,6 @@ export class LiveCaptionBackgroundController {
             message: normalizedOffscreenResponse.message,
             reason:
               normalizedOffscreenResponse.error?.reason ?? "offscreen_failure",
-          },
-        );
-      }
-
-      try {
-        await this.sttCoordinator.startSession(session.sessionId, {
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-        });
-      } catch (speechResumeError) {
-        await this.sttCoordinator.stopSession(session.sessionId).catch(() => {});
-        this.captureCoordinator.stopRuntime({
-          sessionId: session.sessionId,
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-          reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-        });
-        await this.offscreenBridge.requestRuntimeStop({
-          sessionId: session.sessionId,
-          tabId,
-          videoFingerprint:
-            request.data.videoFingerprint ??
-            session.activeVideoFingerprint ??
-            null,
-          requestId: request.messageId,
-          runtimeState: this.captureCoordinator.runtimeState,
-          reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-          message: "Live-caption runtime shell only",
-        }).catch(() => {});
-        this.sessionManager.failClosedCleanup(
-          tabId,
-          LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-        );
-        return this._buildFailClosedResponse(
-          LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
-          speechResumeError,
-          {
-            action: LIVE_CAPTION_RUNTIME_ACTIONS.RESUME,
-            sessionId: session.sessionId,
-            tabId,
-            videoFingerprint:
-              request.data.videoFingerprint ??
-              session.activeVideoFingerprint ??
-              null,
-            runtimeState: this.captureCoordinator.runtimeState,
-            reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
-            message: speechResumeError?.message,
           },
         );
       }

@@ -18,6 +18,7 @@ import {
   normalizeLiveCaptionOffscreenResponse,
   createLiveCaptionRuntimeShellResponse
 } from './index.js';
+import { BROWSER_SPEECH_PROBE_ACTION } from '@/html/liveCaptionBrowserSpeechProbe.js';
 import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache.js';
 import { BaseSTTProvider } from '@/features/live-caption/stt/BaseSTTProvider.js';
 import { UnifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
@@ -47,23 +48,38 @@ describe('live-caption offscreen contracts', () => {
   beforeEach(() => {
     globalThis.chrome = {
       runtime: {
-        sendMessage: vi.fn(async (request) => createLiveCaptionRuntimeShellResponse(request.action, {
-          sessionId: request.data?.sessionId ?? null,
-          tabId: request.data?.tabId ?? null,
-          videoFingerprint: request.data?.videoFingerprint ?? null,
-          requestId: request.messageId ?? null,
-          status: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
-            ? LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL
-            : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
-              ? LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE
-              : LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
-          runtimeState: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
-            ? 'paused'
-            : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
-              ? 'idle'
-              : 'running',
-          message: 'Live-caption offscreen shell response'
-        }))
+        sendMessage: vi.fn(async (request) => {
+          if (request.action === BROWSER_SPEECH_PROBE_ACTION) {
+            return {
+              runtime: 'offscreen',
+              hasSpeechRecognition: true,
+              hasWebkitSpeechRecognition: false,
+              canConstruct: true,
+              canStart: true,
+              errorName: null,
+              errorMessage: null,
+              userAgent: 'test-agent'
+            };
+          }
+
+          return createLiveCaptionRuntimeShellResponse(request.action, {
+            sessionId: request.data?.sessionId ?? null,
+            tabId: request.data?.tabId ?? null,
+            videoFingerprint: request.data?.videoFingerprint ?? null,
+            requestId: request.messageId ?? null,
+            status: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
+              ? LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL
+              : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
+                ? LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE
+                : LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+            runtimeState: request.action === LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE
+              ? 'paused'
+              : request.action === LIVE_CAPTION_RUNTIME_ACTIONS.STOP
+                ? 'idle'
+                : 'running',
+            message: 'Live-caption offscreen shell response'
+          });
+        })
       },
       tabCapture: {
         capture: vi.fn()
@@ -267,6 +283,29 @@ describe('live-caption offscreen contracts', () => {
     expect(pauseResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.PAUSED_SHELL);
     expect(resumeResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL);
     expect(stopResponse.status).toBe(LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE);
+  });
+
+  it('routes browser speech probe requests through the offscreen bridge', async () => {
+    const bridge = new LiveCaptionOffscreenBridge();
+
+    const response = await bridge.requestBrowserSpeechProbe({
+      timeoutMs: 50
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      action: BROWSER_SPEECH_PROBE_ACTION,
+      target: 'offscreen',
+      forwardedFromBackground: true
+    }));
+    expect(response).toEqual(expect.objectContaining({
+      runtime: 'offscreen',
+      hasSpeechRecognition: true,
+      hasWebkitSpeechRecognition: false,
+      canConstruct: true,
+      canStart: true,
+      errorName: null,
+      errorMessage: null
+    }));
   });
 
   it('fails closed when offscreen runtime messaging is unavailable', async () => {

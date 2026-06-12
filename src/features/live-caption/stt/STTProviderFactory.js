@@ -1,4 +1,4 @@
-import { getOpenAIApiKeyAsync, CONFIG, IsDebug } from '@/shared/config/config.js';
+import { getOpenAIApiKeyAsync, IsDebug } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -7,8 +7,6 @@ import {
   STT_PROVIDER_ERROR_CODES
 } from './BaseSTTProvider.js';
 import {
-  STT_PROVIDER_IDS,
-  STT_PROVIDER_MODES,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
   getAvailableSTTProviders,
@@ -17,11 +15,7 @@ import {
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'STTProviderFactory');
 
-function shouldMemoize(options = {}, definition = null) {
-  if (definition?.mode === STT_PROVIDER_MODES.SESSION) {
-    return false;
-  }
-
+function shouldMemoize(options = {}) {
   return !options.requestImpl && !options.responseParser && !options.apiKey && !options.endpointUrl && !options.model && options.memoize !== false;
 }
 
@@ -68,7 +62,7 @@ export class STTProviderFactory {
       });
     }
 
-    const cacheKey = shouldMemoize(options, definition) ? resolvedProviderId : null;
+    const cacheKey = shouldMemoize(options) ? resolvedProviderId : null;
 
     if (cacheKey && this.providerInstances.has(cacheKey)) {
       return this.providerInstances.get(cacheKey);

@@ -978,10 +978,22 @@ export const getPromptBASEScreenCaptureAsync = async () => {
 };
 
 export const getLiveCaptionSttProviderAsync = async () => {
-  return getSettingValueAsync(
+  const providerId = await getSettingValueAsync(
     LIVE_CAPTION_SETTINGS_KEYS?.STT_PROVIDER || 'LIVE_CAPTION_STT_PROVIDER', 
     CONFIG.LIVE_CAPTION_STT_PROVIDER || 'openai_whisper'
   );
+
+  try {
+    const { isSTTProviderSupported } = await import('@/features/live-caption/stt/STTProviderManifest.js');
+    const isDebug = await IsDebug();
+    if (providerId && isSTTProviderSupported(providerId, isDebug)) {
+      return providerId;
+    }
+  } catch {
+    // Fall through to the configured default when STT metadata is unavailable.
+  }
+
+  return 'openai_whisper';
 };
 
 export const getTranslationApiAsync = async () => {

@@ -1,6 +1,11 @@
 import LiveCaptionOffscreenRuntimeShell, {
   LIVE_CAPTION_RUNTIME_ACTIONS
 } from './liveCaptionOffscreenRuntimeShell.js';
+import {
+  BROWSER_SPEECH_PROBE_ACTION,
+  handleBrowserSpeechProbeRequest,
+  installBrowserSpeechProbeGlobal
+} from './liveCaptionBrowserSpeechProbe.js';
 
 // src/public/offscreen.js
 // Chrome-specific offscreen script
@@ -18,6 +23,7 @@ const createOffscreenLogger = () => {
 };
 
 const logger = createOffscreenLogger();
+installBrowserSpeechProbeGlobal({ logger });
 
 // Import ResourceTracker for memory management
 // Note: Since this is an offscreen document, we'll create a simple tracker
@@ -126,8 +132,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => {
         logger.error('Error handling live caption runtime action in offscreen:', error);
         sendResponse({ success: false, error: error.message });
-      });
+    });
     return true; // keep async channel open
+  }
+
+  if (action === BROWSER_SPEECH_PROBE_ACTION) {
+    Promise.resolve(handleBrowserSpeechProbeRequest({ logger }))
+      .then((response) => {
+        sendResponse(response);
+      })
+      .catch((error) => {
+        logger.error('Error handling browser speech probe in offscreen:', error);
+        sendResponse({
+          runtime: 'offscreen',
+          canConstruct: false,
+          canStart: false,
+          errorName: error?.name || 'BrowserSpeechProbeError',
+          errorMessage: error?.message || 'Browser speech probe failed'
+        });
+      });
+    return true;
   }
   
   if (action === "TTS_SPEAK" && cleanMessage.data) {

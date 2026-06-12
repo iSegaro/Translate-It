@@ -1,26 +1,19 @@
 import { CONFIG } from '@/shared/config/config.js';
 import { OPENAI_WHISPER_PROVIDER_ID, OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MOCK_STT_PROVIDER_ID, MockSTTProvider } from './providers/MockSTTProvider.js';
-import {
-  BROWSER_SPEECH_PROVIDER_ID,
-  BrowserSpeechSTTProvider
-} from './providers/BrowserSpeechSTTProvider.js';
 
 export const STT_PROVIDER_IDS = Object.freeze({
   OPENAI_WHISPER: OPENAI_WHISPER_PROVIDER_ID,
-  MOCK: MOCK_STT_PROVIDER_ID,
-  BROWSER_SPEECH: BROWSER_SPEECH_PROVIDER_ID
+  MOCK: MOCK_STT_PROVIDER_ID
 });
 
 export const STT_PROVIDER_MODES = Object.freeze({
-  BATCH: 'batch',
-  SESSION: 'session'
+  BATCH: 'batch'
 });
 
 export const STT_PROVIDER_CAPABILITIES = Object.freeze({
   TRANSCRIPTION: 'transcription',
   BATCH: 'batch',
-  SPEECH_SESSION: 'speech_session',
   FINAL_ONLY: 'final_only',
   AUDIO_CHUNK: 'audio_chunk',
   RETRY: 'retry'
@@ -58,24 +51,6 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.BATCH,
       STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
-    ]),
-    needsApiKey: false,
-    requiredSettings: Object.freeze([]),
-    default: false,
-    supported: true,
-    developmentOnly: true
-  }),
-  [STT_PROVIDER_IDS.BROWSER_SPEECH]: Object.freeze({
-    id: STT_PROVIDER_IDS.BROWSER_SPEECH,
-    name: 'BrowserSpeech',
-    displayName: 'Browser Speech',
-    mode: STT_PROVIDER_MODES.SESSION,
-    type: 'stt',
-    providerClass: BrowserSpeechSTTProvider,
-    capabilities: Object.freeze([
-      STT_PROVIDER_CAPABILITIES.TRANSCRIPTION,
-      STT_PROVIDER_CAPABILITIES.SPEECH_SESSION,
-      STT_PROVIDER_CAPABILITIES.FINAL_ONLY
     ]),
     needsApiKey: false,
     requiredSettings: Object.freeze([]),
