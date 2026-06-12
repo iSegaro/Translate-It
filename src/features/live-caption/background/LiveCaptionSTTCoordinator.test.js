@@ -4,6 +4,7 @@ import { LiveCaptionSessionManager } from '../core/LiveCaptionSessionManager.js'
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 import { createSTTProviderError, STT_PROVIDER_ERROR_CODES } from '../stt/BaseSTTProvider.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getLiveCaptionSttProviderAsync } from '@/shared/config/config.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -29,6 +30,7 @@ describe('live-caption STT coordinator', () => {
   beforeEach(() => {
     sessionManager = new LiveCaptionSessionManager();
     captureCoordinator = new LiveCaptionCaptureCoordinator();
+    getLiveCaptionSttProviderAsync.mockResolvedValue('openai_whisper');
 
     mockProvider = {
       providerId: 'openai_whisper',
@@ -155,6 +157,112 @@ describe('live-caption STT coordinator', () => {
       segmentEndMs: 3000,
       isIncognito: false
     }));
+  });
+
+  it('skips one failed local_whisper chunk and continues processing the next chunk', async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValue('local_whisper');
+
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranscriptSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+
+    mockProvider = {
+      providerId: 'local_whisper',
+      transcribeChunk: vi.fn()
+        .mockRejectedValueOnce(createSTTProviderError(
+          STT_PROVIDER_ERROR_CODES.TRANSCRIPTION_FAILED,
+          'Local Whisper request failed',
+          { type: ErrorTypes.NETWORK_ERROR }
+        ))
+        .mockResolvedValueOnce({ text: 'Recovered chunk' })
+    };
+
+    mockFactory.getProvider.mockResolvedValue(mockProvider);
+
+    const chunk1 = {
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      chunkStartMs: 0,
+      chunkEndMs: 3000,
+      mimeType: 'audio/webm',
+      chunkPayload: { size: 100 }
+    };
+
+    const chunk2 = {
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      chunkStartMs: 3000,
+      chunkEndMs: 6000,
+      mimeType: 'audio/webm',
+      chunkPayload: { size: 100 }
+    };
+
+    await coordinator.handleFinalizedChunk(chunk1);
+    await coordinator.handleFinalizedChunk(chunk2);
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(2);
+    expect(mockVideoSession.addTranscriptSegment).toHaveBeenCalledTimes(1);
+    expect(pageSession.lifecycleState).not.toBe('error');
+    expect(captureCoordinator.status).not.toBe('error');
+    expect(coordinator.getOrCreateQueue('session-1').chunks).toHaveLength(0);
+  });
+
+  it('fails closed after three consecutive local_whisper chunk failures', async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValue('local_whisper');
+
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranscriptSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+    captureCoordinator.setSessionContext({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    mockProvider = {
+      providerId: 'local_whisper',
+      transcribeChunk: vi.fn().mockRejectedValue(createSTTProviderError(
+        STT_PROVIDER_ERROR_CODES.TRANSCRIPTION_FAILED,
+        'Local Whisper request failed',
+        { type: ErrorTypes.NETWORK_ERROR }
+      ))
+    };
+    mockFactory.getProvider.mockResolvedValue(mockProvider);
+
+    const createChunk = (startMs) => ({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      chunkStartMs: startMs,
+      chunkEndMs: startMs + 3000,
+      mimeType: 'audio/webm',
+      chunkPayload: { size: 100 }
+    });
+
+    await coordinator.handleFinalizedChunk(createChunk(0));
+    await coordinator.handleFinalizedChunk(createChunk(3000));
+    await coordinator.handleFinalizedChunk(createChunk(6000));
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(3);
+    expect(pageSession.lifecycleState).toBe('error');
+    expect(captureCoordinator.status).toBe('error');
+    expect(coordinator.sessionQueues.has('session-1')).toBe(false);
   });
 
   it('fails closed and cleans up on queue overflow (limit = 5)', async () => {

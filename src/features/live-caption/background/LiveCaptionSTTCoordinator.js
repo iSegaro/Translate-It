@@ -32,7 +32,8 @@ export class LiveCaptionSTTCoordinator {
     if (!this.sessionQueues.has(sessionId)) {
       this.sessionQueues.set(sessionId, {
         chunks: [],
-        processing: false
+        processing: false,
+        consecutiveLocalWhisperFailures: 0
       });
     }
     return this.sessionQueues.get(sessionId);
@@ -198,10 +199,38 @@ export class LiveCaptionSTTCoordinator {
             charCount: (segment.text || '').length
           });
 
+          if (provider.providerId === 'local_whisper') {
+            queue.consecutiveLocalWhisperFailures = 0;
+          }
+
         } catch (transcriptionError) {
           if (abortController.signal.aborted || transcriptionError.name === 'AbortError') {
             logger.debug('In-flight transcription aborted cleanly', { sessionId });
             break;
+          }
+
+          if (provider.providerId === 'local_whisper') {
+            queue.consecutiveLocalWhisperFailures = (queue.consecutiveLocalWhisperFailures || 0) + 1;
+            const consecutiveFailureCount = queue.consecutiveLocalWhisperFailures;
+
+            logger.warn('Local Whisper chunk transcription failed; skipping chunk', {
+              providerId: provider.providerId,
+              sessionId,
+              tabId,
+              videoFingerprint,
+              chunkStartMs: chunk.chunkStartMs,
+              chunkEndMs: chunk.chunkEndMs,
+              consecutiveFailureCount
+            });
+
+            queue.chunks.shift();
+
+            if (consecutiveFailureCount >= 3) {
+              this.failClosed(sessionId, tabId, transcriptionError);
+              throw transcriptionError;
+            }
+
+            continue;
           }
 
           this.failClosed(sessionId, tabId, transcriptionError);

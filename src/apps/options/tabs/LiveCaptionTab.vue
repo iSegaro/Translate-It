@@ -3,7 +3,7 @@
     <div class="settings-container">
       <div class="tab-header">
         <h2>{{ t('live_caption_tab_title') || 'Live Caption' }}</h2>
-        <p>{{ t('live_caption_tab_desc') || 'Capture and translate audio from active tab videos using OpenAI Whisper. Chrome/Edge desktop only.' }}</p>
+        <p>{{ t('live_caption_tab_desc') || 'Capture and translate audio from active tab videos using a configurable STT provider. Chrome/Edge desktop only.' }}</p>
       </div>
 
       <!-- Platform Support Notice -->

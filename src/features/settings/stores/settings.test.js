@@ -267,6 +267,22 @@ describe('Settings Store', () => {
       const setCall = storageManager.set.mock.calls[0][0];
       expect(setCall).not.toHaveProperty(LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER);
     });
+
+    it('should revert Live Caption STT provider from Local Whisper to Whisper when Debug Mode is disabled', async () => {
+      const store = useSettingsStore();
+
+      store.settings.DEBUG_MODE = true;
+      store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.LOCAL_WHISPER;
+      await nextTick();
+
+      await store.updateSettingAndPersist('DEBUG_MODE', false);
+      await nextTick();
+
+      expect(store.settings[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]).toBe(STT_PROVIDER_IDS.OPENAI_WHISPER);
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+        [LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER]: STT_PROVIDER_IDS.OPENAI_WHISPER
+      }));
+    });
   });
 
   it('should reactively update isDarkTheme in auto mode when system theme changes', async () => {

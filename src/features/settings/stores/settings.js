@@ -15,7 +15,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LIVE_CAPTION_SETTINGS_KEYS } from '@/features/live-caption/constants/liveCaptionSettings.js';
-import { STT_PROVIDER_IDS } from '@/features/live-caption/stt/STTProviderManifest.js';
+import { STT_PROVIDER_IDS, isSTTProviderSupported } from '@/features/live-caption/stt/STTProviderManifest.js';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '@/features/live-caption/core/LiveCaptionCaptionDisplayMode.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
 
@@ -369,6 +369,16 @@ export const useSettingsStore = defineStore('settings', () => {
       logger.info('Sanitizing settings: Both FABs disabled, falling back selectionTranslationMode to ON_CLICK');
       s.selectionTranslationMode = SelectionTranslationMode.ON_CLICK;
     }
+
+    const liveCaptionSttProvider = s[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER];
+    if (liveCaptionSttProvider && !isSTTProviderSupported(liveCaptionSttProvider, s.DEBUG_MODE)) {
+      logger.info('Sanitizing settings: Live Caption STT provider is not supported in the current mode, falling back to OpenAI Whisper', {
+        from: liveCaptionSttProvider,
+        to: STT_PROVIDER_IDS.OPENAI_WHISPER,
+        debugMode: s.DEBUG_MODE
+      });
+      s[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.OPENAI_WHISPER;
+    }
     
     // 2. Extension State: If extension is disabled, ensure we still allow some internal state to be consistent
     // (Add more sanitization rules here if needed in the future)
@@ -436,13 +446,13 @@ export const useSettingsStore = defineStore('settings', () => {
         }
 
         // Cleanup Live Caption STT Provider
-        if (settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] === STT_PROVIDER_IDS.MOCK) {
-          const defaultStt = STT_PROVIDER_IDS.OPENAI_WHISPER;
-          settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = defaultStt;
-          updates[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = defaultStt;
+        const currentSttProvider = settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER];
+        if (currentSttProvider && !isSTTProviderSupported(currentSttProvider, false)) {
+          settings.value[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.OPENAI_WHISPER;
+          updates[LIVE_CAPTION_SETTINGS_KEYS.STT_PROVIDER] = STT_PROVIDER_IDS.OPENAI_WHISPER;
           hasChanges = true;
           logger.info('Debug mode disabled: reverted Live Caption STT provider', {
-            from: STT_PROVIDER_IDS.MOCK,
+            from: currentSttProvider,
             to: STT_PROVIDER_IDS.OPENAI_WHISPER
           });
         }

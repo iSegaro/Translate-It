@@ -122,6 +122,15 @@ describe('Config Module', () => {
 
       await expect(getLiveCaptionSttProviderAsync()).resolves.toBe('openai_whisper');
     });
+
+    it('getLiveCaptionSttProviderAsync should return Local Whisper only in debug mode', async () => {
+      storageManager.get.mockResolvedValue({ LIVE_CAPTION_STT_PROVIDER: 'local_whisper' });
+      storageManager.hasCached.mockReturnValue(true);
+      storageManager.getCached.mockReturnValue(true);
+      const { getLiveCaptionSttProviderAsync } = await import('./config.js');
+
+      await expect(getLiveCaptionSttProviderAsync()).resolves.toBe('local_whisper');
+    });
   });
 
   describe('Error Handling', () => {

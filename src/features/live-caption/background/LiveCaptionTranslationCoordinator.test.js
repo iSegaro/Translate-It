@@ -160,6 +160,9 @@ describe('LiveCaptionTranslationCoordinator', () => {
     expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledTimes(2);
     expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledWith(expect.objectContaining({
       translatedText: 'Translated First',
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
       isIncognito: false
     }));
   });

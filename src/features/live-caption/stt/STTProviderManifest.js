@@ -1,10 +1,12 @@
 import { CONFIG } from '@/shared/config/config.js';
 import { OPENAI_WHISPER_PROVIDER_ID, OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MOCK_STT_PROVIDER_ID, MockSTTProvider } from './providers/MockSTTProvider.js';
+import { LOCAL_WHISPER_PROVIDER_ID, LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
 
 export const STT_PROVIDER_IDS = Object.freeze({
   OPENAI_WHISPER: OPENAI_WHISPER_PROVIDER_ID,
-  MOCK: MOCK_STT_PROVIDER_ID
+  MOCK: MOCK_STT_PROVIDER_ID,
+  LOCAL_WHISPER: LOCAL_WHISPER_PROVIDER_ID
 });
 
 export const STT_PROVIDER_MODES = Object.freeze({
@@ -51,6 +53,26 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.BATCH,
       STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
+    ]),
+    needsApiKey: false,
+    requiredSettings: Object.freeze([]),
+    default: false,
+    supported: true,
+    developmentOnly: true
+  }),
+  [STT_PROVIDER_IDS.LOCAL_WHISPER]: Object.freeze({
+    id: STT_PROVIDER_IDS.LOCAL_WHISPER,
+    name: 'LocalWhisper',
+    displayName: 'Local Whisper',
+    mode: STT_PROVIDER_MODES.BATCH,
+    type: 'stt',
+    providerClass: LocalWhisperSTTProvider,
+    capabilities: Object.freeze([
+      STT_PROVIDER_CAPABILITIES.TRANSCRIPTION,
+      STT_PROVIDER_CAPABILITIES.BATCH,
+      STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
+      STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK,
+      STT_PROVIDER_CAPABILITIES.RETRY
     ]),
     needsApiKey: false,
     requiredSettings: Object.freeze([]),

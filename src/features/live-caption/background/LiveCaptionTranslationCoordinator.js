@@ -145,6 +145,9 @@ export class LiveCaptionTranslationCoordinator {
             if (this.cache) {
               this.cache.appendTranslatedCaptionSegment({
                 ...captionSegment,
+                sessionId,
+                tabId,
+                videoFingerprint,
                 isIncognito: pageSession.isIncognito
               }).catch((err) => {
                 logger.warn('Failed to persist translated caption segment to cache', {

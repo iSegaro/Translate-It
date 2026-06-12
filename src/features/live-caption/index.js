@@ -123,7 +123,8 @@ import {
   isSTTProviderSupported,
   STTProviderFactory,
   OpenAIWhisperProvider,
-  MockSTTProvider
+  MockSTTProvider,
+  LocalWhisperSTTProvider
 } from './stt/index.js';
 
 export { LIVE_CAPTION_ACTIONS } from './constants/liveCaptionActions.js';
@@ -171,7 +172,8 @@ export {
   isSTTProviderSupported,
   STTProviderFactory,
   OpenAIWhisperProvider,
-  MockSTTProvider
+  MockSTTProvider,
+  LocalWhisperSTTProvider
 } from './stt/index.js';
 export {
   LIVE_CAPTION_CLEANUP_REASONS,
@@ -374,7 +376,8 @@ export const LiveCaptionFeature = Object.freeze({
     isSTTProviderSupported,
     STTProviderFactory,
     OpenAIWhisperProvider,
-    MockSTTProvider
+    MockSTTProvider,
+    LocalWhisperSTTProvider
   },
   content: {
     LiveCaptionContentController,

@@ -53,15 +53,27 @@ describe('STTProviderManifest', () => {
       supported: true,
       developmentOnly: true
     });
+    expect(STT_PROVIDER_MANIFEST[STT_PROVIDER_IDS.LOCAL_WHISPER]).toMatchObject({
+      id: STT_PROVIDER_IDS.LOCAL_WHISPER,
+      displayName: 'Local Whisper',
+      mode: STT_PROVIDER_MODES.BATCH,
+      type: 'stt',
+      needsApiKey: false,
+      supported: true,
+      developmentOnly: true
+    });
     expect(getAvailableSTTProviders()).toHaveLength(1);
   });
 
   it('keeps only the batch providers in the manifest', () => {
     expect(Object.keys(STT_PROVIDER_MANIFEST)).toEqual([
       STT_PROVIDER_IDS.OPENAI_WHISPER,
-      STT_PROVIDER_IDS.MOCK
+      STT_PROVIDER_IDS.MOCK,
+      STT_PROVIDER_IDS.LOCAL_WHISPER
     ]);
-    expect(getAvailableSTTProviders(true)).toHaveLength(2);
+    expect(getAvailableSTTProviders(true)).toHaveLength(3);
+    expect(isSTTProviderSupported(STT_PROVIDER_IDS.LOCAL_WHISPER)).toBe(false);
+    expect(isSTTProviderSupported(STT_PROVIDER_IDS.LOCAL_WHISPER, true)).toBe(true);
     expect(isSTTProviderSupported('browser_speech', true)).toBe(false);
   });
 });

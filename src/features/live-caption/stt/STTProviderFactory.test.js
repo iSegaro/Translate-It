@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
+import { LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
 import { STT_PROVIDER_ERROR_CODES } from './BaseSTTProvider.js';
 import { ProviderFactory as TranslationProviderFactory } from '@/features/translation/providers/ProviderFactory.js';
 
@@ -60,6 +61,25 @@ describe('STTProviderFactory', () => {
 
   it('rejects browser speech because it is no longer registered', async () => {
     await expect(factory.getProvider('browser_speech')).rejects.toMatchObject({
+      code: STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND
+    });
+  });
+
+  it('instantiates local whisper in debug mode', async () => {
+    const { IsDebug } = await import('@/shared/config/config.js');
+    IsDebug.mockResolvedValue(true);
+
+    const provider = await factory.getProvider('local_whisper');
+
+    expect(provider).toBeInstanceOf(LocalWhisperSTTProvider);
+    expect(provider.endpointUrl).toBe('http://127.0.0.1:8765/v1/audio/transcriptions');
+  });
+
+  it('rejects local whisper outside debug mode', async () => {
+    const { IsDebug } = await import('@/shared/config/config.js');
+    IsDebug.mockResolvedValue(false);
+
+    await expect(factory.getProvider('local_whisper')).rejects.toMatchObject({
       code: STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND
     });
   });
