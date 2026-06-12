@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import LiveCaptionOverlay from './LiveCaptionOverlay.vue';
@@ -412,5 +414,42 @@ describe('live-caption overlay shell', () => {
     expect(wrapper.text()).toContain('Line 2 Translation');
     expect(wrapper.text()).toContain('Line 3 Original');
     expect(wrapper.text()).toContain('Line 3 Translation');
+  });
+
+  it('keeps DOM order chronological while reversing only the visual stacking in CSS', () => {
+    const wrapper = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionDisplayMode: LIVE_CAPTION_CAPTION_DISPLAY_MODES.TRANSCRIPT_ONLY,
+        captionLines: [
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 1000,
+            segmentEndMs: 2000,
+            originalText: 'Older caption',
+            translatedText: 'Older caption translated',
+            isFinal: true
+          },
+          {
+            sessionId: 'session-1',
+            videoFingerprint: 'video-1',
+            segmentStartMs: 2000,
+            segmentEndMs: 3000,
+            originalText: 'Newer caption',
+            translatedText: 'Newer caption translated',
+            isFinal: true
+          }
+        ]
+      }
+    });
+
+    const renderedLines = wrapper.findAll('.live-caption-caption-line');
+
+    expect(renderedLines).toHaveLength(2);
+    expect(renderedLines[0].text()).toContain('Older caption');
+    expect(renderedLines[1].text()).toContain('Newer caption');
+
+    const stylesheet = readFileSync(resolve('src/features/live-caption/overlay/LiveCaptionOverlay.scss'), 'utf8');
+    expect(stylesheet).toContain('flex-direction: column-reverse');
   });
 });

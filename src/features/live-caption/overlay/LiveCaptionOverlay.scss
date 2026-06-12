@@ -34,7 +34,8 @@
 
 /* --- Live Caption Caption Track --- */
 .live-caption-caption-track {
-  display: grid;
+  display: flex;
+  flex-direction: column-reverse;
   gap: 8px;
   pointer-events: auto;
 }
