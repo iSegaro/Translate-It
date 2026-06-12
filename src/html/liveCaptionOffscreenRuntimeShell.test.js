@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LiveCaptionOffscreenRuntimeShell, {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_SHELL_STATES,
@@ -22,18 +22,26 @@ describe("live-caption offscreen runtime shell", () => {
       this.options = options;
       this.state = "inactive";
       this.ondataavailable = null;
+      this.onstop = null;
       this.onerror = null;
       this.mimeType = options?.mimeType || "audio/webm";
+      this.stopCount = 0;
+      this.startCount = 0;
       MockMediaRecorder.instances.push(this);
     }
 
     start(timeslice) {
       this.state = "recording";
       this.timeslice = timeslice;
+      this.startCount += 1;
     }
 
     stop() {
       this.state = "inactive";
+      this.stopCount += 1;
+      if (typeof this.onstop === "function") {
+        this.onstop({ target: this });
+      }
     }
 
     pause() {
@@ -69,9 +77,26 @@ describe("live-caption offscreen runtime shell", () => {
     }
   }
 
+  class MockFileReader {
+    constructor() {
+      this.result = null;
+      this.onloadend = null;
+      this.onerror = null;
+    }
+
+    readAsDataURL(blob) {
+      const mimeType = blob?.type || "audio/webm";
+      this.result = `data:${mimeType};base64,${Buffer.from("mock-finalized-segment").toString("base64")}`;
+      if (typeof this.onloadend === "function") {
+        this.onloadend({ target: this });
+      }
+    }
+  }
+
   beforeEach(() => {
     MockMediaRecorder.instances = [];
     globalThis.MediaRecorder = MockMediaRecorder;
+    globalThis.FileReader = MockFileReader;
 
     mockClose = vi.fn().mockResolvedValue(undefined);
     mockDisconnect = vi.fn();
@@ -103,6 +128,10 @@ describe("live-caption offscreen runtime shell", () => {
       window.AudioContext = MockAudioContext;
       window.webkitAudioContext = MockAudioContext;
     }
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("starts, pauses, resumes, statuses, and stops without media capture if streamId is not specified but behaves correctly when streamId is passed", async () => {
@@ -255,9 +284,10 @@ describe("live-caption offscreen runtime shell", () => {
     expect(inconsistent.error.code).toBe("inconsistent_session");
   });
 
-  it("starts real media capture and produces finalized chunk messages", async () => {
+  it("buffers recorder data and emits a finalized chunk blob only after recorder stop", async () => {
     const shell = new LiveCaptionOffscreenRuntimeShell();
     const mockSendMessage = vi.spyOn(globalThis.chrome.runtime, "sendMessage");
+    vi.useFakeTimers();
 
     const startResponse = await shell.handleMessage(
       {
@@ -282,10 +312,19 @@ describe("live-caption offscreen runtime shell", () => {
     expect(MockMediaRecorder.instances.length).toBe(1);
     const recorderInstance = MockMediaRecorder.instances[0];
     expect(recorderInstance.state).toBe("recording");
+    expect(recorderInstance.timeslice).toBeUndefined();
 
-    // Simulate chunk generation
-    const dummyBlob = { size: 1024, type: "audio/webm" };
-    recorderInstance.ondataavailable({ data: dummyBlob });
+    const bufferedBlob = new Blob([new Uint8Array(2048).fill(1)], { type: "audio/webm" });
+    recorderInstance.ondataavailable({ data: bufferedBlob });
+    expect(mockSendMessage).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await Promise.resolve();
+
+    expect(recorderInstance.stopCount).toBe(1);
+    expect(MockMediaRecorder.instances.length).toBe(2);
+    expect(MockMediaRecorder.instances[0].state).toBe("inactive");
+    expect(MockMediaRecorder.instances[1].state).toBe("recording");
 
     expect(mockSendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -296,13 +335,23 @@ describe("live-caption offscreen runtime shell", () => {
         chunkStartMs: 0,
         chunkEndMs: 2000,
         mimeType: "audio/webm;codecs=opus",
+        sizeBytes: expect.any(Number),
+        chunkPayload: expect.stringMatching(/^data:audio\/webm(;codecs=opus)?;base64,/),
+        payloadKind: "base64",
       }),
     );
+
+    const emittedMessage = mockSendMessage.mock.calls[0][0];
+    expect(typeof emittedMessage.chunkPayload).toBe("string");
+    expect(emittedMessage.chunkPayload.startsWith("data:audio/webm")).toBe(true);
+    expect(emittedMessage.sizeBytes).toBeGreaterThanOrEqual(bufferedBlob.size);
+    expect(shell.chunkStartMs).toBe(2000);
   });
 
-  it("ignores empty chunks during capture", async () => {
+  it("skips zero and tiny finalized segments before forwarding", async () => {
     const shell = new LiveCaptionOffscreenRuntimeShell();
     const mockSendMessage = vi.spyOn(globalThis.chrome.runtime, "sendMessage");
+    vi.useFakeTimers();
 
     await shell.handleMessage(
       {
@@ -321,13 +370,18 @@ describe("live-caption offscreen runtime shell", () => {
     const recorderInstance = MockMediaRecorder.instances[0];
     mockSendMessage.mockClear();
 
-    // Trigger empty chunk
     recorderInstance.ondataavailable({ data: { size: 0 } });
+    recorderInstance.ondataavailable({ data: new Blob([new Uint8Array(16).fill(1)], { type: "audio/webm" }) });
+
+    await vi.advanceTimersByTimeAsync(3000);
+    await Promise.resolve();
+
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it("cleans up all media tracks, recorder, and AudioContext on stop", async () => {
     const shell = new LiveCaptionOffscreenRuntimeShell();
+    const mockSendMessage = vi.spyOn(globalThis.chrome.runtime, "sendMessage");
     await shell.handleMessage(
       {
         target: "offscreen",
@@ -361,6 +415,7 @@ describe("live-caption offscreen runtime shell", () => {
     expect(shell.mediaRecorder).toBeNull();
     expect(shell.audioCtx).toBeNull();
     expect(shell.audioSource).toBeNull();
+    expect(mockSendMessage).not.toHaveBeenCalled();
 
     expect(mockTrackObj.stop).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();

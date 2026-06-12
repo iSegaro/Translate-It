@@ -12,6 +12,7 @@ import {
 import { LIVE_CAPTION_RUNTIME_STATES } from '@/features/live-caption/constants/liveCaptionRuntimeStates.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
+const MIN_FINALIZED_SEGMENT_BYTES = 1024;
 
 function cloneSessionContext(context = {}) {
   return {
@@ -46,6 +47,10 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.captureState = 'idle'; // idle | starting | capturing | paused | stopping | error
     this.chunkTimeslice = 3000;
     this.chunkStartMs = 0;
+    this.segmentChunks = [];
+    this.segmentBoundaryTimer = null;
+    this.segmentRotationPending = false;
+    this.activeRecorderMimeType = 'audio/webm';
   }
 
   touch() {
@@ -157,6 +162,8 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _stopCapture() {
+    this._clearSegmentTimer();
+    this.segmentRotationPending = false;
     this.captureState = 'stopping';
     if (this.mediaRecorder) {
       try {
@@ -197,6 +204,205 @@ export class LiveCaptionOffscreenRuntimeShell {
     }
 
     this.captureState = 'idle';
+  }
+
+  _clearSegmentTimer() {
+    if (this.segmentBoundaryTimer) {
+      clearTimeout(this.segmentBoundaryTimer);
+      this.segmentBoundaryTimer = null;
+    }
+  }
+
+  _scheduleSegmentBoundary() {
+    this._clearSegmentTimer();
+
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording' || !Number.isFinite(this.chunkTimeslice) || this.chunkTimeslice <= 0) {
+      return;
+    }
+
+    this.segmentBoundaryTimer = setTimeout(() => {
+      this.segmentBoundaryTimer = null;
+
+      if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') {
+        return;
+      }
+
+      this.segmentRotationPending = true;
+      try {
+        this.mediaRecorder.stop();
+      } catch (error) {
+        logger.warn('Error rotating MediaRecorder segment:', error);
+        this.segmentRotationPending = false;
+      }
+    }, this.chunkTimeslice);
+  }
+
+  _emitFinalizedChunk(chunkPayload, { sessionId, tabId, videoFingerprint, chunkStartMs, chunkEndMs, mimeType }) {
+    if (!chunkPayload || chunkPayload.size <= 0) {
+      logger.debug('Skipping finalized chunk emission: empty payload', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs
+      });
+      return;
+    }
+
+    if (!sessionId || !tabId || !videoFingerprint) {
+      logger.debug('Skipping finalized chunk emission: session metadata is incomplete', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        sizeBytes: chunkPayload.size,
+        mimeType
+      });
+      return;
+    }
+
+    if (chunkPayload.size < MIN_FINALIZED_SEGMENT_BYTES) {
+      logger.debug('Skipping finalized chunk emission: payload below minimum size', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        sizeBytes: chunkPayload.size,
+        mimeType
+      });
+      return;
+    }
+
+    logger.info('MediaRecorder finalized segment ready', {
+      sessionId,
+      tabId,
+      videoFingerprint,
+      chunkStartMs,
+      chunkEndMs,
+      sizeBytes: chunkPayload.size,
+      mimeType
+    });
+
+    if (!chrome?.runtime?.sendMessage) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Payload = reader.result;
+      chrome.runtime.sendMessage({
+        action: 'live-caption/offscreen/finalized-chunk',
+        target: 'background',
+        source: 'offscreen',
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        mimeType: chunkPayload.type || mimeType,
+        sizeBytes: chunkPayload.size,
+        payloadKind: 'base64',
+        chunkPayload: base64Payload
+      }).catch((err) => {
+        logger.error('Failed to send finalized chunk to background:', err);
+      });
+    };
+    reader.onerror = () => {
+      logger.error('Failed to serialize finalized chunk payload', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        sizeBytes: chunkPayload.size,
+        mimeType
+      });
+    };
+    reader.readAsDataURL(chunkPayload);
+  }
+
+  _handleMediaRecorderStop() {
+    const sessionId = this.sessionId;
+    const tabId = this.tabId;
+    const videoFingerprint = this.videoFingerprint;
+    const chunkStartMs = this.chunkStartMs;
+    const chunkEndMs = chunkStartMs + this.chunkTimeslice;
+    const mimeType = this.activeRecorderMimeType || this.mediaRecorder?.mimeType || 'audio/webm';
+    const bufferedChunks = Array.isArray(this.segmentChunks) ? this.segmentChunks.slice() : [];
+    const shouldRestart = this.segmentRotationPending && this.captureState === 'capturing' && Boolean(this.mediaStream);
+    const shouldEmit = this.segmentRotationPending && this.captureState === 'capturing';
+
+    this.segmentRotationPending = false;
+    this.segmentChunks = [];
+    this.mediaRecorder = null;
+
+    if (!shouldEmit) {
+      logger.debug('Skipping finalized MediaRecorder stop flush: not a segment rotation', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        captureState: this.captureState
+      });
+      if (shouldRestart && this.mediaStream && this.sessionId && this.tabId && this.videoFingerprint) {
+        this._startMediaRecorder(this.mediaStream, mimeType);
+      }
+      return;
+    }
+
+    if (bufferedChunks.length > 0) {
+      const finalizedBlob = new Blob(bufferedChunks, { type: mimeType });
+      this._emitFinalizedChunk(finalizedBlob, {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs,
+        mimeType: finalizedBlob.type || mimeType
+      });
+      this.chunkStartMs = chunkEndMs;
+    } else {
+      logger.debug('Empty finalized MediaRecorder segment ignored', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        chunkStartMs,
+        chunkEndMs
+      });
+    }
+
+    if (shouldRestart && this.mediaStream && this.sessionId && this.tabId && this.videoFingerprint) {
+      this._startMediaRecorder(this.mediaStream, mimeType);
+    }
+  }
+
+  _startMediaRecorder(stream, selectedMime) {
+    const recorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : {});
+    this.mediaRecorder = recorder;
+    this.activeRecorderMimeType = recorder.mimeType || selectedMime || 'audio/webm';
+    this.segmentChunks = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        this.segmentChunks.push(event.data);
+      }
+    };
+
+    recorder.onstop = () => {
+      this._handleMediaRecorderStop();
+    };
+
+    recorder.onerror = (event) => {
+      logger.error('MediaRecorder runtime error:', event.error);
+      this._handleCaptureError(event.error || new Error('MediaRecorder runtime error'));
+    };
+
+    recorder.start();
+    this._scheduleSegmentBoundary();
+    this.captureState = 'capturing';
   }
 
   _handleCaptureError(error) {
@@ -307,90 +513,7 @@ export class LiveCaptionOffscreenRuntimeShell {
             selectedMime = ''; // Let browser decide
           }
 
-          const mediaRecorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : {});
-          this.mediaRecorder = mediaRecorder;
-
-          mediaRecorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-              const chunkPayload = event.data;
-              const chunkStartMsVal = this.chunkStartMs;
-              const chunkEndMs = chunkStartMsVal + this.chunkTimeslice;
-
-              const sessionSnapshot = {
-                sessionId: this.sessionId,
-                tabId: this.tabId,
-                videoFingerprint: this.videoFingerprint
-              };
-
-              if (!sessionSnapshot.sessionId || !sessionSnapshot.tabId || !sessionSnapshot.videoFingerprint) {
-                logger.debug('Skipping finalized-chunk message: Session metadata is incomplete (post-stop chunk)', sessionSnapshot);
-                return;
-              }
-
-              logger.info('MediaRecorder chunk completed', {
-                sessionId: sessionSnapshot.sessionId,
-                videoFingerprint: sessionSnapshot.videoFingerprint,
-                chunkStartMs: chunkStartMsVal,
-                chunkEndMs,
-                sizeBytes: chunkPayload.size
-              });
-
-              if (chunkPayload instanceof Blob) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const base64Payload = reader.result;
-                  if (chrome?.runtime?.sendMessage) {
-                    chrome.runtime.sendMessage({
-                      action: 'live-caption/offscreen/finalized-chunk',
-                      target: 'background',
-                      source: 'offscreen',
-                      sessionId: sessionSnapshot.sessionId,
-                      tabId: sessionSnapshot.tabId,
-                      videoFingerprint: sessionSnapshot.videoFingerprint,
-                      chunkStartMs: chunkStartMsVal,
-                      chunkEndMs,
-                      mimeType: mediaRecorder.mimeType || 'audio/webm',
-                      payloadKind: 'base64',
-                      chunkPayload: base64Payload
-                    }).catch((err) => {
-                      logger.error('Failed to send finalized chunk to background:', err);
-                    });
-                  }
-                };
-                reader.readAsDataURL(chunkPayload);
-              } else {
-                if (chrome?.runtime?.sendMessage) {
-                  chrome.runtime.sendMessage({
-                    action: 'live-caption/offscreen/finalized-chunk',
-                    target: 'background',
-                    source: 'offscreen',
-                    sessionId: sessionSnapshot.sessionId,
-                    tabId: sessionSnapshot.tabId,
-                    videoFingerprint: sessionSnapshot.videoFingerprint,
-                    chunkStartMs: chunkStartMsVal,
-                    chunkEndMs,
-                    mimeType: mediaRecorder.mimeType || 'audio/webm',
-                    payloadKind: 'blob',
-                    chunkPayload
-                  }).catch((err) => {
-                    logger.error('Failed to send finalized chunk to background:', err);
-                  });
-                }
-              }
-
-              this.chunkStartMs = chunkEndMs;
-            } else {
-              logger.debug('Empty chunk ignored', { sessionId: this.sessionId });
-            }
-          };
-
-          mediaRecorder.onerror = (event) => {
-            logger.error('MediaRecorder runtime error:', event.error);
-            this._handleCaptureError(event.error || new Error('MediaRecorder runtime error'));
-          };
-
-          this.captureState = 'capturing';
-          mediaRecorder.start(this.chunkTimeslice);
+          this._startMediaRecorder(stream, selectedMime);
         } else {
           throw new Error('MediaRecorder is not supported in this environment');
         }
@@ -508,6 +631,8 @@ export class LiveCaptionOffscreenRuntimeShell {
 
       if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
         try {
+          this._clearSegmentTimer();
+          this.segmentRotationPending = false;
           this.mediaRecorder.pause();
           this.captureState = 'paused';
         } catch (e) {
@@ -569,6 +694,7 @@ export class LiveCaptionOffscreenRuntimeShell {
       if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
         try {
           this.mediaRecorder.resume();
+          this._scheduleSegmentBoundary();
           this.captureState = 'capturing';
         } catch (e) {
           logger.warn('Error resuming MediaRecorder:', e);

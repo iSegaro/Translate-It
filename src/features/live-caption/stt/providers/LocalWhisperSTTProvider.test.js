@@ -83,6 +83,30 @@ describe('LocalWhisperSTTProvider', () => {
     expect(provider.state).toBe(STT_PROVIDER_STATUS.READY);
   });
 
+  it('parses dataURL audio payloads', async () => {
+    requestImpl.mockResolvedValue({
+      text: 'hello from dataurl'
+    });
+
+    const provider = new LocalWhisperSTTProvider({
+      requestImpl
+    });
+
+    const dataUrl = 'data:audio/webm;base64,' + Buffer.from('audio').toString('base64');
+    await provider.transcribeChunk(dataUrl, {
+      sessionId: 'session-1',
+      videoFingerprint: 'video-1',
+      chunkStartMs: 100,
+      chunkEndMs: 250
+    });
+
+    const request = requestImpl.mock.calls[0][0];
+    const file = request.body.get('file');
+    expect(file).toBeInstanceOf(Blob);
+    expect(file.type).toBe('audio/webm');
+    expect(file.size).toBeGreaterThan(0);
+  });
+
   it('omits language when the source language is auto', async () => {
     requestImpl.mockResolvedValue({ text: 'translated later' });
 
@@ -205,5 +229,56 @@ describe('LocalWhisperSTTProvider', () => {
     });
     expect(Object.keys(metadata)).not.toContain('text');
     expect(Object.keys(metadata)).not.toContain('transcript');
+  });
+
+  it('logs sanitized response body snippets for HTTP 400 failures', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {
+        get: (key) => (String(key).toLowerCase() === 'content-type' ? 'application/json' : null)
+      },
+      json: async () => ({
+        error: {
+          message: 'Unsupported audio chunk',
+          detail: 'faster-whisper could not decode the provided blob'
+        }
+      }),
+      text: async () => 'unused'
+    });
+
+    try {
+      const provider = new LocalWhisperSTTProvider({
+        retryLimit: 0
+      });
+
+      await expect(provider.transcribeChunk(new Blob(['audio'], { type: 'audio/webm' }), {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        chunkStartMs: 10,
+        chunkEndMs: 20
+      })).rejects.toMatchObject({
+        code: STT_PROVIDER_ERROR_CODES.RETRY_EXHAUSTED,
+        type: ErrorTypes.API_RESPONSE_INVALID
+      });
+
+      const failureLog = logger.warn.mock.calls.find(([message]) => message === '[Local Whisper] Final transcription failure');
+      expect(failureLog).toBeTruthy();
+      const [, metadata] = failureLog;
+      expect(metadata).toMatchObject({
+        providerId: 'local_whisper',
+        endpointHost: '127.0.0.1:8765',
+        statusCode: 400,
+        retryable: false,
+        originalRetryable: false,
+        responseBodySnippet: expect.stringContaining('Unsupported audio chunk')
+      });
+      expect(metadata.serverErrorBodySnippet).toBeNull();
+      expect(String(metadata.responseBodySnippet)).not.toContain('audio/webm');
+      expect(String(metadata.responseBodySnippet)).not.toContain('segment');
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

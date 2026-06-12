@@ -95,6 +95,26 @@ function resolveLanguage(options = {}) {
   return String(language);
 }
 
+function createBodySnippet(payload) {
+  if (payload == null) {
+    return null;
+  }
+
+  let rawValue;
+  if (typeof payload === 'string') {
+    rawValue = payload;
+  } else {
+    try {
+      rawValue = JSON.stringify(payload);
+    } catch {
+      rawValue = String(payload);
+    }
+  }
+
+  const normalized = String(rawValue).replace(/\s+/g, ' ').trim();
+  return normalized.length > 0 ? normalized.slice(0, 240) : null;
+}
+
 function normalizeSegments(segments) {
   if (!Array.isArray(segments)) {
     return null;
@@ -190,6 +210,8 @@ function normalizeLocalWhisperError(error, providerId = LOCAL_WHISPER_PROVIDER_I
 
   const statusCode = error.statusCode ?? error.status ?? null;
   const message = error.message || 'Local Whisper request failed';
+  const responseBodySnippet = error.responseBodySnippet ?? error.cause?.responseBodySnippet ?? error.details?.responseBodySnippet ?? null;
+  const serverErrorBodySnippet = error.serverErrorBodySnippet ?? error.cause?.serverErrorBodySnippet ?? error.details?.serverErrorBodySnippet ?? null;
 
   return createSTTProviderError(STT_PROVIDER_ERROR_CODES.TRANSCRIPTION_FAILED, message, {
     providerId,
@@ -197,6 +219,11 @@ function normalizeLocalWhisperError(error, providerId = LOCAL_WHISPER_PROVIDER_I
     type: error.type || (statusCode >= 500 ? ErrorTypes.SERVER_ERROR : statusCode ? ErrorTypes.API_RESPONSE_INVALID : ErrorTypes.NETWORK_ERROR),
     statusCode,
     retryable: Boolean(error.retryable) || [429, 500, 502, 503, 504].includes(statusCode),
+    details: {
+      ...(error.details && typeof error.details === 'object' ? error.details : {}),
+      responseBodySnippet,
+      serverErrorBodySnippet
+    },
     cause: error
   });
 }
@@ -275,6 +302,8 @@ export class LocalWhisperSTTProvider extends BaseSTTProvider {
       videoFingerprint: options.videoFingerprint ?? null
     }).catch((error) => {
       const originalRetryable = Boolean(error?.cause?.retryable ?? error?.details?.retryable ?? error?.retryable);
+      const responseBodySnippet = error?.details?.responseBodySnippet ?? error?.cause?.responseBodySnippet ?? error?.cause?.details?.responseBodySnippet ?? null;
+      const serverErrorBodySnippet = error?.details?.serverErrorBodySnippet ?? error?.cause?.serverErrorBodySnippet ?? error?.cause?.details?.serverErrorBodySnippet ?? null;
       this.logger.warn('[Local Whisper] Final transcription failure', {
         providerId: this.providerId,
         endpointHost: this.endpointHost,
@@ -287,6 +316,8 @@ export class LocalWhisperSTTProvider extends BaseSTTProvider {
         statusCode: error?.statusCode ?? error?.status ?? null,
         retryable: Boolean(error?.retryable),
         originalRetryable,
+        responseBodySnippet,
+        serverErrorBodySnippet,
         attemptCount,
         retryLimit
       });
@@ -370,6 +401,10 @@ export class LocalWhisperSTTProvider extends BaseSTTProvider {
       const error = new Error(typeof payload === 'string' ? payload : payload?.error?.message || response.statusText || 'Local Whisper request failed');
       error.statusCode = response.status;
       error.response = payload;
+      error.responseBodySnippet = createBodySnippet(payload);
+      if (response.status >= 500) {
+        error.serverErrorBodySnippet = error.responseBodySnippet;
+      }
       error.type = response.status >= 500
         ? ErrorTypes.SERVER_ERROR
         : response.status === 429
