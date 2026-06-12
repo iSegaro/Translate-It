@@ -390,6 +390,10 @@ export class LocalWhisperSTTProvider extends BaseSTTProvider {
         signal: request.signal || undefined
       });
     } catch (error) {
+      if (isCancellationError(error) || request.signal?.aborted) {
+        throw error;
+      }
+
       const networkError = new Error(error?.message || 'Local Whisper request failed');
       networkError.type = ErrorTypes.NETWORK_ERROR;
       networkError.retryable = true;

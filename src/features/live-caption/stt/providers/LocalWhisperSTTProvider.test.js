@@ -309,4 +309,34 @@ describe('LocalWhisperSTTProvider', () => {
     expect(logger.warn).not.toHaveBeenCalledWith('[Local Whisper] Final transcription failure', expect.any(Object));
     expect(provider.state).toBe(STT_PROVIDER_STATUS.READY);
   });
+
+  it('preserves AbortError from the default fetch path without retrying or warning', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+    try {
+      const provider = new LocalWhisperSTTProvider({
+        retryLimit: 2
+      });
+
+      const controller = new AbortController();
+      const transcriptionPromise = provider.transcribeChunk(new Blob(['audio'], { type: 'audio/webm' }), {
+        sessionId: 'session-fetch-abort',
+        videoFingerprint: 'video-fetch-abort',
+        signal: controller.signal
+      });
+
+      controller.abort();
+
+      await expect(transcriptionPromise).rejects.toMatchObject({
+        name: 'AbortError'
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(logger.debug.mock.calls.some(([message]) => String(message).includes('Retrying transcription'))).toBe(false);
+      expect(logger.warn.mock.calls.some(([message]) => String(message).includes('Final transcription failure'))).toBe(false);
+      expect(provider.state).toBe(STT_PROVIDER_STATUS.READY);
+      expect(provider.lastError).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
