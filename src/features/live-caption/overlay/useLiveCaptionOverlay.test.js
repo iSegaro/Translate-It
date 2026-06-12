@@ -2,7 +2,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, nextTick, ref } from 'vue';
 import { mount } from '@vue/test-utils';
-import { useLiveCaptionOverlay } from './useLiveCaptionOverlay.js';
+import { useLiveCaptionOverlay, computeOverlayPlacement } from './useLiveCaptionOverlay.js';
 
 describe('useLiveCaptionOverlay', () => {
   let originalResizeObserver;
@@ -101,7 +101,7 @@ describe('useLiveCaptionOverlay', () => {
     });
     expect(wrapper.vm.overlayStyle).toMatchObject({
       position: 'fixed',
-      top: '468px', // rect.bottom (460px) + gap (8px)
+      top: '468px', // rect.bottom (460) + gap (8)
       left: '58px',
       width: '624px',
       maxWidth: '624px',
@@ -156,7 +156,7 @@ describe('useLiveCaptionOverlay', () => {
     expect(wrapper.vm.isVisible).toBe(true);
     expect(wrapper.vm.overlayStyle).toMatchObject({
       position: 'fixed',
-      top: '448px', // rect.bottom (460px) - offsetBottom (12px)
+      top: '448px', // rect.bottom (460) - offsetBottom (12)
       left: '58px',
       width: '624px',
       maxWidth: '624px',
@@ -255,7 +255,7 @@ describe('useLiveCaptionOverlay', () => {
 
     expect(wrapper.vm.overlayStyle).toMatchObject({
       position: 'fixed',
-      top: '448px', // rect.bottom (460px) - offsetBottom (12px)
+      top: '448px', // rect.bottom (460) - offsetBottom (12)
       left: '58px',
       width: '624px',
       maxWidth: '624px',
@@ -377,5 +377,250 @@ describe('useLiveCaptionOverlay', () => {
     wrapper.vm.overlay.updateOverlayPosition();
     await nextTick();
     expect(wrapper.vm.isVisible).toBe(false);
+  });
+});
+
+describe('computeOverlayPlacement', () => {
+  const defaultOptions = { offsetBottom: 16, offsetHorizontal: 16 };
+
+  it('places overlay below video when enough space exists', () => {
+    const rect = { top: 100, left: 50, width: 640, height: 360, bottom: 460, right: 690 };
+    const viewport = { width: 1280, height: 720 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    expect(result.top).toBe(468); // 460 + 8 gap
+    expect(result.left).toBe(66); // 50 + 16 offset
+    expect(result.width).toBe(608); // 640 - 32
+    expect(result.transform).toBe('none');
+    expect(result.insideVideo).toBe(false);
+    expect(result.left + result.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('places overlay inside video when insufficient space below (YouTube Shorts case)', () => {
+    const rect = { top: 0, left: 20, width: 375, height: 667, bottom: 667, right: 395 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // spaceBelow = 667 - 667 = 0, which is < 80 + 8
+    // So: top = 667 - 80 - 16 = 571
+    // left = 20 + 16 = 36, but 36 + 343 = 379 > 375 viewport width
+    // so left is clamped to max(0, 375 - 343) = 32
+    expect(result.top).toBe(571);
+    expect(result.left).toBe(32);
+    expect(result.width).toBe(343); // 375 - 32
+    expect(result.transform).toBe('none');
+    expect(result.insideVideo).toBe(true);
+    expect(result.left + result.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('clamps top when overlay overflows below viewport', () => {
+    const rect = { top: 120, left: 0, width: 375, height: 540, bottom: 660, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // spaceBelow = 667 - 660 = 7, which is < 80 + 8
+    // So: top = 660 - 80 - 16 = 564
+    // 564 + 80 = 644 <= 667, so no clamp needed
+    expect(result.top).toBe(564);
+    expect(result.left).toBe(16);
+    expect(result.width).toBe(343);
+  });
+
+  it('clamps top when computed top still overflows', () => {
+    const rect = { top: 600, left: 0, width: 375, height: 100, bottom: 700, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // spaceBelow = 667 - 700 = -33, which is < 80 + 8
+    // So: top = 700 - 80 - 16 = 604
+    // 604 + 80 = 684 > 667, so clamp: top = max(0, 667 - 80) = 587
+    expect(result.top).toBe(587);
+    expect(result.left).toBe(16);
+    expect(result.width).toBe(343);
+  });
+
+  it('clamps left when overlay overflows right edge', () => {
+    const rect = { top: 100, left: 600, width: 400, height: 300, bottom: 400, right: 1000 };
+    const viewport = { width: 800, height: 600 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // maxWidth = 400 - 32 = 368
+    // left = 600 + 16 = 616, 616 + 368 = 984 > 800
+    // clamp: left = max(0, 800 - 368) = 432
+    expect(result.top).toBe(408); // below video
+    expect(result.left).toBe(432);
+    expect(result.width).toBe(368);
+    expect(result.left + result.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('clamps width and left when overlay is wider than viewport', () => {
+    const rect = { top: 100, left: 0, width: 1000, height: 300, bottom: 400, right: 1000 };
+    const viewport = { width: 400, height: 600 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // maxWidth = 1000 - 32 = 968, clamped to viewport.width = 400
+    // left = 0 + 16 = 16, 16 + 400 = 416 > 400
+    // clamp left = max(0, 400 - 400) = 0
+    expect(result.left).toBe(0);
+    expect(result.width).toBe(400);
+    expect(result.left + result.width).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it('uses fullscreen placement when isFullscreen is true', () => {
+    const rect = { top: 100, left: 50, width: 640, height: 360, bottom: 460, right: 690 };
+    const viewport = { width: 1280, height: 720 };
+
+    const result = computeOverlayPlacement(rect, viewport, { ...defaultOptions, isFullscreen: true });
+
+    // Fullscreen: top = 460 - 16 = 444, transform = translateY(-100%)
+    expect(result.top).toBe(444);
+    expect(result.left).toBe(66);
+    expect(result.width).toBe(608);
+    expect(result.transform).toBe('translateY(-100%)');
+  });
+
+  it('handles video at viewport edge with zero space below', () => {
+    const rect = { top: 0, left: 0, width: 375, height: 667, bottom: 667, right: 375 };
+    const viewport = { width: 375, height: 667 };
+
+    const result = computeOverlayPlacement(rect, viewport, defaultOptions);
+
+    // spaceBelow = 0, overlay inside video at bottom
+    // top = 667 - 80 - 16 = 571
+    expect(result.top).toBe(571);
+    expect(result.left).toBe(16);
+  });
+});
+
+describe('useLiveCaptionOverlay - viewport-aware maxHeight', () => {
+  let originalResizeObserver;
+  let originalGetBoundingClientRect;
+
+  beforeEach(() => {
+    originalResizeObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor() {}
+      observe = vi.fn();
+      disconnect = vi.fn();
+    };
+
+    originalGetBoundingClientRect = HTMLVideoElement.prototype.getBoundingClientRect;
+  });
+
+  afterEach(() => {
+    if (originalResizeObserver === undefined) {
+      delete globalThis.ResizeObserver;
+    } else {
+      globalThis.ResizeObserver = originalResizeObserver;
+    }
+
+    if (originalGetBoundingClientRect) {
+      Object.defineProperty(HTMLVideoElement.prototype, 'getBoundingClientRect', {
+        configurable: true,
+        value: originalGetBoundingClientRect
+      });
+    }
+  });
+
+  it('includes maxHeight in overlay style when video fills viewport (Shorts case)', async () => {
+    Object.defineProperty(HTMLVideoElement.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: vi.fn(() => ({
+        top: 0,
+        left: 0,
+        width: 375,
+        height: 667,
+        right: 375,
+        bottom: 667
+      }))
+    });
+
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        defaultView: {
+          innerWidth: 375,
+          innerHeight: 667
+        }
+      },
+      getBoundingClientRect: HTMLVideoElement.prototype.getBoundingClientRect
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return {
+          overlay,
+          overlayStyle: overlay.overlayStyle
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    const style = wrapper.vm.overlayStyle;
+    expect(style).not.toBeNull();
+    expect(style.maxHeight).toBe('calc(100vh - 571px)');
+    expect(style.overflowY).toBe('auto');
+  });
+
+  it('does not include maxHeight when enough space below video', async () => {
+    Object.defineProperty(HTMLVideoElement.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: vi.fn(() => ({
+        top: 100,
+        left: 50,
+        width: 640,
+        height: 360,
+        right: 690,
+        bottom: 460
+      }))
+    });
+
+    const videoTarget = ref(null);
+    const videoElement = {
+      isConnected: true,
+      ownerDocument: {
+        defaultView: {
+          innerWidth: 1280,
+          innerHeight: 720
+        }
+      },
+      getBoundingClientRect: HTMLVideoElement.prototype.getBoundingClientRect
+    };
+
+    const Harness = defineComponent({
+      setup() {
+        const overlay = useLiveCaptionOverlay(videoTarget);
+        return {
+          overlay,
+          overlayStyle: overlay.overlayStyle
+        };
+      },
+      template: '<div />'
+    });
+
+    const wrapper = mount(Harness);
+    videoTarget.value = videoElement;
+    wrapper.vm.overlay.attach();
+    await nextTick();
+    await nextTick();
+
+    const style = wrapper.vm.overlayStyle;
+    expect(style).not.toBeNull();
+    expect(style.maxHeight).toBeUndefined();
+    expect(style.overflowY).toBeUndefined();
   });
 });

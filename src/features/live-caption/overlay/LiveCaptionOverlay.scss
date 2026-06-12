@@ -21,7 +21,7 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #f8fafc;
-  pointer-events: none;
+  pointer-events: inherit;
 }
 
 .live-caption-overlay__error {

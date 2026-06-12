@@ -27,12 +27,80 @@ function getRectFromElement(element) {
 }
 
 const LIVE_CAPTION_OVERLAY_BELOW_VIDEO_GAP = 8;
+const OVERLAY_ESTIMATED_HEIGHT = 80;
 
-function buildOverlayStyle(rect, element, options = {}) {
+/**
+ * Pure placement computation for the live caption overlay.
+ *
+ * Strategy:
+ *  1. If video is in fullscreen → overlay inside video, bottom-aligned.
+ *  2. If enough space below the video → place below (current behavior).
+ *  3. Otherwise → place inside video near bottom edge.
+ *  4. Clamp left/width so the overlay stays within the viewport.
+ *  5. Clamp top so the overlay does not overflow below the viewport.
+ *
+ * @param {{ top: number, left: number, width: number, height: number, bottom: number, right: number }} rect
+ *   Video element bounding rect.
+ * @param {{ width: number, height: number }} viewport
+ *   Viewport dimensions.
+ * @param {{ isFullscreen?: boolean, offsetBottom?: number, offsetHorizontal?: number }} options
+ * @returns {{ top: number, left: number, width: number, position: string, transform: string }}
+ */
+export function computeOverlayPlacement(rect, viewport, options = {}) {
   const offsetBottom = Number.isFinite(options.offsetBottom) ? options.offsetBottom : 16;
   const offsetHorizontal = Number.isFinite(options.offsetHorizontal) ? options.offsetHorizontal : 16;
+  const gap = LIVE_CAPTION_OVERLAY_BELOW_VIDEO_GAP;
   const maxWidth = Math.max(0, rect.width - offsetHorizontal * 2);
 
+  if (options.isFullscreen) {
+    return {
+      position: 'fixed',
+      top: Math.max(0, rect.top + rect.height - offsetBottom),
+      left: Math.max(0, rect.left + offsetHorizontal),
+      width: maxWidth,
+      transform: 'translateY(-100%)',
+      insideVideo: false
+    };
+  }
+
+  const spaceBelow = viewport.height - rect.bottom;
+  const overlayHeight = OVERLAY_ESTIMATED_HEIGHT;
+  let top;
+  let insideVideo = false;
+
+  if (spaceBelow >= overlayHeight + gap) {
+    top = rect.top + rect.height + gap;
+  } else {
+    top = rect.top + rect.height - overlayHeight - offsetBottom;
+    insideVideo = true;
+  }
+
+  let left = Math.max(0, rect.left + offsetHorizontal);
+  let width = Math.min(maxWidth, viewport.width);
+
+  if (left + width > viewport.width) {
+    left = Math.max(0, viewport.width - width);
+  }
+
+  if (left < 0) {
+    left = 0;
+  }
+
+  if (top + overlayHeight > viewport.height) {
+    top = Math.max(0, viewport.height - overlayHeight);
+  }
+
+  return {
+    position: 'fixed',
+    top,
+    left,
+    width,
+    transform: 'none',
+    insideVideo
+  };
+}
+
+function buildOverlayStyle(rect, element, options = {}) {
   const doc = element?.ownerDocument || (typeof document !== 'undefined' ? document : null);
   const fullscreenEl = doc?.fullscreenElement;
   const isFullscreen = Boolean(
@@ -40,31 +108,34 @@ function buildOverlayStyle(rect, element, options = {}) {
     (fullscreenEl === element || (typeof fullscreenEl.contains === 'function' && fullscreenEl.contains(element)))
   );
 
-  if (isFullscreen) {
-    return Object.freeze({
-      position: 'fixed',
-      top: `${Math.max(0, rect.top + rect.height - offsetBottom)}px`,
-      left: `${Math.max(0, rect.left + offsetHorizontal)}px`,
-      width: `${maxWidth}px`,
-      maxWidth: `${maxWidth}px`,
-      bottom: 'auto',
-      transform: 'translateY(-100%)',
-      zIndex: 2147483647,
-      pointerEvents: 'none'
-    });
-  }
+  const win = element?.ownerDocument?.defaultView || (typeof window !== 'undefined' ? window : null);
+  const viewportWidth = win?.innerWidth || doc?.documentElement?.clientWidth || 0;
+  const viewportHeight = win?.innerHeight || doc?.documentElement?.clientHeight || 0;
 
-  return Object.freeze({
-    position: 'fixed',
-    top: `${Math.max(0, rect.top + rect.height + LIVE_CAPTION_OVERLAY_BELOW_VIDEO_GAP)}px`,
-    left: `${Math.max(0, rect.left + offsetHorizontal)}px`,
-    width: `${maxWidth}px`,
-    maxWidth: `${maxWidth}px`,
+  const placement = computeOverlayPlacement(rect, { width: viewportWidth, height: viewportHeight }, {
+    ...options,
+    isFullscreen
+  });
+
+  const style = {
+    position: placement.position,
+    top: `${Math.round(placement.top)}px`,
+    left: `${Math.round(placement.left)}px`,
+    width: `${Math.round(placement.width)}px`,
+    maxWidth: `${Math.round(placement.width)}px`,
     bottom: 'auto',
-    transform: 'none',
+    transform: placement.transform,
     zIndex: 2147483647,
     pointerEvents: 'none'
-  });
+  };
+
+  if (placement.insideVideo) {
+    style.maxHeight = `calc(100vh - ${Math.round(placement.top)}px)`;
+    style.overflowY = 'auto';
+    style.pointerEvents = 'auto';
+  }
+
+  return Object.freeze(style);
 }
 
 export function useLiveCaptionOverlay(target, options = {}) {
