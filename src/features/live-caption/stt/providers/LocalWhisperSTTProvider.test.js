@@ -281,4 +281,32 @@ describe('LocalWhisperSTTProvider', () => {
       fetchSpy.mockRestore();
     }
   });
+
+  it('treats AbortError as expected cancellation without retrying or warning', async () => {
+    const provider = new LocalWhisperSTTProvider({
+      requestImpl: vi.fn((_request, options) => new Promise((resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        }, { once: true });
+      })),
+      retryLimit: 2
+    });
+
+    const controller = new AbortController();
+    const transcriptionPromise = provider.transcribeChunk(new Blob(['audio'], { type: 'audio/webm' }), {
+      sessionId: 'session-abort',
+      videoFingerprint: 'video-abort',
+      signal: controller.signal
+    });
+
+    controller.abort();
+
+    await expect(transcriptionPromise).rejects.toMatchObject({
+      name: 'AbortError'
+    });
+
+    expect(provider.requestImpl).toHaveBeenCalledTimes(1);
+    expect(logger.warn).not.toHaveBeenCalledWith('[Local Whisper] Final transcription failure', expect.any(Object));
+    expect(provider.state).toBe(STT_PROVIDER_STATUS.READY);
+  });
 });

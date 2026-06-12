@@ -6,6 +6,7 @@ import {
   STT_PROVIDER_ERROR_CODES,
   STT_PROVIDER_STATUS
 } from '../BaseSTTProvider.js';
+import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 
 export const LOCAL_WHISPER_PROVIDER_ID = 'local_whisper';
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:8765/v1/audio/transcriptions';
@@ -301,6 +302,10 @@ export class LocalWhisperSTTProvider extends BaseSTTProvider {
       sessionId: options.sessionId ?? null,
       videoFingerprint: options.videoFingerprint ?? null
     }).catch((error) => {
+      if (isCancellationError(error)) {
+        throw error;
+      }
+
       const originalRetryable = Boolean(error?.cause?.retryable ?? error?.details?.retryable ?? error?.retryable);
       const responseBodySnippet = error?.details?.responseBodySnippet ?? error?.cause?.responseBodySnippet ?? error?.cause?.details?.responseBodySnippet ?? null;
       const serverErrorBodySnippet = error?.details?.serverErrorBodySnippet ?? error?.cause?.serverErrorBodySnippet ?? error?.cause?.details?.serverErrorBodySnippet ?? null;

@@ -6,6 +6,7 @@ import {
   STT_PROVIDER_ERROR_CODES,
   STT_PROVIDER_STATUS
 } from '../BaseSTTProvider.js';
+import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const DEFAULT_MODEL = 'whisper-1';
 export const OPENAI_WHISPER_PROVIDER_ID = 'openai_whisper';
@@ -177,6 +178,10 @@ export class OpenAIWhisperProvider extends BaseSTTProvider {
         const rawResponse = await this.requestImpl(this._buildRequest(chunk, options), options);
         return this._normalizeTranscriptionResult(rawResponse, options);
       } catch (err) {
+        if (isCancellationError(err)) {
+          throw err;
+        }
+
         this.logger.warn(`[${this.providerName}] Attempt execution failed`, {
           providerId: this.providerId,
           sessionId: options.sessionId ?? null,

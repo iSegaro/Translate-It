@@ -1,6 +1,6 @@
 import { CONFIG } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isTransientError } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isTransientError } from '@/shared/error-management/ErrorMatcher.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { createLiveCaptionNotImplementedError } from '../core/contracts.js';
@@ -230,6 +230,13 @@ export class BaseSTTProvider {
         this.lastUpdatedAt = Date.now();
         return result;
       } catch (error) {
+        if (isCancellationError(error)) {
+          this.state = STT_PROVIDER_STATUS.READY;
+          this.lastError = null;
+          this.lastUpdatedAt = Date.now();
+          throw error;
+        }
+
         const normalized = this.normalizeError(error, {
           stage: 'transcription',
           retryable: error?.retryable
