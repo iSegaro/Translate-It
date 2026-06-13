@@ -116,6 +116,40 @@ Streaming corrections use `segmentId` plus `revision` as the canonical identity 
 - Translation currently assumes finalized transcript segments are one-way queue units.
 - Without identity-based invalidation or replacement, a corrected final can leave stale translated text visible or persist duplicate translated segments.
 
+### 5.1 Latest-state canonical correction persistence model
+
+The correction persistence model is latest-state only:
+
+- keep only the latest canonical revision for a logical segment
+- do not preserve full correction history in the canonical session/cache model
+- use revision as version metadata for ordering and stale-result detection
+- never use timing as identity for correction-capable records
+- preserve batch append-only behavior by keeping append APIs intact for batch providers
+
+**Canonical identity**
+- The canonical identity for transcript and translation replacement is:
+  - `sessionId`
+  - `tabId`
+  - `videoFingerprint`
+  - `segmentId`
+- `revision` is not part of identity; it is version metadata only.
+
+**Replacement rules**
+- canonical replacement must compare revision against the current canonical value for the same identity
+- stale corrections are ignored
+- corrections that arrive without an existing final remain ignored for the MVP
+- persisted canonical state stores the latest accepted revision only
+
+**Session and cache model**
+- `VideoCaptionSession` should remain ordered-array based for consumers, but use identity lookup maps internally for replacement
+- cache helpers should support canonical-keyed upsert without requiring an IndexedDB object-store migration in Phase 4.1
+- transcript cache canonical key should be based on `sessionId + tabId + videoFingerprint + segmentId`
+- translation cache canonical key should be based on transcript canonical identity plus `targetLanguage` and `providerId`
+
+**Translation commit behavior**
+- translation stale-result suppression should happen at commit time
+- AbortController and queue removal are deferred to later work
+
 ### 6. Translation consumes final and corrected-final events only
 
 Translation remains final-segment oriented for the current implementation and MVP.

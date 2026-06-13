@@ -104,6 +104,27 @@ The system SHALL treat transcript corrections as revisioned replacements of an e
 - **THEN** the system SHALL persist only the latest canonical revision rather than preserving transient draft history in the main transcript cache
 - **AND** the current codebase SHALL defer persisted correction replacement and translation invalidation until the revision-aware storage tasks are implemented
 
+### Requirement: Canonical correction persistence is latest-state only
+The system SHALL use a latest-state canonical persistence model for correction-capable transcript and translation records.
+
+#### Scenario: Canonical identity for replacement
+- **WHEN** a correction-capable transcript or translated caption record is compared for replacement
+- **THEN** the system SHALL use `sessionId + tabId + videoFingerprint + segmentId` as the canonical identity
+- **AND** the system SHALL treat `revision` as version metadata rather than part of identity
+
+#### Scenario: Append-only batch behavior preserved
+- **WHEN** a batch provider emits finalized transcript results
+- **THEN** the system SHALL continue to append batch transcript and translated caption segments without requiring replacement semantics
+
+#### Scenario: Timing is not identity for correction-capable records
+- **WHEN** a correction-capable record changes timing between revisions
+- **THEN** the system SHALL NOT rely on timing as the identity for canonical replacement
+
+#### Scenario: Latest-state only persistence
+- **WHEN** a newer canonical revision replaces an older revision
+- **THEN** the system SHALL persist only the latest accepted canonical revision
+- **AND** the system SHALL NOT require full correction history in the canonical stores
+
 ### Requirement: Translation consumes final transcript events only for MVP
 The system SHALL send only final or corrected-final transcript events to translation for the MVP and SHALL NOT translate partial transcript events.
 
