@@ -23,9 +23,22 @@ function createBaseEvent(overrides = {}) {
 }
 
 describe('LiveCaptionTranscriptEventCoordinator', () => {
+  it('routes streaming events through the same normalization path as transcript events', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+    const event = createBaseEvent({
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      segmentStartMs: 100,
+      segmentEndMs: 250
+    });
+
+    expect(coordinator.handleStreamingTranscriptEvent(event)).toEqual(
+      coordinator.handleTranscriptEvent(event)
+    );
+  });
+
   it('accepts valid partial events as ephemeral and non-persisted', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handlePartialTranscriptEvent(createBaseEvent());
+    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent());
 
     expect(result).toMatchObject({
       handled: false,
@@ -45,7 +58,7 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.PARTIAL,
       isFinal: false
     });
-    expect(coordinator.handleTranscriptEvent(createBaseEvent({
+    expect(coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventId: 'event-2'
     }))).toMatchObject({
       handled: false,
@@ -65,12 +78,12 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
 
   it('does not accumulate partial transcript state across repeated events', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const first = coordinator.handleTranscriptEvent(createBaseEvent({
+    const first = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventId: 'event-1',
       revision: 1,
       text: 'First hypothesis'
     }));
-    const second = coordinator.handleTranscriptEvent(createBaseEvent({
+    const second = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventId: 'event-2',
       revision: 2,
       text: 'Second hypothesis'
@@ -108,7 +121,7 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
 
   it('accepts valid final events as canonical final results', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handleFinalTranscriptEvent(createBaseEvent({
+    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
       segmentStartMs: 100,
       segmentEndMs: 250
@@ -140,7 +153,7 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
 
   it('accepts correction events and preserves revision metadata', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handleCorrectionTranscriptEvent(createBaseEvent({
+    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
       revision: 2,
       segmentStartMs: 100,
@@ -178,7 +191,7 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
 
   it('accepts error events as normalized error results', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handleErrorTranscriptEvent(createBaseEvent({
+    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.ERROR,
       segmentId: null,
       revision: null,
@@ -220,8 +233,8 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
   it('rejects invalid transcript events', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
 
-    expect(() => coordinator.handleTranscriptEvent({})).toThrow(/eventType/i);
-    expect(() => coordinator.handleFinalTranscriptEvent({
+    expect(() => coordinator.handleStreamingTranscriptEvent({})).toThrow(/eventType/i);
+    expect(() => coordinator.handleStreamingTranscriptEvent({
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
       providerId: 'provider-1',
       providerMode: STT_PROVIDER_MODES.STREAMING,

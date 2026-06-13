@@ -20,6 +20,14 @@ function createTranscriptEventResult(type, fields = {}) {
 
 export class LiveCaptionTranscriptEventCoordinator {
   handleTranscriptEvent(event) {
+    return this._handleNormalizedTranscriptEvent(event);
+  }
+
+  handleStreamingTranscriptEvent(event) {
+    return this._handleNormalizedTranscriptEvent(event);
+  }
+
+  _handleNormalizedTranscriptEvent(event) {
     const normalizedEvent = normalizeLiveCaptionTranscriptEvent(event);
 
     switch (normalizedEvent.eventType) {
