@@ -2,6 +2,7 @@ import { CONFIG } from '@/shared/config/config.js';
 import { OPENAI_WHISPER_PROVIDER_ID, OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MOCK_STT_PROVIDER_ID, MockSTTProvider } from './providers/MockSTTProvider.js';
 import { LOCAL_WHISPER_PROVIDER_ID, LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
+import { FASTER_WHISPER_STREAMING_PROVIDER_ID, FasterWhisperStreamingProvider } from './providers/FasterWhisperStreamingProvider.js';
 import {
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS
@@ -15,7 +16,8 @@ export {
 export const STT_PROVIDER_IDS = Object.freeze({
   OPENAI_WHISPER: OPENAI_WHISPER_PROVIDER_ID,
   MOCK: MOCK_STT_PROVIDER_ID,
-  LOCAL_WHISPER: LOCAL_WHISPER_PROVIDER_ID
+  LOCAL_WHISPER: LOCAL_WHISPER_PROVIDER_ID,
+  FASTER_WHISPER_STREAMING: FASTER_WHISPER_STREAMING_PROVIDER_ID
 });
 
 export const STT_PROVIDER_CAPABILITIES = Object.freeze({
@@ -98,6 +100,29 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
     requiredSettings: Object.freeze([]),
     default: false,
     supported: true,
+    developmentOnly: true
+  }),
+  [STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING]: Object.freeze({
+    id: STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING,
+    name: 'FasterWhisperStreaming',
+    displayName: 'Faster Whisper Streaming',
+    mode: STT_PROVIDER_MODES.STREAMING,
+    executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+    type: 'stt',
+    providerClass: FasterWhisperStreamingProvider,
+    capabilities: Object.freeze([
+      STT_PROVIDER_CAPABILITIES.TRANSCRIPTION,
+      STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
+      STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
+    ]),
+    supportsPartialResults: false,
+    supportsCorrections: false,
+    supportsReconnect: false,
+    requiresPersistentConnection: true,
+    needsApiKey: false,
+    requiredSettings: Object.freeze([]),
+    default: false,
+    supported: false,
     developmentOnly: true
   })
 });

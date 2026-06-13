@@ -107,11 +107,35 @@ describe('STTProviderManifest', () => {
     expect(isProviderOffscreenExecuted('missing_provider', mockManifest)).toBe(false);
   });
 
+  it('registers the Faster Whisper streaming skeleton metadata without activating it', () => {
+    const provider = STT_PROVIDER_MANIFEST[STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING];
+
+    expect(provider).toMatchObject({
+      id: STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING,
+      displayName: 'Faster Whisper Streaming',
+      mode: STT_PROVIDER_MODES.STREAMING,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+      type: 'stt',
+      supportsPartialResults: false,
+      supportsCorrections: false,
+      supportsReconnect: false,
+      requiresPersistentConnection: true,
+      needsApiKey: false,
+      supported: false,
+      developmentOnly: true
+    });
+    expect(getProviderExecutionLocation(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
+    expect(resolveProviderExecutionHost(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
+    expect(isProviderOffscreenExecuted(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(true);
+    expect(isSTTProviderSupported(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING, true)).toBe(false);
+  });
+
   it('keeps only the batch providers in the manifest', () => {
     expect(Object.keys(STT_PROVIDER_MANIFEST)).toEqual([
       STT_PROVIDER_IDS.OPENAI_WHISPER,
       STT_PROVIDER_IDS.MOCK,
-      STT_PROVIDER_IDS.LOCAL_WHISPER
+      STT_PROVIDER_IDS.LOCAL_WHISPER,
+      STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING
     ]);
     expect(getAvailableSTTProviders(true)).toHaveLength(3);
     expect(isSTTProviderSupported(STT_PROVIDER_IDS.LOCAL_WHISPER)).toBe(false);

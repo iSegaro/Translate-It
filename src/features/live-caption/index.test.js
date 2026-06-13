@@ -129,6 +129,7 @@ import {
   OpenAIWhisperProvider,
   MockSTTProvider,
   LocalWhisperSTTProvider,
+  FasterWhisperStreamingProvider,
   LiveCaptionRuntimeController
 } from './index.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
@@ -267,6 +268,7 @@ describe('live-caption feature shell', () => {
     expect(OpenAIWhisperProvider).toBe(LiveCaptionFeature.contracts.OpenAIWhisperProvider);
     expect(MockSTTProvider).toBe(LiveCaptionFeature.contracts.MockSTTProvider);
     expect(LocalWhisperSTTProvider).toBe(LiveCaptionFeature.contracts.LocalWhisperSTTProvider);
+    expect(FasterWhisperStreamingProvider).toBe(LiveCaptionFeature.contracts.FasterWhisperStreamingProvider);
     expect(LiveCaptionFeature.content.LiveCaptionRuntimeController).toBe(LiveCaptionRuntimeController);
   });
 
@@ -281,5 +283,6 @@ describe('live-caption feature shell', () => {
     expect(OpenAIWhisperProvider).toBeTypeOf('function');
     expect(MockSTTProvider).toBeTypeOf('function');
     expect(LocalWhisperSTTProvider).toBeTypeOf('function');
+    expect(FasterWhisperStreamingProvider).toBeTypeOf('function');
   });
 });

@@ -34,6 +34,7 @@ import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MockSTTProvider } from './providers/MockSTTProvider.js';
 import { LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
+import { FasterWhisperStreamingProvider } from './providers/FasterWhisperStreamingProvider.js';
 
 export {
   BaseSTTProvider,
@@ -69,6 +70,7 @@ export { STTProviderFactory } from './STTProviderFactory.js';
 export { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 export { MockSTTProvider } from './providers/MockSTTProvider.js';
 export { LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
+export { FasterWhisperStreamingProvider } from './providers/FasterWhisperStreamingProvider.js';
 
 export default {
   BaseSTTProvider,
@@ -98,5 +100,6 @@ export default {
   STTProviderFactory,
   OpenAIWhisperProvider,
   MockSTTProvider,
-  LocalWhisperSTTProvider
+  LocalWhisperSTTProvider,
+  FasterWhisperStreamingProvider
 };
