@@ -45,15 +45,25 @@ import {
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse
 } from './LiveCaptionOffscreenBridge.js';
+import {
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
+  createLiveCaptionStartStreamingSttSessionRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttErrorMessage
+} from './liveCaptionOffscreenContracts.js';
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 import { LiveCaptionTranscriptEventCoordinator } from './LiveCaptionTranscriptEventCoordinator.js';
 import {
   LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
-  STT_PROVIDER_MODES,
-  STT_PROVIDER_EXECUTION_LOCATIONS,
   normalizeLiveCaptionTranscriptEvent,
   createLiveCaptionTranscriptEvent
 } from './liveCaptionTranscriptContracts.js';
+import {
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from '../stt/liveCaptionSTTProviderContracts.js';
 
 export { LiveCaptionBackgroundController } from './LiveCaptionBackgroundController.js';
 export { LiveCaptionSTTCoordinator } from './LiveCaptionSTTCoordinator.js';
@@ -102,15 +112,25 @@ export {
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse
 } from './LiveCaptionOffscreenBridge.js';
+export {
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
+  createLiveCaptionStartStreamingSttSessionRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttErrorMessage,
+} from './liveCaptionOffscreenContracts.js';
 export { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 export { LiveCaptionTranscriptEventCoordinator } from './LiveCaptionTranscriptEventCoordinator.js';
 export {
   LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
-  STT_PROVIDER_MODES,
-  STT_PROVIDER_EXECUTION_LOCATIONS,
   normalizeLiveCaptionTranscriptEvent,
   createLiveCaptionTranscriptEvent
 } from './liveCaptionTranscriptContracts.js';
+export {
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from '../stt/liveCaptionSTTProviderContracts.js';
 
 export default {
   LiveCaptionBackgroundController,
@@ -144,6 +164,7 @@ export default {
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
   createLiveCaptionStartCaptureRequest,
   createLiveCaptionStopCaptureRequest,
   createLiveCaptionStatusRequest,
@@ -152,6 +173,11 @@ export default {
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse,
+  createLiveCaptionStartStreamingSttSessionRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttErrorMessage,
   LiveCaptionCaptureCoordinator,
   LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
   STT_PROVIDER_MODES,

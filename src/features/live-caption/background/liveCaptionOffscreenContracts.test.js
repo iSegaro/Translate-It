@@ -3,6 +3,7 @@ import {
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   LIVE_CAPTION_RUNTIME_SHELL_STATES,
@@ -13,6 +14,11 @@ import {
   createLiveCaptionStatusRequest,
   createLiveCaptionFinalizedChunkMessage,
   createLiveCaptionCaptureErrorMessage,
+  createLiveCaptionStartStreamingSttSessionRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse,
@@ -21,6 +27,14 @@ import {
 import { BROWSER_SPEECH_PROBE_ACTION } from '@/html/liveCaptionBrowserSpeechProbe.js';
 import { LiveCaptionCache } from '@/features/live-caption/cache/LiveCaptionCache.js';
 import { BaseSTTProvider } from '@/features/live-caption/stt/BaseSTTProvider.js';
+import {
+  STT_PROVIDER_EXECUTION_LOCATIONS,
+  STT_PROVIDER_MODES
+} from '@/features/live-caption/stt/liveCaptionSTTProviderContracts.js';
+import {
+  LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
+  normalizeLiveCaptionTranscriptEvent
+} from './liveCaptionTranscriptContracts.js';
 import { UnifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
 vi.mock('@/features/live-caption/cache/LiveCaptionCache.js', () => ({
@@ -120,6 +134,108 @@ describe('live-caption offscreen contracts', () => {
     expect(() => createLiveCaptionStartCaptureRequest({ tabId: 7, videoFingerprint: 'video-a' })).toThrow();
     expect(() => createLiveCaptionStopCaptureRequest({ sessionId: 'session-1', tabId: 7 })).toThrow();
     expect(() => createLiveCaptionStatusRequest({ sessionId: 'session-1', videoFingerprint: 'video-a' })).toThrow();
+  });
+
+  it('creates and validates streaming session and transcript event payloads', () => {
+    const transcriptEvent = normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-1',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      providerId: 'deepgram_streaming',
+      providerMode: STT_PROVIDER_MODES.STREAMING,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1',
+      revision: 1,
+      segmentStartMs: 1000,
+      segmentEndMs: 1400,
+      text: 'hello world',
+      createdAt: 100
+    });
+
+    const start = createLiveCaptionStartStreamingSttSessionRequest({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      providerMode: STT_PROVIDER_MODES.STREAMING,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      providerOptions: {
+        endpoint: 'wss://example.invalid'
+      },
+      metadata: {
+        codec: 'opus'
+      }
+    });
+    const stop = createLiveCaptionStopStreamingSttSessionRequest({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      reason: 'user'
+    });
+    const eventMessage = createLiveCaptionStreamingSttTranscriptEventMessage({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      event: transcriptEvent
+    });
+    const status = createLiveCaptionStreamingSttStatusMessage({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      status: 'active',
+      details: { bufferDepth: 2 }
+    });
+    const error = createLiveCaptionStreamingSttErrorMessage({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      error: {
+        code: 'streaming_error',
+        message: 'socket closed'
+      }
+    });
+
+    expect(start.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION);
+    expect(start.providerMode).toBe(STT_PROVIDER_MODES.STREAMING);
+    expect(start.executionLocation).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
+    expect(start.providerOptions).toEqual({ endpoint: 'wss://example.invalid' });
+    expect(start.metadata).toEqual({ codec: 'opus' });
+    expect(stop.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION);
+    expect(eventMessage.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT);
+    expect(eventMessage.event).toEqual(transcriptEvent);
+    expect(status.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS);
+    expect(error.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR);
+
+    expect(() => createLiveCaptionStartStreamingSttSessionRequest({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      providerMode: 'batch',
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN
+    })).toThrow(/providerMode/i);
+
+    expect(() => createLiveCaptionStartStreamingSttSessionRequest({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      providerId: 'deepgram_streaming',
+      providerMode: STT_PROVIDER_MODES.STREAMING,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND
+    })).toThrow(/executionLocation/i);
+
+    expect(() => createLiveCaptionStreamingSttTranscriptEventMessage({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      event: {}
+    })).toThrow(/eventType/i);
   });
 
   it('creates finalized chunk DTOs and rejects raw stream-like payloads', () => {

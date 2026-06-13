@@ -1,3 +1,11 @@
+import {
+  STT_PROVIDER_EXECUTION_LOCATIONS,
+  STT_PROVIDER_MODES
+} from '../stt/liveCaptionSTTProviderContracts.js';
+import {
+  normalizeLiveCaptionTranscriptEvent
+} from './liveCaptionTranscriptContracts.js';
+
 export const LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES = Object.freeze({
   START_CAPTURE_REQUEST: 'live-caption/offscreen/start-capture-request',
   STOP_CAPTURE_REQUEST: 'live-caption/offscreen/stop-capture-request',
@@ -6,6 +14,14 @@ export const LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES = Object.freeze({
   SNAPSHOT_RESPONSE: 'live-caption/offscreen/snapshot-response',
   FINALIZED_CHUNK: 'live-caption/offscreen/finalized-chunk',
   CAPTURE_ERROR: 'live-caption/offscreen/capture-error'
+});
+
+export const LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES = Object.freeze({
+  START_STREAMING_STT_SESSION: 'live-caption/offscreen/start-streaming-stt-session',
+  STOP_STREAMING_STT_SESSION: 'live-caption/offscreen/stop-streaming-stt-session',
+  STREAMING_STT_TRANSCRIPT_EVENT: 'live-caption/offscreen/streaming-stt-transcript-event',
+  STREAMING_STT_STATUS: 'live-caption/offscreen/streaming-stt-status',
+  STREAMING_STT_ERROR: 'live-caption/offscreen/streaming-stt-error'
 });
 
 export const LIVE_CAPTION_CAPTURE_STATES = Object.freeze({
@@ -82,6 +98,46 @@ function createBaseMessage(type, fields = {}) {
     target: 'offscreen',
     ...fields
   });
+}
+
+function normalizeOptionalString(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return String(value);
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeExecutionLocation(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? '';
+  if (
+    normalized !== STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND
+    && normalized !== STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN
+  ) {
+    throw new TypeError('LiveCaption offscreen contract requires a valid executionLocation');
+  }
+  return normalized;
+}
+
+function normalizeProviderMode(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() ?? '';
+  if (normalized !== STT_PROVIDER_MODES.BATCH && normalized !== STT_PROVIDER_MODES.STREAMING) {
+    throw new TypeError('LiveCaption offscreen contract requires a valid providerMode');
+  }
+  return normalized;
+}
+
+function normalizeTranscriptEventPayload(payload, contractName) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new TypeError(`LiveCaption offscreen contract requires transcript event payload for ${contractName}`);
+  }
+
+  return payload;
 }
 
 export function createLiveCaptionStartCaptureRequest({
@@ -207,6 +263,164 @@ export function createLiveCaptionCaptureErrorMessage({
       message,
       details
     }
+  });
+}
+
+export function createLiveCaptionStartStreamingSttSessionRequest({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  providerId,
+  providerMode = STT_PROVIDER_MODES.STREAMING,
+  executionLocation = STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+  sourceLanguage = null,
+  targetLanguage = null,
+  providerOptions = {},
+  metadata = {},
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields(
+    { sessionId, tabId, videoFingerprint, providerId },
+    ['sessionId', 'tabId', 'videoFingerprint', 'providerId'],
+    'start-streaming-stt-session'
+  );
+
+  rejectRawStreamLikePayload(providerOptions, 'start-streaming-stt-session.providerOptions');
+  rejectRawStreamLikePayload(metadata, 'start-streaming-stt-session.metadata');
+
+  const normalizedProviderMode = normalizeProviderMode(providerMode);
+  const normalizedExecutionLocation = normalizeExecutionLocation(executionLocation);
+
+  if (normalizedProviderMode !== STT_PROVIDER_MODES.STREAMING) {
+    throw new TypeError('LiveCaption offscreen contract requires providerMode to be streaming for start-streaming-stt-session');
+  }
+
+  if (normalizedExecutionLocation !== STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN) {
+    throw new TypeError('LiveCaption offscreen contract requires executionLocation to be offscreen for start-streaming-stt-session');
+  }
+
+  return createBaseMessage(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    providerId: assertNonEmptyString(providerId, 'providerId'),
+    providerMode: normalizedProviderMode,
+    executionLocation: normalizedExecutionLocation,
+    sourceLanguage: normalizeOptionalString(sourceLanguage),
+    targetLanguage: normalizeOptionalString(targetLanguage),
+    providerOptions: { ...providerOptions },
+    metadata: { ...metadata }
+  });
+}
+
+export function createLiveCaptionStopStreamingSttSessionRequest({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  providerId = null,
+  reason = 'stop',
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields(
+    { sessionId, tabId, videoFingerprint },
+    ['sessionId', 'tabId', 'videoFingerprint'],
+    'stop-streaming-stt-session'
+  );
+
+  return createBaseMessage(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    providerId: normalizeOptionalString(providerId),
+    reason
+  });
+}
+
+export function createLiveCaptionStreamingSttTranscriptEventMessage({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  event,
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields(
+    { sessionId, tabId, videoFingerprint, event },
+    ['sessionId', 'tabId', 'videoFingerprint', 'event'],
+    'streaming-stt-transcript-event'
+  );
+
+  const normalizedEvent = normalizeLiveCaptionTranscriptEvent(
+    normalizeTranscriptEventPayload(event, 'streaming-stt-transcript-event.event')
+  );
+
+  return createBaseMessage(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    event: normalizedEvent
+  });
+}
+
+export function createLiveCaptionStreamingSttStatusMessage({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  providerId = null,
+  status = 'idle',
+  details = null,
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields(
+    { sessionId, tabId, videoFingerprint },
+    ['sessionId', 'tabId', 'videoFingerprint'],
+    'streaming-stt-status'
+  );
+
+  return createBaseMessage(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    providerId: normalizeOptionalString(providerId),
+    status: normalizeOptionalString(status) ?? 'idle',
+    details: details && typeof details === 'object' ? { ...details } : null
+  });
+}
+
+export function createLiveCaptionStreamingSttErrorMessage({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  providerId = null,
+  error = {},
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields(
+    { sessionId, tabId, videoFingerprint },
+    ['sessionId', 'tabId', 'videoFingerprint'],
+    'streaming-stt-error'
+  );
+
+  return createBaseMessage(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    providerId: normalizeOptionalString(providerId),
+    error: error && typeof error === 'object' ? { ...error } : { message: String(error) }
   });
 }
 
@@ -353,6 +567,7 @@ export function normalizeLiveCaptionOffscreenResponse(response, context = {}) {
 
 export default {
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   createLiveCaptionStartCaptureRequest,
@@ -360,6 +575,11 @@ export default {
   createLiveCaptionStatusRequest,
   createLiveCaptionFinalizedChunkMessage,
   createLiveCaptionCaptureErrorMessage,
+  createLiveCaptionStartStreamingSttSessionRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse
