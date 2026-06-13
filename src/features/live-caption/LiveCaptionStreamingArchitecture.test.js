@@ -18,6 +18,7 @@ import {
 } from './background/index.js';
 import { LiveCaptionOffscreenRuntimeShell, LIVE_CAPTION_RUNTIME_ACTIONS, LIVE_CAPTION_RUNTIME_SHELL_STATES } from '../../html/liveCaptionOffscreenRuntimeShell.js';
 import { createLiveCaptionStreamingSttErrorMessage } from './background/liveCaptionOffscreenContracts.js';
+import { FASTER_WHISPER_STREAMING_PROVIDER_ID } from './stt/providers/FasterWhisperStreamingProvider.js';
 import { LiveCaptionCache } from './cache/LiveCaptionCache.js';
 import { UnifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 
@@ -263,8 +264,35 @@ describe('live-caption streaming architecture seams', () => {
     expect(unavailable.error.reason).toBe('offscreen_unavailable');
   });
 
-  it('recognizes streaming runtime shell messages without creating MediaRecorder state', async () => {
-    const shell = new LiveCaptionOffscreenRuntimeShell();
+  it('hosts streaming providers while keeping recorder capture untouched and control messages no-op', async () => {
+    const provider = {
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      eventSink: null,
+      startSession: vi.fn().mockResolvedValue({
+        handled: true,
+        status: 'ready',
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        sessionId: 'session-1',
+        tabId: 7,
+        videoFingerprint: 'video-a',
+        readyPayload: {
+          type: 'ready',
+          sessionId: 'session-1'
+        }
+      }),
+      stopSession: vi.fn().mockResolvedValue({
+        handled: true,
+        status: 'closed'
+      }),
+      destroy: vi.fn().mockResolvedValue({
+        handled: true,
+        status: 'destroyed'
+      })
+    };
+
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: vi.fn(() => provider)
+    });
 
     const startResponse = await shell.handleMessage({
       target: 'offscreen',
@@ -272,7 +300,7 @@ describe('live-caption streaming architecture seams', () => {
       sessionId: 'session-1',
       tabId: 7,
       videoFingerprint: 'video-a',
-      providerId: 'deepgram_streaming',
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
       providerMode: STT_PROVIDER_MODES.STREAMING,
       executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN
     }, {});
@@ -286,7 +314,7 @@ describe('live-caption streaming architecture seams', () => {
       event: {
         eventId: 'event-1',
         eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.PARTIAL,
-        providerId: 'deepgram_streaming',
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
         providerMode: STT_PROVIDER_MODES.STREAMING,
         sessionId: 'session-1',
         tabId: 7,
@@ -304,7 +332,7 @@ describe('live-caption streaming architecture seams', () => {
       sessionId: 'session-1',
       tabId: 7,
       videoFingerprint: 'video-a',
-      providerId: 'deepgram_streaming',
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
       status: 'active'
     }, {});
 
@@ -314,7 +342,7 @@ describe('live-caption streaming architecture seams', () => {
       sessionId: 'session-1',
       tabId: 7,
       videoFingerprint: 'video-a',
-      providerId: 'deepgram_streaming',
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
       error: {
         code: 'streaming_error',
         message: 'socket closed'
@@ -322,7 +350,7 @@ describe('live-caption streaming architecture seams', () => {
     }, {});
 
     expect(startResponse.success).toBe(true);
-    expect(startResponse.status).toBe('START_NOT_IMPLEMENTED');
+    expect(startResponse.message).toBe('streaming_stt_active');
     expect(transcriptResponse.success).toBe(true);
     expect(statusResponse.success).toBe(true);
     expect(errorResponse.success).toBe(true);
@@ -330,6 +358,7 @@ describe('live-caption streaming architecture seams', () => {
     expect(MockMediaRecorder.instances).toHaveLength(0);
     expect(mockGetUserMedia).not.toHaveBeenCalled();
     expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(provider.startSession).toHaveBeenCalledTimes(1);
   });
 
   it('keeps existing capture behavior unchanged', async () => {

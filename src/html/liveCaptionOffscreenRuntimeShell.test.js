@@ -5,6 +5,9 @@ import LiveCaptionOffscreenRuntimeShell, {
 } from "./liveCaptionOffscreenRuntimeShell.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "@/features/live-caption/constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES } from "@/features/live-caption/background/liveCaptionOffscreenContracts.js";
+import {
+  FASTER_WHISPER_STREAMING_PROVIDER_ID
+} from "@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -92,6 +95,79 @@ describe("live-caption offscreen runtime shell", () => {
         this.onloadend({ target: this });
       }
     }
+  }
+
+  function createDeferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    return { promise, resolve, reject };
+  }
+
+  function createStreamingProviderFactory({
+    startSessionImpl,
+    stopSessionImpl,
+    destroyImpl
+  } = {}) {
+    const provider = {
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      eventSink: null,
+      logger: null,
+      state: "idle",
+      session: null,
+      startSession: vi.fn(startSessionImpl ?? (async (sessionConfig) => {
+        provider.state = "active";
+        provider.session = { ...sessionConfig };
+        return {
+          handled: true,
+          status: "ready",
+          providerId: provider.providerId,
+          sessionId: sessionConfig.sessionId,
+          tabId: sessionConfig.tabId,
+          videoFingerprint: sessionConfig.videoFingerprint,
+          readyPayload: {
+            type: "ready",
+            sessionId: sessionConfig.sessionId
+          }
+        };
+      })),
+      stopSession: vi.fn(stopSessionImpl ?? (async () => {
+        provider.state = "closed";
+        return {
+          handled: true,
+          status: "closed",
+          providerId: provider.providerId,
+          sessionId: provider.session?.sessionId ?? null,
+          tabId: provider.session?.tabId ?? null,
+          videoFingerprint: provider.session?.videoFingerprint ?? null
+        };
+      })),
+      destroy: vi.fn(destroyImpl ?? (async () => {
+        provider.state = "destroyed";
+        return {
+          handled: true,
+          status: "destroyed",
+          providerId: provider.providerId,
+          sessionId: provider.session?.sessionId ?? null,
+          tabId: provider.session?.tabId ?? null,
+          videoFingerprint: provider.session?.videoFingerprint ?? null
+        };
+      }))
+    };
+
+    return {
+      provider,
+      factory: vi.fn(({ providerId, eventSink, logger }) => {
+        provider.providerId = providerId ?? provider.providerId;
+        provider.eventSink = eventSink ?? null;
+        provider.logger = logger ?? null;
+        return provider;
+      })
+    };
   }
 
   beforeEach(() => {
@@ -243,19 +319,350 @@ describe("live-caption offscreen runtime shell", () => {
     );
   });
 
-  it("recognizes streaming STT messages and returns deterministic no-op responses without touching MediaRecorder", async () => {
-    const shell = new LiveCaptionOffscreenRuntimeShell();
+  it("hosts a streaming provider, waits for ready, and keeps MediaRecorder untouched", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
 
-    const startResponse = await shell.handleMessage(
+    const startDeferred = createDeferred();
+    provider.startSession.mockImplementation(() => startDeferred.promise);
+
+    const startPromise = shell.handleMessage(
       {
         target: "offscreen",
         type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
         sessionId: "session-1",
         tabId: 7,
         videoFingerprint: "video-a",
-        providerId: "deepgram_streaming",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
         providerMode: "streaming",
         executionLocation: "offscreen",
+        sourceLanguage: "en",
+        targetLanguage: "fa",
+        providerOptions: {
+          model: "base"
+        },
+        metadata: {
+          origin: "shell-test"
+        }
+      },
+      {},
+    );
+
+    await Promise.resolve();
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(provider.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        sourceLanguage: "en",
+        targetLanguage: "fa",
+        providerOptions: {
+          model: "base"
+        },
+        metadata: {
+          origin: "shell-test"
+        }
+      }),
+      expect.objectContaining({
+        providerOptions: {
+          model: "base"
+        },
+        metadata: {
+          origin: "shell-test"
+        }
+      })
+    );
+    expect(MockMediaRecorder.instances.length).toBe(0);
+
+    let settled = false;
+    startPromise.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    startDeferred.resolve({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: {
+        type: "ready",
+        sessionId: "session-1",
+        serverReady: true
+      }
+    });
+
+    const startResponse = await startPromise;
+    expect(startResponse.success).toBe(true);
+    expect(startResponse.status).toBe("OK");
+    expect(startResponse.message).toBe("streaming_stt_active");
+    expect(shell.streamingProvider).toBe(provider);
+    expect(shell.streamingSessionContext).toMatchObject({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      state: "active"
+    });
+  });
+
+  it("forwards streaming provider events to background, clears ownership on error, and ignores stale sessions", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: { type: "ready", sessionId: "session-1" }
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+
+    provider.eventSink.emit({
+      type: "status",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      state: "ready",
+      details: {
+        ready: true
+      }
+    });
+
+    provider.eventSink.emit({
+      type: "transcript",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      event: {
+        eventType: "final",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        segmentId: "segment-1",
+        revision: 1,
+        segmentStartMs: 100,
+        segmentEndMs: 420,
+        text: "hello world",
+        sourceLanguage: "en",
+        confidence: 0.93,
+        createdAt: 1234,
+        metadata: {
+          providerProtocol: "faster_whisper_streaming_ws"
+        }
+      }
+    });
+
+    provider.eventSink.emit({
+      type: "error",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      error: {
+        code: "streaming_error",
+        message: "socket closed"
+      }
+    });
+
+    provider.eventSink.emit({
+      type: "error",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      error: {
+        code: "streaming_error",
+        message: "socket closed"
+      }
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+      source: "offscreen",
+      target: "background",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      status: "ready"
+    }));
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+      source: "offscreen",
+      target: "background",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+      source: "offscreen",
+      target: "background",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID
+    }));
+    expect(shell.streamingProvider).toBeNull();
+    expect(shell.streamingSessionContext).toBeNull();
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+    provider.eventSink.emit({
+      type: "status",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "stale-session",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      state: "ready"
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(MockMediaRecorder.instances.length).toBe(0);
+
+    const staleTranscriptResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        sessionId: "stale-session",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        event: {
+          eventType: "final",
+          providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+          providerMode: "streaming",
+          sessionId: "stale-session",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          segmentId: "segment-stale",
+          revision: 1,
+          segmentStartMs: 0,
+          segmentEndMs: 10,
+          text: "ignored",
+          sourceLanguage: "en",
+          confidence: 1,
+          createdAt: 1,
+          metadata: {}
+        }
+      },
+      {},
+    );
+
+    expect(staleTranscriptResponse.success).toBe(true);
+    expect(staleTranscriptResponse.message).toBe("streaming_stale_session");
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("forwards closed events and clears streaming ownership", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: { type: "ready", sessionId: "session-1" }
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+    provider.eventSink.emit({
+      type: "closed",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      reason: "stop"
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+      source: "offscreen",
+      target: "background",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      status: "closed"
+    }));
+    expect(shell.streamingProvider).toBeNull();
+    expect(shell.streamingSessionContext).toBeNull();
+  });
+
+  it("stops the streaming provider idempotently and clears shell state", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: { type: "ready", sessionId: "session-1" }
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
       },
       {},
     );
@@ -267,68 +674,80 @@ describe("live-caption offscreen runtime shell", () => {
         sessionId: "session-1",
         tabId: 7,
         videoFingerprint: "video-a",
-        providerId: "deepgram_streaming",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID
       },
       {},
     );
 
-    const transcriptResponse = await shell.handleMessage(
+    const secondStop = await shell.handleMessage(
       {
         target: "offscreen",
-        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
         sessionId: "session-1",
         tabId: 7,
         videoFingerprint: "video-a",
-        event: {
-          eventType: "partial",
-          providerId: "deepgram_streaming",
-          providerMode: "streaming",
-          sessionId: "session-1",
-          tabId: 7,
-          videoFingerprint: "video-a",
-        },
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID
       },
       {},
     );
 
-    const statusResponse = await shell.handleMessage(
-      {
-        target: "offscreen",
-        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
-        sessionId: "session-1",
-        tabId: 7,
-        videoFingerprint: "video-a",
-        providerId: "deepgram_streaming",
-        status: "active",
-      },
-      {},
-    );
-
-    const errorResponse = await shell.handleMessage(
-      {
-        target: "offscreen",
-        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
-        sessionId: "session-1",
-        tabId: 7,
-        videoFingerprint: "video-a",
-        providerId: "deepgram_streaming",
-        error: {
-          code: "streaming_error",
-          message: "socket closed",
-        },
-      },
-      {},
-    );
-
-    expect(startResponse.success).toBe(true);
-    expect(startResponse.status).toBe("START_NOT_IMPLEMENTED");
+    expect(provider.stopSession).toHaveBeenCalledTimes(1);
     expect(stopResponse.success).toBe(true);
-    expect(transcriptResponse.success).toBe(true);
-    expect(statusResponse.success).toBe(true);
-    expect(errorResponse.success).toBe(true);
-    expect(shell.captureState).toBe("idle");
-    expect(MockMediaRecorder.instances.length).toBe(0);
-    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(stopResponse.message).toBe("streaming_stt_closed");
+    expect(secondStop.success).toBe(true);
+    expect(shell.streamingProvider).toBeNull();
+    expect(shell.streamingSessionContext).toBeNull();
+  });
+
+  it("returns no-op success when stop is called without an active streaming provider", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+
+    const stopResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a"
+      },
+      {},
+    );
+
+    expect(stopResponse.success).toBe(true);
+    expect(stopResponse.status).toBe("OK");
+    expect(stopResponse.message).toBe("streaming_stt_no_op");
+  });
+
+  it("returns deterministic error responses when streaming provider startup fails", async () => {
+    const providerError = new Error("boom");
+    providerError.code = "ready_timeout";
+    const { factory } = createStreamingProviderFactory({
+      startSessionImpl: vi.fn().mockRejectedValue(providerError)
+    });
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    const startResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    expect(startResponse.success).toBe(false);
+    expect(startResponse.status).toBe("FAIL_CLOSED");
+    expect(startResponse.error.code).toBe("ready_timeout");
+    expect(startResponse.error.reason).toBe("provider_error");
+    expect(shell.streamingProvider).toBeNull();
+    expect(shell.streamingSessionContext).toBeNull();
   });
 
   it("fails closed for invalid, unknown, and inconsistent payloads", async () => {

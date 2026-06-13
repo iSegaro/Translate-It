@@ -10,12 +10,44 @@ import {
   normalizeLiveCaptionRuntimeRequest
 } from '@/features/live-caption/background/liveCaptionRuntimeContracts.js';
 import {
-  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
+  createLiveCaptionStreamingSttErrorMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttTranscriptEventMessage
 } from '@/features/live-caption/background/liveCaptionOffscreenContracts.js';
 import { LIVE_CAPTION_RUNTIME_STATES } from '@/features/live-caption/constants/liveCaptionRuntimeStates.js';
+import {
+  STT_PROVIDER_EXECUTION_LOCATIONS,
+  STT_PROVIDER_MODES
+} from '@/features/live-caption/stt/liveCaptionSTTProviderContracts.js';
+import {
+  FasterWhisperStreamingProvider
+} from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
 const MIN_FINALIZED_SEGMENT_BYTES = 1024;
+
+function normalizeStreamingIdentityValue(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeStreamingTabId(value) {
+  const tabId = Number(value);
+  return Number.isFinite(tabId) ? tabId : null;
+}
+
+function createDefaultStreamingProviderFactory() {
+  return ({ providerId, eventSink, logger: providerLogger }) => new FasterWhisperStreamingProvider({
+    providerId,
+    eventSink,
+    logger: providerLogger
+  });
+}
 
 function cloneSessionContext(context = {}) {
   return {
@@ -32,7 +64,7 @@ function createInconsistentSessionError(request, state, action) {
 }
 
 export class LiveCaptionOffscreenRuntimeShell {
-  constructor() {
+  constructor({ streamingProviderFactory = null } = {}) {
     this.status = LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE;
     this.runtimeState = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     this.sessionId = null;
@@ -54,6 +86,11 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.segmentBoundaryTimer = null;
     this.segmentRotationPending = false;
     this.activeRecorderMimeType = 'audio/webm';
+    this.streamingProviderFactory = typeof streamingProviderFactory === 'function'
+      ? streamingProviderFactory
+      : createDefaultStreamingProviderFactory();
+    this.streamingProvider = null;
+    this.streamingSessionContext = null;
   }
 
   touch() {
@@ -147,6 +184,201 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.lastResponse = response;
     this.touch();
     return response;
+  }
+
+  _buildStreamingStaleResponse(action, message) {
+    return this._buildStreamingResponse(action, message, {
+      status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+      runtimeState: this.runtimeState,
+      responseMessage: 'streaming_stale_session'
+    });
+  }
+
+  _normalizeStreamingSessionRequest(message, { requireProviderId = true } = {}) {
+    if (!message || typeof message !== 'object' || Array.isArray(message)) {
+      throw new TypeError('Live-caption offscreen shell requires a streaming session request object');
+    }
+
+    const sessionId = normalizeStreamingIdentityValue(message.sessionId);
+    const tabId = normalizeStreamingTabId(message.tabId);
+    const videoFingerprint = normalizeStreamingIdentityValue(message.videoFingerprint);
+    const providerId = normalizeStreamingIdentityValue(message.providerId);
+    const providerMode = normalizeStreamingIdentityValue(message.providerMode);
+    const executionLocation = normalizeStreamingIdentityValue(message.executionLocation);
+
+    if (!sessionId) {
+      throw new TypeError('Live-caption offscreen shell requires sessionId for streaming session requests');
+    }
+
+    if (tabId == null) {
+      throw new TypeError('Live-caption offscreen shell requires tabId for streaming session requests');
+    }
+
+    if (!videoFingerprint) {
+      throw new TypeError('Live-caption offscreen shell requires videoFingerprint for streaming session requests');
+    }
+
+    if (requireProviderId && !providerId) {
+      throw new TypeError('Live-caption offscreen shell requires providerId for streaming session requests');
+    }
+
+    if (providerMode !== STT_PROVIDER_MODES.STREAMING) {
+      throw new TypeError('Live-caption offscreen shell requires providerMode to be streaming');
+    }
+
+    if (executionLocation !== STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN) {
+      throw new TypeError('Live-caption offscreen shell requires executionLocation to be offscreen');
+    }
+
+    return {
+      requestId: normalizeStreamingIdentityValue(message.requestId),
+      sessionId,
+      tabId,
+      videoFingerprint,
+      providerId,
+      providerMode,
+      executionLocation,
+      sourceLanguage: normalizeStreamingIdentityValue(message.sourceLanguage),
+      targetLanguage: normalizeStreamingIdentityValue(message.targetLanguage),
+      providerOptions: message.providerOptions && typeof message.providerOptions === 'object' && !Array.isArray(message.providerOptions)
+        ? { ...message.providerOptions }
+        : {},
+      metadata: message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
+        ? { ...message.metadata }
+        : {}
+    };
+  }
+
+  _matchesStreamingSession(message) {
+    if (!this.streamingSessionContext) {
+      return false;
+    }
+
+    return this.streamingSessionContext.sessionId === normalizeStreamingIdentityValue(message?.sessionId)
+      && this.streamingSessionContext.tabId === normalizeStreamingTabId(message?.tabId)
+      && this.streamingSessionContext.videoFingerprint === normalizeStreamingIdentityValue(message?.videoFingerprint);
+  }
+
+  _clearStreamingSessionContext() {
+    this.streamingProvider = null;
+    this.streamingSessionContext = null;
+  }
+
+  _forwardStreamingMessageToBackground(message) {
+    if (!chrome?.runtime?.sendMessage) {
+      return false;
+    }
+
+    const forwardedMessage = {
+      ...message,
+      source: 'offscreen',
+      target: 'background'
+    };
+
+    try {
+      void Promise.resolve(chrome.runtime.sendMessage(forwardedMessage)).catch((error) => {
+        logger.error('Failed to forward streaming live-caption message to background:', error);
+      });
+    } catch (error) {
+      logger.error('Failed to forward streaming live-caption message to background:', error);
+    }
+
+    return true;
+  }
+
+  _handleStreamingProviderEvent(provider, event) {
+    if (!provider || this.streamingProvider !== provider) {
+      return;
+    }
+
+    if (!this._matchesStreamingSession(event)) {
+      logger.debug('Ignoring stale streaming provider event in offscreen shell', {
+        providerId: event?.providerId ?? provider?.providerId ?? null,
+        sessionId: event?.sessionId ?? null,
+        tabId: event?.tabId ?? null,
+        videoFingerprint: event?.videoFingerprint ?? null
+      });
+      return;
+    }
+
+    switch (event?.type) {
+      case 'status':
+        this._forwardStreamingMessageToBackground(
+          createLiveCaptionStreamingSttStatusMessage({
+            sessionId: event.sessionId ?? this.streamingSessionContext.sessionId,
+            tabId: event.tabId ?? this.streamingSessionContext.tabId,
+            videoFingerprint: event.videoFingerprint ?? this.streamingSessionContext.videoFingerprint,
+            providerId: event.providerId ?? provider.providerId,
+            status: event.state ?? event.status ?? 'idle',
+            details: event.details ?? null
+          })
+        );
+        break;
+      case 'transcript':
+        this._forwardStreamingMessageToBackground(
+          createLiveCaptionStreamingSttTranscriptEventMessage({
+            sessionId: event.sessionId ?? this.streamingSessionContext.sessionId,
+            tabId: event.tabId ?? this.streamingSessionContext.tabId,
+            videoFingerprint: event.videoFingerprint ?? this.streamingSessionContext.videoFingerprint,
+            event: event.event ?? event
+          })
+        );
+        break;
+      case 'error':
+        this._forwardStreamingMessageToBackground(
+          createLiveCaptionStreamingSttErrorMessage({
+            sessionId: event.sessionId ?? this.streamingSessionContext.sessionId,
+            tabId: event.tabId ?? this.streamingSessionContext.tabId,
+            videoFingerprint: event.videoFingerprint ?? this.streamingSessionContext.videoFingerprint,
+            providerId: event.providerId ?? provider.providerId,
+            error: event.error ?? event
+          })
+        );
+        this._clearStreamingSessionContext();
+        break;
+      case 'closed':
+        this._forwardStreamingMessageToBackground(
+          createLiveCaptionStreamingSttStatusMessage({
+            sessionId: event.sessionId ?? this.streamingSessionContext.sessionId,
+            tabId: event.tabId ?? this.streamingSessionContext.tabId,
+            videoFingerprint: event.videoFingerprint ?? this.streamingSessionContext.videoFingerprint,
+            providerId: event.providerId ?? provider.providerId,
+            status: 'closed',
+            details: {
+              reason: event.reason ?? null
+            }
+          })
+        );
+        this._clearStreamingSessionContext();
+        break;
+      default:
+        logger.debug('Ignoring unsupported streaming provider event in offscreen shell', {
+          type: event?.type ?? null,
+          providerId: event?.providerId ?? provider?.providerId ?? null
+        });
+        break;
+    }
+  }
+
+  _createStreamingProvider(request) {
+    let provider = null;
+    const eventSink = {
+      emit: (event) => {
+        this._handleStreamingProviderEvent(provider, event);
+      }
+    };
+
+    provider = this.streamingProviderFactory({
+      providerId: request.providerId,
+      eventSink,
+      logger
+    });
+
+    if (!provider || typeof provider.startSession !== 'function' || typeof provider.stopSession !== 'function') {
+      throw new TypeError('Live-caption offscreen shell requires a valid streaming provider implementation');
+    }
+
+    return provider;
   }
 
   _normalizeRequest(message, sender, action) {
@@ -587,52 +819,223 @@ export class LiveCaptionOffscreenRuntimeShell {
     }
   }
 
-  handleStreamingStart(message) {
-    const response = createLiveCaptionRuntimeShellResponse(
-      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
-      {
-        sessionId: message?.sessionId ?? this.sessionId ?? null,
-        tabId: message?.tabId ?? this.tabId ?? null,
-        videoFingerprint: message?.videoFingerprint ?? this.videoFingerprint ?? null,
-        requestId: message?.requestId ?? null,
-        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.START_NOT_IMPLEMENTED,
-        runtimeState: LIVE_CAPTION_RUNTIME_STATES.IDLE,
-        message: 'streaming_stt_not_implemented'
-      }
-    );
+  async handleStreamingStart(message) {
+    try {
+      const request = this._normalizeStreamingSessionRequest(message);
+      const requestMatchesActive = this._matchesStreamingSession(request);
 
-    this.lastResponse = response;
-    this.touch();
-    logger.info('Live-caption offscreen shell received unsupported streaming start request', {
-      sessionId: response.sessionId,
-      tabId: response.tabId,
-      videoFingerprint: response.videoFingerprint,
-      status: response.status
-    });
-    return response;
+      if (this.streamingProvider && !requestMatchesActive) {
+        const response = this._buildStreamingStaleResponse(
+          LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+          request
+        );
+        logger.debug('Ignoring stale streaming start request in offscreen shell', {
+          sessionId: request.sessionId,
+          tabId: request.tabId,
+          videoFingerprint: request.videoFingerprint
+        });
+        return response;
+      }
+
+      if (this.streamingProvider && requestMatchesActive) {
+        const response = createLiveCaptionRuntimeShellResponse(
+          LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+          {
+            sessionId: request.sessionId,
+            tabId: request.tabId,
+            videoFingerprint: request.videoFingerprint,
+            requestId: request.requestId,
+            status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+            runtimeState: this.runtimeState,
+            message: 'streaming_stt_active'
+          }
+        );
+
+        this.lastResponse = response;
+        this.touch();
+        return response;
+      }
+
+      const provider = this._createStreamingProvider(request);
+      this.streamingProvider = provider;
+      this.streamingSessionContext = {
+        ...request,
+        state: 'starting',
+        readyPayload: null,
+        startedAt: null,
+        stoppedAt: null
+      };
+
+      const startResult = await provider.startSession({
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        sourceLanguage: request.sourceLanguage,
+        targetLanguage: request.targetLanguage,
+        providerOptions: request.providerOptions,
+        metadata: request.metadata,
+        requestId: request.requestId
+      }, {
+        providerOptions: request.providerOptions,
+        metadata: request.metadata
+      });
+
+      this.streamingSessionContext = {
+        ...this.streamingSessionContext,
+        state: 'active',
+        readyPayload: startResult?.readyPayload ?? null,
+        startedAt: Date.now()
+      };
+
+      const response = createLiveCaptionRuntimeShellResponse(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        {
+          sessionId: request.sessionId,
+          tabId: request.tabId,
+          videoFingerprint: request.videoFingerprint,
+          requestId: request.requestId,
+          status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+          runtimeState: this.runtimeState,
+          message: 'streaming_stt_active',
+          details: {
+            readyPayload: startResult?.readyPayload ?? null
+          }
+        }
+      );
+
+      this.lastResponse = response;
+      this.touch();
+      logger.info('Live-caption offscreen shell started streaming provider', {
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        providerId: request.providerId
+      });
+      return response;
+    } catch (error) {
+      this._clearStreamingSessionContext();
+      const normalizedCode = error?.code ?? 'streaming_provider_start_failed';
+      return this._buildFailClosed(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        error,
+        {
+          sessionId: message?.sessionId ?? null,
+          tabId: message?.tabId ?? null,
+          videoFingerprint: message?.videoFingerprint ?? null,
+          code: normalizedCode,
+          reason: normalizedCode === LIVE_CAPTION_RUNTIME_ERROR_CODES.INVALID_PAYLOAD
+            ? 'invalid_payload'
+            : 'provider_error',
+          runtimeState: this.runtimeState,
+          status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED
+        }
+      );
+    }
   }
 
-  handleStreamingStop(message) {
-    const response = this._buildStreamingResponse(
-      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
-      message,
-      {
-        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
-        runtimeState: this.runtimeState,
-        responseMessage: 'streaming_stt_no_op'
+  async handleStreamingStop(message) {
+    try {
+      if (!this.streamingProvider) {
+        this._clearStreamingSessionContext();
+        const response = this._buildStreamingResponse(
+          LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+          message,
+          {
+            status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+            runtimeState: this.runtimeState,
+            responseMessage: 'streaming_stt_no_op'
+          }
+        );
+        this.lastResponse = response;
+        this.touch();
+        return response;
       }
-    );
 
-    logger.debug('Live-caption offscreen shell acknowledged streaming stop request', {
-      sessionId: response.sessionId,
-      tabId: response.tabId,
-      videoFingerprint: response.videoFingerprint,
-      status: response.status
-    });
-    return response;
+      const request = this._normalizeStreamingSessionRequest({
+        ...message,
+        providerMode: message?.providerMode ?? STT_PROVIDER_MODES.STREAMING,
+        executionLocation: message?.executionLocation ?? STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+        providerId: message?.providerId ?? this.streamingSessionContext?.providerId ?? null
+      });
+
+      if (!this._matchesStreamingSession(request)) {
+        const response = this._buildStreamingStaleResponse(
+          LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+          request
+        );
+        logger.debug('Ignoring stale streaming stop request in offscreen shell', {
+          sessionId: request.sessionId,
+          tabId: request.tabId,
+          videoFingerprint: request.videoFingerprint
+        });
+        return response;
+      }
+
+      const provider = this.streamingProvider;
+      const stopResult = await provider.stopSession({
+        reason: message?.reason ?? 'stop'
+      });
+      this.streamingSessionContext = {
+        ...this.streamingSessionContext,
+        state: 'closed',
+        stoppedAt: Date.now()
+      };
+      this._clearStreamingSessionContext();
+
+      const response = createLiveCaptionRuntimeShellResponse(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+        {
+          sessionId: request.sessionId,
+          tabId: request.tabId,
+          videoFingerprint: request.videoFingerprint,
+          requestId: request.requestId,
+          status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+          runtimeState: this.runtimeState,
+          message: 'streaming_stt_closed',
+          details: stopResult
+        }
+      );
+
+      this.lastResponse = response;
+      this.touch();
+      logger.debug('Live-caption offscreen shell stopped streaming provider', {
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint
+      });
+      return response;
+    } catch (error) {
+      this._clearStreamingSessionContext();
+      return this._buildFailClosed(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+        error,
+        {
+          sessionId: message?.sessionId ?? null,
+          tabId: message?.tabId ?? null,
+          videoFingerprint: message?.videoFingerprint ?? null,
+          code: LIVE_CAPTION_RUNTIME_ERROR_CODES.INVALID_PAYLOAD,
+          reason: 'invalid_payload',
+          runtimeState: this.runtimeState,
+          status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED
+        }
+      );
+    }
   }
 
   handleStreamingTranscriptEvent(message) {
+    if (!this._matchesStreamingSession(message)) {
+      const response = this._buildStreamingStaleResponse(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        message
+      );
+      logger.debug('Ignoring stale streaming transcript event request in offscreen shell', {
+        sessionId: response.sessionId,
+        tabId: response.tabId,
+        videoFingerprint: response.videoFingerprint
+      });
+      return response;
+    }
+
     const response = this._buildStreamingResponse(
       LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
       message,
@@ -652,6 +1055,19 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   handleStreamingStatus(message) {
+    if (!this._matchesStreamingSession(message)) {
+      const response = this._buildStreamingStaleResponse(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+        message
+      );
+      logger.debug('Ignoring stale streaming status request in offscreen shell', {
+        sessionId: response.sessionId,
+        tabId: response.tabId,
+        videoFingerprint: response.videoFingerprint
+      });
+      return response;
+    }
+
     const response = this._buildStreamingResponse(
       LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
       message,
@@ -672,6 +1088,19 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   handleStreamingError(message) {
+    if (!this._matchesStreamingSession(message)) {
+      const response = this._buildStreamingStaleResponse(
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+        message
+      );
+      logger.debug('Ignoring stale streaming error request in offscreen shell', {
+        sessionId: response.sessionId,
+        tabId: response.tabId,
+        videoFingerprint: response.videoFingerprint
+      });
+      return response;
+    }
+
     const response = this._buildStreamingResponse(
       LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
       message,
