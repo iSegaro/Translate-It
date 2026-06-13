@@ -12,7 +12,10 @@ import {
   createLiveCaptionRuntimeResumeRequest,
   createLiveCaptionRuntimeVideoChangedRequest,
 } from "./liveCaptionRuntimeContracts.js";
-import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
+import {
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+} from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
 import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
@@ -109,7 +112,7 @@ describe("live-caption background controller", () => {
 
     controller.registerHandlers(messageHandler);
 
-    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(10);
+    expect(messageHandler.registerHandler).toHaveBeenCalledTimes(13);
     expect(messageHandler.registerHandler).toHaveBeenCalledWith(
       LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
       expect.any(Function),
@@ -140,6 +143,18 @@ describe("live-caption background controller", () => {
     );
     expect(messageHandler.registerHandler).toHaveBeenCalledWith(
       "live-caption/offscreen/capture-error",
+      expect.any(Function),
+    );
+    expect(messageHandler.registerHandler).toHaveBeenCalledWith(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+      expect.any(Function),
+    );
+    expect(messageHandler.registerHandler).toHaveBeenCalledWith(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+      expect.any(Function),
+    );
+    expect(messageHandler.registerHandler).toHaveBeenCalledWith(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
       expect.any(Function),
     );
 
@@ -658,6 +673,136 @@ describe("live-caption background controller", () => {
       "error",
       expect.any(Object),
     );
+  });
+
+  it("routes streaming transcript events through the transcript convergence layer", async () => {
+    const transcriptEventCoordinator = {
+      handleStreamingTranscriptEvent: vi.fn().mockResolvedValue({
+        status: "canonical_final",
+        canonicalEvent: {
+          eventType: "final",
+          sessionId: "session-1"
+        }
+      })
+    };
+    const controller = createController({ transcriptEventCoordinator });
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    const response = await controller.handleStreamingTranscriptEvent(
+      {
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        event: {
+          eventId: "event-1",
+          eventType: "final",
+          providerId: "faster_whisper_streaming",
+          providerMode: "streaming",
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          segmentId: "segment-1",
+          revision: 1,
+          segmentStartMs: 0,
+          segmentEndMs: 1000,
+          text: "hello world",
+          sourceLanguage: "en",
+          confidence: 0.9,
+          createdAt: 1234,
+          metadata: {}
+        }
+      },
+      {},
+    );
+
+    expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "final",
+        sessionId: "session-1",
+        videoFingerprint: "video-a"
+      })
+    );
+    expect(response.success).toBe(true);
+    expect(response.message).toBe("streaming_transcript_event_received");
+  });
+
+  it("keeps streaming status events out of transcript processing", async () => {
+    const transcriptEventCoordinator = {
+      handleStreamingTranscriptEvent: vi.fn()
+    };
+    const controller = createController({ transcriptEventCoordinator });
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    const response = await controller.handleStreamingStatus(
+      {
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        status: "ready",
+        providerId: "faster_whisper_streaming"
+      },
+      {},
+    );
+
+    expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).not.toHaveBeenCalled();
+    expect(response.success).toBe(true);
+    expect(response.message).toBe("streaming_status_received");
+  });
+
+  it("keeps streaming error events out of transcript processing and routes fail-close", async () => {
+    const transcriptEventCoordinator = {
+      handleStreamingTranscriptEvent: vi.fn()
+    };
+    const controller = createController({ transcriptEventCoordinator });
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+    controller.handleCoordinatorError = vi.fn();
+
+    const response = await controller.handleStreamingError(
+      {
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: "faster_whisper_streaming",
+        error: {
+          code: "streaming_error",
+          message: "socket closed"
+        }
+      },
+      {},
+    );
+
+    expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).not.toHaveBeenCalled();
+    expect(controller.handleCoordinatorError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "streaming_error",
+        message: "socket closed"
+      }),
+      expect.objectContaining({
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a"
+      })
+    );
+    expect(response.success).toBe(true);
+    expect(response.message).toBe("streaming_error_handled");
   });
 
   it("handles offscreen health success without disruption", async () => {

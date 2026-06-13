@@ -10,6 +10,7 @@ import {
 import { LiveCaptionCaptureCoordinator } from "./LiveCaptionCaptureCoordinator.js";
 import { LiveCaptionOffscreenBridge } from "./LiveCaptionOffscreenBridge.js";
 import { LiveCaptionSTTCoordinator } from "./LiveCaptionSTTCoordinator.js";
+import { LiveCaptionTranscriptEventCoordinator } from "./LiveCaptionTranscriptEventCoordinator.js";
 import { LiveCaptionTranslationCoordinator } from "./LiveCaptionTranslationCoordinator.js";
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
@@ -21,7 +22,10 @@ import {
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_SESSION_STATES } from "../constants/liveCaptionSessionStates.js";
 import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
-import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
+import {
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+} from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_ACTIONS } from "../constants/liveCaptionActions.js";
 import { getLiveCaptionSttProviderAsync, getLiveCaptionQualityProfileAsync } from "@/shared/config/config.js";
 
@@ -70,6 +74,7 @@ export class LiveCaptionBackgroundController {
     offscreenBridge = new LiveCaptionOffscreenBridge(),
     cache = null,
     sttCoordinator = null,
+    transcriptEventCoordinator = null,
     translationCoordinator = null,
   } = {}) {
     this.sessionManager = sessionManager;
@@ -77,6 +82,8 @@ export class LiveCaptionBackgroundController {
     this.cleanupCoordinator = cleanupCoordinator;
     this.captureCoordinator = captureCoordinator;
     this.offscreenBridge = offscreenBridge;
+    this.transcriptEventCoordinator =
+      transcriptEventCoordinator || new LiveCaptionTranscriptEventCoordinator();
     this.translationCoordinator =
       translationCoordinator ||
       new LiveCaptionTranslationCoordinator({
@@ -92,6 +99,7 @@ export class LiveCaptionBackgroundController {
         sessionManager,
         captureCoordinator,
         cache: this.cache,
+        transcriptEventCoordinator: this.transcriptEventCoordinator,
         onTranscriptSegment: async (segment, context) => {
           await this.translationCoordinator.handleTranscriptSegment(segment, context);
         },
@@ -384,6 +392,18 @@ export class LiveCaptionBackgroundController {
       this.handleCaptureError.bind(this),
     );
     messageHandler.registerHandler(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+      this.handleStreamingTranscriptEvent.bind(this),
+    );
+    messageHandler.registerHandler(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+      this.handleStreamingStatus.bind(this),
+    );
+    messageHandler.registerHandler(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+      this.handleStreamingError.bind(this),
+    );
+    messageHandler.registerHandler(
       LIVE_CAPTION_ACTIONS.GET_TAB_ID,
       async (message, sender) => {
         const tabId = sender?.tab?.id ?? null;
@@ -413,6 +433,9 @@ export class LiveCaptionBackgroundController {
         ...Object.values(LIVE_CAPTION_RUNTIME_ACTIONS),
         LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
         LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.CAPTURE_ERROR,
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+        LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
       ],
     });
 
@@ -1468,6 +1491,153 @@ export class LiveCaptionBackgroundController {
       return response;
     } catch (error) {
       logger.error("Failed to handle capture error message:", error);
+      const response = { success: false, error: error.message };
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    }
+  }
+
+  _isActiveStreamingSession(message) {
+    if (!message || typeof message !== "object") {
+      return false;
+    }
+
+    const tabId = Number(message.tabId);
+    if (!Number.isFinite(tabId)) {
+      return false;
+    }
+
+    const session = this.sessionManager.getSession(tabId);
+    if (!session || session.sessionId !== message.sessionId) {
+      return false;
+    }
+
+    const activeVideoSession = session.activeVideoSession;
+    if (!activeVideoSession || activeVideoSession.videoFingerprint !== message.videoFingerprint) {
+      return false;
+    }
+
+    return true;
+  }
+
+  _buildStreamingAckResponse(message, acknowledgement = "streaming_event_received") {
+    return {
+      success: true,
+      message: acknowledgement,
+      sessionId: message?.sessionId ?? null,
+      tabId: message?.tabId ?? null,
+      videoFingerprint: message?.videoFingerprint ?? null,
+    };
+  }
+
+  async handleStreamingTranscriptEvent(message, sender, sendResponse) {
+    try {
+      if (!this._isActiveStreamingSession(message)) {
+        const response = this._buildStreamingAckResponse(message, "streaming_stale_session");
+        if (sendResponse) {
+          sendResponse(response);
+        }
+        return response;
+      }
+
+      const transcriptResult = await Promise.resolve(
+        this.transcriptEventCoordinator.handleStreamingTranscriptEvent(message.event)
+      );
+
+      logger.info("Live-caption streaming transcript event routed in background", {
+        sessionId: message.sessionId,
+        tabId: message.tabId,
+        videoFingerprint: message.videoFingerprint,
+        eventType:
+          transcriptResult?.canonicalEvent?.eventType ??
+          transcriptResult?.normalizedEvent?.eventType ??
+          message.event?.eventType ??
+          null,
+        status: transcriptResult?.status ?? null,
+      });
+
+      const response = this._buildStreamingAckResponse(message, "streaming_transcript_event_received");
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    } catch (error) {
+      logger.error("Failed to handle streaming transcript event in background:", error);
+      const response = { success: false, error: error.message };
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    }
+  }
+
+  async handleStreamingStatus(message, sender, sendResponse) {
+    try {
+      if (!this._isActiveStreamingSession(message)) {
+        const response = this._buildStreamingAckResponse(message, "streaming_stale_session");
+        if (sendResponse) {
+          sendResponse(response);
+        }
+        return response;
+      }
+
+      logger.debug("Live-caption streaming status routed in background", {
+        sessionId: message.sessionId,
+        tabId: message.tabId,
+        videoFingerprint: message.videoFingerprint,
+        status: message.status ?? null,
+        providerId: message.providerId ?? null,
+      });
+
+      const response = this._buildStreamingAckResponse(message, "streaming_status_received");
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    } catch (error) {
+      logger.error("Failed to handle streaming status in background:", error);
+      const response = { success: false, error: error.message };
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    }
+  }
+
+  async handleStreamingError(message, sender, sendResponse) {
+    try {
+      if (!this._isActiveStreamingSession(message)) {
+        const response = this._buildStreamingAckResponse(message, "streaming_stale_session");
+        if (sendResponse) {
+          sendResponse(response);
+        }
+        return response;
+      }
+
+      logger.warn("Live-caption streaming error routed through fail-close path", {
+        sessionId: message.sessionId,
+        tabId: message.tabId,
+        videoFingerprint: message.videoFingerprint,
+        providerId: message.providerId ?? null,
+        errorCode: message.error?.code ?? null,
+        errorMessage: message.error?.message ?? null,
+      });
+
+      this.handleCoordinatorError(message.error || new Error(message.error?.message || "Streaming provider error"), {
+        sessionId: message.sessionId,
+        tabId: message.tabId,
+        videoFingerprint: message.videoFingerprint,
+      });
+
+      const response = this._buildStreamingAckResponse(message, "streaming_error_handled");
+      if (sendResponse) {
+        sendResponse(response);
+      }
+      return response;
+    } catch (error) {
+      logger.error("Failed to handle streaming error in background:", error);
       const response = { success: false, error: error.message };
       if (sendResponse) {
         sendResponse(response);
