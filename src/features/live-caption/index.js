@@ -116,6 +116,7 @@ import { LiveCaptionContentController } from './content/LiveCaptionContentContro
 import { LiveCaptionRuntimeController } from './content/LiveCaptionRuntimeController.js';
 import {
   BaseSTTProvider,
+  BaseStreamingSTTProvider,
   STT_PROVIDER_STATUS,
   STT_PROVIDER_ERROR_CODES,
   normalizeSTTResult,
@@ -123,6 +124,9 @@ import {
   createSTTProviderError,
   isRetryableSTTError,
   normalizeSTTProviderError,
+  STT_STREAMING_PROVIDER_STATES,
+  STT_STREAMING_PROVIDER_EVENT_TYPES,
+  normalizeStreamingProviderEventEnvelope,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,
@@ -169,6 +173,7 @@ export {
 } from './cache/index.js';
 export {
   BaseSTTProvider,
+  BaseStreamingSTTProvider,
   STT_PROVIDER_STATUS,
   STT_PROVIDER_ERROR_CODES,
   normalizeSTTResult,
@@ -176,6 +181,9 @@ export {
   createSTTProviderError,
   isRetryableSTTError,
   normalizeSTTProviderError,
+  STT_STREAMING_PROVIDER_STATES,
+  STT_STREAMING_PROVIDER_EVENT_TYPES,
+  normalizeStreamingProviderEventEnvelope,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,
@@ -398,6 +406,7 @@ export const LiveCaptionFeature = Object.freeze({
     LiveCaptionContentController,
     LiveCaptionRuntimeController,
     BaseSTTProvider,
+    BaseStreamingSTTProvider,
     STT_PROVIDER_STATUS,
     STT_PROVIDER_ERROR_CODES,
     normalizeSTTResult,
@@ -405,6 +414,9 @@ export const LiveCaptionFeature = Object.freeze({
     createSTTProviderError,
     isRetryableSTTError,
     normalizeSTTProviderError,
+    STT_STREAMING_PROVIDER_STATES,
+    STT_STREAMING_PROVIDER_EVENT_TYPES,
+    normalizeStreamingProviderEventEnvelope,
     STT_PROVIDER_IDS,
     STT_PROVIDER_MODES,
     STT_PROVIDER_CAPABILITIES,

@@ -9,6 +9,12 @@ import {
   normalizeSTTProviderError
 } from './BaseSTTProvider.js';
 import {
+  BaseStreamingSTTProvider,
+  STT_STREAMING_PROVIDER_STATES,
+  STT_STREAMING_PROVIDER_EVENT_TYPES,
+  normalizeStreamingProviderEventEnvelope
+} from './BaseStreamingSTTProvider.js';
+import {
   STT_PROVIDER_IDS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
@@ -40,6 +46,12 @@ export {
   normalizeSTTProviderError
 } from './BaseSTTProvider.js';
 export {
+  BaseStreamingSTTProvider,
+  STT_STREAMING_PROVIDER_STATES,
+  STT_STREAMING_PROVIDER_EVENT_TYPES,
+  normalizeStreamingProviderEventEnvelope
+} from './BaseStreamingSTTProvider.js';
+export {
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,
@@ -67,6 +79,10 @@ export default {
   createSTTProviderError,
   isRetryableSTTError,
   normalizeSTTProviderError,
+  BaseStreamingSTTProvider,
+  STT_STREAMING_PROVIDER_STATES,
+  STT_STREAMING_PROVIDER_EVENT_TYPES,
+  normalizeStreamingProviderEventEnvelope,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,
