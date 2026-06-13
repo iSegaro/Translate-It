@@ -100,9 +100,7 @@ export class LiveCaptionBackgroundController {
         captureCoordinator,
         cache: this.cache,
         transcriptEventCoordinator: this.transcriptEventCoordinator,
-        onTranscriptSegment: async (segment, context) => {
-          await this.translationCoordinator.handleTranscriptSegment(segment, context);
-        },
+        onTranscriptSegment: (segment, context) => this._routeTranscriptSegmentToTranslation(segment, context),
         onError: (error, context) => this.handleCoordinatorError(error, context)
       });
     this.messageHandler = null;
@@ -255,6 +253,59 @@ export class LiveCaptionBackgroundController {
       videoFingerprint,
       reason: "coordinator_error"
     }).catch(() => {});
+  }
+
+  _routeTranscriptSegmentToTranslation(segment, context = {}) {
+    return Promise.resolve().then(() => this.translationCoordinator.handleTranscriptSegment(segment, context));
+  }
+
+  _recordTranscriptSegmentForTranslation(segment, pageSession) {
+    if (!segment || typeof segment !== 'object' || !pageSession) {
+      return null;
+    }
+
+    const activeVideoSession = pageSession.activeVideoSession;
+    if (!activeVideoSession || activeVideoSession.videoFingerprint !== segment.videoFingerprint) {
+      return null;
+    }
+
+    activeVideoSession.addTranscriptSegment(segment);
+
+    if (this.cache) {
+      this.cache.appendTranscriptSegment({
+        ...segment,
+        segmentStartMs: segment.startMs,
+        segmentEndMs: segment.endMs,
+        originalText: segment.text,
+        isIncognito: pageSession.isIncognito
+      }).catch((err) => {
+        logger.warn('Failed to persist transcript segment to cache', {
+          sessionId: segment.sessionId,
+          error: err.message
+        });
+      });
+    }
+
+    return segment;
+  }
+
+  _createTranscriptSegmentFromCanonicalEvent(event, fallbackContext = {}) {
+    if (!event || typeof event !== 'object') {
+      return null;
+    }
+
+    return {
+      segmentId: event.segmentId ?? fallbackContext.segmentId ?? null,
+      sessionId: event.sessionId ?? fallbackContext.sessionId ?? null,
+      tabId: event.tabId ?? fallbackContext.tabId ?? null,
+      videoFingerprint: event.videoFingerprint ?? fallbackContext.videoFingerprint ?? null,
+      startMs: event.segmentStartMs ?? fallbackContext.startMs ?? null,
+      endMs: event.segmentEndMs ?? fallbackContext.endMs ?? null,
+      text: event.text ?? '',
+      providerId: event.providerId ?? null,
+      createdAt: event.createdAt ?? Date.now(),
+      isFinal: event.isFinal ?? true
+    };
   }
 
   async _reconcileOrphanedSession(chunk) {
@@ -1542,9 +1593,47 @@ export class LiveCaptionBackgroundController {
         return response;
       }
 
+      const pageSession = this.sessionManager.getSession(Number(message.tabId));
       const transcriptResult = await Promise.resolve(
         this.transcriptEventCoordinator.handleStreamingTranscriptEvent(message.event)
       );
+
+      if (transcriptResult?.status === "canonical_final" && transcriptResult.canonicalEvent) {
+        const transcriptSegment = this._createTranscriptSegmentFromCanonicalEvent(
+          transcriptResult.canonicalEvent,
+          {
+            segmentId: transcriptResult.canonicalEvent.segmentId ?? message.event?.segmentId ?? null,
+            sessionId: message.sessionId,
+            tabId: message.tabId,
+            videoFingerprint: message.videoFingerprint
+          }
+        );
+
+        if (transcriptSegment) {
+          const accumulatedSegment = this._recordTranscriptSegmentForTranslation(transcriptSegment, pageSession);
+          if (!accumulatedSegment) {
+            logger.warn("Skipping streaming transcript translation because active video session is unavailable", {
+              sessionId: message.sessionId,
+              tabId: message.tabId,
+              videoFingerprint: message.videoFingerprint
+            });
+            const response = this._buildStreamingAckResponse(message, "streaming_transcript_event_received");
+            if (sendResponse) {
+              sendResponse(response);
+            }
+            return response;
+          }
+
+          this._routeTranscriptSegmentToTranslation(accumulatedSegment, { tabId: message.tabId }).catch((error) => {
+            logger.error("Error routing canonical streaming transcript segment to translation", {
+              sessionId: message.sessionId,
+              tabId: message.tabId,
+              videoFingerprint: message.videoFingerprint,
+              error: error.message
+            });
+          });
+        }
+      }
 
       logger.info("Live-caption streaming transcript event routed in background", {
         sessionId: message.sessionId,
