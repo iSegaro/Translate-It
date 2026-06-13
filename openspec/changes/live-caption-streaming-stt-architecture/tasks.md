@@ -22,10 +22,12 @@
 
 ## 4. Canonical Session, Translation, and Persistence
 
-- [ ] 4.1 Define canonical revision handling for corrected transcript segments
-- [ ] 4.2 Keep partial transcript hypotheses ephemeral and out of session/cache persistence
-- [ ] 4.3 Ensure translation consumes final and corrected-final transcript events only for MVP
-- [ ] 4.4 Add tests for final-only translation routing, canonical persistence, and partial discard behavior
+- [ ] 4.1 Design canonical correction persistence model
+- [ ] 4.2 Add revision-aware session replacement APIs
+- [ ] 4.3 Add revision-aware cache upsert by canonical identity
+- [ ] 4.4 Add correction-aware translation invalidation/retranslation
+- [ ] 4.5 Add runtime hydration/replacement behavior
+- [ ] 4.6 Add tests for final-only translation and partial discard
 
 ## 5. Recovery, Cleanup, and Documentation
 

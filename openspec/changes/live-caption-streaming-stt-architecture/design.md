@@ -91,6 +91,23 @@ Streaming corrections will use `segmentId` plus `revision` and will supersede pr
 **Alternatives considered**
 - Treating corrections as separate unrelated transcript entries: rejected because it would break canonical ordering and translation invalidation logic.
 
+**Canonical identity**
+- The canonical identity for a transcript segment is:
+  - `sessionId + tabId + videoFingerprint + segmentId`
+- Revision comparison and canonical replacement must be keyed to that identity, not to timing alone.
+
+**Current append-only limitation**
+- The current session, cache, translation, and runtime hydration paths are append-only in practice.
+- They can accumulate canonical-looking segments, but they do not yet provide a revision-aware replacement path for corrected finals.
+
+**Correction persistence risk**
+- If a correction-capable streaming provider is enabled without revision-aware persistence, corrected finals can be duplicated or misordered in session/cache state.
+- Timing-keyed upserts are not sufficient when a correction changes timing or when a provider reuses the same logical utterance with a new revision.
+
+**Translation invalidation risk**
+- Translation currently assumes finalized transcript segments are one-way queue units.
+- Without identity-based invalidation or replacement, a corrected final can leave stale translated text visible or persist duplicate translated segments.
+
 ### 6. Translation consumes final and corrected-final events only
 
 Translation will remain final-segment oriented for the MVP.
@@ -131,8 +148,14 @@ Background will own orchestration, fail-close policy, canonical state, translati
 3. Update provider manifest/factory metadata to distinguish batch/background from streaming/offscreen providers.
 4. Keep batch providers and current batch routing unchanged.
 5. Introduce streaming provider implementations later, behind the new execution-location contract.
-6. Add correction-aware canonical persistence only when a streaming provider needs it.
+6. Add correction-aware canonical persistence only when a correction-capable streaming provider is introduced.
 7. Add optional partial preview UI only if product requirements justify it.
+
+**Phase gating**
+- Providers that emit final-only streaming events can proceed earlier because they do not require correction persistence or translation invalidation.
+- Providers that emit corrections must wait until canonical persistence, revision-aware replacement, and translation invalidation are in place.
+- Partial transcript hypotheses remain ephemeral and are not part of the canonical persistence model.
+- A full correction history or audit log is explicitly deferred; only the latest canonical state is required for MVP support.
 
 Rollback strategy:
 - Keep the batch provider path and current translation/caching behavior unchanged.
