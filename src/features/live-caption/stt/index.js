@@ -14,6 +14,9 @@ import {
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted,
   getAvailableSTTProviders,
   isSTTProviderSupported
 } from './STTProviderManifest.js';
@@ -44,6 +47,9 @@ export {
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted,
   getAvailableSTTProviders,
   isSTTProviderSupported
 } from './STTProviderManifest.js';
@@ -68,6 +74,9 @@ export default {
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted,
   getAvailableSTTProviders,
   isSTTProviderSupported,
   STTProviderFactory,

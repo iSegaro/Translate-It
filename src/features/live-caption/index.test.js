@@ -116,6 +116,9 @@ import {
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted,
   getAvailableSTTProviders,
   isSTTProviderSupported,
   STTProviderFactory,
@@ -247,6 +250,9 @@ describe('live-caption feature shell', () => {
     expect(STT_PROVIDER_MANIFEST).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_MANIFEST);
     expect(getDefaultSTTProviderId).toBe(LiveCaptionFeature.contracts.getDefaultSTTProviderId);
     expect(getSTTProviderDefinition).toBe(LiveCaptionFeature.contracts.getSTTProviderDefinition);
+    expect(getProviderExecutionLocation).toBe(LiveCaptionFeature.contracts.getProviderExecutionLocation);
+    expect(resolveProviderExecutionHost).toBe(LiveCaptionFeature.contracts.resolveProviderExecutionHost);
+    expect(isProviderOffscreenExecuted).toBe(LiveCaptionFeature.contracts.isProviderOffscreenExecuted);
     expect(getAvailableSTTProviders).toBe(LiveCaptionFeature.contracts.getAvailableSTTProviders);
     expect(isSTTProviderSupported).toBe(LiveCaptionFeature.contracts.isSTTProviderSupported);
     expect(STTProviderFactory).toBe(LiveCaptionFeature.contracts.STTProviderFactory);

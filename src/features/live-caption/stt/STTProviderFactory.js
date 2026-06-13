@@ -10,7 +10,10 @@ import {
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
   getAvailableSTTProviders,
-  isSTTProviderSupported
+  isSTTProviderSupported,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted
 } from './STTProviderManifest.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'STTProviderFactory');
@@ -147,6 +150,18 @@ export class STTProviderFactory {
 
   getProviderDefinition(providerId) {
     return getSTTProviderDefinition(providerId);
+  }
+
+  getProviderExecutionLocation(providerId) {
+    return getProviderExecutionLocation(providerId);
+  }
+
+  resolveProviderExecutionHost(providerId) {
+    return resolveProviderExecutionHost(providerId);
+  }
+
+  isProviderOffscreenExecuted(providerId) {
+    return isProviderOffscreenExecuted(providerId);
   }
 
   getSupportedProviders() {

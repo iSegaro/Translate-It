@@ -7,6 +7,9 @@ import {
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
   getSTTProviderDefinition,
+  getProviderExecutionLocation,
+  resolveProviderExecutionHost,
+  isProviderOffscreenExecuted,
   getAvailableSTTProviders,
   isSTTProviderSupported
 } from './STTProviderManifest.js';
@@ -41,6 +44,9 @@ describe('STTProviderManifest', () => {
       STT_PROVIDER_CAPABILITIES.RETRY
     ]);
     expect(provider.requiredSettings).toEqual(['OPENAI_API_KEY']);
+    expect(getProviderExecutionLocation(STT_PROVIDER_IDS.OPENAI_WHISPER)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND);
+    expect(resolveProviderExecutionHost(STT_PROVIDER_IDS.OPENAI_WHISPER)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND);
+    expect(isProviderOffscreenExecuted(STT_PROVIDER_IDS.OPENAI_WHISPER)).toBe(false);
   });
 
   it('exposes the default provider id used by the MVP', () => {
@@ -79,6 +85,26 @@ describe('STTProviderManifest', () => {
       developmentOnly: true
     });
     expect(getAvailableSTTProviders()).toHaveLength(1);
+  });
+
+  it('resolves streaming/offscreen metadata from a supplied manifest entry', () => {
+    const mockManifest = {
+      ...STT_PROVIDER_MANIFEST,
+      mock_streaming: {
+        id: 'mock_streaming',
+        displayName: 'Mock Streaming',
+        mode: STT_PROVIDER_MODES.STREAMING,
+        executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+        supported: true
+      }
+    };
+
+    expect(getProviderExecutionLocation('mock_streaming', mockManifest)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
+    expect(resolveProviderExecutionHost('mock_streaming', mockManifest)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
+    expect(isProviderOffscreenExecuted('mock_streaming', mockManifest)).toBe(true);
+    expect(getProviderExecutionLocation('missing_provider', mockManifest)).toBeNull();
+    expect(resolveProviderExecutionHost('missing_provider', mockManifest)).toBeNull();
+    expect(isProviderOffscreenExecuted('missing_provider', mockManifest)).toBe(false);
   });
 
   it('keeps only the batch providers in the manifest', () => {

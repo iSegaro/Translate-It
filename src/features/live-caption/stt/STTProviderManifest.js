@@ -114,6 +114,23 @@ export function getSTTProviderDefinition(providerId) {
   return STT_PROVIDER_MANIFEST[providerId] || null;
 }
 
+export function getProviderExecutionLocation(providerId, providerManifest = STT_PROVIDER_MANIFEST) {
+  if (!providerId || !providerManifest || typeof providerManifest !== 'object') {
+    return null;
+  }
+
+  const definition = providerManifest[providerId];
+  return definition?.executionLocation ?? null;
+}
+
+export function resolveProviderExecutionHost(providerId, providerManifest = STT_PROVIDER_MANIFEST) {
+  return getProviderExecutionLocation(providerId, providerManifest);
+}
+
+export function isProviderOffscreenExecuted(providerId, providerManifest = STT_PROVIDER_MANIFEST) {
+  return getProviderExecutionLocation(providerId, providerManifest) === STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN;
+}
+
 export function isSTTProviderSupported(providerId, debugMode = null) {
   const definition = getSTTProviderDefinition(providerId);
   if (!definition || definition.supported === false) {

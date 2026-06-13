@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
+import {
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from './liveCaptionSTTProviderContracts.js';
 import { STT_PROVIDER_ERROR_CODES } from './BaseSTTProvider.js';
 import { ProviderFactory as TranslationProviderFactory } from '@/features/translation/providers/ProviderFactory.js';
 
@@ -82,5 +85,17 @@ describe('STTProviderFactory', () => {
     await expect(factory.getProvider('local_whisper')).rejects.toMatchObject({
       code: STT_PROVIDER_ERROR_CODES.PROVIDER_NOT_FOUND
     });
+  });
+
+  it('resolves execution location metadata without changing provider instantiation behavior', async () => {
+    expect(factory.getProviderExecutionLocation('openai_whisper')).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND);
+    expect(factory.resolveProviderExecutionHost('openai_whisper')).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND);
+    expect(factory.isProviderOffscreenExecuted('openai_whisper')).toBe(false);
+    expect(factory.getProviderExecutionLocation('unknown-provider')).toBeNull();
+    expect(factory.resolveProviderExecutionHost('unknown-provider')).toBeNull();
+    expect(factory.isProviderOffscreenExecuted('unknown-provider')).toBe(false);
+
+    const provider = await factory.getProvider('openai_whisper');
+    expect(provider).toBeInstanceOf(OpenAIWhisperProvider);
   });
 });
