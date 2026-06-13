@@ -282,8 +282,27 @@ describe("live-caption background controller", () => {
 
   it("hydrates session from cache on start", async () => {
     const controller = createController();
-    const mockTranscript = { segmentId: "t1", originalText: "Hello", segmentStartMs: 0, segmentEndMs: 1000 };
-    const mockTranslation = { segmentId: "c1", translatedText: "سلام", segmentStartMs: 0, segmentEndMs: 1000 };
+    const mockTranscript = {
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "t1",
+      originalText: "Hello",
+      segmentStartMs: 0,
+      segmentEndMs: 1000,
+      revision: 1
+    };
+    const mockTranslation = {
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "c1",
+      translatedText: "سلام",
+      originalText: "Hello",
+      segmentStartMs: 0,
+      segmentEndMs: 1000,
+      revision: 1
+    };
 
     controller.cache.getTranscriptSegments = vi.fn().mockResolvedValue([mockTranscript]);
     controller.cache.getTranslatedCaptionSegments = vi.fn().mockResolvedValue([mockTranslation]);
@@ -309,6 +328,24 @@ describe("live-caption background controller", () => {
     expect(session.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
     expect(session.activeVideoSession.transcriptSegments[0].originalText).toBe("Hello");
     expect(session.activeVideoSession.translatedCaptionSegments[0].translatedText).toBe("سلام");
+    expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "t1"
+    })).toMatchObject({
+      originalText: "Hello",
+      revision: 1
+    });
+    expect(session.activeVideoSession.getTranslatedCaptionSegmentByIdentity({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "c1"
+    })).toMatchObject({
+      translatedText: "سلام",
+      revision: 1
+    });
     
     expect(response.sessionSnapshot.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
   });

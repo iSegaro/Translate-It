@@ -561,11 +561,12 @@ export class LiveCaptionBackgroundController {
             this.cache.getTranscriptSegments({ tabId, videoFingerprint, isIncognito }),
             this.cache.getTranslatedCaptionSegments({ tabId, videoFingerprint, isIncognito })
           ]);
-          transcripts.forEach(s => videoSession.addTranscriptSegment(s));
-          translations.forEach(s => videoSession.addTranslatedCaptionSegment(s));
-          logger.info("Reconciled session hydrated from cache", { tabId, transcriptCount: transcripts.length });
-        } catch (err) {
-          logger.warn("Cache hydration failed during reconciliation", { error: err.message });
+            transcripts.forEach(s => videoSession.addTranscriptSegment(s));
+            translations.forEach(s => videoSession.addTranslatedCaptionSegment(s));
+            videoSession.rebuildCanonicalIndexes();
+            logger.info("Reconciled session hydrated from cache", { tabId, transcriptCount: transcripts.length });
+          } catch (err) {
+            logger.warn("Cache hydration failed during reconciliation", { error: err.message });
         }
       }
 
@@ -917,6 +918,7 @@ export class LiveCaptionBackgroundController {
 
             transcripts.forEach(s => activeVideoSession.addTranscriptSegment(s));
             translations.forEach(s => activeVideoSession.addTranslatedCaptionSegment(s));
+            activeVideoSession.rebuildCanonicalIndexes();
 
             logger.info('Live-caption session hydrated from cache', {
               tabId,
@@ -1658,6 +1660,7 @@ export class LiveCaptionBackgroundController {
 
             transcripts.forEach(s => videoSession.addTranscriptSegment(s));
             translations.forEach(s => videoSession.addTranslatedCaptionSegment(s));
+            videoSession.rebuildCanonicalIndexes();
 
             logger.info('Live-caption handoff session hydrated from cache', {
               tabId,

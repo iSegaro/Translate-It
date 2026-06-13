@@ -7,6 +7,38 @@ import { LIVE_CAPTION_CLEANUP_REASONS } from './contracts.js';
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from './LiveCaptionCleanupCoordinator.js';
 
 describe('live-caption session model', () => {
+  const canonicalIdentity = {
+    sessionId: 'session-a',
+    tabId: 7,
+    videoFingerprint: 'video-a',
+    segmentId: 'segment-1'
+  };
+
+  const createTranscriptSegment = (overrides = {}) => ({
+    ...canonicalIdentity,
+    text: 'hello world',
+    startMs: 100,
+    endMs: 200,
+    revision: 1,
+    sourceLanguage: 'en',
+    targetLanguage: 'es',
+    provider: 'provider-a',
+    ...overrides
+  });
+
+  const createTranslatedCaptionSegment = (overrides = {}) => ({
+    ...canonicalIdentity,
+    text: 'hello world',
+    translatedText: 'hola mundo',
+    startMs: 100,
+    endMs: 200,
+    revision: 1,
+    sourceLanguage: 'en',
+    targetLanguage: 'es',
+    provider: 'provider-a',
+    ...overrides
+  });
+
   it('initializes a page session with shell state', () => {
     const session = new PageLiveCaptionSession({ tabId: 7 });
 
@@ -92,6 +124,395 @@ describe('live-caption session model', () => {
     expect(transcript.text).toBe('hello world');
     expect(caption.targetLanguage).toBe('es');
     expect(seekState.seekToMs).toBe(1200);
+  });
+
+  it('keeps append-only transcript and translated caption behavior unchanged', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    const firstTranscript = videoSession.addTranscriptSegment(createTranscriptSegment());
+    const secondTranscript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      text: 'hello again',
+      revision: 2
+    }));
+    const firstCaption = videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment());
+    const secondCaption = videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      text: 'hello again',
+      translatedText: 'hola de nuevo',
+      revision: 2
+    }));
+
+    expect(videoSession.transcriptSegments).toHaveLength(2);
+    expect(videoSession.translatedCaptionSegments).toHaveLength(2);
+    expect(firstTranscript.segmentId).toBe(canonicalIdentity.segmentId);
+    expect(secondTranscript.segmentId).toBe(canonicalIdentity.segmentId);
+    expect(firstCaption.segmentId).toBe(canonicalIdentity.segmentId);
+    expect(secondCaption.segmentId).toBe(canonicalIdentity.segmentId);
+  });
+
+  it('rebuilds canonical indexes from hydrated transcript and translated caption segments', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      text: 'old transcript',
+      revision: 1
+    }));
+    videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'old caption',
+      revision: 1
+    }));
+
+    const rebuildResult = videoSession.rebuildCanonicalIndexes();
+
+    expect(rebuildResult).toMatchObject({
+      transcriptCount: 1,
+      translatedCaptionCount: 1,
+      indexedTranscriptCount: 1,
+      indexedTranslatedCaptionCount: 1
+    });
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'old transcript',
+      revision: 1
+    });
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'old caption',
+      revision: 1
+    });
+  });
+
+  it('prefers the highest revision when rebuilding duplicate canonical identities', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      text: 'older duplicate',
+      revision: 1
+    }));
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      text: 'newer duplicate',
+      revision: 3
+    }));
+    videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'older caption duplicate',
+      revision: 1
+    }));
+    videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'newer caption duplicate',
+      revision: 3
+    }));
+
+    const rebuildResult = videoSession.rebuildCanonicalIndexes();
+
+    expect(rebuildResult).toMatchObject({
+      indexedTranscriptCount: 1,
+      indexedTranslatedCaptionCount: 1
+    });
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'newer duplicate',
+      revision: 3
+    });
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'newer caption duplicate',
+      revision: 3
+    });
+  });
+
+  it('replaces hydrated transcript and translated caption records instead of appending duplicates', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      text: 'hydrated transcript',
+      revision: 1
+    }));
+    videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hydrated caption',
+      revision: 1
+    }));
+    videoSession.rebuildCanonicalIndexes();
+
+    const transcriptResult = videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'hydrated transcript updated',
+      revision: 2
+    }));
+    const translatedResult = videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hydrated caption updated',
+      revision: 2
+    }));
+
+    expect(transcriptResult).toMatchObject({ status: 'replaced', replaced: true, ignored: false });
+    expect(translatedResult).toMatchObject({ status: 'replaced', replaced: true, ignored: false });
+    expect(videoSession.transcriptSegments).toHaveLength(1);
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'hydrated transcript updated',
+      revision: 2
+    });
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'hydrated caption updated',
+      revision: 2
+    });
+  });
+
+  it('upserts transcript segments by canonical identity and preserves ordering', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+    const otherIdentity = {
+      sessionId: 'session-a',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-2'
+    };
+
+    const firstResult = videoSession.upsertTranscriptSegment(createTranscriptSegment());
+    const secondResult = videoSession.upsertTranscriptSegment({
+      ...otherIdentity,
+      text: 'second segment',
+      startMs: 300,
+      endMs: 400,
+      revision: 1,
+      sourceLanguage: 'en'
+    });
+    const replacementResult = videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'hello updated',
+      revision: 2
+    }));
+
+    expect(firstResult).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(secondResult).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(replacementResult).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(videoSession.transcriptSegments).toHaveLength(2);
+    expect(videoSession.transcriptSegments[0].text).toBe('hello updated');
+    expect(videoSession.transcriptSegments[1].segmentId).toBe(otherIdentity.segmentId);
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'hello updated',
+      revision: 2
+    });
+  });
+
+  it('ignores stale or equal transcript revisions for canonical identity', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    const insertedResult = videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'canonical one',
+      revision: 2
+    }));
+    const equalResult = videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'canonical equal',
+      revision: 2
+    }));
+    const staleResult = videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'canonical stale',
+      revision: 1
+    }));
+
+    expect(insertedResult).toMatchObject({ status: 'inserted', ignored: false });
+    expect(equalResult).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(staleResult).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(videoSession.transcriptSegments).toHaveLength(1);
+    expect(videoSession.transcriptSegments[0].text).toBe('canonical one');
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'canonical one',
+      revision: 2
+    });
+  });
+
+  it('safely ignores transcript upserts that lack canonical identity', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    const result = videoSession.upsertTranscriptSegment({
+      text: 'missing identity',
+      startMs: 100,
+      endMs: 200,
+      revision: 1
+    });
+
+    expect(result).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      reason: 'missing_canonical_identity'
+    });
+    expect(videoSession.transcriptSegments).toHaveLength(0);
+    expect(videoSession.getTranscriptSegmentByIdentity({
+      ...canonicalIdentity,
+      segmentId: 'missing'
+    })).toBe(null);
+  });
+
+  it('replaces transcript segments by canonical identity without creating duplicates', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.upsertTranscriptSegment(createTranscriptSegment({
+      text: 'canonical one',
+      revision: 1
+    }));
+
+    const result = videoSession.replaceTranscriptSegment(canonicalIdentity, createTranscriptSegment({
+      text: 'canonical replaced',
+      revision: 1
+    }));
+
+    expect(result).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(videoSession.transcriptSegments).toHaveLength(1);
+    expect(videoSession.transcriptSegments[0].text).toBe('canonical replaced');
+    expect(videoSession.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      text: 'canonical replaced'
+    });
+  });
+
+  it('upserts translated caption segments by canonical identity with the same behavior', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+    const otherIdentity = {
+      sessionId: 'session-a',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-2'
+    };
+
+    const firstResult = videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola mundo',
+      revision: 1
+    }));
+    const secondResult = videoSession.upsertTranslatedCaptionSegment({
+      ...otherIdentity,
+      text: 'second segment',
+      translatedText: 'segundo segmento',
+      startMs: 300,
+      endMs: 400,
+      revision: 1,
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      provider: 'provider-a'
+    });
+    const replacementResult = videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola actualizado',
+      revision: 2
+    }));
+
+    expect(firstResult).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(secondResult).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(replacementResult).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(videoSession.translatedCaptionSegments).toHaveLength(2);
+    expect(videoSession.translatedCaptionSegments[0].translatedText).toBe('hola actualizado');
+    expect(videoSession.translatedCaptionSegments[1].segmentId).toBe(otherIdentity.segmentId);
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'hola actualizado',
+      revision: 2
+    });
+  });
+
+  it('ignores stale or equal translated caption revisions for canonical identity', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola uno',
+      revision: 2
+    }));
+
+    const equalResult = videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola igual',
+      revision: 2
+    }));
+    const staleResult = videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola viejo',
+      revision: 1
+    }));
+
+    expect(equalResult).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(staleResult).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'hola uno',
+      revision: 2
+    });
+  });
+
+  it('safely ignores translated caption upserts that lack canonical identity', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    const result = videoSession.upsertTranslatedCaptionSegment({
+      text: 'missing identity',
+      translatedText: 'identidad faltante',
+      startMs: 100,
+      endMs: 200,
+      revision: 1
+    });
+
+    expect(result).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      reason: 'missing_canonical_identity'
+    });
+    expect(videoSession.translatedCaptionSegments).toHaveLength(0);
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity({
+      ...canonicalIdentity,
+      segmentId: 'missing'
+    })).toBe(null);
+  });
+
+  it('replaces translated caption segments by canonical identity without creating duplicates', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    videoSession.upsertTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      translatedText: 'hola uno',
+      revision: 1
+    }));
+
+    const result = videoSession.replaceTranslatedCaptionSegment(canonicalIdentity, createTranslatedCaptionSegment({
+      translatedText: 'hola reemplazado',
+      revision: 1
+    }));
+
+    expect(result).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.translatedCaptionSegments[0].translatedText).toBe('hola reemplazado');
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      translatedText: 'hola reemplazado'
+    });
   });
 
   it('manages one page session per tab and cleans up fail closed', () => {
