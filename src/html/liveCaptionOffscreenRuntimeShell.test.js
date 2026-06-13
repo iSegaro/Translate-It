@@ -509,6 +509,7 @@ describe("live-caption offscreen runtime shell", () => {
     });
 
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
       type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
       source: "offscreen",
       target: "background",
@@ -519,6 +520,7 @@ describe("live-caption offscreen runtime shell", () => {
       status: "ready"
     }));
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
       type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
       source: "offscreen",
       target: "background",
@@ -527,6 +529,7 @@ describe("live-caption offscreen runtime shell", () => {
       videoFingerprint: "video-a"
     }));
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
       type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
       source: "offscreen",
       target: "background",

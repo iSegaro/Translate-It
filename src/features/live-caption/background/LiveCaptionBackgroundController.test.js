@@ -23,6 +23,7 @@ import {
   getLiveCaptionQualityProfileAsync,
   getLiveCaptionSttProviderAsync
 } from "@/shared/config/config.js";
+import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -221,6 +222,44 @@ describe("live-caption background controller", () => {
     expect(controller.captureCoordinator.runtimeState).toBe("idle");
     expect(controller.sessionManager.getSession(7)).toBe(null);
     expect(globalThis.chrome.tabCapture.capture).not.toHaveBeenCalled();
+  });
+
+  it("routes finalized chunks through the normal message-handler path", async () => {
+    const controller = createController();
+    controller.captureCoordinator.recordSnapshot = vi.fn();
+    controller.sttCoordinator.handleFinalizedChunk = vi.fn().mockResolvedValue();
+    const messageHandler = createMessageHandler();
+    controller.registerHandlers(messageHandler);
+
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    const sendResponse = vi.fn();
+    const response = await messageHandler._handleMessage(
+      {
+        action: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
+        type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.FINALIZED_CHUNK,
+        target: "background",
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        chunkStartMs: 0,
+        chunkEndMs: 1000,
+        mimeType: "audio/webm",
+        chunkPayload: new Blob([new Uint8Array(2048).fill(1)], { type: "audio/webm" })
+      },
+      { tab: { id: 7 } },
+      sendResponse,
+    );
+
+    expect(controller.captureCoordinator.recordSnapshot).toHaveBeenCalled();
+    expect(controller.sttCoordinator.handleFinalizedChunk).toHaveBeenCalledTimes(1);
+    expect(response.success).toBe(true);
+    expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
   it("supports cache dependency injection", () => {
@@ -686,6 +725,8 @@ describe("live-caption background controller", () => {
       })
     };
     const controller = createController({ transcriptEventCoordinator });
+    const messageHandler = createMessageHandler();
+    controller.registerHandlers(messageHandler);
     const session = controller.sessionManager.getOrCreateSession(7);
     session.sessionId = "session-1";
     session.replaceVideoSession(new VideoCaptionSession({
@@ -693,8 +734,10 @@ describe("live-caption background controller", () => {
       videoFingerprint: "video-a"
     }));
 
-    const response = await controller.handleStreamingTranscriptEvent(
+    const sendResponse = vi.fn();
+    const response = await messageHandler._handleMessage(
       {
+        action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
         type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
         sessionId: "session-1",
         tabId: 7,
@@ -718,7 +761,8 @@ describe("live-caption background controller", () => {
           metadata: {}
         }
       },
-      {},
+      { tab: { id: 7 } },
+      sendResponse,
     );
 
     expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).toHaveBeenCalledWith(
@@ -730,6 +774,7 @@ describe("live-caption background controller", () => {
     );
     expect(response.success).toBe(true);
     expect(response.message).toBe("streaming_transcript_event_received");
+    expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
   it("keeps streaming status events out of transcript processing", async () => {
@@ -737,6 +782,8 @@ describe("live-caption background controller", () => {
       handleStreamingTranscriptEvent: vi.fn()
     };
     const controller = createController({ transcriptEventCoordinator });
+    const messageHandler = createMessageHandler();
+    controller.registerHandlers(messageHandler);
     const session = controller.sessionManager.getOrCreateSession(7);
     session.sessionId = "session-1";
     session.replaceVideoSession(new VideoCaptionSession({
@@ -744,8 +791,10 @@ describe("live-caption background controller", () => {
       videoFingerprint: "video-a"
     }));
 
-    const response = await controller.handleStreamingStatus(
+    const sendResponse = vi.fn();
+    const response = await messageHandler._handleMessage(
       {
+        action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
         type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
         sessionId: "session-1",
         tabId: 7,
@@ -753,12 +802,14 @@ describe("live-caption background controller", () => {
         status: "ready",
         providerId: "faster_whisper_streaming"
       },
-      {},
+      { tab: { id: 7 } },
+      sendResponse,
     );
 
     expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).not.toHaveBeenCalled();
     expect(response.success).toBe(true);
     expect(response.message).toBe("streaming_status_received");
+    expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
   it("keeps streaming error events out of transcript processing and routes fail-close", async () => {
@@ -766,6 +817,8 @@ describe("live-caption background controller", () => {
       handleStreamingTranscriptEvent: vi.fn()
     };
     const controller = createController({ transcriptEventCoordinator });
+    const messageHandler = createMessageHandler();
+    controller.registerHandlers(messageHandler);
     const session = controller.sessionManager.getOrCreateSession(7);
     session.sessionId = "session-1";
     session.replaceVideoSession(new VideoCaptionSession({
@@ -774,8 +827,10 @@ describe("live-caption background controller", () => {
     }));
     controller.handleCoordinatorError = vi.fn();
 
-    const response = await controller.handleStreamingError(
+    const sendResponse = vi.fn();
+    const response = await messageHandler._handleMessage(
       {
+        action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
         type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
         sessionId: "session-1",
         tabId: 7,
@@ -786,7 +841,8 @@ describe("live-caption background controller", () => {
           message: "socket closed"
         }
       },
-      {},
+      { tab: { id: 7 } },
+      sendResponse,
     );
 
     expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).not.toHaveBeenCalled();
@@ -803,6 +859,7 @@ describe("live-caption background controller", () => {
     );
     expect(response.success).toBe(true);
     expect(response.message).toBe("streaming_error_handled");
+    expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
   it("handles offscreen health success without disruption", async () => {

@@ -271,6 +271,7 @@ export class LiveCaptionOffscreenRuntimeShell {
 
     const forwardedMessage = {
       ...message,
+      action: message?.type ?? message?.action ?? null,
       source: 'offscreen',
       target: 'background'
     };
