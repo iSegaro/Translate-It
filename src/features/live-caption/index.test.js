@@ -77,6 +77,7 @@ import {
   normalizeLiveCaptionTranslationSegment,
   LiveCaptionOffscreenBridge,
   LiveCaptionCaptureCoordinator,
+  LiveCaptionTranscriptEventCoordinator,
   LIVE_CAPTION_CAPTURE_STATES,
   LIVE_CAPTION_OFFSCREEN_ERROR_CODES,
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
@@ -200,6 +201,7 @@ describe('live-caption feature shell', () => {
     expect(normalizeLiveCaptionTranslationSegment).toBe(LiveCaptionFeature.contracts.normalizeLiveCaptionTranslationSegment);
     expect(LiveCaptionOffscreenBridge).toBe(LiveCaptionFeature.contracts.LiveCaptionOffscreenBridge);
     expect(LiveCaptionCaptureCoordinator).toBe(LiveCaptionFeature.contracts.LiveCaptionCaptureCoordinator);
+    expect(LiveCaptionTranscriptEventCoordinator).toBe(LiveCaptionFeature.contracts.LiveCaptionTranscriptEventCoordinator);
     expect(LIVE_CAPTION_CAPTURE_STATES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_CAPTURE_STATES);
     expect(LIVE_CAPTION_OFFSCREEN_ERROR_CODES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_OFFSCREEN_ERROR_CODES);
     expect(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES).toBe(LiveCaptionFeature.contracts.LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES);

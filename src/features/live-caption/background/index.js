@@ -46,6 +46,7 @@ import {
   normalizeLiveCaptionOffscreenResponse
 } from './LiveCaptionOffscreenBridge.js';
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
+import { LiveCaptionTranscriptEventCoordinator } from './LiveCaptionTranscriptEventCoordinator.js';
 import {
   LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
   STT_PROVIDER_MODES,
@@ -102,6 +103,7 @@ export {
   normalizeLiveCaptionOffscreenResponse
 } from './LiveCaptionOffscreenBridge.js';
 export { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
+export { LiveCaptionTranscriptEventCoordinator } from './LiveCaptionTranscriptEventCoordinator.js';
 export {
   LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
   STT_PROVIDER_MODES,
@@ -156,6 +158,7 @@ export default {
   STT_PROVIDER_EXECUTION_LOCATIONS,
   normalizeLiveCaptionTranscriptEvent,
   createLiveCaptionTranscriptEvent,
+  LiveCaptionTranscriptEventCoordinator,
   LiveCaptionSTTCoordinator,
   LiveCaptionTranslationCoordinator
 };
