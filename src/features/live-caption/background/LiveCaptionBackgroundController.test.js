@@ -18,6 +18,7 @@ import {
 } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
+import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
 import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
 import {
   getLiveCaptionQualityProfileAsync,
@@ -403,6 +404,233 @@ describe("live-caption background controller", () => {
     const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-openai")?.[0];
     expect(startRequest).toBeTruthy();
     expect(startRequest.data.metadata?.chunkTimeslice).toBeUndefined();
+    controller.destroy();
+  });
+
+  it("starts the streaming offscreen provider when faster_whisper_streaming is selected", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("faster_whisper_streaming");
+
+    const controller = createController();
+    const startStreamingSpy = vi.spyOn(controller.offscreenBridge, "startStreamingSttSession");
+
+    const response = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-streaming",
+        videoFingerprint: "video-streaming",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(startStreamingSpy).toHaveBeenCalledTimes(1);
+    expect(startStreamingSpy).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "session-streaming",
+      tabId: 7,
+      videoFingerprint: "video-streaming",
+      providerId: "faster_whisper_streaming",
+      providerMode: "streaming",
+      executionLocation: "offscreen"
+    }));
+    expect(controller.activeStreamingSession).toMatchObject({
+      sessionId: "session-streaming",
+      tabId: 7,
+      videoFingerprint: "video-streaming",
+      providerId: "faster_whisper_streaming",
+      providerMode: "streaming",
+      executionLocation: "offscreen",
+      state: "active"
+    });
+    controller.destroy();
+  });
+
+  it("clears capture coordinator runtime state when streaming startup fails after capture begins", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("faster_whisper_streaming");
+
+    const controller = createController();
+    controller.offscreenBridge.startStreamingSttSession = vi.fn().mockResolvedValue({
+      success: false,
+      ok: false,
+      error: {
+        code: "streaming_provider_start_failed",
+        message: "ready timeout"
+      }
+    });
+
+    const response = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-streaming-fail",
+        videoFingerprint: "video-streaming-fail",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(response.success).toBe(false);
+    expect(response.status).toBe(LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.FAIL_CLOSED);
+    expect(controller.captureCoordinator.runtimeState).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
+    expect(controller.activeStreamingSession).toBe(null);
+    expect(controller.sessionManager.getSession(7)).toBe(null);
+    controller.destroy();
+  });
+
+  it("clears capture coordinator runtime state on streaming provider fail-close", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("faster_whisper_streaming");
+
+    const controller = createController();
+    controller.offscreenBridge.startStreamingSttSession = vi.fn().mockResolvedValue({
+      success: true,
+      ok: true,
+      status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+      runtimeState: LIVE_CAPTION_RUNTIME_STATES.RUNNING,
+      message: "streaming_stt_active"
+    });
+    controller.offscreenBridge.stopStreamingSttSession = vi.fn().mockResolvedValue({
+      success: true,
+      ok: true,
+      status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+      runtimeState: LIVE_CAPTION_RUNTIME_STATES.IDLE,
+      message: "streaming_stt_closed"
+    });
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-streaming-error",
+        videoFingerprint: "video-streaming-error",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    controller.handleCoordinatorError(new Error("provider failed"), {
+      sessionId: "session-streaming-error",
+      tabId: 7,
+      videoFingerprint: "video-streaming-error"
+    });
+
+    expect(controller.captureCoordinator.runtimeState).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
+    expect(controller.activeStreamingSession).toBe(null);
+    expect(controller.offscreenBridge.stopStreamingSttSession).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "session-streaming-error",
+      tabId: 7,
+      videoFingerprint: "video-streaming-error",
+      reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR
+    }));
+    controller.destroy();
+  });
+
+  it("allows restarting streaming after a fail-close without stale capture state", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValue("faster_whisper_streaming");
+
+    const controller = createController();
+    const startStreamingMock = vi.fn();
+    startStreamingMock
+      .mockResolvedValueOnce({
+        success: false,
+        ok: false,
+        error: {
+          code: "streaming_provider_start_failed",
+          message: "ready timeout"
+        }
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        ok: true,
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.RUNNING,
+        message: "streaming_stt_active"
+      });
+    controller.offscreenBridge.startStreamingSttSession = startStreamingMock;
+
+    const firstResponse = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-restart",
+        videoFingerprint: "video-restart",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(firstResponse.success).toBe(false);
+    expect(controller.captureCoordinator.runtimeState).toBe(LIVE_CAPTION_RUNTIME_STATES.IDLE);
+    expect(controller.activeStreamingSession).toBe(null);
+
+    const secondResponse = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-restart-2",
+        videoFingerprint: "video-restart-2",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(secondResponse.success).toBe(true);
+    expect(controller.captureCoordinator.runtimeState).toBe(LIVE_CAPTION_RUNTIME_STATES.RUNNING);
+    expect(controller.activeStreamingSession).toMatchObject({
+      sessionId: "session-restart-2",
+      tabId: 7,
+      videoFingerprint: "video-restart-2",
+      state: "active"
+    });
+    expect(startStreamingMock).toHaveBeenCalledTimes(2);
+    controller.destroy();
+  });
+
+  it("does not start the streaming provider for batch runtime providers", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("openai_whisper");
+
+    const controller = createController();
+    const startStreamingSpy = vi.spyOn(controller.offscreenBridge, "startStreamingSttSession");
+
+    const response = await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-batch",
+        videoFingerprint: "video-batch",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(startStreamingSpy).not.toHaveBeenCalled();
+    expect(controller.activeStreamingSession).toBe(null);
+    controller.destroy();
+  });
+
+  it("stops the active streaming provider when stopping a streaming runtime", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("faster_whisper_streaming");
+
+    const controller = createController();
+    const stopStreamingSpy = vi.spyOn(controller.offscreenBridge, "stopStreamingSttSession");
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-streaming-stop",
+        videoFingerprint: "video-streaming-stop",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const response = await controller.handleRuntimeStop(
+      createLiveCaptionRuntimeStopRequest({
+        tabId: 7,
+        sessionId: "session-streaming-stop",
+        videoFingerprint: "video-streaming-stop",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(stopStreamingSpy).toHaveBeenCalledTimes(1);
+    expect(stopStreamingSpy).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "session-streaming-stop",
+      tabId: 7,
+      videoFingerprint: "video-streaming-stop",
+      providerId: "faster_whisper_streaming",
+      reason: LIVE_CAPTION_CLEANUP_REASONS.STOP
+    }));
+    expect(controller.activeStreamingSession).toBe(null);
     controller.destroy();
   });
 

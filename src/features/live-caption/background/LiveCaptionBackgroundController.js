@@ -28,6 +28,14 @@ import {
 } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_ACTIONS } from "../constants/liveCaptionActions.js";
 import { getLiveCaptionSttProviderAsync, getLiveCaptionQualityProfileAsync } from "@/shared/config/config.js";
+import {
+  getSTTProviderDefinition,
+  resolveProviderExecutionHost
+} from "../stt/STTProviderManifest.js";
+import {
+  STT_PROVIDER_EXECUTION_LOCATIONS,
+  STT_PROVIDER_MODES
+} from "../stt/liveCaptionSTTProviderContracts.js";
 
 const LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE = Object.freeze({
   fast: 4000,
@@ -48,11 +56,11 @@ function normalizeTabId(tabId) {
   return tabId;
 }
 
-async function resolveRuntimeStartMetadata(metadata = {}) {
+async function resolveRuntimeStartMetadata(metadata = {}, providerId = null) {
   const normalizedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {};
-  const providerId = await getLiveCaptionSttProviderAsync();
+  const resolvedProviderId = providerId ?? await getLiveCaptionSttProviderAsync();
 
-  if (providerId === 'local_whisper') {
+  if (resolvedProviderId === 'local_whisper') {
     const qualityProfile = await getLiveCaptionQualityProfileAsync();
     normalizedMetadata.chunkTimeslice = LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE[
       typeof qualityProfile === 'string' ? qualityProfile.trim().toLowerCase() : ''
@@ -109,6 +117,7 @@ export class LiveCaptionBackgroundController {
     this.lastAction = null;
     this.lastRequest = null;
     this.lastResponse = null;
+    this.activeStreamingSession = null;
 
     this._startHealthMonitor();
 
@@ -121,8 +130,149 @@ export class LiveCaptionBackgroundController {
     this.updatedAt = Date.now();
   }
 
-  async _resolveRuntimeStartMetadata(metadata = {}) {
-    return resolveRuntimeStartMetadata(metadata);
+  async _resolveRuntimeStartMetadata(metadata = {}, providerId = null) {
+    return resolveRuntimeStartMetadata(metadata, providerId);
+  }
+
+  _setActiveStreamingSession(context = null) {
+    this.activeStreamingSession = context ? { ...context } : null;
+    return this.activeStreamingSession;
+  }
+
+  _clearActiveStreamingSession() {
+    this.activeStreamingSession = null;
+    return this.activeStreamingSession;
+  }
+
+  _stopCaptureCoordinatorOnFailClose({
+    sessionId = null,
+    tabId = null,
+    videoFingerprint = null,
+    reason = LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
+  } = {}) {
+    try {
+      this.captureCoordinator.stopRuntime({
+        sessionId,
+        tabId,
+        videoFingerprint,
+        reason,
+      });
+      this.captureCoordinator.setRuntimeState(LIVE_CAPTION_RUNTIME_STATES.IDLE, {
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
+        reason,
+        failClosed: true,
+      });
+    } catch (error) {
+      logger.warn('Failed to unwind capture coordinator on fail-close', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        reason,
+        error: error?.message ?? String(error)
+      });
+    }
+  }
+
+  async _resolveSelectedStreamingProvider() {
+    const providerId = await getLiveCaptionSttProviderAsync();
+    const definition = getSTTProviderDefinition(providerId);
+    const executionLocation = definition?.executionLocation ?? resolveProviderExecutionHost(providerId);
+    const mode = definition?.mode ?? null;
+
+    return {
+      providerId,
+      definition,
+      mode,
+      executionLocation,
+      isStreamingOffscreen:
+        mode === STT_PROVIDER_MODES.STREAMING &&
+        executionLocation === STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN,
+    };
+  }
+
+  async _startActiveStreamingSession({
+    session,
+    request,
+    providerRuntime
+  }) {
+    if (!providerRuntime?.isStreamingOffscreen) {
+      this._clearActiveStreamingSession();
+      return null;
+    }
+
+    const streamingStartResponse = await this.offscreenBridge.startStreamingSttSession({
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+      providerId: providerRuntime.providerId,
+      providerMode: providerRuntime.mode,
+      executionLocation: providerRuntime.executionLocation,
+      sourceLanguage: request.data.sourceLanguage ?? null,
+      targetLanguage: request.data.targetLanguage ?? null,
+      providerOptions: request.data.providerOptions ?? {},
+      metadata: request.data.metadata ?? {},
+      requestId: request.messageId,
+      runtimeState: this.captureCoordinator.runtimeState,
+      message: 'Live-caption streaming provider start'
+    });
+
+    if (
+      streamingStartResponse?.success === false ||
+      streamingStartResponse?.ok === false
+    ) {
+      const startError = streamingStartResponse?.error || new Error('Live-caption streaming provider start failed');
+      this._clearActiveStreamingSession();
+      throw startError;
+    }
+
+    this._setActiveStreamingSession({
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: request.data.videoFingerprint ?? session.activeVideoFingerprint ?? null,
+      providerId: providerRuntime.providerId,
+      providerMode: providerRuntime.mode,
+      executionLocation: providerRuntime.executionLocation,
+      requestId: request.messageId,
+      startedAt: Date.now(),
+      state: 'active'
+    });
+
+    return streamingStartResponse;
+  }
+
+  async _stopActiveStreamingSession({
+    reason = LIVE_CAPTION_CLEANUP_REASONS.STOP,
+    requestId = null,
+    sessionId = null,
+    tabId = null,
+    videoFingerprint = null,
+  } = {}) {
+    const activeStreamingSession = this.activeStreamingSession;
+    if (!activeStreamingSession) {
+      return null;
+    }
+
+    this._clearActiveStreamingSession();
+
+    try {
+      return await this.offscreenBridge.stopStreamingSttSession({
+        sessionId: sessionId ?? activeStreamingSession.sessionId,
+        tabId: tabId ?? activeStreamingSession.tabId,
+        videoFingerprint: videoFingerprint ?? activeStreamingSession.videoFingerprint,
+        providerId: activeStreamingSession.providerId,
+        requestId: requestId ?? activeStreamingSession.requestId ?? null,
+        reason
+      });
+    } catch (error) {
+      logger.warn('Failed to stop active streaming provider session', {
+        sessionId: sessionId ?? activeStreamingSession.sessionId,
+        tabId: tabId ?? activeStreamingSession.tabId,
+        videoFingerprint: videoFingerprint ?? activeStreamingSession.videoFingerprint,
+        providerId: activeStreamingSession.providerId,
+        error: error?.message ?? String(error)
+      });
+      return null;
+    }
   }
 
   _startHealthMonitor() {
@@ -136,6 +286,13 @@ export class LiveCaptionBackgroundController {
       this._healthInterval = null;
     }
 
+    void this._stopActiveStreamingSession({
+      reason: LIVE_CAPTION_CLEANUP_REASONS.MANUAL,
+    });
+    this._stopCaptureCoordinatorOnFailClose({
+      reason: LIVE_CAPTION_CLEANUP_REASONS.MANUAL,
+    });
+    this._clearActiveStreamingSession();
     this.transcriptEventCoordinator?.destroy?.();
   }
 
@@ -170,6 +327,19 @@ export class LiveCaptionBackgroundController {
           tabId: session.tabId, 
           sessionId: session.sessionId, 
           error: error.message 
+        });
+
+        void this._stopActiveStreamingSession({
+          reason: LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE,
+          sessionId: session.sessionId,
+          tabId: session.tabId,
+          videoFingerprint: session.activeVideoFingerprint
+        });
+        this._stopCaptureCoordinatorOnFailClose({
+          reason: LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE,
+          sessionId: session.sessionId,
+          tabId: session.tabId,
+          videoFingerprint: session.activeVideoFingerprint
         });
 
         this.offscreenBridge.requestRuntimeStop({
@@ -259,6 +429,18 @@ export class LiveCaptionBackgroundController {
     }
 
     // 3. Perform internal cleanup
+    void this._stopActiveStreamingSession({
+      reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
+      sessionId,
+      tabId,
+      videoFingerprint
+    });
+    this._stopCaptureCoordinatorOnFailClose({
+      sessionId,
+      tabId,
+      videoFingerprint,
+      reason: LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR,
+    });
     this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.PROVIDER_ERROR, error);
 
     // 4. Stop offscreen capture
@@ -699,6 +881,11 @@ export class LiveCaptionBackgroundController {
         sender,
         LIVE_CAPTION_RUNTIME_ACTIONS.START,
       );
+      const providerRuntime = await this._resolveSelectedStreamingProvider();
+      const streamingMetadata = await this._resolveRuntimeStartMetadata(
+        request.data.metadata,
+        providerRuntime.providerId
+      );
 
       // 3. Ensure the offscreen document is open before messaging it
       await this.offscreenBridge.ensureOffscreenDocument();
@@ -776,7 +963,7 @@ export class LiveCaptionBackgroundController {
         requestId: request.messageId,
         runtimeState: this.captureCoordinator.runtimeState,
         streamId, // Forward the stream ID!
-        metadata: await this._resolveRuntimeStartMetadata(request.data.metadata),
+        metadata: streamingMetadata,
         message: "Live-caption runtime start",
       });
 
@@ -810,6 +997,50 @@ export class LiveCaptionBackgroundController {
               "offscreen_failure",
           },
         );
+      }
+
+      let streamingStartResponse = null;
+      if (providerRuntime.isStreamingOffscreen) {
+        try {
+          streamingStartResponse = await this._startActiveStreamingSession({
+            session,
+            request,
+            providerRuntime
+          });
+        } catch (streamingStartError) {
+          this.handleCoordinatorError(streamingStartError, {
+            sessionId: session.sessionId,
+            tabId,
+            videoFingerprint:
+              request.data.videoFingerprint ??
+              session.activeVideoFingerprint ??
+              null,
+          });
+
+          return this._buildFailClosedResponse(
+            LIVE_CAPTION_RUNTIME_ACTIONS.START,
+            streamingStartError,
+            {
+              action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+              sessionId: session.sessionId,
+              tabId,
+              videoFingerprint:
+                request.data.videoFingerprint ??
+                session.activeVideoFingerprint ??
+                null,
+              runtimeState: this.captureCoordinator.runtimeState,
+              message: streamingStartResponse?.message,
+              reason:
+                streamingStartError?.reason ??
+                "streaming_provider_start_failed",
+              code:
+                streamingStartError?.code ??
+                "streaming_provider_start_failed",
+            }
+          );
+        }
+      } else {
+        this._clearActiveStreamingSession();
       }
 
       const response = this._buildShellResponse({
@@ -901,6 +1132,17 @@ export class LiveCaptionBackgroundController {
           action: LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
           reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
         });
+
+      await this._stopActiveStreamingSession({
+        reason: request.data.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
+        requestId: request.messageId,
+        sessionId: session.sessionId,
+        tabId,
+        videoFingerprint:
+          request.data.videoFingerprint ??
+          session.activeVideoFingerprint ??
+          null,
+      });
 
       // Stop/abort STT and translation sessions
       await this.sttCoordinator.stopSession(session.sessionId);
@@ -1012,6 +1254,18 @@ export class LiveCaptionBackgroundController {
 
       return response;
     } catch (error) {
+      void this._stopActiveStreamingSession({
+        reason: LIVE_CAPTION_CLEANUP_REASONS.STOP,
+        sessionId: message?.data?.sessionId ?? null,
+        tabId: message?.data?.tabId ?? null,
+        videoFingerprint: message?.data?.videoFingerprint ?? null,
+      });
+      this._stopCaptureCoordinatorOnFailClose({
+        sessionId: message?.data?.sessionId ?? null,
+        tabId: message?.data?.tabId ?? null,
+        videoFingerprint: message?.data?.videoFingerprint ?? null,
+        reason: message?.data?.reason ?? LIVE_CAPTION_CLEANUP_REASONS.STOP,
+      });
       return this._buildFailClosedResponse(
         LIVE_CAPTION_RUNTIME_ACTIONS.STOP,
         error,
