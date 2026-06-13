@@ -345,7 +345,7 @@ describe('FasterWhisperStreamingProvider', () => {
     expect(provider.state).toBe(STT_STREAMING_PROVIDER_STATES.ERROR);
   });
 
-  it('does not attempt reconnect and does not send audio chunks yet', async () => {
+  it('sends binary audio chunks for Blob, ArrayBuffer, and Uint8Array inputs', async () => {
     const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
     const websocketFactory = vi.fn(() => socket);
     const provider = new FasterWhisperStreamingProvider({
@@ -364,14 +364,63 @@ describe('FasterWhisperStreamingProvider', () => {
       state: STT_STREAMING_PROVIDER_STATES.ACTIVE
     });
 
-    await expect(provider.handleAudioChunk(new Blob(['audio']))).resolves.toMatchObject({
-      handled: false,
-      status: 'unsupported',
-      reason: 'audio_chunk_not_supported',
-      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID
+    const blobResult = await provider.handleAudioChunk(new Blob([new Uint8Array([1, 2, 3])]));
+    const arrayBufferResult = await provider.handleAudioChunk(new Uint8Array([4, 5, 6]).buffer);
+    const uint8ArrayResult = await provider.handleAudioChunk(new Uint8Array([7, 8, 9]));
+
+    expect(blobResult).toMatchObject({
+      handled: true,
+      status: 'sent',
+      bytes: 3
     });
-    expect(socket.sent).toHaveLength(1);
+    expect(arrayBufferResult).toMatchObject({
+      handled: true,
+      status: 'sent',
+      bytes: 3
+    });
+    expect(uint8ArrayResult).toMatchObject({
+      handled: true,
+      status: 'sent',
+      bytes: 3
+    });
+    expect(socket.sent).toHaveLength(4);
+    expect(socket.sent.slice(1).every((payload) => payload instanceof Uint8Array)).toBe(true);
+    expect(socket.sent.slice(1).every((payload) => typeof payload !== 'string')).toBe(true);
+    expect(Array.from(socket.sent[1])).toEqual([1, 2, 3]);
+    expect(Array.from(socket.sent[2])).toEqual([4, 5, 6]);
+    expect(Array.from(socket.sent[3])).toEqual([7, 8, 9]);
     expect(websocketFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns not_ready before ready and on closed sockets without emitting errors', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory: vi.fn(() => socket)
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a'
+    });
+    startPromise.catch(() => undefined);
+
+    socket.open();
+
+    await expect(provider.handleAudioChunk(new Uint8Array([1, 2, 3]))).resolves.toMatchObject({
+      handled: false,
+      status: 'not_ready'
+    });
+
+    await provider.stopSession({ reason: 'stop' });
+
+    await expect(provider.handleAudioChunk(new Uint8Array([4, 5, 6]))).resolves.toMatchObject({
+      handled: false,
+      status: 'not_ready'
+    });
+    expect(eventSink.emit.mock.calls.some(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.ERROR)).toBe(false);
   });
 
   it('registers metadata for the offscreen streaming skeleton', () => {

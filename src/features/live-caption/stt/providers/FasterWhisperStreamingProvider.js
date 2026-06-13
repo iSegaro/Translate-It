@@ -439,12 +439,50 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
     return this._handleServerMessage(message);
   }
 
-  async handleAudioChunk() {
+  async _normalizeAudioChunk(audioChunk) {
+    if (audioChunk instanceof Uint8Array) {
+      return audioChunk;
+    }
+
+    if (audioChunk instanceof ArrayBuffer) {
+      return new Uint8Array(audioChunk);
+    }
+
+    if (audioChunk instanceof Blob) {
+      return new Uint8Array(await audioChunk.arrayBuffer());
+    }
+
+    throw new TypeError('Faster Whisper streaming provider requires a Blob, ArrayBuffer, or Uint8Array audio chunk');
+  }
+
+  async handleAudioChunk(audioChunk, metadata = {}) {
+    const socket = this._socket;
+    const isReady = this.state === STT_STREAMING_PROVIDER_STATES.ACTIVE && this._readyReceived && socket && socket.readyState === 1;
+
+    if (!isReady) {
+      return Object.freeze({
+        handled: false,
+        status: 'not_ready',
+        providerId: this.providerId,
+        sessionId: this.session?.sessionId ?? null,
+        tabId: this.session?.tabId ?? null,
+        videoFingerprint: this.session?.videoFingerprint ?? null,
+        metadata: metadata ?? null
+      });
+    }
+
+    const uint8Array = await this._normalizeAudioChunk(audioChunk);
+    socket.send(uint8Array);
+
     return Object.freeze({
-      handled: false,
-      status: 'unsupported',
-      reason: 'audio_chunk_not_supported',
-      providerId: this.providerId
+      handled: true,
+      status: 'sent',
+      bytes: uint8Array.byteLength,
+      providerId: this.providerId,
+      sessionId: this.session?.sessionId ?? null,
+      tabId: this.session?.tabId ?? null,
+      videoFingerprint: this.session?.videoFingerprint ?? null,
+      metadata: metadata ?? null
     });
   }
 
