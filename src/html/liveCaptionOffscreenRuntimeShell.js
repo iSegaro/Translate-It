@@ -504,6 +504,72 @@ export class LiveCaptionOffscreenRuntimeShell {
       return;
     }
 
+    if (this.streamingProvider && this.streamingSessionContext && this._matchesStreamingSession(this.streamingSessionContext)) {
+      const provider = this.streamingProvider;
+      const chunkSessionContext = cloneSessionContext(this.streamingSessionContext);
+      const handleAudioChunk = provider?.handleAudioChunk;
+
+      if (typeof handleAudioChunk === 'function') {
+        try {
+          void Promise.resolve(handleAudioChunk.call(provider, chunkPayload, {
+            sessionId,
+            tabId,
+            videoFingerprint,
+            chunkStartMs,
+            chunkEndMs,
+            mimeType: chunkPayload.type || mimeType
+          })).catch((error) => {
+            logger.error('Streaming provider failed to handle finalized audio chunk:', error);
+            this._handleStreamingProviderEvent(provider, {
+              type: 'error',
+              providerId: provider?.providerId ?? chunkSessionContext.providerId ?? null,
+              sessionId: chunkSessionContext.sessionId,
+              tabId: chunkSessionContext.tabId,
+              videoFingerprint: chunkSessionContext.videoFingerprint,
+              error: {
+                code: error?.code ?? 'streaming_chunk_error',
+                message: error?.message ?? 'Streaming provider failed to handle finalized audio chunk',
+                details: {
+                  chunkStartMs,
+                  chunkEndMs,
+                  mimeType: chunkPayload.type || mimeType
+                }
+              }
+            });
+          });
+        } catch (error) {
+          logger.error('Streaming provider failed to handle finalized audio chunk:', error);
+          this._handleStreamingProviderEvent(provider, {
+            type: 'error',
+            providerId: provider?.providerId ?? chunkSessionContext.providerId ?? null,
+            sessionId: chunkSessionContext.sessionId,
+            tabId: chunkSessionContext.tabId,
+            videoFingerprint: chunkSessionContext.videoFingerprint,
+            error: {
+              code: error?.code ?? 'streaming_chunk_error',
+              message: error?.message ?? 'Streaming provider failed to handle finalized audio chunk',
+              details: {
+                chunkStartMs,
+                chunkEndMs,
+                mimeType: chunkPayload.type || mimeType
+              }
+            }
+          });
+        }
+
+        logger.debug('Routed finalized audio chunk to active streaming provider', {
+          sessionId,
+          tabId,
+          videoFingerprint,
+          chunkStartMs,
+          chunkEndMs,
+          sizeBytes: chunkPayload.size,
+          mimeType
+        });
+        return;
+      }
+    }
+
     if (!sessionId || !tabId || !videoFingerprint) {
       logger.debug('Skipping finalized chunk emission: session metadata is incomplete', {
         sessionId,

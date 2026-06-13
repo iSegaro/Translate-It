@@ -119,6 +119,7 @@ describe("live-caption offscreen runtime shell", () => {
       logger: null,
       state: "idle",
       session: null,
+      handleAudioChunk: vi.fn(),
       startSession: vi.fn(startSessionImpl ?? (async (sessionConfig) => {
         provider.state = "active";
         provider.session = { ...sessionConfig };
@@ -581,6 +582,224 @@ describe("live-caption offscreen runtime shell", () => {
     expect(staleTranscriptResponse.success).toBe(true);
     expect(staleTranscriptResponse.message).toBe("streaming_stale_session");
     expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("routes finalized blobs to the active streaming provider without base64 serialization", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: { type: "ready", sessionId: "session-1" }
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        data: {
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          streamId: "mock-stream-id",
+        },
+      },
+      {},
+    );
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+    provider.handleAudioChunk.mockClear();
+
+    const recorderInstance = MockMediaRecorder.instances[0];
+    const finalizedBlob = new Blob([new Uint8Array(16).fill(1)], { type: "audio/webm" });
+    recorderInstance.ondataavailable({ data: finalizedBlob });
+    shell.segmentRotationPending = true;
+    recorderInstance.stop();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(provider.handleAudioChunk).toHaveBeenCalledTimes(1);
+    expect(provider.handleAudioChunk).toHaveBeenCalledWith(
+      expect.any(Blob),
+      expect.objectContaining({
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a"
+      })
+    );
+    expect(provider.handleAudioChunk.mock.calls[0][0]).toBeInstanceOf(Blob);
+    expect(provider.handleAudioChunk.mock.calls[0][0].size).toBe(finalizedBlob.size);
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "live-caption/offscreen/finalized-chunk"
+      })
+    );
+  });
+
+  it("routes small finalized blobs to the active streaming provider and ignores base64 serialization", async () => {
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      readyPayload: { type: "ready", sessionId: "session-1" }
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        data: {
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          streamId: "mock-stream-id",
+        },
+      },
+      {},
+    );
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+    provider.handleAudioChunk.mockClear();
+
+    const recorderInstance = MockMediaRecorder.instances[0];
+    const smallBlob = new Blob([new Uint8Array(16).fill(1)], { type: "audio/webm" });
+    recorderInstance.ondataavailable({ data: smallBlob });
+    shell.segmentRotationPending = true;
+    recorderInstance.stop();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(provider.handleAudioChunk).toHaveBeenCalledTimes(1);
+    expect(provider.handleAudioChunk.mock.calls[0][0]).toBeInstanceOf(Blob);
+    expect(provider.handleAudioChunk.mock.calls[0][0].size).toBe(smallBlob.size);
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "live-caption/offscreen/finalized-chunk"
+      })
+    );
+  });
+
+  it("emits provider error behavior when streaming finalized chunk handling fails", async () => {
+    const providerError = new Error("chunk failure");
+    const { provider, factory } = createStreamingProviderFactory({
+      startSessionImpl: vi.fn(async (sessionConfig) => {
+        provider.state = "active";
+        provider.session = { ...sessionConfig };
+        return {
+          handled: true,
+          status: "ready",
+          providerId: provider.providerId,
+          sessionId: sessionConfig.sessionId,
+          tabId: sessionConfig.tabId,
+          videoFingerprint: sessionConfig.videoFingerprint,
+          readyPayload: { type: "ready", sessionId: sessionConfig.sessionId }
+        };
+      })
+    });
+    provider.handleAudioChunk.mockRejectedValue(providerError);
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        data: {
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          streamId: "mock-stream-id",
+        },
+      },
+      {},
+    );
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen"
+      },
+      {},
+    );
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+
+    const recorderInstance = MockMediaRecorder.instances[0];
+    recorderInstance.ondataavailable({ data: new Blob([new Uint8Array(2048).fill(1)], { type: "audio/webm" }) });
+    shell.segmentRotationPending = true;
+    recorderInstance.stop();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+        source: "offscreen",
+        target: "background",
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        error: expect.objectContaining({
+          code: "streaming_chunk_error"
+        })
+      })
+    );
+    expect(shell.streamingProvider).toBeNull();
+    expect(shell.streamingSessionContext).toBeNull();
   });
 
   it("forwards closed events and clears streaming ownership", async () => {
