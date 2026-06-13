@@ -135,6 +135,8 @@ export class LiveCaptionBackgroundController {
       clearInterval(this._healthInterval);
       this._healthInterval = null;
     }
+
+    this.transcriptEventCoordinator?.destroy?.();
   }
 
   async _performHealthCheck() {
@@ -177,6 +179,7 @@ export class LiveCaptionBackgroundController {
           reason: "health_check_failure"
         }).catch(() => {});
 
+        this.transcriptEventCoordinator?.clearSession?.(session.sessionId);
         this.sessionManager.failClosedCleanup(session.tabId, LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE);
 
         if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
@@ -214,6 +217,18 @@ export class LiveCaptionBackgroundController {
       errorType: error?.type,
       message: error?.message
     });
+
+    if (sessionId) {
+      if (tabId != null && videoFingerprint) {
+        this.transcriptEventCoordinator?.clearVideoSession?.({
+          sessionId,
+          tabId,
+          videoFingerprint
+        });
+      } else {
+        this.transcriptEventCoordinator?.clearSession?.(sessionId);
+      }
+    }
 
     // 2. Notify content script IMMEDIATELY before we destroy the session state
     if (this.offscreenBridge.browserApi?.tabs?.sendMessage) {
@@ -381,6 +396,7 @@ export class LiveCaptionBackgroundController {
     } catch (error) {
       logger.error("Failed to reconcile orphaned live-caption session, failing closed", { tabId, sessionId, error: error.message });
 
+      this.transcriptEventCoordinator?.clearSession?.(sessionId);
       this.sessionManager.failClosedCleanup(tabId, LIVE_CAPTION_CLEANUP_REASONS.RECOVERY_FAILURE);
       this.offscreenBridge.requestRuntimeStop({
         sessionId, tabId, videoFingerprint, reason: "recovery_failure"
@@ -889,6 +905,7 @@ export class LiveCaptionBackgroundController {
       // Stop/abort STT and translation sessions
       await this.sttCoordinator.stopSession(session.sessionId);
       this.translationCoordinator.stopSession(session.sessionId);
+      this.transcriptEventCoordinator?.clearSession?.(session.sessionId);
 
       this.sessionManager.cleanupByTabId(
         tabId,
@@ -1367,6 +1384,13 @@ export class LiveCaptionBackgroundController {
             oldFingerprint: session.activeVideoFingerprint,
             newFingerprint: videoFingerprint
           });
+          if (session.activeVideoFingerprint) {
+            this.transcriptEventCoordinator?.clearVideoSession?.({
+              sessionId: session.sessionId,
+              tabId,
+              videoFingerprint: session.activeVideoFingerprint
+            });
+          }
           const videoSession = new VideoCaptionSession({ tabId, videoFingerprint });
           session.replaceVideoSession(videoSession, LIVE_CAPTION_CLEANUP_REASONS.VIDEO_CHANGED);
           session.start();

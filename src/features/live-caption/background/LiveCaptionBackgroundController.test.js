@@ -105,6 +105,15 @@ describe("live-caption background controller", () => {
     return c;
   }
 
+  function createTranscriptEventCoordinatorMock() {
+    return {
+      handleStreamingTranscriptEvent: vi.fn(),
+      clearSession: vi.fn(),
+      clearVideoSession: vi.fn(),
+      destroy: vi.fn()
+    };
+  }
+
   it("registers runtime handlers and routes shell requests without media work", async () => {
     const messageHandler = {
       registerHandler: vi.fn(),
@@ -617,6 +626,86 @@ describe("live-caption background controller", () => {
     expect(controller.captureCoordinator.runtimeState).toBe(
       LIVE_CAPTION_RUNTIME_STATES.ERROR,
     );
+  });
+
+  it("clears transcript revision state on runtime stop", async () => {
+    const transcriptEventCoordinator = createTranscriptEventCoordinatorMock();
+    const sttCoordinator = {
+      stopSession: vi.fn().mockResolvedValue(undefined)
+    };
+    const translationCoordinator = {
+      stopSession: vi.fn(),
+      activeAbortControllers: new Map(),
+      sessionQueues: new Map()
+    };
+    const cache = {
+      clearVideo: vi.fn().mockResolvedValue(undefined)
+    };
+    const controller = createController({
+      transcriptEventCoordinator,
+      sttCoordinator,
+      translationCoordinator,
+      cache
+    });
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    const response = await controller.handleRuntimeStop(
+      createLiveCaptionRuntimeStopRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    expect(response.success).toBe(true);
+    expect(transcriptEventCoordinator.clearSession).toHaveBeenCalledWith("session-1");
+    expect(transcriptEventCoordinator.clearVideoSession).not.toHaveBeenCalled();
+  });
+
+  it("clears transcript revision state on fail-close cleanup", async () => {
+    const transcriptEventCoordinator = createTranscriptEventCoordinatorMock();
+    const controller = createController({ transcriptEventCoordinator });
+    controller.offscreenBridge.browserApi = {
+      tabs: {
+        sendMessage: vi.fn().mockResolvedValue(undefined)
+      }
+    };
+    controller.offscreenBridge.requestRuntimeStop = vi.fn().mockResolvedValue(undefined);
+
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    controller.handleCoordinatorError(new Error("provider failed"), {
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    });
+
+    expect(transcriptEventCoordinator.clearVideoSession).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    });
+    expect(transcriptEventCoordinator.clearSession).not.toHaveBeenCalled();
+  });
+
+  it("clears all transcript revision state when the controller is destroyed", () => {
+    const transcriptEventCoordinator = createTranscriptEventCoordinatorMock();
+    const controller = createController({ transcriptEventCoordinator });
+
+    controller.destroy();
+
+    expect(transcriptEventCoordinator.destroy).toHaveBeenCalledTimes(1);
   });
 
   it("handles finalized chunk messages cleanly without raw stream or side effects", async () => {
@@ -1167,7 +1256,12 @@ describe("live-caption background controller", () => {
   });
 
   it("handles active-video handoff via handleVideoChanged without recreating page session", async () => {
-    const controller = createController();
+    const transcriptEventCoordinator = createTranscriptEventCoordinatorMock();
+    const cache = {
+      getTranscriptSegments: vi.fn().mockResolvedValue([]),
+      getTranslatedCaptionSegments: vi.fn().mockResolvedValue([])
+    };
+    const controller = createController({ transcriptEventCoordinator, cache });
     const session = controller.sessionManager.getOrCreateSession(7);
     session.sessionId = "session-1";
     session.lifecycleState = "active";
@@ -1196,6 +1290,11 @@ describe("live-caption background controller", () => {
     expect(controller.sessionManager.getSession(7)).toBe(session); // session not recreated
     expect(session.activeVideoFingerprint).toBe("video-new"); // fingerprint updated
     expect(controller.captureCoordinator.videoFingerprint).toBe("video-new"); // capture coordinator updated
+    expect(transcriptEventCoordinator.clearVideoSession).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-old"
+    });
     expect(controller.offscreenBridge.requestVideoChanged).toHaveBeenCalledWith(expect.objectContaining({
       videoFingerprint: "video-new",
       sessionId: "session-1",
