@@ -2,6 +2,9 @@ import LiveCaptionOffscreenRuntimeShell, {
   LIVE_CAPTION_RUNTIME_ACTIONS
 } from './liveCaptionOffscreenRuntimeShell.js';
 import {
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+} from '@/features/live-caption/background/liveCaptionOffscreenContracts.js';
+import {
   BROWSER_SPEECH_PROBE_ACTION,
   handleBrowserSpeechProbeRequest,
   installBrowserSpeechProbeGlobal
@@ -119,12 +122,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   delete cleanMessage.forwardedFromBackground;
   delete cleanMessage.target;
 
-  logger.info("Processing message targeted for offscreen:", cleanMessage.action);
-
   // Handle different TTS and audio actions
-  const action = cleanMessage.action;
+  const action = cleanMessage.action ?? cleanMessage.type;
 
-  if (Object.values(LIVE_CAPTION_RUNTIME_ACTIONS).includes(action)) {
+  logger.info("Processing message targeted for offscreen:", action);
+
+  if (
+    Object.values(LIVE_CAPTION_RUNTIME_ACTIONS).includes(action)
+    || Object.values(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES).includes(action)
+  ) {
     Promise.resolve(liveCaptionOffscreenRuntimeShell.handleMessage(cleanMessage, sender))
       .then((response) => {
         sendResponse(response);

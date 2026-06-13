@@ -4,6 +4,7 @@ import LiveCaptionOffscreenRuntimeShell, {
   LIVE_CAPTION_RUNTIME_SHELL_STATES,
 } from "./liveCaptionOffscreenRuntimeShell.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "@/features/live-caption/constants/liveCaptionRuntimeStates.js";
+import { LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES } from "@/features/live-caption/background/liveCaptionOffscreenContracts.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -240,6 +241,94 @@ describe("live-caption offscreen runtime shell", () => {
     expect(shell.getSnapshot().status).toBe(
       LIVE_CAPTION_RUNTIME_SHELL_STATES.IDLE,
     );
+  });
+
+  it("recognizes streaming STT messages and returns deterministic no-op responses without touching MediaRecorder", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+
+    const startResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: "deepgram_streaming",
+        providerMode: "streaming",
+        executionLocation: "offscreen",
+      },
+      {},
+    );
+
+    const stopResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: "deepgram_streaming",
+      },
+      {},
+    );
+
+    const transcriptResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        event: {
+          eventType: "partial",
+          providerId: "deepgram_streaming",
+          providerMode: "streaming",
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+        },
+      },
+      {},
+    );
+
+    const statusResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: "deepgram_streaming",
+        status: "active",
+      },
+      {},
+    );
+
+    const errorResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        providerId: "deepgram_streaming",
+        error: {
+          code: "streaming_error",
+          message: "socket closed",
+        },
+      },
+      {},
+    );
+
+    expect(startResponse.success).toBe(true);
+    expect(startResponse.status).toBe("START_NOT_IMPLEMENTED");
+    expect(stopResponse.success).toBe(true);
+    expect(transcriptResponse.success).toBe(true);
+    expect(statusResponse.success).toBe(true);
+    expect(errorResponse.success).toBe(true);
+    expect(shell.captureState).toBe("idle");
+    expect(MockMediaRecorder.instances.length).toBe(0);
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalled();
   });
 
   it("fails closed for invalid, unknown, and inconsistent payloads", async () => {

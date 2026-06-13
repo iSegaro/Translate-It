@@ -16,7 +16,7 @@
 
 - [x] 3.1 Define offscreen-owned streaming provider session routing and websocket/session lifecycle contracts
 - [x] 3.2 Add offscreen bridge messages for starting, stopping, and reporting streaming transcript events
-- [ ] 3.3 Keep offscreen capture ownership unchanged while enabling streaming provider runtime execution
+- [x] 3.3 Keep offscreen capture ownership unchanged while enabling streaming provider runtime execution
 - [ ] 3.4 Add/update provider factory or host-resolution logic for offscreen-executed streaming providers
 - [ ] 3.5 Add tests for offscreen streaming session lifecycle, event delivery, and host-resolution routing
 

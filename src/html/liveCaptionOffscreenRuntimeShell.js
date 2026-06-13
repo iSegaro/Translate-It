@@ -9,6 +9,9 @@ import {
   createLiveCaptionRuntimeShellResponse,
   normalizeLiveCaptionRuntimeRequest
 } from '@/features/live-caption/background/liveCaptionRuntimeContracts.js';
+import {
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+} from '@/features/live-caption/background/liveCaptionOffscreenContracts.js';
 import { LIVE_CAPTION_RUNTIME_STATES } from '@/features/live-caption/constants/liveCaptionRuntimeStates.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
@@ -123,6 +126,26 @@ export class LiveCaptionOffscreenRuntimeShell {
       videoFingerprint: response.error?.videoFingerprint ?? null
     });
 
+    return response;
+  }
+
+  _buildStreamingResponse(action, message, {
+    status = LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+    runtimeState = this.runtimeState,
+    responseMessage = 'streaming_stt_no_op'
+  } = {}) {
+    const response = createLiveCaptionRuntimeShellResponse(action, {
+      sessionId: message?.sessionId ?? this.sessionId ?? null,
+      tabId: message?.tabId ?? this.tabId ?? null,
+      videoFingerprint: message?.videoFingerprint ?? this.videoFingerprint ?? null,
+      requestId: message?.requestId ?? null,
+      status,
+      runtimeState,
+      message: responseMessage
+    });
+
+    this.lastResponse = response;
+    this.touch();
     return response;
   }
 
@@ -564,6 +587,110 @@ export class LiveCaptionOffscreenRuntimeShell {
     }
   }
 
+  handleStreamingStart(message) {
+    const response = createLiveCaptionRuntimeShellResponse(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+      {
+        sessionId: message?.sessionId ?? this.sessionId ?? null,
+        tabId: message?.tabId ?? this.tabId ?? null,
+        videoFingerprint: message?.videoFingerprint ?? this.videoFingerprint ?? null,
+        requestId: message?.requestId ?? null,
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.START_NOT_IMPLEMENTED,
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.IDLE,
+        message: 'streaming_stt_not_implemented'
+      }
+    );
+
+    this.lastResponse = response;
+    this.touch();
+    logger.info('Live-caption offscreen shell received unsupported streaming start request', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint,
+      status: response.status
+    });
+    return response;
+  }
+
+  handleStreamingStop(message) {
+    const response = this._buildStreamingResponse(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION,
+      message,
+      {
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+        runtimeState: this.runtimeState,
+        responseMessage: 'streaming_stt_no_op'
+      }
+    );
+
+    logger.debug('Live-caption offscreen shell acknowledged streaming stop request', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint,
+      status: response.status
+    });
+    return response;
+  }
+
+  handleStreamingTranscriptEvent(message) {
+    const response = this._buildStreamingResponse(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+      message,
+      {
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+        runtimeState: this.runtimeState,
+        responseMessage: 'streaming_stt_no_op'
+      }
+    );
+
+    logger.debug('Live-caption offscreen shell ignored streaming transcript event', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint
+    });
+    return response;
+  }
+
+  handleStreamingStatus(message) {
+    const response = this._buildStreamingResponse(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS,
+      message,
+      {
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+        runtimeState: this.runtimeState,
+        responseMessage: 'streaming_stt_no_op'
+      }
+    );
+
+    logger.debug('Live-caption offscreen shell acknowledged streaming status request', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint,
+      status: response.status
+    });
+    return response;
+  }
+
+  handleStreamingError(message) {
+    const response = this._buildStreamingResponse(
+      LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR,
+      message,
+      {
+        status: LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES.OK,
+        runtimeState: this.runtimeState,
+        responseMessage: 'streaming_stt_no_op'
+      }
+    );
+
+    logger.debug('Live-caption offscreen shell acknowledged streaming error request', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint,
+      status: response.status
+    });
+    return response;
+  }
+
   handleRuntimeStatus(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.STATUS);
@@ -848,7 +975,7 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   handleMessage(message, sender) {
-    const action = message?.action ?? null;
+    const action = message?.action ?? message?.type ?? null;
 
     switch (action) {
       case LIVE_CAPTION_RUNTIME_ACTIONS.START:
@@ -863,6 +990,16 @@ export class LiveCaptionOffscreenRuntimeShell {
         return this.handleRuntimeStop(message, sender);
       case LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED:
         return this.handleVideoChanged(message, sender);
+      case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION:
+        return this.handleStreamingStart(message, sender);
+      case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION:
+        return this.handleStreamingStop(message, sender);
+      case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT:
+        return this.handleStreamingTranscriptEvent(message, sender);
+      case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS:
+        return this.handleStreamingStatus(message, sender);
+      case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR:
+        return this.handleStreamingError(message, sender);
       default:
         return this._buildFailClosed(action, new TypeError(`Unknown live-caption offscreen runtime action: ${String(action)}`), {
           code: LIVE_CAPTION_RUNTIME_ERROR_CODES.UNKNOWN_ACTION,
