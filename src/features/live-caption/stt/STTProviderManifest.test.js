@@ -121,13 +121,13 @@ describe('STTProviderManifest', () => {
       supportsReconnect: false,
       requiresPersistentConnection: true,
       needsApiKey: false,
-      supported: false,
+      supported: true,
       developmentOnly: true
     });
     expect(getProviderExecutionLocation(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
     expect(resolveProviderExecutionHost(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN);
     expect(isProviderOffscreenExecuted(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING)).toBe(true);
-    expect(isSTTProviderSupported(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING, true)).toBe(false);
+    expect(isSTTProviderSupported(STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING, true)).toBe(true);
   });
 
   it('keeps only the batch providers in the manifest', () => {
@@ -137,7 +137,8 @@ describe('STTProviderManifest', () => {
       STT_PROVIDER_IDS.LOCAL_WHISPER,
       STT_PROVIDER_IDS.FASTER_WHISPER_STREAMING
     ]);
-    expect(getAvailableSTTProviders(true)).toHaveLength(3);
+    expect(getAvailableSTTProviders()).toHaveLength(1);
+    expect(getAvailableSTTProviders(true)).toHaveLength(4);
     expect(isSTTProviderSupported(STT_PROVIDER_IDS.LOCAL_WHISPER)).toBe(false);
     expect(isSTTProviderSupported(STT_PROVIDER_IDS.LOCAL_WHISPER, true)).toBe(true);
     expect(isSTTProviderSupported('browser_speech', true)).toBe(false);

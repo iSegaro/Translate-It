@@ -122,7 +122,7 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
     needsApiKey: false,
     requiredSettings: Object.freeze([]),
     default: false,
-    supported: false,
+    supported: true,
     developmentOnly: true
   })
 });
