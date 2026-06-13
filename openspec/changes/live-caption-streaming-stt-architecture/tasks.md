@@ -1,8 +1,8 @@
 ## 1. Contracts and Manifest Metadata
 
-- [ ] 1.1 Add a transcript-event contract module for partial, final, correction, and error events
-- [ ] 1.2 Extend the STT provider manifest schema with mode, executionLocation, and streaming capability flags
-- [ ] 1.3 Add validation/tests proving existing batch providers declare batch/background metadata
+- [x] 1.1 Add a transcript-event contract module for partial, final, correction, and error events
+- [x] 1.2 Extend the STT provider manifest schema with mode, executionLocation, and streaming capability flags
+- [x] 1.3 Add validation/tests proving existing batch providers declare batch/background metadata
 - [ ] 1.4 Defer actual provider factory execution-location routing to the offscreen streaming execution phase
 
 ## 2. Background Transcript Event Convergence

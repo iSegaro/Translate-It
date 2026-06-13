@@ -100,6 +100,9 @@ import {
   createLiveCaptionTranslationRequest,
   createLiveCaptionTranslatedCaptionSegment,
   normalizeLiveCaptionTranslationError,
+  LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
+  normalizeLiveCaptionTranscriptEvent,
+  createLiveCaptionTranscriptEvent,
   LiveCaptionTranslationAdapter
 } from './background/index.js';
 import { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
@@ -115,6 +118,7 @@ import {
   normalizeSTTProviderError,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
@@ -164,6 +168,7 @@ export {
   normalizeSTTProviderError,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
@@ -251,6 +256,9 @@ export {
   createLiveCaptionTranslationRequest,
   createLiveCaptionTranslatedCaptionSegment,
   normalizeLiveCaptionTranslationError,
+  LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
+  normalizeLiveCaptionTranscriptEvent,
+  createLiveCaptionTranscriptEvent,
   LiveCaptionTranslationAdapter
 } from './background/index.js';
 export { LiveCaptionContentController } from './content/LiveCaptionContentController.js';
@@ -355,6 +363,10 @@ export const LiveCaptionFeature = Object.freeze({
     createLiveCaptionTranslationRequest,
     createLiveCaptionTranslatedCaptionSegment,
     normalizeLiveCaptionTranslationError,
+    LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
+    STT_PROVIDER_EXECUTION_LOCATIONS,
+    normalizeLiveCaptionTranscriptEvent,
+    createLiveCaptionTranscriptEvent,
     LiveCaptionTranslationAdapter,
     LiveCaptionContentController,
     LiveCaptionRuntimeController,

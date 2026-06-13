@@ -2,15 +2,20 @@ import { CONFIG } from '@/shared/config/config.js';
 import { OPENAI_WHISPER_PROVIDER_ID, OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MOCK_STT_PROVIDER_ID, MockSTTProvider } from './providers/MockSTTProvider.js';
 import { LOCAL_WHISPER_PROVIDER_ID, LocalWhisperSTTProvider } from './providers/LocalWhisperSTTProvider.js';
+import {
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from './liveCaptionSTTProviderContracts.js';
+
+export {
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from './liveCaptionSTTProviderContracts.js';
 
 export const STT_PROVIDER_IDS = Object.freeze({
   OPENAI_WHISPER: OPENAI_WHISPER_PROVIDER_ID,
   MOCK: MOCK_STT_PROVIDER_ID,
   LOCAL_WHISPER: LOCAL_WHISPER_PROVIDER_ID
-});
-
-export const STT_PROVIDER_MODES = Object.freeze({
-  BATCH: 'batch'
 });
 
 export const STT_PROVIDER_CAPABILITIES = Object.freeze({
@@ -27,6 +32,7 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
     name: 'OpenAIWhisper',
     displayName: 'OpenAI Whisper',
     mode: STT_PROVIDER_MODES.BATCH,
+    executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
     type: 'stt',
     providerClass: OpenAIWhisperProvider,
     capabilities: Object.freeze([
@@ -36,6 +42,10 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK,
       STT_PROVIDER_CAPABILITIES.RETRY
     ]),
+    supportsPartialResults: false,
+    supportsCorrections: false,
+    supportsReconnect: false,
+    requiresPersistentConnection: false,
     needsApiKey: true,
     requiredSettings: Object.freeze(['OPENAI_API_KEY']),
     default: true,
@@ -46,6 +56,7 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
     name: 'MockSTT',
     displayName: 'Mock STT',
     mode: STT_PROVIDER_MODES.BATCH,
+    executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
     type: 'stt',
     providerClass: MockSTTProvider,
     capabilities: Object.freeze([
@@ -54,6 +65,10 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
     ]),
+    supportsPartialResults: false,
+    supportsCorrections: false,
+    supportsReconnect: false,
+    requiresPersistentConnection: false,
     needsApiKey: false,
     requiredSettings: Object.freeze([]),
     default: false,
@@ -65,6 +80,7 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
     name: 'LocalWhisper',
     displayName: 'Local Whisper',
     mode: STT_PROVIDER_MODES.BATCH,
+    executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
     type: 'stt',
     providerClass: LocalWhisperSTTProvider,
     capabilities: Object.freeze([
@@ -74,6 +90,10 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK,
       STT_PROVIDER_CAPABILITIES.RETRY
     ]),
+    supportsPartialResults: false,
+    supportsCorrections: false,
+    supportsReconnect: false,
+    requiresPersistentConnection: false,
     needsApiKey: false,
     requiredSettings: Object.freeze([]),
     default: false,

@@ -10,7 +10,6 @@ import {
 } from './BaseSTTProvider.js';
 import {
   STT_PROVIDER_IDS,
-  STT_PROVIDER_MODES,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
@@ -18,6 +17,10 @@ import {
   getAvailableSTTProviders,
   isSTTProviderSupported
 } from './STTProviderManifest.js';
+import {
+  STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS
+} from './liveCaptionSTTProviderContracts.js';
 import { STTProviderFactory } from './STTProviderFactory.js';
 import { OpenAIWhisperProvider } from './providers/OpenAIWhisperProvider.js';
 import { MockSTTProvider } from './providers/MockSTTProvider.js';
@@ -36,6 +39,7 @@ export {
 export {
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
@@ -59,6 +63,7 @@ export default {
   normalizeSTTProviderError,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
+  STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
   getDefaultSTTProviderId,
@@ -23,7 +24,12 @@ describe('STTProviderManifest', () => {
       id: STT_PROVIDER_IDS.OPENAI_WHISPER,
       displayName: 'OpenAI Whisper',
       mode: STT_PROVIDER_MODES.BATCH,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
       type: 'stt',
+      supportsPartialResults: false,
+      supportsCorrections: false,
+      supportsReconnect: false,
+      requiresPersistentConnection: false,
       needsApiKey: true,
       supported: true
     });
@@ -48,7 +54,12 @@ describe('STTProviderManifest', () => {
       id: STT_PROVIDER_IDS.MOCK,
       displayName: 'Mock STT',
       mode: STT_PROVIDER_MODES.BATCH,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
       type: 'stt',
+      supportsPartialResults: false,
+      supportsCorrections: false,
+      supportsReconnect: false,
+      requiresPersistentConnection: false,
       needsApiKey: false,
       supported: true,
       developmentOnly: true
@@ -57,7 +68,12 @@ describe('STTProviderManifest', () => {
       id: STT_PROVIDER_IDS.LOCAL_WHISPER,
       displayName: 'Local Whisper',
       mode: STT_PROVIDER_MODES.BATCH,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.BACKGROUND,
       type: 'stt',
+      supportsPartialResults: false,
+      supportsCorrections: false,
+      supportsReconnect: false,
+      requiresPersistentConnection: false,
       needsApiKey: false,
       supported: true,
       developmentOnly: true
