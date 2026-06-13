@@ -23,6 +23,118 @@ function createBaseEvent(overrides = {}) {
 }
 
 describe('LiveCaptionTranscriptEventCoordinator', () => {
+  it('clears canonical revision state for a specific session and video identity', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1',
+      segmentId: 'segment-a',
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 200
+    }));
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1',
+      segmentId: 'segment-b',
+      revision: 2,
+      segmentStartMs: 200,
+      segmentEndMs: 300
+    }));
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-3',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      sessionId: 'session-2',
+      tabId: 8,
+      videoFingerprint: 'video-2',
+      segmentId: 'segment-c',
+      revision: 3,
+      segmentStartMs: 300,
+      segmentEndMs: 400
+    }));
+
+    coordinator.clearVideoSession({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1'
+    });
+
+    const staleCorrection = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-4',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1',
+      segmentId: 'segment-a',
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 210,
+      supersedesSegmentId: 'segment-a',
+      supersedesEventId: 'event-1',
+      text: 'Updated after cleanup'
+    }));
+
+    const otherSessionCorrection = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-5',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      sessionId: 'session-2',
+      tabId: 8,
+      videoFingerprint: 'video-2',
+      segmentId: 'segment-c',
+      revision: 4,
+      segmentStartMs: 300,
+      segmentEndMs: 420,
+      supersedesSegmentId: 'segment-c',
+      supersedesEventId: 'event-3',
+      text: 'Still tracked'
+    }));
+
+    expect(staleCorrection).toMatchObject({
+      handled: true,
+      status: 'canonical_correction'
+    });
+    expect(otherSessionCorrection).toMatchObject({
+      handled: true,
+      status: 'canonical_correction'
+    });
+  });
+
+  it('destroy clears canonical revision state for all tracked identities', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 250
+    }));
+
+    coordinator.destroy();
+
+    const correctionAfterDestroy = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 260,
+      supersedesSegmentId: 'segment-1',
+      supersedesEventId: 'event-1',
+      text: 'After destroy'
+    }));
+
+    expect(correctionAfterDestroy).toMatchObject({
+      handled: true,
+      persisted: false,
+      status: 'canonical_correction',
+      canonicalEvent: {
+        eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION
+      }
+    });
+  });
   it('routes streaming events through the same normalization path as transcript events', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
     const event = createBaseEvent({
@@ -119,15 +231,25 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
     expect(first.metadata.revision).toBe(1);
   });
 
-  it('accepts valid final events as canonical final results', () => {
+  it('final events establish canonical revision and newer corrections replace it', () => {
     const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+    const finalResult = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
       eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
       segmentStartMs: 100,
       segmentEndMs: 250
     }));
+    const correctionResult = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      revision: 2,
+      segmentStartMs: 100,
+      segmentEndMs: 260,
+      supersedesSegmentId: 'segment-1',
+      supersedesEventId: 'event-1',
+      text: 'Updated text'
+    }));
 
-    expect(result).toMatchObject({
+    expect(finalResult).toMatchObject({
       handled: true,
       persisted: false,
       status: 'canonical_final',
@@ -144,26 +266,12 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
         isFinal: true
       }
     });
-    expect(result.event).toMatchObject({
+    expect(finalResult.event).toMatchObject({
       segmentStartMs: 100,
       segmentEndMs: 250,
       isFinal: true
     });
-  });
-
-  it('accepts correction events and preserves revision metadata', () => {
-    const coordinator = new LiveCaptionTranscriptEventCoordinator();
-    const result = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
-      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
-      revision: 2,
-      segmentStartMs: 100,
-      segmentEndMs: 260,
-      supersedesSegmentId: 'segment-0',
-      supersedesEventId: 'event-0',
-      text: 'Corrected text'
-    }));
-
-    expect(result).toMatchObject({
+    expect(correctionResult).toMatchObject({
       handled: true,
       persisted: false,
       status: 'canonical_correction',
@@ -173,19 +281,182 @@ describe('LiveCaptionTranscriptEventCoordinator', () => {
         isFinal: true
       },
       metadata: {
-        eventId: 'event-1',
+        eventId: 'event-2',
         segmentId: 'segment-1',
         revision: 2,
-        supersedesEventId: 'event-0',
-        supersedesSegmentId: 'segment-0',
+        supersedesEventId: 'event-1',
+        supersedesSegmentId: 'segment-1',
         isFinal: true
       }
     });
-    expect(result.event).toMatchObject({
+    expect(correctionResult.event).toMatchObject({
       revision: 2,
-      supersedesEventId: 'event-0',
-      supersedesSegmentId: 'segment-0',
+      supersedesEventId: 'event-1',
+      supersedesSegmentId: 'segment-1',
       isFinal: true
+    });
+  });
+
+  it('ignores stale corrections once a newer canonical revision exists', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      revision: 2,
+      segmentStartMs: 100,
+      segmentEndMs: 250
+    }));
+
+    const staleCorrection = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-3',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      revision: 2,
+      segmentStartMs: 100,
+      segmentEndMs: 260,
+      supersedesSegmentId: 'segment-1',
+      supersedesEventId: 'event-2',
+      text: 'Stale correction'
+    }));
+
+    expect(staleCorrection).toMatchObject({
+      handled: false,
+      persisted: false,
+      status: 'stale_correction',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      canonicalEvent: null,
+      reason: 'stale_revision',
+      metadata: {
+        eventId: 'event-3',
+        segmentId: 'segment-1',
+        revision: 2,
+        currentCanonicalRevision: 2,
+        supersedesEventId: 'event-2',
+        supersedesSegmentId: 'segment-1',
+        isFinal: true
+      }
+    });
+  });
+
+  it('clearSession removes only that session canonical revisions', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1',
+      segmentId: 'segment-a',
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 200
+    }));
+    coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      sessionId: 'session-2',
+      tabId: 8,
+      videoFingerprint: 'video-2',
+      segmentId: 'segment-b',
+      revision: 2,
+      segmentStartMs: 200,
+      segmentEndMs: 300
+    }));
+
+    coordinator.clearSession('session-1');
+
+    const session1Correction = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-3',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-1',
+      segmentId: 'segment-a',
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 210,
+      supersedesSegmentId: 'segment-a',
+      supersedesEventId: 'event-1',
+      text: 'Reopened'
+    }));
+    const session2StaleCorrection = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-4',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      sessionId: 'session-2',
+      tabId: 8,
+      videoFingerprint: 'video-2',
+      segmentId: 'segment-b',
+      revision: 2,
+      segmentStartMs: 200,
+      segmentEndMs: 320,
+      supersedesSegmentId: 'segment-b',
+      supersedesEventId: 'event-2',
+      text: 'Still stale'
+    }));
+
+    expect(session1Correction).toMatchObject({
+      handled: true,
+      status: 'canonical_correction',
+      persisted: false
+    });
+    expect(session2StaleCorrection).toMatchObject({
+      handled: false,
+      status: 'stale_correction',
+      persisted: false
+    });
+  });
+
+  it('partial and error events do not establish canonical revision state', () => {
+    const coordinator = new LiveCaptionTranscriptEventCoordinator();
+
+    const partialResult = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-1',
+      revision: 10,
+      text: 'Partial hypothesis'
+    }));
+    const errorResult = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.ERROR,
+      segmentId: null,
+      revision: null,
+      text: null,
+      error: {
+        code: 'provider_error',
+        message: 'Failed'
+      }
+    }));
+    const correctionResult = coordinator.handleStreamingTranscriptEvent(createBaseEvent({
+      eventId: 'event-3',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 260,
+      supersedesSegmentId: 'segment-1',
+      supersedesEventId: 'event-1',
+      text: 'Canonical after partial/error'
+    }));
+
+    expect(partialResult).toMatchObject({
+      handled: false,
+      persisted: false,
+      status: 'ignored',
+      canonicalEvent: null,
+      reason: 'partial_ephemeral'
+    });
+    expect(errorResult).toMatchObject({
+      handled: true,
+      persisted: false,
+      status: 'error',
+      canonicalEvent: null
+    });
+    expect(correctionResult).toMatchObject({
+      handled: true,
+      persisted: false,
+      status: 'canonical_correction',
+      canonicalEvent: {
+        eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION,
+        isFinal: true
+      },
+      metadata: {
+        revision: 1
+      }
     });
   });
 

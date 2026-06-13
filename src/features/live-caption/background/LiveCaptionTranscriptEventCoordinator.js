@@ -19,6 +19,61 @@ function createTranscriptEventResult(type, fields = {}) {
 }
 
 export class LiveCaptionTranscriptEventCoordinator {
+  constructor() {
+    this.canonicalRevisionByIdentity = new Map();
+  }
+
+  clearCanonicalRevisions(filter = null) {
+    if (typeof filter === 'function') {
+      for (const [identityKey, revision] of this.canonicalRevisionByIdentity.entries()) {
+        if (filter(identityKey, revision)) {
+          this.canonicalRevisionByIdentity.delete(identityKey);
+        }
+      }
+      return;
+    }
+
+    if (filter && typeof filter === 'object') {
+      if (filter.sessionId) {
+        this.clearSession(filter.sessionId);
+        return;
+      }
+
+      if (filter.tabId != null || filter.videoFingerprint || filter.segmentId) {
+        this.clearVideoSession(filter);
+        return;
+      }
+    }
+
+    this.canonicalRevisionByIdentity.clear();
+  }
+
+  clearSession(sessionId) {
+    if (!sessionId) {
+      return;
+    }
+
+    this.clearCanonicalRevisions((identityKey) => identityKey.startsWith(`${sessionId}::`));
+  }
+
+  clearVideoSession({ sessionId, tabId, videoFingerprint, segmentId } = {}) {
+    if (!sessionId || tabId == null || !videoFingerprint) {
+      return;
+    }
+
+    const identityPrefix = `${sessionId}::${String(tabId)}::${videoFingerprint}::`;
+    if (segmentId) {
+      this.canonicalRevisionByIdentity.delete(`${identityPrefix}${segmentId}`);
+      return;
+    }
+
+    this.clearCanonicalRevisions((identityKey) => identityKey.startsWith(identityPrefix));
+  }
+
+  destroy() {
+    this.canonicalRevisionByIdentity.clear();
+  }
+
   handleTranscriptEvent(event) {
     return this._handleNormalizedTranscriptEvent(event);
   }
@@ -44,6 +99,40 @@ export class LiveCaptionTranscriptEventCoordinator {
     }
   }
 
+  _getCanonicalIdentityKey(event) {
+    if (!event || !event.sessionId || event.tabId == null || !event.videoFingerprint || !event.segmentId) {
+      return null;
+    }
+
+    return [
+      event.sessionId,
+      String(event.tabId),
+      event.videoFingerprint,
+      event.segmentId
+    ].join('::');
+  }
+
+  _getCanonicalRevision(event) {
+    const identityKey = this._getCanonicalIdentityKey(event);
+
+    if (!identityKey) {
+      return null;
+    }
+
+    return this.canonicalRevisionByIdentity.get(identityKey) ?? null;
+  }
+
+  _setCanonicalRevision(event) {
+    const identityKey = this._getCanonicalIdentityKey(event);
+
+    if (!identityKey) {
+      return null;
+    }
+
+    this.canonicalRevisionByIdentity.set(identityKey, event.revision);
+    return identityKey;
+  }
+
   handlePartialTranscriptEvent(event) {
     const normalizedEvent = normalizeLiveCaptionTranscriptEvent(event);
 
@@ -63,6 +152,7 @@ export class LiveCaptionTranscriptEventCoordinator {
 
   handleFinalTranscriptEvent(event) {
     const normalizedEvent = normalizeLiveCaptionTranscriptEvent(event);
+    this._setCanonicalRevision(normalizedEvent);
 
     return createTranscriptEventResult(LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL, {
       status: 'canonical_final',
@@ -80,6 +170,29 @@ export class LiveCaptionTranscriptEventCoordinator {
 
   handleCorrectionTranscriptEvent(event) {
     const normalizedEvent = normalizeLiveCaptionTranscriptEvent(event);
+    const currentCanonicalRevision = this._getCanonicalRevision(normalizedEvent);
+
+    if (currentCanonicalRevision != null && normalizedEvent.revision <= currentCanonicalRevision) {
+      return createTranscriptEventResult(LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION, {
+        handled: false,
+        status: 'stale_correction',
+        event: normalizedEvent,
+        normalizedEvent,
+        canonicalEvent: null,
+        reason: 'stale_revision',
+        metadata: {
+          eventId: normalizedEvent.eventId,
+          segmentId: normalizedEvent.segmentId,
+          revision: normalizedEvent.revision,
+          currentCanonicalRevision,
+          supersedesEventId: normalizedEvent.supersedesEventId,
+          supersedesSegmentId: normalizedEvent.supersedesSegmentId,
+          isFinal: normalizedEvent.isFinal
+        }
+      });
+    }
+
+    this._setCanonicalRevision(normalizedEvent);
 
     return createTranscriptEventResult(LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION, {
       status: 'canonical_correction',
