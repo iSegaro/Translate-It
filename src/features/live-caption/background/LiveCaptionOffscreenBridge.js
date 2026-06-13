@@ -9,8 +9,13 @@ import {
   createLiveCaptionFailClosedResponse,
   createLiveCaptionOffscreenSnapshotResponse,
   createLiveCaptionStartCaptureRequest,
+  createLiveCaptionStartStreamingSttSessionRequest,
   createLiveCaptionStopCaptureRequest,
+  createLiveCaptionStopStreamingSttSessionRequest,
   createLiveCaptionStatusRequest,
+  createLiveCaptionStreamingSttErrorMessage,
+  createLiveCaptionStreamingSttStatusMessage,
+  createLiveCaptionStreamingSttTranscriptEventMessage,
   normalizeLiveCaptionOffscreenResponse
 } from './liveCaptionOffscreenContracts.js';
 import { BROWSER_SPEECH_PROBE_ACTION } from '@/html/liveCaptionBrowserSpeechProbe.js';
@@ -329,6 +334,89 @@ export class LiveCaptionOffscreenBridge {
       });
       return unavailable;
     }
+  }
+
+  async _sendStreamingRequest(message, options = {}) {
+    const runtime = this.getBrowserRuntime();
+    this.lastRuntimeRequest = message;
+
+    if (!runtime?.sendMessage) {
+      const unavailable = createLiveCaptionRuntimeUnavailableResponse(message.type, {
+        ...options,
+        code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+        reason: 'offscreen_unavailable',
+        message: 'Live-caption offscreen bridge is unavailable',
+        runtimeState: options.runtimeState ?? LIVE_CAPTION_RUNTIME_STATES.ERROR
+      });
+
+      this.lastRuntimeResponse = unavailable;
+      return unavailable;
+    }
+
+    try {
+      const response = await runtime.sendMessage(message);
+      this.lastRuntimeResponse = response;
+      return response;
+    } catch (error) {
+      const unavailable = createLiveCaptionRuntimeUnavailableResponse(message.type, {
+        ...options,
+        code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+        reason: 'offscreen_unavailable',
+        message: error?.message ?? 'Live-caption offscreen bridge is unavailable',
+        runtimeState: LIVE_CAPTION_RUNTIME_STATES.ERROR
+      });
+
+      this.lastRuntimeResponse = unavailable;
+      logger.warn('Live-caption streaming offscreen request threw', {
+        action: message.type,
+        code: unavailable.error?.code ?? null,
+        reason: unavailable.error?.reason ?? null,
+        sessionId: message.sessionId ?? null,
+        tabId: message.tabId ?? null,
+        videoFingerprint: message.videoFingerprint ?? null
+      });
+      return unavailable;
+    }
+  }
+
+  startStreamingSttSession(options = {}) {
+    const request = createLiveCaptionStartStreamingSttSessionRequest(options);
+    return this._sendStreamingRequest(request, {
+      ...options,
+      runtimeState: options.runtimeState ?? LIVE_CAPTION_RUNTIME_STATES.STARTING
+    });
+  }
+
+  stopStreamingSttSession(options = {}) {
+    const request = createLiveCaptionStopStreamingSttSessionRequest(options);
+    return this._sendStreamingRequest(request, {
+      ...options,
+      runtimeState: options.runtimeState ?? LIVE_CAPTION_RUNTIME_STATES.STOPPING
+    });
+  }
+
+  forwardStreamingTranscriptEvent(options = {}) {
+    const request = createLiveCaptionStreamingSttTranscriptEventMessage(options);
+    return this._sendStreamingRequest(request, {
+      ...options,
+      runtimeState: options.runtimeState ?? this.runtimeState
+    });
+  }
+
+  forwardStreamingSttStatus(options = {}) {
+    const request = createLiveCaptionStreamingSttStatusMessage(options);
+    return this._sendStreamingRequest(request, {
+      ...options,
+      runtimeState: options.runtimeState ?? this.runtimeState
+    });
+  }
+
+  forwardStreamingSttError(options = {}) {
+    const request = createLiveCaptionStreamingSttErrorMessage(options);
+    return this._sendStreamingRequest(request, {
+      ...options,
+      runtimeState: options.runtimeState ?? LIVE_CAPTION_RUNTIME_STATES.ERROR
+    });
   }
 
   async requestBrowserSpeechProbe(options = {}) {

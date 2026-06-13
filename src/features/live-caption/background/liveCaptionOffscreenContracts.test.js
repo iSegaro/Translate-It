@@ -364,6 +364,83 @@ describe('live-caption offscreen contracts', () => {
     expect(globalThis.chrome.tabCapture.capture).not.toHaveBeenCalled();
   });
 
+  it('forwards streaming session and transcript messages through the offscreen bridge', async () => {
+    globalThis.chrome.runtime.sendMessage = vi.fn(async (request) => request);
+
+    const bridge = new LiveCaptionOffscreenBridge();
+    const transcriptEvent = normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-2',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.PARTIAL,
+      providerId: 'deepgram_streaming',
+      providerMode: STT_PROVIDER_MODES.STREAMING,
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      segmentId: 'segment-2',
+      revision: 1,
+      text: 'streaming partial',
+      createdAt: 200
+    });
+
+    const start = await bridge.startStreamingSttSession({
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      providerId: 'deepgram_streaming',
+      providerMode: STT_PROVIDER_MODES.STREAMING,
+      executionLocation: STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN
+    });
+    const stop = await bridge.stopStreamingSttSession({
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      providerId: 'deepgram_streaming'
+    });
+    const eventResponse = await bridge.forwardStreamingTranscriptEvent({
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      event: transcriptEvent
+    });
+    const statusResponse = await bridge.forwardStreamingSttStatus({
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      providerId: 'deepgram_streaming',
+      status: 'active'
+    });
+    const errorResponse = await bridge.forwardStreamingSttError({
+      sessionId: 'session-2',
+      tabId: 11,
+      videoFingerprint: 'video-b',
+      providerId: 'deepgram_streaming',
+      error: {
+        code: 'streaming_error',
+        message: 'socket closed'
+      }
+    });
+
+    expect(start.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION);
+    expect(stop.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STOP_STREAMING_STT_SESSION);
+    expect(eventResponse.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT);
+    expect(statusResponse.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS);
+    expect(errorResponse.type).toBe(LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR);
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(5);
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION
+    }));
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT
+    }));
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_STATUS
+    }));
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(5, expect.objectContaining({
+      type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR
+    }));
+    expect(start).toEqual(expect.objectContaining({ source: 'background', target: 'offscreen' }));
+  });
+
   it('routes runtime shell requests through the offscreen bridge', async () => {
     const bridge = new LiveCaptionOffscreenBridge();
 
