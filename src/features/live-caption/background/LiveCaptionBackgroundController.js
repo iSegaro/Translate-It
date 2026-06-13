@@ -23,9 +23,13 @@ import { LIVE_CAPTION_SESSION_STATES } from "../constants/liveCaptionSessionStat
 import { LIVE_CAPTION_CLEANUP_REASONS } from "../core/contracts.js";
 import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_ACTIONS } from "../constants/liveCaptionActions.js";
-import { getLiveCaptionSttProviderAsync } from "@/shared/config/config.js";
+import { getLiveCaptionSttProviderAsync, getLiveCaptionQualityProfileAsync } from "@/shared/config/config.js";
 
-const LOCAL_WHISPER_CHUNK_TIMESLICE_MS = 10000;
+const LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE = Object.freeze({
+  fast: 4000,
+  balanced: 6000,
+  quality: 10000
+});
 
 const logger = getScopedLogger(
   LOG_COMPONENTS.LIVE_CAPTION,
@@ -45,7 +49,10 @@ async function resolveRuntimeStartMetadata(metadata = {}) {
   const providerId = await getLiveCaptionSttProviderAsync();
 
   if (providerId === 'local_whisper') {
-    normalizedMetadata.chunkTimeslice = LOCAL_WHISPER_CHUNK_TIMESLICE_MS;
+    const qualityProfile = await getLiveCaptionQualityProfileAsync();
+    normalizedMetadata.chunkTimeslice = LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE[
+      typeof qualityProfile === 'string' ? qualityProfile.trim().toLowerCase() : ''
+    ] ?? LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE.balanced;
   }
 
   return normalizedMetadata;

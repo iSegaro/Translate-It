@@ -268,7 +268,7 @@ export const CONFIG = {
   // --- Live Caption Translation Scaffolding ---
   LIVE_CAPTION_ENABLED: false, // Master toggle for the live-caption MVP scaffolding
   [LIVE_CAPTION_SETTINGS_KEYS.DISPLAY_MODE]: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT,
-  LIVE_CAPTION_QUALITY_PROFILE: 'balanced', // fast, balanced, accurate
+  LIVE_CAPTION_QUALITY_PROFILE: 'fast', // fast, balanced, accurate
   LIVE_CAPTION_CACHE_MAX_ITEMS: 500, // Maximum cached caption segments per video
   LIVE_CAPTION_CACHE_MAX_BYTES: 10485760, // 10 MiB cap for live-caption cache data
   LIVE_CAPTION_STT_PROVIDER: 'openai_whisper', // Hidden MVP provider identifier
@@ -873,6 +873,10 @@ export const getSourceLanguageAsync = async () => {
 
 export const getTargetLanguageAsync = async () => {
   return getSettingValueAsync("TARGET_LANGUAGE", CONFIG.TARGET_LANGUAGE);
+};
+
+export const getLiveCaptionQualityProfileAsync = async () => {
+  return getSettingValueAsync("LIVE_CAPTION_QUALITY_PROFILE", CONFIG.LIVE_CAPTION_QUALITY_PROFILE);
 };
 
 export const getFeatureSemanticBlockGroupingAsync = async () => {

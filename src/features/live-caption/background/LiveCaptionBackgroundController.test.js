@@ -16,7 +16,10 @@ import { LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES } from "./liveCaptionOffscreenCont
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
 import { VideoCaptionSession } from "../core/VideoCaptionSession.js";
-import { getLiveCaptionSttProviderAsync } from "@/shared/config/config.js";
+import {
+  getLiveCaptionQualityProfileAsync,
+  getLiveCaptionSttProviderAsync
+} from "@/shared/config/config.js";
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -32,6 +35,7 @@ vi.mock("@/shared/config/config.js", async (importOriginal) => {
   return {
     ...actual,
     getLiveCaptionSttProviderAsync: vi.fn().mockResolvedValue("openai_whisper"),
+    getLiveCaptionQualityProfileAsync: vi.fn().mockResolvedValue("balanced"),
   };
 });
 
@@ -41,6 +45,7 @@ describe("live-caption background controller", () => {
   beforeEach(() => {
     activeControllers = [];
     getLiveCaptionSttProviderAsync.mockResolvedValue("openai_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValue("balanced");
     globalThis.chrome = {
       runtime: {
         sendMessage: vi.fn(async (request) => {
@@ -244,25 +249,121 @@ describe("live-caption background controller", () => {
     expect(response.sessionSnapshot.activeVideoSession.translatedCaptionSegments).toHaveLength(1);
   });
 
-  it("applies a longer chunkTimeslice only for local_whisper runtime start", async () => {
+  it("applies provider-aware chunkTimeslice presets only for local_whisper runtime start", async () => {
     getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValueOnce("fast");
+    let controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-fast",
+        videoFingerprint: "video-a",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    let startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-fast")?.[0];
+    expect(startRequest.data.metadata).toMatchObject({
+      chunkTimeslice: 4000
+    });
+    controller.destroy();
+
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValueOnce("balanced");
+    controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-balanced",
+        videoFingerprint: "video-b",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-balanced")?.[0];
+    expect(startRequest.data.metadata).toMatchObject({
+      chunkTimeslice: 6000
+    });
+    controller.destroy();
+
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValueOnce("quality");
+    controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-quality",
+        videoFingerprint: "video-c",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-quality")?.[0];
+    expect(startRequest.data.metadata).toMatchObject({
+      chunkTimeslice: 10000
+    });
+    controller.destroy();
+
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValueOnce("unknown-profile");
+    controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-fallback",
+        videoFingerprint: "video-d",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-fallback")?.[0];
+    expect(startRequest.data.metadata).toMatchObject({
+      chunkTimeslice: 6000
+    });
+    controller.destroy();
+  });
+
+  it("keeps openai_whisper runtime start metadata free of chunkTimeslice", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("openai_whisper");
 
     const controller = createController();
 
     await controller.handleRuntimeStart(
       createLiveCaptionRuntimeStartRequest({
         tabId: 7,
-        sessionId: "session-1",
-        videoFingerprint: "video-a",
+        sessionId: "session-openai",
+        videoFingerprint: "video-openai",
       }),
       { tab: { id: 7 } },
     );
 
-    const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.action === LIVE_CAPTION_RUNTIME_ACTIONS.START)?.[0];
+    const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-openai")?.[0];
+    expect(startRequest).toBeTruthy();
+    expect(startRequest.data.metadata?.chunkTimeslice).toBeUndefined();
+    controller.destroy();
+  });
+
+  it("normalizes local_whisper quality profile values before resolving chunkTimeslice", async () => {
+    getLiveCaptionSttProviderAsync.mockResolvedValueOnce("local_whisper");
+    getLiveCaptionQualityProfileAsync.mockResolvedValueOnce(" Fast ");
+
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-normalized",
+        videoFingerprint: "video-normalized",
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const startRequest = globalThis.chrome.runtime.sendMessage.mock.calls.find(([request]) => request.data?.sessionId === "session-normalized")?.[0];
     expect(startRequest).toBeTruthy();
     expect(startRequest.data.metadata).toMatchObject({
-      chunkTimeslice: 10000
+      chunkTimeslice: 4000
     });
+    controller.destroy();
   });
 
   it("keeps default runtime start metadata unchanged for openai_whisper", async () => {
