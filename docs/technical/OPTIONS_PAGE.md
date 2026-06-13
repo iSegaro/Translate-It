@@ -74,6 +74,7 @@ Live Caption Translation follows the same pattern:
 - Do not introduce a separate STT credential UI for the scaffolding phase.
 - The MVP target remains Chrome/Edge desktop only; manifest wiring uses `activeTab` and `tabCapture` in the Chrome path only.
 - Consent remains a runtime capture gate and is not modeled as an Options page setting.
+- Live Caption provider discovery is metadata-driven; development-only providers such as `faster_whisper_streaming` appear only when the current debug/development provider listing logic allows them.
 
 ### 3. Create an Async Getter (Optional but Recommended)
 Add an async getter function in `src/shared/config/config.js` (e.g., `export const getMySettingAsync = ...`).
