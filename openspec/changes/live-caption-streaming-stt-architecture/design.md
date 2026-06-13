@@ -1,22 +1,29 @@
 ## Context
 
-Live Caption currently runs as a batch pipeline: offscreen capture finalizes audio chunks, background STT providers transcribe each chunk, translation consumes only finalized transcript segments, and the overlay renders canonical caption lines. That model is already stable and must remain unchanged for batch providers such as OpenAI Whisper and Local Whisper.
+Live Caption now runs as two coordinated paths:
+- batch providers such as OpenAI Whisper and Local Whisper continue to execute in the background and preserve the existing finalized-chunk flow
+- the first streaming provider, `FasterWhisperStreamingProvider`, executes in the offscreen document and owns its WebSocket transport there
 
-Future streaming STT providers such as Deepgram Streaming, WhisperLiveKit, and Faster-Whisper WebSocket require a different runtime model because they depend on long-lived sessions, partial hypotheses, and correction events. Under MV3, those concerns should not be moved into the service worker as an execution owner. The existing offscreen document is the correct place to host long-lived streaming provider execution and websocket/session ownership.
+Offscreen capture still finalizes audio chunks, but finalized blobs now bifurcate by provider mode:
+- batch providers keep the existing finalized-chunk path into background STT
+- streaming providers receive finalized blobs directly in the offscreen provider runtime
 
-This change is intentionally architecture-only: it defines provider metadata, transcript-event contracts, background/offscreen ownership, and canonicalization rules before any implementation work begins.
+Background owns transcript convergence and translation handoff. Canonical streaming finals are persisted to the active session/cache flow and then routed to translation. Partial hypotheses remain ephemeral, and correction/reconnect behavior is intentionally deferred.
+
+This change documents the implemented streaming architecture and the remaining deferred items without changing the established batch provider path.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Preserve current batch STT behavior unchanged.
-- Define a future-safe streaming STT architecture that executes streaming providers in offscreen.
+- Keep the streaming STT execution model offscreen-hosted.
 - Add explicit provider metadata for mode, execution location, and streaming capabilities.
 - Define a revisioned transcript event contract for partial, final, correction, and error events.
-- Introduce a background transcript-event convergence layer.
+- Keep the background transcript-event convergence layer as the canonical normalization boundary.
 - Keep partial transcript state ephemeral and off the canonical persistence path.
 - Keep translation final-only for the MVP.
-- Keep recovery and fail-close policy owned by background, while reconnect and provider cleanup remain host-owned.
+- Keep recovery and fail-close policy owned by background, while provider transport cleanup remains host-owned.
+- Reflect the current codebase accurately: `BaseStreamingSTTProvider` and `FasterWhisperStreamingProvider` exist, and `faster_whisper_streaming` is development-only.
 
 **Non-Goals:**
 - Implement any runtime code.
@@ -30,7 +37,7 @@ This change is intentionally architecture-only: it defines provider metadata, tr
 
 ### 1. Execution location: offscreen for streaming, background for batch
 
-Streaming STT providers will execute in the offscreen document. Batch providers continue to execute in background.
+Streaming STT providers execute in the offscreen document. Batch providers continue to execute in background. This is already implemented for `FasterWhisperStreamingProvider`.
 
 **Why this decision**
 - Streaming providers need long-lived transport and session ownership.
@@ -62,6 +69,7 @@ Add a background-owned `LiveCaptionTranscriptEventCoordinator` to normalize batc
 - Batch audio chunks and streaming transcript events are different input shapes, but they converge at the same downstream semantic boundary.
 - A dedicated coordinator keeps `LiveCaptionSTTCoordinator` batch-only and avoids making it a mixed batch/event router.
 - It keeps translation and canonical session updates isolated from provider transport details.
+- The implemented streaming path already routes canonical finals through this coordinator before translation.
 
 **Alternatives considered**
 - Extending `LiveCaptionSTTCoordinator` to handle streaming events too: rejected because it would blur responsibilities and increase batch regression risk.
@@ -81,7 +89,7 @@ Do not introduce a background partial-state manager. Partial transcript hypothes
 
 ### 5. Corrections are revision-based canonical replacements
 
-Streaming corrections will use `segmentId` plus `revision` and will supersede prior revisions for the same logical segment.
+Streaming corrections use `segmentId` plus `revision` as the canonical identity model. The current implementation tracks canonical revisions in memory, but persisted correction replacement and translation invalidation remain deferred.
 
 **Why this decision**
 - It provides a clear identity model for providers that revise hypotheses over time.
@@ -110,12 +118,13 @@ Streaming corrections will use `segmentId` plus `revision` and will supersede pr
 
 ### 6. Translation consumes final and corrected-final events only
 
-Translation will remain final-segment oriented for the MVP.
+Translation remains final-segment oriented for the current implementation and MVP.
 
 **Why this decision**
 - The current translation pipeline is optimized for canonical text, not speculative drafts.
 - Partial translation increases cost and correction churn.
 - Final-only translation keeps current cache and overlay behavior stable.
+- The implemented streaming path sends canonical finals to the existing translation pipeline and keeps partials/corrections/error events out of translation.
 
 **Alternatives considered**
 - Translating partials too: rejected for MVP due to cost, churn, and invalidation complexity.
@@ -123,7 +132,7 @@ Translation will remain final-segment oriented for the MVP.
 
 ### 7. Recovery ownership stays split
 
-Background will own orchestration, fail-close policy, canonical state, translation, and persistence. Offscreen will own reconnect, provider cleanup, and live session runtime.
+Background owns orchestration, fail-close policy, canonical state, translation, and persistence. Offscreen owns provider lifecycle and websocket transport cleanup. Reconnect is intentionally unsupported at this stage.
 
 **Why this decision**
 - It aligns recovery behavior with actual ownership boundaries.
@@ -140,6 +149,7 @@ Background will own orchestration, fail-close policy, canonical state, translati
 - [Correction handling may require future canonical upsert logic] → Mitigate by defining revision rules now and keeping persistent stores canonical-only.
 - [Partial previews are not persisted] → Mitigate by treating partials as ephemeral UI/runtime hints only; canonical replay remains final-only.
 - [Offscreen recovery can lose drafts during restart] → Mitigate by limiting recovery guarantees to canonical final state, which is acceptable for MVP.
+- [Development-only provider exposure] → Mitigate by keeping `faster_whisper_streaming` gated by the manifest's `developmentOnly` flag.
 
 ## Migration Plan
 
@@ -147,7 +157,7 @@ Background will own orchestration, fail-close policy, canonical state, translati
 2. Add a background transcript-event convergence layer.
 3. Update provider manifest/factory metadata to distinguish batch/background from streaming/offscreen providers.
 4. Keep batch providers and current batch routing unchanged.
-5. Introduce streaming provider implementations later, behind the new execution-location contract.
+5. Introduce streaming provider implementations behind the new execution-location contract.
 6. Add correction-aware canonical persistence only when a correction-capable streaming provider is introduced.
 7. Add optional partial preview UI only if product requirements justify it.
 
@@ -156,6 +166,7 @@ Background will own orchestration, fail-close policy, canonical state, translati
 - Providers that emit corrections must wait until canonical persistence, revision-aware replacement, and translation invalidation are in place.
 - Partial transcript hypotheses remain ephemeral and are not part of the canonical persistence model.
 - A full correction history or audit log is explicitly deferred; only the latest canonical state is required for MVP support.
+- `faster_whisper_streaming` is development-only in the manifest and is intentionally not a production-ready default provider.
 
 Rollback strategy:
 - Keep the batch provider path and current translation/caching behavior unchanged.

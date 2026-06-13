@@ -3,7 +3,7 @@
 - [x] 1.1 Add a transcript-event contract module for partial, final, correction, and error events
 - [x] 1.2 Extend the STT provider manifest schema with mode, executionLocation, and streaming capability flags
 - [x] 1.3 Add validation/tests proving existing batch providers declare batch/background metadata
-- [ ] 1.4 Defer actual provider factory execution-location routing to the offscreen streaming execution phase
+- [x] 1.4 Defer actual provider factory execution-location routing to the offscreen streaming execution phase
 
 ## 2. Background Transcript Event Convergence
 
@@ -27,11 +27,11 @@
 - [ ] 4.3 Add revision-aware cache upsert by canonical identity
 - [ ] 4.4 Add correction-aware translation invalidation/retranslation
 - [ ] 4.5 Add runtime hydration/replacement behavior
-- [ ] 4.6 Add tests for final-only translation and partial discard
+- [x] 4.6 Add tests for final-only translation and partial discard
 
 ## 5. Recovery, Cleanup, and Documentation
 
-- [ ] 5.1 Define recovery responsibilities for background restart, offscreen restart, disconnect, reconnect, and cleanup
-- [ ] 5.2 Keep fail-close policy in background while provider reconnect remains host-owned
+- [x] 5.1 Define recovery responsibilities for background restart, offscreen restart, disconnect, reconnect, and cleanup
+- [x] 5.2 Keep fail-close policy in background while provider reconnect remains host-owned
 - [ ] 5.3 Update architecture documentation to describe batch vs streaming routing and ownership boundaries
-- [ ] 5.4 Add recovery and cleanup tests for streaming provider loss, session restart, and canonical state rehydration
+- [ ] 5.4 Add recovery and cleanup tests for streaming provider loss, session restart, and cleanup/restart coverage; true persisted canonical state rehydration remains deferred

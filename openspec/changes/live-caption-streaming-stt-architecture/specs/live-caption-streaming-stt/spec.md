@@ -17,6 +17,8 @@ The system SHALL execute future streaming STT providers in the offscreen documen
 #### Scenario: Streaming session start
 - **WHEN** a streaming STT provider is selected for an active live-caption session
 - **THEN** the system SHALL start the provider runtime in the offscreen document
+- **AND** the provider runtime SHALL own the websocket transport
+- **AND** the offscreen shell SHALL own provider lifecycle hosting
 
 #### Scenario: Service worker restart
 - **WHEN** the background service worker restarts during an active streaming session
@@ -32,6 +34,7 @@ The system SHALL describe each STT provider with explicit mode and execution-loc
 #### Scenario: Streaming provider metadata
 - **WHEN** a provider is registered as streaming
 - **THEN** the provider manifest SHALL mark it as offscreen-executed and SHALL declare whether it supports partial results, corrections, reconnect, and a persistent connection
+- **AND** the current manifest SHALL allow `faster_whisper_streaming` only as a development-only streaming provider
 
 ### Requirement: Transcript events use a revisioned identity model
 The system SHALL represent transcript output as revisioned transcript events with stable segment identity so that batch final results and streaming partial/final/correction/error events can converge on a common contract.
@@ -43,10 +46,12 @@ The system SHALL represent transcript output as revisioned transcript events wit
 #### Scenario: Final transcript event
 - **WHEN** a batch provider or streaming provider produces a final transcript
 - **THEN** the system SHALL emit a final transcript event with the same identity model and finality flag
+- **AND** the current implementation SHALL treat canonical streaming finals as eligible for session/cache persistence and translation handoff
 
 #### Scenario: Correction transcript event
 - **WHEN** a streaming provider revises a previously emitted transcript
 - **THEN** the system SHALL emit a correction event that references the superseded segment or event and increments revision
+- **AND** current persisted correction replacement remains deferred until revision-aware storage is implemented
 
 #### Scenario: Provider error event
 - **WHEN** transcription fails in a batch or streaming provider
@@ -62,6 +67,7 @@ The system SHALL route batch final transcript results and streaming transcript e
 #### Scenario: Streaming event routing
 - **WHEN** a streaming STT provider emits a partial, final, correction, or error event
 - **THEN** the system SHALL normalize that event through the transcript-event convergence layer before canonical session updates
+- **AND** the current implementation SHALL route canonical streaming finals through the existing translation pipeline after canonical session/cache persistence
 
 ### Requirement: Partial transcripts remain ephemeral
 The system SHALL keep partial transcript state ephemeral and SHALL NOT persist partial hypotheses in the canonical session cache or IndexedDB stores.
@@ -73,6 +79,7 @@ The system SHALL keep partial transcript state ephemeral and SHALL NOT persist p
 #### Scenario: Session end cleanup
 - **WHEN** a live-caption session stops, pauses, fails closed, or restarts
 - **THEN** the system SHALL discard partial transcript state
+- **AND** the current implementation SHALL not translate partial events
 
 ### Requirement: No background partial-state manager
 The system SHALL NOT require a dedicated background-owned partial transcript state manager that duplicates the offscreen provider's live partial hypotheses.
@@ -95,6 +102,7 @@ The system SHALL treat transcript corrections as revisioned replacements of an e
 #### Scenario: Canonical persistence of corrections
 - **WHEN** a correction becomes the canonical transcript value
 - **THEN** the system SHALL persist only the latest canonical revision rather than preserving transient draft history in the main transcript cache
+- **AND** the current codebase SHALL defer persisted correction replacement and translation invalidation until the revision-aware storage tasks are implemented
 
 ### Requirement: Translation consumes final transcript events only for MVP
 The system SHALL send only final or corrected-final transcript events to translation for the MVP and SHALL NOT translate partial transcript events.
@@ -102,6 +110,7 @@ The system SHALL send only final or corrected-final transcript events to transla
 #### Scenario: Final transcript translation
 - **WHEN** a final or corrected-final transcript event is produced
 - **THEN** the system SHALL forward it to the existing translation pipeline
+- **AND** the current implementation SHALL keep partial, correction, and error events out of translation
 
 #### Scenario: Partial transcript translation blocked
 - **WHEN** a partial transcript event is produced
@@ -113,6 +122,7 @@ The system SHALL keep websocket reconnect, streaming session recovery, and provi
 #### Scenario: Provider disconnect
 - **WHEN** a streaming provider disconnects
 - **THEN** the provider execution host SHALL handle reconnect or cleanup according to its capability flags and SHALL notify the background layer of the failure state
+- **AND** reconnect support SHALL remain unsupported for the current `faster_whisper_streaming` provider
 
 #### Scenario: Offscreen restart
 - **WHEN** the offscreen document restarts
