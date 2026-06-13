@@ -40,6 +40,7 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
     this._readyReceived = false;
     this._socket = null;
     this._boundSocketHandlers = null;
+    this._serverMessageSequence = 0;
   }
 
   async startSession(sessionConfig, options = {}) {
@@ -61,6 +62,7 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
     this._intentionalClose = false;
     this._socketOpened = false;
     this._readyReceived = false;
+    this._serverMessageSequence = 0;
     this._readyTimeoutMs = Number.isFinite(Number(options.readyTimeoutMs)) ? Math.max(0, Number(options.readyTimeoutMs)) : 5000;
     this.runtime = Object.freeze({
       sessionId: session?.sessionId ?? null,
@@ -170,6 +172,53 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
     return true;
   }
 
+  _isStaleSessionMessage(payload, session) {
+    return Boolean(payload?.sessionId && session?.sessionId && payload.sessionId !== session.sessionId);
+  }
+
+  _createGeneratedId(sessionId, sequence) {
+    return `${sessionId}:${sequence}`;
+  }
+
+  _nextServerMessageSequence() {
+    this._serverMessageSequence += 1;
+    return this._serverMessageSequence;
+  }
+
+  _buildFinalTranscriptEvent(session, payload = {}) {
+    const sequence = this._nextServerMessageSequence();
+    const generatedId = this._createGeneratedId(session.sessionId, sequence);
+    const sourceLanguage = payload.language ?? session.sourceLanguage ?? null;
+    const confidence = Number.isFinite(Number(payload.confidence)) ? Number(payload.confidence) : null;
+    const text = typeof payload.text === 'string' ? payload.text.trim() : String(payload.text ?? '').trim();
+
+    if (!text) {
+      return null;
+    }
+
+    return Object.freeze({
+      eventId: typeof payload.eventId === 'string' && payload.eventId.trim().length > 0 ? payload.eventId.trim() : generatedId,
+      eventType: 'final',
+      providerId: this.providerId,
+      providerMode: 'streaming',
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: session.videoFingerprint,
+      segmentId: typeof payload.segmentId === 'string' && payload.segmentId.trim().length > 0 ? payload.segmentId.trim() : generatedId,
+      revision: 1,
+      segmentStartMs: Number.isFinite(Number(payload.startMs)) ? Number(payload.startMs) : null,
+      segmentEndMs: Number.isFinite(Number(payload.endMs)) ? Number(payload.endMs) : null,
+      text,
+      sourceLanguage: typeof sourceLanguage === 'string' && sourceLanguage.trim().length > 0 ? sourceLanguage.trim() : null,
+      confidence,
+      createdAt: Date.now(),
+      metadata: Object.freeze({
+        rawServerPayload: payload,
+        providerProtocol: 'faster_whisper_streaming_ws'
+      })
+    });
+  }
+
   async _connect(session, options = {}) {
     const websocketFactory = this._getWebSocketFactory();
     if (!websocketFactory) {
@@ -243,6 +292,17 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
         }
       }
 
+      if (this._isStaleSessionMessage(payload, session)) {
+        return Object.freeze({
+          handled: false,
+          status: 'stale_session',
+          providerId: this.providerId,
+          sessionId: session?.sessionId ?? null,
+          tabId: session?.tabId ?? null,
+          videoFingerprint: session?.videoFingerprint ?? null
+        });
+      }
+
       if (payload?.type === 'ready' && payload.sessionId === session.sessionId) {
         this._readyReceived = true;
         this._clearReadyTimer();
@@ -256,6 +316,24 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
         return;
       }
 
+      if (payload?.type === 'final') {
+        const transcriptEvent = this._buildFinalTranscriptEvent(session, payload);
+        if (!transcriptEvent) {
+          return Object.freeze({
+            handled: false,
+            status: 'empty_final',
+            providerId: this.providerId,
+            sessionId: session?.sessionId ?? null,
+            tabId: session?.tabId ?? null,
+            videoFingerprint: session?.videoFingerprint ?? null
+          });
+        }
+        this.emitTranscriptEvent({
+          event: transcriptEvent
+        });
+        return transcriptEvent;
+      }
+
       if (payload?.type === 'error') {
         const normalized = this._normalizeError(payload, {
           code: payload.code ?? 'streaming_error',
@@ -265,6 +343,12 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
         });
         if (this._readyReceived) {
           this.emitErrorEvent({ error: normalized });
+          this._intentionalClose = true;
+          try {
+            socket.close?.(1011, 'server error');
+          } catch {
+            // Best effort cleanup.
+          }
         } else {
           this._settleReadyReject(normalized);
           this._intentionalClose = true;
@@ -277,7 +361,26 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
         return;
       }
 
-      this._handleServerMessage(payload);
+      const normalized = this._normalizeError(new Error(`Unsupported Faster Whisper streaming message type: ${payload?.type ?? 'unknown'}`), {
+        code: 'protocol_error',
+        message: `Unsupported Faster Whisper streaming message type: ${payload?.type ?? 'unknown'}`,
+        retryable: false,
+        details: {
+          payload
+        }
+      });
+      if (this._readyReceived) {
+        this.emitErrorEvent({ error: normalized });
+      } else {
+        this._settleReadyReject(normalized);
+      }
+      this._intentionalClose = true;
+      try {
+        socket.close?.(1002, 'unsupported message type');
+      } catch {
+        // Best effort cleanup.
+      }
+      return normalized;
     };
 
     const handleError = (error) => {

@@ -345,6 +345,278 @@ describe('FasterWhisperStreamingProvider', () => {
     expect(provider.state).toBe(STT_STREAMING_PROVIDER_STATES.ERROR);
   });
 
+  it('maps final server messages to canonical transcript events', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory: vi.fn(() => socket)
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a',
+      sourceLanguage: 'en'
+    });
+
+    socket.open();
+    socket.message(JSON.stringify({ type: 'ready', sessionId: 'session-1' }));
+    await expect(startPromise).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      text: 'hello world',
+      startMs: 100,
+      endMs: 420,
+      confidence: 0.93,
+      segmentId: 'server-segment-1'
+    }));
+
+    const transcriptCall = eventSink.emit.mock.calls.find(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.TRANSCRIPT);
+    expect(transcriptCall).toBeTruthy();
+    expect(transcriptCall[0]).toMatchObject({
+      type: STT_STREAMING_PROVIDER_EVENT_TYPES.TRANSCRIPT,
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a',
+      event: expect.objectContaining({
+        eventType: 'final',
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: 'streaming',
+        sessionId: 'session-1',
+        tabId: 12,
+        videoFingerprint: 'video-a',
+        segmentId: 'server-segment-1',
+        revision: 1,
+        segmentStartMs: 100,
+        segmentEndMs: 420,
+        text: 'hello world',
+        sourceLanguage: 'en',
+        confidence: 0.93,
+        metadata: expect.objectContaining({
+          providerProtocol: 'faster_whisper_streaming_ws'
+        })
+      })
+    });
+    expect(transcriptCall[0].event.eventId).toBe('session-1:1');
+    expect(transcriptCall[0].event.metadata.rawServerPayload).toMatchObject({
+      type: 'final',
+      sessionId: 'session-1',
+      text: 'hello world'
+    });
+  });
+
+  it('ignores finals with missing, empty, or whitespace text without emitting transcript or error events', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory: vi.fn(() => socket)
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a'
+    });
+
+    socket.open();
+    socket.message(JSON.stringify({ type: 'ready', sessionId: 'session-1' }));
+    await expect(startPromise).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    const missingTextResult = socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      startMs: 100,
+      endMs: 200
+    }));
+    const emptyTextResult = socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      text: ''
+    }));
+    const whitespaceTextResult = socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      text: '   '
+    }));
+
+    expect(missingTextResult).toBeUndefined();
+    expect(emptyTextResult).toBeUndefined();
+    expect(whitespaceTextResult).toBeUndefined();
+    expect(eventSink.emit.mock.calls.some(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.TRANSCRIPT)).toBe(false);
+    expect(eventSink.emit.mock.calls.some(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.ERROR)).toBe(false);
+    expect(socket.closeCalls).toHaveLength(0);
+  });
+
+  it('generates stable provider-local ids and falls back to session source language and null confidence', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory: vi.fn(() => socket)
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a',
+      sourceLanguage: 'de'
+    });
+
+    socket.open();
+    socket.message(JSON.stringify({ type: 'ready', sessionId: 'session-1' }));
+    await expect(startPromise).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      text: 'eins'
+    }));
+    socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'session-1',
+      text: 'zwei'
+    }));
+
+    const transcriptEvents = eventSink.emit.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.TRANSCRIPT)
+      .map((event) => event.event);
+
+    expect(transcriptEvents).toHaveLength(2);
+    expect(transcriptEvents[0]).toMatchObject({
+      eventId: 'session-1:1',
+      segmentId: 'session-1:1',
+      sourceLanguage: 'de',
+      confidence: null
+    });
+    expect(transcriptEvents[1]).toMatchObject({
+      eventId: 'session-1:2',
+      segmentId: 'session-1:2',
+      sourceLanguage: 'de',
+      confidence: null
+    });
+  });
+
+  it('ignores stale session finals without emitting transcript or error events', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory: vi.fn(() => socket)
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a'
+    });
+
+    socket.open();
+    socket.message(JSON.stringify({ type: 'ready', sessionId: 'session-1' }));
+    await expect(startPromise).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    const staleResult = socket.message(JSON.stringify({
+      type: 'final',
+      sessionId: 'stale-session',
+      text: 'ignored'
+    }));
+
+    expect(staleResult).toBeUndefined();
+    expect(eventSink.emit.mock.calls.some(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.TRANSCRIPT)).toBe(false);
+    expect(eventSink.emit.mock.calls.some(([event]) => event?.type === STT_STREAMING_PROVIDER_EVENT_TYPES.ERROR)).toBe(false);
+  });
+
+  it('emits error and closes the socket on server error and unknown protocol messages without reconnecting', async () => {
+    const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const websocketFactory = vi.fn(() => socket);
+    const eventSink = { emit: vi.fn() };
+    const provider = new FasterWhisperStreamingProvider({
+      eventSink,
+      websocketFactory
+    });
+
+    const startPromise = provider.startSession({
+      sessionId: 'session-1',
+      tabId: 12,
+      videoFingerprint: 'video-a'
+    });
+
+    socket.open();
+    socket.message(JSON.stringify({ type: 'ready', sessionId: 'session-1' }));
+    await expect(startPromise).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    socket.message(JSON.stringify({
+      type: 'error',
+      sessionId: 'session-1',
+      code: 'server_error',
+      message: 'transcription failed',
+      retryable: false,
+      details: {}
+    }));
+
+    expect(eventSink.emit).toHaveBeenCalledWith(expect.objectContaining({
+      type: STT_STREAMING_PROVIDER_EVENT_TYPES.ERROR,
+      error: expect.objectContaining({
+        code: 'server_error',
+        message: 'transcription failed',
+        retryable: false
+      })
+    }));
+    expect(socket.closeCalls[socket.closeCalls.length - 1]).toMatchObject({
+      code: 1011,
+      reason: 'server error'
+    });
+
+    const unknownSocket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
+    const unknownFactory = vi.fn(() => unknownSocket);
+    const unknownEventSink = { emit: vi.fn() };
+    const unknownProvider = new FasterWhisperStreamingProvider({
+      eventSink: unknownEventSink,
+      websocketFactory: unknownFactory
+    });
+
+    const unknownStart = unknownProvider.startSession({
+      sessionId: 'session-2',
+      tabId: 13,
+      videoFingerprint: 'video-b'
+    });
+
+    unknownSocket.open();
+    unknownSocket.message(JSON.stringify({ type: 'ready', sessionId: 'session-2' }));
+    await expect(unknownStart).resolves.toMatchObject({
+      state: STT_STREAMING_PROVIDER_STATES.ACTIVE
+    });
+
+    unknownSocket.message(JSON.stringify({
+      type: 'mystery',
+      sessionId: 'session-2'
+    }));
+
+    expect(unknownSocket.closeCalls.length).toBeGreaterThan(0);
+    expect(unknownFactory).toHaveBeenCalledTimes(1);
+    expect(unknownEventSink.emit).toHaveBeenCalledWith(expect.objectContaining({
+      type: STT_STREAMING_PROVIDER_EVENT_TYPES.ERROR,
+      error: expect.objectContaining({
+        code: 'protocol_error'
+      })
+    }));
+  });
+
   it('sends binary audio chunks for Blob, ArrayBuffer, and Uint8Array inputs', async () => {
     const socket = new FakeWebSocket('ws://127.0.0.1:8765/v1/audio/transcriptions/stream');
     const websocketFactory = vi.fn(() => socket);
