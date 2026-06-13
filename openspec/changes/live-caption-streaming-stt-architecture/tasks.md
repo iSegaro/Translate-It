@@ -8,7 +8,7 @@
 ## 2. Background Transcript Event Convergence
 
 - [x] 2.1 Add a background transcript-event convergence layer
-- [ ] 2.2 Normalize batch final transcript results through the new convergence layer without changing batch semantics
+- [x] 2.2 Normalize batch final transcript results through the new convergence layer without changing batch semantics
 - [ ] 2.3 Normalize streaming partial, final, correction, and error events through the same convergence layer
 - [ ] 2.4 Add tests for event normalization, revision ordering, and correction reconciliation
 

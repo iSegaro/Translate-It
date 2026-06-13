@@ -3,6 +3,9 @@ import { LiveCaptionSTTCoordinator } from './LiveCaptionSTTCoordinator.js';
 import { LiveCaptionSessionManager } from '../core/LiveCaptionSessionManager.js';
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
 import { createSTTProviderError, STT_PROVIDER_ERROR_CODES } from '../stt/BaseSTTProvider.js';
+import {
+  LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES
+} from './liveCaptionTranscriptContracts.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getLiveCaptionSttProviderAsync } from '@/shared/config/config.js';
 
@@ -25,6 +28,8 @@ describe('live-caption STT coordinator', () => {
   let mockProvider;
   let mockFactory;
   let mockCache;
+  let mockTranscriptEventCoordinator;
+  let mockOnTranscriptSegment;
   let coordinator;
 
   beforeEach(() => {
@@ -47,11 +52,35 @@ describe('live-caption STT coordinator', () => {
       appendTranscriptSegment: vi.fn().mockResolvedValue({})
     };
 
+    mockTranscriptEventCoordinator = {
+      handleTranscriptEvent: vi.fn((event) => ({
+        handled: true,
+        persisted: false,
+        status: 'canonical_final',
+        eventType: event.eventType,
+        event,
+        normalizedEvent: event,
+        canonicalEvent: event,
+        reason: null,
+        error: null,
+        metadata: {
+          eventId: event.eventId,
+          segmentId: event.segmentId,
+          revision: event.revision,
+          isFinal: event.isFinal
+        }
+      }))
+    };
+
+    mockOnTranscriptSegment = vi.fn().mockResolvedValue(undefined);
+
     coordinator = new LiveCaptionSTTCoordinator({
       sessionManager,
       captureCoordinator,
       sttFactory: mockFactory,
-      cache: mockCache
+      cache: mockCache,
+      transcriptEventCoordinator: mockTranscriptEventCoordinator,
+      onTranscriptSegment: mockOnTranscriptSegment
     });
   });
 
@@ -136,7 +165,9 @@ describe('live-caption STT coordinator', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(2);
+    expect(mockTranscriptEventCoordinator.handleTranscriptEvent).toHaveBeenCalledTimes(2);
     expect(mockVideoSession.addTranscriptSegment).toHaveBeenCalledTimes(2);
+    expect(mockOnTranscriptSegment).toHaveBeenCalledTimes(2);
 
     expect(mockVideoSession.addTranscriptSegment).toHaveBeenNthCalledWith(1, expect.objectContaining({
       text: 'First Chunk',
@@ -157,6 +188,48 @@ describe('live-caption STT coordinator', () => {
       segmentEndMs: 3000,
       isIncognito: false
     }));
+
+    expect(mockTranscriptEventCoordinator.handleTranscriptEvent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+        text: 'First Chunk',
+        segmentStartMs: 0,
+        segmentEndMs: 3000,
+        isFinal: true
+      })
+    );
+    expect(mockTranscriptEventCoordinator.handleTranscriptEvent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+        text: 'Second Chunk',
+        segmentStartMs: 3000,
+        segmentEndMs: 6000,
+        isFinal: true
+      })
+    );
+
+    expect(mockOnTranscriptSegment).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        text: 'First Chunk',
+        startMs: 0,
+        endMs: 3000,
+        providerId: 'openai_whisper'
+      }),
+      { tabId: 7 }
+    );
+    expect(mockOnTranscriptSegment).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        text: 'Second Chunk',
+        startMs: 3000,
+        endMs: 6000,
+        providerId: 'openai_whisper'
+      }),
+      { tabId: 7 }
+    );
   });
 
   it('skips one failed local_whisper chunk and continues processing the next chunk', async () => {
@@ -214,6 +287,56 @@ describe('live-caption STT coordinator', () => {
     expect(pageSession.lifecycleState).not.toBe('error');
     expect(captureCoordinator.status).not.toBe('error');
     expect(coordinator.getOrCreateQueue('session-1').chunks).toHaveLength(0);
+  });
+
+  it('treats transcript event normalization failures as STT processing failures without updating session or cache', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranscriptSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+    captureCoordinator.setSessionContext({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    const transcriptEventError = new Error('Transcript event normalization failed');
+    mockTranscriptEventCoordinator.handleTranscriptEvent = vi.fn().mockImplementation(() => {
+      throw transcriptEventError;
+    });
+
+    mockProvider = {
+      providerId: 'openai_whisper',
+      transcribeChunk: vi.fn().mockResolvedValue({ text: 'Hello from batch' })
+    };
+    mockFactory.getProvider.mockResolvedValue(mockProvider);
+
+    const chunk = {
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      chunkStartMs: 0,
+      chunkEndMs: 3000,
+      mimeType: 'audio/webm',
+      chunkPayload: { size: 100 }
+    };
+
+    await coordinator.handleFinalizedChunk(chunk);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockProvider.transcribeChunk).toHaveBeenCalledTimes(1);
+    expect(mockTranscriptEventCoordinator.handleTranscriptEvent).toHaveBeenCalledTimes(1);
+    expect(mockVideoSession.addTranscriptSegment).not.toHaveBeenCalled();
+    expect(mockCache.appendTranscriptSegment).not.toHaveBeenCalled();
+    expect(mockOnTranscriptSegment).not.toHaveBeenCalled();
+    expect(pageSession.lifecycleState).toBe('error');
+    expect(captureCoordinator.status).toBe('error');
+    expect(coordinator.sessionQueues.has('session-1')).toBe(false);
   });
 
   it('fails closed after three consecutive local_whisper chunk failures', async () => {

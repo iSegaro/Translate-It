@@ -1,10 +1,16 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { STTProviderFactory } from '../stt/STTProviderFactory.js';
+import { STT_PROVIDER_MODES } from '../stt/liveCaptionSTTProviderContracts.js';
 import { createSTTProviderError, STT_PROVIDER_ERROR_CODES } from '../stt/BaseSTTProvider.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 import { getLiveCaptionSttProviderAsync } from '@/shared/config/config.js';
+import {
+  LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES,
+  createLiveCaptionTranscriptEvent
+} from './liveCaptionTranscriptContracts.js';
+import { LiveCaptionTranscriptEventCoordinator } from './LiveCaptionTranscriptEventCoordinator.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionSTTCoordinator');
 
@@ -13,7 +19,15 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionSTTCoord
  * Manages FIFO queueing, transcription bounds, abort routing, and session state mapping.
  */
 export class LiveCaptionSTTCoordinator {
-  constructor({ sessionManager, captureCoordinator, cache = null, sttFactory = null, onTranscriptSegment = null, onError = null } = {}) {
+  constructor({
+    sessionManager,
+    captureCoordinator,
+    cache = null,
+    sttFactory = null,
+    transcriptEventCoordinator = null,
+    onTranscriptSegment = null,
+    onError = null
+  } = {}) {
     if (!sessionManager) {
       throw new TypeError('LiveCaptionSTTCoordinator requires a sessionManager');
     }
@@ -21,6 +35,7 @@ export class LiveCaptionSTTCoordinator {
     this.captureCoordinator = captureCoordinator;
     this.cache = cache;
     this.sttFactory = sttFactory || new STTProviderFactory();
+    this.transcriptEventCoordinator = transcriptEventCoordinator || new LiveCaptionTranscriptEventCoordinator();
     this.onTranscriptSegment = onTranscriptSegment;
     this.onError = onError;
     this.sessionQueues = new Map();
@@ -150,17 +165,53 @@ export class LiveCaptionSTTCoordinator {
             mimeType: chunk.mimeType
           });
 
-          // Produce transcript segment
-          const segment = {
-            segmentId: `live-caption:transcript:${Date.now()}:${Math.random().toString(36).substring(2, 9)}`,
+          const eventStamp = Date.now();
+          const eventSuffix = Math.random().toString(36).substring(2, 9);
+          const segmentId = `live-caption:transcript:${eventStamp}:${eventSuffix}`;
+          const eventId = `live-caption:transcript-event:${eventStamp}:${eventSuffix}`;
+
+          const transcriptEvent = createLiveCaptionTranscriptEvent({
+            eventId,
+            eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+            providerId: provider.providerId,
+            providerMode: STT_PROVIDER_MODES.BATCH,
             sessionId,
             tabId,
             videoFingerprint,
-            startMs: chunk.chunkStartMs,
-            endMs: chunk.chunkEndMs,
+            segmentId,
+            revision: 1,
+            segmentStartMs: chunk.chunkStartMs,
+            segmentEndMs: chunk.chunkEndMs,
             text: result?.text || '',
-            providerId: provider.providerId,
-            createdAt: Date.now()
+            sourceLanguage: result?.sourceLanguage ?? null,
+            targetLanguage: result?.targetLanguage ?? null,
+            confidence: result?.confidence ?? null,
+            createdAt: Date.now(),
+            metadata: {
+              chunkStartMs: chunk.chunkStartMs,
+              chunkEndMs: chunk.chunkEndMs,
+              mimeType: chunk.mimeType
+            }
+          });
+
+          const transcriptResult = await Promise.resolve(
+            this.transcriptEventCoordinator.handleTranscriptEvent(transcriptEvent)
+          );
+          const normalizedTranscriptEvent = transcriptResult?.canonicalEvent
+            || transcriptResult?.normalizedEvent
+            || transcriptEvent;
+
+          // Produce transcript segment
+          const segment = {
+            segmentId: normalizedTranscriptEvent.segmentId || segmentId,
+            sessionId: normalizedTranscriptEvent.sessionId || sessionId,
+            tabId: normalizedTranscriptEvent.tabId ?? tabId,
+            videoFingerprint: normalizedTranscriptEvent.videoFingerprint || videoFingerprint,
+            startMs: normalizedTranscriptEvent.segmentStartMs ?? chunk.chunkStartMs,
+            endMs: normalizedTranscriptEvent.segmentEndMs ?? chunk.chunkEndMs,
+            text: normalizedTranscriptEvent.text || '',
+            providerId: normalizedTranscriptEvent.providerId || provider.providerId,
+            createdAt: normalizedTranscriptEvent.createdAt || Date.now()
           };
 
           // Attach to active video session state
