@@ -7,7 +7,7 @@ Live Caption is a dedicated browser extension feature for capturing the active t
 The current implementation uses two STT execution paths:
 
 - **Batch STT**: background-hosted providers such as `OpenAIWhisperProvider`, `LocalWhisperSTTProvider`, and `MockSTTProvider` continue to process finalized audio chunks in the background.
-- **Streaming STT**: `FasterWhisperStreamingProvider` runs in the offscreen document, owns its WebSocket transport there, and receives finalized `MediaRecorder` blobs directly from offscreen capture.
+- **Streaming STT**: `FasterWhisperStreamingProvider` runs in the offscreen document, owns its WebSocket transport there, and receives finalized audio chunks from an offscreen-owned streaming audio source.
 
 It exists as a separate feature because its execution model differs from text selection, page translation, subtitle translation, and TTS:
 
@@ -17,6 +17,34 @@ It exists as a separate feature because its execution model differs from text se
 - it must separate transcription from translation
 - it needs per-video identity, cache, and cleanup rules
 - it must fail closed when recovery or ownership reconciliation is uncertain
+
+### Streaming Audio Source Layer
+
+The streaming STT path now has a dedicated source layer inside offscreen:
+
+- `StreamingAudioSource` is the abstraction for offscreen-owned audio chunk production.
+- `StreamingAudioSourceSelector` chooses the active source using runtime audio-format negotiation, provider capabilities, environment support, and future routing policies.
+- `MediaRecorderStreamingAudioSource` is the current WebM/Opus fallback source and remains the current runtime path when PCM is unavailable.
+- `AudioWorkletPcm16StreamingAudioSource` is the introduced PCM source for streaming providers. It produces little-endian PCM16 mono 16 kHz audio chunks and is the preferred path when the provider declares PCM support and the environment supports AudioWorklet.
+
+The source layer is intentionally source-agnostic from the perspective of the provider and background controller:
+
+- offscreen owns tab audio capture and selected streaming audio source lifecycle
+- streaming audio sources own chunk production only
+- streaming providers own transport/protocol only
+- background never receives raw audio
+
+Audio format negotiation is now explicit in the streaming contract:
+
+- `webm-opus`
+- `pcm16-mono-16khz`
+- `audioInputFormats`
+- `preferredAudioInputFormat`
+- `fallbackAudioInputFormat`
+
+The runtime prefers PCM16 for supported streaming providers, but WebM/Opus fallback remains supported and must stay available until the server protocol is updated to accept PCM16 on the wire.
+
+The negotiated PCM format currently means signed 16-bit PCM, mono, 16 kHz, little-endian byte order.
 
 ## Relationship to Existing Systems
 
@@ -29,7 +57,7 @@ It exists as a separate feature because its execution model differs from text se
 
 - **Feature isolation**: Live Caption is implemented under `src/features/live-caption/` and remains decoupled from translation, subtitle translation, TTS, and page translation execution paths.
 - **MV3 constraints**: Long-lived media work is not owned by the service worker. Background logic coordinates and reconciles, but the offscreen document owns stream capture and chunk finalization.
-- **Offscreen ownership**: The offscreen document owns the tab audio stream, the `MediaRecorder` lifecycle, and the streaming provider runtime host.
+- **Offscreen ownership**: The offscreen document owns the tab audio stream, the selected streaming audio source lifecycle, and the streaming provider runtime host.
 - **Session ownership**: `PageLiveCaptionSession` is the tab-scoped owner; `VideoCaptionSession` is the per-video owner.
 - **STT/translation separation**: `BaseSTTProvider` remains the batch provider base, `BaseStreamingSTTProvider` is the streaming provider base, and `STTProviderManifest` controls execution location and capabilities. Translation reuses `UnifiedTranslationService`.
 - **Per-video cache ownership**: Cache keys are based on tab identity plus video fingerprint. Transcript and translated caption data remain separate.
@@ -51,16 +79,57 @@ Background Orchestration
            ↓
     Offscreen Capture
        ├── Batch finalized chunks → background STT
-       └── Streaming finalized blobs → FasterWhisperStreamingProvider
-                                    ↓
-                       STREAMING_STT_* messages
-                                    ↓
-                     Background Transcript Convergence
-                                    ↓
-                    Canonical session/cache + translation
+       └── StreamingAudioSourceSelector
+                ├── MediaRecorder/WebM
+                └── AudioWorklet/PCM
+                          ↓
+             FasterWhisperStreamingProvider
+                          ↓
+              STREAMING_STT_* messages
+                          ↓
+        Background Transcript Convergence
+                          ↓
+         Canonical session/cache + translation
   ↓
 Overlay Rendering
 ```
+
+### Streaming Audio Source Layer
+
+The streaming audio source layer is offscreen-owned and sits between tab capture and the streaming STT provider.
+
+#### Responsibilities
+
+- `StreamingAudioSource` defines the common lifecycle contract for chunk-producing sources.
+- `StreamingAudioSourceSelector` chooses the source implementation using runtime audio-format negotiation, provider capabilities, environment support, and future routing policies.
+- `MediaRecorderStreamingAudioSource` produces WebM/Opus chunks and remains the fallback path.
+- `AudioWorkletPcm16StreamingAudioSource` produces little-endian PCM16 mono 16 kHz chunks and is the preferred path when supported.
+
+#### Audio Format Negotiation
+
+The source layer negotiates the following audio format metadata with the streaming runtime:
+
+- `audioInputFormats`
+- `preferredAudioInputFormat`
+- `fallbackAudioInputFormat`
+- `audioFormat`
+- `selectedAudioFormat`
+- `audioSourceType`
+
+Supported formats are currently:
+
+- `webm-opus`
+- `pcm16-mono-16khz`
+
+For the negotiated PCM path, `pcm16-mono-16khz` means signed 16-bit PCM, mono, 16 kHz, little-endian byte order.
+
+#### Ownership Rules
+
+- Background never receives raw audio.
+- Offscreen owns tab audio capture and selected streaming audio source lifecycle.
+- Streaming audio sources own chunk production only.
+- Streaming providers own transport/protocol only.
+- Providers may validate audio format metadata but must not choose the capture source.
 
 ### Ownership Boundaries
 
@@ -84,7 +153,8 @@ The current implementation routes transcript work based on provider metadata:
   - `LiveCaptionSTTCoordinator` handles transcription
   - batch transcript results are normalized, accumulated, and translated through the existing path
 - `mode: streaming` + `executionLocation: offscreen`
-  - finalized blobs are routed directly to `FasterWhisperStreamingProvider.handleAudioChunk(blob)`
+  - `StreamingAudioSourceSelector` chooses between `MediaRecorderStreamingAudioSource` and `AudioWorkletPcm16StreamingAudioSource` using runtime audio-format negotiation and policy-based routing
+  - finalized chunks are produced by the selected offscreen source and routed to `FasterWhisperStreamingProvider.handleAudioChunk(...)`
   - the provider owns the WebSocket transport and emits `ready`, `final`, `error`, and `closed` style events
   - background receives `STREAMING_STT_*` messages with both `type` and `action` so `MessageHandler` dispatch works, then routes transcript events through `LiveCaptionTranscriptEventCoordinator`
   - canonical finals are persisted to `VideoCaptionSession` and transcript cache, then routed to translation
@@ -135,7 +205,7 @@ Does not own:
 Owns:
 
 - tab audio stream capture
-- `MediaRecorder` lifecycle
+- selected streaming audio source lifecycle
 - audio chunk finalization
 - streaming provider lifecycle hosting
 - streaming provider WebSocket transport
@@ -148,6 +218,37 @@ Does not own:
 - overlay rendering
 - persistent cache management
 - active-video detection
+
+### StreamingAudioSourceSelector
+
+Owns:
+
+- source selection between WebM/MediaRecorder and PCM/AudioWorklet
+- runtime audio-format negotiation using provider capabilities, environment support, and future routing policies
+- source instantiation wiring for offscreen capture
+
+Does not own:
+
+- tab audio capture
+- streaming provider transport
+- background orchestration
+- cache persistence
+- overlay rendering
+
+### StreamingAudioSource
+
+Owns:
+
+- source-local audio chunk production
+- chunk timing and lifecycle state for the selected source implementation
+- source-specific cleanup
+
+Does not own:
+
+- provider transport
+- background routing
+- cache persistence
+- overlay rendering
 
 ### PageLiveCaptionSession
 
@@ -429,6 +530,8 @@ Recovery limitations:
 - No correction history or audit-log persistence
 - No reconnect or resume support
 - `faster_whisper_streaming` is development-only
+- Client-side PCM16 mono 16 kHz source selection and negotiation are introduced, but the local Faster Whisper server remains WebM/Opus-only until the protocol/server update lands
+- WebM fallback must remain supported
 - Local WebSocket smoke testing against `ws://127.0.0.1:8765/v1/audio/transcriptions/stream` is still required in a new environment before treating the streaming path as operational
 - When the active video changes, the handoff coordinator produces a pure plan that either no-ops, replaces the current video session, or tears down the current target.
 - Recovery reconciliation uses session snapshots and offscreen status snapshots rather than trusting service-worker memory as the source of truth.
@@ -480,8 +583,9 @@ Live Caption translates finalized transcript text through the existing translati
 - it builds a request compatible with the current translation flow
 - it delegates to `UnifiedTranslationService`
 - it normalizes translated output into caption segment objects
-- canonical streaming finals use the same translation handoff after session/cache persistence
-- partial, correction, and error events do not enter translation in the current MVP
+- canonical streaming finals and canonical corrections use the same translation handoff after session/cache persistence
+- stale corrections and error events do not enter translation
+- partial events remain non-persistent and non-translated
 
 ### Provider Selection Behavior
 
@@ -527,7 +631,7 @@ The cache model uses two layers:
 - **Session cache**: in-memory, per-video, fast for live updates and seek/replay handling
 - **IndexedDB persistence**: durable storage for transcript and translated caption records
 
-Both batch final transcript segments and canonical streaming final transcript segments flow through the same session-cache and persistence model. Partial, correction, and error events do not enter canonical cache persistence in the current implementation.
+Both batch final transcript segments and canonical streaming transcript segments flow through the same session-cache and persistence model. Canonical streaming corrections replace the current canonical transcript state before persistence and translation. Partial and error events do not enter canonical cache persistence.
 
 ### Stores
 
@@ -537,12 +641,11 @@ Both batch final transcript segments and canonical streaming final transcript se
 
 ### Per-Video Keying
 
-Cache keys are based on:
+Cache keys are based on the record type and identity model:
 
-- tab identity
-- video fingerprint
-- segment timing
-- target language and provider for translated caption records
+- append-oriented transcript records use tab identity, video fingerprint, and segment timing
+- canonical correction-aware transcript records use session id, tab id, video fingerprint, and segment id
+- translated caption records add target language and provider to the canonical identity for replacement-aware storage
 
 This avoids page-URL-only identity, which is too coarse for media sessions.
 
@@ -629,7 +732,11 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - STT infrastructure
 - `BaseStreamingSTTProvider`
 - `FasterWhisperStreamingProvider`
-- STT provider manifest metadata for mode, execution location, and streaming capability flags
+- `StreamingAudioSource`
+- `StreamingAudioSourceSelector`
+- `MediaRecorderStreamingAudioSource`
+- `AudioWorkletPcm16StreamingAudioSource`
+- STT provider manifest metadata for mode, execution location, streaming capability flags, and audio format negotiation
 - translation adapter
 - active-video detector
 - active-video handoff coordinator
@@ -638,13 +745,14 @@ Live Caption uses `LOG_COMPONENTS.LIVE_CAPTION`.
 - runtime message contracts
 - structured logging scope
 - `chrome.tabCapture` runtime and offscreen capture ownership
-- `MediaRecorder` chunking runtime and offscreen runtime capture
+- `MediaRecorderStreamingAudioSource` WebM/Opus fallback runtime and offscreen runtime capture
+- selected streaming audio source lifecycle ownership in offscreen
 - finalized audio chunks delivery to background controller
 - STT execution pipeline
 - offscreen-hosted streaming provider lifecycle
 - provider-owned WebSocket transport for `FasterWhisperStreamingProvider`
 - streaming transcript-event convergence
-- canonical streaming final persistence and translation handoff
+- canonical streaming final and correction persistence plus translation handoff
 - translation execution pipeline
 - overlay caption rendering and controls
 - cache persistence writes (Phase 8)
@@ -664,10 +772,11 @@ Phase 10 completed the user-facing layer:
 
 ## Future Runtime Phases
 
-The remaining runtime work is limited to persisted recovery and reconnect enhancements:
+The remaining runtime work is limited to persisted recovery, reconnect enhancements, and server/protocol PCM support:
 
 1. persisted canonical rehydration for revision-aware state across restart
 2. reconnect/resume or other provider recovery enhancements if product requirements change
+3. server-side PCM16 protocol support for `pcm16-mono-16khz` while preserving WebM/Opus fallback compatibility
 
 ## Maintenance Notes
 
