@@ -34,6 +34,64 @@ function normalizeOptionalString(value) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeAudioWorkletModuleUrl(value) {
+  return normalizeOptionalString(value) ?? resolvePcm16MonoStreamingProcessorModuleUrl();
+}
+
+function isJavaScriptLikeContentType(contentType = '') {
+  const normalized = String(contentType).trim().toLowerCase();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return normalized.includes('javascript')
+    || normalized.includes('ecmascript')
+    || normalized.includes('x-javascript');
+}
+
+async function readResponsePreview(response, limit = 200) {
+  if (!response || typeof response.clone !== 'function' || typeof response.text !== 'function') {
+    return null;
+  }
+
+  try {
+    const text = await response.clone().text();
+    return text.slice(0, limit);
+  } catch (error) {
+    return `<<unavailable: ${error?.message ?? 'unknown'}>>`;
+  }
+}
+
+function formatAudioWorkletModuleDiagnosticLine({
+  moduleUrl = null,
+  preflight = null,
+  errorName = null,
+  errorMessage = null
+} = {}) {
+  const parts = [
+    `moduleUrl=${moduleUrl ?? 'null'}`,
+    `preflightStatus=${preflight?.status ?? 'null'}`,
+    `preflightOk=${preflight?.ok ?? 'null'}`,
+    `contentType=${preflight?.contentType ?? 'null'}`,
+    `redirected=${preflight?.redirected ?? 'null'}`
+  ];
+
+  if (preflight?.responsePreview) {
+    parts.push(`responsePreview=${preflight.responsePreview}`);
+  }
+
+  if (preflight?.errorName || preflight?.errorMessage) {
+    parts.push(`preflightError=${preflight.errorName ?? 'null'}:${preflight.errorMessage ?? 'null'}`);
+  }
+
+  if (errorName || errorMessage) {
+    parts.push(`addModuleError=${errorName ?? 'null'}:${errorMessage ?? 'null'}`);
+  }
+
+  return `AudioWorklet PCM module diagnostics: ${parts.join(' | ')}`;
+}
+
 function toFloat32Array(samples) {
   if (!samples) {
     return null;
@@ -145,7 +203,7 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.onStateChange = typeof onStateChange === 'function' ? onStateChange : null;
     this.audioContextFactory = typeof audioContextFactory === 'function' ? audioContextFactory : null;
     this.audioWorkletNodeFactory = typeof audioWorkletNodeFactory === 'function' ? audioWorkletNodeFactory : null;
-    this.audioWorkletModuleUrl = audioWorkletModuleUrl;
+    this.audioWorkletModuleUrl = normalizeAudioWorkletModuleUrl(audioWorkletModuleUrl);
 
     this.targetSampleRate = AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE;
     this.channelCount = AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT;
@@ -163,6 +221,7 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.captureState = 'idle';
     this.audioContextState = 'closed';
     this.destroyed = false;
+    this.lastAudioWorkletModulePreflight = null;
   }
 
   _notifyStateChange(state, details = {}) {
@@ -353,7 +412,36 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.audioContextState = this.audioContext?.state ?? 'running';
 
     if (this.audioContext?.audioWorklet?.addModule) {
-      await this.audioContext.audioWorklet.addModule(this.audioWorkletModuleUrl);
+      const moduleUrl = normalizeOptionalString(this.audioWorkletModuleUrl);
+      if (!moduleUrl) {
+        const error = new Error('AudioWorkletPcm16StreamingAudioSource requires a valid audioWorkletModuleUrl');
+        error.code = 'audio_worklet_module_url_invalid';
+        error.reason = 'invalid_audio_worklet_module_url';
+        throw error;
+      }
+
+      this.audioWorkletModuleUrl = moduleUrl;
+
+      try {
+        await this._preflightAudioWorkletModuleLoad(moduleUrl);
+        await this.audioContext.audioWorklet.addModule(moduleUrl);
+      } catch (error) {
+        const diagnosticLine = formatAudioWorkletModuleDiagnosticLine({
+          moduleUrl,
+          preflight: this.lastAudioWorkletModulePreflight,
+          errorName: error?.name ?? null,
+          errorMessage: error?.message ?? String(error)
+        });
+
+        this.logger?.warn?.(diagnosticLine, {
+          moduleUrl,
+          preflight: this.lastAudioWorkletModulePreflight ? { ...this.lastAudioWorkletModulePreflight } : null,
+          errorName: error?.name ?? null,
+          errorMessage: error?.message ?? String(error),
+          fallbackReason: 'audio_worklet_module_load_failure'
+        });
+        throw error;
+      }
     }
 
     if (!stream || typeof this.audioContext.createMediaStreamSource !== 'function') {
@@ -370,6 +458,73 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     }
 
     this.audioContextState = this.audioContext?.state ?? 'running';
+  }
+
+  async _preflightAudioWorkletModuleLoad(moduleUrl) {
+    if (!moduleUrl || typeof fetch !== 'function') {
+      return null;
+    }
+
+    try {
+      const response = await fetch(moduleUrl);
+      const contentType = response?.headers?.get?.('content-type') ?? '';
+      const isJavaScriptLike = isJavaScriptLikeContentType(contentType);
+      const logDetails = {
+        moduleUrl,
+        status: response?.status ?? null,
+        ok: Boolean(response?.ok),
+        contentType,
+        redirected: Boolean(response?.redirected)
+      };
+
+      this.lastAudioWorkletModulePreflight = {
+        ...logDetails,
+        responsePreview: null,
+        errorName: null,
+        errorMessage: null
+      };
+
+      if (!response?.ok || !isJavaScriptLike) {
+        logDetails.responsePreview = await readResponsePreview(response);
+        this.lastAudioWorkletModulePreflight.responsePreview = logDetails.responsePreview;
+        this.logger?.warn?.(
+          formatAudioWorkletModuleDiagnosticLine({
+            moduleUrl,
+            preflight: this.lastAudioWorkletModulePreflight
+          }),
+          { moduleUrl, preflight: { ...this.lastAudioWorkletModulePreflight } }
+        );
+      } else {
+        this.logger?.debug?.(
+          formatAudioWorkletModuleDiagnosticLine({
+            moduleUrl,
+            preflight: this.lastAudioWorkletModulePreflight
+          }),
+          { moduleUrl, preflight: { ...this.lastAudioWorkletModulePreflight } }
+        );
+      }
+
+      return logDetails;
+    } catch (error) {
+      this.lastAudioWorkletModulePreflight = {
+        moduleUrl,
+        status: null,
+        ok: false,
+        contentType: null,
+        redirected: false,
+        responsePreview: null,
+        errorName: error?.name ?? null,
+        errorMessage: error?.message ?? null
+      };
+      this.logger?.warn?.(formatAudioWorkletModuleDiagnosticLine({
+        moduleUrl,
+        preflight: this.lastAudioWorkletModulePreflight
+      }), {
+        moduleUrl,
+        preflight: { ...this.lastAudioWorkletModulePreflight }
+      });
+      return null;
+    }
   }
 
   async _suspendAudioContext() {
@@ -485,8 +640,9 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     });
 
     try {
-      if (audioWorkletModuleUrl) {
-        this.audioWorkletModuleUrl = audioWorkletModuleUrl;
+      const normalizedAudioWorkletModuleUrl = normalizeOptionalString(audioWorkletModuleUrl);
+      if (normalizedAudioWorkletModuleUrl) {
+        this.audioWorkletModuleUrl = normalizedAudioWorkletModuleUrl;
       }
 
       await this._connectGraph(stream, {

@@ -35,6 +35,15 @@ function normalizeProviderDefinition(providerDefinition = null) {
   });
 }
 
+function normalizeOptionalString(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function createDefaultAudioContextConstructorProvider() {
   return globalThis.AudioContext || globalThis.webkitAudioContext || null;
 }
@@ -154,7 +163,7 @@ function createAudioWorkletSource({
     onStateChange,
     audioContextFactory,
     audioWorkletNodeFactory,
-    audioWorkletModuleUrl,
+    audioWorkletModuleUrl: normalizeOptionalString(audioWorkletModuleUrl),
     logger: sourceLogger
   });
 }
@@ -223,7 +232,7 @@ export class StreamingAudioSourceSelector {
       onStateChange: callbacks.onStateChange ?? null,
       audioContextFactory,
       audioWorkletNodeFactory,
-      audioWorkletModuleUrl,
+      audioWorkletModuleUrl: normalizeOptionalString(audioWorkletModuleUrl),
       logger: this.logger
     });
 

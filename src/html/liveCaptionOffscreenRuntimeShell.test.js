@@ -567,39 +567,51 @@ describe("live-caption offscreen runtime shell", () => {
       {},
     );
 
-    expect(provider.startSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: "session-pcm",
-        tabId: 7,
-        videoFingerprint: "video-pcm",
-        audioFormat: "pcm16-mono-16khz",
-        selectedAudioFormat: "pcm16-mono-16khz",
-        audioSourceType: "audio_worklet_pcm16",
-        audioInputFormats: [
-          "pcm16-mono-16khz",
-          "webm-opus"
-        ],
-        preferredAudioInputFormat: "pcm16-mono-16khz",
-        fallbackAudioInputFormat: "webm-opus",
-        metadata: expect.objectContaining({
-          streamingProvider: expect.objectContaining({
-            preferredAudioInputFormat: "pcm16-mono-16khz"
-          })
-        })
-      }),
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          streamingProvider: expect.objectContaining({
-            preferredAudioInputFormat: "pcm16-mono-16khz"
-          })
-        })
+    expect(provider.startSession).toHaveBeenCalledTimes(1);
+    const [startPayload, startOptions] = provider.startSession.mock.calls[0];
+    expect(startPayload).toMatchObject({
+      sessionId: "session-pcm",
+      tabId: 7,
+      videoFingerprint: "video-pcm",
+      audioFormat: "pcm16-mono-16khz",
+      selectedAudioFormat: "pcm16-mono-16khz",
+      audioSourceType: "audio_worklet_pcm16",
+      audioInputFormats: [
+        "pcm16-mono-16khz",
+        "webm-opus"
+      ],
+      preferredAudioInputFormat: "pcm16-mono-16khz",
+      fallbackAudioInputFormat: "webm-opus",
+      sampleRate: 16000,
+      channelCount: 1,
+      bitDepth: 16,
+      metadata: expect.objectContaining({
+        streamingProvider: expect.objectContaining({
+          preferredAudioInputFormat: "pcm16-mono-16khz"
+        }),
+        sampleRate: 16000,
+        channelCount: 1,
+        bitDepth: 16
       })
-    );
+    });
+    expect(startOptions).toMatchObject({
+      metadata: expect.objectContaining({
+        streamingProvider: expect.objectContaining({
+          preferredAudioInputFormat: "pcm16-mono-16khz"
+        }),
+        sampleRate: 16000,
+        channelCount: 1,
+        bitDepth: 16
+      })
+    });
 
     expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
       audioFormat: "pcm16-mono-16khz",
       selectedAudioFormat: "pcm16-mono-16khz",
-      audioSourceType: "audio_worklet_pcm16"
+      audioSourceType: "audio_worklet_pcm16",
+      sampleRate: 16000,
+      channelCount: 1,
+      bitDepth: 16
     });
     expect(shell.mediaRecorderStreamingAudioSource?.audioWorkletNode).toBe(workletNode);
     expect(shell.mediaRecorder).toBeNull();

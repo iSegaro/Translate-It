@@ -68,6 +68,13 @@ export function generateManifest(browser = 'chrome') {
       },
       {
         resources: [
+          'src/features/live-caption/stt/worklets/pcm16MonoStreamingProcessor.js'
+        ],
+        matches: ['<all_urls>', 'file://*/*'],
+        use_dynamic_url: false
+      },
+      {
+        resources: [
           'assets/ocr/*'
         ],
         matches: ['<all_urls>', 'file://*/*'],

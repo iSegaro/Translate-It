@@ -26,6 +26,11 @@ import {
 } from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
 import { MediaRecorderStreamingAudioSource } from '@/features/live-caption/stt/MediaRecorderStreamingAudioSource.js';
 import { StreamingAudioSourceSelector } from '@/features/live-caption/stt/StreamingAudioSourceSelector.js';
+import {
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH
+} from '@/features/live-caption/stt/AudioWorkletPcm16StreamingAudioSource.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
 const MIN_FINALIZED_SEGMENT_BYTES = 1024;
@@ -519,6 +524,12 @@ export class LiveCaptionOffscreenRuntimeShell {
     selectedAudioFormat = null,
     sourceType = null
   } = {}) {
+    const isPcmAudioWorkletSource = sourceType === 'audio_worklet_pcm16'
+      || selectedAudioFormat === 'pcm16-mono-16khz';
+    const sampleRate = isPcmAudioWorkletSource ? AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE : null;
+    const channelCount = isPcmAudioWorkletSource ? AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT : null;
+    const bitDepth = isPcmAudioWorkletSource ? AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH : null;
+
     return {
       sessionId: this.sessionId,
       tabId: this.tabId,
@@ -531,11 +542,22 @@ export class LiveCaptionOffscreenRuntimeShell {
       preferredAudioInputFormat: providerDefinition?.preferredAudioInputFormat ?? selectedAudioFormat ?? 'webm-opus',
       fallbackAudioInputFormat: providerDefinition?.fallbackAudioInputFormat ?? 'webm-opus',
       audioSourceType: sourceType ?? null,
+      sampleRate,
+      channelCount,
+      bitDepth,
       providerId: providerDefinition?.id ?? null,
       providerMode: providerDefinition?.mode ?? null,
       executionLocation: providerDefinition?.executionLocation ?? null,
       metadata: {
-        streamingProvider: providerDefinition ? { ...providerDefinition } : null
+        streamingProvider: providerDefinition ? { ...providerDefinition } : null,
+        audioFormat: selectedAudioFormat ?? providerDefinition?.preferredAudioInputFormat ?? 'webm-opus',
+        selectedAudioFormat: selectedAudioFormat ?? providerDefinition?.preferredAudioInputFormat ?? 'webm-opus',
+        preferredAudioInputFormat: providerDefinition?.preferredAudioInputFormat ?? selectedAudioFormat ?? 'webm-opus',
+        fallbackAudioInputFormat: providerDefinition?.fallbackAudioInputFormat ?? 'webm-opus',
+        audioSourceType: sourceType ?? null,
+        sampleRate,
+        channelCount,
+        bitDepth
       }
     };
   }
@@ -712,7 +734,9 @@ export class LiveCaptionOffscreenRuntimeShell {
       }
 
       logger.warn('AudioWorklet PCM source failed to start, falling back to MediaRecorder/WebM:', {
-        error: error?.message ?? String(error),
+        moduleUrl: selection.source?.audioWorkletModuleUrl ?? null,
+        errorName: error?.name ?? null,
+        errorMessage: error?.message ?? String(error),
         providerId: selection.providerDefinition?.id ?? null,
         fallbackReason: 'audio_worklet_module_load_failure'
       });
@@ -812,7 +836,9 @@ export class LiveCaptionOffscreenRuntimeShell {
       }
 
       logger.warn('AudioWorklet PCM source failed to start during deferred start, falling back to MediaRecorder/WebM:', {
-        error: error?.message ?? String(error),
+        moduleUrl: selection.source?.audioWorkletModuleUrl ?? null,
+        errorName: error?.name ?? null,
+        errorMessage: error?.message ?? String(error),
         providerId: selection.providerDefinition?.id ?? null,
         fallbackReason: 'audio_worklet_module_load_failure'
       });
@@ -1284,7 +1310,10 @@ export class LiveCaptionOffscreenRuntimeShell {
           audioSourceType: audioSessionConfig.audioSourceType,
           audioInputFormats: audioSessionConfig.audioInputFormats,
           preferredAudioInputFormat: audioSessionConfig.preferredAudioInputFormat,
-          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat
+          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat,
+          sampleRate: audioSessionConfig.sampleRate,
+          channelCount: audioSessionConfig.channelCount,
+          bitDepth: audioSessionConfig.bitDepth
         },
         requestId: request.requestId
       }, {
@@ -1295,7 +1324,10 @@ export class LiveCaptionOffscreenRuntimeShell {
           audioSourceType: audioSessionConfig.audioSourceType,
           audioInputFormats: audioSessionConfig.audioInputFormats,
           preferredAudioInputFormat: audioSessionConfig.preferredAudioInputFormat,
-          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat
+          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat,
+          sampleRate: audioSessionConfig.sampleRate,
+          channelCount: audioSessionConfig.channelCount,
+          bitDepth: audioSessionConfig.bitDepth
         }
       });
 

@@ -21,5 +21,14 @@ describe('manifest-generator live caption scaffolding', () => {
 
     expect(offscreenResources).toContain('src/html/offscreen.html');
     expect(offscreenResources).toContain('src/html/offscreen.js');
+    expect(offscreenResources).toContain('src/features/live-caption/stt/worklets/pcm16MonoStreamingProcessor.js');
+
+    const pcmWorkletEntry = chromeManifest.web_accessible_resources.find((entry) =>
+      entry.resources.includes('src/features/live-caption/stt/worklets/pcm16MonoStreamingProcessor.js')
+    );
+
+    expect(pcmWorkletEntry).toMatchObject({
+      use_dynamic_url: false
+    });
   });
 });
