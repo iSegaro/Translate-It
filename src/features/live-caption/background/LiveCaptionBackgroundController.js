@@ -59,12 +59,30 @@ function normalizeTabId(tabId) {
 async function resolveRuntimeStartMetadata(metadata = {}, providerId = null) {
   const normalizedMetadata = metadata && typeof metadata === 'object' ? { ...metadata } : {};
   const resolvedProviderId = providerId ?? await getLiveCaptionSttProviderAsync();
+  const providerDefinition = getSTTProviderDefinition(resolvedProviderId);
 
   if (resolvedProviderId === 'local_whisper') {
     const qualityProfile = await getLiveCaptionQualityProfileAsync();
     normalizedMetadata.chunkTimeslice = LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE[
       typeof qualityProfile === 'string' ? qualityProfile.trim().toLowerCase() : ''
     ] ?? LOCAL_WHISPER_CHUNK_TIMESLICE_BY_PROFILE.balanced;
+  }
+
+  if (providerDefinition) {
+    normalizedMetadata.streamingProvider = {
+      id: providerDefinition.id ?? resolvedProviderId ?? null,
+      mode: providerDefinition.mode ?? null,
+      executionLocation: providerDefinition.executionLocation ?? null,
+      audioInputFormats: Array.isArray(providerDefinition.audioInputFormats)
+        ? [...providerDefinition.audioInputFormats]
+        : [],
+      preferredAudioInputFormat: providerDefinition.preferredAudioInputFormat ?? null,
+      fallbackAudioInputFormat: providerDefinition.fallbackAudioInputFormat ?? null,
+      supportsPartialResults: Boolean(providerDefinition.supportsPartialResults),
+      supportsCorrections: Boolean(providerDefinition.supportsCorrections),
+      supportsReconnect: Boolean(providerDefinition.supportsReconnect),
+      requiresPersistentConnection: Boolean(providerDefinition.requiresPersistentConnection)
+    };
   }
 
   return normalizedMetadata;
@@ -193,7 +211,8 @@ export class LiveCaptionBackgroundController {
   async _startActiveStreamingSession({
     session,
     request,
-    providerRuntime
+    providerRuntime,
+    streamingMetadata = null
   }) {
     if (!providerRuntime?.isStreamingOffscreen) {
       this._clearActiveStreamingSession();
@@ -210,7 +229,13 @@ export class LiveCaptionBackgroundController {
       sourceLanguage: request.data.sourceLanguage ?? null,
       targetLanguage: request.data.targetLanguage ?? null,
       providerOptions: request.data.providerOptions ?? {},
-      metadata: request.data.metadata ?? {},
+      metadata: {
+        ...(streamingMetadata && typeof streamingMetadata === 'object' ? streamingMetadata : {}),
+        streamingProvider:
+          streamingMetadata?.streamingProvider
+          ?? request.data.metadata?.streamingProvider
+          ?? null
+      },
       requestId: request.messageId,
       runtimeState: this.captureCoordinator.runtimeState,
       message: 'Live-caption streaming provider start'
@@ -1028,7 +1053,8 @@ export class LiveCaptionBackgroundController {
           streamingStartResponse = await this._startActiveStreamingSession({
             session,
             request,
-            providerRuntime
+            providerRuntime,
+            streamingMetadata
           });
         } catch (streamingStartError) {
           this.handleCoordinatorError(streamingStartError, {

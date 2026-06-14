@@ -148,8 +148,13 @@ export class StreamingAudioSource {
       tabId,
       videoFingerprint,
       audioFormat: normalizeStreamingAudioFormat(sessionConfig.audioFormat),
+      audioInputFormats: Array.isArray(sessionConfig.audioInputFormats)
+        ? Object.freeze(sessionConfig.audioInputFormats.filter((format) => normalizeStreamingAudioFormat(format)))
+        : Object.freeze([]),
+      selectedAudioFormat: normalizeStreamingAudioFormat(sessionConfig.selectedAudioFormat),
       preferredAudioInputFormat: normalizeOptionalString(sessionConfig.preferredAudioInputFormat),
       fallbackAudioInputFormat: normalizeOptionalString(sessionConfig.fallbackAudioInputFormat),
+      audioSourceType: normalizeOptionalString(sessionConfig.audioSourceType),
       sampleRate: normalizeOptionalNumber(sessionConfig.sampleRate),
       channelCount: normalizeOptionalNumber(sessionConfig.channelCount),
       bitDepth: normalizeOptionalNumber(sessionConfig.bitDepth),

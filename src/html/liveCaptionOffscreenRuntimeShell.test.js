@@ -210,6 +210,7 @@ describe("live-caption offscreen runtime shell", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("starts, pauses, resumes, statuses, and stops without media capture if streamId is not specified but behaves correctly when streamId is passed", async () => {
@@ -345,7 +346,18 @@ describe("live-caption offscreen runtime shell", () => {
           model: "base"
         },
         metadata: {
-          origin: "shell-test"
+          origin: "shell-test",
+          streamingProvider: {
+            id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+            mode: "streaming",
+            executionLocation: "offscreen",
+            audioInputFormats: [
+              "pcm16-mono-16khz",
+              "webm-opus"
+            ],
+            preferredAudioInputFormat: "pcm16-mono-16khz",
+            fallbackAudioInputFormat: "webm-opus"
+          }
         }
       },
       {},
@@ -360,20 +372,45 @@ describe("live-caption offscreen runtime shell", () => {
         videoFingerprint: "video-a",
         sourceLanguage: "en",
         targetLanguage: "fa",
+        audioFormat: "pcm16-mono-16khz",
+        selectedAudioFormat: "pcm16-mono-16khz",
+        audioSourceType: null,
+        audioInputFormats: [
+          "pcm16-mono-16khz",
+          "webm-opus"
+        ],
+        preferredAudioInputFormat: "pcm16-mono-16khz",
+        fallbackAudioInputFormat: "webm-opus",
         providerOptions: {
           model: "base"
         },
-        metadata: {
-          origin: "shell-test"
-        }
+        metadata: expect.objectContaining({
+          origin: "shell-test",
+          selectedAudioFormat: "pcm16-mono-16khz",
+          audioSourceType: null,
+          audioInputFormats: [
+            "pcm16-mono-16khz",
+            "webm-opus"
+          ],
+          preferredAudioInputFormat: "pcm16-mono-16khz",
+          fallbackAudioInputFormat: "webm-opus"
+        })
       }),
       expect.objectContaining({
         providerOptions: {
           model: "base"
         },
-        metadata: {
-          origin: "shell-test"
-        }
+        metadata: expect.objectContaining({
+          origin: "shell-test",
+          selectedAudioFormat: "pcm16-mono-16khz",
+          audioSourceType: null,
+          audioInputFormats: [
+            "pcm16-mono-16khz",
+            "webm-opus"
+          ],
+          preferredAudioInputFormat: "pcm16-mono-16khz",
+          fallbackAudioInputFormat: "webm-opus"
+        })
       })
     );
     expect(MockMediaRecorder.instances.length).toBe(0);
@@ -411,6 +448,183 @@ describe("live-caption offscreen runtime shell", () => {
       providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
       state: "active"
     });
+  });
+
+  it("selects AudioWorklet PCM16 capture for supported streaming providers and keeps raw audio off background", async () => {
+    vi.useFakeTimers();
+
+    const pcmAudioWorkletAddModule = vi.fn().mockResolvedValue(undefined);
+    class MockPcmAudioContext {
+      constructor() {
+        this.destination = {};
+        this.state = "running";
+        this.audioWorklet = {
+          addModule: pcmAudioWorkletAddModule
+        };
+        this.close = mockClose;
+        this.suspend = vi.fn().mockImplementation(async () => {
+          this.state = "suspended";
+        });
+        this.resume = vi.fn().mockImplementation(async () => {
+          this.state = "running";
+        });
+      }
+
+      createMediaStreamSource() {
+        return {
+          connect: mockConnect,
+          disconnect: mockDisconnect
+        };
+      }
+    }
+
+    const workletPort = {
+      onmessage: null,
+      close: vi.fn()
+    };
+    const workletNode = {
+      port: workletPort,
+      connect: vi.fn(),
+      disconnect: vi.fn()
+    };
+
+    vi.stubGlobal("AudioContext", MockPcmAudioContext);
+    vi.stubGlobal("webkitAudioContext", MockPcmAudioContext);
+    vi.stubGlobal("AudioWorkletNode", function MockAudioWorkletNode() {
+      return workletNode;
+    });
+
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-pcm",
+      tabId: 7,
+      videoFingerprint: "video-pcm",
+      readyPayload: { type: "ready", sessionId: "session-pcm" }
+    });
+
+    const runtimeStartResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        data: {
+          sessionId: "session-pcm",
+          tabId: 7,
+          videoFingerprint: "video-pcm",
+          streamId: "mock-stream-id",
+          metadata: {
+            streamingProvider: {
+              id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+              mode: "streaming",
+              executionLocation: "offscreen",
+              audioInputFormats: [
+                "pcm16-mono-16khz",
+                "webm-opus"
+              ],
+              preferredAudioInputFormat: "pcm16-mono-16khz",
+              fallbackAudioInputFormat: "webm-opus"
+            },
+            chunkTimeslice: 100
+          }
+        }
+      },
+      {},
+    );
+
+    expect(runtimeStartResponse.success).toBe(true);
+    expect(MockMediaRecorder.instances.length).toBe(0);
+
+    await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-pcm",
+        tabId: 7,
+        videoFingerprint: "video-pcm",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen",
+        metadata: {
+          streamingProvider: {
+            id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+            mode: "streaming",
+            executionLocation: "offscreen",
+            audioInputFormats: [
+              "pcm16-mono-16khz",
+              "webm-opus"
+            ],
+            preferredAudioInputFormat: "pcm16-mono-16khz",
+            fallbackAudioInputFormat: "webm-opus"
+          }
+        }
+      },
+      {},
+    );
+
+    expect(provider.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-pcm",
+        tabId: 7,
+        videoFingerprint: "video-pcm",
+        audioFormat: "pcm16-mono-16khz",
+        selectedAudioFormat: "pcm16-mono-16khz",
+        audioSourceType: "audio_worklet_pcm16",
+        audioInputFormats: [
+          "pcm16-mono-16khz",
+          "webm-opus"
+        ],
+        preferredAudioInputFormat: "pcm16-mono-16khz",
+        fallbackAudioInputFormat: "webm-opus",
+        metadata: expect.objectContaining({
+          streamingProvider: expect.objectContaining({
+            preferredAudioInputFormat: "pcm16-mono-16khz"
+          })
+        })
+      }),
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          streamingProvider: expect.objectContaining({
+            preferredAudioInputFormat: "pcm16-mono-16khz"
+          })
+        })
+      })
+    );
+
+    expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
+      audioFormat: "pcm16-mono-16khz",
+      selectedAudioFormat: "pcm16-mono-16khz",
+      audioSourceType: "audio_worklet_pcm16"
+    });
+    expect(shell.mediaRecorderStreamingAudioSource?.audioWorkletNode).toBe(workletNode);
+    expect(shell.mediaRecorder).toBeNull();
+
+    globalThis.chrome.runtime.sendMessage.mockClear();
+    provider.handleAudioChunk.mockClear();
+
+    workletPort.onmessage?.({
+      data: {
+        type: "frame",
+        samples: new Float32Array(4800).fill(0.5),
+        sampleRate: 48000
+      }
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+    await Promise.resolve();
+
+    expect(provider.handleAudioChunk).toHaveBeenCalledTimes(1);
+    expect(provider.handleAudioChunk.mock.calls[0][0]).toBeInstanceOf(Uint8Array);
+    expect(globalThis.chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "live-caption/offscreen/finalized-chunk"
+      })
+    );
   });
 
   it("forwards streaming provider events to background, clears ownership on error, and ignores stale sessions", async () => {
@@ -612,6 +826,19 @@ describe("live-caption offscreen runtime shell", () => {
           tabId: 7,
           videoFingerprint: "video-a",
           streamId: "mock-stream-id",
+          metadata: {
+            streamingProvider: {
+              id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+              mode: "streaming",
+              executionLocation: "offscreen",
+              audioInputFormats: [
+                "pcm16-mono-16khz",
+                "webm-opus"
+              ],
+              preferredAudioInputFormat: "pcm16-mono-16khz",
+              fallbackAudioInputFormat: "webm-opus"
+            }
+          }
         },
       },
       {},
@@ -686,6 +913,19 @@ describe("live-caption offscreen runtime shell", () => {
           tabId: 7,
           videoFingerprint: "video-a",
           streamId: "mock-stream-id",
+          metadata: {
+            streamingProvider: {
+              id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+              mode: "streaming",
+              executionLocation: "offscreen",
+              audioInputFormats: [
+                "pcm16-mono-16khz",
+                "webm-opus"
+              ],
+              preferredAudioInputFormat: "pcm16-mono-16khz",
+              fallbackAudioInputFormat: "webm-opus"
+            }
+          }
         },
       },
       {},
@@ -758,6 +998,19 @@ describe("live-caption offscreen runtime shell", () => {
           tabId: 7,
           videoFingerprint: "video-a",
           streamId: "mock-stream-id",
+          metadata: {
+            streamingProvider: {
+              id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+              mode: "streaming",
+              executionLocation: "offscreen",
+              audioInputFormats: [
+                "pcm16-mono-16khz",
+                "webm-opus"
+              ],
+              preferredAudioInputFormat: "pcm16-mono-16khz",
+              fallbackAudioInputFormat: "webm-opus"
+            }
+          }
         },
       },
       {},

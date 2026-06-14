@@ -23,6 +23,7 @@ import {
   createStreamingAudioChunk
 } from './StreamingAudioSource.js';
 import { MediaRecorderStreamingAudioSource } from './MediaRecorderStreamingAudioSource.js';
+import { StreamingAudioSourceSelector } from './StreamingAudioSourceSelector.js';
 import {
   AudioWorkletPcm16StreamingAudioSource,
   AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME,
@@ -78,6 +79,7 @@ export {
   createStreamingAudioChunk
 } from './StreamingAudioSource.js';
 export { MediaRecorderStreamingAudioSource } from './MediaRecorderStreamingAudioSource.js';
+export { StreamingAudioSourceSelector } from './StreamingAudioSourceSelector.js';
 export {
   AudioWorkletPcm16StreamingAudioSource,
   AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME,
@@ -125,6 +127,7 @@ export default {
   normalizeStreamingAudioFormat,
   normalizeStreamingAudioChunk,
   createStreamingAudioChunk,
+  StreamingAudioSourceSelector,
   MediaRecorderStreamingAudioSource,
   AudioWorkletPcm16StreamingAudioSource,
   AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME,

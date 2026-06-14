@@ -467,7 +467,16 @@ describe("live-caption background controller", () => {
       videoFingerprint: "video-streaming",
       providerId: "faster_whisper_streaming",
       providerMode: "streaming",
-      executionLocation: "offscreen"
+      executionLocation: "offscreen",
+      metadata: expect.objectContaining({
+        streamingProvider: expect.objectContaining({
+          id: "faster_whisper_streaming",
+          mode: "streaming",
+          executionLocation: "offscreen",
+          preferredAudioInputFormat: "pcm16-mono-16khz",
+          fallbackAudioInputFormat: "webm-opus"
+        })
+      })
     }));
     expect(controller.activeStreamingSession).toMatchObject({
       sessionId: "session-streaming",

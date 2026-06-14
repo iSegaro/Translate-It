@@ -20,10 +20,11 @@ import {
   STT_PROVIDER_EXECUTION_LOCATIONS,
   STT_PROVIDER_MODES
 } from '@/features/live-caption/stt/liveCaptionSTTProviderContracts.js';
+import { getSTTProviderDefinition } from '@/features/live-caption/stt/STTProviderManifest.js';
 import {
   FasterWhisperStreamingProvider
 } from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
-import { MediaRecorderStreamingAudioSource } from '@/features/live-caption/stt/MediaRecorderStreamingAudioSource.js';
+import { StreamingAudioSourceSelector } from '@/features/live-caption/stt/StreamingAudioSourceSelector.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
 const MIN_FINALIZED_SEGMENT_BYTES = 1024;
@@ -81,6 +82,8 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.audioSource = null;
     this.mediaRecorderStreamingAudioSource = null;
     this.mediaRecorder = null;
+    this.streamingAudioSourceSelection = null;
+    this.pendingStreamingAudioSourceStart = null;
     this.captureState = 'idle'; // idle | starting | capturing | paused | stopping | error
     this.chunkTimeslice = 3000;
     this.chunkStartMs = 0;
@@ -93,12 +96,13 @@ export class LiveCaptionOffscreenRuntimeShell {
       get: () => this._segmentRotationPending,
       set: (value) => {
         this._segmentRotationPending = Boolean(value);
-        if (this.mediaRecorderStreamingAudioSource) {
+        if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
           this.mediaRecorderStreamingAudioSource.segmentRotationPending = this._segmentRotationPending;
         }
       }
     });
     this.activeRecorderMimeType = 'audio/webm';
+    this.streamingAudioSourceSelector = new StreamingAudioSourceSelector();
     this.streamingProviderFactory = typeof streamingProviderFactory === 'function'
       ? streamingProviderFactory
       : createDefaultStreamingProviderFactory();
@@ -434,6 +438,8 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.captureState = 'stopping';
     const streamingAudioSource = this.mediaRecorderStreamingAudioSource;
     this.mediaRecorderStreamingAudioSource = null;
+    this.streamingAudioSourceSelection = null;
+    this.pendingStreamingAudioSourceStart = null;
     this.mediaRecorder = null;
     void streamingAudioSource?.stop?.();
 
@@ -467,12 +473,256 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.captureState = 'idle';
   }
 
+  async _stopStreamingAudioSource() {
+    const streamingAudioSource = this.mediaRecorderStreamingAudioSource;
+    this.mediaRecorderStreamingAudioSource = null;
+    this.streamingAudioSourceSelection = null;
+    this.pendingStreamingAudioSourceStart = null;
+    this.mediaRecorder = null;
+
+    if (streamingAudioSource?.stop) {
+      try {
+        await streamingAudioSource.stop();
+      } catch (error) {
+        logger.warn('Error stopping selected streaming audio source:', error);
+      }
+    }
+  }
+
   _clearSegmentTimer() {
     this.mediaRecorderStreamingAudioSource?._clearSegmentTimer?.();
   }
 
   _scheduleSegmentBoundary() {
     this.mediaRecorderStreamingAudioSource?._scheduleSegmentBoundary?.();
+  }
+
+  _resolveStreamingProviderDefinition(metadata = {}, providerId = null) {
+    const streamingProvider = metadata?.streamingProvider && typeof metadata.streamingProvider === 'object'
+      ? metadata.streamingProvider
+      : null;
+
+    if (streamingProvider?.id || streamingProvider?.mode) {
+      return streamingProvider;
+    }
+
+    if (!providerId) {
+      return null;
+    }
+
+    return null;
+  }
+
+  _buildStreamingAudioSourceSessionConfig({
+    providerDefinition = null,
+    selectedAudioFormat = null,
+    sourceType = null
+  } = {}) {
+    return {
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      audioFormat: selectedAudioFormat ?? providerDefinition?.preferredAudioInputFormat ?? 'webm-opus',
+      audioInputFormats: Array.isArray(providerDefinition?.audioInputFormats)
+        ? [...providerDefinition.audioInputFormats]
+        : [],
+      selectedAudioFormat: selectedAudioFormat ?? providerDefinition?.preferredAudioInputFormat ?? 'webm-opus',
+      preferredAudioInputFormat: providerDefinition?.preferredAudioInputFormat ?? selectedAudioFormat ?? 'webm-opus',
+      fallbackAudioInputFormat: providerDefinition?.fallbackAudioInputFormat ?? 'webm-opus',
+      audioSourceType: sourceType ?? null,
+      providerId: providerDefinition?.id ?? null,
+      providerMode: providerDefinition?.mode ?? null,
+      executionLocation: providerDefinition?.executionLocation ?? null,
+      metadata: {
+        streamingProvider: providerDefinition ? { ...providerDefinition } : null
+      }
+    };
+  }
+
+  _createStreamingAudioSourceSelection({
+    providerDefinition = null,
+    audioContext = null
+  } = {}) {
+    return this.streamingAudioSourceSelector.select({
+      providerDefinition,
+      audioContext,
+      callbacks: {
+        onChunk: (chunk) => {
+          this._emitFinalizedChunk(chunk.payload, {
+            sessionId: chunk.sessionId ?? this.sessionId,
+            tabId: chunk.tabId ?? this.tabId,
+            videoFingerprint: chunk.videoFingerprint ?? this.videoFingerprint,
+            chunkStartMs: chunk.chunkStartMs ?? this.chunkStartMs,
+            chunkEndMs: chunk.chunkEndMs ?? (this.chunkStartMs + this.chunkTimeslice),
+            mimeType: chunk.mimeType || chunk.payload?.type || chunk.format || this.activeRecorderMimeType || 'audio/webm'
+          });
+          if (Number.isFinite(chunk.chunkEndMs)) {
+            this.chunkStartMs = chunk.chunkEndMs;
+          } else if (Number.isFinite(chunk.chunkStartMs)) {
+            this.chunkStartMs = chunk.chunkStartMs;
+          }
+          this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+        },
+        onError: (error) => {
+          logger.error('Streaming audio source runtime error:', error);
+          this._handleCaptureError(error || new Error('Streaming audio source runtime error'));
+        },
+        onStateChange: (state) => {
+          this.captureState = state;
+        }
+      }
+    });
+  }
+
+  _resolveMediaRecorderMimeType() {
+    const options = { mimeType: 'audio/webm;codecs=opus' };
+    let selectedMime = options.mimeType;
+
+    if (typeof MediaRecorder === 'undefined') {
+      return selectedMime;
+    }
+
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      selectedMime = 'audio/webm';
+    }
+
+    if (!MediaRecorder.isTypeSupported(selectedMime)) {
+      return '';
+    }
+
+    return selectedMime;
+  }
+
+  _resolveStreamingProviderDefinitionFromRequest(request = {}) {
+    const metadataProvider = request?.metadata?.streamingProvider;
+    const providerId = normalizeStreamingIdentityValue(request?.providerId);
+    const resolved = metadataProvider && typeof metadataProvider === 'object'
+      ? metadataProvider
+      : (providerId ? getSTTProviderDefinition(providerId) : null);
+
+    if (!resolved || typeof resolved !== 'object') {
+      return null;
+    }
+
+    return {
+      id: normalizeStreamingIdentityValue(resolved.id) ?? providerId ?? null,
+      mode: normalizeStreamingIdentityValue(resolved.mode) ?? null,
+      executionLocation: normalizeStreamingIdentityValue(resolved.executionLocation) ?? null,
+      audioInputFormats: Array.isArray(resolved.audioInputFormats)
+        ? resolved.audioInputFormats.filter((format) => typeof format === 'string' && format.trim().length > 0).map((format) => format.trim())
+        : [],
+      preferredAudioInputFormat: normalizeStreamingIdentityValue(resolved.preferredAudioInputFormat) ?? null,
+      fallbackAudioInputFormat: normalizeStreamingIdentityValue(resolved.fallbackAudioInputFormat) ?? null,
+      supportsPartialResults: Boolean(resolved.supportsPartialResults),
+      supportsCorrections: Boolean(resolved.supportsCorrections),
+      supportsReconnect: Boolean(resolved.supportsReconnect),
+      requiresPersistentConnection: Boolean(resolved.requiresPersistentConnection)
+    };
+  }
+
+  async _startSelectedStreamingAudioSource({
+    providerDefinition = null,
+    stream = null,
+    chunkTimeslice = this.chunkTimeslice,
+    audioContext = null,
+    startImmediately = true,
+    mimeType = null
+  } = {}) {
+    const selection = this._createStreamingAudioSourceSelection({
+      providerDefinition,
+      audioContext
+    });
+
+    this.mediaRecorderStreamingAudioSource = selection.source;
+    this.streamingAudioSourceSelection = {
+      ...selection,
+      providerDefinition: selection.providerDefinition ? { ...selection.providerDefinition } : null
+    };
+
+    if (!startImmediately) {
+      this.pendingStreamingAudioSourceStart = {
+        stream,
+        chunkTimeslice,
+        mimeType,
+        selection: this.streamingAudioSourceSelection
+      };
+      this.captureState = 'capturing';
+      return this.streamingAudioSourceSelection;
+    }
+
+    return selection.source.start(
+      this._buildStreamingAudioSourceSessionConfig({
+        providerDefinition: selection.providerDefinition,
+        selectedAudioFormat: selection.selectedAudioFormat,
+        sourceType: selection.sourceType
+      }),
+      selection.sourceType === 'audio_worklet_pcm16'
+        ? {
+            stream,
+            chunkTimeslice,
+            audioContextOptions: {
+              latencyHint: 'interactive'
+            }
+        }
+        : {
+            stream,
+            mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+            chunkTimeslice
+          }
+    ).then((snapshot) => {
+      if (this.mediaRecorderStreamingAudioSource) {
+        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+      }
+      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
+      this.pendingStreamingAudioSourceStart = null;
+      return snapshot;
+    });
+  }
+
+  async _startDeferredStreamingAudioSource(request = {}) {
+    const pending = this.pendingStreamingAudioSourceStart;
+    const selection = pending?.selection ?? this.streamingAudioSourceSelection ?? null;
+
+    if (!selection?.source) {
+      return this.mediaRecorderStreamingAudioSource?.getStatus?.() ?? this.mediaRecorderStreamingAudioSource?.getSessionSnapshot?.() ?? null;
+    }
+
+    const providerDefinition = selection.providerDefinition
+      ?? this._resolveStreamingProviderDefinitionFromRequest(request)
+      ?? null;
+
+    const stream = pending.stream ?? this.mediaStream ?? null;
+    const chunkTimeslice = pending.chunkTimeslice ?? this.chunkTimeslice;
+    const mimeType = pending.mimeType ?? null;
+
+    this.pendingStreamingAudioSourceStart = null;
+
+    return selection.source.start(
+      this._buildStreamingAudioSourceSessionConfig({
+        providerDefinition,
+        selectedAudioFormat: selection.selectedAudioFormat,
+        sourceType: selection.sourceType
+      }),
+      selection.sourceType === 'audio_worklet_pcm16'
+        ? {
+            stream,
+            chunkTimeslice,
+            audioContextOptions: {
+              latencyHint: 'interactive'
+            }
+          }
+        : {
+            stream,
+            mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+            chunkTimeslice
+          }
+    ).then((snapshot) => {
+      if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
+        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+      }
+      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+      return snapshot;
+    });
   }
 
   _emitFinalizedChunk(chunkPayload, { sessionId, tabId, videoFingerprint, chunkStartMs, chunkEndMs, mimeType }) {
@@ -631,53 +881,33 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.mediaRecorderStreamingAudioSource?._handleMediaRecorderStop?.();
   }
 
-  _startMediaRecorder(stream, selectedMime) {
-    if (!this.mediaRecorderStreamingAudioSource) {
-      this.mediaRecorderStreamingAudioSource = new MediaRecorderStreamingAudioSource({
-        onChunk: (chunk) => {
-          this._emitFinalizedChunk(chunk.payload, {
-            sessionId: chunk.sessionId ?? this.sessionId,
-            tabId: chunk.tabId ?? this.tabId,
-            videoFingerprint: chunk.videoFingerprint ?? this.videoFingerprint,
-            chunkStartMs: chunk.chunkStartMs ?? this.chunkStartMs,
-            chunkEndMs: chunk.chunkEndMs ?? (this.chunkStartMs + this.chunkTimeslice),
-            mimeType: chunk.mimeType || chunk.payload?.type || selectedMime || this.activeRecorderMimeType || 'audio/webm'
-          });
-          if (Number.isFinite(chunk.chunkEndMs)) {
-            this.chunkStartMs = chunk.chunkEndMs;
-          } else if (Number.isFinite(chunk.chunkStartMs)) {
-            this.chunkStartMs = chunk.chunkStartMs;
-          }
-          this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
-        },
-        onError: (error) => {
-          logger.error('MediaRecorder runtime error:', error);
-          this._handleCaptureError(error || new Error('MediaRecorder runtime error'));
-        },
-        onStateChange: (state) => {
-          this.captureState = state;
-        }
-      });
+  async _startMediaRecorder(stream, selectedMime, {
+    providerDefinition = null,
+    startImmediately = true
+  } = {}) {
+    const selectedProviderDefinition = providerDefinition
+      || this.pendingStreamingAudioSourceStart?.selection?.providerDefinition
+      || this.streamingAudioSourceSelection?.providerDefinition
+      || null;
+
+    const selection = await this._startSelectedStreamingAudioSource({
+      providerDefinition: selectedProviderDefinition,
+      stream,
+      chunkTimeslice: this.chunkTimeslice,
+      audioContext: this.audioCtx,
+      startImmediately: Boolean(startImmediately)
+    });
+
+    if (!startImmediately) {
+      return selection;
     }
 
-    return this.mediaRecorderStreamingAudioSource.start({
-      sessionId: this.sessionId,
-      tabId: this.tabId,
-      videoFingerprint: this.videoFingerprint,
-      audioFormat: 'webm-opus',
-      preferredAudioInputFormat: 'webm-opus',
-      fallbackAudioInputFormat: 'webm-opus'
-    }, {
-      stream,
-      mimeType: selectedMime,
-      chunkTimeslice: this.chunkTimeslice
-    }).then((snapshot) => {
-      if (this.mediaRecorderStreamingAudioSource) {
-        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
-      }
-      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
-      return snapshot;
-    });
+    if (this.mediaRecorderStreamingAudioSource?.segmentRotationPending !== undefined) {
+      this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+    }
+
+    this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+    return this.mediaRecorderStreamingAudioSource?.getStatus?.() ?? this.mediaRecorderStreamingAudioSource?.getSessionSnapshot?.() ?? null;
   }
 
   _handleCaptureError(error) {
@@ -776,25 +1006,20 @@ export class LiveCaptionOffscreenRuntimeShell {
         logger.warn('Failed to setup AudioContext loopback (tab may remain muted):', err);
       }
 
-      // Initialize MediaRecorder
-      try {
-        const options = { mimeType: 'audio/webm;codecs=opus' };
-        let selectedMime = options.mimeType;
-        if (typeof MediaRecorder !== 'undefined') {
-          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            selectedMime = 'audio/webm';
-          }
-          if (!MediaRecorder.isTypeSupported(selectedMime)) {
-            selectedMime = ''; // Let browser decide
-          }
+      const streamingProviderDefinition = request.data.metadata?.streamingProvider ?? null;
+      const isDeferredStreamingProvider =
+        streamingProviderDefinition?.mode === STT_PROVIDER_MODES.STREAMING
+        && streamingProviderDefinition?.executionLocation === STT_PROVIDER_EXECUTION_LOCATIONS.OFFSCREEN;
 
-      await this._startMediaRecorder(stream, selectedMime);
-        } else {
-          throw new Error('MediaRecorder is not supported in this environment');
-        }
+      // Initialize the selected capture source
+      try {
+        await this._startMediaRecorder(stream, null, {
+          providerDefinition: streamingProviderDefinition,
+          startImmediately: !isDeferredStreamingProvider
+        });
       } catch (err) {
-        logger.error('Failed to setup MediaRecorder in offscreen:', err);
-        throw new Error(`MediaRecorder setup failed: ${err.message}`);
+        logger.error('Failed to setup streaming audio source in offscreen:', err);
+        throw new Error(`Streaming audio source setup failed: ${err.message}`);
       }
 
       this._setState({
@@ -886,6 +1111,20 @@ export class LiveCaptionOffscreenRuntimeShell {
         stoppedAt: null
       };
 
+      const providerDefinition = this.streamingAudioSourceSelection?.providerDefinition
+        ?? this.pendingStreamingAudioSourceStart?.selection?.providerDefinition
+        ?? this._resolveStreamingProviderDefinitionFromRequest(request)
+        ?? null;
+      const audioSessionConfig = this._buildStreamingAudioSourceSessionConfig({
+        providerDefinition,
+        selectedAudioFormat: this.streamingAudioSourceSelection?.selectedAudioFormat
+          ?? this.pendingStreamingAudioSourceStart?.selection?.selectedAudioFormat
+          ?? null,
+        sourceType: this.streamingAudioSourceSelection?.sourceType
+          ?? this.pendingStreamingAudioSourceStart?.selection?.sourceType
+          ?? null
+      });
+
       const startResult = await provider.startSession({
         sessionId: request.sessionId,
         tabId: request.tabId,
@@ -893,11 +1132,34 @@ export class LiveCaptionOffscreenRuntimeShell {
         sourceLanguage: request.sourceLanguage,
         targetLanguage: request.targetLanguage,
         providerOptions: request.providerOptions,
-        metadata: request.metadata,
+        audioFormat: audioSessionConfig.audioFormat,
+        audioInputFormats: audioSessionConfig.audioInputFormats,
+        selectedAudioFormat: audioSessionConfig.selectedAudioFormat,
+        preferredAudioInputFormat: audioSessionConfig.preferredAudioInputFormat,
+        fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat,
+        sampleRate: audioSessionConfig.sampleRate,
+        channelCount: audioSessionConfig.channelCount,
+        bitDepth: audioSessionConfig.bitDepth,
+        audioSourceType: audioSessionConfig.audioSourceType,
+        metadata: {
+          ...(request.metadata && typeof request.metadata === 'object' ? request.metadata : {}),
+          selectedAudioFormat: audioSessionConfig.selectedAudioFormat,
+          audioSourceType: audioSessionConfig.audioSourceType,
+          audioInputFormats: audioSessionConfig.audioInputFormats,
+          preferredAudioInputFormat: audioSessionConfig.preferredAudioInputFormat,
+          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat
+        },
         requestId: request.requestId
       }, {
         providerOptions: request.providerOptions,
-        metadata: request.metadata
+        metadata: {
+          ...(request.metadata && typeof request.metadata === 'object' ? request.metadata : {}),
+          selectedAudioFormat: audioSessionConfig.selectedAudioFormat,
+          audioSourceType: audioSessionConfig.audioSourceType,
+          audioInputFormats: audioSessionConfig.audioInputFormats,
+          preferredAudioInputFormat: audioSessionConfig.preferredAudioInputFormat,
+          fallbackAudioInputFormat: audioSessionConfig.fallbackAudioInputFormat
+        }
       });
 
       this.streamingSessionContext = {
@@ -906,6 +1168,13 @@ export class LiveCaptionOffscreenRuntimeShell {
         readyPayload: startResult?.readyPayload ?? null,
         startedAt: Date.now()
       };
+
+      await this._startDeferredStreamingAudioSource({
+        ...request,
+        metadata: request.metadata && typeof request.metadata === 'object'
+          ? { ...request.metadata, streamingProvider: request.metadata.streamingProvider ?? this.streamingSessionContext?.metadata?.streamingProvider ?? null }
+          : { streamingProvider: this.streamingSessionContext?.metadata?.streamingProvider ?? null }
+      });
 
       const response = createLiveCaptionRuntimeShellResponse(
         LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
@@ -933,6 +1202,17 @@ export class LiveCaptionOffscreenRuntimeShell {
       });
       return response;
     } catch (error) {
+      const activeProvider = this.streamingProvider;
+      this._stopCapture();
+      if (activeProvider?.stopSession) {
+        try {
+          await activeProvider.stopSession({
+            reason: error?.reason ?? 'provider_error'
+          });
+        } catch (stopError) {
+          logger.warn('Failed to stop streaming provider after source startup failure:', stopError);
+        }
+      }
       this._clearStreamingSessionContext();
       const normalizedCode = error?.code ?? 'streaming_provider_start_failed';
       return this._buildFailClosed(
@@ -991,6 +1271,7 @@ export class LiveCaptionOffscreenRuntimeShell {
         return response;
       }
 
+      await this._stopStreamingAudioSource();
       const provider = this.streamingProvider;
       const stopResult = await provider.stopSession({
         reason: message?.reason ?? 'stop'
@@ -1205,7 +1486,7 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorderStreamingAudioSource?.recorderState === 'recording') {
+      if (this.mediaRecorderStreamingAudioSource?.pause) {
         try {
           this.mediaRecorderStreamingAudioSource?.pause?.();
           this.captureState = 'paused';
@@ -1265,7 +1546,7 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorderStreamingAudioSource?.recorderState === 'paused') {
+      if (this.mediaRecorderStreamingAudioSource?.resume) {
         try {
           this.mediaRecorderStreamingAudioSource?.resume?.();
           this.captureState = 'capturing';

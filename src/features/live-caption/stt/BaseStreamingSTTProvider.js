@@ -76,6 +76,20 @@ function cloneObject(value) {
   return Array.isArray(value) ? [...value] : { ...value };
 }
 
+function normalizeOptionalAudioFormat(value) {
+  return normalizeOptionalString(value);
+}
+
+function normalizeAudioFormatList(formats) {
+  if (!Array.isArray(formats)) {
+    return [];
+  }
+
+  return formats
+    .map((format) => normalizeOptionalAudioFormat(format))
+    .filter((format) => typeof format === 'string' && format.length > 0);
+}
+
 export function normalizeStreamingProviderEventEnvelope(type, payload = {}, fallback = {}) {
   const normalizedType = normalizeOptionalString(type);
 
@@ -202,8 +216,15 @@ export class BaseStreamingSTTProvider {
       sessionId: normalized.sessionId,
       tabId: normalized.tabId,
       videoFingerprint: normalized.videoFingerprint,
+      audioFormat: normalizeOptionalAudioFormat(normalized.audioFormat),
+      audioInputFormats: Object.freeze(normalizeAudioFormatList(normalized.audioInputFormats)),
+      selectedAudioFormat: normalizeOptionalAudioFormat(normalized.selectedAudioFormat),
+      audioSourceType: normalizeOptionalString(normalized.audioSourceType),
       sourceLanguage: normalizeOptionalString(normalized.sourceLanguage),
       targetLanguage: normalizeOptionalString(normalized.targetLanguage),
+      sampleRate: normalizeOptionalNumber(normalized.sampleRate),
+      channelCount: normalizeOptionalNumber(normalized.channelCount),
+      bitDepth: normalizeOptionalNumber(normalized.bitDepth),
       providerOptions: cloneObject(normalized.providerOptions) ?? {},
       metadata: cloneObject(normalized.metadata) ?? {},
       requestId: normalizeOptionalString(normalized.requestId),
