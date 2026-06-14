@@ -199,6 +199,40 @@ function flush() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+const canonicalIdentity = {
+  sessionId: 'session-canonical',
+  tabId: 21,
+  videoFingerprint: 'video-canonical',
+  segmentId: 'segment-1'
+};
+
+function createTranscriptCanonicalSegment(overrides = {}) {
+  return {
+    ...canonicalIdentity,
+    segmentStartMs: 10,
+    segmentEndMs: 20,
+    originalText: 'Hello',
+    sourceLanguage: 'en',
+    revision: 1,
+    ...overrides
+  };
+}
+
+function createTranslatedCanonicalSegment(overrides = {}) {
+  return {
+    ...canonicalIdentity,
+    segmentStartMs: 10,
+    segmentEndMs: 20,
+    originalText: 'Hello',
+    translatedText: 'سلام',
+    sourceLanguage: 'en',
+    targetLanguage: 'fa',
+    provider: 'openai',
+    revision: 1,
+    ...overrides
+  };
+}
+
 function getDatabase(mockIndexedDb, dbName = LIVE_CAPTION_CACHE_DB_NAME) {
   return mockIndexedDb.databases.get(dbName);
 }
@@ -350,6 +384,123 @@ describe('live-caption cache layer', () => {
     expect(await translationRepository.getByVideo({ tabId: 1, videoFingerprint: 'video-b' })).toEqual([]);
   });
 
+  it('supports canonical transcript upsert by identity without changing append behavior', async () => {
+    const repository = new LiveCaptionTranscriptRepository();
+
+    const inserted = await repository.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      revision: 1
+    }));
+    const replaced = await repository.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      segmentStartMs: 30,
+      segmentEndMs: 40,
+      originalText: 'Hello updated',
+      revision: 2
+    }));
+    const stale = await repository.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      segmentStartMs: 50,
+      segmentEndMs: 60,
+      originalText: 'Hello stale',
+      revision: 2
+    }));
+    const missingIdentity = await repository.upsertTranscriptSegmentByIdentity({
+      tabId: 21,
+      videoFingerprint: 'video-canonical',
+      sessionId: 'session-canonical',
+      segmentStartMs: 10,
+      segmentEndMs: 20,
+      originalText: 'Missing identity',
+      revision: 1
+    });
+
+    await flush();
+
+    expect(inserted).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(replaced).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(stale).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(missingIdentity).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      reason: 'missing_canonical_identity'
+    });
+
+    const current = await repository.getTranscriptSegmentByIdentity(canonicalIdentity);
+    expect(current).toMatchObject({
+      originalText: 'Hello updated',
+      segmentStartMs: 30,
+      segmentEndMs: 40,
+      revision: 2
+    });
+    expect(getStore(indexedDbMock, 'transcripts').records.size).toBe(1);
+  });
+
+  it('supports canonical translated caption upsert by identity without changing append behavior', async () => {
+    const repository = new LiveCaptionTranslationRepository();
+
+    const inserted = await repository.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      revision: 1
+    }));
+    const replaced = await repository.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      segmentStartMs: 30,
+      segmentEndMs: 40,
+      originalText: 'Hello updated',
+      translatedText: 'سلامِ جدید',
+      revision: 2
+    }));
+    const stale = await repository.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      segmentStartMs: 50,
+      segmentEndMs: 60,
+      originalText: 'Hello stale',
+      translatedText: 'سلامِ قدیمی',
+      revision: 2
+    }));
+    const missingIdentity = await repository.upsertTranslatedCaptionSegmentByIdentity({
+      tabId: 21,
+      videoFingerprint: 'video-canonical',
+      sessionId: 'session-canonical',
+      segmentStartMs: 10,
+      segmentEndMs: 20,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      targetLanguage: 'fa',
+      provider: 'openai',
+      revision: 1
+    });
+    const missingTarget = await repository.upsertTranslatedCaptionSegmentByIdentity({
+      ...createTranslatedCanonicalSegment({ revision: 1 }),
+      targetLanguage: null
+    });
+
+    await flush();
+
+    expect(inserted).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(replaced).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(stale).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(missingIdentity).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      reason: 'missing_canonical_identity'
+    });
+    expect(missingTarget).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      reason: 'missing_translation_identity'
+    });
+
+    const current = await repository.getTranslatedCaptionSegmentByIdentity({
+      ...canonicalIdentity,
+      targetLanguage: 'fa',
+      providerId: 'openai'
+    });
+    expect(current).toMatchObject({
+      originalText: 'Hello updated',
+      translatedText: 'سلامِ جدید',
+      segmentStartMs: 30,
+      segmentEndMs: 40,
+      revision: 2
+    });
+    expect(getStore(indexedDbMock, 'translations').records.size).toBe(1);
+  });
+
   it('supports session cache append get clear and per-video keying', async () => {
     const cache = new LiveCaptionCache();
     const firstKey = createLiveCaptionSessionCacheKey(11, 'video-11');
@@ -413,6 +564,73 @@ describe('live-caption cache layer', () => {
     await flush();
     expect(await cache.getTranscriptSegments({ tabId: 11, videoFingerprint: 'video-11' })).toEqual([]);
     expect(await cache.getTranslatedCaptionSegments({ tabId: 11, videoFingerprint: 'video-11' })).toEqual([]);
+  });
+
+  it('supports canonical transcript and translated caption upserts through the cache facade', async () => {
+    const cache = new LiveCaptionCache();
+
+    const transcriptInserted = await cache.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      revision: 1
+    }));
+    const transcriptReplaced = await cache.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      segmentStartMs: 40,
+      segmentEndMs: 55,
+      originalText: 'Hello updated',
+      revision: 2
+    }));
+    const transcriptIgnored = await cache.upsertTranscriptSegmentByIdentity(createTranscriptCanonicalSegment({
+      segmentStartMs: 60,
+      segmentEndMs: 70,
+      originalText: 'Hello stale',
+      revision: 2
+    }));
+
+    const translationInserted = await cache.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      revision: 1
+    }));
+    const translationReplaced = await cache.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      segmentStartMs: 40,
+      segmentEndMs: 55,
+      originalText: 'Hello updated',
+      translatedText: 'سلامِ جدید',
+      revision: 2
+    }));
+    const translationIgnored = await cache.upsertTranslatedCaptionSegmentByIdentity(createTranslatedCanonicalSegment({
+      segmentStartMs: 60,
+      segmentEndMs: 70,
+      originalText: 'Hello stale',
+      translatedText: 'سلامِ قدیمی',
+      revision: 2
+    }));
+
+    await flush();
+
+    expect(transcriptInserted).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(transcriptReplaced).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(transcriptIgnored).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+    expect(translationInserted).toMatchObject({ status: 'inserted', ignored: false, replaced: false });
+    expect(translationReplaced).toMatchObject({ status: 'replaced', ignored: false, replaced: true });
+    expect(translationIgnored).toMatchObject({ status: 'ignored', ignored: true, reason: 'stale_revision' });
+
+    expect(await cache.getTranscriptSegmentByIdentity(canonicalIdentity)).toMatchObject({
+      originalText: 'Hello updated',
+      segmentStartMs: 40,
+      segmentEndMs: 55,
+      revision: 2
+    });
+    expect(await cache.getTranslatedCaptionSegmentByIdentity({
+      ...canonicalIdentity,
+      targetLanguage: 'fa',
+      providerId: 'openai'
+    })).toMatchObject({
+      originalText: 'Hello updated',
+      translatedText: 'سلامِ جدید',
+      segmentStartMs: 40,
+      segmentEndMs: 55,
+      revision: 2
+    });
+    expect(await cache.getTranscriptSegments({ tabId: 21, videoFingerprint: 'video-canonical' })).toHaveLength(1);
+    expect(await cache.getTranslatedCaptionSegments({ tabId: 21, videoFingerprint: 'video-canonical' })).toHaveLength(1);
   });
 
   it('clears all session and persistent cache data', async () => {

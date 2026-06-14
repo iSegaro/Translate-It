@@ -18,6 +18,74 @@ function hasValue(value) {
   return value !== null && value !== undefined && value !== '';
 }
 
+function normalizeCanonicalIdentity(input) {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const sessionId = typeof input.sessionId === 'string' && input.sessionId.trim().length > 0
+    ? input.sessionId.trim()
+    : null;
+  const tabId = Number(input.tabId);
+  const videoFingerprint = typeof input.videoFingerprint === 'string' && input.videoFingerprint.trim().length > 0
+    ? input.videoFingerprint.trim()
+    : null;
+  const segmentId = typeof input.segmentId === 'string' && input.segmentId.trim().length > 0
+    ? input.segmentId.trim()
+    : null;
+
+  if (!sessionId || !Number.isFinite(tabId) || !videoFingerprint || !segmentId) {
+    return null;
+  }
+
+  return {
+    sessionId,
+    tabId,
+    videoFingerprint,
+    segmentId
+  };
+}
+
+function normalizeRevisionValue(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const revision = Number(value);
+  return Number.isFinite(revision) ? revision : null;
+}
+
+function createCanonicalTranslationEntryKey(identity) {
+  return [
+    'live-caption',
+    'canonical-translation',
+    `session:${encodeURIComponent(identity.sessionId)}`,
+    `tab:${encodeURIComponent(String(identity.tabId))}`,
+    `video:${encodeURIComponent(identity.videoFingerprint)}`,
+    `segment:${encodeURIComponent(identity.segmentId)}`
+  ].join('|');
+}
+
+function createCanonicalTranslationQualifiedEntryKey(identity, targetLanguage, providerId) {
+  return `${createCanonicalTranslationEntryKey(identity)}|target:${encodeURIComponent(String(targetLanguage))}|provider:${encodeURIComponent(String(providerId))}`;
+}
+
+function createCanonicalOperationResult({
+  status,
+  replaced = false,
+  ignored = false,
+  reason = null,
+  record = null
+} = {}) {
+  return {
+    status,
+    replaced,
+    ignored,
+    reason,
+    record: record ? cloneSegment(record) : null
+  };
+}
+
 function cloneSegment(segment) {
   return {
     ...segment,
@@ -39,7 +107,7 @@ function normalizeTranslationSegment(segment) {
   const translatedText = String(segment.translatedText ?? '').trim();
   const sourceLanguage = segment.sourceLanguage ?? null;
   const targetLanguage = segment.targetLanguage ?? null;
-  const provider = segment.provider ?? null;
+  const provider = segment.providerId ?? segment.provider ?? null;
 
   if (!hasValue(tabId) || !hasValue(videoFingerprint) || !hasValue(sessionId)) {
     throw new Error('Translated caption segment requires tabId, videoFingerprint, and sessionId');
@@ -57,7 +125,7 @@ function normalizeTranslationSegment(segment) {
   const sessionKey = createLiveCaptionVideoCacheKey(tabId, videoFingerprint);
 
   return {
-    entryKey: createLiveCaptionTranslatedSegmentCacheKey({
+    entryKey: segment.entryKey ?? createLiveCaptionTranslatedSegmentCacheKey({
       tabId,
       videoFingerprint,
       segmentStartMs,
@@ -77,6 +145,8 @@ function normalizeTranslationSegment(segment) {
     sourceLanguage,
     targetLanguage,
     provider,
+    segmentId: segment.segmentId ?? null,
+    revision: normalizeRevisionValue(segment.revision),
     isFinal: segment.isFinal !== false,
     createdAt: now,
     updatedAt: now
@@ -214,6 +284,129 @@ export class LiveCaptionTranslationRepository {
 
     const db = await this._getDb();
     return writeNormalizedTranslationRecord(db, record);
+  }
+
+  async upsertTranslatedCaptionSegmentByIdentity(segment, { compareRevision = true } = {}) {
+    const identity = normalizeCanonicalIdentity(segment);
+    const targetLanguage = typeof segment?.targetLanguage === 'string' && segment.targetLanguage.trim().length > 0
+      ? segment.targetLanguage.trim()
+      : null;
+    const providerId = typeof segment?.providerId === 'string' && segment.providerId.trim().length > 0
+      ? segment.providerId.trim()
+      : (typeof segment?.provider === 'string' && segment.provider.trim().length > 0
+        ? segment.provider.trim()
+        : null);
+
+    if (!identity) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_canonical_identity'
+      });
+    }
+
+    if (!targetLanguage || !providerId) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_translation_identity'
+      });
+    }
+
+    const record = normalizeTranslationSegment({
+      ...segment,
+      ...identity,
+      targetLanguage,
+      provider: providerId,
+      entryKey: createCanonicalTranslationQualifiedEntryKey(identity, targetLanguage, providerId)
+    });
+    const db = await this._getDb();
+    const existingRecord = await this.getTranslatedCaptionSegmentByIdentity({
+      ...identity,
+      targetLanguage,
+      provider: providerId
+    });
+
+    if (existingRecord) {
+      if (compareRevision) {
+        const incomingRevision = normalizeRevisionValue(record.revision);
+        const existingRevision = normalizeRevisionValue(existingRecord.revision);
+
+        if (incomingRevision == null) {
+          return createCanonicalOperationResult({
+            status: 'ignored',
+            ignored: true,
+            reason: 'missing_revision',
+            record: existingRecord
+          });
+        }
+
+        if (existingRevision != null && incomingRevision <= existingRevision) {
+          return createCanonicalOperationResult({
+            status: 'ignored',
+            ignored: true,
+            reason: 'stale_revision',
+            record: existingRecord
+          });
+        }
+      }
+
+      const persistedRecord = await writeNormalizedTranslationRecord(db, record);
+      return createCanonicalOperationResult({
+        status: 'replaced',
+        replaced: true,
+        ignored: false,
+        record: persistedRecord
+      });
+    }
+
+    if (compareRevision && normalizeRevisionValue(record.revision) == null) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_revision'
+      });
+    }
+
+    const persistedRecord = await writeNormalizedTranslationRecord(db, record);
+    return createCanonicalOperationResult({
+      status: 'inserted',
+      replaced: false,
+      ignored: false,
+      record: persistedRecord
+    });
+  }
+
+  async getTranslatedCaptionSegmentByIdentity(identity, options = {}) {
+    const normalizedIdentity = normalizeCanonicalIdentity(identity);
+    const targetLanguage = typeof identity?.targetLanguage === 'string' && identity.targetLanguage.trim().length > 0
+      ? identity.targetLanguage.trim()
+      : null;
+    const providerId = typeof identity?.providerId === 'string' && identity.providerId.trim().length > 0
+      ? identity.providerId.trim()
+      : (typeof identity?.provider === 'string' && identity.provider.trim().length > 0 ? identity.provider.trim() : null);
+
+    if (!normalizedIdentity || !targetLanguage || !providerId || options?.skipPersistence) {
+      return null;
+    }
+
+    if (this.isIncognito) {
+      return null;
+    }
+
+    const db = await this._getDb();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([LIVE_CAPTION_CACHE_STORE_NAMES.TRANSLATIONS], 'readonly');
+      const store = transaction.objectStore(LIVE_CAPTION_CACHE_STORE_NAMES.TRANSLATIONS);
+      const request = store.get(createCanonicalTranslationQualifiedEntryKey(normalizedIdentity, targetLanguage, providerId));
+
+      request.onsuccess = () => {
+        resolve(request.result ? cloneSegment(request.result) : null);
+      };
+
+      request.onerror = () => reject(request.error || createLiveCaptionCacheUnavailableError('Failed to read translated caption segment'));
+    });
   }
 
   async getByVideo({ tabId, videoFingerprint }) {

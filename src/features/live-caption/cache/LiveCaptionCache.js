@@ -76,6 +76,251 @@ function recordToMemoryEntry(record) {
   };
 }
 
+function normalizeCanonicalIdentity(input) {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const sessionId = typeof input.sessionId === 'string' && input.sessionId.trim().length > 0
+    ? input.sessionId.trim()
+    : null;
+  const tabId = Number(input.tabId);
+  const videoFingerprint = typeof input.videoFingerprint === 'string' && input.videoFingerprint.trim().length > 0
+    ? input.videoFingerprint.trim()
+    : null;
+  const segmentId = typeof input.segmentId === 'string' && input.segmentId.trim().length > 0
+    ? input.segmentId.trim()
+    : null;
+
+  if (!sessionId || !Number.isFinite(tabId) || !videoFingerprint || !segmentId) {
+    return null;
+  }
+
+  return {
+    sessionId,
+    tabId,
+    videoFingerprint,
+    segmentId
+  };
+}
+
+function createCanonicalTranscriptEntryKey(identity) {
+  return [
+    'live-caption',
+    'canonical-transcript',
+    `session:${encodeURIComponent(identity.sessionId)}`,
+    `tab:${encodeURIComponent(String(identity.tabId))}`,
+    `video:${encodeURIComponent(identity.videoFingerprint)}`,
+    `segment:${encodeURIComponent(identity.segmentId)}`
+  ].join('|');
+}
+
+function createCanonicalTranslationEntryKey(identity) {
+  return [
+    'live-caption',
+    'canonical-translation',
+    `session:${encodeURIComponent(identity.sessionId)}`,
+    `tab:${encodeURIComponent(String(identity.tabId))}`,
+    `video:${encodeURIComponent(identity.videoFingerprint)}`,
+    `segment:${encodeURIComponent(identity.segmentId)}`
+  ].join('|');
+}
+
+function createCanonicalTranslationQualifiedEntryKey(identity, targetLanguage, providerId) {
+  return `${createCanonicalTranslationEntryKey(identity)}|target:${encodeURIComponent(String(targetLanguage))}|provider:${encodeURIComponent(String(providerId))}`;
+}
+
+function normalizeTranslationCanonicalIdentity(input) {
+  const identity = normalizeCanonicalIdentity(input);
+  if (!identity) {
+    return null;
+  }
+
+  const targetLanguage = typeof input.targetLanguage === 'string' && input.targetLanguage.trim().length > 0
+    ? input.targetLanguage.trim()
+    : null;
+  const providerId = typeof input.providerId === 'string' && input.providerId.trim().length > 0
+    ? input.providerId.trim()
+    : (typeof input.provider === 'string' && input.provider.trim().length > 0 ? input.provider.trim() : null);
+
+  if (!targetLanguage || !providerId) {
+    return null;
+  }
+
+  return {
+    ...identity,
+    targetLanguage,
+    providerId
+  };
+}
+
+function normalizeRevisionValue(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const revision = Number(value);
+  return Number.isFinite(revision) ? revision : null;
+}
+
+function compareCanonicalRevision(existingRecord, nextRecord) {
+  const existingRevision = normalizeRevisionValue(existingRecord?.revision);
+  const nextRevision = normalizeRevisionValue(nextRecord?.revision);
+
+  if (existingRevision == null && nextRevision == null) {
+    return 0;
+  }
+
+  if (existingRevision == null) {
+    return -1;
+  }
+
+  if (nextRevision == null) {
+    return 1;
+  }
+
+  if (nextRevision > existingRevision) {
+    return 1;
+  }
+
+  if (nextRevision < existingRevision) {
+    return -1;
+  }
+
+  return 0;
+}
+
+function createCanonicalOperationResult({
+  status,
+  replaced = false,
+  ignored = false,
+  reason = null,
+  record = null
+} = {}) {
+  return {
+    status,
+    replaced,
+    ignored,
+    reason,
+    record: record ? cloneSegment(record) : null
+  };
+}
+
+function canonicalTranscriptIdentityMatches(record, identity) {
+  return record?.sessionId === identity.sessionId
+    && Number(record?.tabId) === identity.tabId
+    && record?.videoFingerprint === identity.videoFingerprint
+    && record?.segmentId === identity.segmentId;
+}
+
+function canonicalTranslationIdentityMatches(record, identity) {
+  return canonicalTranscriptIdentityMatches(record, identity)
+    && record?.targetLanguage === identity.targetLanguage
+    && (record?.providerId ?? record?.provider ?? null) === identity.providerId;
+}
+
+function findBestCanonicalEntryIndex(entries, identity, matcher) {
+  let bestIndex = null;
+
+  entries.forEach((entry, index) => {
+    const record = entry?.record;
+    if (!record || !matcher(record, identity)) {
+      return;
+    }
+
+    if (bestIndex == null) {
+      bestIndex = index;
+      return;
+    }
+
+    const comparison = compareCanonicalRevision(entries[bestIndex].record, record);
+    if (comparison > 0 || (comparison === 0 && index > bestIndex)) {
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
+}
+
+function replaceBucketEntry(bucket, collectionKey, index, record) {
+  const entries = bucket[collectionKey];
+  const previousEntry = entries[index] ?? null;
+  const nextEntry = recordToMemoryEntry(record);
+
+  if (previousEntry) {
+    const byteDelta = nextEntry.bytes - previousEntry.bytes;
+    if (collectionKey === 'transcripts') {
+      bucket.transcriptBytes += byteDelta;
+    } else {
+      bucket.translationBytes += byteDelta;
+    }
+  } else if (collectionKey === 'transcripts') {
+    bucket.transcriptBytes += nextEntry.bytes;
+  } else {
+    bucket.translationBytes += nextEntry.bytes;
+  }
+
+  entries[index] = nextEntry;
+  return nextEntry;
+}
+
+function upsertBucketEntry(bucket, collectionKey, identity, record, { compareRevision = true, matcher }) {
+  const entries = bucket[collectionKey];
+  const existingIndex = findBestCanonicalEntryIndex(entries, identity, matcher);
+
+  if (existingIndex == null) {
+    const nextEntry = recordToMemoryEntry(record);
+    entries.push(nextEntry);
+    if (collectionKey === 'transcripts') {
+      bucket.transcriptBytes += nextEntry.bytes;
+    } else {
+      bucket.translationBytes += nextEntry.bytes;
+    }
+    return {
+      status: 'inserted',
+      replaced: false,
+      ignored: false,
+      reason: null,
+      record: nextEntry.record
+    };
+  }
+
+  if (compareRevision) {
+    const existingRecord = entries[existingIndex].record;
+    const incomingRevision = normalizeRevisionValue(record.revision);
+    const existingRevision = normalizeRevisionValue(existingRecord.revision);
+
+    if (incomingRevision == null) {
+      return {
+        status: 'ignored',
+        replaced: false,
+        ignored: true,
+        reason: 'missing_revision',
+        record: cloneSegment(existingRecord)
+      };
+    }
+
+    if (existingRevision != null && incomingRevision <= existingRevision) {
+      return {
+        status: 'ignored',
+        replaced: false,
+        ignored: true,
+        reason: 'stale_revision',
+        record: cloneSegment(existingRecord)
+      };
+    }
+  }
+
+  const nextEntry = replaceBucketEntry(bucket, collectionKey, existingIndex, record);
+  return {
+    status: 'replaced',
+    replaced: true,
+    ignored: false,
+    reason: null,
+    record: nextEntry.record
+  };
+}
+
 function selectOldestEntry(bucket) {
   const transcriptEntry = bucket.transcripts[0] || null;
   const translationEntry = bucket.translations[0] || null;
@@ -385,6 +630,109 @@ export class LiveCaptionCache {
     }));
 
     return cloneSegment(record);
+  }
+
+  async upsertTranscriptSegmentByIdentity(segment, { compareRevision = true } = {}) {
+    const identity = normalizeCanonicalIdentity(segment);
+    if (!identity) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_canonical_identity'
+      });
+    }
+
+    validateSegmentContext(segment, 'Transcript');
+    const bucket = await this._hydrateBucketFromPersistence(segment.tabId, segment.videoFingerprint, segment.isIncognito);
+    const record = normalizeLiveCaptionTranscriptSegment({
+      ...segment,
+      ...identity,
+      entryKey: createCanonicalTranscriptEntryKey(identity)
+    });
+    const result = upsertBucketEntry(bucket, 'transcripts', identity, record, {
+      compareRevision,
+      matcher: canonicalTranscriptIdentityMatches
+    });
+
+    if (result.ignored) {
+      return result;
+    }
+
+    bucket.sessionId = record.sessionId;
+    bucket.lastSegmentStartMs = record.segmentStartMs;
+    bucket.lastSegmentEndMs = record.segmentEndMs;
+    bucket.updatedAt = Date.now();
+    trimBucket(bucket, this.maxItems, this.maxBytes);
+    await this._syncPersistentBucket(bucket);
+
+    return createCanonicalOperationResult(result);
+  }
+
+  async getTranscriptSegmentByIdentity(identity, options = {}) {
+    const normalizedIdentity = normalizeCanonicalIdentity(identity);
+    if (!normalizedIdentity) {
+      return null;
+    }
+
+    const bucket = await this._hydrateBucketFromPersistence(normalizedIdentity.tabId, normalizedIdentity.videoFingerprint, options.isIncognito ?? false);
+    const index = findBestCanonicalEntryIndex(bucket.transcripts, normalizedIdentity, canonicalTranscriptIdentityMatches);
+    return index == null ? null : cloneSegment(bucket.transcripts[index].record);
+  }
+
+  async upsertTranslatedCaptionSegmentByIdentity(segment, { compareRevision = true } = {}) {
+    const identity = normalizeTranslationCanonicalIdentity(segment);
+    if (!identity) {
+      if (!normalizeCanonicalIdentity(segment)) {
+        return createCanonicalOperationResult({
+          status: 'ignored',
+          ignored: true,
+          reason: 'missing_canonical_identity'
+        });
+      }
+
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_translation_identity'
+      });
+    }
+
+    validateSegmentContext(segment, 'Translated caption');
+    const bucket = await this._hydrateBucketFromPersistence(segment.tabId, segment.videoFingerprint, segment.isIncognito);
+    const record = normalizeLiveCaptionTranslationSegment({
+      ...segment,
+      ...identity,
+      provider: identity.providerId,
+      entryKey: createCanonicalTranslationQualifiedEntryKey(identity, identity.targetLanguage, identity.providerId)
+    });
+    const result = upsertBucketEntry(bucket, 'translations', identity, record, {
+      compareRevision,
+      matcher: canonicalTranslationIdentityMatches
+    });
+
+    if (result.ignored) {
+      return result;
+    }
+
+    bucket.sessionId = record.sessionId;
+    bucket.lastSegmentStartMs = record.segmentStartMs;
+    bucket.lastSegmentEndMs = record.segmentEndMs;
+    bucket.updatedAt = Date.now();
+    trimBucket(bucket, this.maxItems, this.maxBytes);
+    await this._syncPersistentBucket(bucket);
+
+    return createCanonicalOperationResult(result);
+  }
+
+  async getTranslatedCaptionSegmentByIdentity(identity, options = {}) {
+    const normalizedIdentity = normalizeTranslationCanonicalIdentity(identity);
+    if (!normalizedIdentity) {
+      return null;
+    }
+
+    const bucket = await this._hydrateBucketFromPersistence(normalizedIdentity.tabId, normalizedIdentity.videoFingerprint, options.isIncognito ?? false);
+    const index = findBestCanonicalEntryIndex(bucket.translations, normalizedIdentity, canonicalTranslationIdentityMatches);
+    return index == null ? null : cloneSegment(bucket.translations[index].record);
   }
 
   async getTranscriptSegments({ tabId, videoFingerprint, isIncognito = false }) {

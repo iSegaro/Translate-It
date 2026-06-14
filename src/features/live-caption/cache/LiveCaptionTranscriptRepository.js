@@ -18,6 +18,97 @@ function hasValue(value) {
   return value !== null && value !== undefined && value !== '';
 }
 
+function normalizeCanonicalIdentity(input) {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const sessionId = typeof input.sessionId === 'string' && input.sessionId.trim().length > 0
+    ? input.sessionId.trim()
+    : null;
+  const tabId = Number(input.tabId);
+  const videoFingerprint = typeof input.videoFingerprint === 'string' && input.videoFingerprint.trim().length > 0
+    ? input.videoFingerprint.trim()
+    : null;
+  const segmentId = typeof input.segmentId === 'string' && input.segmentId.trim().length > 0
+    ? input.segmentId.trim()
+    : null;
+
+  if (!sessionId || !Number.isFinite(tabId) || !videoFingerprint || !segmentId) {
+    return null;
+  }
+
+  return {
+    sessionId,
+    tabId,
+    videoFingerprint,
+    segmentId
+  };
+}
+
+function normalizeRevisionValue(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const revision = Number(value);
+  return Number.isFinite(revision) ? revision : null;
+}
+
+function createCanonicalTranscriptEntryKey(identity) {
+  return [
+    'live-caption',
+    'canonical-transcript',
+    `session:${encodeURIComponent(identity.sessionId)}`,
+    `tab:${encodeURIComponent(String(identity.tabId))}`,
+    `video:${encodeURIComponent(identity.videoFingerprint)}`,
+    `segment:${encodeURIComponent(identity.segmentId)}`
+  ].join('|');
+}
+
+function compareCanonicalRevision(existingRecord, nextRecord) {
+  const existingRevision = normalizeRevisionValue(existingRecord?.revision);
+  const nextRevision = normalizeRevisionValue(nextRecord?.revision);
+
+  if (existingRevision == null && nextRevision == null) {
+    return 0;
+  }
+
+  if (existingRevision == null) {
+    return -1;
+  }
+
+  if (nextRevision == null) {
+    return 1;
+  }
+
+  if (nextRevision > existingRevision) {
+    return 1;
+  }
+
+  if (nextRevision < existingRevision) {
+    return -1;
+  }
+
+  return 0;
+}
+
+function createCanonicalOperationResult({
+  status,
+  replaced = false,
+  ignored = false,
+  reason = null,
+  record = null
+} = {}) {
+  return {
+    status,
+    replaced,
+    ignored,
+    reason,
+    record: record ? cloneSegment(record) : null
+  };
+}
+
 function cloneSegment(segment) {
   return {
     ...segment,
@@ -53,7 +144,7 @@ function normalizeTranscriptSegment(segment) {
   const sessionKey = createLiveCaptionVideoCacheKey(tabId, videoFingerprint);
 
   return {
-    entryKey: createLiveCaptionSegmentCacheKey({ tabId, videoFingerprint, segmentStartMs, segmentEndMs }),
+    entryKey: segment.entryKey ?? createLiveCaptionSegmentCacheKey({ tabId, videoFingerprint, segmentStartMs, segmentEndMs }),
     sessionKey,
     tabId,
     sessionId,
@@ -63,6 +154,8 @@ function normalizeTranscriptSegment(segment) {
     segmentTiming: [segmentStartMs, segmentEndMs],
     originalText,
     sourceLanguage: segment.sourceLanguage ?? null,
+    segmentId: segment.segmentId ?? null,
+    revision: normalizeRevisionValue(segment.revision),
     isFinal: segment.isFinal !== false,
     createdAt: now,
     updatedAt: now
@@ -198,6 +291,99 @@ export class LiveCaptionTranscriptRepository {
 
     const db = await this._getDb();
     return writeNormalizedTranscriptRecord(db, record);
+  }
+
+  async upsertTranscriptSegmentByIdentity(segment, { compareRevision = true } = {}) {
+    const identity = normalizeCanonicalIdentity(segment);
+    if (!identity) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_canonical_identity'
+      });
+    }
+
+    const record = normalizeTranscriptSegment({
+      ...segment,
+      ...identity,
+      entryKey: createCanonicalTranscriptEntryKey(identity)
+    });
+    const db = await this._getDb();
+    const existingRecord = await this.getTranscriptSegmentByIdentity(identity);
+
+    if (existingRecord) {
+      if (compareRevision) {
+        const incomingRevision = normalizeRevisionValue(record.revision);
+        const existingRevision = normalizeRevisionValue(existingRecord.revision);
+
+        if (incomingRevision == null) {
+          return createCanonicalOperationResult({
+            status: 'ignored',
+            ignored: true,
+            reason: 'missing_revision',
+            record: existingRecord
+          });
+        }
+
+        if (existingRevision != null && incomingRevision <= existingRevision) {
+          return createCanonicalOperationResult({
+            status: 'ignored',
+            ignored: true,
+            reason: 'stale_revision',
+            record: existingRecord
+          });
+        }
+      }
+
+      const persistedRecord = await writeNormalizedTranscriptRecord(db, record);
+      return createCanonicalOperationResult({
+        status: 'replaced',
+        replaced: true,
+        ignored: false,
+        record: persistedRecord
+      });
+    }
+
+    if (compareRevision && normalizeRevisionValue(record.revision) == null) {
+      return createCanonicalOperationResult({
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_revision'
+      });
+    }
+
+    const persistedRecord = await writeNormalizedTranscriptRecord(db, record);
+    return createCanonicalOperationResult({
+      status: 'inserted',
+      replaced: false,
+      ignored: false,
+      record: persistedRecord
+    });
+  }
+
+  async getTranscriptSegmentByIdentity(identity, options = {}) {
+    const normalizedIdentity = normalizeCanonicalIdentity(identity);
+    if (!normalizedIdentity || options?.skipPersistence) {
+      return null;
+    }
+
+    if (this.isIncognito) {
+      return null;
+    }
+
+    const db = await this._getDb();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([LIVE_CAPTION_CACHE_STORE_NAMES.TRANSCRIPTS], 'readonly');
+      const store = transaction.objectStore(LIVE_CAPTION_CACHE_STORE_NAMES.TRANSCRIPTS);
+      const request = store.get(createCanonicalTranscriptEntryKey(normalizedIdentity));
+
+      request.onsuccess = () => {
+        resolve(request.result ? cloneSegment(request.result) : null);
+      };
+
+      request.onerror = () => reject(request.error || createLiveCaptionCacheUnavailableError('Failed to read transcript segment'));
+    });
   }
 
   async getByVideo({ tabId, videoFingerprint }) {

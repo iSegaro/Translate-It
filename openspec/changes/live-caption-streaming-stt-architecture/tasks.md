@@ -24,7 +24,7 @@
 
 - [x] 4.1 Design canonical correction persistence model
 - [x] 4.2 Add revision-aware session replacement APIs
-- [ ] 4.3 Add revision-aware cache upsert by canonical identity
+- [x] 4.3 Add revision-aware cache upsert by canonical identity
 - [ ] 4.4 Add correction-aware translation invalidation/retranslation
 - [ ] 4.5 Add runtime hydration/replacement behavior
 - [x] 4.6 Add tests for final-only translation and partial discard
