@@ -141,6 +141,58 @@ function buildActiveVideoState({
   };
 }
 
+function normalizeRuntimeRevisionValue(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const revision = Number(value);
+  return Number.isFinite(revision) ? revision : null;
+}
+
+function createRuntimeSegmentKey(videoSession, segment = null) {
+  if (!segment || typeof segment !== 'object') {
+    return null;
+  }
+
+  const identity = videoSession?.getCanonicalSegmentIdentity?.(segment);
+  if (identity) {
+    return [
+      identity.sessionId,
+      String(identity.tabId),
+      identity.videoFingerprint,
+      identity.segmentId
+    ].join('::');
+  }
+
+  const segmentStartMs = segment.segmentStartMs ?? segment.startMs ?? null;
+  const segmentEndMs = segment.segmentEndMs ?? segment.endMs ?? null;
+
+  if (segmentStartMs == null && segmentEndMs == null) {
+    return null;
+  }
+
+  return `${segmentStartMs ?? ''}::${segmentEndMs ?? ''}`;
+}
+
+function sortRuntimeSegments(left, right) {
+  const leftStart = left.segmentStartMs ?? left.startMs ?? 0;
+  const rightStart = right.segmentStartMs ?? right.startMs ?? 0;
+
+  if (leftStart !== rightStart) {
+    return leftStart - rightStart;
+  }
+
+  const leftEnd = left.segmentEndMs ?? left.endMs ?? 0;
+  const rightEnd = right.segmentEndMs ?? right.endMs ?? 0;
+
+  if (leftEnd !== rightEnd) {
+    return leftEnd - rightEnd;
+  }
+
+  return String(left.segmentId ?? '').localeCompare(String(right.segmentId ?? ''));
+}
+
 /**
  * Content-side runtime controller for Live Caption.
  * Owns active-video observation, handoff planning, and local session/store coordination only.
@@ -671,6 +723,151 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     };
   }
 
+  _isCanonicalRuntimeSegment(segment, videoSession = this.pageSession?.activeVideoSession ?? null) {
+    if (!segment || typeof segment !== 'object' || !videoSession?.getCanonicalSegmentIdentity) {
+      return false;
+    }
+
+    const identity = videoSession.getCanonicalSegmentIdentity(segment);
+    return Boolean(identity && normalizeRuntimeRevisionValue(segment.revision) != null);
+  }
+
+  _upsertRuntimeSessionSegment(videoSession, segment, kind = 'translated') {
+    if (!videoSession || !segment || typeof segment !== 'object') {
+      return {
+        status: 'ignored',
+        ignored: true,
+        reason: 'missing_video_session_or_segment'
+      };
+    }
+
+    const isCanonical = this._isCanonicalRuntimeSegment(segment, videoSession);
+    const upsertMethod = kind === 'transcript'
+      ? videoSession.upsertTranscriptSegment?.bind(videoSession)
+      : videoSession.upsertTranslatedCaptionSegment?.bind(videoSession);
+    const appendMethod = kind === 'transcript'
+      ? videoSession.addTranscriptSegment?.bind(videoSession)
+      : videoSession.addTranslatedCaptionSegment?.bind(videoSession);
+
+    if (isCanonical && upsertMethod) {
+      const result = upsertMethod(segment);
+
+      if (result?.ignored) {
+        if (result.reason === 'missing_canonical_identity' || result.reason === 'missing_revision') {
+          const appendedSegment = appendMethod ? appendMethod(segment) : segment;
+          return {
+            status: 'appended',
+            replaced: false,
+            ignored: false,
+            canonical: false,
+            segment: appendedSegment
+          };
+        }
+
+        return {
+          status: result.status ?? 'ignored',
+          replaced: Boolean(result.replaced),
+          ignored: true,
+          reason: result.reason ?? 'canonical_segment_ignored',
+          canonical: true,
+          segment: null
+        };
+      }
+
+      return {
+        status: result.status ?? 'replaced',
+        replaced: Boolean(result.replaced),
+        ignored: false,
+        canonical: true,
+        segment: result.segment ?? null
+      };
+    }
+
+    const appendedSegment = appendMethod ? appendMethod(segment) : segment;
+    return {
+      status: 'appended',
+      replaced: false,
+      ignored: false,
+      canonical: false,
+      segment: appendedSegment
+    };
+  }
+
+  _rehydrateVideoSessionFromSnapshot(videoSession, snapshot = null) {
+    if (!videoSession || !snapshot || videoSession.videoFingerprint !== snapshot.activeVideoFingerprint) {
+      return {
+        hydrated: false,
+        displaySegments: []
+      };
+    }
+
+    const activeVideoSession = snapshot.activeVideoSession ?? null;
+    if (!activeVideoSession) {
+      return {
+        hydrated: false,
+        displaySegments: []
+      };
+    }
+
+    const transcriptSegments = Array.isArray(activeVideoSession.transcriptSegments)
+      ? activeVideoSession.transcriptSegments
+      : [];
+    const translatedCaptionSegments = Array.isArray(activeVideoSession.translatedCaptionSegments)
+      ? activeVideoSession.translatedCaptionSegments
+      : [];
+
+    transcriptSegments.forEach((segment) => {
+      this._upsertRuntimeSessionSegment(videoSession, segment, 'transcript');
+    });
+
+    translatedCaptionSegments.forEach((segment) => {
+      this._upsertRuntimeSessionSegment(videoSession, segment, 'translated');
+    });
+
+    videoSession.rebuildCanonicalIndexes?.();
+
+    return {
+      hydrated: transcriptSegments.length > 0 || translatedCaptionSegments.length > 0,
+      displaySegments: this._buildDisplaySegmentsFromVideoSession(videoSession)
+    };
+  }
+
+  _buildDisplaySegmentsFromVideoSession(videoSession) {
+    if (!videoSession) {
+      return [];
+    }
+
+    const translatedSegments = Array.isArray(videoSession.translatedCaptionSegments)
+      ? videoSession.translatedCaptionSegments
+      : [];
+    const transcriptSegments = Array.isArray(videoSession.transcriptSegments)
+      ? videoSession.transcriptSegments
+      : [];
+
+    const translatedKeys = new Set();
+    const displaySegments = [];
+
+    translatedSegments.forEach((segment) => {
+      displaySegments.push({ ...segment });
+      const key = createRuntimeSegmentKey(videoSession, segment);
+      if (key) {
+        translatedKeys.add(key);
+      }
+    });
+
+    transcriptSegments.forEach((segment) => {
+      const key = createRuntimeSegmentKey(videoSession, segment);
+      if (key && translatedKeys.has(key)) {
+        return;
+      }
+
+      displaySegments.push({ ...segment });
+    });
+
+    displaySegments.sort(sortRuntimeSegments);
+    return displaySegments;
+  }
+
 
 
   handleTranslateResult({ sessionId, videoFingerprint, segment }) {
@@ -696,13 +893,24 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       currentVideoSession &&
       currentVideoSession.videoFingerprint === videoFingerprint
     ) {
-      currentVideoSession.addTranslatedCaptionSegment(segment);
-      this.store?.setCaptions(currentVideoSession.translatedCaptionSegments);
+      const upsertResult = this._upsertRuntimeSessionSegment(currentVideoSession, segment, 'translated');
+
+      if (upsertResult.ignored && upsertResult.reason !== 'missing_canonical_identity' && upsertResult.reason !== 'missing_revision') {
+        logger.debug('Ignoring canonical translated segment for active video session', {
+          sessionId,
+          videoFingerprint,
+          reason: upsertResult.reason ?? null
+        });
+        return;
+      }
+
+      const displaySegments = this._buildDisplaySegmentsFromVideoSession(currentVideoSession);
+      this.store?.setCaptions(displaySegments);
 
       logger.debug('Overlay caption updated with new translated segment', {
         sessionId,
         videoFingerprint,
-        lineCount: currentVideoSession.translatedCaptionSegments.length,
+        lineCount: displaySegments.length,
         segmentTiming: segment.segmentStartMs != null || segment.startMs != null
           ? `${segment.segmentStartMs ?? segment.startMs}ms - ${segment.segmentEndMs ?? segment.endMs}ms`
           : 'none'
@@ -818,48 +1026,23 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
 
     const snapshot = response.sessionSnapshot;
     if (snapshot && snapshot.activeVideoSession) {
-      const translatedSegments = snapshot.activeVideoSession.translatedCaptionSegments || [];
-      const transcriptSegments = snapshot.activeVideoSession.transcriptSegments || [];
-      
-      // Merge for store display if needed, or just set if translated exist
-      // Usually captionLines in store is driven by translated segments if available
-      // but if only transcripts exist, we should show them.
-      if (translatedSegments.length > 0 || transcriptSegments.length > 0) {
-        // Merge translated and transcript segments safely
-        // translatedSegments already contain originalText.
-        // Append transcriptSegments that don't have a corresponding translatedSegment.
-        const translatedTimes = new Set(
-          translatedSegments.map((s) => `${s.segmentStartMs}-${s.segmentEndMs}`)
-        );
+      const localVideoSession = this.pageSession?.activeVideoSession;
+      const hydrated = this._rehydrateVideoSessionFromSnapshot(localVideoSession, snapshot);
+      const displaySegments = hydrated.displaySegments.length > 0
+        ? hydrated.displaySegments
+        : this._buildDisplaySegmentsFromVideoSession(localVideoSession);
 
-        const unmergedTranscripts = transcriptSegments.filter(
-          (s) => !translatedTimes.has(`${s.segmentStartMs}-${s.segmentEndMs}`)
-        );
-
-        const displaySegments = [...translatedSegments, ...unmergedTranscripts].sort(
-          (a, b) => (a.segmentStartMs ?? 0) - (b.segmentStartMs ?? 0)
-        );
-
+      if (displaySegments.length > 0) {
         this.store?.setCaptions(displaySegments);
 
-        // Synchronize local video session segments if fingerprints match
-        const localVideoSession = this.pageSession?.activeVideoSession;
-        if (
-          localVideoSession &&
-          localVideoSession.videoFingerprint === snapshot.activeVideoFingerprint
-        ) {
-          if (localVideoSession.translatedCaptionSegments.length === 0) {
-            translatedSegments.forEach((s) => localVideoSession.addTranslatedCaptionSegment(s));
-          }
-          if (localVideoSession.transcriptSegments.length === 0) {
-            transcriptSegments.forEach((s) => localVideoSession.addTranscriptSegment(s));
-          }
-          
+        if (localVideoSession && localVideoSession.videoFingerprint === snapshot.activeVideoFingerprint) {
           logger.debug('Local video session hydrated from runtime response', {
             tabId: this.tabId,
             videoFingerprint: snapshot.activeVideoFingerprint,
             captionCount: displaySegments.length,
-            hasTranslations: translatedSegments.length > 0
+            hasTranslations: Array.isArray(localVideoSession.translatedCaptionSegments)
+              ? localVideoSession.translatedCaptionSegments.length > 0
+              : false
           });
         }
       }

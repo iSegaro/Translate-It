@@ -104,6 +104,70 @@ function createRuntimeBrowserApi() {
   };
 }
 
+function createRuntimeBrowserApiWithMessageListener(startSnapshot = null) {
+  let messageListener = null;
+
+  const sendMessage = vi.fn(async (request) => {
+    if (request.action === LIVE_CAPTION_ACTIONS.RUNTIME_START) {
+      return createRuntimeResponse(request.action, request.data, {
+        sessionSnapshot: startSnapshot ?? {
+          sessionId: request.data?.sessionId ?? null,
+          tabId: request.data?.tabId ?? null,
+          activeVideoFingerprint: request.data?.videoFingerprint ?? null,
+          activeVideoSession: {
+            videoFingerprint: request.data?.videoFingerprint ?? null,
+            transcriptSegments: [],
+            translatedCaptionSegments: []
+          }
+        }
+      });
+    }
+
+    return createRuntimeResponse(request.action, request.data);
+  });
+
+  return {
+    browserApi: {
+      runtime: {
+        sendMessage,
+        onMessage: {
+          addListener: vi.fn((listener) => {
+            messageListener = listener;
+          }),
+          removeListener: vi.fn()
+        }
+      }
+    },
+    getMessageListener: () => messageListener,
+    sendMessage
+  };
+}
+
+function createCanonicalTranslatedSegment({
+  sessionId = 'session-1',
+  tabId = 11,
+  videoFingerprint = 'video-fingerprint-1',
+  segmentId = 'segment-1',
+  revision = 1,
+  segmentStartMs = 1000,
+  segmentEndMs = 3000,
+  originalText = 'Hello',
+  translatedText = 'سلام'
+} = {}) {
+  return {
+    sessionId,
+    tabId,
+    videoFingerprint,
+    segmentId,
+    revision,
+    segmentStartMs,
+    segmentEndMs,
+    originalText,
+    translatedText,
+    isFinal: true
+  };
+}
+
 function createRuntimeResponse(action, data = {}, overrides = {}) {
   const runtimeStateByAction = {
     [LIVE_CAPTION_ACTIONS.RUNTIME_START]: 'running',
@@ -558,6 +622,165 @@ describe('live-caption runtime controller', () => {
     });
   });
 
+  it('upserts canonical translated results without duplicating visible captions', async () => {
+    const store = useLiveCaptionStore();
+    const { browserApi, getMessageListener } = createRuntimeBrowserApiWithMessageListener();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    await controller.start({ tabId: 11 });
+
+    const video = createVideo({ src: 'http://example.com/canonical.mp4' });
+    document.body.appendChild(video);
+    await controller.syncActiveVideo('test');
+
+    const messageListener = getMessageListener();
+    const activeVideoSession = controller.pageSession.activeVideoSession;
+    const sessionId = controller.pageSession.sessionId;
+    const videoFingerprint = activeVideoSession.videoFingerprint;
+
+    const revisionOne = createCanonicalTranslatedSegment({
+      sessionId,
+      tabId: 11,
+      videoFingerprint,
+      segmentId: 'canonical-1',
+      revision: 1,
+      translatedText: 'سلام 1'
+    });
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment: revisionOne
+      }
+    });
+
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(activeVideoSession.getTranslatedCaptionSegmentByIdentity(revisionOne)).toMatchObject({
+      revision: 1,
+      translatedText: 'سلام 1'
+    });
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0]).toMatchObject({
+      segmentId: 'canonical-1',
+      translatedText: 'سلام 1'
+    });
+
+    const revisionTwo = createCanonicalTranslatedSegment({
+      sessionId,
+      tabId: 11,
+      videoFingerprint,
+      segmentId: 'canonical-1',
+      revision: 2,
+      translatedText: 'سلام 2'
+    });
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment: revisionTwo
+      }
+    });
+
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(activeVideoSession.getTranslatedCaptionSegmentByIdentity(revisionTwo)).toMatchObject({
+      revision: 2,
+      translatedText: 'سلام 2'
+    });
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0]).toMatchObject({
+      segmentId: 'canonical-1',
+      translatedText: 'سلام 2'
+    });
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment: revisionTwo
+      }
+    });
+
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0]).toMatchObject({
+      segmentId: 'canonical-1',
+      translatedText: 'سلام 2'
+    });
+  });
+
+  it('keeps non-canonical translated results append-only', async () => {
+    const store = useLiveCaptionStore();
+    const { browserApi, getMessageListener } = createRuntimeBrowserApiWithMessageListener();
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    await controller.start({ tabId: 11 });
+
+    const video = createVideo({ src: 'http://example.com/non-canonical.mp4' });
+    document.body.appendChild(video);
+    await controller.syncActiveVideo('test');
+
+    const messageListener = getMessageListener();
+    const activeVideoSession = controller.pageSession.activeVideoSession;
+    const sessionId = controller.pageSession.sessionId;
+    const videoFingerprint = activeVideoSession.videoFingerprint;
+
+    const firstSegment = {
+      segmentStartMs: 1000,
+      segmentEndMs: 2000,
+      originalText: 'First',
+      translatedText: 'اول'
+    };
+
+    const secondSegment = {
+      segmentStartMs: 2000,
+      segmentEndMs: 3000,
+      originalText: 'Second',
+      translatedText: 'دوم'
+    };
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment: firstSegment
+      }
+    });
+
+    messageListener({
+      action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+      payload: {
+        sessionId,
+        videoFingerprint,
+        segment: secondSegment
+      }
+    });
+
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(2);
+    expect(store.captionLines).toHaveLength(2);
+    expect(store.captionLines[0].translatedText).toBe('اول');
+    expect(store.captionLines[1].translatedText).toBe('دوم');
+  });
+
   it('updates canPause and canResume reactively in controlsState based on runtime status', async () => {
     const store = useLiveCaptionStore();
 
@@ -616,6 +839,84 @@ describe('live-caption runtime controller', () => {
     expect(controller.pageSession.activeVideoSession.translatedCaptionSegments[0].translatedText).toBe('سلام');
     expect(controller.pageSession.activeVideoSession.transcriptSegments).toHaveLength(1);
     expect(controller.pageSession.activeVideoSession.transcriptSegments[0].originalText).toBe('Hello');
+  });
+
+  it('hydrates canonical duplicates once and keeps the latest revision', async () => {
+    const store = useLiveCaptionStore();
+    const canonicalSegmentV1 = createCanonicalTranslatedSegment({
+      sessionId: 'session-1',
+      tabId: 11,
+      videoFingerprint: 'http://example.com/canonical-hydration.mp4',
+      segmentId: 'canonical-hydration-1',
+      revision: 1,
+      translatedText: 'Old canonical'
+    });
+    const canonicalSegmentV2 = createCanonicalTranslatedSegment({
+      sessionId: 'session-1',
+      tabId: 11,
+      videoFingerprint: 'http://example.com/canonical-hydration.mp4',
+      segmentId: 'canonical-hydration-1',
+      revision: 2,
+      translatedText: 'Latest canonical'
+    });
+
+    const sendMessage = vi.fn(async (request) => ({
+      success: true,
+      ok: true,
+      action: request.action,
+      status: LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
+      runtimeState: 'running',
+      sessionId: request.data?.sessionId ?? null,
+      tabId: request.data?.tabId ?? null,
+      videoFingerprint: request.data?.videoFingerprint ?? null,
+      sessionSnapshot: {
+        sessionId: request.data?.sessionId ?? null,
+        tabId: request.data?.tabId ?? null,
+        activeVideoFingerprint: request.data?.videoFingerprint ?? null,
+        activeVideoSession: {
+          videoFingerprint: request.data?.videoFingerprint ?? null,
+          transcriptSegments: [
+            { ...canonicalSegmentV1, originalText: 'Canonical original' },
+            { ...canonicalSegmentV2, originalText: 'Canonical original' }
+          ],
+          translatedCaptionSegments: [
+            canonicalSegmentV1,
+            canonicalSegmentV2
+          ]
+        }
+      }
+    }));
+
+    const browserApi = { runtime: { sendMessage } };
+
+    const controller = new LiveCaptionRuntimeController({
+      store,
+      documentRef: document,
+      windowRef: window,
+      browserApi,
+      platformSupport: createSupportedPlatformSupport()
+    });
+
+    const video = createVideo({ src: 'http://example.com/canonical-hydration.mp4' });
+    document.body.appendChild(video);
+
+    await controller.start({ tabId: 11 });
+
+    const activeVideoSession = controller.pageSession.activeVideoSession;
+    expect(activeVideoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(activeVideoSession.transcriptSegments).toHaveLength(1);
+    expect(activeVideoSession.getTranslatedCaptionSegmentByIdentity(canonicalSegmentV1)).toMatchObject({
+      revision: 2,
+      translatedText: 'Latest canonical'
+    });
+    expect(activeVideoSession.getTranscriptSegmentByIdentity(canonicalSegmentV1)).toMatchObject({
+      revision: 2
+    });
+    expect(store.captionLines).toHaveLength(1);
+    expect(store.captionLines[0]).toMatchObject({
+      segmentId: 'canonical-hydration-1',
+      translatedText: 'Latest canonical'
+    });
   });
 
   it('hydrates store captions from transcripts only if translations are missing', async () => {
