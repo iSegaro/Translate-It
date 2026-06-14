@@ -35,29 +35,81 @@ function normalizeProviderDefinition(providerDefinition = null) {
   });
 }
 
-function createAudioWorkletSupportProbeContext() {
-  const AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext;
-
-  if (typeof AudioContextCtor !== 'function') {
-    return null;
-  }
-
-  try {
-    return new AudioContextCtor({ latencyHint: 'interactive' });
-  } catch (error) {
-    try {
-      return new AudioContextCtor();
-    } catch {
-      logger.debug('AudioWorklet support probe failed to create AudioContext', {
-        error: error?.message ?? null
-      });
-      return null;
-    }
-  }
+function createDefaultAudioContextConstructorProvider() {
+  return globalThis.AudioContext || globalThis.webkitAudioContext || null;
 }
 
-function isAudioWorkletSupported(audioContext = null) {
-  if (typeof globalThis.AudioWorkletNode !== 'function') {
+function createDefaultAudioWorkletSupportProbeFactory({
+  audioContextConstructorProvider = createDefaultAudioContextConstructorProvider
+} = {}) {
+  return () => {
+    const AudioContextCtor = audioContextConstructorProvider();
+
+    if (typeof AudioContextCtor !== 'function') {
+      return null;
+    }
+
+    try {
+      return new AudioContextCtor({ latencyHint: 'interactive' });
+    } catch {
+      try {
+        return new AudioContextCtor();
+      } catch (error) {
+        logger.debug('AudioWorklet support probe failed to create AudioContext', {
+          error: error?.message ?? null
+        });
+        return null;
+      }
+    }
+  };
+}
+
+function createDefaultAudioWorkletSupportDetector({
+  audioWorkletSupportProbeFactory = createDefaultAudioWorkletSupportProbeFactory()
+} = {}) {
+  return ({
+    audioContext = null,
+    audioContextConstructorProvider = createDefaultAudioContextConstructorProvider,
+    audioWorkletNodeCtor = globalThis.AudioWorkletNode ?? null
+  } = {}) => {
+    if (typeof audioWorkletNodeCtor !== 'function') {
+      return false;
+    }
+
+    if (audioContext?.audioWorklet && typeof audioContext.audioWorklet.addModule === 'function') {
+      return true;
+    }
+
+    const probeContext = audioWorkletSupportProbeFactory({
+      audioContextConstructorProvider
+    });
+
+    if (!probeContext) {
+      return false;
+    }
+
+    const supported = Boolean(probeContext.audioWorklet && typeof probeContext.audioWorklet.addModule === 'function');
+
+    if (typeof probeContext.close === 'function') {
+      try {
+        void Promise.resolve(probeContext.close()).catch(() => {});
+      } catch {
+        // Best-effort probe cleanup.
+      }
+    }
+
+    return supported;
+  };
+}
+
+function isAudioWorkletSupported(audioContext = null, {
+  audioContextConstructorProvider = createDefaultAudioContextConstructorProvider,
+  audioWorkletSupportProbeFactory = createDefaultAudioWorkletSupportProbeFactory({
+    audioContextConstructorProvider
+  }),
+  audioWorkletNodeCtor = globalThis.AudioWorkletNode ?? null
+} = {}) {
+  if (typeof audioWorkletNodeCtor !== 'function') {
     return false;
   }
 
@@ -65,22 +117,14 @@ function isAudioWorkletSupported(audioContext = null) {
     return true;
   }
 
-  const probeContext = createAudioWorkletSupportProbeContext();
-  if (!probeContext) {
-    return false;
-  }
-
-  const supported = Boolean(probeContext.audioWorklet && typeof probeContext.audioWorklet.addModule === 'function');
-
-  if (typeof probeContext.close === 'function') {
-    try {
-      void Promise.resolve(probeContext.close()).catch(() => {});
-    } catch {
-      // Best-effort probe cleanup.
-    }
-  }
-
-  return supported;
+  const detector = createDefaultAudioWorkletSupportDetector({
+    audioWorkletSupportProbeFactory
+  });
+  return detector({
+    audioContext,
+    audioContextConstructorProvider,
+    audioWorkletNodeCtor
+  });
 }
 
 function createMediaRecorderSource({ sourceId, onChunk, onError, onStateChange, logger: sourceLogger } = {}) {
@@ -119,10 +163,30 @@ export class StreamingAudioSourceSelector {
   constructor({
     mediaRecorderFactory = createMediaRecorderSource,
     audioWorkletFactory = createAudioWorkletSource,
+    audioContextConstructorProvider = createDefaultAudioContextConstructorProvider,
+    audioWorkletSupportProbeFactory = createDefaultAudioWorkletSupportProbeFactory({
+      audioContextConstructorProvider
+    }),
+    audioWorkletSupportDetector = createDefaultAudioWorkletSupportDetector({
+      audioWorkletSupportProbeFactory
+    }),
     logger: sourceLogger = logger
   } = {}) {
     this.mediaRecorderFactory = typeof mediaRecorderFactory === 'function' ? mediaRecorderFactory : createMediaRecorderSource;
     this.audioWorkletFactory = typeof audioWorkletFactory === 'function' ? audioWorkletFactory : createAudioWorkletSource;
+    this.audioContextConstructorProvider = typeof audioContextConstructorProvider === 'function'
+      ? audioContextConstructorProvider
+      : createDefaultAudioContextConstructorProvider;
+    this.audioWorkletSupportProbeFactory = typeof audioWorkletSupportProbeFactory === 'function'
+      ? audioWorkletSupportProbeFactory
+      : createDefaultAudioWorkletSupportProbeFactory({
+        audioContextConstructorProvider: this.audioContextConstructorProvider
+      });
+    this.audioWorkletSupportDetector = typeof audioWorkletSupportDetector === 'function'
+      ? audioWorkletSupportDetector
+      : createDefaultAudioWorkletSupportDetector({
+        audioWorkletSupportProbeFactory: this.audioWorkletSupportProbeFactory
+      });
     this.logger = sourceLogger ?? logger;
   }
 
@@ -139,7 +203,11 @@ export class StreamingAudioSourceSelector {
     const canUseAudioWorklet = Boolean(
       normalizedProvider?.mode === 'streaming'
       && normalizedProvider.audioInputFormats.includes(STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ)
-      && isAudioWorkletSupported(audioContext)
+      && this.audioWorkletSupportDetector({
+        audioContext,
+        audioContextConstructorProvider: this.audioContextConstructorProvider,
+        audioWorkletSupportProbeFactory: this.audioWorkletSupportProbeFactory
+      })
     );
 
     const selectedAudioFormat = canUseAudioWorklet
@@ -178,6 +246,9 @@ export class StreamingAudioSourceSelector {
 
 export {
   normalizeProviderDefinition,
+  createDefaultAudioContextConstructorProvider,
+  createDefaultAudioWorkletSupportProbeFactory,
+  createDefaultAudioWorkletSupportDetector,
   isAudioWorkletSupported,
   createMediaRecorderSource,
   createAudioWorkletSource
