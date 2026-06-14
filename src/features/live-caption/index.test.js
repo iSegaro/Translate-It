@@ -116,7 +116,13 @@ import {
   normalizeStreamingProviderEventEnvelope,
   StreamingAudioSource,
   MediaRecorderStreamingAudioSource,
+  AudioWorkletPcm16StreamingAudioSource,
   STREAMING_AUDIO_FORMATS,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH,
+  AUDIO_WORKLET_PCM16_MONO_STREAMING_MIME_TYPE,
   STREAMING_AUDIO_SOURCE_STATES,
   normalizeStreamingAudioFormat,
   normalizeStreamingAudioChunk,
@@ -262,7 +268,13 @@ describe('live-caption feature shell', () => {
     expect(normalizeStreamingProviderEventEnvelope).toBe(LiveCaptionFeature.contracts.normalizeStreamingProviderEventEnvelope);
     expect(StreamingAudioSource).toBe(LiveCaptionFeature.contracts.StreamingAudioSource);
     expect(MediaRecorderStreamingAudioSource).toBe(LiveCaptionFeature.contracts.MediaRecorderStreamingAudioSource);
+    expect(AudioWorkletPcm16StreamingAudioSource).toBe(LiveCaptionFeature.contracts.AudioWorkletPcm16StreamingAudioSource);
     expect(STREAMING_AUDIO_FORMATS).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_FORMATS);
+    expect(AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME).toBe(LiveCaptionFeature.contracts.AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME);
+    expect(AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE).toBe(LiveCaptionFeature.contracts.AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE);
+    expect(AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT).toBe(LiveCaptionFeature.contracts.AUDIO_WORKLET_PCM16_MONO_STREAMING_CHANNEL_COUNT);
+    expect(AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH).toBe(LiveCaptionFeature.contracts.AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH);
+    expect(AUDIO_WORKLET_PCM16_MONO_STREAMING_MIME_TYPE).toBe(LiveCaptionFeature.contracts.AUDIO_WORKLET_PCM16_MONO_STREAMING_MIME_TYPE);
     expect(STREAMING_AUDIO_SOURCE_STATES).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_SOURCE_STATES);
     expect(normalizeStreamingAudioFormat).toBe(LiveCaptionFeature.contracts.normalizeStreamingAudioFormat);
     expect(normalizeStreamingAudioChunk).toBe(LiveCaptionFeature.contracts.normalizeStreamingAudioChunk);
