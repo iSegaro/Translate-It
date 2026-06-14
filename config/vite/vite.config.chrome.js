@@ -4,6 +4,7 @@ import webExtension from 'vite-plugin-web-extension'
 import fs from 'fs-extra'
 import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
+import { copyLiveCaptionAudioWorkletAssets } from '../live-caption-audio-worklet-assets.js';
 import pkg from '../../package.json' with { type: 'json' };
 
 const baseOutDir = `dist/chrome/Translate-It-v${pkg.version}`;
@@ -310,6 +311,8 @@ export default defineConfig({
           await fs.copy(tesseractSrc, tesseractDest);
           console.log('✅ Copied Tesseract assets to assets/ocr/');
         }
+
+        await copyLiveCaptionAudioWorkletAssets(outDir, process.cwd(), fs);
         
         // HTML files are now handled by the fixExtensionPaths plugin
         

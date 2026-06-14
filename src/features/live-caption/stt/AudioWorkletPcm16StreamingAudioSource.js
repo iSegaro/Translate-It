@@ -6,6 +6,9 @@ import {
   STREAMING_AUDIO_SOURCE_STATES,
   createStreamingAudioChunk
 } from './StreamingAudioSource.js';
+import {
+  resolvePcm16MonoStreamingProcessorModuleUrl
+} from './worklets/pcm16MonoStreamingProcessorAsset.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'AudioWorkletPcm16StreamingAudioSource');
 
@@ -132,7 +135,7 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     onStateChange = null,
     audioContextFactory = null,
     audioWorkletNodeFactory = null,
-    audioWorkletModuleUrl = new URL('./worklets/pcm16MonoStreamingProcessor.js', import.meta.url),
+    audioWorkletModuleUrl = resolvePcm16MonoStreamingProcessorModuleUrl(),
     logger: sourceLogger = logger
   } = {}) {
     super(sourceId, { logger: sourceLogger });

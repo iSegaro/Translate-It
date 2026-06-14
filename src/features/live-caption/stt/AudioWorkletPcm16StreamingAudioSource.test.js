@@ -8,6 +8,10 @@ import {
   AUDIO_WORKLET_PCM16_MONO_STREAMING_MIME_TYPE
 } from './AudioWorkletPcm16StreamingAudioSource.js';
 import { STREAMING_AUDIO_FORMATS, STREAMING_AUDIO_SOURCE_STATES } from './StreamingAudioSource.js';
+import {
+  PCM16_MONO_STREAMING_PROCESSOR_ASSET_PATH,
+  resolvePcm16MonoStreamingProcessorModuleUrl
+} from './worklets/pcm16MonoStreamingProcessorAsset.js';
 import { downmixFrameToMono } from './worklets/pcm16MonoStreamingProcessor.js';
 
 function createMockEnvironment() {
@@ -132,6 +136,63 @@ describe('AudioWorkletPcm16StreamingAudioSource', () => {
     expect(events.some((entry) => entry.state === 'capturing')).toBe(true);
   });
 
+  it('uses the runtime-resolved packaged asset URL by default', async () => {
+    const env = createMockEnvironment();
+    const getURL = vi.fn((path) => `chrome-extension://extension-id/${path}`);
+    vi.stubGlobal('chrome', {
+      runtime: {
+        getURL
+      }
+    });
+
+    const source = new AudioWorkletPcm16StreamingAudioSource({
+      audioContextFactory: vi.fn(async () => env.audioContext),
+      audioWorkletNodeFactory: vi.fn(() => env.audioWorkletNode)
+    });
+
+    await source.start({
+      sessionId: 'session-asset',
+      tabId: 1,
+      videoFingerprint: 'video-asset'
+    }, {
+      stream: env.mediaStream,
+      chunkTimeslice: 100
+    });
+
+    expect(getURL).toHaveBeenCalledWith(PCM16_MONO_STREAMING_PROCESSOR_ASSET_PATH);
+    expect(env.audioContext.audioWorklet.addModule).toHaveBeenCalledWith(
+      `chrome-extension://extension-id/${PCM16_MONO_STREAMING_PROCESSOR_ASSET_PATH}`
+    );
+  });
+
+  it('allows an injected audioWorkletModuleUrl to override the packaged asset URL', async () => {
+    const env = createMockEnvironment();
+    const getURL = vi.fn((path) => `chrome-extension://extension-id/${path}`);
+    vi.stubGlobal('chrome', {
+      runtime: {
+        getURL
+      }
+    });
+
+    const source = new AudioWorkletPcm16StreamingAudioSource({
+      audioContextFactory: vi.fn(async () => env.audioContext),
+      audioWorkletNodeFactory: vi.fn(() => env.audioWorkletNode),
+      audioWorkletModuleUrl: 'mock://pcm16-worklet.js'
+    });
+
+    await source.start({
+      sessionId: 'session-override',
+      tabId: 2,
+      videoFingerprint: 'video-override'
+    }, {
+      stream: env.mediaStream,
+      chunkTimeslice: 100
+    });
+
+    expect(getURL).not.toHaveBeenCalled();
+    expect(env.audioContext.audioWorklet.addModule).toHaveBeenCalledWith('mock://pcm16-worklet.js');
+  });
+
   it('downmixes multichannel frames to mono before source-side resampling', () => {
     const mono = downmixFrameToMono([
       Float32Array.from([1, 0.5, -0.5]),
@@ -186,5 +247,18 @@ describe('AudioWorkletPcm16StreamingAudioSource', () => {
     expect(env.audioContext.resume).toHaveBeenCalled();
     expect(env.audioContext.close).toHaveBeenCalledTimes(1);
     expect(source.getStatus().state).toBe(STREAMING_AUDIO_SOURCE_STATES.DESTROYED);
+  });
+
+  it('normalizes the packaged audio worklet module URL helper', () => {
+    const getURL = vi.fn((path) => `chrome-extension://extension-id/${path}`);
+    const runtimeUrl = resolvePcm16MonoStreamingProcessorModuleUrl({
+      chrome: {
+        runtime: {
+          getURL
+        }
+      }
+    });
+
+    expect(runtimeUrl).toBe(`chrome-extension://extension-id/${PCM16_MONO_STREAMING_PROCESSOR_ASSET_PATH}`);
   });
 });

@@ -751,6 +751,11 @@ describe("live-caption offscreen runtime shell", () => {
         })
       })
     );
+    expect(shell.streamingAudioSourceSelection).toMatchObject({
+      selectedAudioFormat: "webm-opus",
+      sourceType: "media_recorder_webm_opus",
+      fallbackReason: "audio_worklet_module_load_failure"
+    });
     expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
       audioFormat: "webm-opus",
       selectedAudioFormat: "webm-opus",

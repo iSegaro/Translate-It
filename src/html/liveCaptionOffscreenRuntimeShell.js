@@ -713,7 +713,8 @@ export class LiveCaptionOffscreenRuntimeShell {
 
       logger.warn('AudioWorklet PCM source failed to start, falling back to MediaRecorder/WebM:', {
         error: error?.message ?? String(error),
-        providerId: selection.providerDefinition?.id ?? null
+        providerId: selection.providerDefinition?.id ?? null,
+        fallbackReason: 'audio_worklet_module_load_failure'
       });
 
       try {
@@ -733,7 +734,10 @@ export class LiveCaptionOffscreenRuntimeShell {
       });
 
       this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
-      this.streamingAudioSourceSelection = fallbackSelection;
+      this.streamingAudioSourceSelection = {
+        ...fallbackSelection,
+        fallbackReason: 'audio_worklet_module_load_failure'
+      };
 
       const snapshot = await fallbackSelection.source.start(
         this._buildStreamingAudioSourceSessionConfig({
@@ -809,7 +813,8 @@ export class LiveCaptionOffscreenRuntimeShell {
 
       logger.warn('AudioWorklet PCM source failed to start during deferred start, falling back to MediaRecorder/WebM:', {
         error: error?.message ?? String(error),
-        providerId: selection.providerDefinition?.id ?? null
+        providerId: selection.providerDefinition?.id ?? null,
+        fallbackReason: 'audio_worklet_module_load_failure'
       });
 
       try {
@@ -829,7 +834,10 @@ export class LiveCaptionOffscreenRuntimeShell {
       });
 
       this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
-      this.streamingAudioSourceSelection = fallbackSelection;
+      this.streamingAudioSourceSelection = {
+        ...fallbackSelection,
+        fallbackReason: 'audio_worklet_module_load_failure'
+      };
 
       const snapshot = await fallbackSelection.source.start(
         this._buildStreamingAudioSourceSessionConfig({
