@@ -8,7 +8,7 @@ Offscreen capture still finalizes audio chunks, but finalized blobs now bifurcat
 - batch providers keep the existing finalized-chunk path into background STT
 - streaming providers receive finalized blobs directly in the offscreen provider runtime
 
-Background owns transcript convergence and translation handoff. Canonical streaming finals are persisted to the active session/cache flow and then routed to translation. Partial hypotheses remain ephemeral, and correction/reconnect behavior is intentionally deferred.
+Background owns transcript convergence and translation handoff. Canonical streaming finals and canonical corrections are persisted to the active session/cache flow and then routed to translation. Partial hypotheses remain ephemeral. Reconnect/resume and true persisted canonical rehydration across restart remain deferred.
 
 This change documents the implemented streaming architecture and the remaining deferred items without changing the established batch provider path.
 
@@ -89,12 +89,13 @@ Do not introduce a background partial-state manager. Partial transcript hypothes
 
 ### 5. Corrections are revision-based canonical replacements
 
-Streaming corrections use `segmentId` plus `revision` as the canonical identity model. The current implementation tracks canonical revisions in memory, but persisted correction replacement and translation invalidation remain deferred.
+Streaming corrections use `segmentId` plus `revision` as the canonical identity model. The current implementation performs revision-aware canonical replacement in session, cache, translation, and runtime hydration.
 
 **Why this decision**
 - It provides a clear identity model for providers that revise hypotheses over time.
 - It allows canonical persistence to store only the latest accepted revision.
 - It gives the transcript-event coordinator a deterministic reconciliation rule.
+- It keeps visible runtime state single-entry per canonical segment while still allowing replacement by revision.
 
 **Alternatives considered**
 - Treating corrections as separate unrelated transcript entries: rejected because it would break canonical ordering and translation invalidation logic.
@@ -104,17 +105,17 @@ Streaming corrections use `segmentId` plus `revision` as the canonical identity 
   - `sessionId + tabId + videoFingerprint + segmentId`
 - Revision comparison and canonical replacement must be keyed to that identity, not to timing alone.
 
-**Current append-only limitation**
-- The current session, cache, translation, and runtime hydration paths are append-only in practice.
-- They can accumulate canonical-looking segments, but they do not yet provide a revision-aware replacement path for corrected finals.
+**Current correction behavior**
+- The session, cache, translation, and runtime hydration paths perform revision-aware replacement for canonical transcript and translated caption records.
+- Batch provider paths remain append-only and are unchanged.
 
 **Correction persistence risk**
-- If a correction-capable streaming provider is enabled without revision-aware persistence, corrected finals can be duplicated or misordered in session/cache state.
+- If future regressions bypass canonical identity and revision checks, corrected finals can be duplicated or misordered in session/cache state.
 - Timing-keyed upserts are not sufficient when a correction changes timing or when a provider reuses the same logical utterance with a new revision.
 
 **Translation invalidation risk**
-- Translation currently assumes finalized transcript segments are one-way queue units.
-- Without identity-based invalidation or replacement, a corrected final can leave stale translated text visible or persist duplicate translated segments.
+- Translation suppresses stale canonical results at commit time.
+- Without identity-based invalidation or replacement in future regressions, a corrected final could leave stale translated text visible or persist duplicate translated segments.
 
 ### 5.1 Latest-state canonical correction persistence model
 
@@ -147,8 +148,8 @@ The correction persistence model is latest-state only:
 - translation cache canonical key should be based on transcript canonical identity plus `targetLanguage` and `providerId`
 
 **Translation commit behavior**
-- translation stale-result suppression should happen at commit time
-- AbortController and queue removal are deferred to later work
+- translation stale-result suppression happens at commit time
+- AbortController and queue removal remain deferred to later work
 
 ### 6. Translation consumes final and corrected-final events only
 
@@ -158,7 +159,7 @@ Translation remains final-segment oriented for the current implementation and MV
 - The current translation pipeline is optimized for canonical text, not speculative drafts.
 - Partial translation increases cost and correction churn.
 - Final-only translation keeps current cache and overlay behavior stable.
-- The implemented streaming path sends canonical finals to the existing translation pipeline and keeps partials/corrections/error events out of translation.
+- The implemented streaming path sends canonical finals and canonical corrections to the existing translation pipeline and keeps partials/error events out of translation.
 
 **Alternatives considered**
 - Translating partials too: rejected for MVP due to cost, churn, and invalidation complexity.
@@ -196,8 +197,8 @@ Background owns orchestration, fail-close policy, canonical state, translation, 
 7. Add optional partial preview UI only if product requirements justify it.
 
 **Phase gating**
-- Providers that emit final-only streaming events can proceed earlier because they do not require correction persistence or translation invalidation.
-- Providers that emit corrections must wait until canonical persistence, revision-aware replacement, and translation invalidation are in place.
+- Providers that emit final-only streaming events can proceed earlier because they do not require correction-specific recovery features beyond the canonical persistence pipeline.
+- Providers that emit corrections are supported by the current canonical persistence, revision-aware replacement, and translation suppression pipeline.
 - Partial transcript hypotheses remain ephemeral and are not part of the canonical persistence model.
 - A full correction history or audit log is explicitly deferred; only the latest canonical state is required for MVP support.
 - `faster_whisper_streaming` is development-only in the manifest and is intentionally not a production-ready default provider.
@@ -209,5 +210,4 @@ Rollback strategy:
 ## Open Questions
 
 - Whether any future streaming provider will need partial captions visible in the overlay before finalization.
-- Whether correction events should trigger immediate translation replacement or deferred canonical re-translation for specific providers.
 - Whether a future provider requires a provider-specific resume token contract beyond the generic reconnect flag.

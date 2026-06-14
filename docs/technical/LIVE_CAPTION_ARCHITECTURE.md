@@ -342,8 +342,9 @@ Supported event types:
 Current behavior:
 
 - partial events remain ephemeral and are not persisted or translated
-- canonical finals are the only streaming events that continue into session/cache persistence and translation
-- correction events are recognized by contract and revision bookkeeping, but persisted replacement and translation invalidation are deferred
+- canonical finals continue into session/cache persistence and translation
+- canonical correction events replace the current canonical transcript state, upsert into cache, and route through translation
+- stale corrections are ignored
 - error events are routed through fail-close cleanup, not translation
 
 Revision tracking and cleanup:
@@ -371,7 +372,7 @@ The runtime model uses:
 
 `PageLiveCaptionSession` coordinates the tab-level lifecycle, active-video ownership, and cache scope. `VideoCaptionSession` owns chunk sequencing, transcript accumulation, caption rendering state, and per-video persistence metadata. `LiveCaptionCleanupCoordinator` owns cleanup plan and result generation, while `LiveCaptionSessionManager` remains the tab-scoped registry and snapshot source.
 
-Streaming finals participate in the same transcript accumulation and translation handoff after canonicalization. The streaming path does not bypass `VideoCaptionSession` or transcript cache for canonical finals.
+Streaming finals and canonical corrections participate in the same transcript accumulation and translation handoff after canonicalization. The streaming path does not bypass `VideoCaptionSession` or transcript cache for canonical transcript state.
 
 Active-video selection follows a deterministic MVP tie-break order:
 
@@ -397,10 +398,11 @@ The translation and persistence path is shared by:
 Current implementation details:
 
 - batch finalized chunks are transcribed in background, normalized, accumulated into `VideoCaptionSession`, persisted to transcript cache, and then routed to translation
-- streaming canonical finals are normalized by `LiveCaptionTranscriptEventCoordinator`, accumulated into `VideoCaptionSession`, persisted to transcript cache, and then routed to translation
+- streaming canonical finals and canonical corrections are normalized by `LiveCaptionTranscriptEventCoordinator`, replaced/upserted into `VideoCaptionSession`, persisted to transcript cache, and then routed to translation
+- canonical translated captions replace by identity in session/cache/runtime so corrected captions remain single-entry
 - partial, correction, and error events do not persist or translate in the MVP
 
-The cache and session layers remain append-only for canonical finals today. Revision-aware correction persistence and runtime rehydration are still deferred.
+Batch provider flows remain append-only. Canonical streaming final/correction flows are revision-aware and replace by identity. Runtime hydration/replacement is implemented for the active session, while persisted canonical rehydration across restart remains deferred.
 
 ## Cleanup and Recovery
 
@@ -417,13 +419,14 @@ Current cleanup behavior includes:
 Recovery limitations:
 
 - reconnect/resume is unsupported
-- true persisted canonical rehydration is deferred
+- true persisted canonical rehydration across restart is deferred
+- runtime canonical hydration/replacement from the current snapshot is implemented
 - local streaming provider cleanup is best-effort and fail-closed from the background side
 
 ## Current Limitations
 
 - No partial transcript UI
-- No correction persistence or correction-driven replacement
+- No correction history or audit-log persistence
 - No reconnect or resume support
 - `faster_whisper_streaming` is development-only
 - Local WebSocket smoke testing against `ws://127.0.0.1:8765/v1/audio/transcriptions/stream` is still required in a new environment before treating the streaming path as operational
@@ -661,11 +664,10 @@ Phase 10 completed the user-facing layer:
 
 ## Future Runtime Phases
 
-The remaining runtime work is limited to deferred canonical-state behavior and recovery enhancements:
+The remaining runtime work is limited to persisted recovery and reconnect enhancements:
 
-1. canonical correction persistence and revision-aware replacement
-2. persisted canonical rehydration for revision-aware state
-3. reconnect/resume or other provider recovery enhancements if product requirements change
+1. persisted canonical rehydration for revision-aware state across restart
+2. reconnect/resume or other provider recovery enhancements if product requirements change
 
 ## Maintenance Notes
 

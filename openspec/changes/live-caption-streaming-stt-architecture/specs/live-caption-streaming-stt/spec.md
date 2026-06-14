@@ -51,7 +51,7 @@ The system SHALL represent transcript output as revisioned transcript events wit
 #### Scenario: Correction transcript event
 - **WHEN** a streaming provider revises a previously emitted transcript
 - **THEN** the system SHALL emit a correction event that references the superseded segment or event and increments revision
-- **AND** current persisted correction replacement remains deferred until revision-aware storage is implemented
+- **AND** the system SHALL treat the corrected transcript as canonical when the revision is current
 
 #### Scenario: Provider error event
 - **WHEN** transcription fails in a batch or streaming provider
@@ -67,7 +67,7 @@ The system SHALL route batch final transcript results and streaming transcript e
 #### Scenario: Streaming event routing
 - **WHEN** a streaming STT provider emits a partial, final, correction, or error event
 - **THEN** the system SHALL normalize that event through the transcript-event convergence layer before canonical session updates
-- **AND** the current implementation SHALL route canonical streaming finals through the existing translation pipeline after canonical session/cache persistence
+- **AND** the current implementation SHALL route canonical streaming finals and canonical corrections through the existing translation pipeline after canonical session/cache persistence
 
 ### Requirement: Partial transcripts remain ephemeral
 The system SHALL keep partial transcript state ephemeral and SHALL NOT persist partial hypotheses in the canonical session cache or IndexedDB stores.
@@ -102,7 +102,7 @@ The system SHALL treat transcript corrections as revisioned replacements of an e
 #### Scenario: Canonical persistence of corrections
 - **WHEN** a correction becomes the canonical transcript value
 - **THEN** the system SHALL persist only the latest canonical revision rather than preserving transient draft history in the main transcript cache
-- **AND** the current codebase SHALL defer persisted correction replacement and translation invalidation until the revision-aware storage tasks are implemented
+- **AND** the current codebase SHALL use canonical replacement and translation stale-result suppression for canonical corrections
 
 ### Requirement: Canonical correction persistence is latest-state only
 The system SHALL use a latest-state canonical persistence model for correction-capable transcript and translation records.
@@ -131,7 +131,7 @@ The system SHALL send only final or corrected-final transcript events to transla
 #### Scenario: Final transcript translation
 - **WHEN** a final or corrected-final transcript event is produced
 - **THEN** the system SHALL forward it to the existing translation pipeline
-- **AND** the current implementation SHALL keep partial, correction, and error events out of translation
+- **AND** the current implementation SHALL keep partial and error events out of translation
 
 #### Scenario: Partial transcript translation blocked
 - **WHEN** a partial transcript event is produced
