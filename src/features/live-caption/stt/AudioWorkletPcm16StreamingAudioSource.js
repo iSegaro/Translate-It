@@ -435,31 +435,12 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.mediaStreamSource = null;
   }
 
-  _stopMediaTracks() {
-    if (!this.mediaStream || typeof this.mediaStream.getTracks !== 'function') {
-      return;
-    }
-
-    try {
-      for (const track of this.mediaStream.getTracks()) {
-        try {
-          track.stop?.();
-        } catch (error) {
-          logger.warn('Failed to stop MediaStream track:', error);
-        }
-      }
-    } catch (error) {
-      logger.warn('Failed to enumerate MediaStream tracks:', error);
-    }
-  }
-
   async _cleanupResources() {
     this._clearFlushTimer();
     this.pendingFrames = [];
     this.segmentRotationPending = false;
 
     this._disconnectGraph();
-    this._stopMediaTracks();
     await this._suspendAudioContext();
     await this._closeAudioContext();
 

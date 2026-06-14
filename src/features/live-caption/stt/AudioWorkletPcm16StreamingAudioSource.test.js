@@ -181,7 +181,7 @@ describe('AudioWorkletPcm16StreamingAudioSource', () => {
     expect(env.mediaStreamSource.disconnect).toHaveBeenCalledTimes(1);
     expect(env.audioWorkletNode.disconnect).toHaveBeenCalledTimes(1);
     expect(env.port.close).toHaveBeenCalledTimes(1);
-    expect(env.trackStop).toHaveBeenCalledTimes(1);
+    expect(env.trackStop).not.toHaveBeenCalled();
     expect(env.audioContext.suspend).toHaveBeenCalled();
     expect(env.audioContext.resume).toHaveBeenCalled();
     expect(env.audioContext.close).toHaveBeenCalledTimes(1);
