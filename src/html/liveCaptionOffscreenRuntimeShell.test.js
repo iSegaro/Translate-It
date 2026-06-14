@@ -627,6 +627,142 @@ describe("live-caption offscreen runtime shell", () => {
     );
   });
 
+  it("falls back to MediaRecorder/WebM when the PCM AudioWorklet module fails to load", async () => {
+    vi.useFakeTimers();
+
+    const pcmAudioWorkletAddModule = vi.fn().mockRejectedValue(new Error("Unable to load a worklet's module."));
+    class MockPcmAudioContext {
+      constructor() {
+        this.destination = {};
+        this.state = "running";
+        this.audioWorklet = {
+          addModule: pcmAudioWorkletAddModule
+        };
+        this.close = mockClose;
+        this.suspend = vi.fn().mockImplementation(async () => {
+          this.state = "suspended";
+        });
+        this.resume = vi.fn().mockImplementation(async () => {
+          this.state = "running";
+        });
+      }
+
+      createMediaStreamSource() {
+        return {
+          connect: mockConnect,
+          disconnect: mockDisconnect,
+        };
+      }
+    }
+
+    vi.stubGlobal("AudioContext", MockPcmAudioContext);
+    vi.stubGlobal("webkitAudioContext", MockPcmAudioContext);
+    vi.stubGlobal("AudioWorkletNode", function MockAudioWorkletNode() {});
+
+    const { provider, factory } = createStreamingProviderFactory();
+    const shell = new LiveCaptionOffscreenRuntimeShell({
+      streamingProviderFactory: factory
+    });
+
+    provider.startSession.mockResolvedValue({
+      handled: true,
+      status: "ready",
+      providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+      sessionId: "session-pcm-fallback",
+      tabId: 7,
+      videoFingerprint: "video-pcm-fallback",
+      readyPayload: { type: "ready", sessionId: "session-pcm-fallback" }
+    });
+
+    const runtimeStartResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.START,
+        data: {
+          sessionId: "session-pcm-fallback",
+          tabId: 7,
+          videoFingerprint: "video-pcm-fallback",
+          streamId: "mock-stream-id",
+          metadata: {
+            streamingProvider: {
+              id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+              mode: "streaming",
+              executionLocation: "offscreen",
+              audioInputFormats: [
+                "pcm16-mono-16khz",
+                "webm-opus"
+              ],
+              preferredAudioInputFormat: "pcm16-mono-16khz",
+              fallbackAudioInputFormat: "webm-opus"
+            },
+            chunkTimeslice: 100
+          }
+        }
+      },
+      {},
+    );
+
+    expect(runtimeStartResponse.success).toBe(true);
+
+    const streamingStartResponse = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,
+        sessionId: "session-pcm-fallback",
+        tabId: 7,
+        videoFingerprint: "video-pcm-fallback",
+        providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+        providerMode: "streaming",
+        executionLocation: "offscreen",
+        metadata: {
+          streamingProvider: {
+            id: FASTER_WHISPER_STREAMING_PROVIDER_ID,
+            mode: "streaming",
+            executionLocation: "offscreen",
+            audioInputFormats: [
+              "pcm16-mono-16khz",
+              "webm-opus"
+            ],
+            preferredAudioInputFormat: "pcm16-mono-16khz",
+            fallbackAudioInputFormat: "webm-opus"
+          }
+        }
+      },
+      {},
+    );
+
+    expect(streamingStartResponse.success).toBe(true);
+    expect(pcmAudioWorkletAddModule).toHaveBeenCalledTimes(1);
+    expect(MockMediaRecorder.instances.length).toBe(1);
+    expect(provider.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioFormat: "webm-opus",
+        selectedAudioFormat: "webm-opus",
+        audioSourceType: "media_recorder_webm_opus",
+        metadata: expect.objectContaining({
+          selectedAudioFormat: "webm-opus",
+          audioSourceType: "media_recorder_webm_opus"
+        })
+      }),
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          selectedAudioFormat: "webm-opus",
+          audioSourceType: "media_recorder_webm_opus"
+        })
+      })
+    );
+    expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
+      audioFormat: "webm-opus",
+      selectedAudioFormat: "webm-opus",
+      audioSourceType: "media_recorder_webm_opus"
+    });
+    expect(shell.mediaRecorderStreamingAudioSource?.mediaRecorder).toBe(MockMediaRecorder.instances[0]);
+    expect(shell.streamingAudioSourceSelection?.selectedAudioFormat).toBe("webm-opus");
+    expect(shell.streamingSessionContext?.state).toBe("active");
+    expect(provider.startSession).toHaveBeenCalledTimes(1);
+    expect(provider.stopSession).not.toHaveBeenCalled();
+  });
+
   it("forwards streaming provider events to background, clears ownership on error, and ignores stale sessions", async () => {
     const { provider, factory } = createStreamingProviderFactory();
     const shell = new LiveCaptionOffscreenRuntimeShell({

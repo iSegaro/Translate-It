@@ -24,6 +24,7 @@ import { getSTTProviderDefinition } from '@/features/live-caption/stt/STTProvide
 import {
   FasterWhisperStreamingProvider
 } from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
+import { MediaRecorderStreamingAudioSource } from '@/features/live-caption/stt/MediaRecorderStreamingAudioSource.js';
 import { StreamingAudioSourceSelector } from '@/features/live-caption/stt/StreamingAudioSourceSelector.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
@@ -574,6 +575,33 @@ export class LiveCaptionOffscreenRuntimeShell {
     });
   }
 
+  _createMediaRecorderFallbackSelection({
+    providerDefinition = null,
+    callbacks = {},
+    sourceId = null
+  } = {}) {
+    const source = new MediaRecorderStreamingAudioSource({
+      sourceId: sourceId ?? 'media_recorder_streaming_audio_source_fallback',
+      onChunk: callbacks.onChunk ?? null,
+      onError: callbacks.onError ?? null,
+      onStateChange: callbacks.onStateChange ?? null,
+      logger
+    });
+
+    return {
+      source,
+      sourceType: 'media_recorder_webm_opus',
+      selectedAudioFormat: 'webm-opus',
+      audioInputFormats: Array.isArray(providerDefinition?.audioInputFormats)
+        ? [...providerDefinition.audioInputFormats]
+        : [],
+      preferredAudioInputFormat: providerDefinition?.preferredAudioInputFormat ?? 'webm-opus',
+      fallbackAudioInputFormat: providerDefinition?.fallbackAudioInputFormat ?? 'webm-opus',
+      canUseAudioWorklet: false,
+      providerDefinition: providerDefinition ? { ...providerDefinition } : null
+    };
+  }
+
   _resolveMediaRecorderMimeType() {
     const options = { mimeType: 'audio/webm;codecs=opus' };
     let selectedMime = options.mimeType;
@@ -650,33 +678,83 @@ export class LiveCaptionOffscreenRuntimeShell {
       return this.streamingAudioSourceSelection;
     }
 
-    return selection.source.start(
-      this._buildStreamingAudioSourceSessionConfig({
-        providerDefinition: selection.providerDefinition,
-        selectedAudioFormat: selection.selectedAudioFormat,
-        sourceType: selection.sourceType
-      }),
-      selection.sourceType === 'audio_worklet_pcm16'
-        ? {
-            stream,
-            chunkTimeslice,
-            audioContextOptions: {
-              latencyHint: 'interactive'
+    try {
+      return await selection.source.start(
+        this._buildStreamingAudioSourceSessionConfig({
+          providerDefinition: selection.providerDefinition,
+          selectedAudioFormat: selection.selectedAudioFormat,
+          sourceType: selection.sourceType
+        }),
+        selection.sourceType === 'audio_worklet_pcm16'
+          ? {
+              stream,
+              chunkTimeslice,
+              audioContextOptions: {
+                latencyHint: 'interactive'
+              }
             }
+          : {
+              stream,
+              mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+              chunkTimeslice
+            }
+      ).then((snapshot) => {
+        if (this.mediaRecorderStreamingAudioSource) {
+          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
         }
-        : {
-            stream,
-            mimeType: mimeType || this._resolveMediaRecorderMimeType(),
-            chunkTimeslice
-          }
-    ).then((snapshot) => {
+        this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
+        this.pendingStreamingAudioSourceStart = null;
+        return snapshot;
+      });
+    } catch (error) {
+      if (selection.sourceType !== 'audio_worklet_pcm16') {
+        throw error;
+      }
+
+      logger.warn('AudioWorklet PCM source failed to start, falling back to MediaRecorder/WebM:', {
+        error: error?.message ?? String(error),
+        providerId: selection.providerDefinition?.id ?? null
+      });
+
+      try {
+        await selection.source.stop?.();
+      } catch (stopError) {
+        logger.debug('Failed to stop PCM source after start failure while preparing fallback:', stopError);
+      }
+
+      const fallbackSelection = this._createMediaRecorderFallbackSelection({
+        providerDefinition: selection.providerDefinition,
+        callbacks: {
+          onChunk: selection.source?.onChunk ?? null,
+          onError: selection.source?.onError ?? null,
+          onStateChange: selection.source?.onStateChange ?? null
+        },
+        sourceId: selection.source?.sourceId ?? null
+      });
+
+      this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
+      this.streamingAudioSourceSelection = fallbackSelection;
+
+      const snapshot = await fallbackSelection.source.start(
+        this._buildStreamingAudioSourceSessionConfig({
+          providerDefinition: fallbackSelection.providerDefinition,
+          selectedAudioFormat: fallbackSelection.selectedAudioFormat,
+          sourceType: fallbackSelection.sourceType
+        }),
+        {
+          stream,
+          mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+          chunkTimeslice
+        }
+      );
+
       if (this.mediaRecorderStreamingAudioSource) {
         this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
       }
       this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
       this.pendingStreamingAudioSourceStart = null;
       return snapshot;
-    });
+    }
   }
 
   async _startDeferredStreamingAudioSource(request = {}) {
@@ -697,32 +775,81 @@ export class LiveCaptionOffscreenRuntimeShell {
 
     this.pendingStreamingAudioSourceStart = null;
 
-    return selection.source.start(
-      this._buildStreamingAudioSourceSessionConfig({
-        providerDefinition,
-        selectedAudioFormat: selection.selectedAudioFormat,
-        sourceType: selection.sourceType
-      }),
-      selection.sourceType === 'audio_worklet_pcm16'
-        ? {
-            stream,
-            chunkTimeslice,
-            audioContextOptions: {
-              latencyHint: 'interactive'
+    try {
+      return await selection.source.start(
+        this._buildStreamingAudioSourceSessionConfig({
+          providerDefinition,
+          selectedAudioFormat: selection.selectedAudioFormat,
+          sourceType: selection.sourceType
+        }),
+        selection.sourceType === 'audio_worklet_pcm16'
+          ? {
+              stream,
+              chunkTimeslice,
+              audioContextOptions: {
+                latencyHint: 'interactive'
+              }
             }
-          }
-        : {
-            stream,
-            mimeType: mimeType || this._resolveMediaRecorderMimeType(),
-            chunkTimeslice
-          }
-    ).then((snapshot) => {
+          : {
+              stream,
+              mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+              chunkTimeslice
+            }
+      ).then((snapshot) => {
+        if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
+          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+        }
+        this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+        return snapshot;
+      });
+    } catch (error) {
+      if (selection.sourceType !== 'audio_worklet_pcm16') {
+        throw error;
+      }
+
+      logger.warn('AudioWorklet PCM source failed to start during deferred start, falling back to MediaRecorder/WebM:', {
+        error: error?.message ?? String(error),
+        providerId: selection.providerDefinition?.id ?? null
+      });
+
+      try {
+        await selection.source.stop?.();
+      } catch (stopError) {
+        logger.debug('Failed to stop PCM source after deferred start failure while preparing fallback:', stopError);
+      }
+
+      const fallbackSelection = this._createMediaRecorderFallbackSelection({
+        providerDefinition,
+        callbacks: {
+          onChunk: selection.source?.onChunk ?? null,
+          onError: selection.source?.onError ?? null,
+          onStateChange: selection.source?.onStateChange ?? null
+        },
+        sourceId: selection.source?.sourceId ?? null
+      });
+
+      this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
+      this.streamingAudioSourceSelection = fallbackSelection;
+
+      const snapshot = await fallbackSelection.source.start(
+        this._buildStreamingAudioSourceSessionConfig({
+          providerDefinition,
+          selectedAudioFormat: fallbackSelection.selectedAudioFormat,
+          sourceType: fallbackSelection.sourceType
+        }),
+        {
+          stream,
+          mimeType: mimeType || this._resolveMediaRecorderMimeType(),
+          chunkTimeslice
+        }
+      );
+
       if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
         this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
       }
       this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
       return snapshot;
-    });
+    }
   }
 
   _emitFinalizedChunk(chunkPayload, { sessionId, tabId, videoFingerprint, chunkStartMs, chunkEndMs, mimeType }) {
@@ -1102,6 +1229,13 @@ export class LiveCaptionOffscreenRuntimeShell {
       }
 
       const provider = this._createStreamingProvider(request);
+      await this._startDeferredStreamingAudioSource({
+        ...request,
+        metadata: request.metadata && typeof request.metadata === 'object'
+          ? { ...request.metadata, streamingProvider: request.metadata.streamingProvider ?? this.streamingSessionContext?.metadata?.streamingProvider ?? null }
+          : { streamingProvider: this.streamingSessionContext?.metadata?.streamingProvider ?? null }
+      });
+
       this.streamingProvider = provider;
       this.streamingSessionContext = {
         ...request,
@@ -1112,17 +1246,12 @@ export class LiveCaptionOffscreenRuntimeShell {
       };
 
       const providerDefinition = this.streamingAudioSourceSelection?.providerDefinition
-        ?? this.pendingStreamingAudioSourceStart?.selection?.providerDefinition
         ?? this._resolveStreamingProviderDefinitionFromRequest(request)
         ?? null;
       const audioSessionConfig = this._buildStreamingAudioSourceSessionConfig({
         providerDefinition,
-        selectedAudioFormat: this.streamingAudioSourceSelection?.selectedAudioFormat
-          ?? this.pendingStreamingAudioSourceStart?.selection?.selectedAudioFormat
-          ?? null,
-        sourceType: this.streamingAudioSourceSelection?.sourceType
-          ?? this.pendingStreamingAudioSourceStart?.selection?.sourceType
-          ?? null
+        selectedAudioFormat: this.streamingAudioSourceSelection?.selectedAudioFormat ?? null,
+        sourceType: this.streamingAudioSourceSelection?.sourceType ?? null
       });
 
       const startResult = await provider.startSession({
@@ -1168,13 +1297,6 @@ export class LiveCaptionOffscreenRuntimeShell {
         readyPayload: startResult?.readyPayload ?? null,
         startedAt: Date.now()
       };
-
-      await this._startDeferredStreamingAudioSource({
-        ...request,
-        metadata: request.metadata && typeof request.metadata === 'object'
-          ? { ...request.metadata, streamingProvider: request.metadata.streamingProvider ?? this.streamingSessionContext?.metadata?.streamingProvider ?? null }
-          : { streamingProvider: this.streamingSessionContext?.metadata?.streamingProvider ?? null }
-      });
 
       const response = createLiveCaptionRuntimeShellResponse(
         LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.START_STREAMING_STT_SESSION,

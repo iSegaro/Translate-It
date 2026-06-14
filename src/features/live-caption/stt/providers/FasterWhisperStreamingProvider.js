@@ -5,6 +5,25 @@ import {
 } from '../BaseStreamingSTTProvider.js';
 
 export const FASTER_WHISPER_STREAMING_PROVIDER_ID = 'faster_whisper_streaming';
+const DEFAULT_PROTOCOL_VERSION = 1;
+
+function normalizeOptionalNumber(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizeOptionalString(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
 
 /**
  * Faster Whisper streaming provider skeleton.
@@ -172,6 +191,69 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
     return true;
   }
 
+  _buildStartPayload(session, options = {}) {
+    const metadata = session?.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
+      ? session.metadata
+      : {};
+    const optionMetadata = options?.metadata && typeof options.metadata === 'object' && !Array.isArray(options.metadata)
+      ? options.metadata
+      : {};
+    const mergedMetadata = {
+      ...metadata,
+      ...optionMetadata
+    };
+    const audioInputFormats = Array.isArray(session?.audioInputFormats)
+      ? session.audioInputFormats.filter((format) => typeof format === 'string' && format.trim().length > 0).map((format) => format.trim())
+      : [];
+    const selectedAudioFormat = normalizeOptionalString(session?.selectedAudioFormat) ?? normalizeOptionalString(session?.audioFormat) ?? null;
+    const preferredAudioInputFormat = normalizeOptionalString(session?.preferredAudioInputFormat) ?? selectedAudioFormat;
+    const fallbackAudioInputFormat = normalizeOptionalString(session?.fallbackAudioInputFormat) ?? 'webm-opus';
+    const audioSourceType = normalizeOptionalString(session?.audioSourceType) ?? null;
+    const protocolVersion = normalizeOptionalNumber(
+      mergedMetadata.protocolVersion
+      ?? session?.protocolVersion
+      ?? options?.protocolVersion
+      ?? DEFAULT_PROTOCOL_VERSION
+    ) ?? DEFAULT_PROTOCOL_VERSION;
+
+    return {
+      type: 'start',
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: session.videoFingerprint,
+      providerId: this.providerId,
+      sourceLanguage: session.sourceLanguage ?? null,
+      targetLanguage: session.targetLanguage ?? null,
+      audioFormat: selectedAudioFormat,
+      selectedAudioFormat,
+      preferredAudioInputFormat,
+      fallbackAudioInputFormat,
+      audioSourceType,
+      audioInputFormats,
+      sampleRate: normalizeOptionalNumber(session?.sampleRate) ?? null,
+      channelCount: normalizeOptionalNumber(session?.channelCount) ?? null,
+      bitDepth: normalizeOptionalNumber(session?.bitDepth) ?? null,
+      protocolVersion,
+      options: {
+        ...(session.providerOptions ?? {}),
+        ...(options.providerOptions ?? {})
+      },
+      metadata: {
+        ...mergedMetadata,
+        audioFormat: selectedAudioFormat,
+        selectedAudioFormat,
+        preferredAudioInputFormat,
+        fallbackAudioInputFormat,
+        audioSourceType,
+        audioInputFormats,
+        sampleRate: normalizeOptionalNumber(session?.sampleRate) ?? null,
+        channelCount: normalizeOptionalNumber(session?.channelCount) ?? null,
+        bitDepth: normalizeOptionalNumber(session?.bitDepth) ?? null,
+        protocolVersion
+      }
+    };
+  }
+
   _isStaleSessionMessage(payload, session) {
     return Boolean(payload?.sessionId && session?.sessionId && payload.sessionId !== session.sessionId);
   }
@@ -250,19 +332,7 @@ export class FasterWhisperStreamingProvider extends BaseStreamingSTTProvider {
 
     const handleOpen = () => {
       this._socketOpened = true;
-      this._sendJson(socket, {
-        type: 'start',
-        sessionId: session.sessionId,
-        tabId: session.tabId,
-        videoFingerprint: session.videoFingerprint,
-        providerId: this.providerId,
-        sourceLanguage: session.sourceLanguage ?? null,
-        targetLanguage: session.targetLanguage ?? null,
-        options: {
-          ...(session.providerOptions ?? {}),
-          ...(options.providerOptions ?? {})
-        }
-      });
+      this._sendJson(socket, this._buildStartPayload(session, options));
     };
 
     const handleMessage = (event) => {

@@ -68,6 +68,15 @@ function normalizeOptionalString(value) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeOptionalNumber(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
 function cloneObject(value) {
   if (!value || typeof value !== 'object') {
     return value ?? null;

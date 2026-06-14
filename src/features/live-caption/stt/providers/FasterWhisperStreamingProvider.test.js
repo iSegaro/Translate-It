@@ -128,13 +128,23 @@ describe('FasterWhisperStreamingProvider', () => {
       videoFingerprint: 'video-a',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
+      audioFormat: 'pcm16-mono-16khz',
+      selectedAudioFormat: 'pcm16-mono-16khz',
+      preferredAudioInputFormat: 'pcm16-mono-16khz',
+      fallbackAudioInputFormat: 'webm-opus',
+      audioSourceType: 'audio_worklet_pcm16',
+      audioInputFormats: ['pcm16-mono-16khz', 'webm-opus'],
+      sampleRate: 16000,
+      channelCount: 1,
+      bitDepth: 16,
       providerOptions: {
         endpointUrl: 'ws://example.invalid/stream',
         model: 'base'
       }
     }, {
       providerOptions: {
-        sampleRate: 16000
+        sampleRate: 16000,
+        protocolVersion: 1
       }
     });
 
@@ -153,10 +163,32 @@ describe('FasterWhisperStreamingProvider', () => {
       providerId: FASTER_WHISPER_STREAMING_PROVIDER_ID,
       sourceLanguage: 'en',
       targetLanguage: 'fa',
+      audioFormat: 'pcm16-mono-16khz',
+      selectedAudioFormat: 'pcm16-mono-16khz',
+      preferredAudioInputFormat: 'pcm16-mono-16khz',
+      fallbackAudioInputFormat: 'webm-opus',
+      audioSourceType: 'audio_worklet_pcm16',
+      audioInputFormats: ['pcm16-mono-16khz', 'webm-opus'],
+      sampleRate: 16000,
+      channelCount: 1,
+      bitDepth: 16,
+      protocolVersion: 1,
       options: {
         endpointUrl: 'ws://example.invalid/stream',
         model: 'base',
         sampleRate: 16000
+      },
+      metadata: {
+        protocolVersion: 1,
+        audioFormat: 'pcm16-mono-16khz',
+        selectedAudioFormat: 'pcm16-mono-16khz',
+        preferredAudioInputFormat: 'pcm16-mono-16khz',
+        fallbackAudioInputFormat: 'webm-opus',
+        audioSourceType: 'audio_worklet_pcm16',
+        audioInputFormats: ['pcm16-mono-16khz', 'webm-opus'],
+        sampleRate: 16000,
+        channelCount: 1,
+        bitDepth: 16
       }
     });
 
