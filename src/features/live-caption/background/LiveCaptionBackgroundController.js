@@ -466,16 +466,33 @@ export class LiveCaptionBackgroundController {
       return null;
     }
 
-    activeVideoSession.addTranscriptSegment(segment);
+    const isCanonicalTranscriptSegment =
+      segment.sessionId != null
+      && segment.tabId != null
+      && segment.videoFingerprint != null
+      && segment.segmentId != null
+      && segment.revision != null;
+
+    if (isCanonicalTranscriptSegment && typeof activeVideoSession.upsertTranscriptSegment === 'function') {
+      activeVideoSession.upsertTranscriptSegment(segment);
+    } else {
+      activeVideoSession.addTranscriptSegment(segment);
+    }
 
     if (this.cache) {
-      this.cache.appendTranscriptSegment({
+      const cacheSegment = {
         ...segment,
         segmentStartMs: segment.startMs,
         segmentEndMs: segment.endMs,
         originalText: segment.text,
         isIncognito: pageSession.isIncognito
-      }).catch((err) => {
+      };
+
+      const persistTranscriptSegment = isCanonicalTranscriptSegment && this.cache.upsertTranscriptSegmentByIdentity
+        ? this.cache.upsertTranscriptSegmentByIdentity(cacheSegment)
+        : this.cache.appendTranscriptSegment(cacheSegment);
+
+      persistTranscriptSegment.catch((err) => {
         logger.warn('Failed to persist transcript segment to cache', {
           sessionId: segment.sessionId,
           error: err.message
@@ -500,6 +517,10 @@ export class LiveCaptionBackgroundController {
       endMs: event.segmentEndMs ?? fallbackContext.endMs ?? null,
       text: event.text ?? '',
       providerId: event.providerId ?? null,
+      sourceLanguage: event.sourceLanguage ?? null,
+      targetLanguage: event.targetLanguage ?? null,
+      confidence: event.confidence ?? null,
+      revision: event.revision ?? null,
       createdAt: event.createdAt ?? Date.now(),
       isFinal: event.isFinal ?? true
     };
@@ -1879,7 +1900,8 @@ export class LiveCaptionBackgroundController {
         this.transcriptEventCoordinator.handleStreamingTranscriptEvent(message.event)
       );
 
-      if (transcriptResult?.status === "canonical_final" && transcriptResult.canonicalEvent) {
+      if ((transcriptResult?.status === "canonical_final" || transcriptResult?.status === "canonical_correction")
+        && transcriptResult.canonicalEvent) {
         const transcriptSegment = this._createTranscriptSegmentFromCanonicalEvent(
           transcriptResult.canonicalEvent,
           {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveCaptionTranslationCoordinator } from './LiveCaptionTranslationCoordinator.js';
 import { LiveCaptionSessionManager } from '../core/LiveCaptionSessionManager.js';
 import { LiveCaptionCaptureCoordinator } from './LiveCaptionCaptureCoordinator.js';
+import { VideoCaptionSession } from '../core/VideoCaptionSession.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -12,11 +13,26 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
+function createCanonicalTranscriptSegment(overrides = {}) {
+  return {
+    sessionId: 'session-1',
+    tabId: 7,
+    videoFingerprint: 'video-a',
+    segmentId: 'segment-1',
+    revision: 1,
+    startMs: 0,
+    endMs: 3000,
+    text: 'Hello',
+    ...overrides
+  };
+}
+
 describe('LiveCaptionTranslationCoordinator', () => {
   let sessionManager;
   let captureCoordinator;
   let mockAdapter;
   let mockCache;
+  let mockBrowserApi;
   let coordinator;
 
   beforeEach(() => {
@@ -41,14 +57,22 @@ describe('LiveCaptionTranslationCoordinator', () => {
     };
 
     mockCache = {
-      appendTranslatedCaptionSegment: vi.fn().mockResolvedValue({})
+      appendTranslatedCaptionSegment: vi.fn().mockResolvedValue({}),
+      upsertTranslatedCaptionSegmentByIdentity: vi.fn().mockResolvedValue({})
+    };
+
+    mockBrowserApi = {
+      tabs: {
+        sendMessage: vi.fn().mockResolvedValue(undefined)
+      }
     };
 
     coordinator = new LiveCaptionTranslationCoordinator({
       sessionManager,
       captureCoordinator,
       translationAdapter: mockAdapter,
-      cache: mockCache
+      cache: mockCache,
+      browserApi: mockBrowserApi
     });
   });
 
@@ -367,5 +391,211 @@ describe('LiveCaptionTranslationCoordinator', () => {
       originalText: 'Hi',
       translatedText: 'Translated: Hi'
     }));
+  });
+
+  it('commits canonical translated captions when the current transcript revision matches', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      sessionId: 'video-1'
+    });
+    pageSession.activeVideoSession = videoSession;
+    videoSession.upsertTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }));
+
+    mockAdapter.translateFinalizedSegment = vi.fn().mockResolvedValue({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      segmentStartMs: 0,
+      segmentEndMs: 3000,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'google',
+      isFinal: true
+    });
+
+    await coordinator.handleTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }), { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1'
+    })).toMatchObject({
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      segmentId: 'segment-1',
+      revision: 1
+    });
+    expect(mockCache.upsertTranslatedCaptionSegmentByIdentity).toHaveBeenCalledTimes(1);
+    expect(mockCache.upsertTranslatedCaptionSegmentByIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        tabId: 7,
+        videoFingerprint: 'video-a',
+        segmentId: 'segment-1',
+        revision: 1,
+        originalText: 'Hello',
+        translatedText: 'سلام'
+      }),
+      { compareRevision: false }
+    );
+    expect(mockCache.appendTranslatedCaptionSegment).not.toHaveBeenCalled();
+    expect(mockBrowserApi.tabs.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows equal canonical transcript revisions to commit and replace translated captions by identity', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      sessionId: 'video-1'
+    });
+    pageSession.activeVideoSession = videoSession;
+    videoSession.upsertTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }));
+
+    mockAdapter.translateFinalizedSegment = vi.fn().mockResolvedValue({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      segmentStartMs: 0,
+      segmentEndMs: 3000,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'google',
+      isFinal: true
+    });
+
+    await coordinator.handleTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }), { tabId: 7 });
+
+    await coordinator.handleTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }), { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.getTranslatedCaptionSegmentByIdentity({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1'
+    })).toMatchObject({
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      segmentId: 'segment-1',
+      revision: 1
+    });
+    expect(mockCache.upsertTranslatedCaptionSegmentByIdentity).toHaveBeenCalledTimes(2);
+    expect(mockCache.appendTranslatedCaptionSegment).not.toHaveBeenCalled();
+    expect(mockBrowserApi.tabs.sendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('suppresses stale canonical translated captions when the active transcript revision is newer', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      sessionId: 'video-1'
+    });
+    pageSession.activeVideoSession = videoSession;
+    videoSession.upsertTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }));
+
+    let resolveTranslation;
+    mockAdapter.translateFinalizedSegment = vi.fn().mockImplementation(() => new Promise((resolve) => {
+      resolveTranslation = resolve;
+    }));
+
+    const translatePromise = coordinator.handleTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }), { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    videoSession.upsertTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 2,
+      text: 'Hello corrected'
+    }));
+
+    resolveTranslation({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      segmentStartMs: 0,
+      segmentEndMs: 3000,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'google',
+      isFinal: true
+    });
+
+    await translatePromise;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(videoSession.translatedCaptionSegments).toHaveLength(0);
+    expect(mockCache.upsertTranslatedCaptionSegmentByIdentity).not.toHaveBeenCalled();
+    expect(mockCache.appendTranslatedCaptionSegment).not.toHaveBeenCalled();
+    expect(mockBrowserApi.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('suppresses canonical translated captions when the current transcript is missing', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    pageSession.activeVideoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      sessionId: 'video-1'
+    });
+
+    mockAdapter.translateFinalizedSegment = vi.fn().mockResolvedValue({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      segmentStartMs: 0,
+      segmentEndMs: 3000,
+      originalText: 'Hello',
+      translatedText: 'سلام',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'google',
+      isFinal: true
+    });
+
+    await coordinator.handleTranscriptSegment(createCanonicalTranscriptSegment({
+      revision: 1,
+      text: 'Hello'
+    }), { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(pageSession.activeVideoSession.translatedCaptionSegments).toHaveLength(0);
+    expect(mockCache.upsertTranslatedCaptionSegmentByIdentity).not.toHaveBeenCalled();
+    expect(mockCache.appendTranslatedCaptionSegment).not.toHaveBeenCalled();
+    expect(mockBrowserApi.tabs.sendMessage).not.toHaveBeenCalled();
   });
 });

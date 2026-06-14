@@ -36,6 +36,267 @@ export class LiveCaptionTranslationCoordinator {
     return this.sessionQueues.get(sessionId);
   }
 
+  _normalizeCanonicalIdentity(input) {
+    if (!input || typeof input !== 'object') {
+      return null;
+    }
+
+    const sessionId = typeof input.sessionId === 'string' && input.sessionId.trim().length > 0
+      ? input.sessionId.trim()
+      : null;
+    const tabId = Number(input.tabId);
+    const videoFingerprint = typeof input.videoFingerprint === 'string' && input.videoFingerprint.trim().length > 0
+      ? input.videoFingerprint.trim()
+      : null;
+    const segmentId = typeof input.segmentId === 'string' && input.segmentId.trim().length > 0
+      ? input.segmentId.trim()
+      : null;
+
+    if (!sessionId || !Number.isFinite(tabId) || !videoFingerprint || !segmentId) {
+      return null;
+    }
+
+    return {
+      sessionId,
+      tabId,
+      videoFingerprint,
+      segmentId
+    };
+  }
+
+  _normalizeRevisionValue(value) {
+    if (value == null || value === '') {
+      return null;
+    }
+
+    const revision = Number(value);
+    return Number.isFinite(revision) ? revision : null;
+  }
+
+  _getCurrentCanonicalTranscriptState(pageSession, sourceSegment, tabId) {
+    const activeVideoSession = pageSession?.activeVideoSession;
+    if (!activeVideoSession) {
+      return {
+        status: 'missing_video_session'
+      };
+    }
+
+    const canonicalIdentity = this._normalizeCanonicalIdentity({
+      ...sourceSegment,
+      tabId: sourceSegment?.tabId ?? tabId
+    });
+    const revision = this._normalizeRevisionValue(sourceSegment?.revision);
+
+    if (!canonicalIdentity || revision == null) {
+      return null;
+    }
+
+    if (typeof activeVideoSession.getTranscriptSegmentByIdentity !== 'function') {
+      return {
+        status: 'missing_lookup',
+        identity: canonicalIdentity,
+        revision
+      };
+    }
+
+    const currentTranscript = activeVideoSession.getTranscriptSegmentByIdentity(canonicalIdentity);
+
+    if (!currentTranscript) {
+      return {
+        status: 'missing_transcript',
+        identity: canonicalIdentity,
+        revision
+      };
+    }
+
+    const currentRevision = this._normalizeRevisionValue(currentTranscript.revision);
+    if (currentRevision == null) {
+      return {
+        status: 'missing_transcript_revision',
+        identity: canonicalIdentity,
+        revision
+      };
+    }
+
+    if (currentRevision > revision) {
+      return {
+        status: 'stale',
+        identity: canonicalIdentity,
+        revision,
+        currentRevision
+      };
+    }
+
+    return {
+      status: 'current',
+      identity: canonicalIdentity,
+      revision,
+      currentRevision
+    };
+  }
+
+  _normalizeCommittedTranslatedCaptionSegment({ captionSegment, sourceSegment, tabId }) {
+    const canonicalIdentity = this._normalizeCanonicalIdentity({
+      ...sourceSegment,
+      tabId: sourceSegment?.tabId ?? tabId
+    });
+    const revision = this._normalizeRevisionValue(sourceSegment?.revision);
+
+    if (!canonicalIdentity || revision == null) {
+      return null;
+    }
+
+    return {
+      ...captionSegment,
+      sessionId: sourceSegment.sessionId ?? captionSegment.sessionId ?? null,
+      tabId: sourceSegment.tabId ?? tabId ?? captionSegment.tabId ?? null,
+      videoFingerprint: sourceSegment.videoFingerprint ?? captionSegment.videoFingerprint ?? null,
+      segmentId: canonicalIdentity.segmentId,
+      revision,
+      sourceLanguage: captionSegment.sourceLanguage ?? sourceSegment.sourceLanguage ?? null,
+      targetLanguage: captionSegment.targetLanguage ?? sourceSegment.targetLanguage ?? null,
+      providerId: captionSegment.providerId ?? captionSegment.provider ?? sourceSegment.provider ?? null,
+      provider: captionSegment.provider ?? sourceSegment.provider ?? null
+    };
+  }
+
+  async _commitTranslatedCaptionSegment({ pageSession, tabId, sourceSegment, captionSegment }) {
+    const activeVideoSession = pageSession?.activeVideoSession;
+    if (!activeVideoSession || activeVideoSession.videoFingerprint !== sourceSegment.videoFingerprint) {
+      return {
+        status: 'missing_video_session'
+      };
+    }
+
+    const canonicalState = this._getCurrentCanonicalTranscriptState(pageSession, sourceSegment, tabId);
+
+    if (!canonicalState) {
+      const committedCaptionSegment = {
+        ...captionSegment
+      };
+
+      if (typeof activeVideoSession.addTranslatedCaptionSegment === 'function') {
+        activeVideoSession.addTranslatedCaptionSegment(committedCaptionSegment);
+      }
+
+      if (this.cache) {
+        this.cache.appendTranslatedCaptionSegment({
+          ...committedCaptionSegment,
+          sessionId: sourceSegment.sessionId,
+          tabId,
+          videoFingerprint: sourceSegment.videoFingerprint,
+          isIncognito: pageSession.isIncognito
+        }).catch((err) => {
+          logger.warn('Failed to persist translated caption segment to cache', {
+            sessionId: sourceSegment.sessionId,
+            error: err.message
+          });
+        });
+      }
+
+      if (tabId && this.browserApi?.tabs?.sendMessage) {
+        try {
+          this.browserApi.tabs.sendMessage(tabId, {
+            action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+            payload: {
+              sessionId: sourceSegment.sessionId,
+              videoFingerprint: sourceSegment.videoFingerprint,
+              segment: committedCaptionSegment
+            }
+          }).catch((err) => {
+            logger.debug('Failed to send translate result message to tab', { tabId, error: err.message });
+          });
+        } catch (err) {
+          logger.debug('Synchronous error broadcasting translate result to tab', { tabId, error: err.message });
+        }
+      }
+
+      return {
+        status: 'committed_batch'
+      };
+    }
+
+    if (canonicalState.status === 'stale') {
+      return canonicalState;
+    }
+
+    if (canonicalState.status === 'missing_transcript'
+      || canonicalState.status === 'missing_transcript_revision'
+      || canonicalState.status === 'missing_lookup') {
+      return canonicalState;
+    }
+
+    const committedCaptionSegment = this._normalizeCommittedTranslatedCaptionSegment({
+      captionSegment,
+      sourceSegment,
+      tabId
+    });
+
+    if (!committedCaptionSegment) {
+      return {
+        status: 'missing_canonical_identity'
+      };
+    }
+
+    if (typeof activeVideoSession.upsertTranslatedCaptionSegment === 'function') {
+      activeVideoSession.upsertTranslatedCaptionSegment(committedCaptionSegment, {
+        compareRevision: false
+      });
+    } else if (typeof activeVideoSession.addTranslatedCaptionSegment === 'function') {
+      activeVideoSession.addTranslatedCaptionSegment(committedCaptionSegment);
+    }
+
+    if (this.cache?.upsertTranslatedCaptionSegmentByIdentity) {
+      this.cache.upsertTranslatedCaptionSegmentByIdentity({
+        ...committedCaptionSegment,
+        isIncognito: pageSession.isIncognito
+      }, {
+        compareRevision: false
+      }).catch((err) => {
+        logger.warn('Failed to persist canonical translated caption segment to cache', {
+          sessionId: sourceSegment.sessionId,
+          error: err.message
+        });
+      });
+    } else if (this.cache) {
+      this.cache.appendTranslatedCaptionSegment({
+        ...committedCaptionSegment,
+        sessionId: sourceSegment.sessionId,
+        tabId,
+        videoFingerprint: sourceSegment.videoFingerprint,
+        isIncognito: pageSession.isIncognito
+      }).catch((err) => {
+        logger.warn('Failed to persist translated caption segment to cache', {
+          sessionId: sourceSegment.sessionId,
+          error: err.message
+        });
+      });
+    }
+
+    if (tabId && this.browserApi?.tabs?.sendMessage) {
+      try {
+        this.browserApi.tabs.sendMessage(tabId, {
+          action: 'LIVE_CAPTION_TRANSLATE_RESULT',
+          payload: {
+            sessionId: sourceSegment.sessionId,
+            videoFingerprint: sourceSegment.videoFingerprint,
+            segment: committedCaptionSegment
+          }
+        }).catch((err) => {
+          logger.debug('Failed to send translate result message to tab', { tabId, error: err.message });
+        });
+      } catch (err) {
+        logger.debug('Synchronous error broadcasting translate result to tab', { tabId, error: err.message });
+      }
+    }
+
+    return {
+      status: 'committed_canonical',
+      identity: canonicalState.identity,
+      revision: canonicalState.revision
+    };
+  }
+
   async handleTranscriptSegment(segment, { tabId } = {}) {
     let normalized;
     try {
@@ -136,53 +397,49 @@ export class LiveCaptionTranslationCoordinator {
             tabId
           });
 
-          // Attach to active video session state
-          const activeVideoSession = pageSession.activeVideoSession;
-          if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
-            activeVideoSession.addTranslatedCaptionSegment(captionSegment);
+          const commitResult = await this._commitTranslatedCaptionSegment({
+            pageSession,
+            tabId,
+            sourceSegment: segment,
+            captionSegment
+          });
 
-            // Persist to cache
-            if (this.cache) {
-              this.cache.appendTranslatedCaptionSegment({
-                ...captionSegment,
-                sessionId,
-                tabId,
-                videoFingerprint,
-                isIncognito: pageSession.isIncognito
-              }).catch((err) => {
-                logger.warn('Failed to persist translated caption segment to cache', {
-                  sessionId,
-                  error: err.message
-                });
-              });
-            }
-
-            // Broadcast translate result to the content script in the target tab
-            if (tabId && this.browserApi?.tabs?.sendMessage) {
-              try {
-                this.browserApi.tabs.sendMessage(tabId, {
-                  action: 'LIVE_CAPTION_TRANSLATE_RESULT',
-                  payload: {
-                    sessionId,
-                    videoFingerprint,
-                    segment: captionSegment
-                  }
-                }).catch((err) => {
-                  logger.debug('Failed to send translate result message to tab', { tabId, error: err.message });
-                });
-              } catch (err) {
-                logger.debug('Synchronous error broadcasting translate result to tab', { tabId, error: err.message });
-              }
-            }
+          if (commitResult.status === 'stale') {
+            logger.warn('Suppressed stale canonical translated caption segment', {
+              sessionId,
+              tabId,
+              videoFingerprint,
+              segmentId: commitResult.identity?.segmentId ?? segment.segmentId ?? null,
+              originatingRevision: commitResult.revision,
+              currentRevision: commitResult.currentRevision
+            });
+          } else if (commitResult.status === 'missing_transcript'
+            || commitResult.status === 'missing_transcript_revision'
+            || commitResult.status === 'missing_lookup'
+            || commitResult.status === 'missing_video_session') {
+            logger.warn('Suppressed canonical translated caption segment because current transcript state is unavailable', {
+              sessionId,
+              tabId,
+              videoFingerprint,
+              segmentId: segment.segmentId ?? null,
+              originatingRevision: segment.revision ?? null,
+              status: commitResult.status
+            });
           }
 
-          logger.info('Translation segment completed and recorded', {
-            sessionId,
-            startMs: segment.startMs,
-            endMs: segment.endMs,
-            provider: captionSegment.provider,
-            translatedLength: (captionSegment.translatedText || '').length
-          });
+          logger.info(
+            commitResult.status === 'committed_batch' || commitResult.status === 'committed_canonical'
+              ? 'Translation segment completed and recorded'
+              : 'Translation segment processed without committing translated caption output',
+            {
+              sessionId,
+              startMs: segment.startMs,
+              endMs: segment.endMs,
+              provider: captionSegment.provider,
+              translatedLength: (captionSegment.translatedText || '').length,
+              commitStatus: commitResult.status
+            }
+          );
 
         } catch (translationError) {
           if (abortController.signal.aborted || isCancellationError(translationError)) {

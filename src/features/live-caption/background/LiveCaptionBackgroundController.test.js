@@ -1099,7 +1099,8 @@ describe("live-caption background controller", () => {
       sessionQueues: new Map()
     };
     const cache = {
-      appendTranscriptSegment: vi.fn().mockResolvedValue(undefined)
+      appendTranscriptSegment: vi.fn().mockResolvedValue(undefined),
+      upsertTranscriptSegmentByIdentity: vi.fn().mockResolvedValue(undefined)
     };
     const controller = createController({ transcriptEventCoordinator, translationCoordinator, cache });
     const sttCoordinatorSpy = vi.spyOn(controller.sttCoordinator, "handleFinalizedChunk");
@@ -1161,9 +1162,19 @@ describe("live-caption background controller", () => {
       startMs: 0,
       endMs: 1000,
       text: "hello world",
-      providerId: "faster_whisper_streaming"
+      providerId: "faster_whisper_streaming",
+      revision: 1
     });
-    expect(cache.appendTranscriptSegment).toHaveBeenCalledWith(expect.objectContaining({
+    expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "segment-1"
+    })).toMatchObject({
+      revision: 1,
+      text: "hello world"
+    });
+    expect(cache.upsertTranscriptSegmentByIdentity).toHaveBeenCalledWith(expect.objectContaining({
       segmentId: "segment-1",
       sessionId: "session-1",
       tabId: 7,
@@ -1171,8 +1182,10 @@ describe("live-caption background controller", () => {
       segmentStartMs: 0,
       segmentEndMs: 1000,
       originalText: "hello world",
+      revision: 1,
       isIncognito: false
     }));
+    expect(cache.appendTranscriptSegment).not.toHaveBeenCalled();
     expect(translationCoordinator.handleTranscriptSegment).toHaveBeenCalledWith(
       expect.objectContaining({
         segmentId: "segment-1",
@@ -1183,6 +1196,7 @@ describe("live-caption background controller", () => {
         endMs: 1000,
         text: "hello world",
         providerId: "faster_whisper_streaming",
+        revision: 1,
         createdAt: 1234,
         isFinal: true
       }),
@@ -1264,7 +1278,7 @@ describe("live-caption background controller", () => {
     expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps streaming correction events out of translation", async () => {
+  it("routes canonical streaming correction events into translation and updates canonical transcript state", async () => {
     const transcriptEventCoordinator = {
       handleStreamingTranscriptEvent: vi.fn().mockResolvedValue({
         status: "canonical_correction",
@@ -1294,7 +1308,8 @@ describe("live-caption background controller", () => {
       sessionQueues: new Map()
     };
     const cache = {
-      appendTranscriptSegment: vi.fn().mockResolvedValue(undefined)
+      appendTranscriptSegment: vi.fn().mockResolvedValue(undefined),
+      upsertTranscriptSegmentByIdentity: vi.fn().mockResolvedValue(undefined)
     };
     const controller = createController({ transcriptEventCoordinator, translationCoordinator, cache });
     const sttCoordinatorSpy = vi.spyOn(controller.sttCoordinator, "handleFinalizedChunk");
@@ -1346,7 +1361,129 @@ describe("live-caption background controller", () => {
       })
     );
     await Promise.resolve();
+    expect(session.activeVideoSession.transcriptSegments).toHaveLength(1);
+    expect(session.activeVideoSession.transcriptSegments[0]).toMatchObject({
+      segmentId: "segment-1",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      startMs: 0,
+      endMs: 1000,
+      text: "hello world corrected",
+      providerId: "faster_whisper_streaming",
+      revision: 2
+    });
+    expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentId: "segment-1"
+    })).toMatchObject({
+      revision: 2,
+      text: "hello world corrected"
+    });
+    expect(cache.upsertTranscriptSegmentByIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      segmentId: "segment-1",
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      segmentStartMs: 0,
+      segmentEndMs: 1000,
+      originalText: "hello world corrected",
+      revision: 2,
+      isIncognito: false
+    }));
+    expect(cache.appendTranscriptSegment).not.toHaveBeenCalled();
+    expect(translationCoordinator.handleTranscriptSegment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        segmentId: "segment-1",
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        startMs: 0,
+        endMs: 1000,
+        text: "hello world corrected",
+        providerId: "faster_whisper_streaming",
+        revision: 2,
+        createdAt: 1250,
+        isFinal: true
+      }),
+      { tabId: 7 }
+    );
+    expect(sttCoordinatorSpy).not.toHaveBeenCalled();
+    expect(response.success).toBe(true);
+    expect(response.message).toBe("streaming_transcript_event_received");
+    expect(sendResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores stale canonical streaming correction events", async () => {
+    const transcriptEventCoordinator = {
+      handleStreamingTranscriptEvent: vi.fn().mockResolvedValue({
+        status: "stale_correction",
+        canonicalEvent: null
+      })
+    };
+    const translationCoordinator = {
+      handleTranscriptSegment: vi.fn().mockResolvedValue(undefined),
+      activeAbortControllers: new Map(),
+      sessionQueues: new Map()
+    };
+    const cache = {
+      appendTranscriptSegment: vi.fn().mockResolvedValue(undefined),
+      upsertTranscriptSegmentByIdentity: vi.fn().mockResolvedValue(undefined)
+    };
+    const controller = createController({ transcriptEventCoordinator, translationCoordinator, cache });
+    const sttCoordinatorSpy = vi.spyOn(controller.sttCoordinator, "handleFinalizedChunk");
+    const messageHandler = createMessageHandler();
+    controller.registerHandlers(messageHandler);
+    const session = controller.sessionManager.getOrCreateSession(7);
+    session.sessionId = "session-1";
+    session.replaceVideoSession(new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: "video-a"
+    }));
+
+    const sendResponse = vi.fn();
+    const response = await messageHandler._handleMessage(
+      {
+        action: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        type: LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_TRANSCRIPT_EVENT,
+        sessionId: "session-1",
+        tabId: 7,
+        videoFingerprint: "video-a",
+        event: {
+          eventId: "event-2",
+          eventType: "correction",
+          providerId: "faster_whisper_streaming",
+          providerMode: "streaming",
+          sessionId: "session-1",
+          tabId: 7,
+          videoFingerprint: "video-a",
+          segmentId: "segment-1",
+          revision: 1,
+          segmentStartMs: 0,
+          segmentEndMs: 1000,
+          supersedesEventId: "event-1",
+          supersedesSegmentId: "segment-1",
+          text: "hello world corrected",
+          createdAt: 1250,
+          metadata: {}
+        }
+      },
+      { tab: { id: 7 } },
+      sendResponse,
+    );
+
+    expect(transcriptEventCoordinator.handleStreamingTranscriptEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "correction",
+        sessionId: "session-1",
+        videoFingerprint: "video-a"
+      })
+    );
+    await Promise.resolve();
     expect(translationCoordinator.handleTranscriptSegment).not.toHaveBeenCalled();
+    expect(cache.upsertTranscriptSegmentByIdentity).not.toHaveBeenCalled();
     expect(cache.appendTranscriptSegment).not.toHaveBeenCalled();
     expect(session.activeVideoSession.transcriptSegments).toHaveLength(0);
     expect(sttCoordinatorSpy).not.toHaveBeenCalled();
