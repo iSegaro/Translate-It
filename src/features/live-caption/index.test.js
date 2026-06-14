@@ -114,6 +114,12 @@ import {
   STT_STREAMING_PROVIDER_STATES,
   STT_STREAMING_PROVIDER_EVENT_TYPES,
   normalizeStreamingProviderEventEnvelope,
+  StreamingAudioSource,
+  STREAMING_AUDIO_FORMATS,
+  STREAMING_AUDIO_SOURCE_STATES,
+  normalizeStreamingAudioFormat,
+  normalizeStreamingAudioChunk,
+  createStreamingAudioChunk,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_CAPABILITIES,
@@ -253,6 +259,12 @@ describe('live-caption feature shell', () => {
     expect(STT_STREAMING_PROVIDER_STATES).toBe(LiveCaptionFeature.contracts.STT_STREAMING_PROVIDER_STATES);
     expect(STT_STREAMING_PROVIDER_EVENT_TYPES).toBe(LiveCaptionFeature.contracts.STT_STREAMING_PROVIDER_EVENT_TYPES);
     expect(normalizeStreamingProviderEventEnvelope).toBe(LiveCaptionFeature.contracts.normalizeStreamingProviderEventEnvelope);
+    expect(StreamingAudioSource).toBe(LiveCaptionFeature.contracts.StreamingAudioSource);
+    expect(STREAMING_AUDIO_FORMATS).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_FORMATS);
+    expect(STREAMING_AUDIO_SOURCE_STATES).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_SOURCE_STATES);
+    expect(normalizeStreamingAudioFormat).toBe(LiveCaptionFeature.contracts.normalizeStreamingAudioFormat);
+    expect(normalizeStreamingAudioChunk).toBe(LiveCaptionFeature.contracts.normalizeStreamingAudioChunk);
+    expect(createStreamingAudioChunk).toBe(LiveCaptionFeature.contracts.createStreamingAudioChunk);
     expect(STT_PROVIDER_IDS).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_IDS);
     expect(STT_PROVIDER_MODES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_MODES);
     expect(STT_PROVIDER_CAPABILITIES).toBe(LiveCaptionFeature.contracts.STT_PROVIDER_CAPABILITIES);

@@ -15,6 +15,14 @@ import {
   normalizeStreamingProviderEventEnvelope
 } from './BaseStreamingSTTProvider.js';
 import {
+  StreamingAudioSource,
+  STREAMING_AUDIO_FORMATS,
+  STREAMING_AUDIO_SOURCE_STATES,
+  normalizeStreamingAudioFormat,
+  normalizeStreamingAudioChunk,
+  createStreamingAudioChunk
+} from './StreamingAudioSource.js';
+import {
   STT_PROVIDER_IDS,
   STT_PROVIDER_CAPABILITIES,
   STT_PROVIDER_MANIFEST,
@@ -53,6 +61,14 @@ export {
   normalizeStreamingProviderEventEnvelope
 } from './BaseStreamingSTTProvider.js';
 export {
+  StreamingAudioSource,
+  STREAMING_AUDIO_FORMATS,
+  STREAMING_AUDIO_SOURCE_STATES,
+  normalizeStreamingAudioFormat,
+  normalizeStreamingAudioChunk,
+  createStreamingAudioChunk
+} from './StreamingAudioSource.js';
+export {
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,
@@ -85,6 +101,12 @@ export default {
   STT_STREAMING_PROVIDER_STATES,
   STT_STREAMING_PROVIDER_EVENT_TYPES,
   normalizeStreamingProviderEventEnvelope,
+  StreamingAudioSource,
+  STREAMING_AUDIO_FORMATS,
+  STREAMING_AUDIO_SOURCE_STATES,
+  normalizeStreamingAudioFormat,
+  normalizeStreamingAudioChunk,
+  createStreamingAudioChunk,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,

@@ -7,6 +7,9 @@ import {
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS
 } from './liveCaptionSTTProviderContracts.js';
+import {
+  STREAMING_AUDIO_FORMATS
+} from './StreamingAudioSource.js';
 
 export {
   STT_PROVIDER_MODES,
@@ -44,6 +47,9 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK,
       STT_PROVIDER_CAPABILITIES.RETRY
     ]),
+    audioInputFormats: Object.freeze([STREAMING_AUDIO_FORMATS.WEBM_OPUS]),
+    preferredAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
+    fallbackAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
     supportsPartialResults: false,
     supportsCorrections: false,
     supportsReconnect: false,
@@ -67,6 +73,9 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
     ]),
+    audioInputFormats: Object.freeze([STREAMING_AUDIO_FORMATS.WEBM_OPUS]),
+    preferredAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
+    fallbackAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
     supportsPartialResults: false,
     supportsCorrections: false,
     supportsReconnect: false,
@@ -92,6 +101,9 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK,
       STT_PROVIDER_CAPABILITIES.RETRY
     ]),
+    audioInputFormats: Object.freeze([STREAMING_AUDIO_FORMATS.WEBM_OPUS]),
+    preferredAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
+    fallbackAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
     supportsPartialResults: false,
     supportsCorrections: false,
     supportsReconnect: false,
@@ -115,6 +127,12 @@ export const STT_PROVIDER_MANIFEST = Object.freeze({
       STT_PROVIDER_CAPABILITIES.FINAL_ONLY,
       STT_PROVIDER_CAPABILITIES.AUDIO_CHUNK
     ]),
+    audioInputFormats: Object.freeze([
+      STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ,
+      STREAMING_AUDIO_FORMATS.WEBM_OPUS
+    ]),
+    preferredAudioInputFormat: STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ,
+    fallbackAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS,
     supportsPartialResults: false,
     supportsCorrections: false,
     supportsReconnect: false,
