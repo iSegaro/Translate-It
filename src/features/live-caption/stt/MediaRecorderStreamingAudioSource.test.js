@@ -1,6 +1,6 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaRecorderStreamingAudioSource } from './MediaRecorderStreamingAudioSource.js';
-import { STREAMING_AUDIO_FORMATS, STREAMING_AUDIO_SOURCE_STATES } from '@/features/live-caption/stt/StreamingAudioSource.js';
+import { STREAMING_AUDIO_FORMATS, STREAMING_AUDIO_SOURCE_STATES } from './StreamingAudioSource.js';
 
 class MockMediaRecorder {
   static instances = [];

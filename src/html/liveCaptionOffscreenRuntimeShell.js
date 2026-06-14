@@ -23,7 +23,7 @@ import {
 import {
   FasterWhisperStreamingProvider
 } from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
-import { MediaRecorderStreamingAudioSource } from './MediaRecorderStreamingAudioSource.js';
+import { MediaRecorderStreamingAudioSource } from '@/features/live-caption/stt/MediaRecorderStreamingAudioSource.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
 const MIN_FINALIZED_SEGMENT_BYTES = 1024;

@@ -5,7 +5,7 @@ import {
   STREAMING_AUDIO_FORMATS,
   STREAMING_AUDIO_SOURCE_STATES,
   createStreamingAudioChunk
-} from '@/features/live-caption/stt/StreamingAudioSource.js';
+} from './StreamingAudioSource.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'MediaRecorderStreamingAudioSource');
 
