@@ -23,6 +23,7 @@ import {
 import {
   FasterWhisperStreamingProvider
 } from '@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js';
+import { MediaRecorderStreamingAudioSource } from './MediaRecorderStreamingAudioSource.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionOffscreenRuntimeShell');
 const MIN_FINALIZED_SEGMENT_BYTES = 1024;
@@ -76,15 +77,27 @@ export class LiveCaptionOffscreenRuntimeShell {
 
     // Media capture state properties
     this.mediaStream = null;
-    this.mediaRecorder = null;
     this.audioCtx = null;
     this.audioSource = null;
+    this.mediaRecorderStreamingAudioSource = null;
+    this.mediaRecorder = null;
     this.captureState = 'idle'; // idle | starting | capturing | paused | stopping | error
     this.chunkTimeslice = 3000;
     this.chunkStartMs = 0;
     this.segmentChunks = [];
     this.segmentBoundaryTimer = null;
-    this.segmentRotationPending = false;
+    this._segmentRotationPending = false;
+    Object.defineProperty(this, 'segmentRotationPending', {
+      configurable: true,
+      enumerable: true,
+      get: () => this._segmentRotationPending,
+      set: (value) => {
+        this._segmentRotationPending = Boolean(value);
+        if (this.mediaRecorderStreamingAudioSource) {
+          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this._segmentRotationPending;
+        }
+      }
+    });
     this.activeRecorderMimeType = 'audio/webm';
     this.streamingProviderFactory = typeof streamingProviderFactory === 'function'
       ? streamingProviderFactory
@@ -418,19 +431,11 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _stopCapture() {
-    this._clearSegmentTimer();
-    this.segmentRotationPending = false;
     this.captureState = 'stopping';
-    if (this.mediaRecorder) {
-      try {
-        if (this.mediaRecorder.state !== 'inactive') {
-          this.mediaRecorder.stop();
-        }
-      } catch (e) {
-        logger.warn('Error stopping MediaRecorder:', e);
-      }
-      this.mediaRecorder = null;
-    }
+    const streamingAudioSource = this.mediaRecorderStreamingAudioSource;
+    this.mediaRecorderStreamingAudioSource = null;
+    this.mediaRecorder = null;
+    void streamingAudioSource?.stop?.();
 
     if (this.mediaStream) {
       try {
@@ -463,34 +468,11 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _clearSegmentTimer() {
-    if (this.segmentBoundaryTimer) {
-      clearTimeout(this.segmentBoundaryTimer);
-      this.segmentBoundaryTimer = null;
-    }
+    this.mediaRecorderStreamingAudioSource?._clearSegmentTimer?.();
   }
 
   _scheduleSegmentBoundary() {
-    this._clearSegmentTimer();
-
-    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording' || !Number.isFinite(this.chunkTimeslice) || this.chunkTimeslice <= 0) {
-      return;
-    }
-
-    this.segmentBoundaryTimer = setTimeout(() => {
-      this.segmentBoundaryTimer = null;
-
-      if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') {
-        return;
-      }
-
-      this.segmentRotationPending = true;
-      try {
-        this.mediaRecorder.stop();
-      } catch (error) {
-        logger.warn('Error rotating MediaRecorder segment:', error);
-        this.segmentRotationPending = false;
-      }
-    }, this.chunkTimeslice);
+    this.mediaRecorderStreamingAudioSource?._scheduleSegmentBoundary?.();
   }
 
   _emitFinalizedChunk(chunkPayload, { sessionId, tabId, videoFingerprint, chunkStartMs, chunkEndMs, mimeType }) {
@@ -646,85 +628,56 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _handleMediaRecorderStop() {
-    const sessionId = this.sessionId;
-    const tabId = this.tabId;
-    const videoFingerprint = this.videoFingerprint;
-    const chunkStartMs = this.chunkStartMs;
-    const chunkEndMs = chunkStartMs + this.chunkTimeslice;
-    const mimeType = this.activeRecorderMimeType || this.mediaRecorder?.mimeType || 'audio/webm';
-    const bufferedChunks = Array.isArray(this.segmentChunks) ? this.segmentChunks.slice() : [];
-    const shouldRestart = this.segmentRotationPending && this.captureState === 'capturing' && Boolean(this.mediaStream);
-    const shouldEmit = this.segmentRotationPending && this.captureState === 'capturing';
-
-    this.segmentRotationPending = false;
-    this.segmentChunks = [];
-    this.mediaRecorder = null;
-
-    if (!shouldEmit) {
-      logger.debug('Skipping finalized MediaRecorder stop flush: not a segment rotation', {
-        sessionId,
-        tabId,
-        videoFingerprint,
-        chunkStartMs,
-        chunkEndMs,
-        captureState: this.captureState
-      });
-      if (shouldRestart && this.mediaStream && this.sessionId && this.tabId && this.videoFingerprint) {
-        this._startMediaRecorder(this.mediaStream, mimeType);
-      }
-      return;
-    }
-
-    if (bufferedChunks.length > 0) {
-      const finalizedBlob = new Blob(bufferedChunks, { type: mimeType });
-      this._emitFinalizedChunk(finalizedBlob, {
-        sessionId,
-        tabId,
-        videoFingerprint,
-        chunkStartMs,
-        chunkEndMs,
-        mimeType: finalizedBlob.type || mimeType
-      });
-      this.chunkStartMs = chunkEndMs;
-    } else {
-      logger.debug('Empty finalized MediaRecorder segment ignored', {
-        sessionId,
-        tabId,
-        videoFingerprint,
-        chunkStartMs,
-        chunkEndMs
-      });
-    }
-
-    if (shouldRestart && this.mediaStream && this.sessionId && this.tabId && this.videoFingerprint) {
-      this._startMediaRecorder(this.mediaStream, mimeType);
-    }
+    this.mediaRecorderStreamingAudioSource?._handleMediaRecorderStop?.();
   }
 
   _startMediaRecorder(stream, selectedMime) {
-    const recorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : {});
-    this.mediaRecorder = recorder;
-    this.activeRecorderMimeType = recorder.mimeType || selectedMime || 'audio/webm';
-    this.segmentChunks = [];
+    if (!this.mediaRecorderStreamingAudioSource) {
+      this.mediaRecorderStreamingAudioSource = new MediaRecorderStreamingAudioSource({
+        onChunk: (chunk) => {
+          this._emitFinalizedChunk(chunk.payload, {
+            sessionId: chunk.sessionId ?? this.sessionId,
+            tabId: chunk.tabId ?? this.tabId,
+            videoFingerprint: chunk.videoFingerprint ?? this.videoFingerprint,
+            chunkStartMs: chunk.chunkStartMs ?? this.chunkStartMs,
+            chunkEndMs: chunk.chunkEndMs ?? (this.chunkStartMs + this.chunkTimeslice),
+            mimeType: chunk.mimeType || chunk.payload?.type || selectedMime || this.activeRecorderMimeType || 'audio/webm'
+          });
+          if (Number.isFinite(chunk.chunkEndMs)) {
+            this.chunkStartMs = chunk.chunkEndMs;
+          } else if (Number.isFinite(chunk.chunkStartMs)) {
+            this.chunkStartMs = chunk.chunkStartMs;
+          }
+          this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+        },
+        onError: (error) => {
+          logger.error('MediaRecorder runtime error:', error);
+          this._handleCaptureError(error || new Error('MediaRecorder runtime error'));
+        },
+        onStateChange: (state) => {
+          this.captureState = state;
+        }
+      });
+    }
 
-    recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        this.segmentChunks.push(event.data);
+    return this.mediaRecorderStreamingAudioSource.start({
+      sessionId: this.sessionId,
+      tabId: this.tabId,
+      videoFingerprint: this.videoFingerprint,
+      audioFormat: 'webm-opus',
+      preferredAudioInputFormat: 'webm-opus',
+      fallbackAudioInputFormat: 'webm-opus'
+    }, {
+      stream,
+      mimeType: selectedMime,
+      chunkTimeslice: this.chunkTimeslice
+    }).then((snapshot) => {
+      if (this.mediaRecorderStreamingAudioSource) {
+        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
       }
-    };
-
-    recorder.onstop = () => {
-      this._handleMediaRecorderStop();
-    };
-
-    recorder.onerror = (event) => {
-      logger.error('MediaRecorder runtime error:', event.error);
-      this._handleCaptureError(event.error || new Error('MediaRecorder runtime error'));
-    };
-
-    recorder.start();
-    this._scheduleSegmentBoundary();
-    this.captureState = 'capturing';
+      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
+      return snapshot;
+    });
   }
 
   _handleCaptureError(error) {
@@ -835,7 +788,7 @@ export class LiveCaptionOffscreenRuntimeShell {
             selectedMime = ''; // Let browser decide
           }
 
-          this._startMediaRecorder(stream, selectedMime);
+      await this._startMediaRecorder(stream, selectedMime);
         } else {
           throw new Error('MediaRecorder is not supported in this environment');
         }
@@ -1252,11 +1205,9 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      if (this.mediaRecorderStreamingAudioSource?.recorderState === 'recording') {
         try {
-          this._clearSegmentTimer();
-          this.segmentRotationPending = false;
-          this.mediaRecorder.pause();
+          this.mediaRecorderStreamingAudioSource?.pause?.();
           this.captureState = 'paused';
         } catch (e) {
           logger.warn('Error pausing MediaRecorder:', e);
@@ -1314,10 +1265,9 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
+      if (this.mediaRecorderStreamingAudioSource?.recorderState === 'paused') {
         try {
-          this.mediaRecorder.resume();
-          this._scheduleSegmentBoundary();
+          this.mediaRecorderStreamingAudioSource?.resume?.();
           this.captureState = 'capturing';
         } catch (e) {
           logger.warn('Error resuming MediaRecorder:', e);

@@ -22,6 +22,7 @@ import {
   normalizeStreamingAudioChunk,
   createStreamingAudioChunk
 } from './StreamingAudioSource.js';
+import { MediaRecorderStreamingAudioSource } from '@/html/MediaRecorderStreamingAudioSource.js';
 import {
   STT_PROVIDER_IDS,
   STT_PROVIDER_CAPABILITIES,
@@ -68,6 +69,7 @@ export {
   normalizeStreamingAudioChunk,
   createStreamingAudioChunk
 } from './StreamingAudioSource.js';
+export { MediaRecorderStreamingAudioSource } from '@/html/MediaRecorderStreamingAudioSource.js';
 export {
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
@@ -107,6 +109,7 @@ export default {
   normalizeStreamingAudioFormat,
   normalizeStreamingAudioChunk,
   createStreamingAudioChunk,
+  MediaRecorderStreamingAudioSource,
   STT_PROVIDER_IDS,
   STT_PROVIDER_MODES,
   STT_PROVIDER_EXECUTION_LOCATIONS,

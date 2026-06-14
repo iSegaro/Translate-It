@@ -115,6 +115,7 @@ import {
   STT_STREAMING_PROVIDER_EVENT_TYPES,
   normalizeStreamingProviderEventEnvelope,
   StreamingAudioSource,
+  MediaRecorderStreamingAudioSource,
   STREAMING_AUDIO_FORMATS,
   STREAMING_AUDIO_SOURCE_STATES,
   normalizeStreamingAudioFormat,
@@ -260,6 +261,7 @@ describe('live-caption feature shell', () => {
     expect(STT_STREAMING_PROVIDER_EVENT_TYPES).toBe(LiveCaptionFeature.contracts.STT_STREAMING_PROVIDER_EVENT_TYPES);
     expect(normalizeStreamingProviderEventEnvelope).toBe(LiveCaptionFeature.contracts.normalizeStreamingProviderEventEnvelope);
     expect(StreamingAudioSource).toBe(LiveCaptionFeature.contracts.StreamingAudioSource);
+    expect(MediaRecorderStreamingAudioSource).toBe(LiveCaptionFeature.contracts.MediaRecorderStreamingAudioSource);
     expect(STREAMING_AUDIO_FORMATS).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_FORMATS);
     expect(STREAMING_AUDIO_SOURCE_STATES).toBe(LiveCaptionFeature.contracts.STREAMING_AUDIO_SOURCE_STATES);
     expect(normalizeStreamingAudioFormat).toBe(LiveCaptionFeature.contracts.normalizeStreamingAudioFormat);
