@@ -35,12 +35,52 @@ function normalizeProviderDefinition(providerDefinition = null) {
   });
 }
 
+function createAudioWorkletSupportProbeContext() {
+  const AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext;
+
+  if (typeof AudioContextCtor !== 'function') {
+    return null;
+  }
+
+  try {
+    return new AudioContextCtor({ latencyHint: 'interactive' });
+  } catch (error) {
+    try {
+      return new AudioContextCtor();
+    } catch {
+      logger.debug('AudioWorklet support probe failed to create AudioContext', {
+        error: error?.message ?? null
+      });
+      return null;
+    }
+  }
+}
+
 function isAudioWorkletSupported(audioContext = null) {
   if (typeof globalThis.AudioWorkletNode !== 'function') {
     return false;
   }
 
-  return Boolean(audioContext?.audioWorklet && typeof audioContext.audioWorklet.addModule === 'function');
+  if (audioContext?.audioWorklet && typeof audioContext.audioWorklet.addModule === 'function') {
+    return true;
+  }
+
+  const probeContext = createAudioWorkletSupportProbeContext();
+  if (!probeContext) {
+    return false;
+  }
+
+  const supported = Boolean(probeContext.audioWorklet && typeof probeContext.audioWorklet.addModule === 'function');
+
+  if (typeof probeContext.close === 'function') {
+    try {
+      void Promise.resolve(probeContext.close()).catch(() => {});
+    } catch {
+      // Best-effort probe cleanup.
+    }
+  }
+
+  return supported;
 }
 
 function createMediaRecorderSource({ sourceId, onChunk, onError, onStateChange, logger: sourceLogger } = {}) {

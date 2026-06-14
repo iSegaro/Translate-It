@@ -24,13 +24,21 @@ describe('StreamingAudioSourceSelector', () => {
       resume: vi.fn()
     }));
     vi.stubGlobal('AudioWorkletNode', function AudioWorkletNode() {});
+    vi.stubGlobal('AudioContext', class AudioContext {
+      constructor() {
+        this.audioWorklet = {
+          addModule: vi.fn().mockResolvedValue(undefined)
+        };
+        this.close = vi.fn().mockResolvedValue(undefined);
+      }
+    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('prefers AudioWorklet PCM16 when supported by the provider and environment', () => {
+  it('prefers AudioWorklet PCM16 when supported by the provider and environment without a pre-existing audioContext', () => {
     const selector = new StreamingAudioSourceSelector({
       mediaRecorderFactory,
       audioWorkletFactory
@@ -47,11 +55,31 @@ describe('StreamingAudioSourceSelector', () => {
         ],
         preferredAudioInputFormat: STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ,
         fallbackAudioInputFormat: STREAMING_AUDIO_FORMATS.WEBM_OPUS
+      }
+    });
+
+    expect(selection.sourceType).toBe('audio_worklet_pcm16');
+    expect(selection.selectedAudioFormat).toBe(STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ);
+    expect(selection.canUseAudioWorklet).toBe(true);
+    expect(audioWorkletFactory).toHaveBeenCalledTimes(1);
+    expect(mediaRecorderFactory).not.toHaveBeenCalled();
+  });
+
+  it('does not depend on the loopback audioContext when probing PCM support', () => {
+    const selector = new StreamingAudioSourceSelector({
+      mediaRecorderFactory,
+      audioWorkletFactory
+    });
+
+    const selection = selector.select({
+      providerDefinition: {
+        id: 'faster_whisper_streaming',
+        mode: 'streaming',
+        executionLocation: 'offscreen',
+        audioInputFormats: [STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ]
       },
       audioContext: {
-        audioWorklet: {
-          addModule: vi.fn()
-        }
+        // Simulate a loopback context that lacks audioWorklet support.
       }
     });
 
@@ -75,11 +103,6 @@ describe('StreamingAudioSourceSelector', () => {
         mode: 'streaming',
         executionLocation: 'offscreen',
         audioInputFormats: [STREAMING_AUDIO_FORMATS.PCM16_MONO_16KHZ]
-      },
-      audioContext: {
-        audioWorklet: {
-          addModule: vi.fn()
-        }
       }
     });
 
