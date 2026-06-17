@@ -73,6 +73,155 @@ export class LiveCaptionTranslationCoordinator {
     return Number.isFinite(revision) ? revision : null;
   }
 
+  _normalizeQueuedCanonicalState(segment, tabId = null) {
+    if (!segment || typeof segment !== 'object') {
+      return null;
+    }
+
+    const canonicalIdentity = this._normalizeCanonicalIdentity({
+      ...segment,
+      tabId: segment?.tabId ?? tabId
+    });
+    const revision = this._normalizeRevisionValue(segment?.revision);
+
+    if (!canonicalIdentity || revision == null) {
+      return null;
+    }
+
+    return {
+      identity: canonicalIdentity,
+      revision,
+      key: [
+        canonicalIdentity.sessionId,
+        canonicalIdentity.tabId,
+        canonicalIdentity.videoFingerprint,
+        canonicalIdentity.segmentId,
+        revision
+      ].join('::')
+    };
+  }
+
+  _findQueuedCanonicalSegmentIndex(queue, segment, tabId = null) {
+    const queuedState = this._normalizeQueuedCanonicalState(segment, tabId);
+    if (!queuedState || !queue?.segments?.length) {
+      return -1;
+    }
+
+    return queue.segments.findIndex((queuedSegment) => {
+      const candidateState = this._normalizeQueuedCanonicalState(queuedSegment, tabId);
+      return Boolean(candidateState && candidateState.key === queuedState.key);
+    });
+  }
+
+  _pruneQueuedSegments(queue, pageSession, tabId, videoFingerprint) {
+    if (!queue?.segments?.length) {
+      return {
+        prunedCount: 0,
+        duplicateCount: 0
+      };
+    }
+
+    const activeVideoSession = pageSession?.activeVideoSession;
+    if (!activeVideoSession || activeVideoSession.videoFingerprint !== videoFingerprint) {
+      return {
+        prunedCount: 0,
+        duplicateCount: 0
+      };
+    }
+
+    const prunedSegments = [];
+    const seenCanonicalKeys = new Set();
+    let prunedCount = 0;
+    let duplicateCount = 0;
+
+    for (const queuedSegment of queue.segments) {
+      const queuedState = this._normalizeQueuedCanonicalState(queuedSegment, tabId);
+      if (!queuedState) {
+        prunedSegments.push(queuedSegment);
+        continue;
+      }
+
+      const currentTranscript = activeVideoSession.getTranscriptSegmentByIdentity?.(queuedState.identity);
+      if (!currentTranscript) {
+        prunedCount += 1;
+        logger.debug('Dropped queued canonical segment because current transcript is missing', {
+          sessionId: queuedState.identity.sessionId,
+          tabId: queuedState.identity.tabId,
+          videoFingerprint: queuedState.identity.videoFingerprint,
+          segmentId: queuedState.identity.segmentId,
+          revision: queuedState.revision
+        });
+        continue;
+      }
+
+      const currentRevision = this._normalizeRevisionValue(currentTranscript.revision);
+      if (currentRevision == null || currentRevision > queuedState.revision) {
+        prunedCount += 1;
+        logger.debug('Dropped stale queued canonical segment before translation', {
+          sessionId: queuedState.identity.sessionId,
+          tabId: queuedState.identity.tabId,
+          videoFingerprint: queuedState.identity.videoFingerprint,
+          segmentId: queuedState.identity.segmentId,
+          queuedRevision: queuedState.revision,
+          currentRevision
+        });
+        continue;
+      }
+
+      if (seenCanonicalKeys.has(queuedState.key)) {
+        duplicateCount += 1;
+        logger.debug('Dropped duplicate queued canonical segment before translation', {
+          sessionId: queuedState.identity.sessionId,
+          tabId: queuedState.identity.tabId,
+          videoFingerprint: queuedState.identity.videoFingerprint,
+          segmentId: queuedState.identity.segmentId,
+          revision: queuedState.revision
+        });
+        continue;
+      }
+
+      seenCanonicalKeys.add(queuedState.key);
+      prunedSegments.push(queuedSegment);
+    }
+
+    if (prunedCount > 0 || duplicateCount > 0) {
+      queue.segments = prunedSegments;
+    }
+
+    return {
+      prunedCount,
+      duplicateCount
+    };
+  }
+
+  _dropOldestQueuedSegment(queue, {
+    sessionId = null,
+    tabId = null,
+    videoFingerprint = null,
+    reason = 'queue_overflow'
+  } = {}) {
+    if (!queue?.segments?.length) {
+      return null;
+    }
+
+    const evictionIndex = queue.processing && queue.segments.length > 1 ? 1 : 0;
+    const [droppedSegment] = queue.segments.splice(evictionIndex, 1);
+
+    if (droppedSegment) {
+      logger.warn('Dropped queued transcript segment to preserve bounded backpressure', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        reason,
+        droppedSegmentId: droppedSegment.segmentId ?? null,
+        droppedRevision: droppedSegment.revision ?? null,
+        queueDepth: queue.segments.length
+      });
+    }
+
+    return droppedSegment ?? null;
+  }
+
   _getCurrentCanonicalTranscriptState(pageSession, sourceSegment, tabId) {
     const activeVideoSession = pageSession?.activeVideoSession;
     if (!activeVideoSession) {
@@ -325,15 +474,28 @@ export class LiveCaptionTranslationCoordinator {
     }
 
     const queue = this.getOrCreateQueue(sessionId);
+    this._pruneQueuedSegments(queue, pageSession, tabId, videoFingerprint);
+
+    const incomingQueuedState = this._normalizeQueuedCanonicalState(segment, tabId);
+    if (incomingQueuedState && this._findQueuedCanonicalSegmentIndex(queue, segment, tabId) !== -1) {
+      logger.debug('Dropping duplicate queued canonical transcript segment before translation', {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        segmentId: incomingQueuedState.identity.segmentId,
+        revision: incomingQueuedState.revision
+      });
+      return;
+    }
 
     // Bounded Queue Check
     if (queue.segments.length >= this.maxPendingSegments) {
-      const errorMsg = `Translation queue overflow: pending segments count reached limit of ${this.maxPendingSegments}`;
-      logger.error(errorMsg, { sessionId, tabId });
-      const error = new Error(errorMsg);
-      error.code = 'translation_queue_overflow';
-      this.failClosed(sessionId, tabId, error);
-      throw error;
+      this._dropOldestQueuedSegment(queue, {
+        sessionId,
+        tabId,
+        videoFingerprint,
+        reason: 'queue_overflow_soft_eviction'
+      });
     }
 
     queue.segments.push(segment);
@@ -363,8 +525,6 @@ export class LiveCaptionTranslationCoordinator {
 
     try {
       while (queue.segments.length > 0) {
-        const segment = queue.segments[0];
-
         // Re-validate session state before executing request
         const pageSession = this.sessionManager.getSession(tabId);
         if (!pageSession || pageSession.sessionId !== sessionId) {
@@ -380,6 +540,13 @@ export class LiveCaptionTranslationCoordinator {
           break;
         }
 
+        this._pruneQueuedSegments(queue, pageSession, tabId, videoFingerprint);
+
+        if (queue.segments.length === 0) {
+          break;
+        }
+
+        const segment = queue.segments[0];
         const abortController = new AbortController();
         this.activeAbortControllers.set(sessionId, abortController);
 
