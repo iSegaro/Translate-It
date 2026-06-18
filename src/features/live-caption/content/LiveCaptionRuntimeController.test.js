@@ -223,6 +223,7 @@ function createVideo({
   paused = false,
   muted = false,
   volume = 1,
+  playbackRate = 1,
   width = 640,
   height = 360,
   top = 0,
@@ -253,6 +254,11 @@ function createVideo({
     configurable: true,
     writable: true,
     value: volume
+  });
+  Object.defineProperty(video, 'playbackRate', {
+    configurable: true,
+    writable: true,
+    value: playbackRate
   });
   video.getBoundingClientRect = vi.fn(() => ({
     top,
@@ -1466,7 +1472,7 @@ describe('live-caption runtime controller', () => {
   describe('Phase 3: mediaTimelineMappingStatus validity transitions', () => {
     it('sets mediaTimelineMappingStatus to valid if mediaAnchorMs is present on start', async () => {
       const store = useLiveCaptionStore();
-      const video = createVideo({ src: 'https://example.com/a.mp4' });
+      const video = createVideo({ src: 'https://example.com/a.mp4', playbackRate: 1.5 });
       video.currentTime = 5.5;
       document.body.append(video);
 
@@ -1480,6 +1486,7 @@ describe('live-caption runtime controller', () => {
 
       await controller.start({ tabId: 11 });
       expect(store.mediaTimelineMappingStatus).toBe('valid');
+      expect(controller.pageSession.activeVideoSession.getTimelineAnchors()).toHaveLength(0);
     });
 
     it('sets mediaTimelineMappingStatus to invalid on seeked, seeking, ratechange, and pause events', async () => {

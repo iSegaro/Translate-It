@@ -74,6 +74,9 @@ export function createVideoCaptionSessionSnapshot(session) {
     translatedCaptionSegments: Array.isArray(session.translatedCaptionSegments)
       ? session.translatedCaptionSegments.map((segment) => ({ ...segment }))
       : [],
+    timelineAnchors: Array.isArray(session.timelineAnchors)
+      ? session.timelineAnchors.map((anchor) => ({ ...anchor }))
+      : [],
     seekState: session.seekState ? { ...session.seekState } : null,
     lastError: session.lastError ? { ...session.lastError } : null,
     lastCleanupReason: session.lastCleanupReason ?? null,

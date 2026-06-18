@@ -7,10 +7,12 @@ import {
   createLiveCaptionSessionId,
   createVideoCaptionSessionSnapshot
 } from './contracts.js';
+import { normalizeLiveCaptionTimelineAnchor } from './LiveCaptionTimelineProjection.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'VideoCaptionSession');
 
 let liveCaptionSegmentCounter = 0;
+let liveCaptionTimelineAnchorCounter = 0;
 
 function normalizeCanonicalIdentity(input) {
   if (!input || typeof input !== 'object') {
@@ -166,6 +168,13 @@ function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
   };
 }
 
+function createTimelineAnchorId(sessionId, tabId) {
+  liveCaptionTimelineAnchorCounter += 1;
+  const timestamp = Date.now().toString(36);
+  const counter = liveCaptionTimelineAnchorCounter.toString(36);
+  return `live-caption:timeline-anchor:${sessionId ?? 'session'}:${tabId ?? 'tab'}:${timestamp}:${counter}`;
+}
+
 /**
  * Lightweight per-video live-caption session model.
  * Owns video fingerprint, segment accumulation, and replay metadata.
@@ -189,6 +198,7 @@ export class VideoCaptionSession {
     };
     this.transcriptSegments = [];
     this.translatedCaptionSegments = [];
+    this.timelineAnchors = [];
     this.transcriptSegmentIndexByIdentity = new Map();
     this.translatedCaptionSegmentIndexByIdentity = new Map();
     this.seekState = null;
@@ -314,6 +324,41 @@ export class VideoCaptionSession {
     return normalizedSegment;
   }
 
+  addTimelineAnchor(anchor) {
+    const normalizedAnchor = normalizeLiveCaptionTimelineAnchor({
+      ...anchor,
+      anchorId: anchor?.anchorId ?? createTimelineAnchorId(this.sessionId, this.tabId)
+    });
+
+    if (!normalizedAnchor) {
+      return null;
+    }
+
+    this.timelineAnchors = [...this.timelineAnchors, normalizedAnchor];
+    this.touch();
+
+    logger.debug('Timeline anchor accumulated', {
+      tabId: this.tabId,
+      sessionId: this.sessionId,
+      videoFingerprint: this.videoFingerprint,
+      anchorCount: this.timelineAnchors.length,
+      anchorId: normalizedAnchor.anchorId,
+      reason: normalizedAnchor.reason ?? null
+    });
+
+    return normalizedAnchor;
+  }
+
+  getTimelineAnchors() {
+    return this.timelineAnchors.map((anchor) => ({ ...anchor }));
+  }
+
+  clearTimelineAnchors() {
+    this.timelineAnchors = [];
+    this.touch();
+    return this.getTimelineAnchors();
+  }
+
   rebuildCanonicalIndexes() {
     this.transcriptSegmentIndexByIdentity.clear();
     this.translatedCaptionSegmentIndexByIdentity.clear();
@@ -351,7 +396,8 @@ export class VideoCaptionSession {
       transcriptCount: this.transcriptSegments.length,
       translatedCaptionCount: this.translatedCaptionSegments.length,
       indexedTranscriptCount: this.transcriptSegmentIndexByIdentity.size,
-      indexedTranslatedCaptionCount: this.translatedCaptionSegmentIndexByIdentity.size
+      indexedTranslatedCaptionCount: this.translatedCaptionSegmentIndexByIdentity.size,
+      timelineAnchorCount: this.timelineAnchors.length
     };
   }
 

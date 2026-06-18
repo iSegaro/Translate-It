@@ -26,6 +26,14 @@ describe('live-caption session contracts', () => {
   it('builds page and video snapshots', () => {
     const pageSession = new PageLiveCaptionSession({ tabId: 42 });
     const videoSession = new VideoCaptionSession({ tabId: 42, videoFingerprint: 'video-42' });
+    videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: 'session-42',
+      videoFingerprint: 'video-42'
+    });
 
     pageSession.attachVideoSession(videoSession);
 
@@ -37,5 +45,6 @@ describe('live-caption session contracts', () => {
     expect(pageSnapshot.activeVideoSession.videoFingerprint).toBe('video-42');
     expect(videoSnapshot.tabId).toBe(42);
     expect(videoSnapshot.videoFingerprint).toBe('video-42');
+    expect(videoSnapshot.timelineAnchors).toHaveLength(1);
   });
 });

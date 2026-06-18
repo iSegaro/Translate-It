@@ -1176,6 +1176,9 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         sessionId: this.pageSession.sessionId,
         videoFingerprint: this.currentVideoFingerprint,
         mediaAnchorMs: isAnchorValid ? mediaAnchorMs : null,
+        playbackRate: Number.isFinite(Number(this.currentVideoElement?.playbackRate))
+          ? Number(this.currentVideoElement.playbackRate)
+          : 1,
         reason: 'start'
       });
 

@@ -126,6 +126,68 @@ describe('live-caption session model', () => {
     expect(seekState.seekToMs).toBe(1200);
   });
 
+  it('stores valid timeline anchors and preserves insertion order', () => {
+    const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
+
+    const firstAnchor = videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      sourceTimelineType: 'provider'
+    });
+    const secondAnchor = videoSession.addTimelineAnchor({
+      reason: 'resume',
+      sourceMs: 1000,
+      mediaMs: 6000,
+      playbackRate: 1,
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      sourceTimelineType: 'provider'
+    });
+
+    expect(firstAnchor.anchorId).toContain('live-caption:timeline-anchor');
+    expect(secondAnchor.anchorId).toContain('live-caption:timeline-anchor');
+    expect(videoSession.getTimelineAnchors()).toHaveLength(2);
+    expect(videoSession.getTimelineAnchors()[0]).toMatchObject({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000
+    });
+    expect(videoSession.getTimelineAnchors()[1]).toMatchObject({
+      reason: 'resume',
+      sourceMs: 1000,
+      mediaMs: 6000
+    });
+  });
+
+  it('ignores invalid timeline anchors and can clear anchors', () => {
+    const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
+
+    expect(videoSession.addTimelineAnchor({
+      anchorId: ' ',
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1
+    })).toBe(null);
+    expect(videoSession.getTimelineAnchors()).toHaveLength(0);
+
+    videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1
+    });
+    expect(videoSession.getTimelineAnchors()).toHaveLength(1);
+
+    const cleared = videoSession.clearTimelineAnchors();
+    expect(cleared).toEqual([]);
+    expect(videoSession.getTimelineAnchors()).toHaveLength(0);
+  });
+
   it('keeps append-only transcript and translated caption behavior unchanged', () => {
     const videoSession = new VideoCaptionSession({
       tabId: canonicalIdentity.tabId,

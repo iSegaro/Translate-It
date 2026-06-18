@@ -93,7 +93,8 @@ function normalizeRuntimeData(data = {}) {
     requestSource: data.requestSource ?? 'content',
     metadata: data.metadata ? { ...data.metadata } : null,
     streamId: data.streamId ?? null,
-    mediaAnchorMs: data.mediaAnchorMs ?? null
+    mediaAnchorMs: data.mediaAnchorMs ?? null,
+    playbackRate: data.playbackRate ?? null
   };
 }
 

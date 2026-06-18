@@ -241,7 +241,8 @@ describe("live-caption background controller", () => {
         tabId: 7,
         sessionId: "session-1",
         videoFingerprint: "video-a",
-        mediaAnchorMs: 3000
+        mediaAnchorMs: 3000,
+        playbackRate: 1.5
       }),
       { tab: { id: 7 } },
     );
@@ -249,6 +250,33 @@ describe("live-caption background controller", () => {
     expect(session).not.toBeNull();
     expect(session.activeVideoSession).not.toBeNull();
     expect(session.activeVideoSession.mediaAnchorMs).toBe(3000);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+    expect(session.activeVideoSession.getTimelineAnchors()[0]).toMatchObject({
+      reason: "start",
+      sourceMs: 0,
+      mediaMs: 3000,
+      playbackRate: 1.5,
+      sessionId: "session-1",
+      videoFingerprint: "video-a"
+    });
+  });
+
+  it("does not create a start timeline anchor when mediaAnchorMs is invalid", async () => {
+    const controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: null,
+        playbackRate: 1.5
+      }),
+      { tab: { id: 7 } },
+    );
+    const session = controller.sessionManager.getSession(7);
+    expect(session).not.toBeNull();
+    expect(session.activeVideoSession).not.toBeNull();
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(0);
   });
 
   it("routes finalized chunks through the normal message-handler path", async () => {

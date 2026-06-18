@@ -968,6 +968,32 @@ export class LiveCaptionBackgroundController {
         }
 
         const activeVideoSession = session.activeVideoSession;
+        const rawMediaAnchorMs = request.data.mediaAnchorMs;
+        const mediaAnchorMs = rawMediaAnchorMs == null || rawMediaAnchorMs === ''
+          ? null
+          : Number(rawMediaAnchorMs);
+        const playbackRate = Number.isFinite(Number(request.data.playbackRate))
+          ? Number(request.data.playbackRate)
+          : 1;
+        if (
+          activeVideoSession &&
+          Number.isFinite(mediaAnchorMs) &&
+          typeof activeVideoSession.getTimelineAnchors === 'function' &&
+          activeVideoSession.getTimelineAnchors().length === 0
+        ) {
+          activeVideoSession.addTimelineAnchor({
+            reason: 'start',
+            sourceMs: 0,
+            mediaMs: mediaAnchorMs,
+            playbackRate,
+            sessionId: session.sessionId,
+            videoFingerprint,
+            sourceTimelineType: null,
+            sourceClockId: null,
+            sourceResetId: null
+          });
+        }
+
         if (
           activeVideoSession &&
           activeVideoSession.transcriptSegments.length === 0 &&
