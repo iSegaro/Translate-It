@@ -11,6 +11,11 @@ import {
   createVideoFingerprint
 } from './VideoFingerprint.js';
 import {
+  projectLiveCaptionSegmentToMediaTime,
+  normalizeLiveCaptionTimelineAnchor,
+  isLiveCaptionTimelineAnchorCompatible
+} from './LiveCaptionTimelineProjection.js';
+import {
   LiveCaptionCacheKeys,
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
@@ -65,6 +70,11 @@ export {
   createVideoFingerprint
 } from './VideoFingerprint.js';
 export {
+  projectLiveCaptionSegmentToMediaTime,
+  normalizeLiveCaptionTimelineAnchor,
+  isLiveCaptionTimelineAnchorCompatible
+} from './LiveCaptionTimelineProjection.js';
+export {
   LiveCaptionCacheKeys,
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
@@ -113,6 +123,9 @@ export default {
   VideoFingerprint,
   describeVideoFingerprint,
   createVideoFingerprint,
+  projectLiveCaptionSegmentToMediaTime,
+  normalizeLiveCaptionTimelineAnchor,
+  isLiveCaptionTimelineAnchorCompatible,
   LiveCaptionCacheKeys,
   createLiveCaptionVideoCacheKey,
   createLiveCaptionSegmentCacheKey,
