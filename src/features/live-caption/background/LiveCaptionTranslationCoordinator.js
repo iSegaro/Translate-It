@@ -307,7 +307,12 @@ export class LiveCaptionTranslationCoordinator {
       sourceLanguage: captionSegment.sourceLanguage ?? sourceSegment.sourceLanguage ?? null,
       targetLanguage: captionSegment.targetLanguage ?? sourceSegment.targetLanguage ?? null,
       providerId: captionSegment.providerId ?? captionSegment.provider ?? sourceSegment.provider ?? null,
-      provider: captionSegment.provider ?? sourceSegment.provider ?? null
+      provider: captionSegment.provider ?? sourceSegment.provider ?? null,
+      providerUtteranceId: sourceSegment.providerUtteranceId ?? null,
+      providerSequence: sourceSegment.providerSequence ?? null,
+      providerRevision: sourceSegment.providerRevision ?? null,
+      providerStreamId: sourceSegment.providerStreamId ?? null,
+      providerChannel: sourceSegment.providerChannel ?? null
     };
   }
 
@@ -325,7 +330,12 @@ export class LiveCaptionTranslationCoordinator {
       const committedCaptionSegment = {
         ...captionSegment,
         mediaStartMs: sourceSegment.mediaStartMs ?? captionSegment.mediaStartMs ?? null,
-        mediaEndMs: sourceSegment.mediaEndMs ?? captionSegment.mediaEndMs ?? null
+        mediaEndMs: sourceSegment.mediaEndMs ?? captionSegment.mediaEndMs ?? null,
+        providerUtteranceId: sourceSegment.providerUtteranceId ?? null,
+        providerSequence: sourceSegment.providerSequence ?? null,
+        providerRevision: sourceSegment.providerRevision ?? null,
+        providerStreamId: sourceSegment.providerStreamId ?? null,
+        providerChannel: sourceSegment.providerChannel ?? null
       };
 
       if (typeof activeVideoSession.addTranslatedCaptionSegment === 'function') {

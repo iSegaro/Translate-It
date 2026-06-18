@@ -314,7 +314,12 @@ describe('live-caption cache layer', () => {
       originalText: 'Hello',
       sourceLanguage: 'en',
       audio: new Uint8Array([1, 2, 3]),
-      stream: { id: 'raw-stream' }
+      stream: { id: 'raw-stream' },
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
     });
 
     await flush();
@@ -323,7 +328,12 @@ describe('live-caption cache layer', () => {
       tabId: 1,
       videoFingerprint: 'video-a',
       sessionId: 'session-a',
-      originalText: 'Hello'
+      originalText: 'Hello',
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
     });
     expect(result.audio).toBeUndefined();
     expect(result.stream).toBeUndefined();
@@ -332,12 +342,22 @@ describe('live-caption cache layer', () => {
     const persisted = [...store.records.values()][0];
     expect(persisted.audio).toBeUndefined();
     expect(persisted.stream).toBeUndefined();
+    expect(persisted.providerUtteranceId).toBe('utt-123');
+    expect(persisted.providerSequence).toBe(12);
+    expect(persisted.providerRevision).toBe(3);
+    expect(persisted.providerStreamId).toBe('stream-xyz');
+    expect(persisted.providerChannel).toBe(2);
 
     const records = await repository.getByVideo({ tabId: 1, videoFingerprint: 'video-a' });
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       originalText: 'Hello',
-      sourceLanguage: 'en'
+      sourceLanguage: 'en',
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
     });
 
     await repository.clearVideo({ tabId: 1, videoFingerprint: 'video-a' });
@@ -369,13 +389,29 @@ describe('live-caption cache layer', () => {
       translatedText: 'ترجمه',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
-      provider: 'openai'
+      provider: 'openai',
+      providerUtteranceId: 'utt-456',
+      providerSequence: 13,
+      providerRevision: 4,
+      providerStreamId: 'stream-wxy',
+      providerChannel: 3
     });
 
     await flush();
 
+    const tRecords = await translationRepository.getByVideo({ tabId: 1, videoFingerprint: 'video-b' });
+    expect(tRecords).toHaveLength(1);
+    expect(tRecords[0]).toMatchObject({
+      originalText: 'Original',
+      translatedText: 'ترجمه',
+      providerUtteranceId: 'utt-456',
+      providerSequence: 13,
+      providerRevision: 4,
+      providerStreamId: 'stream-wxy',
+      providerChannel: 3
+    });
+
     expect(await transcriptRepository.getByVideo({ tabId: 1, videoFingerprint: 'video-b' })).toHaveLength(1);
-    expect(await translationRepository.getByVideo({ tabId: 1, videoFingerprint: 'video-b' })).toHaveLength(1);
     expect(getStore(indexedDbMock, 'transcripts').records.size).toBe(1);
     expect(getStore(indexedDbMock, 'translations').records.size).toBe(1);
 

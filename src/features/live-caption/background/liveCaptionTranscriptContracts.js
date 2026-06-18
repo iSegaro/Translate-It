@@ -186,6 +186,15 @@ export function normalizeLiveCaptionTranscriptEvent(input = {}) {
       : null,
     createdAt,
     updatedAt,
+    providerUtteranceId: normalizeOptionalString(event.providerUtteranceId),
+    providerSequence: normalizeOptionalNumber(event.providerSequence),
+    providerRevision: normalizeOptionalNumber(event.providerRevision),
+    providerStreamId: normalizeOptionalString(event.providerStreamId),
+    providerChannel: typeof event.providerChannel === 'number'
+      ? event.providerChannel
+      : (typeof event.providerChannel === 'string' && event.providerChannel.trim().length > 0
+        ? event.providerChannel.trim()
+        : null),
     metadata: event.metadata && typeof event.metadata === 'object' ? { ...event.metadata } : {}
   };
 

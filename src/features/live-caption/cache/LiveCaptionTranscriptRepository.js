@@ -167,7 +167,12 @@ function normalizeTranscriptSegment(segment) {
     revision: normalizeRevisionValue(segment.revision),
     isFinal: segment.isFinal !== false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    providerUtteranceId: segment.providerUtteranceId ?? null,
+    providerSequence: segment.providerSequence ?? null,
+    providerRevision: segment.providerRevision ?? null,
+    providerStreamId: segment.providerStreamId ?? null,
+    providerChannel: segment.providerChannel ?? null
   };
 }
 

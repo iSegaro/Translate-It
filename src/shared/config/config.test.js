@@ -60,7 +60,7 @@ describe('Config Module', () => {
 
     it('should include live-caption scaffolding defaults in CONFIG', () => {
       expect(CONFIG.LIVE_CAPTION_ENABLED).toBe(false);
-      expect(CONFIG.LIVE_CAPTION_QUALITY_PROFILE).toBe('balanced');
+      expect(CONFIG.LIVE_CAPTION_QUALITY_PROFILE).toBe('fast');
       expect(CONFIG.LIVE_CAPTION_CACHE_MAX_ITEMS).toBe(500);
       expect(CONFIG.LIVE_CAPTION_CACHE_MAX_BYTES).toBe(10485760);
       expect(CONFIG.LIVE_CAPTION_STT_PROVIDER).toBe('openai_whisper');

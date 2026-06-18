@@ -189,4 +189,80 @@ describe('live-caption transcript contracts', () => {
       segmentEndMs: 200
     })).toThrow(/requires text/i);
   });
+
+  it('preserves and normalizes optional provider identity metadata fields', () => {
+    const event = normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-1',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      providerId: 'openai_whisper',
+      providerMode: STT_PROVIDER_MODES.BATCH,
+      sessionId: 'session-1',
+      tabId: '7',
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1',
+      revision: '2',
+      segmentStartMs: '100',
+      segmentEndMs: 250,
+      text: 'Hello world',
+      providerUtteranceId: 'utt-123',
+      providerSequence: 45,
+      providerRevision: 2,
+      providerStreamId: 'stream-abc',
+      providerChannel: 'channel-1'
+    });
+
+    expect(event.providerUtteranceId).toBe('utt-123');
+    expect(event.providerSequence).toBe(45);
+    expect(event.providerRevision).toBe(2);
+    expect(event.providerStreamId).toBe('stream-abc');
+    expect(event.providerChannel).toBe('channel-1');
+
+    // Also verify normalizations
+    const eventNulls = normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-1',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      providerId: 'openai_whisper',
+      providerMode: STT_PROVIDER_MODES.BATCH,
+      sessionId: 'session-1',
+      tabId: '7',
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1',
+      revision: '2',
+      segmentStartMs: '100',
+      segmentEndMs: 250,
+      text: 'Hello world'
+    });
+
+    expect(eventNulls.providerUtteranceId).toBeNull();
+    expect(eventNulls.providerSequence).toBeNull();
+    expect(eventNulls.providerRevision).toBeNull();
+    expect(eventNulls.providerStreamId).toBeNull();
+    expect(eventNulls.providerChannel).toBeNull();
+  });
+
+  it('normalizes providerChannel consistently', () => {
+    const run = (providerChannel) => normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-1',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      providerId: 'openai_whisper',
+      providerMode: STT_PROVIDER_MODES.BATCH,
+      sessionId: 'session-1',
+      tabId: '7',
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1',
+      revision: '2',
+      segmentStartMs: '100',
+      segmentEndMs: 250,
+      text: 'Hello world',
+      providerChannel
+    }).providerChannel;
+
+    expect(run('')).toBeNull();
+    expect(run('  ')).toBeNull();
+    expect(run(null)).toBeNull();
+    expect(run(undefined)).toBeNull();
+    expect(run(0)).toBe(0);
+    expect(run('left')).toBe('left');
+    expect(run('channel-1')).toBe('channel-1');
+  });
 });

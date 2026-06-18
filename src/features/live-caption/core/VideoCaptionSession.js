@@ -157,7 +157,12 @@ function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
     targetLanguage: normalizedSegment.targetLanguage ?? null,
     provider: normalizedSegment.provider ?? null,
     createdAt: normalizedSegment.createdAt ?? now,
-    updatedAt: now
+    updatedAt: now,
+    providerUtteranceId: normalizedSegment.providerUtteranceId ?? null,
+    providerSequence: normalizedSegment.providerSequence ?? null,
+    providerRevision: normalizedSegment.providerRevision ?? null,
+    providerStreamId: normalizedSegment.providerStreamId ?? null,
+    providerChannel: normalizedSegment.providerChannel ?? null
   };
 }
 

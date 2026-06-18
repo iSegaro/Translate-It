@@ -663,6 +663,50 @@ describe('LiveCaptionTranslationCoordinator', () => {
     }));
   });
 
+  it('preserves optional provider identity metadata fields during translation', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranslatedCaptionSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+
+    await coordinator.handleTranscriptSegment({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      startMs: 0,
+      endMs: 3000,
+      text: 'Hi',
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
+    }, { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockAdapter.translateFinalizedSegment).toHaveBeenCalledTimes(1);
+    expect(mockVideoSession.addTranslatedCaptionSegment).toHaveBeenCalledTimes(1);
+    expect(mockVideoSession.addTranslatedCaptionSegment).toHaveBeenCalledWith(expect.objectContaining({
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
+    }));
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledTimes(1);
+    expect(mockCache.appendTranslatedCaptionSegment).toHaveBeenCalledWith(expect.objectContaining({
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
+    }));
+  });
+
   it('retranslates the latest canonical correction revision and prunes stale queued work', async () => {
     const pageSession = sessionManager.getOrCreateSession(7);
     pageSession.sessionId = 'session-1';

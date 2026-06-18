@@ -607,6 +607,51 @@ describe('live-caption session model', () => {
     expect(segmentInvalid.mediaEndMs).toBeNull();
   });
 
+  it('preserves optional provider identity fields on segment normalization', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    const segment = videoSession.addTranscriptSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      originalText: 'Test',
+      startMs: 100,
+      endMs: 200,
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
+    });
+
+    expect(segment.providerUtteranceId).toBe('utt-123');
+    expect(segment.providerSequence).toBe(12);
+    expect(segment.providerRevision).toBe(3);
+    expect(segment.providerStreamId).toBe('stream-xyz');
+    expect(segment.providerChannel).toBe(2);
+
+    const transSegment = videoSession.addTranslatedCaptionSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      translatedText: 'Translated',
+      startMs: 100,
+      endMs: 200,
+      providerUtteranceId: 'utt-123',
+      providerSequence: 12,
+      providerRevision: 3,
+      providerStreamId: 'stream-xyz',
+      providerChannel: 2
+    });
+
+    expect(transSegment.providerUtteranceId).toBe('utt-123');
+    expect(transSegment.providerSequence).toBe(12);
+    expect(transSegment.providerRevision).toBe(3);
+    expect(transSegment.providerStreamId).toBe('stream-xyz');
+    expect(transSegment.providerChannel).toBe(2);
+  });
+
   it('manages one page session per tab and cleans up fail closed', () => {
     const manager = new LiveCaptionSessionManager();
 

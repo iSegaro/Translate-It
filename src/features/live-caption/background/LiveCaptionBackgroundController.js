@@ -547,7 +547,12 @@ export class LiveCaptionBackgroundController {
       confidence: event.confidence ?? null,
       revision: event.revision ?? null,
       createdAt: event.createdAt ?? Date.now(),
-      isFinal: event.isFinal ?? true
+      isFinal: event.isFinal ?? true,
+      providerUtteranceId: event.providerUtteranceId ?? null,
+      providerSequence: event.providerSequence ?? null,
+      providerRevision: event.providerRevision ?? null,
+      providerStreamId: event.providerStreamId ?? null,
+      providerChannel: event.providerChannel ?? null
     };
   }
 
