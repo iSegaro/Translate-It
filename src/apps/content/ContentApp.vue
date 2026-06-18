@@ -101,6 +101,7 @@
         :last-error="liveCaptionStore.lastError"
         :controls-state="liveCaptionStore.controlsState"
         :video-element="liveCaptionRuntimeController?.currentVideoElement || null"
+        :media-timeline-mapping-status="liveCaptionStore.mediaTimelineMappingStatus"
         @start="handleLiveCaptionStart"
         @stop="handleLiveCaptionStop"
         @pause="handleLiveCaptionPause"

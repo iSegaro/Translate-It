@@ -1462,4 +1462,56 @@ describe('live-caption runtime controller', () => {
       expect(sendRequestSpy).toHaveBeenCalledWith(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, expect.any(Object));
     });
   });
+
+  describe('Phase 3: mediaTimelineMappingStatus validity transitions', () => {
+    it('sets mediaTimelineMappingStatus to valid if mediaAnchorMs is present on start', async () => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4' });
+      video.currentTime = 5.5;
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      await controller.start({ tabId: 11 });
+      expect(store.mediaTimelineMappingStatus).toBe('valid');
+    });
+
+    it('sets mediaTimelineMappingStatus to invalid on seeked, seeking, ratechange, and pause events', async () => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4' });
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      await controller.start({ tabId: 11 });
+      expect(store.mediaTimelineMappingStatus).toBe('valid');
+
+      const eventsToTest = ['seeking', 'seeked', 'ratechange', 'pause'];
+
+      for (const eventType of eventsToTest) {
+        // Reset state to valid before firing the event
+        store.setMediaTimelineMappingStatus('valid');
+        expect(store.mediaTimelineMappingStatus).toBe('valid');
+
+        // fire target event on the video
+        const event = new Event(eventType, { bubbles: true });
+        Object.defineProperty(event, 'target', { value: video, configurable: true });
+        document.dispatchEvent(event);
+        
+        expect(store.mediaTimelineMappingStatus).toBe('invalid');
+      }
+    });
+  });
 });

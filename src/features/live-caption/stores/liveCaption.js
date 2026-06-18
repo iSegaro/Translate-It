@@ -34,8 +34,10 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     canClearCache: false
   });
   const lastError = ref(null);
+  const mediaTimelineMappingStatus = ref('invalid');
 
   const reset = () => {
+    mediaTimelineMappingStatus.value = 'invalid';
     status.value = LIVE_CAPTION_SESSION_STATES.IDLE;
     activeSessionState.value = LIVE_CAPTION_SESSION_STATES.IDLE;
     runtimeStatus.value = LIVE_CAPTION_RUNTIME_STATES.IDLE;
@@ -145,6 +147,7 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       canResume: false,
       canClearCache: false
     };
+    mediaTimelineMappingStatus.value = 'invalid';
     lastError.value = null;
     activeVideoState.value = null;
     runtimeStatus.value = LIVE_CAPTION_RUNTIME_STATES.IDLE;
@@ -174,6 +177,8 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
       activeVideoState.value = null;
     }
 
+    mediaTimelineMappingStatus.value = 'invalid';
+
     controlsState.value = {
       canStart: true,
       canStop: Boolean(error),
@@ -194,6 +199,10 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
 
   const getCaptionLineDisplay = (line, mode = captionDisplayMode.value) => {
     return resolveLiveCaptionCaptionLineDisplay(line, mode);
+  };
+
+  const setMediaTimelineMappingStatus = (val) => {
+    mediaTimelineMappingStatus.value = val === 'valid' ? 'valid' : 'invalid';
   };
 
   return {
@@ -229,7 +238,9 @@ export const useLiveCaptionStore = defineStore('liveCaption', () => {
     getCaptionLinesForDisplayMode,
     getCaptionLineDisplay,
     applyCleanupResult,
-    resetOverlayState
+    resetOverlayState,
+    mediaTimelineMappingStatus,
+    setMediaTimelineMappingStatus
   };
 });
 

@@ -20,6 +20,7 @@
         :caption-lines="captionLines"
         :caption-display-mode="captionDisplayMode"
         :video-element="videoElement"
+        :media-timeline-mapping-status="mediaTimelineMappingStatus"
       />
 
       <div
@@ -110,6 +111,10 @@ const props = defineProps({
   videoElement: {
     type: Object,
     default: null
+  },
+  mediaTimelineMappingStatus: {
+    type: String,
+    default: 'invalid'
   },
   activeVideoState: {
     type: Object,

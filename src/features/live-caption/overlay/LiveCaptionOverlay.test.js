@@ -514,4 +514,170 @@ describe('live-caption overlay shell', () => {
     const stylesheet = readFileSync(resolve('src/features/live-caption/overlay/LiveCaptionOverlay.scss'), 'utf8');
     expect(stylesheet).toContain('flex-direction: column-reverse');
   });
+
+  describe('Phase 3: guarded time-aware Live Caption overlay tests', () => {
+    const mockVideo = {
+      currentTime: 1.0, // 1000ms
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    };
+
+    const captionLines = [
+      {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        segmentStartMs: 100,
+        segmentEndMs: 200,
+        mediaStartMs: 500,
+        mediaEndMs: 1500, // 500ms to 1500ms (visible window max(1500+1500, 500+2000) = 3000ms)
+        originalText: 'Active caption',
+        translatedText: 'کپشن فعال',
+        isFinal: true
+      },
+      {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        segmentStartMs: 300,
+        segmentEndMs: 400,
+        mediaStartMs: 4000,
+        mediaEndMs: 5000,
+        originalText: 'Future caption',
+        translatedText: 'کپشن آینده',
+        isFinal: true
+      }
+    ];
+
+    it('valid mapping + media timestamps renders current caption', () => {
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines,
+          videoElement: mockVideo,
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      // video.currentTime is 1.0 -> 1000ms.
+      // Active caption is [500, 1500] (covers 1000ms) -> should render
+      // Future caption is [4000, 5000] (does not cover 1000ms) -> should hide
+      expect(wrapper.text()).toContain('کپشن فعال');
+      expect(wrapper.text()).not.toContain('کپشن آینده');
+    });
+
+    it('valid mapping hides future/stale captions', () => {
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines,
+          videoElement: {
+            currentTime: 3.5, // 3500ms (past active caption's max window of 3000ms, and before future caption's start 4000ms)
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn()
+          },
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      expect(wrapper.text()).not.toContain('کپشن فعال');
+      expect(wrapper.text()).not.toContain('کپشن آینده');
+    });
+
+    it('valid mapping keeps short media-timed caption visible for min duration', () => {
+      const shortCaptionLines = [
+        {
+          sessionId: 'session-1',
+          videoFingerprint: 'video-1',
+          segmentStartMs: 100,
+          segmentEndMs: 200,
+          mediaStartMs: 1000,
+          mediaEndMs: 1200, // Duration 200ms. Max visible window: max(1200+1500, 1000+2000) = 3000ms (so visible up to 3000ms)
+          originalText: 'Short caption',
+          translatedText: 'کپشن کوتاه',
+          isFinal: true
+        }
+      ];
+
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines: shortCaptionLines,
+          videoElement: {
+            currentTime: 2.8, // 2800ms (within 3000ms min display limit)
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn()
+          },
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      expect(wrapper.text()).toContain('کپشن کوتاه');
+
+      const wrapperHidden = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines: shortCaptionLines,
+          videoElement: {
+            currentTime: 3.2, // 3200ms (beyond 3000ms min display limit)
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn()
+          },
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      expect(wrapperHidden.text()).not.toContain('کپشن کوتاه');
+    });
+
+    it('invalid mapping falls back to last 2 captions', () => {
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines,
+          videoElement: mockVideo,
+          mediaTimelineMappingStatus: 'invalid'
+        }
+      });
+      // Should show both captions regardless of media timeline when status is 'invalid'
+      expect(wrapper.text()).toContain('کپشن فعال');
+      expect(wrapper.text()).toContain('کپشن آینده');
+    });
+
+    it('missing media timestamps falls back safely for that caption', () => {
+      const linesWithMissing = [
+        {
+          sessionId: 'session-1',
+          videoFingerprint: 'video-1',
+          segmentStartMs: 100,
+          segmentEndMs: 200,
+          // media timestamps missing
+          originalText: 'Missing media timestamps',
+          translatedText: 'بدون زمان رسانه',
+          isFinal: true
+        }
+      ];
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines: linesWithMissing,
+          videoElement: mockVideo,
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      expect(wrapper.text()).toContain('بدون زمان رسانه');
+    });
+
+    it('mediaTimelineMappingStatus: "valid" with invalid media timestamp values should still show the caption via fallback', () => {
+      const linesWithInvalid = [
+        {
+          sessionId: 'session-1',
+          videoFingerprint: 'video-1',
+          segmentStartMs: 100,
+          segmentEndMs: 200,
+          mediaStartMs: 'NaN',
+          mediaEndMs: undefined,
+          originalText: 'Invalid timestamps text',
+          translatedText: 'زمان نامعتبر',
+          isFinal: true
+        }
+      ];
+      const wrapper = mount(LiveCaptionCaptionTrack, {
+        props: {
+          captionLines: linesWithInvalid,
+          videoElement: mockVideo,
+          mediaTimelineMappingStatus: 'valid'
+        }
+      });
+      expect(wrapper.text()).toContain('زمان نامعتبر');
+    });
+  });
 });

@@ -565,6 +565,12 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         
         const target = event?.target;
         if (target && target === this.currentVideoElement) {
+          // Invalidate timeline mapping on seeking, seeked, ratechange, pause
+          if (['seeking', 'seeked', 'ratechange', 'pause'].includes(event.type)) {
+            logger.info(`Invalidating Live Caption media timeline mapping status due to video event: ${event.type}`);
+            this.store?.setMediaTimelineMappingStatus?.('invalid');
+          }
+
           if (event.type === 'pause' || event.type === 'ended') {
             if (this.runtimeStatus === LIVE_CAPTION_RUNTIME_STATES.RUNNING) {
               const reason = event.type === 'ended' ? 'video_ended' : 'video_pause';
@@ -1158,11 +1164,18 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         ? this.currentVideoElement.currentTime * 1000
         : null;
 
+      const isAnchorValid = Number.isFinite(mediaAnchorMs);
+      if (isAnchorValid) {
+        this.store?.setMediaTimelineMappingStatus?.('valid');
+      } else {
+        this.store?.setMediaTimelineMappingStatus?.('invalid');
+      }
+
       const response = await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_START, {
         tabId,
         sessionId: this.pageSession.sessionId,
         videoFingerprint: this.currentVideoFingerprint,
-        mediaAnchorMs: Number.isFinite(mediaAnchorMs) ? mediaAnchorMs : null,
+        mediaAnchorMs: isAnchorValid ? mediaAnchorMs : null,
         reason: 'start'
       });
 
