@@ -1021,4 +1021,75 @@ describe('LiveCaptionTranslationCoordinator', () => {
     expect(mockCache.appendTranslatedCaptionSegment).not.toHaveBeenCalled();
     expect(mockBrowserApi.tabs.sendMessage).not.toHaveBeenCalled();
   });
+
+  it('drops late transcript segments when runtime state is paused', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranslatedCaptionSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+
+    // Transition state to PAUSED
+    captureCoordinator.runtimeState = 'paused';
+
+    await coordinator.handleTranscriptSegment({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      startMs: 0,
+      endMs: 3000,
+      text: 'Late segment'
+    }, { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Queue should not be recreated, and translate should not run
+    expect(coordinator.sessionQueues.has('session-1')).toBe(false);
+    expect(mockAdapter.translateFinalizedSegment).not.toHaveBeenCalled();
+  });
+
+  it('resumes translation processing normally after moving from paused to running', async () => {
+    const pageSession = sessionManager.getOrCreateSession(7);
+    pageSession.sessionId = 'session-1';
+    const mockVideoSession = {
+      sessionId: 'video-1',
+      videoFingerprint: 'video-a',
+      addTranslatedCaptionSegment: vi.fn()
+    };
+    pageSession.activeVideoSession = mockVideoSession;
+
+    // Transition state to PAUSED
+    captureCoordinator.runtimeState = 'paused';
+
+    await coordinator.handleTranscriptSegment({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      startMs: 0,
+      endMs: 3000,
+      text: 'Late segment'
+    }, { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(coordinator.sessionQueues.has('session-1')).toBe(false);
+    expect(mockAdapter.translateFinalizedSegment).not.toHaveBeenCalled();
+
+    // Now resume back to RUNNING
+    captureCoordinator.runtimeState = 'running';
+
+    await coordinator.handleTranscriptSegment({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      startMs: 3000,
+      endMs: 6000,
+      text: 'New segment'
+    }, { tabId: 7 });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(coordinator.sessionQueues.has('session-1')).toBe(true);
+    expect(mockAdapter.translateFinalizedSegment).toHaveBeenCalledTimes(1);
+  });
 });

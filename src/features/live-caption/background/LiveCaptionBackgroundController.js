@@ -1909,6 +1909,12 @@ export class LiveCaptionBackgroundController {
       return false;
     }
 
+    // TODO: If Live Caption supports concurrent multi-tab/multi-video capture,
+    // replace this global capture runtime-state guard with session-scoped lifecycle state.
+    if (this.captureCoordinator && this.captureCoordinator.runtimeState === LIVE_CAPTION_RUNTIME_STATES.PAUSED) {
+      return false;
+    }
+
     return true;
   }
 

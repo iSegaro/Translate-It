@@ -3,6 +3,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LiveCaptionTranslationAdapter } from './LiveCaptionTranslationAdapter.js';
 import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
 import { normalizeLiveCaptionTranscriptSegment } from './liveCaptionTranslationContracts.js';
+import { LIVE_CAPTION_RUNTIME_STATES } from '../constants/liveCaptionRuntimeStates.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionTranslationCoordinator');
 
@@ -484,6 +485,16 @@ export class LiveCaptionTranslationCoordinator {
     const videoSession = pageSession.activeVideoSession;
     if (!videoSession || videoSession.videoFingerprint !== videoFingerprint) {
       logger.warn('Ignoring transcript segment for inactive/invalid video session', { sessionId, videoFingerprint });
+      return;
+    }
+
+    // TODO: If Live Caption supports concurrent multi-tab/multi-video capture,
+    // replace this global capture runtime-state guard with session-scoped lifecycle state.
+    if (this.captureCoordinator && this.captureCoordinator.runtimeState === LIVE_CAPTION_RUNTIME_STATES.PAUSED) {
+      logger.warn('Ignoring transcript segment because runtime state is paused', {
+        sessionId,
+        runtimeState: this.captureCoordinator.runtimeState
+      });
       return;
     }
 
