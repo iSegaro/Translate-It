@@ -39,6 +39,12 @@ describe('live-caption transcript contracts', () => {
       revision: '2',
       segmentStartMs: '100',
       segmentEndMs: 250,
+      sourceTimelineType: 'capture',
+      sourceStartMs: '90',
+      sourceEndMs: 260,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: '12',
+      sourceResetId: 'reset-1',
       text: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
@@ -62,6 +68,12 @@ describe('live-caption transcript contracts', () => {
       revision: 2,
       segmentStartMs: 100,
       segmentEndMs: 250,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 90,
+      sourceEndMs: 260,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 12,
+      sourceResetId: 'reset-1',
       text: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
@@ -75,6 +87,38 @@ describe('live-caption transcript contracts', () => {
       metadata: {
         source: 'batch'
       }
+    });
+  });
+
+  it('normalizes invalid source timeline metadata safely', () => {
+    const event = normalizeLiveCaptionTranscriptEvent({
+      eventId: 'event-invalid-source',
+      eventType: LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL,
+      providerId: 'openai_whisper',
+      providerMode: STT_PROVIDER_MODES.BATCH,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      segmentId: 'segment-1',
+      revision: 1,
+      segmentStartMs: 100,
+      segmentEndMs: 250,
+      sourceTimelineType: 'not-a-real-type',
+      sourceStartMs: 'invalid',
+      sourceEndMs: 'still-invalid',
+      sourceClockId: '   ',
+      sourceSequence: 'NaN',
+      sourceResetId: '',
+      text: 'Hello world'
+    });
+
+    expect(event).toMatchObject({
+      sourceTimelineType: 'unknown',
+      sourceStartMs: null,
+      sourceEndMs: null,
+      sourceClockId: null,
+      sourceSequence: null,
+      sourceResetId: null
     });
   });
 

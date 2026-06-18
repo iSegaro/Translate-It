@@ -75,6 +75,41 @@ function normalizeOptionalNumber(value) {
   return Number.isFinite(normalized) ? normalized : null;
 }
 
+function normalizeSourceTimelineType(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : String(value).trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return ['capture', 'provider', 'media', 'unknown'].includes(normalized) ? normalized : 'unknown';
+}
+
+function normalizeOptionalSourceResetId(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalSourceClockId(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function normalizeEventType(value) {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
 
@@ -146,6 +181,8 @@ export function normalizeLiveCaptionTranscriptEvent(input = {}) {
   const updatedAt = normalizeOptionalNumber(event.updatedAt);
   const segmentStartMs = normalizeOptionalNumber(event.segmentStartMs);
   const segmentEndMs = normalizeOptionalNumber(event.segmentEndMs);
+  const sourceStartMs = normalizeOptionalNumber(event.sourceStartMs);
+  const sourceEndMs = normalizeOptionalNumber(event.sourceEndMs);
 
   if (eventType === LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.FINAL || eventType === LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.CORRECTION) {
     if (segmentStartMs == null || segmentEndMs == null) {
@@ -171,6 +208,12 @@ export function normalizeLiveCaptionTranscriptEvent(input = {}) {
     revision: identity.revision,
     segmentStartMs,
     segmentEndMs,
+    sourceTimelineType: normalizeSourceTimelineType(event.sourceTimelineType),
+    sourceStartMs,
+    sourceEndMs,
+    sourceClockId: normalizeOptionalSourceClockId(event.sourceClockId),
+    sourceSequence: normalizeOptionalNumber(event.sourceSequence),
+    sourceResetId: normalizeOptionalSourceResetId(event.sourceResetId),
     text: eventType === LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.ERROR
       ? null
       : normalizeTextValue(event.text ?? event.originalText ?? '', 'text'),

@@ -1110,6 +1110,11 @@ describe("live-caption background controller", () => {
           revision: 1,
           segmentStartMs: 0,
           segmentEndMs: 1000,
+          sourceTimelineType: "provider",
+          sourceStartMs: 0,
+          sourceEndMs: 1000,
+          sourceClockId: "session-1",
+          sourceSequence: 1,
           text: "hello world",
           sourceLanguage: "en",
           targetLanguage: "fa",
@@ -1159,6 +1164,11 @@ describe("live-caption background controller", () => {
           revision: 1,
           segmentStartMs: 0,
           segmentEndMs: 1000,
+          sourceTimelineType: "provider",
+          sourceStartMs: 0,
+          sourceEndMs: 1000,
+          sourceClockId: "session-1",
+          sourceSequence: 1,
           text: "hello world",
           sourceLanguage: "en",
           targetLanguage: "fa",
@@ -1189,7 +1199,12 @@ describe("live-caption background controller", () => {
       endMs: 1000,
       text: "hello world",
       providerId: "faster_whisper_streaming",
-      revision: 1
+      revision: 1,
+      sourceTimelineType: "provider",
+      sourceStartMs: 0,
+      sourceEndMs: 1000,
+      sourceClockId: "session-1",
+      sourceSequence: 1
     });
     expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
       sessionId: "session-1",
@@ -1208,6 +1223,11 @@ describe("live-caption background controller", () => {
       segmentStartMs: 0,
       segmentEndMs: 1000,
       originalText: "hello world",
+      sourceTimelineType: "provider",
+      sourceStartMs: 0,
+      sourceEndMs: 1000,
+      sourceClockId: "session-1",
+      sourceSequence: 1,
       revision: 1,
       isIncognito: false
     }));
@@ -1223,6 +1243,11 @@ describe("live-caption background controller", () => {
         text: "hello world",
         providerId: "faster_whisper_streaming",
         revision: 1,
+        sourceTimelineType: "provider",
+        sourceStartMs: 0,
+        sourceEndMs: 1000,
+        sourceClockId: "session-1",
+        sourceSequence: 1,
         createdAt: 1234,
         isFinal: true
       }),
@@ -1322,6 +1347,11 @@ describe("live-caption background controller", () => {
           segmentEndMs: 1000,
           supersedesEventId: "event-1",
           supersedesSegmentId: "segment-1",
+          sourceTimelineType: "provider",
+          sourceStartMs: 0,
+          sourceEndMs: 1000,
+          sourceClockId: "session-1",
+          sourceSequence: 2,
           text: "hello world corrected",
           createdAt: 1250,
           isFinal: true
@@ -1370,6 +1400,11 @@ describe("live-caption background controller", () => {
           segmentEndMs: 1000,
           supersedesEventId: "event-1",
           supersedesSegmentId: "segment-1",
+          sourceTimelineType: "provider",
+          sourceStartMs: 0,
+          sourceEndMs: 1000,
+          sourceClockId: "session-1",
+          sourceSequence: 2,
           text: "hello world corrected",
           createdAt: 1250,
           metadata: {}
@@ -1397,7 +1432,12 @@ describe("live-caption background controller", () => {
       endMs: 1000,
       text: "hello world corrected",
       providerId: "faster_whisper_streaming",
-      revision: 2
+      revision: 2,
+      sourceTimelineType: "provider",
+      sourceStartMs: 0,
+      sourceEndMs: 1000,
+      sourceClockId: "session-1",
+      sourceSequence: 2
     });
     expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
       sessionId: "session-1",
@@ -1416,6 +1456,11 @@ describe("live-caption background controller", () => {
       segmentStartMs: 0,
       segmentEndMs: 1000,
       originalText: "hello world corrected",
+      sourceTimelineType: "provider",
+      sourceStartMs: 0,
+      sourceEndMs: 1000,
+      sourceClockId: "session-1",
+      sourceSequence: 2,
       revision: 2,
       isIncognito: false
     }));
@@ -1431,6 +1476,11 @@ describe("live-caption background controller", () => {
         text: "hello world corrected",
         providerId: "faster_whisper_streaming",
         revision: 2,
+        sourceTimelineType: "provider",
+        sourceStartMs: 0,
+        sourceEndMs: 1000,
+        sourceClockId: "session-1",
+        sourceSequence: 2,
         createdAt: 1250,
         isFinal: true
       }),

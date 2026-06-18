@@ -36,6 +36,41 @@ function toNumberOrNull(value) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function normalizeSourceTimelineType(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : String(value).trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return ['capture', 'provider', 'media', 'unknown'].includes(normalized) ? normalized : 'unknown';
+}
+
+function normalizeOptionalSourceResetId(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalSourceClockId(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
   const sessionId = segment.sessionId ?? null;
   const videoFingerprint = segment.videoFingerprint ?? null;
@@ -63,6 +98,12 @@ export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
     segmentEndMs,
     mediaStartMs,
     mediaEndMs,
+    sourceTimelineType: normalizeSourceTimelineType(segment.sourceTimelineType),
+    sourceStartMs: toNumberOrNull(segment.sourceStartMs),
+    sourceEndMs: toNumberOrNull(segment.sourceEndMs),
+    sourceClockId: normalizeOptionalSourceClockId(segment.sourceClockId),
+    sourceSequence: toNumberOrNull(segment.sourceSequence),
+    sourceResetId: normalizeOptionalSourceResetId(segment.sourceResetId),
     originalText,
     sourceLanguage: segment.sourceLanguage ?? segment.detectedLanguage ?? null,
     targetLanguage: segment.targetLanguage ?? null,
@@ -88,7 +129,13 @@ export function createLiveCaptionTranslationRequestMetadata(segment, options = {
     segmentStartMs: transcriptSegment.segmentStartMs,
     segmentEndMs: transcriptSegment.segmentEndMs,
     sourceLanguage: options.sourceLanguage ?? transcriptSegment.sourceLanguage ?? 'auto',
-    targetLanguage: options.targetLanguage ?? transcriptSegment.targetLanguage ?? null
+    targetLanguage: options.targetLanguage ?? transcriptSegment.targetLanguage ?? null,
+    sourceTimelineType: transcriptSegment.sourceTimelineType ?? null,
+    sourceStartMs: transcriptSegment.sourceStartMs ?? null,
+    sourceEndMs: transcriptSegment.sourceEndMs ?? null,
+    sourceClockId: transcriptSegment.sourceClockId ?? null,
+    sourceSequence: transcriptSegment.sourceSequence ?? null,
+    sourceResetId: transcriptSegment.sourceResetId ?? null
   });
 }
 
@@ -129,6 +176,12 @@ export function createLiveCaptionTranslatedCaptionSegment(segment, translationRe
     videoFingerprint: metadata.videoFingerprint ?? transcriptSegment.videoFingerprint,
     segmentStartMs: metadata.segmentStartMs ?? transcriptSegment.segmentStartMs,
     segmentEndMs: metadata.segmentEndMs ?? transcriptSegment.segmentEndMs,
+    sourceTimelineType: metadata.sourceTimelineType ?? transcriptSegment.sourceTimelineType ?? null,
+    sourceStartMs: metadata.sourceStartMs ?? transcriptSegment.sourceStartMs ?? null,
+    sourceEndMs: metadata.sourceEndMs ?? transcriptSegment.sourceEndMs ?? null,
+    sourceClockId: metadata.sourceClockId ?? transcriptSegment.sourceClockId ?? null,
+    sourceSequence: metadata.sourceSequence ?? transcriptSegment.sourceSequence ?? null,
+    sourceResetId: metadata.sourceResetId ?? transcriptSegment.sourceResetId ?? null,
     originalText: transcriptSegment.originalText,
     translatedText,
     sourceLanguage: translationResult.sourceLanguage ?? metadata.sourceLanguage ?? transcriptSegment.sourceLanguage ?? null,

@@ -172,13 +172,21 @@ describe('live-caption STT coordinator', () => {
     expect(mockVideoSession.addTranscriptSegment).toHaveBeenNthCalledWith(1, expect.objectContaining({
       text: 'First Chunk',
       startMs: 0,
-      endMs: 3000
+      endMs: 3000,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 0,
+      sourceEndMs: 3000,
+      sourceClockId: 'session-1'
     }));
 
     expect(mockVideoSession.addTranscriptSegment).toHaveBeenNthCalledWith(2, expect.objectContaining({
       text: 'Second Chunk',
       startMs: 3000,
-      endMs: 6000
+      endMs: 6000,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 3000,
+      sourceEndMs: 6000,
+      sourceClockId: 'session-1'
     }));
 
     expect(mockCache.appendTranscriptSegment).toHaveBeenCalledTimes(2);
@@ -186,6 +194,10 @@ describe('live-caption STT coordinator', () => {
       text: 'First Chunk',
       segmentStartMs: 0,
       segmentEndMs: 3000,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 0,
+      sourceEndMs: 3000,
+      sourceClockId: 'session-1',
       isIncognito: false
     }));
 
@@ -196,6 +208,10 @@ describe('live-caption STT coordinator', () => {
         text: 'First Chunk',
         segmentStartMs: 0,
         segmentEndMs: 3000,
+        sourceTimelineType: 'capture',
+        sourceStartMs: 0,
+        sourceEndMs: 3000,
+        sourceClockId: 'session-1',
         isFinal: true
       })
     );
@@ -206,6 +222,10 @@ describe('live-caption STT coordinator', () => {
         text: 'Second Chunk',
         segmentStartMs: 3000,
         segmentEndMs: 6000,
+        sourceTimelineType: 'capture',
+        sourceStartMs: 3000,
+        sourceEndMs: 6000,
+        sourceClockId: 'session-1',
         isFinal: true
       })
     );
@@ -226,7 +246,11 @@ describe('live-caption STT coordinator', () => {
         text: 'Second Chunk',
         startMs: 3000,
         endMs: 6000,
-        providerId: 'openai_whisper'
+        providerId: 'openai_whisper',
+        sourceTimelineType: 'capture',
+        sourceStartMs: 3000,
+        sourceEndMs: 6000,
+        sourceClockId: 'session-1'
       }),
       { tabId: 7 }
     );

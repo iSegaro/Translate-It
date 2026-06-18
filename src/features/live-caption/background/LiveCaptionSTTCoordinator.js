@@ -182,6 +182,10 @@ export class LiveCaptionSTTCoordinator {
             revision: 1,
             segmentStartMs: chunk.chunkStartMs,
             segmentEndMs: chunk.chunkEndMs,
+            sourceTimelineType: 'capture',
+            sourceStartMs: chunk.chunkStartMs,
+            sourceEndMs: chunk.chunkEndMs,
+            sourceClockId: sessionId,
             text: result?.text || '',
             sourceLanguage: result?.sourceLanguage ?? null,
             targetLanguage: result?.targetLanguage ?? null,
@@ -211,6 +215,12 @@ export class LiveCaptionSTTCoordinator {
             endMs: normalizedTranscriptEvent.segmentEndMs ?? chunk.chunkEndMs,
             text: normalizedTranscriptEvent.text || '',
             providerId: normalizedTranscriptEvent.providerId || provider.providerId,
+            sourceTimelineType: normalizedTranscriptEvent.sourceTimelineType ?? null,
+            sourceStartMs: normalizedTranscriptEvent.sourceStartMs ?? null,
+            sourceEndMs: normalizedTranscriptEvent.sourceEndMs ?? null,
+            sourceClockId: normalizedTranscriptEvent.sourceClockId ?? null,
+            sourceSequence: normalizedTranscriptEvent.sourceSequence ?? null,
+            sourceResetId: normalizedTranscriptEvent.sourceResetId ?? null,
             createdAt: normalizedTranscriptEvent.createdAt || Date.now()
           };
 

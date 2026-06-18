@@ -55,6 +55,41 @@ function normalizeRevisionValue(value) {
   return Number.isFinite(revision) ? revision : null;
 }
 
+function normalizeSourceTimelineType(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : String(value).trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return ['capture', 'provider', 'media', 'unknown'].includes(normalized) ? normalized : 'unknown';
+}
+
+function normalizeOptionalSourceResetId(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalSourceClockId(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function createCanonicalTranslationEntryKey(identity) {
   return [
     'live-caption',
@@ -130,6 +165,12 @@ function normalizeTranslationSegment(segment) {
   const mediaEndMs = segment.mediaEndMs != null && Number.isFinite(Number(segment.mediaEndMs))
     ? Number(segment.mediaEndMs)
     : null;
+  const sourceStartMs = segment.sourceStartMs != null && Number.isFinite(Number(segment.sourceStartMs))
+    ? Number(segment.sourceStartMs)
+    : null;
+  const sourceEndMs = segment.sourceEndMs != null && Number.isFinite(Number(segment.sourceEndMs))
+    ? Number(segment.sourceEndMs)
+    : null;
 
   return {
     entryKey: segment.entryKey ?? createLiveCaptionTranslatedSegmentCacheKey({
@@ -148,6 +189,14 @@ function normalizeTranslationSegment(segment) {
     segmentEndMs,
     mediaStartMs,
     mediaEndMs,
+    sourceTimelineType: normalizeSourceTimelineType(segment.sourceTimelineType),
+    sourceStartMs,
+    sourceEndMs,
+    sourceClockId: normalizeOptionalSourceClockId(segment.sourceClockId),
+    sourceSequence: segment.sourceSequence != null && Number.isFinite(Number(segment.sourceSequence))
+      ? Number(segment.sourceSequence)
+      : null,
+    sourceResetId: normalizeOptionalSourceResetId(segment.sourceResetId),
     segmentTiming: [segmentStartMs, segmentEndMs],
     originalText,
     translatedText,

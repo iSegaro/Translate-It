@@ -22,7 +22,13 @@ describe('live-caption translation contracts', () => {
       segmentStartMs: '100',
       segmentEndMs: 250,
       originalText: 'Hello world',
-      sourceLanguage: 'en'
+      sourceLanguage: 'en',
+      sourceTimelineType: 'capture',
+      sourceStartMs: '90',
+      sourceEndMs: '260',
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: '12',
+      sourceResetId: 'reset-1'
     });
 
     expect(segment).toEqual({
@@ -32,6 +38,12 @@ describe('live-caption translation contracts', () => {
       segmentEndMs: 250,
       mediaStartMs: null,
       mediaEndMs: null,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 90,
+      sourceEndMs: 260,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 12,
+      sourceResetId: 'reset-1',
       originalText: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: null,
@@ -64,7 +76,13 @@ describe('live-caption translation contracts', () => {
       segmentStartMs: 100,
       segmentEndMs: 250,
       originalText: 'Hello world',
-      sourceLanguage: 'en'
+      sourceLanguage: 'en',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2'
     }, {
       messageId: 'msg-1',
       context: LIVE_CAPTION_TRANSLATION_CONTEXT,
@@ -78,7 +96,13 @@ describe('live-caption translation contracts', () => {
       segmentStartMs: 100,
       segmentEndMs: 250,
       originalText: 'Hello world',
-      sourceLanguage: 'en'
+      sourceLanguage: 'en',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2'
     }, {
       messageId: 'msg-1',
       targetLanguage: 'fa'
@@ -94,7 +118,13 @@ describe('live-caption translation contracts', () => {
       segmentStartMs: 100,
       segmentEndMs: 250,
       sourceLanguage: 'en',
-      targetLanguage: 'fa'
+      targetLanguage: 'fa',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2'
     });
     expect(request).toMatchObject({
       action: MessageActions.TRANSLATE,
@@ -122,6 +152,12 @@ describe('live-caption translation contracts', () => {
       segmentEndMs: 250,
       originalText: 'Hello world',
       sourceLanguage: 'en',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2',
       isFinal: true
     }, {
       results: [{ text: 'سلام دنیا' }],
@@ -132,7 +168,13 @@ describe('live-caption translation contracts', () => {
     }, {
       provider: 'google',
       sourceLanguage: 'en',
-      targetLanguage: 'fa'
+      targetLanguage: 'fa',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2'
     });
 
     expect(caption).toEqual({
@@ -140,6 +182,12 @@ describe('live-caption translation contracts', () => {
       videoFingerprint: 'video-a',
       segmentStartMs: 100,
       segmentEndMs: 250,
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 250,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2',
       originalText: 'Hello world',
       translatedText: 'سلام دنیا',
       sourceLanguage: 'en',

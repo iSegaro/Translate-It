@@ -213,6 +213,12 @@ function createTranscriptCanonicalSegment(overrides = {}) {
     segmentEndMs: 20,
     originalText: 'Hello',
     sourceLanguage: 'en',
+    sourceTimelineType: 'capture',
+    sourceStartMs: 10,
+    sourceEndMs: 20,
+    sourceClockId: 'capture-clock-1',
+    sourceSequence: 1,
+    sourceResetId: 'reset-1',
     revision: 1,
     ...overrides
   };
@@ -228,6 +234,12 @@ function createTranslatedCanonicalSegment(overrides = {}) {
     sourceLanguage: 'en',
     targetLanguage: 'fa',
     provider: 'openai',
+    sourceTimelineType: 'provider',
+    sourceStartMs: 10,
+    sourceEndMs: 20,
+    sourceClockId: 'provider-session',
+    sourceSequence: 1,
+    sourceResetId: 'reset-2',
     revision: 1,
     ...overrides
   };
@@ -313,6 +325,12 @@ describe('live-caption cache layer', () => {
       segmentEndMs: 250,
       originalText: 'Hello',
       sourceLanguage: 'en',
+      sourceTimelineType: 'capture',
+      sourceStartMs: 90,
+      sourceEndMs: 260,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 12,
+      sourceResetId: 'reset-1',
       audio: new Uint8Array([1, 2, 3]),
       stream: { id: 'raw-stream' },
       providerUtteranceId: 'utt-123',
@@ -347,17 +365,28 @@ describe('live-caption cache layer', () => {
     expect(persisted.providerRevision).toBe(3);
     expect(persisted.providerStreamId).toBe('stream-xyz');
     expect(persisted.providerChannel).toBe(2);
+    expect(persisted.sourceTimelineType).toBe('capture');
+    expect(persisted.sourceStartMs).toBe(90);
+    expect(persisted.sourceEndMs).toBe(260);
+    expect(persisted.sourceClockId).toBe('capture-clock-1');
+    expect(persisted.sourceSequence).toBe(12);
+    expect(persisted.sourceResetId).toBe('reset-1');
 
     const records = await repository.getByVideo({ tabId: 1, videoFingerprint: 'video-a' });
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       originalText: 'Hello',
       sourceLanguage: 'en',
+      sourceTimelineType: 'capture',
+      sourceStartMs: 90,
+      sourceEndMs: 260,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 12,
       providerUtteranceId: 'utt-123',
       providerSequence: 12,
       providerRevision: 3,
       providerStreamId: 'stream-xyz',
-      providerChannel: 2
+      sourceResetId: 'reset-1'
     });
 
     await repository.clearVideo({ tabId: 1, videoFingerprint: 'video-a' });
@@ -394,7 +423,13 @@ describe('live-caption cache layer', () => {
       providerSequence: 13,
       providerRevision: 4,
       providerStreamId: 'stream-wxy',
-      providerChannel: 3
+      providerChannel: 3,
+      sourceTimelineType: 'provider',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'provider-session',
+      sourceSequence: 77,
+      sourceResetId: 'reset-2'
     });
 
     await flush();
@@ -404,6 +439,12 @@ describe('live-caption cache layer', () => {
     expect(tRecords[0]).toMatchObject({
       originalText: 'Original',
       translatedText: 'ترجمه',
+      sourceTimelineType: 'provider',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'provider-session',
+      sourceSequence: 77,
+      sourceResetId: 'reset-2',
       providerUtteranceId: 'utt-456',
       providerSequence: 13,
       providerRevision: 4,
@@ -464,6 +505,12 @@ describe('live-caption cache layer', () => {
       originalText: 'Hello updated',
       segmentStartMs: 30,
       segmentEndMs: 40,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 1,
+      sourceResetId: 'reset-1',
       revision: 2
     });
     expect(getStore(indexedDbMock, 'transcripts').records.size).toBe(1);
@@ -532,6 +579,12 @@ describe('live-caption cache layer', () => {
       translatedText: 'سلامِ جدید',
       segmentStartMs: 30,
       segmentEndMs: 40,
+      sourceTimelineType: 'provider',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'provider-session',
+      sourceSequence: 1,
+      sourceResetId: 'reset-2',
       revision: 2
     });
     expect(getStore(indexedDbMock, 'translations').records.size).toBe(1);
@@ -652,6 +705,12 @@ describe('live-caption cache layer', () => {
       originalText: 'Hello updated',
       segmentStartMs: 40,
       segmentEndMs: 55,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 1,
+      sourceResetId: 'reset-1',
       revision: 2
     });
     expect(await cache.getTranslatedCaptionSegmentByIdentity({
@@ -663,6 +722,12 @@ describe('live-caption cache layer', () => {
       translatedText: 'سلامِ جدید',
       segmentStartMs: 40,
       segmentEndMs: 55,
+      sourceTimelineType: 'provider',
+      sourceStartMs: 10,
+      sourceEndMs: 20,
+      sourceClockId: 'provider-session',
+      sourceSequence: 1,
+      sourceResetId: 'reset-2',
       revision: 2
     });
     expect(await cache.getTranscriptSegments({ tabId: 21, videoFingerprint: 'video-canonical' })).toHaveLength(1);

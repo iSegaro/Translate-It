@@ -619,6 +619,12 @@ describe('live-caption session model', () => {
       originalText: 'Test',
       startMs: 100,
       endMs: 200,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 80,
+      sourceEndMs: 220,
+      sourceClockId: 'capture-clock-1',
+      sourceSequence: 11,
+      sourceResetId: 'reset-1',
       providerUtteranceId: 'utt-123',
       providerSequence: 12,
       providerRevision: 3,
@@ -631,6 +637,12 @@ describe('live-caption session model', () => {
     expect(segment.providerRevision).toBe(3);
     expect(segment.providerStreamId).toBe('stream-xyz');
     expect(segment.providerChannel).toBe(2);
+    expect(segment.sourceTimelineType).toBe('capture');
+    expect(segment.sourceStartMs).toBe(80);
+    expect(segment.sourceEndMs).toBe(220);
+    expect(segment.sourceClockId).toBe('capture-clock-1');
+    expect(segment.sourceSequence).toBe(11);
+    expect(segment.sourceResetId).toBe('reset-1');
 
     const transSegment = videoSession.addTranslatedCaptionSegment({
       sessionId: 'session-a',
@@ -638,6 +650,12 @@ describe('live-caption session model', () => {
       translatedText: 'Translated',
       startMs: 100,
       endMs: 200,
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 200,
+      sourceClockId: 'provider-session',
+      sourceSequence: 99,
+      sourceResetId: 'reset-2',
       providerUtteranceId: 'utt-123',
       providerSequence: 12,
       providerRevision: 3,
@@ -650,6 +668,12 @@ describe('live-caption session model', () => {
     expect(transSegment.providerRevision).toBe(3);
     expect(transSegment.providerStreamId).toBe('stream-xyz');
     expect(transSegment.providerChannel).toBe(2);
+    expect(transSegment.sourceTimelineType).toBe('provider');
+    expect(transSegment.sourceStartMs).toBe(100);
+    expect(transSegment.sourceEndMs).toBe(200);
+    expect(transSegment.sourceClockId).toBe('provider-session');
+    expect(transSegment.sourceSequence).toBe(99);
+    expect(transSegment.sourceResetId).toBe('reset-2');
   });
 
   it('manages one page session per tab and cleans up fail closed', () => {
