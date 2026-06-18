@@ -92,7 +92,8 @@ function normalizeRuntimeData(data = {}) {
     clearCache: Boolean(data.clearCache),
     requestSource: data.requestSource ?? 'content',
     metadata: data.metadata ? { ...data.metadata } : null,
-    streamId: data.streamId ?? null
+    streamId: data.streamId ?? null,
+    mediaAnchorMs: data.mediaAnchorMs ?? null
   };
 }
 

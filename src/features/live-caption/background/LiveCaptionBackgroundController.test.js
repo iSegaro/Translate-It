@@ -234,6 +234,23 @@ describe("live-caption background controller", () => {
     expect(globalThis.chrome.tabCapture.capture).not.toHaveBeenCalled();
   });
 
+  it("stores mediaAnchorMs when starting session", async () => {
+    const controller = createController();
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000
+      }),
+      { tab: { id: 7 } },
+    );
+    const session = controller.sessionManager.getSession(7);
+    expect(session).not.toBeNull();
+    expect(session.activeVideoSession).not.toBeNull();
+    expect(session.activeVideoSession.mediaAnchorMs).toBe(3000);
+  });
+
   it("routes finalized chunks through the normal message-handler path", async () => {
     const controller = createController();
     controller.captureCoordinator.recordSnapshot = vi.fn();

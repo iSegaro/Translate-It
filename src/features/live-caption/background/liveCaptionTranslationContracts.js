@@ -41,6 +41,8 @@ export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
   const videoFingerprint = segment.videoFingerprint ?? null;
   const segmentStartMs = toNumberOrNull(segment.segmentStartMs ?? segment.startMs);
   const segmentEndMs = toNumberOrNull(segment.segmentEndMs ?? segment.endMs);
+  const mediaStartMs = toNumberOrNull(segment.mediaStartMs);
+  const mediaEndMs = toNumberOrNull(segment.mediaEndMs);
   const originalText = normalizeTextValue(segment.originalText ?? segment.text ?? '');
 
   if (!sessionId || !videoFingerprint || segmentStartMs == null || segmentEndMs == null || !originalText) {
@@ -59,6 +61,8 @@ export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
     videoFingerprint,
     segmentStartMs,
     segmentEndMs,
+    mediaStartMs,
+    mediaEndMs,
     originalText,
     sourceLanguage: segment.sourceLanguage ?? segment.detectedLanguage ?? null,
     targetLanguage: segment.targetLanguage ?? null,

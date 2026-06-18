@@ -946,8 +946,14 @@ export class LiveCaptionBackgroundController {
       const videoFingerprint = request.data.videoFingerprint ?? session.activeVideoFingerprint;
       if (videoFingerprint) {
         if (!session.activeVideoSession || session.activeVideoSession.videoFingerprint !== videoFingerprint) {
-          const videoSession = new VideoCaptionSession({ tabId, videoFingerprint });
+          const videoSession = new VideoCaptionSession({
+            tabId,
+            videoFingerprint,
+            mediaAnchorMs: request.data.mediaAnchorMs ?? null
+          });
           session.attachVideoSession(videoSession);
+        } else if (request.data.mediaAnchorMs != null) {
+          session.activeVideoSession.mediaAnchorMs = request.data.mediaAnchorMs;
         }
 
         const activeVideoSession = session.activeVideoSession;

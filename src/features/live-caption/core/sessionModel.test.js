@@ -515,6 +515,98 @@ describe('live-caption session model', () => {
     });
   });
 
+  it('computes mediaStartMs and mediaEndMs using mediaAnchorMs', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      mediaAnchorMs: 5000
+    });
+
+    expect(videoSession.mediaAnchorMs).toBe(5000);
+
+    const segment = videoSession.addTranscriptSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      originalText: 'Test',
+      startMs: 100,
+      endMs: 200
+    });
+
+    expect(segment.mediaStartMs).toBe(5100);
+    expect(segment.mediaEndMs).toBe(5200);
+
+    const transSegment = videoSession.addTranslatedCaptionSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      translatedText: 'Test Translated',
+      originalText: 'Test',
+      startMs: 300,
+      endMs: 400
+    });
+
+    expect(transSegment.mediaStartMs).toBe(5300);
+    expect(transSegment.mediaEndMs).toBe(5400);
+  });
+
+  it('falls back safely when mediaAnchorMs is missing or not a finite number', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      mediaAnchorMs: null
+    });
+
+    const segment = videoSession.addTranscriptSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      originalText: 'Test',
+      startMs: 100,
+      endMs: 200
+    });
+
+    expect(segment.mediaStartMs).toBeNull();
+    expect(segment.mediaEndMs).toBeNull();
+  });
+
+  it('normalizes numeric strings and handles invalid non-finite values safely', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      mediaAnchorMs: '5000'
+    });
+
+    const segment = videoSession.addTranscriptSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      originalText: 'Test',
+      startMs: '100',
+      endMs: '200'
+    });
+
+    expect(segment.startMs).toBe(100);
+    expect(segment.endMs).toBe(200);
+    expect(segment.mediaStartMs).toBe(5100);
+    expect(segment.mediaEndMs).toBe(5200);
+
+    const videoSessionInvalid = new VideoCaptionSession({
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      mediaAnchorMs: 'invalid-anchor'
+    });
+
+    const segmentInvalid = videoSessionInvalid.addTranscriptSegment({
+      sessionId: 'session-a',
+      videoFingerprint: 'video-a',
+      originalText: 'Test',
+      startMs: 'invalid-start',
+      endMs: 200
+    });
+
+    expect(segmentInvalid.startMs).toBeNull();
+    expect(segmentInvalid.endMs).toBe(200);
+    expect(segmentInvalid.mediaStartMs).toBeNull();
+    expect(segmentInvalid.mediaEndMs).toBeNull();
+  });
+
   it('manages one page session per tab and cleans up fail closed', () => {
     const manager = new LiveCaptionSessionManager();
 

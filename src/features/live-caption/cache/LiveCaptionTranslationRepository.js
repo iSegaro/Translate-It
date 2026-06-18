@@ -124,6 +124,13 @@ function normalizeTranslationSegment(segment) {
   const now = segment.createdAt || Date.now();
   const sessionKey = createLiveCaptionVideoCacheKey(tabId, videoFingerprint);
 
+  const mediaStartMs = segment.mediaStartMs != null && Number.isFinite(Number(segment.mediaStartMs))
+    ? Number(segment.mediaStartMs)
+    : null;
+  const mediaEndMs = segment.mediaEndMs != null && Number.isFinite(Number(segment.mediaEndMs))
+    ? Number(segment.mediaEndMs)
+    : null;
+
   return {
     entryKey: segment.entryKey ?? createLiveCaptionTranslatedSegmentCacheKey({
       tabId,
@@ -139,6 +146,8 @@ function normalizeTranslationSegment(segment) {
     videoFingerprint,
     segmentStartMs,
     segmentEndMs,
+    mediaStartMs,
+    mediaEndMs,
     segmentTiming: [segmentStartMs, segmentEndMs],
     originalText,
     translatedText,

@@ -1152,10 +1152,17 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         return this.getSnapshot();
       }
 
+      // TODO: enable playback-time rendering only after segment timestamps are mapped to the media timeline.
+      // This mapping is valid only for uninterrupted continuous playback and must be extended before enabling seek-aware renderer.
+      const mediaAnchorMs = this.currentVideoElement
+        ? this.currentVideoElement.currentTime * 1000
+        : null;
+
       const response = await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.RUNTIME_START, {
         tabId,
         sessionId: this.pageSession.sessionId,
         videoFingerprint: this.currentVideoFingerprint,
+        mediaAnchorMs: Number.isFinite(mediaAnchorMs) ? mediaAnchorMs : null,
         reason: 'start'
       });
 

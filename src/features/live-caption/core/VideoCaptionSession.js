@@ -109,7 +109,15 @@ function compareCanonicalRevision(previousSegment, nextSegment) {
   return 0;
 }
 
-function normalizeSegment(segment, kind) {
+function toNumberOrNull(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
   if (!segment || typeof segment !== 'object') {
     throw new TypeError(`VideoCaptionSession.${kind} requires a segment object`);
   }
@@ -118,12 +126,33 @@ function normalizeSegment(segment, kind) {
   liveCaptionSegmentCounter += 1;
   const normalizedSegment = { ...segment };
 
+  const rawStart = normalizedSegment.startMs ?? normalizedSegment.segmentStartMs ?? null;
+  const rawEnd = normalizedSegment.endMs ?? normalizedSegment.segmentEndMs ?? null;
+
+  const startMs = toNumberOrNull(rawStart);
+  const endMs = toNumberOrNull(rawEnd);
+  const mediaAnchorMs = toNumberOrNull(mediaAnchorMsInput);
+
+  let mediaStartMs = toNumberOrNull(normalizedSegment.mediaStartMs);
+  let mediaEndMs = toNumberOrNull(normalizedSegment.mediaEndMs);
+
+  if (mediaAnchorMs !== null) {
+    if (mediaStartMs === null && startMs !== null) {
+      mediaStartMs = mediaAnchorMs + startMs;
+    }
+    if (mediaEndMs === null && endMs !== null) {
+      mediaEndMs = mediaAnchorMs + endMs;
+    }
+  }
+
   return {
     ...normalizedSegment,
     segmentId: normalizedSegment.segmentId || `live-caption:${kind}:${now.toString(36)}:${liveCaptionSegmentCounter.toString(36)}`,
     text: normalizedSegment.text ?? '',
-    startMs: normalizedSegment.startMs ?? null,
-    endMs: normalizedSegment.endMs ?? null,
+    startMs: rawStart === null ? null : startMs,
+    endMs: rawEnd === null ? null : endMs,
+    mediaStartMs,
+    mediaEndMs,
     sourceLanguage: normalizedSegment.sourceLanguage ?? null,
     targetLanguage: normalizedSegment.targetLanguage ?? null,
     provider: normalizedSegment.provider ?? null,
@@ -137,7 +166,7 @@ function normalizeSegment(segment, kind) {
  * Owns video fingerprint, segment accumulation, and replay metadata.
  */
 export class VideoCaptionSession {
-  constructor({ tabId, videoFingerprint, sessionId = createLiveCaptionSessionId('video', tabId) } = {}) {
+  constructor({ tabId, videoFingerprint, sessionId = createLiveCaptionSessionId('video', tabId), mediaAnchorMs = null } = {}) {
     if (tabId == null) {
       throw new TypeError('VideoCaptionSession requires a tabId');
     }
@@ -145,6 +174,7 @@ export class VideoCaptionSession {
     this.tabId = tabId;
     this.sessionId = sessionId;
     this.videoFingerprint = videoFingerprint ?? null;
+    this.mediaAnchorMs = mediaAnchorMs ?? null;
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
     this.lifecycleState = LIVE_CAPTION_SESSION_STATES.IDLE;
@@ -228,7 +258,7 @@ export class VideoCaptionSession {
   }
 
   recordChunk(chunk) {
-    const normalizedChunk = normalizeSegment(chunk, 'recordChunk');
+    const normalizedChunk = normalizeSegment(chunk, 'recordChunk', this.mediaAnchorMs);
     this.chunkState.activeChunkId = normalizedChunk.segmentId;
     this.chunkState.chunks = [...this.chunkState.chunks, normalizedChunk];
     this.touch();
@@ -250,7 +280,7 @@ export class VideoCaptionSession {
   }
 
   addTranscriptSegment(segment) {
-    const normalizedSegment = normalizeSegment(segment, 'addTranscriptSegment');
+    const normalizedSegment = normalizeSegment(segment, 'addTranscriptSegment', this.mediaAnchorMs);
     this.transcriptSegments = [...this.transcriptSegments, normalizedSegment];
     this.touch();
 
@@ -265,7 +295,7 @@ export class VideoCaptionSession {
   }
 
   addTranslatedCaptionSegment(segment) {
-    const normalizedSegment = normalizeSegment(segment, 'addTranslatedCaptionSegment');
+    const normalizedSegment = normalizeSegment(segment, 'addTranslatedCaptionSegment', this.mediaAnchorMs);
     this.translatedCaptionSegments = [...this.translatedCaptionSegments, normalizedSegment];
     this.touch();
 
@@ -350,7 +380,8 @@ export class VideoCaptionSession {
         ...segment,
         ...identity
       },
-      kind
+      kind,
+      this.mediaAnchorMs
     );
     const incomingRevision = normalizeRevisionValue(normalizedSegment.revision);
 
@@ -454,7 +485,8 @@ export class VideoCaptionSession {
         ...segment,
         ...normalizedIdentity
       },
-      kind
+      kind,
+      this.mediaAnchorMs
     );
 
     segments[existingIndex] = normalizedSegment;

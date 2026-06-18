@@ -300,6 +300,8 @@ export class LiveCaptionTranslationCoordinator {
       sessionId: sourceSegment.sessionId ?? captionSegment.sessionId ?? null,
       tabId: sourceSegment.tabId ?? tabId ?? captionSegment.tabId ?? null,
       videoFingerprint: sourceSegment.videoFingerprint ?? captionSegment.videoFingerprint ?? null,
+      mediaStartMs: sourceSegment.mediaStartMs ?? captionSegment.mediaStartMs ?? null,
+      mediaEndMs: sourceSegment.mediaEndMs ?? captionSegment.mediaEndMs ?? null,
       segmentId: canonicalIdentity.segmentId,
       revision,
       sourceLanguage: captionSegment.sourceLanguage ?? sourceSegment.sourceLanguage ?? null,
@@ -321,7 +323,9 @@ export class LiveCaptionTranslationCoordinator {
 
     if (!canonicalState) {
       const committedCaptionSegment = {
-        ...captionSegment
+        ...captionSegment,
+        mediaStartMs: sourceSegment.mediaStartMs ?? captionSegment.mediaStartMs ?? null,
+        mediaEndMs: sourceSegment.mediaEndMs ?? captionSegment.mediaEndMs ?? null
       };
 
       if (typeof activeVideoSession.addTranslatedCaptionSegment === 'function') {

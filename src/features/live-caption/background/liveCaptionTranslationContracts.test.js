@@ -30,6 +30,8 @@ describe('live-caption translation contracts', () => {
       videoFingerprint: 'video-a',
       segmentStartMs: 100,
       segmentEndMs: 250,
+      mediaStartMs: null,
+      mediaEndMs: null,
       originalText: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: null,
@@ -180,5 +182,20 @@ describe('live-caption translation contracts', () => {
       targetLanguage: 'fa',
       retryable: true
     });
+  });
+
+  it('preserves mediaStartMs and mediaEndMs properties in transcript segment normalization', () => {
+    const segment = normalizeLiveCaptionTranscriptSegment({
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      segmentStartMs: 100,
+      segmentEndMs: 250,
+      mediaStartMs: 5100,
+      mediaEndMs: 5250,
+      originalText: 'Hello'
+    });
+
+    expect(segment.mediaStartMs).toBe(5100);
+    expect(segment.mediaEndMs).toBe(5250);
   });
 });
