@@ -968,6 +968,10 @@ export class LiveCaptionBackgroundController {
         }
 
         const activeVideoSession = session.activeVideoSession;
+        if (activeVideoSession && typeof activeVideoSession.clearTimelineAnchors === 'function') {
+          activeVideoSession.clearTimelineAnchors();
+        }
+
         const rawMediaAnchorMs = request.data.mediaAnchorMs;
         const mediaAnchorMs = rawMediaAnchorMs == null || rawMediaAnchorMs === ''
           ? null
@@ -978,8 +982,7 @@ export class LiveCaptionBackgroundController {
         if (
           activeVideoSession &&
           Number.isFinite(mediaAnchorMs) &&
-          typeof activeVideoSession.getTimelineAnchors === 'function' &&
-          activeVideoSession.getTimelineAnchors().length === 0
+          typeof activeVideoSession.addTimelineAnchor === 'function'
         ) {
           activeVideoSession.addTimelineAnchor({
             reason: 'start',

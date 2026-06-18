@@ -261,6 +261,45 @@ describe("live-caption background controller", () => {
     });
   });
 
+  it("restarts the start timeline anchor when the same video session is started again", async () => {
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 4000,
+        playbackRate: 1.25
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session).not.toBeNull();
+    expect(session.activeVideoSession).not.toBeNull();
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+    expect(session.activeVideoSession.getTimelineAnchors()[0]).toMatchObject({
+      reason: "start",
+      sourceMs: 0,
+      mediaMs: 4000,
+      playbackRate: 1.25,
+      sessionId: "session-1",
+      videoFingerprint: "video-a"
+    });
+  });
+
   it("does not create a start timeline anchor when mediaAnchorMs is invalid", async () => {
     const controller = createController();
     await controller.handleRuntimeStart(
@@ -273,6 +312,37 @@ describe("live-caption background controller", () => {
       }),
       { tab: { id: 7 } },
     );
+    const session = controller.sessionManager.getSession(7);
+    expect(session).not.toBeNull();
+    expect(session.activeVideoSession).not.toBeNull();
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(0);
+  });
+
+  it("clears stale anchors when a restart start request has an invalid media anchor", async () => {
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: null,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
     const session = controller.sessionManager.getSession(7);
     expect(session).not.toBeNull();
     expect(session.activeVideoSession).not.toBeNull();
