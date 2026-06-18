@@ -186,6 +186,68 @@ describe('live-caption overlay shell', () => {
     expect(wrapper.text()).not.toContain('Hello');
   });
 
+  it('renders last 2 finalized captions when videoElement is provided or missing', () => {
+    const captionLines = [
+      {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        segmentStartMs: 100,
+        segmentEndMs: 200,
+        originalText: 'One',
+        translatedText: 'یک',
+        isFinal: true
+      },
+      {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        segmentStartMs: 300,
+        segmentEndMs: 400,
+        originalText: 'Two',
+        translatedText: 'دو',
+        isFinal: true
+      },
+      {
+        sessionId: 'session-1',
+        videoFingerprint: 'video-1',
+        segmentStartMs: 500,
+        segmentEndMs: 600,
+        originalText: 'Three',
+        translatedText: 'سه',
+        isFinal: true
+      }
+    ];
+
+    // Missing videoElement case
+    const wrapperMissing = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionLines,
+        videoElement: null
+      }
+    });
+    expect(wrapperMissing.findAll('.live-caption-caption-line')).toHaveLength(2);
+    expect(wrapperMissing.text()).toContain('دو');
+    expect(wrapperMissing.text()).toContain('سه');
+    expect(wrapperMissing.text()).not.toContain('یک');
+
+    // Provided videoElement case (should behave exactly the same due to disabled timing comparison)
+    const mockVideo = {
+      currentTime: 0.1,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
+    };
+    const wrapperProvided = mount(LiveCaptionCaptionTrack, {
+      props: {
+        captionLines,
+        videoElement: mockVideo
+      }
+    });
+    expect(wrapperProvided.findAll('.live-caption-caption-line')).toHaveLength(2);
+    expect(wrapperProvided.text()).toContain('دو');
+    expect(wrapperProvided.text()).toContain('سه');
+    expect(wrapperProvided.text()).not.toContain('یک');
+  });
+
+
 
   it('emits control actions only', async () => {
     const wrapper = mount(LiveCaptionControls, {

@@ -26,10 +26,15 @@ const props = defineProps({
   captionDisplayMode: {
     type: String,
     default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
+  },
+  videoElement: {
+    type: Object,
+    default: null
   }
 });
 
 const MAX_VISIBLE_CAPTION_SEGMENTS = 2;
+// TODO: enable playback-time rendering only after segment timestamps are mapped to the media timeline.
 
 const finalizedLines = computed(() => {
   if (!Array.isArray(props.captionLines)) return [];
@@ -40,6 +45,7 @@ const finalizedLines = computed(() => {
     const text = line?.translatedText || line?.originalText || '';
     return text.trim().length > 0;
   });
+
   return lines.slice(-MAX_VISIBLE_CAPTION_SEGMENTS);
 });
 

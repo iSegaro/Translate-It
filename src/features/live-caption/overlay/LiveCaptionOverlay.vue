@@ -19,6 +19,7 @@
       <LiveCaptionCaptionTrack
         :caption-lines="captionLines"
         :caption-display-mode="captionDisplayMode"
+        :video-element="videoElement"
       />
 
       <div
