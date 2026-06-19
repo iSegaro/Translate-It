@@ -101,6 +101,35 @@ function normalizeOptionalSourceResetId(value) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeOptionalProjectedMediaTime(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizeTimelineProjectionStatus(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase()
+    : String(value).trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return ['mapped', 'unmapped', 'boundary_crossing', 'invalid'].includes(normalized) ? normalized : null;
+}
+
 function normalizeOptionalSourceClockId(value) {
   if (typeof value !== 'string') {
     return null;
@@ -214,6 +243,11 @@ export function normalizeLiveCaptionTranscriptEvent(input = {}) {
     sourceClockId: normalizeOptionalSourceClockId(event.sourceClockId),
     sourceSequence: normalizeOptionalNumber(event.sourceSequence),
     sourceResetId: normalizeOptionalSourceResetId(event.sourceResetId),
+    projectedMediaStartMs: normalizeOptionalProjectedMediaTime(event.projectedMediaStartMs),
+    projectedMediaEndMs: normalizeOptionalProjectedMediaTime(event.projectedMediaEndMs),
+    timelineProjectionStatus: normalizeTimelineProjectionStatus(event.timelineProjectionStatus),
+    timelineProjectionAnchorId: normalizeOptionalString(event.timelineProjectionAnchorId),
+    timelineProjectionReason: normalizeOptionalString(event.timelineProjectionReason),
     text: eventType === LIVE_CAPTION_TRANSCRIPT_EVENT_TYPES.ERROR
       ? null
       : normalizeTextValue(event.text ?? event.originalText ?? '', 'text'),

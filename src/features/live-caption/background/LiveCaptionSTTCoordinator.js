@@ -206,7 +206,7 @@ export class LiveCaptionSTTCoordinator {
             || transcriptEvent;
 
           // Produce transcript segment
-          const segment = {
+          let segment = {
             segmentId: normalizedTranscriptEvent.segmentId || segmentId,
             sessionId: normalizedTranscriptEvent.sessionId || sessionId,
             tabId: normalizedTranscriptEvent.tabId ?? tabId,
@@ -221,13 +221,21 @@ export class LiveCaptionSTTCoordinator {
             sourceClockId: normalizedTranscriptEvent.sourceClockId ?? null,
             sourceSequence: normalizedTranscriptEvent.sourceSequence ?? null,
             sourceResetId: normalizedTranscriptEvent.sourceResetId ?? null,
+            projectedMediaStartMs: normalizedTranscriptEvent.projectedMediaStartMs ?? null,
+            projectedMediaEndMs: normalizedTranscriptEvent.projectedMediaEndMs ?? null,
+            timelineProjectionStatus: normalizedTranscriptEvent.timelineProjectionStatus ?? null,
+            timelineProjectionAnchorId: normalizedTranscriptEvent.timelineProjectionAnchorId ?? null,
+            timelineProjectionReason: normalizedTranscriptEvent.timelineProjectionReason ?? null,
             createdAt: normalizedTranscriptEvent.createdAt || Date.now()
           };
 
           // Attach to active video session state
           const activeVideoSession = pageSession.activeVideoSession;
           if (activeVideoSession && activeVideoSession.videoFingerprint === videoFingerprint) {
-            activeVideoSession.addTranscriptSegment(segment);
+            const storedSegment = activeVideoSession.addTranscriptSegment(segment);
+            if (storedSegment) {
+              segment = storedSegment;
+            }
           }
 
           // Persist to cache

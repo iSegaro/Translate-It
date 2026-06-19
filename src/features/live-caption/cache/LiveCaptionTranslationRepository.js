@@ -90,6 +90,44 @@ function normalizeOptionalSourceClockId(value) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeOptionalProjectedMediaTime(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizeTimelineProjectionStatus(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase()
+    : String(value).trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return ['mapped', 'unmapped', 'boundary_crossing', 'invalid'].includes(normalized) ? normalized : null;
+}
+
 function createCanonicalTranslationEntryKey(identity) {
   return [
     'live-caption',
@@ -197,6 +235,11 @@ function normalizeTranslationSegment(segment) {
       ? Number(segment.sourceSequence)
       : null,
     sourceResetId: normalizeOptionalSourceResetId(segment.sourceResetId),
+    projectedMediaStartMs: normalizeOptionalProjectedMediaTime(segment.projectedMediaStartMs),
+    projectedMediaEndMs: normalizeOptionalProjectedMediaTime(segment.projectedMediaEndMs),
+    timelineProjectionStatus: normalizeTimelineProjectionStatus(segment.timelineProjectionStatus),
+    timelineProjectionAnchorId: normalizeOptionalString(segment.timelineProjectionAnchorId),
+    timelineProjectionReason: normalizeOptionalString(segment.timelineProjectionReason),
     segmentTiming: [segmentStartMs, segmentEndMs],
     originalText,
     translatedText,

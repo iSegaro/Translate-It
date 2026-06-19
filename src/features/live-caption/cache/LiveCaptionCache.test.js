@@ -219,6 +219,11 @@ function createTranscriptCanonicalSegment(overrides = {}) {
     sourceClockId: 'capture-clock-1',
     sourceSequence: 1,
     sourceResetId: 'reset-1',
+    projectedMediaStartMs: 310,
+    projectedMediaEndMs: 360,
+    timelineProjectionStatus: 'mapped',
+    timelineProjectionAnchorId: 'anchor-1',
+    timelineProjectionReason: 'start',
     revision: 1,
     ...overrides
   };
@@ -240,6 +245,11 @@ function createTranslatedCanonicalSegment(overrides = {}) {
     sourceClockId: 'provider-session',
     sourceSequence: 1,
     sourceResetId: 'reset-2',
+    projectedMediaStartMs: 310,
+    projectedMediaEndMs: 360,
+    timelineProjectionStatus: 'mapped',
+    timelineProjectionAnchorId: 'anchor-1',
+    timelineProjectionReason: 'start',
     revision: 1,
     ...overrides
   };
@@ -331,6 +341,11 @@ describe('live-caption cache layer', () => {
       sourceClockId: 'capture-clock-1',
       sourceSequence: 12,
       sourceResetId: 'reset-1',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       audio: new Uint8Array([1, 2, 3]),
       stream: { id: 'raw-stream' },
       providerUtteranceId: 'utt-123',
@@ -351,7 +366,12 @@ describe('live-caption cache layer', () => {
       providerSequence: 12,
       providerRevision: 3,
       providerStreamId: 'stream-xyz',
-      providerChannel: 2
+      providerChannel: 2,
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
     expect(result.audio).toBeUndefined();
     expect(result.stream).toBeUndefined();
@@ -365,6 +385,11 @@ describe('live-caption cache layer', () => {
     expect(persisted.providerRevision).toBe(3);
     expect(persisted.providerStreamId).toBe('stream-xyz');
     expect(persisted.providerChannel).toBe(2);
+    expect(persisted.projectedMediaStartMs).toBe(310);
+    expect(persisted.projectedMediaEndMs).toBe(360);
+    expect(persisted.timelineProjectionStatus).toBe('mapped');
+    expect(persisted.timelineProjectionAnchorId).toBe('anchor-1');
+    expect(persisted.timelineProjectionReason).toBe('start');
     expect(persisted.sourceTimelineType).toBe('capture');
     expect(persisted.sourceStartMs).toBe(90);
     expect(persisted.sourceEndMs).toBe(260);
@@ -386,7 +411,12 @@ describe('live-caption cache layer', () => {
       providerSequence: 12,
       providerRevision: 3,
       providerStreamId: 'stream-xyz',
-      sourceResetId: 'reset-1'
+      sourceResetId: 'reset-1',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
 
     await repository.clearVideo({ tabId: 1, videoFingerprint: 'video-a' });
@@ -429,7 +459,12 @@ describe('live-caption cache layer', () => {
       sourceEndMs: 20,
       sourceClockId: 'provider-session',
       sourceSequence: 77,
-      sourceResetId: 'reset-2'
+      sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
 
     await flush();
@@ -445,11 +480,21 @@ describe('live-caption cache layer', () => {
       sourceClockId: 'provider-session',
       sourceSequence: 77,
       sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       providerUtteranceId: 'utt-456',
       providerSequence: 13,
       providerRevision: 4,
       providerStreamId: 'stream-wxy',
-      providerChannel: 3
+      providerChannel: 3,
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
 
     expect(await transcriptRepository.getByVideo({ tabId: 1, videoFingerprint: 'video-b' })).toHaveLength(1);
@@ -711,6 +756,11 @@ describe('live-caption cache layer', () => {
       sourceClockId: 'capture-clock-1',
       sourceSequence: 1,
       sourceResetId: 'reset-1',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       revision: 2
     });
     expect(await cache.getTranslatedCaptionSegmentByIdentity({
@@ -728,6 +778,11 @@ describe('live-caption cache layer', () => {
       sourceClockId: 'provider-session',
       sourceSequence: 1,
       sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       revision: 2
     });
     expect(await cache.getTranscriptSegments({ tabId: 21, videoFingerprint: 'video-canonical' })).toHaveLength(1);

@@ -28,7 +28,12 @@ describe('live-caption translation contracts', () => {
       sourceEndMs: '260',
       sourceClockId: 'capture-clock-1',
       sourceSequence: '12',
-      sourceResetId: 'reset-1'
+      sourceResetId: 'reset-1',
+      projectedMediaStartMs: '310',
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
 
     expect(segment).toEqual({
@@ -44,6 +49,11 @@ describe('live-caption translation contracts', () => {
       sourceClockId: 'capture-clock-1',
       sourceSequence: 12,
       sourceResetId: 'reset-1',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       originalText: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: null,
@@ -82,7 +92,12 @@ describe('live-caption translation contracts', () => {
       sourceEndMs: 250,
       sourceClockId: 'provider-session',
       sourceSequence: 99,
-      sourceResetId: 'reset-2'
+      sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     }, {
       messageId: 'msg-1',
       context: LIVE_CAPTION_TRANSLATION_CONTEXT,
@@ -102,7 +117,12 @@ describe('live-caption translation contracts', () => {
       sourceEndMs: 250,
       sourceClockId: 'provider-session',
       sourceSequence: 99,
-      sourceResetId: 'reset-2'
+      sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     }, {
       messageId: 'msg-1',
       targetLanguage: 'fa'
@@ -124,7 +144,12 @@ describe('live-caption translation contracts', () => {
       sourceEndMs: 250,
       sourceClockId: 'provider-session',
       sourceSequence: 99,
-      sourceResetId: 'reset-2'
+      sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
     expect(request).toMatchObject({
       action: MessageActions.TRANSLATE,
@@ -158,6 +183,11 @@ describe('live-caption translation contracts', () => {
       sourceClockId: 'provider-session',
       sourceSequence: 99,
       sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       isFinal: true
     }, {
       results: [{ text: 'سلام دنیا' }],
@@ -174,7 +204,12 @@ describe('live-caption translation contracts', () => {
       sourceEndMs: 250,
       sourceClockId: 'provider-session',
       sourceSequence: 99,
-      sourceResetId: 'reset-2'
+      sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start'
     });
 
     expect(caption).toEqual({
@@ -188,6 +223,11 @@ describe('live-caption translation contracts', () => {
       sourceClockId: 'provider-session',
       sourceSequence: 99,
       sourceResetId: 'reset-2',
+      projectedMediaStartMs: 310,
+      projectedMediaEndMs: 360,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       originalText: 'Hello world',
       translatedText: 'سلام دنیا',
       sourceLanguage: 'en',

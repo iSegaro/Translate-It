@@ -163,6 +163,252 @@ describe('live-caption session model', () => {
     });
   });
 
+  it('projects transcript and translated caption segments against stored anchors', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    const startAnchor = videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint
+    });
+
+    const transcript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+    const caption = videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200,
+      translatedText: 'hola mundo'
+    }));
+
+    expect(transcript).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: startAnchor.anchorId,
+      timelineProjectionReason: null
+    });
+    expect(caption).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: startAnchor.anchorId,
+      timelineProjectionReason: null
+    });
+
+    const snapshot = videoSession.getSnapshot();
+    expect(snapshot.transcriptSegments[0]).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: startAnchor.anchorId,
+      timelineProjectionReason: null
+    });
+    expect(snapshot.translatedCaptionSegments[0]).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: startAnchor.anchorId,
+      timelineProjectionReason: null
+    });
+  });
+
+  it('marks transcript projection as unmapped when no anchor exists', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId
+    });
+
+    const transcript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+
+    expect(transcript).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'unmapped',
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: 'no_compatible_anchor'
+    });
+  });
+
+  it('marks transcript projection as boundary crossing when an anchor boundary is crossed', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    const startAnchor = videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint
+    });
+    videoSession.addTimelineAnchor({
+      reason: 'resume',
+      sourceMs: 150,
+      mediaMs: 5150,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint
+    });
+
+    const transcript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+
+    expect(transcript).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'boundary_crossing',
+      timelineProjectionAnchorId: startAnchor.anchorId,
+      timelineProjectionReason: 'segment_crosses_anchor_boundary'
+    });
+  });
+
+  it('refreshes transcript and translated caption projections when anchors change', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    const transcript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+    const caption = videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200,
+      translatedText: 'hola mundo'
+    }));
+
+    expect(transcript).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'unmapped',
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: 'no_compatible_anchor'
+    });
+    expect(caption).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'unmapped',
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: 'no_compatible_anchor'
+    });
+
+    const transcriptSegmentIdsBefore = videoSession.transcriptSegments.map((segment) => segment.segmentId);
+    const translatedSegmentIdsBefore = videoSession.translatedCaptionSegments.map((segment) => segment.segmentId);
+
+    videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint
+    });
+
+    expect(videoSession.transcriptSegments.map((segment) => segment.segmentId)).toEqual(transcriptSegmentIdsBefore);
+    expect(videoSession.translatedCaptionSegments.map((segment) => segment.segmentId)).toEqual(translatedSegmentIdsBefore);
+    expect(videoSession.transcriptSegments[0]).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: videoSession.timelineAnchors[0].anchorId,
+      timelineProjectionReason: null
+    });
+    expect(videoSession.translatedCaptionSegments[0]).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: videoSession.timelineAnchors[0].anchorId,
+      timelineProjectionReason: null
+    });
+
+    videoSession.clearTimelineAnchors();
+
+    expect(videoSession.transcriptSegments).toHaveLength(1);
+    expect(videoSession.translatedCaptionSegments).toHaveLength(1);
+    expect(videoSession.transcriptSegments[0]).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'unmapped',
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: 'no_compatible_anchor'
+    });
+    expect(videoSession.translatedCaptionSegments[0]).toMatchObject({
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: 'unmapped',
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: 'no_compatible_anchor'
+    });
+  });
+
+  it('preserves segment order and canonical identity during projection refresh', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      segmentId: 'segment-1',
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      segmentId: 'segment-2',
+      text: 'second transcript',
+      revision: 2,
+      sourceTimelineType: 'capture',
+      sourceStartMs: 300,
+      sourceEndMs: 400
+    }));
+
+    const transcriptIdsBefore = videoSession.transcriptSegments.map((segment) => segment.segmentId);
+
+    videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint
+    });
+
+    expect(videoSession.transcriptSegments.map((segment) => segment.segmentId)).toEqual(transcriptIdsBefore);
+    expect(videoSession.transcriptSegments[0].segmentId).toBe('segment-1');
+    expect(videoSession.transcriptSegments[1].segmentId).toBe('segment-2');
+  });
+
   it('ignores invalid timeline anchors and can clear anchors', () => {
     const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
 

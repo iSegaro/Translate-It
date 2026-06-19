@@ -45,6 +45,11 @@ describe('live-caption transcript contracts', () => {
       sourceClockId: 'capture-clock-1',
       sourceSequence: '12',
       sourceResetId: 'reset-1',
+      projectedMediaStartMs: '400',
+      projectedMediaEndMs: 520,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       text: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
@@ -74,6 +79,11 @@ describe('live-caption transcript contracts', () => {
       sourceClockId: 'capture-clock-1',
       sourceSequence: 12,
       sourceResetId: 'reset-1',
+      projectedMediaStartMs: 400,
+      projectedMediaEndMs: 520,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: 'anchor-1',
+      timelineProjectionReason: 'start',
       text: 'Hello world',
       sourceLanguage: 'en',
       targetLanguage: 'fa',
@@ -109,6 +119,11 @@ describe('live-caption transcript contracts', () => {
       sourceClockId: '   ',
       sourceSequence: 'NaN',
       sourceResetId: '',
+      projectedMediaStartMs: 'invalid',
+      projectedMediaEndMs: '   ',
+      timelineProjectionStatus: 'bad-type',
+      timelineProjectionAnchorId: '   ',
+      timelineProjectionReason: '   ',
       text: 'Hello world'
     });
 
@@ -118,7 +133,12 @@ describe('live-caption transcript contracts', () => {
       sourceEndMs: null,
       sourceClockId: null,
       sourceSequence: null,
-      sourceResetId: null
+      sourceResetId: null,
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: null,
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: null
     });
   });
 

@@ -71,6 +71,35 @@ function normalizeOptionalSourceClockId(value) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeOptionalProjectedMediaTime(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return null;
+  }
+
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizeTimelineProjectionStatus(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase()
+    : String(value).trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return ['mapped', 'unmapped', 'boundary_crossing', 'invalid'].includes(normalized) ? normalized : null;
+}
+
 export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
   const sessionId = segment.sessionId ?? null;
   const videoFingerprint = segment.videoFingerprint ?? null;
@@ -104,6 +133,11 @@ export function normalizeLiveCaptionTranscriptSegment(segment = {}) {
     sourceClockId: normalizeOptionalSourceClockId(segment.sourceClockId),
     sourceSequence: toNumberOrNull(segment.sourceSequence),
     sourceResetId: normalizeOptionalSourceResetId(segment.sourceResetId),
+    projectedMediaStartMs: normalizeOptionalProjectedMediaTime(segment.projectedMediaStartMs),
+    projectedMediaEndMs: normalizeOptionalProjectedMediaTime(segment.projectedMediaEndMs),
+    timelineProjectionStatus: normalizeTimelineProjectionStatus(segment.timelineProjectionStatus),
+    timelineProjectionAnchorId: normalizeOptionalString(segment.timelineProjectionAnchorId),
+    timelineProjectionReason: normalizeOptionalString(segment.timelineProjectionReason),
     originalText,
     sourceLanguage: segment.sourceLanguage ?? segment.detectedLanguage ?? null,
     targetLanguage: segment.targetLanguage ?? null,
@@ -135,7 +169,12 @@ export function createLiveCaptionTranslationRequestMetadata(segment, options = {
     sourceEndMs: transcriptSegment.sourceEndMs ?? null,
     sourceClockId: transcriptSegment.sourceClockId ?? null,
     sourceSequence: transcriptSegment.sourceSequence ?? null,
-    sourceResetId: transcriptSegment.sourceResetId ?? null
+    sourceResetId: transcriptSegment.sourceResetId ?? null,
+    projectedMediaStartMs: transcriptSegment.projectedMediaStartMs ?? null,
+    projectedMediaEndMs: transcriptSegment.projectedMediaEndMs ?? null,
+    timelineProjectionStatus: transcriptSegment.timelineProjectionStatus ?? null,
+    timelineProjectionAnchorId: transcriptSegment.timelineProjectionAnchorId ?? null,
+    timelineProjectionReason: transcriptSegment.timelineProjectionReason ?? null
   });
 }
 
@@ -182,6 +221,11 @@ export function createLiveCaptionTranslatedCaptionSegment(segment, translationRe
     sourceClockId: metadata.sourceClockId ?? transcriptSegment.sourceClockId ?? null,
     sourceSequence: metadata.sourceSequence ?? transcriptSegment.sourceSequence ?? null,
     sourceResetId: metadata.sourceResetId ?? transcriptSegment.sourceResetId ?? null,
+    projectedMediaStartMs: metadata.projectedMediaStartMs ?? transcriptSegment.projectedMediaStartMs ?? null,
+    projectedMediaEndMs: metadata.projectedMediaEndMs ?? transcriptSegment.projectedMediaEndMs ?? null,
+    timelineProjectionStatus: metadata.timelineProjectionStatus ?? transcriptSegment.timelineProjectionStatus ?? null,
+    timelineProjectionAnchorId: metadata.timelineProjectionAnchorId ?? transcriptSegment.timelineProjectionAnchorId ?? null,
+    timelineProjectionReason: metadata.timelineProjectionReason ?? transcriptSegment.timelineProjectionReason ?? null,
     originalText: transcriptSegment.originalText,
     translatedText,
     sourceLanguage: translationResult.sourceLanguage ?? metadata.sourceLanguage ?? transcriptSegment.sourceLanguage ?? null,

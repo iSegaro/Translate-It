@@ -1302,7 +1302,12 @@ describe("live-caption background controller", () => {
       sourceStartMs: 0,
       sourceEndMs: 1000,
       sourceClockId: "session-1",
-      sourceSequence: 1
+      sourceSequence: 1,
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: "unmapped",
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: "no_compatible_anchor"
     });
     expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
       sessionId: "session-1",
@@ -1311,7 +1316,12 @@ describe("live-caption background controller", () => {
       segmentId: "segment-1"
     })).toMatchObject({
       revision: 1,
-      text: "hello world"
+      text: "hello world",
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: "unmapped",
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: "no_compatible_anchor"
     });
     expect(cache.upsertTranscriptSegmentByIdentity).toHaveBeenCalledWith(expect.objectContaining({
       segmentId: "segment-1",
@@ -1326,6 +1336,11 @@ describe("live-caption background controller", () => {
       sourceEndMs: 1000,
       sourceClockId: "session-1",
       sourceSequence: 1,
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: "unmapped",
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: "no_compatible_anchor",
       revision: 1,
       isIncognito: false
     }));
@@ -1346,6 +1361,11 @@ describe("live-caption background controller", () => {
         sourceEndMs: 1000,
         sourceClockId: "session-1",
         sourceSequence: 1,
+        projectedMediaStartMs: null,
+        projectedMediaEndMs: null,
+        timelineProjectionStatus: "unmapped",
+        timelineProjectionAnchorId: null,
+        timelineProjectionReason: "no_compatible_anchor",
         createdAt: 1234,
         isFinal: true
       }),
@@ -1535,7 +1555,12 @@ describe("live-caption background controller", () => {
       sourceStartMs: 0,
       sourceEndMs: 1000,
       sourceClockId: "session-1",
-      sourceSequence: 2
+      sourceSequence: 2,
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: "unmapped",
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: "no_compatible_anchor"
     });
     expect(session.activeVideoSession.getTranscriptSegmentByIdentity({
       sessionId: "session-1",
@@ -1559,6 +1584,11 @@ describe("live-caption background controller", () => {
       sourceEndMs: 1000,
       sourceClockId: "session-1",
       sourceSequence: 2,
+      projectedMediaStartMs: null,
+      projectedMediaEndMs: null,
+      timelineProjectionStatus: "unmapped",
+      timelineProjectionAnchorId: null,
+      timelineProjectionReason: "no_compatible_anchor",
       revision: 2,
       isIncognito: false
     }));
@@ -1579,6 +1609,11 @@ describe("live-caption background controller", () => {
         sourceEndMs: 1000,
         sourceClockId: "session-1",
         sourceSequence: 2,
+        projectedMediaStartMs: null,
+        projectedMediaEndMs: null,
+        timelineProjectionStatus: "unmapped",
+        timelineProjectionAnchorId: null,
+        timelineProjectionReason: "no_compatible_anchor",
         createdAt: 1250,
         isFinal: true
       }),

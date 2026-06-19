@@ -7,7 +7,10 @@ import {
   createLiveCaptionSessionId,
   createVideoCaptionSessionSnapshot
 } from './contracts.js';
-import { normalizeLiveCaptionTimelineAnchor } from './LiveCaptionTimelineProjection.js';
+import {
+  normalizeLiveCaptionTimelineAnchor,
+  projectLiveCaptionSegmentToMediaTime
+} from './LiveCaptionTimelineProjection.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'VideoCaptionSession');
 
@@ -119,7 +122,7 @@ function toNumberOrNull(value) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
+function normalizeSegment(segment, kind, mediaAnchorMsInput = null, timelineAnchors = []) {
   if (!segment || typeof segment !== 'object') {
     throw new TypeError(`VideoCaptionSession.${kind} requires a segment object`);
   }
@@ -147,6 +150,27 @@ function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
     }
   }
 
+  const shouldProjectTimeline = kind !== 'recordChunk';
+  const timelineProjection = shouldProjectTimeline
+    ? projectLiveCaptionSegmentToMediaTime(
+      {
+        ...normalizedSegment,
+        sourceStartMs: normalizedSegment.sourceStartMs ?? startMs,
+        sourceEndMs: normalizedSegment.sourceEndMs ?? endMs
+      },
+      Array.isArray(timelineAnchors) ? timelineAnchors : []
+    )
+    : null;
+  const projectionFields = timelineProjection
+    ? {
+        projectedMediaStartMs: timelineProjection.mediaStartMs,
+        projectedMediaEndMs: timelineProjection.mediaEndMs,
+        timelineProjectionStatus: timelineProjection.status,
+        timelineProjectionAnchorId: timelineProjection.anchorId,
+        timelineProjectionReason: timelineProjection.reason
+      }
+    : {};
+
   return {
     ...normalizedSegment,
     segmentId: normalizedSegment.segmentId || `live-caption:${kind}:${now.toString(36)}:${liveCaptionSegmentCounter.toString(36)}`,
@@ -164,7 +188,8 @@ function normalizeSegment(segment, kind, mediaAnchorMsInput = null) {
     providerSequence: normalizedSegment.providerSequence ?? null,
     providerRevision: normalizedSegment.providerRevision ?? null,
     providerStreamId: normalizedSegment.providerStreamId ?? null,
-    providerChannel: normalizedSegment.providerChannel ?? null
+    providerChannel: normalizedSegment.providerChannel ?? null,
+    ...projectionFields
   };
 }
 
@@ -273,7 +298,7 @@ export class VideoCaptionSession {
   }
 
   recordChunk(chunk) {
-    const normalizedChunk = normalizeSegment(chunk, 'recordChunk', this.mediaAnchorMs);
+    const normalizedChunk = normalizeSegment(chunk, 'recordChunk', this.mediaAnchorMs, this.timelineAnchors);
     this.chunkState.activeChunkId = normalizedChunk.segmentId;
     this.chunkState.chunks = [...this.chunkState.chunks, normalizedChunk];
     this.touch();
@@ -295,7 +320,7 @@ export class VideoCaptionSession {
   }
 
   addTranscriptSegment(segment) {
-    const normalizedSegment = normalizeSegment(segment, 'addTranscriptSegment', this.mediaAnchorMs);
+    const normalizedSegment = normalizeSegment(segment, 'addTranscriptSegment', this.mediaAnchorMs, this.timelineAnchors);
     this.transcriptSegments = [...this.transcriptSegments, normalizedSegment];
     this.touch();
 
@@ -310,7 +335,7 @@ export class VideoCaptionSession {
   }
 
   addTranslatedCaptionSegment(segment) {
-    const normalizedSegment = normalizeSegment(segment, 'addTranslatedCaptionSegment', this.mediaAnchorMs);
+    const normalizedSegment = normalizeSegment(segment, 'addTranslatedCaptionSegment', this.mediaAnchorMs, this.timelineAnchors);
     this.translatedCaptionSegments = [...this.translatedCaptionSegments, normalizedSegment];
     this.touch();
 
@@ -335,7 +360,7 @@ export class VideoCaptionSession {
     }
 
     this.timelineAnchors = [...this.timelineAnchors, normalizedAnchor];
-    this.touch();
+    this.refreshTimelineProjections();
 
     logger.debug('Timeline anchor accumulated', {
       tabId: this.tabId,
@@ -355,8 +380,38 @@ export class VideoCaptionSession {
 
   clearTimelineAnchors() {
     this.timelineAnchors = [];
-    this.touch();
+    this.refreshTimelineProjections();
     return this.getTimelineAnchors();
+  }
+
+  refreshTimelineProjections() {
+    const refreshCollection = (collection) => collection.map((segment) => {
+      const refreshedSegment = normalizeSegment(
+        segment,
+        'refreshTimelineProjections',
+        this.mediaAnchorMs,
+        this.timelineAnchors
+      );
+
+      return {
+        ...segment,
+        projectedMediaStartMs: refreshedSegment.projectedMediaStartMs ?? null,
+        projectedMediaEndMs: refreshedSegment.projectedMediaEndMs ?? null,
+        timelineProjectionStatus: refreshedSegment.timelineProjectionStatus ?? 'unmapped',
+        timelineProjectionAnchorId: refreshedSegment.timelineProjectionAnchorId ?? null,
+        timelineProjectionReason: refreshedSegment.timelineProjectionReason ?? null
+      };
+    });
+
+    this.transcriptSegments = refreshCollection(this.transcriptSegments);
+    this.translatedCaptionSegments = refreshCollection(this.translatedCaptionSegments);
+    this.touch();
+
+    return {
+      transcriptCount: this.transcriptSegments.length,
+      translatedCaptionCount: this.translatedCaptionSegments.length,
+      timelineAnchorCount: this.timelineAnchors.length
+    };
   }
 
   rebuildCanonicalIndexes() {
@@ -432,7 +487,8 @@ export class VideoCaptionSession {
         ...identity
       },
       kind,
-      this.mediaAnchorMs
+      this.mediaAnchorMs,
+      this.timelineAnchors
     );
     const incomingRevision = normalizeRevisionValue(normalizedSegment.revision);
 
@@ -537,7 +593,8 @@ export class VideoCaptionSession {
         ...normalizedIdentity
       },
       kind,
-      this.mediaAnchorMs
+      this.mediaAnchorMs,
+      this.timelineAnchors
     );
 
     segments[existingIndex] = normalizedSegment;

@@ -498,18 +498,17 @@ export class LiveCaptionBackgroundController {
       && segment.segmentId != null
       && segment.revision != null;
 
-    if (isCanonicalTranscriptSegment && typeof activeVideoSession.upsertTranscriptSegment === 'function') {
-      activeVideoSession.upsertTranscriptSegment(segment);
-    } else {
-      activeVideoSession.addTranscriptSegment(segment);
-    }
+    const storedSegment = isCanonicalTranscriptSegment && typeof activeVideoSession.upsertTranscriptSegment === 'function'
+      ? activeVideoSession.upsertTranscriptSegment(segment)?.segment ?? null
+      : activeVideoSession.addTranscriptSegment(segment);
 
     if (this.cache) {
+      const effectiveSegment = storedSegment ?? segment;
       const cacheSegment = {
-        ...segment,
-        segmentStartMs: segment.startMs,
-        segmentEndMs: segment.endMs,
-        originalText: segment.text,
+        ...effectiveSegment,
+        segmentStartMs: effectiveSegment.startMs,
+        segmentEndMs: effectiveSegment.endMs,
+        originalText: effectiveSegment.text,
         isIncognito: pageSession.isIncognito
       };
 
@@ -525,7 +524,7 @@ export class LiveCaptionBackgroundController {
       });
     }
 
-    return segment;
+    return storedSegment ?? segment;
   }
 
   _createTranscriptSegmentFromCanonicalEvent(event, fallbackContext = {}) {
@@ -554,6 +553,11 @@ export class LiveCaptionBackgroundController {
       sourceClockId: event.sourceClockId ?? null,
       sourceSequence: event.sourceSequence ?? null,
       sourceResetId: event.sourceResetId ?? null,
+      projectedMediaStartMs: event.projectedMediaStartMs ?? null,
+      projectedMediaEndMs: event.projectedMediaEndMs ?? null,
+      timelineProjectionStatus: event.timelineProjectionStatus ?? null,
+      timelineProjectionAnchorId: event.timelineProjectionAnchorId ?? null,
+      timelineProjectionReason: event.timelineProjectionReason ?? null,
       providerUtteranceId: event.providerUtteranceId ?? null,
       providerSequence: event.providerSequence ?? null,
       providerRevision: event.providerRevision ?? null,
