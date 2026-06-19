@@ -11,6 +11,7 @@ import {
 } from './worklets/pcm16MonoStreamingProcessorAsset.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'AudioWorkletPcm16StreamingAudioSource');
+let audioWorkletSourceClockCounter = 0;
 
 export const AUDIO_WORKLET_PCM16_MONO_STREAMING_PROCESSOR_NAME = 'pcm16-mono-streaming-processor';
 export const AUDIO_WORKLET_PCM16_MONO_STREAMING_SAMPLE_RATE = 16000;
@@ -36,6 +37,11 @@ function normalizeOptionalString(value) {
 
 function normalizeAudioWorkletModuleUrl(value) {
   return normalizeOptionalString(value) ?? resolvePcm16MonoStreamingProcessorModuleUrl();
+}
+
+function createAudioWorkletSourceClockId(sourceId, sourceResetId) {
+  audioWorkletSourceClockCounter += 1;
+  return `live-caption:audio-worklet:${sourceId}:${sourceResetId}:${Date.now().toString(36)}:${audioWorkletSourceClockCounter.toString(36)}`;
 }
 
 function isJavaScriptLikeContentType(contentType = '') {
@@ -210,6 +216,9 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.bitDepth = AUDIO_WORKLET_PCM16_MONO_STREAMING_BIT_DEPTH;
     this.chunkTimeslice = DEFAULT_TIMESLICE;
     this.chunkStartMs = 0;
+    this.sourceClockId = null;
+    this.sourceResetId = 0;
+    this.sourceSequence = 0;
     this.mediaStream = null;
     this.mediaStreamSource = null;
     this.audioContext = null;
@@ -317,8 +326,15 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
       }
     });
 
+    this.sourceSequence += 1;
     this.onChunk?.(chunk);
     return chunk;
+  }
+
+  _resetSourceClockLineage() {
+    this.sourceResetId += 1;
+    this.sourceClockId = createAudioWorkletSourceClockId(this.sourceId, this.sourceResetId);
+    this.sourceSequence = 0;
   }
 
   async _flushPendingFrames() {
@@ -628,6 +644,7 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
     this.mediaStream = stream ?? null;
     this.chunkTimeslice = normalizeOptionalNumber(chunkTimeslice, DEFAULT_TIMESLICE) ?? DEFAULT_TIMESLICE;
     this.chunkStartMs = 0;
+    this._resetSourceClockLineage();
     this.pendingFrames = [];
     this.inputSampleRate = null;
     this.destroyed = false;
@@ -751,6 +768,22 @@ export class AudioWorkletPcm16StreamingAudioSource extends StreamingAudioSource 
         }
       : null;
     return this._createSessionSnapshot();
+  }
+
+  getSourceClockSnapshot() {
+    if (!this.sourceClockId) {
+      return null;
+    }
+
+    return Object.freeze({
+      sourceMs: this.chunkStartMs,
+      sourceClockId: this.sourceClockId,
+      sourceResetId: this.sourceResetId,
+      sourceTimelineType: 'capture',
+      sourceSequence: this.sourceSequence,
+      captureState: this.captureState,
+      wallClockMs: Date.now()
+    });
   }
 }
 

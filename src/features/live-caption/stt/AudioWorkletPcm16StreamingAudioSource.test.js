@@ -195,6 +195,72 @@ describe('AudioWorkletPcm16StreamingAudioSource', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
+  it('exposes a monotonic source clock snapshot across pause/resume and lineage reset', async () => {
+    const env = createMockEnvironment();
+    const source = new AudioWorkletPcm16StreamingAudioSource({
+      audioContextFactory: vi.fn(async () => env.audioContext),
+      audioWorkletNodeFactory: vi.fn(() => env.audioWorkletNode),
+      audioWorkletModuleUrl: 'mock://pcm16-worklet.js'
+    });
+
+    await source.start({
+      sessionId: 'session-snapshot',
+      tabId: 9,
+      videoFingerprint: 'video-snapshot'
+    }, {
+      stream: env.mediaStream,
+      chunkTimeslice: 100
+    });
+
+    const snapshot1 = source.getSourceClockSnapshot();
+    expect(snapshot1).toMatchObject({
+      sourceMs: 0,
+      sourceClockId: expect.any(String),
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 0,
+      captureState: 'capturing'
+    });
+
+    env.port.onmessage?.({
+      data: {
+        type: 'frame',
+        samples: new Float32Array(4800).fill(0.25),
+        sampleRate: 48000
+      }
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+    await Promise.resolve();
+
+    const snapshot2 = source.getSourceClockSnapshot();
+    expect(snapshot2.sourceMs).toBeGreaterThanOrEqual(snapshot1.sourceMs);
+    expect(snapshot2.sourceSequence).toBeGreaterThan(snapshot1.sourceSequence);
+    expect(snapshot2.sourceResetId).toBe(snapshot1.sourceResetId);
+
+    await source.pause();
+    const pausedSnapshot = source.getSourceClockSnapshot();
+    expect(pausedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId);
+
+    await source.resume();
+    const resumedSnapshot = source.getSourceClockSnapshot();
+    expect(resumedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId);
+
+    await source.stop();
+    await source.start({
+      sessionId: 'session-snapshot',
+      tabId: 9,
+      videoFingerprint: 'video-snapshot'
+    }, {
+      stream: env.mediaStream,
+      chunkTimeslice: 100
+    });
+
+    const restartedSnapshot = source.getSourceClockSnapshot();
+    expect(restartedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId + 1);
+    expect(restartedSnapshot.sourceSequence).toBe(0);
+  });
+
   it('falls back to the runtime-resolved packaged asset URL when the constructor receives null', async () => {
     const env = createMockEnvironment();
     const getURL = vi.fn((path) => `chrome-extension://extension-id/${path}`);

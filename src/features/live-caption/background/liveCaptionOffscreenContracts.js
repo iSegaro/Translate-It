@@ -12,6 +12,8 @@ export const LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES = Object.freeze({
   STATUS_REQUEST: 'live-caption/offscreen/status-request',
   STATUS_RESPONSE: 'live-caption/offscreen/status-response',
   SNAPSHOT_RESPONSE: 'live-caption/offscreen/snapshot-response',
+  SOURCE_CLOCK_SNAPSHOT_REQUEST: 'live-caption/offscreen/source-clock-snapshot-request',
+  SOURCE_CLOCK_SNAPSHOT_RESPONSE: 'live-caption/offscreen/source-clock-snapshot-response',
   FINALIZED_CHUNK: 'live-caption/offscreen/finalized-chunk',
   CAPTURE_ERROR: 'live-caption/offscreen/capture-error'
 });
@@ -191,6 +193,24 @@ export function createLiveCaptionStatusRequest({
   assertRequiredFields({ sessionId, tabId, videoFingerprint }, ['sessionId', 'tabId', 'videoFingerprint'], 'status-request');
 
   return createBaseMessage(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.STATUS_REQUEST, {
+    requestId,
+    sentAt,
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint')
+  });
+}
+
+export function createLiveCaptionSourceClockSnapshotRequest({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  requestId = null,
+  sentAt = Date.now()
+} = {}) {
+  assertRequiredFields({ sessionId, tabId, videoFingerprint }, ['sessionId', 'tabId', 'videoFingerprint'], 'source-clock-snapshot-request');
+
+  return createBaseMessage(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST, {
     requestId,
     sentAt,
     sessionId: assertNonEmptyString(sessionId, 'sessionId'),
@@ -447,6 +467,30 @@ export function createLiveCaptionOffscreenSnapshotResponse({
   });
 }
 
+export function createLiveCaptionSourceClockSnapshotResponse({
+  sessionId,
+  tabId,
+  videoFingerprint,
+  ok = true,
+  requestId = null,
+  sentAt = Date.now(),
+  sourceClockSnapshot = null,
+  error = null
+} = {}) {
+  assertRequiredFields({ sessionId, tabId, videoFingerprint }, ['sessionId', 'tabId', 'videoFingerprint'], 'source-clock-snapshot-response');
+
+  return createBaseMessage(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE, {
+    requestId,
+    sentAt,
+    ok: Boolean(ok),
+    sessionId: assertNonEmptyString(sessionId, 'sessionId'),
+    tabId: normalizeNumericValue(tabId, 'tabId'),
+    videoFingerprint: assertNonEmptyString(videoFingerprint, 'videoFingerprint'),
+    sourceClockSnapshot: sourceClockSnapshot && typeof sourceClockSnapshot === 'object' ? { ...sourceClockSnapshot } : null,
+    error: error && typeof error === 'object' ? { ...error } : null
+  });
+}
+
 export function createLiveCaptionFailClosedResponse({
   sessionId = null,
   tabId = null,
@@ -489,6 +533,19 @@ export function normalizeLiveCaptionOffscreenResponse(response, context = {}) {
   const sessionId = response.sessionId ?? context.sessionId ?? null;
   const tabId = response.tabId ?? context.tabId ?? null;
   const videoFingerprint = response.videoFingerprint ?? context.videoFingerprint ?? null;
+
+  if (type === LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE) {
+    return createBaseMessage(type, {
+      ok: response.ok !== false,
+      sessionId,
+      tabId: tabId === null ? null : normalizeNumericValue(tabId, 'tabId'),
+      videoFingerprint,
+      requestId: response.requestId ?? null,
+      sentAt: response.sentAt ?? null,
+      sourceClockSnapshot: response.sourceClockSnapshot ? { ...response.sourceClockSnapshot } : null,
+      error: response.error ? { ...response.error } : null
+    });
+  }
 
   if (response.ok === false || response.failClosed === true) {
     return createLiveCaptionFailClosedResponse({
@@ -573,6 +630,7 @@ export default {
   createLiveCaptionStartCaptureRequest,
   createLiveCaptionStopCaptureRequest,
   createLiveCaptionStatusRequest,
+  createLiveCaptionSourceClockSnapshotRequest,
   createLiveCaptionFinalizedChunkMessage,
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionStartStreamingSttSessionRequest,
@@ -581,6 +639,7 @@ export default {
   createLiveCaptionStreamingSttStatusMessage,
   createLiveCaptionStreamingSttErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionSourceClockSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse
 };

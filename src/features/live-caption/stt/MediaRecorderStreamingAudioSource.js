@@ -8,6 +8,7 @@ import {
 } from './StreamingAudioSource.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'MediaRecorderStreamingAudioSource');
+let mediaRecorderSourceClockCounter = 0;
 
 const DEFAULT_MIME_TYPE = 'audio/webm';
 const DEFAULT_TIMESLICE = 3000;
@@ -24,6 +25,11 @@ function normalizeOptionalString(value) {
 
   const normalized = String(value).trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function createMediaRecorderSourceClockId(sourceId, sourceResetId) {
+  mediaRecorderSourceClockCounter += 1;
+  return `live-caption:media-recorder:${sourceId}:${sourceResetId}:${Date.now().toString(36)}:${mediaRecorderSourceClockCounter.toString(36)}`;
 }
 
 export class MediaRecorderStreamingAudioSource extends StreamingAudioSource {
@@ -47,6 +53,9 @@ export class MediaRecorderStreamingAudioSource extends StreamingAudioSource {
     this.recorderState = 'inactive';
     this.chunkTimeslice = DEFAULT_TIMESLICE;
     this.chunkStartMs = 0;
+    this.sourceClockId = null;
+    this.sourceResetId = 0;
+    this.sourceSequence = 0;
     this.segmentChunks = [];
     this.segmentBoundaryTimer = null;
     this.segmentRotationPending = false;
@@ -119,8 +128,15 @@ export class MediaRecorderStreamingAudioSource extends StreamingAudioSource {
       }
     });
 
+    this.sourceSequence += 1;
     this.onChunk?.(normalizedChunk);
     return normalizedChunk;
+  }
+
+  _resetSourceClockLineage() {
+    this.sourceResetId += 1;
+    this.sourceClockId = createMediaRecorderSourceClockId(this.sourceId, this.sourceResetId);
+    this.sourceSequence = 0;
   }
 
   _handleMediaRecorderStop() {
@@ -260,6 +276,7 @@ export class MediaRecorderStreamingAudioSource extends StreamingAudioSource {
     this.mediaStream = stream ?? null;
     this.chunkTimeslice = normalizeOptionalNumber(chunkTimeslice, DEFAULT_TIMESLICE) ?? DEFAULT_TIMESLICE;
     this.chunkStartMs = 0;
+    this._resetSourceClockLineage();
     this.segmentRotationPending = false;
     this.lastError = null;
 
@@ -377,6 +394,30 @@ export class MediaRecorderStreamingAudioSource extends StreamingAudioSource {
     this.mediaStream = null;
     this.segmentChunks = [];
     return this._createSessionSnapshot();
+  }
+
+  getSourceClockSnapshot() {
+    if (!this.sourceClockId) {
+      return null;
+    }
+
+    return Object.freeze({
+      sourceMs: this.chunkStartMs,
+      sourceClockId: this.sourceClockId,
+      sourceResetId: this.sourceResetId,
+      sourceTimelineType: 'capture',
+      sourceSequence: this.sourceSequence,
+      captureState: this.recorderState === 'recording'
+        ? 'capturing'
+        : this.recorderState === 'paused'
+          ? 'paused'
+          : this.recorderState === 'inactive'
+            ? this.destroyed
+              ? 'destroyed'
+              : 'idle'
+            : this.recorderState,
+      wallClockMs: Date.now()
+    });
   }
 }
 

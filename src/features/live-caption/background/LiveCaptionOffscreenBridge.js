@@ -8,6 +8,8 @@ import {
   createLiveCaptionFinalizedChunkMessage,
   createLiveCaptionFailClosedResponse,
   createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionSourceClockSnapshotRequest,
+  createLiveCaptionSourceClockSnapshotResponse,
   createLiveCaptionStartCaptureRequest,
   createLiveCaptionStartStreamingSttSessionRequest,
   createLiveCaptionStopCaptureRequest,
@@ -58,6 +60,7 @@ export class LiveCaptionOffscreenBridge {
     this.lastRuntimeRequest = null;
     this.lastRuntimeResponse = null;
     this.lastSnapshot = null;
+    this.lastSourceClockSnapshot = null;
     this.lastUpdatedAt = Date.now();
 
     logger.debug('Live-caption offscreen bridge initialized', {
@@ -157,6 +160,21 @@ export class LiveCaptionOffscreenBridge {
 
   createSnapshotResponse(options = {}) {
     return createLiveCaptionOffscreenSnapshotResponse(options);
+  }
+
+  createSourceClockSnapshotRequest(options = {}) {
+    const request = createLiveCaptionSourceClockSnapshotRequest(options);
+    this.lastRequest = request;
+    logger.debug('Live-caption source clock snapshot request created', {
+      sessionId: request.sessionId,
+      tabId: request.tabId,
+      videoFingerprint: request.videoFingerprint
+    });
+    return request;
+  }
+
+  createSourceClockSnapshotResponse(options = {}) {
+    return createLiveCaptionSourceClockSnapshotResponse(options);
   }
 
   createFinalizedChunkMessage(options = {}) {
@@ -379,6 +397,63 @@ export class LiveCaptionOffscreenBridge {
     }
   }
 
+  async requestSourceClockSnapshot(options = {}) {
+    const runtime = this.getBrowserRuntime();
+    const request = this.createSourceClockSnapshotRequest(options);
+
+    if (!runtime?.sendMessage) {
+      const unavailable = createLiveCaptionSourceClockSnapshotResponse({
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        ok: false,
+        error: {
+          code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+          message: 'Live-caption offscreen bridge is unavailable',
+          reason: 'offscreen_unavailable'
+        }
+      });
+
+      this.lastSourceClockSnapshot = null;
+      this.lastResponse = unavailable;
+      return unavailable;
+    }
+
+    try {
+      const response = await runtime.sendMessage(request);
+      const normalized = normalizeLiveCaptionOffscreenResponse(response, {
+        expectedType: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        reason: 'source_clock_snapshot_failed'
+      });
+
+      this.lastResponse = normalized;
+      if (normalized?.type === LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE) {
+        this.lastSourceClockSnapshot = normalized.sourceClockSnapshot ? { ...normalized.sourceClockSnapshot } : null;
+      }
+
+      return normalized;
+    } catch (error) {
+      const unavailable = createLiveCaptionSourceClockSnapshotResponse({
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        ok: false,
+        error: {
+          code: LIVE_CAPTION_OFFSCREEN_ERROR_CODES.OFFSCREEN_UNAVAILABLE,
+          message: error?.message ?? 'Live-caption offscreen bridge is unavailable',
+          reason: 'offscreen_unavailable'
+        }
+      });
+
+      this.lastSourceClockSnapshot = null;
+      this.lastResponse = unavailable;
+      return unavailable;
+    }
+  }
+
   startStreamingSttSession(options = {}) {
     const request = createLiveCaptionStartStreamingSttSessionRequest(options);
     return this._sendStreamingRequest(request, {
@@ -586,6 +661,10 @@ export class LiveCaptionOffscreenBridge {
       this.lastSnapshot = normalized;
     }
 
+    if (normalized?.type === LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE) {
+      this.lastSourceClockSnapshot = normalized.sourceClockSnapshot ? { ...normalized.sourceClockSnapshot } : null;
+    }
+
     logger.debug('Live-caption offscreen response normalized', {
       status: normalized?.status ?? null,
       type: normalized?.type ?? null,
@@ -634,6 +713,7 @@ export class LiveCaptionOffscreenBridge {
       lastRuntimeRequest: this.lastRuntimeRequest ? { ...this.lastRuntimeRequest } : null,
       lastRuntimeResponse: this.lastRuntimeResponse ? { ...this.lastRuntimeResponse } : null,
       lastSnapshot: this.lastSnapshot ? { ...this.lastSnapshot } : null,
+      lastSourceClockSnapshot: this.lastSourceClockSnapshot ? { ...this.lastSourceClockSnapshot } : null,
       lastUpdatedAt: this.lastUpdatedAt
     };
   }
@@ -646,6 +726,8 @@ export {
   createLiveCaptionStartCaptureRequest,
   createLiveCaptionStopCaptureRequest,
   createLiveCaptionStatusRequest,
+  createLiveCaptionSourceClockSnapshotRequest,
+  createLiveCaptionSourceClockSnapshotResponse,
   createLiveCaptionFinalizedChunkMessage,
   createLiveCaptionCaptureErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,

@@ -20,6 +20,8 @@ import {
   createLiveCaptionStreamingSttStatusMessage,
   createLiveCaptionStreamingSttErrorMessage,
   createLiveCaptionOffscreenSnapshotResponse,
+  createLiveCaptionSourceClockSnapshotRequest,
+  createLiveCaptionSourceClockSnapshotResponse,
   createLiveCaptionFailClosedResponse,
   normalizeLiveCaptionOffscreenResponse,
   createLiveCaptionRuntimeShellResponse
@@ -74,6 +76,23 @@ describe('live-caption offscreen contracts', () => {
               errorMessage: null,
               userAgent: 'test-agent'
             };
+          }
+
+          if (request.type === LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST) {
+            return createLiveCaptionSourceClockSnapshotResponse({
+              sessionId: request.sessionId,
+              tabId: request.tabId,
+              videoFingerprint: request.videoFingerprint,
+              sourceClockSnapshot: {
+                sourceMs: 120,
+                sourceClockId: 'clock-1',
+                sourceResetId: 1,
+                sourceTimelineType: 'capture',
+                sourceSequence: 3,
+                captureState: 'capturing',
+                wallClockMs: 10
+              }
+            });
           }
 
           return createLiveCaptionRuntimeShellResponse(request.action, {
@@ -134,6 +153,49 @@ describe('live-caption offscreen contracts', () => {
     expect(() => createLiveCaptionStartCaptureRequest({ tabId: 7, videoFingerprint: 'video-a' })).toThrow();
     expect(() => createLiveCaptionStopCaptureRequest({ sessionId: 'session-1', tabId: 7 })).toThrow();
     expect(() => createLiveCaptionStatusRequest({ sessionId: 'session-1', videoFingerprint: 'video-a' })).toThrow();
+  });
+
+  it('creates and normalizes source clock snapshot request/response payloads', () => {
+    const request = createLiveCaptionSourceClockSnapshotRequest({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+    const response = createLiveCaptionSourceClockSnapshotResponse({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a',
+      sourceClockSnapshot: {
+        sourceMs: 120,
+        sourceClockId: 'clock-1',
+        sourceResetId: 1,
+        sourceTimelineType: 'capture',
+        sourceSequence: 3,
+        captureState: 'capturing',
+        wallClockMs: 10
+      }
+    });
+    const normalized = normalizeLiveCaptionOffscreenResponse(response, {
+      expectedType: response.type,
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(request.type).toBe(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST);
+    expect(response.type).toBe(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE);
+    expect(normalized).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sourceClockSnapshot: {
+        sourceMs: 120,
+        sourceClockId: 'clock-1',
+        sourceResetId: 1,
+        sourceTimelineType: 'capture',
+        sourceSequence: 3,
+        captureState: 'capturing'
+      }
+    });
   });
 
   it('creates and validates streaming session and transcript event payloads', () => {
@@ -284,6 +346,42 @@ describe('live-caption offscreen contracts', () => {
       chunkEndMs: 2500,
       chunkPayload: 'blob:chunk-1'
     })).toThrow();
+  });
+
+  it('requests source clock snapshots through the bridge and records the last snapshot', async () => {
+    const bridge = new LiveCaptionOffscreenBridge();
+    const sourceClockSnapshot = {
+      sourceMs: 240,
+      sourceClockId: 'clock-bridge',
+      sourceResetId: 2,
+      sourceTimelineType: 'capture',
+      sourceSequence: 4,
+      captureState: 'capturing',
+      wallClockMs: 20
+    };
+
+    globalThis.chrome.runtime.sendMessage = vi.fn(async (request) => {
+      expect(request.type).toBe(LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST);
+      return createLiveCaptionSourceClockSnapshotResponse({
+        sessionId: request.sessionId,
+        tabId: request.tabId,
+        videoFingerprint: request.videoFingerprint,
+        sourceClockSnapshot
+      });
+    });
+
+    const response = await bridge.requestSourceClockSnapshot({
+      sessionId: 'session-1',
+      tabId: 7,
+      videoFingerprint: 'video-a'
+    });
+
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sourceClockSnapshot
+    });
+    expect(bridge.getSnapshot().lastSourceClockSnapshot).toEqual(sourceClockSnapshot);
   });
 
   it('normalizes status and snapshot responses', () => {

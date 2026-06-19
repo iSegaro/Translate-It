@@ -100,6 +100,64 @@ describe('MediaRecorderStreamingAudioSource', () => {
     expect(emittedStates.some((entry) => entry.state === 'capturing')).toBe(true);
   });
 
+  it('exposes a monotonic source clock snapshot across pause/resume and lineage reset', async () => {
+    const source = new MediaRecorderStreamingAudioSource();
+
+    await source.start({
+      sessionId: 'session-snapshot',
+      tabId: 13,
+      videoFingerprint: 'video-snapshot'
+    }, {
+      stream: { id: 'stream-snapshot' },
+      mimeType: 'audio/webm',
+      chunkTimeslice: 1000
+    });
+
+    const snapshot1 = source.getSourceClockSnapshot();
+    expect(snapshot1).toMatchObject({
+      sourceMs: 0,
+      sourceClockId: expect.any(String),
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 0,
+      captureState: 'capturing'
+    });
+
+    const recorderInstance = MockMediaRecorder.instances[0];
+    recorderInstance.ondataavailable?.({ data: new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/webm' }) });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.resolve();
+
+    const snapshot2 = source.getSourceClockSnapshot();
+    expect(snapshot2.sourceMs).toBeGreaterThanOrEqual(snapshot1.sourceMs);
+    expect(snapshot2.sourceSequence).toBeGreaterThan(snapshot1.sourceSequence);
+    expect(snapshot2.sourceResetId).toBe(snapshot1.sourceResetId);
+
+    await source.pause();
+    const pausedSnapshot = source.getSourceClockSnapshot();
+    expect(pausedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId);
+
+    await source.resume();
+    const resumedSnapshot = source.getSourceClockSnapshot();
+    expect(resumedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId);
+
+    await source.stop();
+    await source.start({
+      sessionId: 'session-snapshot',
+      tabId: 13,
+      videoFingerprint: 'video-snapshot'
+    }, {
+      stream: { id: 'stream-snapshot' },
+      mimeType: 'audio/webm',
+      chunkTimeslice: 1000
+    });
+
+    const restartedSnapshot = source.getSourceClockSnapshot();
+    expect(restartedSnapshot.sourceResetId).toBe(snapshot2.sourceResetId + 1);
+    expect(restartedSnapshot.sourceSequence).toBe(0);
+  });
+
   it('supports pause, resume, stop, and destroy lifecycle transitions', async () => {
     const emittedStates = [];
     const source = new MediaRecorderStreamingAudioSource({

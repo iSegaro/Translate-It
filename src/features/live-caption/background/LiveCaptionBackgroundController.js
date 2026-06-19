@@ -208,6 +208,22 @@ export class LiveCaptionBackgroundController {
     };
   }
 
+  async requestSourceClockSnapshot({
+    sessionId = null,
+    tabId = null,
+    videoFingerprint = null,
+    requestId = null
+  } = {}) {
+    const response = await this.offscreenBridge.requestSourceClockSnapshot({
+      sessionId,
+      tabId,
+      videoFingerprint,
+      requestId
+    });
+
+    return response;
+  }
+
   async _startActiveStreamingSession({
     session,
     request,

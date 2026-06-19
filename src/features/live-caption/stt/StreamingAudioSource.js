@@ -207,6 +207,10 @@ export class StreamingAudioSource {
   getSessionSnapshot() {
     return this._createSessionSnapshot();
   }
+
+  getSourceClockSnapshot() {
+    throw createLiveCaptionNotImplementedError(`${this.constructor.name}.getSourceClockSnapshot`);
+  }
 }
 
 export default StreamingAudioSource;

@@ -4,7 +4,10 @@ import LiveCaptionOffscreenRuntimeShell, {
   LIVE_CAPTION_RUNTIME_SHELL_STATES,
 } from "./liveCaptionOffscreenRuntimeShell.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "@/features/live-caption/constants/liveCaptionRuntimeStates.js";
-import { LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES } from "@/features/live-caption/background/liveCaptionOffscreenContracts.js";
+import {
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+} from "@/features/live-caption/background/liveCaptionOffscreenContracts.js";
 import {
   FASTER_WHISPER_STREAMING_PROVIDER_ID
 } from "@/features/live-caption/stt/providers/FasterWhisperStreamingProvider.js";
@@ -321,6 +324,162 @@ describe("live-caption offscreen runtime shell", () => {
     );
   });
 
+  it("returns a source clock snapshot from the active source without changing state", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+    const sourceClockSnapshot = {
+      sourceMs: 240,
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      sourceTimelineType: "capture",
+      sourceSequence: 2,
+      captureState: "capturing",
+      wallClockMs: 1234
+    };
+    const getSourceClockSnapshot = vi.fn().mockReturnValue(sourceClockSnapshot);
+
+    shell.sessionId = "session-snapshot";
+    shell.tabId = 7;
+    shell.videoFingerprint = "video-snapshot";
+    shell.activeStreamingAudioSource = {
+      getSourceClockSnapshot
+    };
+
+    const response = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST,
+        sessionId: "session-snapshot",
+        tabId: 7,
+        videoFingerprint: "video-snapshot",
+        requestId: "snapshot-request-1"
+      },
+      {},
+    );
+
+    expect(getSourceClockSnapshot).toHaveBeenCalledTimes(1);
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sessionId: "session-snapshot",
+      tabId: 7,
+      videoFingerprint: "video-snapshot",
+      requestId: "snapshot-request-1",
+      sourceClockSnapshot
+    });
+    expect(shell.lastResponse).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE
+    });
+  });
+
+  it("returns a source clock snapshot from an AudioWorklet active source", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+    const sourceClockSnapshot = {
+      sourceMs: 480,
+      sourceClockId: "worklet-clock-1",
+      sourceResetId: 2,
+      sourceTimelineType: "capture",
+      sourceSequence: 4,
+      captureState: "capturing",
+      wallClockMs: 2345
+    };
+    const getSourceClockSnapshot = vi.fn().mockReturnValue(sourceClockSnapshot);
+
+    shell.sessionId = "session-worklet";
+    shell.tabId = 8;
+    shell.videoFingerprint = "video-worklet";
+    shell.activeStreamingAudioSource = null;
+    shell.streamingAudioSourceSelection = {
+      source: {
+        getSourceClockSnapshot
+      }
+    };
+
+    const response = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST,
+        sessionId: "session-worklet",
+        tabId: 8,
+        videoFingerprint: "video-worklet"
+      },
+      {},
+    );
+
+    expect(getSourceClockSnapshot).toHaveBeenCalledTimes(1);
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sourceClockSnapshot
+    });
+  });
+
+  it("returns an error when a source clock snapshot is unavailable", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+    shell.sessionId = "session-snapshot";
+    shell.tabId = 7;
+    shell.videoFingerprint = "video-snapshot";
+    shell.activeStreamingAudioSource = null;
+
+    const response = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST,
+        sessionId: "session-snapshot",
+        tabId: 7,
+        videoFingerprint: "video-snapshot"
+      },
+      {},
+    );
+
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: false,
+      error: expect.objectContaining({
+        reason: "source_clock_snapshot_unavailable"
+      })
+    });
+  });
+
+  it("rejects inconsistent source clock snapshot requests before reading the source", async () => {
+    const shell = new LiveCaptionOffscreenRuntimeShell();
+    const getSourceClockSnapshot = vi.fn().mockReturnValue({
+      sourceMs: 10,
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      sourceTimelineType: "capture",
+      sourceSequence: 1,
+      captureState: "capturing",
+      wallClockMs: 100
+    });
+
+    shell.sessionId = "session-snapshot";
+    shell.tabId = 7;
+    shell.videoFingerprint = "video-snapshot";
+    shell.activeStreamingAudioSource = {
+      getSourceClockSnapshot
+    };
+
+    const response = await shell.handleMessage(
+      {
+        target: "offscreen",
+        type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST,
+        sessionId: "different-session",
+        tabId: 7,
+        videoFingerprint: "video-snapshot"
+      },
+      {},
+    );
+
+    expect(getSourceClockSnapshot).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: false,
+      error: expect.objectContaining({
+        reason: "inconsistent_session"
+      })
+    });
+  });
+
   it("hosts a streaming provider, waits for ready, and keeps MediaRecorder untouched", async () => {
     const { provider, factory } = createStreamingProviderFactory();
     const shell = new LiveCaptionOffscreenRuntimeShell({
@@ -605,7 +764,7 @@ describe("live-caption offscreen runtime shell", () => {
       })
     });
 
-    expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
+    expect(shell.activeStreamingAudioSource?.getStatus?.().session).toMatchObject({
       audioFormat: "pcm16-mono-16khz",
       selectedAudioFormat: "pcm16-mono-16khz",
       audioSourceType: "audio_worklet_pcm16",
@@ -613,7 +772,7 @@ describe("live-caption offscreen runtime shell", () => {
       channelCount: 1,
       bitDepth: 16
     });
-    expect(shell.mediaRecorderStreamingAudioSource?.audioWorkletNode).toBe(workletNode);
+    expect(shell.activeStreamingAudioSource?.audioWorkletNode).toBe(workletNode);
     expect(shell.mediaRecorder).toBeNull();
 
     globalThis.chrome.runtime.sendMessage.mockClear();
@@ -768,12 +927,12 @@ describe("live-caption offscreen runtime shell", () => {
       sourceType: "media_recorder_webm_opus",
       fallbackReason: "audio_worklet_module_load_failure"
     });
-    expect(shell.mediaRecorderStreamingAudioSource?.getStatus?.().session).toMatchObject({
+    expect(shell.activeStreamingAudioSource?.getStatus?.().session).toMatchObject({
       audioFormat: "webm-opus",
       selectedAudioFormat: "webm-opus",
       audioSourceType: "media_recorder_webm_opus"
     });
-    expect(shell.mediaRecorderStreamingAudioSource?.mediaRecorder).toBe(MockMediaRecorder.instances[0]);
+    expect(shell.activeStreamingAudioSource?.mediaRecorder).toBe(MockMediaRecorder.instances[0]);
     expect(shell.streamingAudioSourceSelection?.selectedAudioFormat).toBe("webm-opus");
     expect(shell.streamingSessionContext?.state).toBe("active");
     expect(provider.startSession).toHaveBeenCalledTimes(1);

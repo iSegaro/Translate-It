@@ -10,10 +10,12 @@ import {
   normalizeLiveCaptionRuntimeRequest
 } from '@/features/live-caption/background/liveCaptionRuntimeContracts.js';
 import {
+  LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
   LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
   createLiveCaptionStreamingSttErrorMessage,
   createLiveCaptionStreamingSttStatusMessage,
-  createLiveCaptionStreamingSttTranscriptEventMessage
+  createLiveCaptionStreamingSttTranscriptEventMessage,
+  createLiveCaptionSourceClockSnapshotResponse
 } from '@/features/live-caption/background/liveCaptionOffscreenContracts.js';
 import { LIVE_CAPTION_RUNTIME_STATES } from '@/features/live-caption/constants/liveCaptionRuntimeStates.js';
 import {
@@ -86,7 +88,7 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.mediaStream = null;
     this.audioCtx = null;
     this.audioSource = null;
-    this.mediaRecorderStreamingAudioSource = null;
+    this.activeStreamingAudioSource = null;
     this.mediaRecorder = null;
     this.streamingAudioSourceSelection = null;
     this.pendingStreamingAudioSourceStart = null;
@@ -102,8 +104,8 @@ export class LiveCaptionOffscreenRuntimeShell {
       get: () => this._segmentRotationPending,
       set: (value) => {
         this._segmentRotationPending = Boolean(value);
-        if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
-          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this._segmentRotationPending;
+        if (this.activeStreamingAudioSource && 'segmentRotationPending' in this.activeStreamingAudioSource) {
+          this.activeStreamingAudioSource.segmentRotationPending = this._segmentRotationPending;
         }
       }
     });
@@ -287,6 +289,13 @@ export class LiveCaptionOffscreenRuntimeShell {
     this.streamingSessionContext = null;
   }
 
+  _getActiveStreamingAudioSource() {
+    return this.activeStreamingAudioSource
+      ?? this.streamingAudioSourceSelection?.source
+      ?? this.pendingStreamingAudioSourceStart?.selection?.source
+      ?? null;
+  }
+
   _forwardStreamingMessageToBackground(message) {
     if (!chrome?.runtime?.sendMessage) {
       return false;
@@ -442,8 +451,8 @@ export class LiveCaptionOffscreenRuntimeShell {
 
   _stopCapture() {
     this.captureState = 'stopping';
-    const streamingAudioSource = this.mediaRecorderStreamingAudioSource;
-    this.mediaRecorderStreamingAudioSource = null;
+    const streamingAudioSource = this.activeStreamingAudioSource;
+    this.activeStreamingAudioSource = null;
     this.streamingAudioSourceSelection = null;
     this.pendingStreamingAudioSourceStart = null;
     this.mediaRecorder = null;
@@ -480,8 +489,8 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   async _stopStreamingAudioSource() {
-    const streamingAudioSource = this.mediaRecorderStreamingAudioSource;
-    this.mediaRecorderStreamingAudioSource = null;
+    const streamingAudioSource = this.activeStreamingAudioSource;
+    this.activeStreamingAudioSource = null;
     this.streamingAudioSourceSelection = null;
     this.pendingStreamingAudioSourceStart = null;
     this.mediaRecorder = null;
@@ -496,11 +505,11 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _clearSegmentTimer() {
-    this.mediaRecorderStreamingAudioSource?._clearSegmentTimer?.();
+    this.activeStreamingAudioSource?._clearSegmentTimer?.();
   }
 
   _scheduleSegmentBoundary() {
-    this.mediaRecorderStreamingAudioSource?._scheduleSegmentBoundary?.();
+    this.activeStreamingAudioSource?._scheduleSegmentBoundary?.();
   }
 
   _resolveStreamingProviderDefinition(metadata = {}, providerId = null) {
@@ -584,7 +593,7 @@ export class LiveCaptionOffscreenRuntimeShell {
           } else if (Number.isFinite(chunk.chunkStartMs)) {
             this.chunkStartMs = chunk.chunkStartMs;
           }
-          this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+          this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
         },
         onError: (error) => {
           logger.error('Streaming audio source runtime error:', error);
@@ -683,7 +692,7 @@ export class LiveCaptionOffscreenRuntimeShell {
       audioContext
     });
 
-    this.mediaRecorderStreamingAudioSource = selection.source;
+    this.activeStreamingAudioSource = selection.source;
     this.streamingAudioSourceSelection = {
       ...selection,
       providerDefinition: selection.providerDefinition ? { ...selection.providerDefinition } : null
@@ -721,10 +730,10 @@ export class LiveCaptionOffscreenRuntimeShell {
               chunkTimeslice
             }
       ).then((snapshot) => {
-        if (this.mediaRecorderStreamingAudioSource) {
-          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+        if (this.activeStreamingAudioSource) {
+          this.activeStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
         }
-        this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
+        this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? null;
         this.pendingStreamingAudioSourceStart = null;
         return snapshot;
       });
@@ -757,7 +766,7 @@ export class LiveCaptionOffscreenRuntimeShell {
         sourceId: selection.source?.sourceId ?? null
       });
 
-      this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
+      this.activeStreamingAudioSource = fallbackSelection.source;
       this.streamingAudioSourceSelection = {
         ...fallbackSelection,
         fallbackReason: 'audio_worklet_module_load_failure'
@@ -776,10 +785,10 @@ export class LiveCaptionOffscreenRuntimeShell {
         }
       );
 
-      if (this.mediaRecorderStreamingAudioSource) {
-        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+      if (this.activeStreamingAudioSource) {
+        this.activeStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
       }
-      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? null;
+      this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? null;
       this.pendingStreamingAudioSourceStart = null;
       return snapshot;
     }
@@ -790,7 +799,7 @@ export class LiveCaptionOffscreenRuntimeShell {
     const selection = pending?.selection ?? this.streamingAudioSourceSelection ?? null;
 
     if (!selection?.source) {
-      return this.mediaRecorderStreamingAudioSource?.getStatus?.() ?? this.mediaRecorderStreamingAudioSource?.getSessionSnapshot?.() ?? null;
+      return this.activeStreamingAudioSource?.getStatus?.() ?? this.activeStreamingAudioSource?.getSessionSnapshot?.() ?? null;
     }
 
     const providerDefinition = selection.providerDefinition
@@ -824,10 +833,10 @@ export class LiveCaptionOffscreenRuntimeShell {
               chunkTimeslice
             }
       ).then((snapshot) => {
-        if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
-          this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+        if (this.activeStreamingAudioSource && 'segmentRotationPending' in this.activeStreamingAudioSource) {
+          this.activeStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
         }
-        this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+        this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
         return snapshot;
       });
     } catch (error) {
@@ -859,7 +868,7 @@ export class LiveCaptionOffscreenRuntimeShell {
         sourceId: selection.source?.sourceId ?? null
       });
 
-      this.mediaRecorderStreamingAudioSource = fallbackSelection.source;
+      this.activeStreamingAudioSource = fallbackSelection.source;
       this.streamingAudioSourceSelection = {
         ...fallbackSelection,
         fallbackReason: 'audio_worklet_module_load_failure'
@@ -878,10 +887,10 @@ export class LiveCaptionOffscreenRuntimeShell {
         }
       );
 
-      if (this.mediaRecorderStreamingAudioSource && 'segmentRotationPending' in this.mediaRecorderStreamingAudioSource) {
-        this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+      if (this.activeStreamingAudioSource && 'segmentRotationPending' in this.activeStreamingAudioSource) {
+        this.activeStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
       }
-      this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+      this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
       return snapshot;
     }
   }
@@ -1039,7 +1048,7 @@ export class LiveCaptionOffscreenRuntimeShell {
   }
 
   _handleMediaRecorderStop() {
-    this.mediaRecorderStreamingAudioSource?._handleMediaRecorderStop?.();
+    this.activeStreamingAudioSource?._handleMediaRecorderStop?.();
   }
 
   async _startMediaRecorder(stream, selectedMime, {
@@ -1063,12 +1072,12 @@ export class LiveCaptionOffscreenRuntimeShell {
       return selection;
     }
 
-    if (this.mediaRecorderStreamingAudioSource?.segmentRotationPending !== undefined) {
-      this.mediaRecorderStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
+    if (this.activeStreamingAudioSource?.segmentRotationPending !== undefined) {
+      this.activeStreamingAudioSource.segmentRotationPending = this.segmentRotationPending;
     }
 
-    this.mediaRecorder = this.mediaRecorderStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
-    return this.mediaRecorderStreamingAudioSource?.getStatus?.() ?? this.mediaRecorderStreamingAudioSource?.getSessionSnapshot?.() ?? null;
+    this.mediaRecorder = this.activeStreamingAudioSource?.mediaRecorder ?? this.mediaRecorder ?? null;
+    return this.activeStreamingAudioSource?.getStatus?.() ?? this.activeStreamingAudioSource?.getSessionSnapshot?.() ?? null;
   }
 
   _handleCaptureError(error) {
@@ -1583,6 +1592,68 @@ export class LiveCaptionOffscreenRuntimeShell {
     return response;
   }
 
+  handleSourceClockSnapshotRequest(message) {
+    const sessionId = message?.sessionId ?? null;
+    const tabId = message?.tabId ?? null;
+    const videoFingerprint = message?.videoFingerprint ?? null;
+
+    if (this.sessionId != null && (
+      sessionId !== this.sessionId
+      || tabId !== this.tabId
+      || videoFingerprint !== this.videoFingerprint
+    )) {
+      return createLiveCaptionSourceClockSnapshotResponse({
+        sessionId,
+        tabId,
+        videoFingerprint,
+        ok: false,
+        error: {
+          code: LIVE_CAPTION_RUNTIME_ERROR_CODES.INCONSISTENT_SESSION,
+          message: 'Live-caption offscreen shell rejected source clock snapshot for inconsistent session',
+          reason: 'inconsistent_session'
+        }
+      });
+    }
+
+    const activeSource = this._getActiveStreamingAudioSource();
+    const sourceClockSnapshot = activeSource?.getSourceClockSnapshot?.() ?? null;
+
+    if (!sourceClockSnapshot) {
+      return createLiveCaptionSourceClockSnapshotResponse({
+        sessionId: sessionId ?? this.sessionId,
+        tabId: tabId ?? this.tabId,
+        videoFingerprint: videoFingerprint ?? this.videoFingerprint,
+        ok: false,
+        error: {
+          code: LIVE_CAPTION_RUNTIME_ERROR_CODES.INVALID_PAYLOAD,
+          message: 'Live-caption source clock snapshot unavailable',
+          reason: 'source_clock_snapshot_unavailable'
+        }
+      });
+    }
+
+    const response = createLiveCaptionSourceClockSnapshotResponse({
+      sessionId: sessionId ?? this.sessionId,
+      tabId: tabId ?? this.tabId,
+      videoFingerprint: videoFingerprint ?? this.videoFingerprint,
+      requestId: message?.requestId ?? null,
+      sourceClockSnapshot
+    });
+
+    this.lastResponse = response;
+    this.touch();
+
+    logger.debug('Live-caption offscreen shell source clock snapshot handled', {
+      sessionId: response.sessionId,
+      tabId: response.tabId,
+      videoFingerprint: response.videoFingerprint,
+      sourceMs: response.sourceClockSnapshot?.sourceMs ?? null,
+      sourceClockId: response.sourceClockSnapshot?.sourceClockId ?? null
+    });
+
+    return response;
+  }
+
   handleRuntimeStatus(message, sender) {
     try {
       const request = this._normalizeRequest(message, sender, LIVE_CAPTION_RUNTIME_ACTIONS.STATUS);
@@ -1648,9 +1719,9 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorderStreamingAudioSource?.pause) {
+      if (this.activeStreamingAudioSource?.pause) {
         try {
-          this.mediaRecorderStreamingAudioSource?.pause?.();
+          this.activeStreamingAudioSource?.pause?.();
           this.captureState = 'paused';
         } catch (e) {
           logger.warn('Error pausing MediaRecorder:', e);
@@ -1708,9 +1779,9 @@ export class LiveCaptionOffscreenRuntimeShell {
         });
       }
 
-      if (this.mediaRecorderStreamingAudioSource?.resume) {
+      if (this.activeStreamingAudioSource?.resume) {
         try {
-          this.mediaRecorderStreamingAudioSource?.resume?.();
+          this.activeStreamingAudioSource?.resume?.();
           this.captureState = 'capturing';
         } catch (e) {
           logger.warn('Error resuming MediaRecorder:', e);
@@ -1889,6 +1960,8 @@ export class LiveCaptionOffscreenRuntimeShell {
         return this.handleStreamingStatus(message, sender);
       case LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES.STREAMING_STT_ERROR:
         return this.handleStreamingError(message, sender);
+      case LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST:
+        return this.handleSourceClockSnapshotRequest(message, sender);
       default:
         return this._buildFailClosed(action, new TypeError(`Unknown live-caption offscreen runtime action: ${String(action)}`), {
           code: LIVE_CAPTION_RUNTIME_ERROR_CODES.UNKNOWN_ACTION,

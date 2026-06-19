@@ -14,7 +14,8 @@ import {
 } from "./liveCaptionRuntimeContracts.js";
 import {
   LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES,
-  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES
+  LIVE_CAPTION_STREAMING_OFFSCREEN_MESSAGE_TYPES,
+  createLiveCaptionSourceClockSnapshotResponse
 } from "./liveCaptionOffscreenContracts.js";
 import { LIVE_CAPTION_RUNTIME_STATES } from "../constants/liveCaptionRuntimeStates.js";
 import { LIVE_CAPTION_CLEANUP_RESULT_STATUSES } from "../core/LiveCaptionCleanupCoordinator.js";
@@ -54,6 +55,23 @@ describe("live-caption background controller", () => {
     globalThis.chrome = {
       runtime: {
         sendMessage: vi.fn(async (request) => {
+          if (request.type === LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_REQUEST) {
+            return createLiveCaptionSourceClockSnapshotResponse({
+              sessionId: request.sessionId,
+              tabId: request.tabId,
+              videoFingerprint: request.videoFingerprint,
+              sourceClockSnapshot: {
+                sourceMs: 0,
+                sourceClockId: "clock-1",
+                sourceResetId: 1,
+                sourceTimelineType: "capture",
+                sourceSequence: 0,
+                captureState: "capturing",
+                wallClockMs: 1000
+              }
+            });
+          }
+
           const shellByAction = {
             [LIVE_CAPTION_RUNTIME_ACTIONS.START]:
               LIVE_CAPTION_RUNTIME_SHELL_STATES.RUNNING_SHELL,
@@ -316,6 +334,62 @@ describe("live-caption background controller", () => {
     expect(session).not.toBeNull();
     expect(session.activeVideoSession).not.toBeNull();
     expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(0);
+  });
+
+  it("requests a source clock snapshot through the background controller without emitting anchors", async () => {
+    const controller = createController();
+    controller.offscreenBridge.requestSourceClockSnapshot = vi.fn().mockResolvedValue({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      sourceClockSnapshot: {
+        sourceMs: 240,
+        sourceClockId: "clock-1",
+        sourceResetId: 1,
+        sourceTimelineType: "capture",
+        sourceSequence: 3,
+        captureState: "capturing",
+        wallClockMs: 1000
+      }
+    });
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const response = await controller.requestSourceClockSnapshot({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    });
+
+    expect(controller.offscreenBridge.requestSourceClockSnapshot).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      requestId: null
+    });
+    expect(response).toMatchObject({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sourceClockSnapshot: {
+        sourceMs: 240,
+        sourceClockId: "clock-1",
+        sourceResetId: 1,
+        sourceTimelineType: "capture",
+        sourceSequence: 3
+      }
+    });
+    expect(controller.sessionManager.getSession(7).activeVideoSession.getTimelineAnchors()).toHaveLength(1);
   });
 
   it("clears stale anchors when a restart start request has an invalid media anchor", async () => {
