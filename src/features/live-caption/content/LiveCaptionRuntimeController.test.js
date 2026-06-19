@@ -1521,4 +1521,188 @@ describe('live-caption runtime controller', () => {
       }
     });
   });
+
+  describe('timeline discontinuity forwarding', () => {
+    function dispatchVideoEvent(video, documentRef, eventType) {
+      const event = new Event(eventType, { bubbles: true });
+      Object.defineProperty(event, 'target', { value: video, configurable: true });
+      documentRef.dispatchEvent(event);
+    }
+
+    function createDeferred() {
+      let resolve;
+      let reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+
+      return { promise, resolve, reject };
+    }
+
+    it.each([
+      ['playing', 12.5, 1.25],
+      ['seeked', 8.5, 1],
+      ['ratechange', 4.75, 1.5]
+    ])('forwards %s discontinuity metadata to background', async (eventType, currentTime, playbackRate) => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4', playbackRate });
+      video.currentTime = currentTime;
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      sendRequestSpy.mockClear();
+
+      dispatchVideoEvent(video, document, eventType);
+
+      expect(sendRequestSpy).toHaveBeenCalledWith(
+        LIVE_CAPTION_ACTIONS.VIDEO_CHANGED,
+        expect.objectContaining({
+          eventType,
+          sessionId: controller.pageSession.sessionId,
+          tabId: 11,
+          videoFingerprint: controller.currentVideoFingerprint,
+          mediaMs: currentTime * 1000,
+          playbackRate,
+          wallClockMs: expect.any(Number)
+        })
+      );
+    });
+
+    it.each(['pause', 'seeking', 'timeupdate'])('does not forward %s as a timeline discontinuity', async (eventType) => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4' });
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      sendRequestSpy.mockClear();
+
+      dispatchVideoEvent(video, document, eventType);
+
+      expect(sendRequestSpy).not.toHaveBeenCalledWith(
+        LIVE_CAPTION_ACTIONS.VIDEO_CHANGED,
+        expect.objectContaining({
+          eventType
+        })
+      );
+    });
+
+    it('dedupes repeated playing requests while the first request is in flight', async () => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4', playbackRate: 1.25 });
+      video.currentTime = 12.5;
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const deferred = createDeferred();
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation((action, data) => {
+        if (action === LIVE_CAPTION_ACTIONS.VIDEO_CHANGED) {
+          return deferred.promise;
+        }
+
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      sendRequestSpy.mockClear();
+
+      const first = controller._requestTimelineDiscontinuityAnchor('playing');
+      const second = controller._requestTimelineDiscontinuityAnchor('playing');
+
+      await expect(second).resolves.toBeNull();
+      expect(sendRequestSpy).toHaveBeenCalledTimes(1);
+      expect(controller.pendingTimelineDiscontinuityAnchorEvents.has('playing')).toBe(true);
+
+      deferred.resolve(createRuntimeResponse(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, {
+        eventType: 'playing',
+        sessionId: controller.pageSession.sessionId,
+        tabId: 11,
+        videoFingerprint: controller.currentVideoFingerprint,
+        mediaMs: 12500,
+        playbackRate: 1.25,
+        wallClockMs: Date.now()
+      }));
+
+      await first;
+      expect(controller.pendingTimelineDiscontinuityAnchorEvents.has('playing')).toBe(false);
+
+      sendRequestSpy.mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+      sendRequestSpy.mockClear();
+      await controller._requestTimelineDiscontinuityAnchor('playing');
+      expect(sendRequestSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears pending playing requests after rejection', async () => {
+      const store = useLiveCaptionStore();
+      const video = createVideo({ src: 'https://example.com/a.mp4', playbackRate: 1.25 });
+      video.currentTime = 12.5;
+      document.body.append(video);
+
+      const controller = new LiveCaptionRuntimeController({
+        store,
+        documentRef: document,
+        windowRef: window,
+        browserApi: createRuntimeBrowserApi(),
+        platformSupport: createSupportedPlatformSupport()
+      });
+
+      const deferred = createDeferred();
+      const sendRequestSpy = vi.spyOn(controller, '_sendRuntimeRequest').mockImplementation((action, data) => {
+        if (action === LIVE_CAPTION_ACTIONS.VIDEO_CHANGED) {
+          return deferred.promise;
+        }
+
+        return createRuntimeResponse(action, data);
+      });
+
+      await controller.start({ tabId: 11 });
+      sendRequestSpy.mockClear();
+
+      const first = controller._requestTimelineDiscontinuityAnchor('playing');
+      deferred.reject(new Error('failed'));
+
+      await expect(first).rejects.toThrow('failed');
+      expect(controller.pendingTimelineDiscontinuityAnchorEvents.has('playing')).toBe(false);
+
+      sendRequestSpy.mockImplementation(async (action, data) => {
+        return createRuntimeResponse(action, data);
+      });
+      sendRequestSpy.mockClear();
+      await controller._requestTimelineDiscontinuityAnchor('playing');
+      expect(sendRequestSpy).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -31,6 +31,7 @@ import {
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
   createLiveCaptionRuntimeVideoChangedRequest,
+  LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES,
   normalizeLiveCaptionRuntimeResponse,
   createLiveCaptionRuntimeFailClosedResponse
 } from '../background/liveCaptionRuntimeContracts.js';
@@ -38,6 +39,10 @@ import { useLiveCaptionStore } from '../stores/liveCaption.js';
 import { getFriendlyLiveCaptionError } from '../utils/liveCaptionErrorUtils.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_CAPTION, 'LiveCaptionRuntimeController');
+
+const LIVE_CAPTION_TIMELINE_DISCONTINUITY_EVENT_TYPES = new Set(
+  Object.values(LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES)
+);
 
 const requestFrame = typeof globalThis.requestAnimationFrame === 'function'
   ? globalThis.requestAnimationFrame.bind(globalThis)
@@ -230,6 +235,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
     this.lastRuntimeRequest = null;
     this.lastRuntimeResponse = null;
     this.lastScanReason = null;
+    this.pendingTimelineDiscontinuityAnchorEvents = new Set();
     this.runtimeStatus = LIVE_CAPTION_RUNTIME_STATES.IDLE;
     this.started = false;
     this.paused = false;
@@ -564,6 +570,7 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
         this._markVideoInteractionFromEvent(event);
         
         const target = event?.target;
+        let deferTimelineDiscontinuity = false;
         if (target && target === this.currentVideoElement) {
           // Invalidate timeline mapping on seeking, seeked, ratechange, pause
           if (['seeking', 'seeked', 'ratechange', 'pause'].includes(event.type)) {
@@ -588,8 +595,19 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
                 sessionId: this.pageSession?.sessionId ?? null,
                 videoFingerprint: this.currentVideoFingerprint
               });
-              this.resume().catch(() => {});
+              this.resume()
+                .then(() => {
+                  if (event.type === 'playing') {
+                    void this._requestTimelineDiscontinuityAnchor(event.type);
+                  }
+                })
+                .catch(() => {});
+              deferTimelineDiscontinuity = event.type === 'playing';
             }
+          }
+
+          if (this._isEligibleTimelineDiscontinuityEvent(event.type) && !deferTimelineDiscontinuity) {
+            void this._requestTimelineDiscontinuityAnchor(event.type);
           }
         }
 
@@ -1022,6 +1040,66 @@ export class LiveCaptionRuntimeController extends ResourceTracker {
       });
 
       return failed;
+    }
+  }
+
+  _isEligibleTimelineDiscontinuityEvent(eventType) {
+    return LIVE_CAPTION_TIMELINE_DISCONTINUITY_EVENT_TYPES.has(eventType);
+  }
+
+  _getCurrentVideoTimelineMetadata() {
+    const currentVideoElement = this.currentVideoElement;
+    const sessionId = this.pageSession?.sessionId ?? null;
+    const videoFingerprint = this.currentVideoFingerprint ?? null;
+    const tabId = this.tabId ?? this.store?.activeTabId ?? null;
+
+    if (!this.started || !this.runtimeStartCompleted || !sessionId || !videoFingerprint || !currentVideoElement) {
+      return null;
+    }
+
+    const mediaMs = Number(currentVideoElement.currentTime) * 1000;
+    const playbackRate = Number(currentVideoElement.playbackRate);
+
+    if (!Number.isFinite(mediaMs) || !Number.isFinite(playbackRate) || playbackRate <= 0) {
+      return null;
+    }
+
+    return {
+      sessionId,
+      tabId,
+      videoFingerprint,
+      mediaMs,
+      playbackRate,
+      wallClockMs: Date.now()
+    };
+  }
+
+  async _requestTimelineDiscontinuityAnchor(eventType) {
+    if (!this._isEligibleTimelineDiscontinuityEvent(eventType)) {
+      return null;
+    }
+
+    if (this.pendingTimelineDiscontinuityAnchorEvents.has(eventType)) {
+      return null;
+    }
+
+    const metadata = this._getCurrentVideoTimelineMetadata();
+    if (!metadata) {
+      return null;
+    }
+
+    this.pendingTimelineDiscontinuityAnchorEvents.add(eventType);
+
+    try {
+      return await this._sendRuntimeRequest(LIVE_CAPTION_ACTIONS.VIDEO_CHANGED, {
+        ...metadata,
+        eventType,
+        reason: eventType === LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES.PLAYING
+          ? 'resume'
+          : eventType
+      });
+    } finally {
+      this.pendingTimelineDiscontinuityAnchorEvents.delete(eventType);
     }
   }
 

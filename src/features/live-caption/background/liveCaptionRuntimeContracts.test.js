@@ -10,6 +10,7 @@ import {
   createLiveCaptionRuntimeStatusRequest,
   createLiveCaptionRuntimePauseRequest,
   createLiveCaptionRuntimeResumeRequest,
+  createLiveCaptionRuntimeVideoChangedRequest,
   createLiveCaptionRuntimeSuccessResponse,
   createLiveCaptionRuntimeShellResponse,
   createLiveCaptionRuntimeNotImplementedResponse,
@@ -45,17 +46,38 @@ describe('live-caption runtime contracts', () => {
       sessionId: 'session-1',
       videoFingerprint: 'video-a'
     });
+    const videoChanged = createLiveCaptionRuntimeVideoChangedRequest({
+      tabId: 7,
+      sessionId: 'session-1',
+      videoFingerprint: 'video-a',
+      eventType: 'playing',
+      mediaMs: 1200,
+      playbackRate: 1.25,
+      wallClockMs: 42
+    });
 
     expect(start.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.START);
     expect(stop.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.STOP);
     expect(status.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.STATUS);
     expect(pause.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.PAUSE);
     expect(resume.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.RESUME);
+    expect(videoChanged.action).toBe(LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED);
 
     expect(() => normalizeLiveCaptionRuntimeRequest({ action: LIVE_CAPTION_RUNTIME_ACTIONS.START, data: {} }))
       .toThrow('requires tabId');
     expect(() => normalizeLiveCaptionRuntimeRequest({ action: 'UNKNOWN_ACTION', data: { tabId: 7 } }))
       .toThrow('Unknown live-caption runtime action');
+
+    const normalizedVideoChanged = normalizeLiveCaptionRuntimeRequest(videoChanged, {
+      senderTabId: 7
+    });
+
+    expect(normalizedVideoChanged.data).toMatchObject({
+      eventType: 'playing',
+      mediaMs: 1200,
+      playbackRate: 1.25,
+      wallClockMs: 42
+    });
   });
 
   it('normalizes success and not-implemented runtime responses', () => {

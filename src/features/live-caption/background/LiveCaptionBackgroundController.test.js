@@ -444,6 +444,214 @@ describe("live-caption background controller", () => {
     expect(session.activeVideoSession.getSourceClockSnapshot()).toBe(null);
   });
 
+  it.each([
+    ["playing", "resume"],
+    ["seeked", "seeked"],
+    ["ratechange", "ratechange"]
+  ])("creates a timeline anchor for %s when the source snapshot is valid", async (eventType, expectedReason) => {
+    const controller = createController();
+    const requestVideoChangedSpy = vi.spyOn(controller.offscreenBridge, "requestVideoChanged");
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const response = await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        eventType,
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    const anchors = session.activeVideoSession.getTimelineAnchors();
+
+    expect(response.ok).toBe(true);
+    expect(requestVideoChangedSpy).not.toHaveBeenCalled();
+    expect(anchors).toHaveLength(2);
+    expect(anchors[1]).toMatchObject({
+      reason: expectedReason,
+      sourceMs: 0,
+      mediaMs: 6100,
+      playbackRate: 1.25,
+      sessionId: "session-1",
+      videoFingerprint: "video-a",
+      sourceTimelineType: "capture",
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      wallClockMs: 42
+    });
+  });
+
+  it("does not create a timeline anchor when the snapshot is invalid", async () => {
+    const controller = createController();
+    controller.offscreenBridge.requestSourceClockSnapshot = vi.fn().mockResolvedValue({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: false,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      error: {
+        code: "invalid_response",
+        reason: "source_clock_snapshot_unavailable",
+        message: "Live-caption source clock snapshot unavailable"
+      }
+    });
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        eventType: "playing",
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+    expect(session.activeVideoSession.getSourceClockSnapshot()).toBe(null);
+  });
+
+  it("does not create a timeline anchor for mismatched session or video fingerprint", async () => {
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-b",
+        eventType: "playing",
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+  });
+
+  it("does not add duplicate timeline anchors for the same discontinuity", async () => {
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        eventType: "playing",
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        eventType: "playing",
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(2);
+    expect(session.activeVideoSession.getTimelineAnchors()[1]).toMatchObject({
+      reason: "resume",
+      sourceMs: 0,
+      mediaMs: 6100,
+      sourceClockId: "clock-1",
+      sourceResetId: 1
+    });
+  });
+
+  it.each(["pause", "seeking"])("ignores unsupported timeline event %s without creating anchors", async (eventType) => {
+    const controller = createController();
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.handleVideoChanged(
+      createLiveCaptionRuntimeVideoChangedRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        eventType,
+        mediaMs: 6100,
+        playbackRate: 1.25,
+        wallClockMs: 42
+      }),
+      { tab: { id: 7 } }
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+  });
+
   it("clears a stored source clock snapshot when the latest snapshot request fails for the active session", async () => {
     const controller = createController();
 

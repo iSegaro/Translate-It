@@ -15,6 +15,7 @@ import { LiveCaptionTranslationCoordinator } from "./LiveCaptionTranslationCoord
 import {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
+  LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES,
   normalizeLiveCaptionRuntimeRequest,
   createLiveCaptionRuntimeSuccessResponse,
   createLiveCaptionRuntimeFailClosedResponse,
@@ -86,6 +87,22 @@ async function resolveRuntimeStartMetadata(metadata = {}, providerId = null) {
   }
 
   return normalizedMetadata;
+}
+
+const TIMELINE_DISCONTINUITY_EVENT_TYPES = new Set(
+  Object.values(LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES)
+);
+
+function areEquivalentTimelineAnchors(left = null, right = null) {
+  if (!left || !right) {
+    return false;
+  }
+
+  return left.reason === right.reason
+    && left.sourceMs === right.sourceMs
+    && left.mediaMs === right.mediaMs
+    && left.sourceClockId === right.sourceClockId
+    && left.sourceResetId === right.sourceResetId;
 }
 
 /**
@@ -893,6 +910,142 @@ export class LiveCaptionBackgroundController {
     });
 
     return response;
+  }
+
+  _buildTimelineDiscontinuityAnchor({
+    sessionId = null,
+    videoFingerprint = null,
+    eventType = null,
+    mediaMs = null,
+    playbackRate = null,
+    sourceClockSnapshot = null,
+    wallClockMs = null
+  } = {}) {
+    if (!TIMELINE_DISCONTINUITY_EVENT_TYPES.has(eventType)) {
+      return null;
+    }
+
+    const sourceMs = Number(sourceClockSnapshot?.sourceMs);
+    const normalizedMediaMs = Number(mediaMs);
+    const normalizedPlaybackRate = Number(playbackRate);
+    const sourceClockId = typeof sourceClockSnapshot?.sourceClockId === 'string'
+      ? sourceClockSnapshot.sourceClockId.trim()
+      : '';
+    const sourceResetId = Number(sourceClockSnapshot?.sourceResetId);
+    const sourceTimelineType = sourceClockSnapshot?.sourceTimelineType ?? null;
+    const anchorWallClockMs = Number.isFinite(Number(wallClockMs)) ? Number(wallClockMs) : Date.now();
+
+    if (!Number.isFinite(sourceMs) || !Number.isFinite(normalizedMediaMs) || !Number.isFinite(normalizedPlaybackRate) || normalizedPlaybackRate <= 0) {
+      return null;
+    }
+
+    if (!sourceClockId || !Number.isFinite(sourceResetId) || sourceTimelineType !== 'capture') {
+      return null;
+    }
+
+    return {
+      reason: eventType === 'playing' ? 'resume' : eventType,
+      sourceMs,
+      mediaMs: normalizedMediaMs,
+      playbackRate: normalizedPlaybackRate,
+      sessionId,
+      videoFingerprint,
+      sourceTimelineType,
+      sourceClockId,
+      sourceResetId,
+      wallClockMs: anchorWallClockMs
+    };
+  }
+
+  _isDuplicateTimelineAnchor(videoSession, anchor) {
+    const latestAnchor = videoSession?.getTimelineAnchors?.()?.at?.(-1) ?? null;
+    return areEquivalentTimelineAnchors(latestAnchor, anchor);
+  }
+
+  async _handleTimelineDiscontinuity(request) {
+    const session = this.sessionManager.getSession(request.data.tabId);
+    const activeVideoSession = session?.activeVideoSession ?? null;
+    const matchesActiveSession = Boolean(
+      session
+      && activeVideoSession
+      && session.sessionId === request.data.sessionId
+      && session.tabId === request.data.tabId
+      && session.activeVideoFingerprint === request.data.videoFingerprint
+      && activeVideoSession.videoFingerprint === request.data.videoFingerprint
+    );
+
+    if (!matchesActiveSession) {
+      return createLiveCaptionRuntimeSuccessResponse({
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+        sessionId: request.data.sessionId ?? session?.sessionId ?? null,
+        tabId: request.data.tabId ?? session?.tabId ?? null,
+        videoFingerprint: request.data.videoFingerprint ?? session?.activeVideoFingerprint ?? null,
+        runtimeState: this.captureCoordinator.runtimeState,
+        sessionSnapshot: session?.getSnapshot?.() ?? null,
+        message: 'Live-caption timeline discontinuity ignored for inactive session'
+      });
+    }
+
+    const snapshotResponse = await this.requestSourceClockSnapshot({
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: session.activeVideoFingerprint,
+      requestId: request.messageId
+    });
+
+    const sourceClockSnapshot = activeVideoSession.getSourceClockSnapshot?.() ?? null;
+    const anchor = this._buildTimelineDiscontinuityAnchor({
+      sessionId: session.sessionId,
+      videoFingerprint: session.activeVideoFingerprint,
+      eventType: request.data.eventType,
+      mediaMs: request.data.mediaMs,
+      playbackRate: request.data.playbackRate,
+      sourceClockSnapshot,
+      wallClockMs: request.data.wallClockMs
+    });
+
+    if (snapshotResponse?.ok !== true || !anchor) {
+      return createLiveCaptionRuntimeSuccessResponse({
+        action: LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+        sessionId: session.sessionId,
+        tabId: session.tabId,
+        videoFingerprint: session.activeVideoFingerprint,
+        runtimeState: this.captureCoordinator.runtimeState,
+        sessionSnapshot: session.getSnapshot(),
+        message: 'Live-caption timeline discontinuity did not produce an anchor'
+      });
+    }
+
+    if (!this._isDuplicateTimelineAnchor(activeVideoSession, anchor)) {
+      activeVideoSession.addTimelineAnchor(anchor);
+      logger.info('Live-caption timeline anchor added from discontinuity event', {
+        sessionId: session.sessionId,
+        tabId: session.tabId,
+        videoFingerprint: session.activeVideoFingerprint,
+        reason: anchor.reason,
+        sourceMs: anchor.sourceMs,
+        mediaMs: anchor.mediaMs
+      });
+    } else {
+      logger.debug('Skipped duplicate live-caption timeline anchor from discontinuity event', {
+        sessionId: session.sessionId,
+        tabId: session.tabId,
+        videoFingerprint: session.activeVideoFingerprint,
+        reason: anchor.reason,
+        sourceMs: anchor.sourceMs,
+        mediaMs: anchor.mediaMs
+      });
+    }
+
+    return createLiveCaptionRuntimeSuccessResponse({
+      action: LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+      sessionId: session.sessionId,
+      tabId: session.tabId,
+      videoFingerprint: session.activeVideoFingerprint,
+      runtimeState: this.captureCoordinator.runtimeState,
+      sessionSnapshot: session.getSnapshot(),
+      message: 'Live-caption timeline discontinuity handled'
+    });
   }
 
   async handleRuntimeStart(message, sender) {
@@ -1723,6 +1876,29 @@ export class LiveCaptionBackgroundController {
         sender,
         LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
       );
+      const eventType = request.data.eventType ?? null;
+
+      if (eventType && !TIMELINE_DISCONTINUITY_EVENT_TYPES.has(eventType)) {
+        const ignoredResponse = createLiveCaptionRuntimeSuccessResponse({
+          action: LIVE_CAPTION_RUNTIME_ACTIONS.VIDEO_CHANGED,
+          sessionId: request.data.sessionId ?? null,
+          tabId,
+          videoFingerprint: request.data.videoFingerprint ?? null,
+          runtimeState: this.captureCoordinator.runtimeState,
+          message: 'Live-caption timeline discontinuity ignored'
+        });
+
+        this.lastResponse = ignoredResponse;
+        this.touch();
+        return ignoredResponse;
+      }
+
+      if (TIMELINE_DISCONTINUITY_EVENT_TYPES.has(eventType)) {
+        const response = await this._handleTimelineDiscontinuity(request);
+        this.lastResponse = response;
+        this.touch();
+        return response;
+      }
 
       const session = this.sessionManager.getSession(tabId);
       if (!session) {

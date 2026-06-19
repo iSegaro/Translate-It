@@ -16,6 +16,12 @@ export const LIVE_CAPTION_RUNTIME_ACTIONS = Object.freeze({
   VIDEO_CHANGED: MessageActions.LIVE_CAPTION_VIDEO_CHANGED
 });
 
+export const LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES = Object.freeze({
+  PLAYING: 'playing',
+  SEEKED: 'seeked',
+  RATECHANGE: 'ratechange'
+});
+
 export const LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES = Object.freeze({
   OK: 'OK',
   START_NOT_IMPLEMENTED: 'START_NOT_IMPLEMENTED',
@@ -94,7 +100,10 @@ function normalizeRuntimeData(data = {}) {
     metadata: data.metadata ? { ...data.metadata } : null,
     streamId: data.streamId ?? null,
     mediaAnchorMs: data.mediaAnchorMs ?? null,
-    playbackRate: data.playbackRate ?? null
+    playbackRate: data.playbackRate ?? null,
+    eventType: data.eventType ?? null,
+    mediaMs: data.mediaMs ?? null,
+    wallClockMs: data.wallClockMs ?? null
   };
 }
 
@@ -336,6 +345,7 @@ export default {
   LIVE_CAPTION_RUNTIME_ACTIONS,
   LIVE_CAPTION_RUNTIME_RESPONSE_STATUSES,
   LIVE_CAPTION_RUNTIME_ERROR_CODES,
+  LIVE_CAPTION_RUNTIME_TIMELINE_DISCONTINUITY_EVENT_TYPES,
   normalizeLiveCaptionRuntimeRequest,
   createLiveCaptionRuntimeStartRequest,
   createLiveCaptionRuntimeStopRequest,
