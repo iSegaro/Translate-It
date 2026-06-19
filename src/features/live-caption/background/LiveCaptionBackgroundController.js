@@ -1018,13 +1018,16 @@ export class LiveCaptionBackgroundController {
 
     if (!this._isDuplicateTimelineAnchor(activeVideoSession, anchor)) {
       activeVideoSession.addTimelineAnchor(anchor);
+      const projectionSummary = activeVideoSession.getTimelineProjectionSummary?.() ?? null;
       logger.info('Live-caption timeline anchor added from discontinuity event', {
         sessionId: session.sessionId,
         tabId: session.tabId,
         videoFingerprint: session.activeVideoFingerprint,
         reason: anchor.reason,
         sourceMs: anchor.sourceMs,
-        mediaMs: anchor.mediaMs
+        mediaMs: anchor.mediaMs,
+        anchorCount: activeVideoSession.getTimelineAnchors?.().length ?? null,
+        projectionSummary
       });
     } else {
       logger.debug('Skipped duplicate live-caption timeline anchor from discontinuity event', {

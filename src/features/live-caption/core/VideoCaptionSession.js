@@ -242,6 +242,44 @@ function createTimelineAnchorId(sessionId, tabId) {
   return `live-caption:timeline-anchor:${sessionId ?? 'session'}:${tabId ?? 'tab'}:${timestamp}:${counter}`;
 }
 
+function summarizeTimelineProjectionState(transcriptSegments, translatedCaptionSegments, anchors) {
+  const summary = {
+    transcriptCount: Array.isArray(transcriptSegments) ? transcriptSegments.length : 0,
+    translatedCaptionCount: Array.isArray(translatedCaptionSegments) ? translatedCaptionSegments.length : 0,
+    timelineAnchorCount: Array.isArray(anchors) ? anchors.length : 0,
+    mappedCount: 0,
+    unmappedCount: 0,
+    boundaryCrossingCount: 0,
+    invalidCount: 0
+  };
+
+  const countProjectionStatus = (segment) => {
+    const status = segment?.timelineProjectionStatus ?? 'unmapped';
+
+    if (status === 'mapped') {
+      summary.mappedCount += 1;
+      return;
+    }
+
+    if (status === 'boundary_crossing') {
+      summary.boundaryCrossingCount += 1;
+      return;
+    }
+
+    if (status === 'invalid') {
+      summary.invalidCount += 1;
+      return;
+    }
+
+    summary.unmappedCount += 1;
+  };
+
+  transcriptSegments?.forEach?.(countProjectionStatus);
+  translatedCaptionSegments?.forEach?.(countProjectionStatus);
+
+  return Object.freeze(summary);
+}
+
 /**
  * Lightweight per-video live-caption session model.
  * Owns video fingerprint, segment accumulation, and replay metadata.
@@ -267,6 +305,7 @@ export class VideoCaptionSession {
     this.translatedCaptionSegments = [];
     this.timelineAnchors = [];
     this.sourceClockSnapshot = null;
+    this.lastTimelineProjectionSummary = summarizeTimelineProjectionState([], [], []);
     this.transcriptSegmentIndexByIdentity = new Map();
     this.translatedCaptionSegmentIndexByIdentity = new Map();
     this.seekState = null;
@@ -495,13 +534,25 @@ export class VideoCaptionSession {
 
     this.transcriptSegments = refreshCollection(this.transcriptSegments);
     this.translatedCaptionSegments = refreshCollection(this.translatedCaptionSegments);
+    this.lastTimelineProjectionSummary = summarizeTimelineProjectionState(
+      this.transcriptSegments,
+      this.translatedCaptionSegments,
+      this.timelineAnchors
+    );
     this.touch();
 
-    return {
-      transcriptCount: this.transcriptSegments.length,
-      translatedCaptionCount: this.translatedCaptionSegments.length,
-      timelineAnchorCount: this.timelineAnchors.length
-    };
+    logger.debug('Timeline projections refreshed', {
+      tabId: this.tabId,
+      sessionId: this.sessionId,
+      videoFingerprint: this.videoFingerprint,
+      ...this.lastTimelineProjectionSummary
+    });
+
+    return { ...this.lastTimelineProjectionSummary };
+  }
+
+  getTimelineProjectionSummary() {
+    return this.lastTimelineProjectionSummary ? { ...this.lastTimelineProjectionSummary } : summarizeTimelineProjectionState([], [], []);
   }
 
   rebuildCanonicalIndexes() {

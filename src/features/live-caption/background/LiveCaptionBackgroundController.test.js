@@ -494,6 +494,15 @@ describe("live-caption background controller", () => {
       sourceResetId: 1,
       wallClockMs: 42
     });
+    expect(session.activeVideoSession.getTimelineProjectionSummary()).toMatchObject({
+      transcriptCount: 0,
+      translatedCaptionCount: 0,
+      timelineAnchorCount: 2,
+      mappedCount: 0,
+      unmappedCount: 0,
+      boundaryCrossingCount: 0,
+      invalidCount: 0
+    });
   });
 
   it("does not create a timeline anchor when the snapshot is invalid", async () => {

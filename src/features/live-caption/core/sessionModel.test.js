@@ -205,6 +205,94 @@ describe('live-caption session model', () => {
     expect(videoSession.getSourceClockSnapshot()).toBe(null);
   });
 
+  it('summarizes timeline projection state when projections refresh', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+    videoSession.addTranslatedCaptionSegment(createTranslatedCaptionSegment({
+      sourceTimelineType: 'capture',
+      sourceStartMs: 300,
+      sourceEndMs: 400,
+      translatedText: 'hola mundo'
+    }));
+
+    const unmappedSummary = videoSession.refreshTimelineProjections();
+
+    expect(unmappedSummary).toMatchObject({
+      transcriptCount: 1,
+      translatedCaptionCount: 1,
+      timelineAnchorCount: 0,
+      mappedCount: 0,
+      unmappedCount: 2,
+      boundaryCrossingCount: 0,
+      invalidCount: 0
+    });
+    expect(videoSession.getTimelineProjectionSummary()).toMatchObject(unmappedSummary);
+
+    const startAnchor = videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sourceTimelineType: 'capture'
+    });
+    const mappedSummary = videoSession.getTimelineProjectionSummary();
+
+    expect(startAnchor).toMatchObject({ anchorId: expect.any(String) });
+    expect(mappedSummary).toMatchObject({
+      transcriptCount: 1,
+      translatedCaptionCount: 1,
+      timelineAnchorCount: 1,
+      mappedCount: 2,
+      unmappedCount: 0,
+      boundaryCrossingCount: 0,
+      invalidCount: 0
+    });
+
+    videoSession.addTimelineAnchor({
+      reason: 'resume',
+      sourceMs: 150,
+      mediaMs: 5150,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sourceTimelineType: 'capture'
+    });
+    const boundarySummary = videoSession.getTimelineProjectionSummary();
+
+    expect(boundarySummary).toMatchObject({
+      transcriptCount: 1,
+      translatedCaptionCount: 1,
+      timelineAnchorCount: 2,
+      mappedCount: 1,
+      unmappedCount: 0,
+      boundaryCrossingCount: 1,
+      invalidCount: 0
+    });
+
+    videoSession.clearTimelineAnchors();
+    expect(videoSession.getTimelineProjectionSummary()).toMatchObject({
+      transcriptCount: 1,
+      translatedCaptionCount: 1,
+      timelineAnchorCount: 0,
+      mappedCount: 0,
+      unmappedCount: 2,
+      boundaryCrossingCount: 0,
+      invalidCount: 0
+    });
+  });
+
   it('stores valid timeline anchors and preserves insertion order', () => {
     const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
 
