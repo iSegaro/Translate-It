@@ -371,6 +371,7 @@ describe("live-caption background controller", () => {
       tabId: 7,
       videoFingerprint: "video-a"
     });
+    const session = controller.sessionManager.getSession(7);
 
     expect(controller.offscreenBridge.requestSourceClockSnapshot).toHaveBeenCalledWith({
       sessionId: "session-1",
@@ -389,7 +390,106 @@ describe("live-caption background controller", () => {
         sourceSequence: 3
       }
     });
-    expect(controller.sessionManager.getSession(7).activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
+    expect(session.activeVideoSession.getSourceClockSnapshot()).toMatchObject({
+      sourceMs: 240,
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      sourceTimelineType: "capture",
+      sourceSequence: 3,
+      captureState: "capturing",
+      wallClockMs: 1000
+    });
+  });
+
+  it("does not store a source clock snapshot for mismatched session or video fingerprint", async () => {
+    const controller = createController();
+    const sessionSnapshot = {
+      sourceMs: 240,
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      sourceTimelineType: "capture",
+      sourceSequence: 3,
+      captureState: "capturing",
+      wallClockMs: 1000
+    };
+
+    controller.offscreenBridge.requestSourceClockSnapshot = vi.fn().mockResolvedValue({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: true,
+      sessionId: "different-session",
+      tabId: 7,
+      videoFingerprint: "video-b",
+      sourceClockSnapshot: sessionSnapshot
+    });
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    await controller.requestSourceClockSnapshot({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    });
+
+    const session = controller.sessionManager.getSession(7);
+    expect(session.activeVideoSession.getSourceClockSnapshot()).toBe(null);
+  });
+
+  it("clears a stored source clock snapshot when the latest snapshot request fails for the active session", async () => {
+    const controller = createController();
+
+    controller.offscreenBridge.requestSourceClockSnapshot = vi.fn().mockResolvedValue({
+      type: LIVE_CAPTION_OFFSCREEN_MESSAGE_TYPES.SOURCE_CLOCK_SNAPSHOT_RESPONSE,
+      ok: false,
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a",
+      error: {
+        code: "invalid_response",
+        reason: "source_clock_snapshot_unavailable",
+        message: "Live-caption source clock snapshot unavailable"
+      }
+    });
+
+    await controller.handleRuntimeStart(
+      createLiveCaptionRuntimeStartRequest({
+        tabId: 7,
+        sessionId: "session-1",
+        videoFingerprint: "video-a",
+        mediaAnchorMs: 3000,
+        playbackRate: 1
+      }),
+      { tab: { id: 7 } },
+    );
+
+    const session = controller.sessionManager.getSession(7);
+    session.activeVideoSession.setSourceClockSnapshot({
+      sourceMs: 240,
+      sourceClockId: "clock-1",
+      sourceResetId: 1,
+      sourceTimelineType: "capture",
+      sourceSequence: 3,
+      captureState: "capturing",
+      wallClockMs: 1000
+    });
+
+    await controller.requestSourceClockSnapshot({
+      sessionId: "session-1",
+      tabId: 7,
+      videoFingerprint: "video-a"
+    });
+
+    expect(session.activeVideoSession.getSourceClockSnapshot()).toBe(null);
+    expect(session.activeVideoSession.getTimelineAnchors()).toHaveLength(1);
   });
 
   it("clears stale anchors when a restart start request has an invalid media anchor", async () => {

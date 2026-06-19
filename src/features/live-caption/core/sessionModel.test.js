@@ -126,6 +126,85 @@ describe('live-caption session model', () => {
     expect(seekState.seekToMs).toBe(1200);
   });
 
+  it('stores, clears, and snapshots source clock metadata without changing projections', () => {
+    const videoSession = new VideoCaptionSession({
+      tabId: canonicalIdentity.tabId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sessionId: canonicalIdentity.sessionId,
+      mediaAnchorMs: 5000
+    });
+
+    const anchor = videoSession.addTimelineAnchor({
+      reason: 'start',
+      sourceMs: 0,
+      mediaMs: 5000,
+      playbackRate: 1,
+      sessionId: canonicalIdentity.sessionId,
+      videoFingerprint: canonicalIdentity.videoFingerprint,
+      sourceTimelineType: 'provider'
+    });
+    const transcript = videoSession.addTranscriptSegment(createTranscriptSegment({
+      sourceTimelineType: 'provider',
+      sourceStartMs: 100,
+      sourceEndMs: 200
+    }));
+
+    expect(transcript).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: anchor.anchorId
+    });
+
+    const storedSnapshot = videoSession.setSourceClockSnapshot({
+      sourceMs: 240,
+      sourceClockId: 'clock-1',
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 3,
+      captureState: 'capturing',
+      wallClockMs: 1000
+    });
+
+    expect(storedSnapshot).toMatchObject({
+      sourceMs: 240,
+      sourceClockId: 'clock-1',
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 3,
+      captureState: 'capturing',
+      wallClockMs: 1000
+    });
+    expect(videoSession.getSourceClockSnapshot()).toEqual(storedSnapshot);
+
+    const retrievedSnapshot = videoSession.getSourceClockSnapshot();
+    retrievedSnapshot.sourceMs = 999;
+    expect(videoSession.getSourceClockSnapshot()).toMatchObject({
+      sourceMs: 240,
+      sourceClockId: 'clock-1'
+    });
+    expect(videoSession.transcriptSegments[0]).toMatchObject({
+      projectedMediaStartMs: 5100,
+      projectedMediaEndMs: 5200,
+      timelineProjectionStatus: 'mapped',
+      timelineProjectionAnchorId: anchor.anchorId
+    });
+
+    expect(videoSession.setSourceClockSnapshot({
+      sourceMs: Number.NaN,
+      sourceClockId: 'clock-2',
+      sourceResetId: 2,
+      sourceTimelineType: 'capture',
+      sourceSequence: 4,
+      captureState: 'capturing',
+      wallClockMs: 2000
+    })).toBe(null);
+    expect(videoSession.getSourceClockSnapshot()).toBe(null);
+
+    expect(videoSession.clearSourceClockSnapshot()).toBe(null);
+    expect(videoSession.getSourceClockSnapshot()).toBe(null);
+  });
+
   it('stores valid timeline anchors and preserves insertion order', () => {
     const videoSession = new VideoCaptionSession({ tabId: 7, videoFingerprint: 'video-a' });
 

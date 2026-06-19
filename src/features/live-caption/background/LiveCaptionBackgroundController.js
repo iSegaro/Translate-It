@@ -221,6 +221,26 @@ export class LiveCaptionBackgroundController {
       requestId
     });
 
+    const pageSession = this.sessionManager.getSession(tabId);
+    const activeVideoSession = pageSession?.activeVideoSession ?? null;
+    const responseMatchesActiveSession = Boolean(
+      pageSession
+      && activeVideoSession
+      && response?.sessionId === pageSession.sessionId
+      && response?.tabId === pageSession.tabId
+      && response?.videoFingerprint === pageSession.activeVideoFingerprint
+      && activeVideoSession.videoFingerprint === pageSession.activeVideoFingerprint
+      && activeVideoSession.sessionId
+    );
+
+    if (responseMatchesActiveSession) {
+      if (response?.ok === true) {
+        activeVideoSession.setSourceClockSnapshot(response.sourceClockSnapshot ?? null);
+      } else if (typeof activeVideoSession.clearSourceClockSnapshot === 'function') {
+        activeVideoSession.clearSourceClockSnapshot();
+      }
+    }
+
     return response;
   }
 

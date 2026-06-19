@@ -122,6 +122,48 @@ function toNumberOrNull(value) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function normalizeSourceClockSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    return null;
+  }
+
+  const sourceMs = toNumberOrNull(snapshot.sourceMs);
+  const sourceClockId = typeof snapshot.sourceClockId === 'string' && snapshot.sourceClockId.trim().length > 0
+    ? snapshot.sourceClockId.trim()
+    : null;
+  const sourceResetId = toNumberOrNull(snapshot.sourceResetId);
+  const sourceTimelineType = typeof snapshot.sourceTimelineType === 'string'
+    ? snapshot.sourceTimelineType.trim().toLowerCase()
+    : null;
+  const sourceSequence = toNumberOrNull(snapshot.sourceSequence);
+  const captureState = typeof snapshot.captureState === 'string' && snapshot.captureState.trim().length > 0
+    ? snapshot.captureState.trim()
+    : null;
+  const wallClockMs = toNumberOrNull(snapshot.wallClockMs);
+
+  if (
+    sourceMs == null
+    || !sourceClockId
+    || sourceResetId == null
+    || sourceTimelineType !== 'capture'
+    || sourceSequence == null
+    || !captureState
+    || wallClockMs == null
+  ) {
+    return null;
+  }
+
+  return Object.freeze({
+    sourceMs,
+    sourceClockId,
+    sourceResetId,
+    sourceTimelineType,
+    sourceSequence,
+    captureState,
+    wallClockMs
+  });
+}
+
 function normalizeSegment(segment, kind, mediaAnchorMsInput = null, timelineAnchors = []) {
   if (!segment || typeof segment !== 'object') {
     throw new TypeError(`VideoCaptionSession.${kind} requires a segment object`);
@@ -224,6 +266,7 @@ export class VideoCaptionSession {
     this.transcriptSegments = [];
     this.translatedCaptionSegments = [];
     this.timelineAnchors = [];
+    this.sourceClockSnapshot = null;
     this.transcriptSegmentIndexByIdentity = new Map();
     this.translatedCaptionSegmentIndexByIdentity = new Map();
     this.seekState = null;
@@ -382,6 +425,53 @@ export class VideoCaptionSession {
     this.timelineAnchors = [];
     this.refreshTimelineProjections();
     return this.getTimelineAnchors();
+  }
+
+  setSourceClockSnapshot(snapshot) {
+    const normalizedSnapshot = normalizeSourceClockSnapshot(snapshot);
+
+    if (!normalizedSnapshot) {
+      this.sourceClockSnapshot = null;
+      this.touch();
+      logger.debug('Source clock snapshot cleared due to invalid input', {
+        tabId: this.tabId,
+        sessionId: this.sessionId,
+        videoFingerprint: this.videoFingerprint
+      });
+      return null;
+    }
+
+    this.sourceClockSnapshot = normalizedSnapshot;
+    this.touch();
+
+    logger.debug('Source clock snapshot stored', {
+      tabId: this.tabId,
+      sessionId: this.sessionId,
+      videoFingerprint: this.videoFingerprint,
+      sourceMs: normalizedSnapshot.sourceMs,
+      sourceClockId: normalizedSnapshot.sourceClockId,
+      sourceResetId: normalizedSnapshot.sourceResetId,
+      sourceSequence: normalizedSnapshot.sourceSequence
+    });
+
+    return this.getSourceClockSnapshot();
+  }
+
+  getSourceClockSnapshot() {
+    return this.sourceClockSnapshot ? { ...this.sourceClockSnapshot } : null;
+  }
+
+  clearSourceClockSnapshot() {
+    this.sourceClockSnapshot = null;
+    this.touch();
+
+    logger.debug('Source clock snapshot cleared', {
+      tabId: this.tabId,
+      sessionId: this.sessionId,
+      videoFingerprint: this.videoFingerprint
+    });
+
+    return this.getSourceClockSnapshot();
   }
 
   refreshTimelineProjections() {

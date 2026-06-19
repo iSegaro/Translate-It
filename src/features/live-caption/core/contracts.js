@@ -77,6 +77,9 @@ export function createVideoCaptionSessionSnapshot(session) {
     timelineAnchors: Array.isArray(session.timelineAnchors)
       ? session.timelineAnchors.map((anchor) => ({ ...anchor }))
       : [],
+    sourceClockSnapshot: session.sourceClockSnapshot
+      ? { ...session.sourceClockSnapshot }
+      : null,
     seekState: session.seekState ? { ...session.seekState } : null,
     lastError: session.lastError ? { ...session.lastError } : null,
     lastCleanupReason: session.lastCleanupReason ?? null,

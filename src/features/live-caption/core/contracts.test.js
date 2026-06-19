@@ -34,6 +34,15 @@ describe('live-caption session contracts', () => {
       sessionId: 'session-42',
       videoFingerprint: 'video-42'
     });
+    videoSession.setSourceClockSnapshot({
+      sourceMs: 120,
+      sourceClockId: 'clock-42',
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 2,
+      captureState: 'capturing',
+      wallClockMs: 1000
+    });
 
     pageSession.attachVideoSession(videoSession);
 
@@ -46,5 +55,12 @@ describe('live-caption session contracts', () => {
     expect(videoSnapshot.tabId).toBe(42);
     expect(videoSnapshot.videoFingerprint).toBe('video-42');
     expect(videoSnapshot.timelineAnchors).toHaveLength(1);
+    expect(videoSnapshot.sourceClockSnapshot).toMatchObject({
+      sourceMs: 120,
+      sourceClockId: 'clock-42',
+      sourceResetId: 1,
+      sourceTimelineType: 'capture',
+      sourceSequence: 2
+    });
   });
 });
