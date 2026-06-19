@@ -20,6 +20,7 @@
         :caption-lines="captionLines"
         :caption-display-mode="captionDisplayMode"
         :video-element="videoElement"
+        :timeline-projection-context="activeVideoState"
         :media-timeline-mapping-status="mediaTimelineMappingStatus"
       />
 

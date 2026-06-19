@@ -17,6 +17,12 @@
 import { computed, ref, watch, onBeforeUnmount } from 'vue';
 import { LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT } from '../core/LiveCaptionCaptionDisplayMode.js';
 import LiveCaptionCaptionLine from './LiveCaptionCaptionLine.vue';
+import {
+  selectFinalizedCaptionLines,
+  selectProjectedCaptionLines
+} from './LiveCaptionCaptionTrackProjection.js';
+
+const ENABLE_LIVE_CAPTION_PROJECTED_TIMELINE_RENDERING = false;
 
 const props = defineProps({
   captionLines: {
@@ -28,6 +34,10 @@ const props = defineProps({
     default: LIVE_CAPTION_CAPTION_DISPLAY_MODE_DEFAULT
   },
   videoElement: {
+    type: Object,
+    default: null
+  },
+  timelineProjectionContext: {
     type: Object,
     default: null
   },
@@ -68,47 +78,27 @@ onBeforeUnmount(() => {
   }
 });
 
-function toFiniteNumberOrNull(val) {
-  if (val == null || val === '') {
-    return null;
-  }
-  const num = Number(val);
-  return Number.isFinite(num) ? num : null;
-}
-
 const finalizedLines = computed(() => {
-  if (!Array.isArray(props.captionLines)) return [];
-  const lines = props.captionLines.filter((line) => {
-    if (line?.isFinal === false) {
-      return false;
-    }
-    const text = line?.translatedText || line?.originalText || '';
-    return text.trim().length > 0;
-  });
-
-  // TODO: `"valid"` currently means “single-anchor continuous playback” (conservative single-anchor policy).
-  // Later anchor-list mapping can support pause/seek and replace this boolean/status without changing overlay API much.
-  if (props.mediaTimelineMappingStatus === 'valid') {
-    const currentTimeMs = videoCurrentTimeMs.value;
-    const filtered = lines.filter((line) => {
-      const mediaStartMs = toFiniteNumberOrNull(line.mediaStartMs);
-      const mediaEndMs = toFiniteNumberOrNull(line.mediaEndMs);
-
-      // Fallback safely if media timestamps are missing or non-finite for this caption
-      if (mediaStartMs == null || mediaEndMs == null) {
-        return true;
-      }
-
-      return (
-        currentTimeMs >= mediaStartMs &&
-        currentTimeMs <= Math.max(mediaEndMs + 1500, mediaStartMs + 2000)
-      );
+  if (ENABLE_LIVE_CAPTION_PROJECTED_TIMELINE_RENDERING) {
+    const projectedLines = selectProjectedCaptionLines(props.captionLines, {
+      enableProjectedTimelineRendering: ENABLE_LIVE_CAPTION_PROJECTED_TIMELINE_RENDERING,
+      videoElement: props.videoElement,
+      currentTimeMs: videoCurrentTimeMs.value,
+      mediaTimelineMappingStatus: props.mediaTimelineMappingStatus,
+      maxVisibleCaptionSegments: MAX_VISIBLE_CAPTION_SEGMENTS,
+      timelineProjectionContext: props.timelineProjectionContext
     });
-    return filtered.slice(-MAX_VISIBLE_CAPTION_SEGMENTS);
+
+    if (projectedLines.length > 0) {
+      return projectedLines;
+    }
   }
 
-  // Fallback to old behavior: last 2 finalized captions
-  return lines.slice(-MAX_VISIBLE_CAPTION_SEGMENTS);
+  return selectFinalizedCaptionLines(props.captionLines, {
+    currentTimeMs: videoCurrentTimeMs.value,
+    mediaTimelineMappingStatus: props.mediaTimelineMappingStatus,
+    maxVisibleCaptionSegments: MAX_VISIBLE_CAPTION_SEGMENTS
+  });
 });
 
 function lineKey(line) {
