@@ -165,6 +165,31 @@ export const AIConversationHelper = {
   },
 
   /**
+   * Format the last Select Element turn as compact prompt context.
+   * Returns an empty string when history is disabled or unavailable.
+   */
+  async formatCompactHistoryContext(sessionId, translateMode = '', options = {}) {
+    const turns = await this.getConversationHistory(sessionId, translateMode, {
+      maxTurns: 1,
+      maxChars: options.maxChars ?? TRANSLATION_CONSTANTS.HISTORY_CHARACTER_LIMITS.AI
+    });
+
+    if (!turns.length) return '';
+
+    const lastTurn = turns[turns.length - 1];
+    if (!lastTurn?.user || !lastTurn?.assistant) return '';
+
+    return [
+      'Previous translation context:',
+      'Original:',
+      lastTurn.user,
+      '',
+      'Translated:',
+      lastTurn.assistant
+    ].join('\n');
+  },
+
+  /**
    * Prepares a compact context string for DeepL
    */
   async prepareDeepLContext(sessionId, contextMetadata, translateMode = null) {

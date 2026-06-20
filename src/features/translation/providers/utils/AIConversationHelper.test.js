@@ -38,10 +38,12 @@ vi.mock('@/features/translation/utils/bilingualPromptHelper.js', () => ({
 }));
 
 import { AIConversationHelper } from './AIConversationHelper.js';
+import { translationSessionManager } from '@/features/translation/core/TranslationSessionManager.js';
 
 describe('AIConversationHelper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    translationSessionManager.sessions.clear();
   });
 
   it('uses the non-auto batch prompt when bilingual auto prompts are disabled', async () => {
@@ -114,5 +116,66 @@ describe('AIConversationHelper', () => {
     expect(occurrences).toBe(1);
     expect(systemPrompt).toContain('USER RULE ');
     expect(systemPrompt).toContain('BATCH RULE ');
+  });
+
+  it('formats compact Select Element history from the active session only', async () => {
+    const { getAIConversationHistoryEnabledAsync, TranslationMode } = await import('@/shared/config/config.js');
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+
+    const activeSessionId = 'session-active';
+    const otherSessionId = 'session-other';
+
+    translationSessionManager.sessions.set(activeSessionId, {
+      id: activeSessionId,
+      provider: 'WebAI',
+      history: [
+        { role: 'user', content: 'Previous original text' },
+        { role: 'assistant', content: 'Previous translated text' }
+      ]
+    });
+
+    translationSessionManager.sessions.set(otherSessionId, {
+      id: otherSessionId,
+      provider: 'WebAI',
+      history: [
+        { role: 'user', content: 'Wrong session original' },
+        { role: 'assistant', content: 'Wrong session translated' }
+      ]
+    });
+
+    const context = await AIConversationHelper.formatCompactHistoryContext(activeSessionId, TranslationMode.Select_Element);
+
+    expect(context).toContain('Previous translation context:');
+    expect(context).toContain('Original:');
+    expect(context).toContain('Previous original text');
+    expect(context).toContain('Translated:');
+    expect(context).toContain('Previous translated text');
+    expect(context).not.toContain('Wrong session original');
+    expect(context).not.toContain('Wrong session translated');
+  });
+
+  it('returns an empty context when history is disabled or mode is not Select Element', async () => {
+    const { getAIConversationHistoryEnabledAsync, TranslationMode } = await import('@/shared/config/config.js');
+
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+    translationSessionManager.sessions.set('session-id', {
+      id: 'session-id',
+      provider: 'WebAI',
+      history: [
+        { role: 'user', content: 'Previous original text' },
+        { role: 'assistant', content: 'Previous translated text' }
+      ]
+    });
+
+    await expect(
+      AIConversationHelper.formatCompactHistoryContext('session-id', TranslationMode.Select_Element)
+    ).resolves.toBe('');
+
+    getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+
+    await expect(
+      AIConversationHelper.formatCompactHistoryContext('session-id', TranslationMode.Field)
+    ).resolves.toBe('');
   });
 });
