@@ -1,3 +1,12 @@
+#### v1.17.2 – Released on X XX, 2026
+
+##### Fixed
+
+- Improved `Select Element` translation performance and responsiveness, especially when processing large selections.
+- Fixed WebAI conversation history behavior to provide more consistent and predictable translation results.
+
+---
+
 #### v1.17.1 – Released on June 11, 2026
 
 ##### Added
