@@ -3,6 +3,8 @@ import { BaseAIProvider } from "@/features/translation/providers/BaseAIProvider.
 import {
   getWebAIApiUrlAsync,
   getWebAIApiModelAsync,
+  getAIConversationHistoryEnabledAsync,
+  TranslationMode
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -36,12 +38,27 @@ export class WebAIProvider extends BaseAIProvider {
 
     this._validateConfig({ apiUrl, apiModel }, ["apiUrl", "apiModel"], `${this.providerName.toLowerCase()}-translation`);
 
-    const turnNumber = await AIConversationHelper.claimNextTurn(sessionId, this.providerName);
-    logger.info(`[WebAI] Model: ${apiModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}..., Turn: ${turnNumber})` : ''}`);
+    const historyEnabled = await getAIConversationHistoryEnabledAsync();
+    const shouldUseConversationHistory =
+      historyEnabled && options.mode === TranslationMode.Select_Element;
+
+    const turnNumber = shouldUseConversationHistory
+      ? await AIConversationHelper.claimNextTurn(sessionId, this.providerName)
+      : null;
+    logger.info(`[WebAI] Model: ${apiModel}${sessionId ? ` (Session: ${sessionId.substring(0, 15)}...${turnNumber ? `, Turn: ${turnNumber}` : ''})` : ''}`);
 
     // WebAI uses a single prompt string instead of separate messages
     // We combine the system prompt and user text into a final message
-    const finalMessage = `${systemPrompt}\n\nText to translate:\n${userText}`;
+    const historyContext = shouldUseConversationHistory
+      ? await AIConversationHelper.formatCompactHistoryContext(sessionId, options.mode, {
+          maxChars: 300
+        })
+      : '';
+
+    const finalMessage = [
+      systemPrompt,
+      historyContext
+    ].filter(Boolean).join('\n\n') + `\n\nText to translate:\n${userText}`;
 
     const fetchOptions = {
       method: "POST",
@@ -69,7 +86,7 @@ export class WebAIProvider extends BaseAIProvider {
       sessionId
     });
 
-    if (sessionId && result) {
+    if (shouldUseConversationHistory && sessionId && result) {
       await AIConversationHelper.updateSessionHistory(sessionId, userText, result);
     }
     
