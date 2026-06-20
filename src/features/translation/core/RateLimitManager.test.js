@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockRuntime = vi.hoisted(() => ({
+  providerLevels: new Map()
+}));
+
 // Mock extension polyfill before anything else
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -16,7 +20,9 @@ import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
-  getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(1),
+  getProviderOptimizationLevelAsync: vi.fn(async (providerName) => {
+    return mockRuntime.providerLevels.get(providerName) ?? 1;
+  }),
   getSettingsAsync: vi.fn().mockResolvedValue({}),
 }));
 
@@ -24,11 +30,34 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
   PROVIDER_CONFIGURATIONS: {
     TestProvider: {
       rateLimit: { maxConcurrent: 1, delayBetweenRequests: 0 }
+    },
+    WebAI: {
+      rateLimit: {
+        maxConcurrent: 2,
+        delayBetweenRequests: 0,
+        modeOverrides: {
+          select_element: {
+            maxConcurrent: 2,
+            subsequentDelay: 700,
+            burstLimit: 4
+          }
+        }
+      }
     }
   },
-  getProviderConfiguration: vi.fn(() => ({
-    rateLimit: { maxConcurrent: 1, delayBetweenRequests: 0 }
-  }))
+  getProviderConfiguration: vi.fn((providerName, level) => {
+    const numericLevel = Number(level) || 1;
+    const maxConcurrent = providerName === 'WebAI'
+      ? (numericLevel >= 5 ? 4 : numericLevel >= 4 ? 3 : 2)
+      : (numericLevel >= 5 ? 4 : numericLevel >= 4 ? 3 : 1);
+
+    return {
+      rateLimit: {
+        maxConcurrent,
+        delayBetweenRequests: 0
+      }
+    };
+  })
 }));
 
 // Mock logger
@@ -45,6 +74,10 @@ describe('RateLimitManager', () => {
   let manager;
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockRuntime.providerLevels.clear();
+    mockRuntime.providerLevels.set('TestProvider', 1);
+    mockRuntime.providerLevels.set('ConcurrentProvider', 1);
+    mockRuntime.providerLevels.set('WebAI', 3);
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err.message === 'FATAL');
@@ -56,6 +89,8 @@ describe('RateLimitManager', () => {
     // Pre-initialize provider state
     manager._initializeProvider('TestProvider', { maxConcurrent: 1, delayBetweenRequests: 0 });
   });
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   describe('Priority Queueing', () => {
     it('should execute HIGH priority tasks before NORMAL and LOW', async () => {
@@ -148,6 +183,62 @@ describe('RateLimitManager', () => {
 
       await Promise.all(promises);
       expect(maxSeenActive).toBe(2);
+    });
+
+    it('should refresh runtime concurrency when optimization level changes', async () => {
+      manager._initializeProvider('WebAI', { maxConcurrent: 2, delayBetweenRequests: 0 }, {
+        isManualConfig: false,
+        optimizationLevel: 3,
+        configSource: 'fresh-load'
+      });
+
+      let activeCount = 0;
+      let maxSeenActive = 0;
+
+      const task = async () => {
+        activeCount++;
+        maxSeenActive = Math.max(maxSeenActive, activeCount);
+        await sleep(30);
+        activeCount--;
+      };
+
+      mockRuntime.providerLevels.set('WebAI', 3);
+      const initialRun = Array.from({ length: 4 }, () => manager.executeWithRateLimit('WebAI', task));
+      await Promise.all(initialRun);
+      expect(maxSeenActive).toBe(2);
+
+      activeCount = 0;
+      maxSeenActive = 0;
+
+      mockRuntime.providerLevels.set('WebAI', 5);
+      const refreshedRun = Array.from({ length: 5 }, () => manager.executeWithRateLimit('WebAI', task));
+      await Promise.all(refreshedRun);
+      expect(maxSeenActive).toBe(4);
+    });
+
+    it('should preserve manual override configs without refreshing them', async () => {
+      manager._initializeProvider('ManualProvider', { maxConcurrent: 1, delayBetweenRequests: 0 }, {
+        isManualConfig: true,
+        optimizationLevel: 3,
+        configSource: 'manual'
+      });
+
+      mockRuntime.providerLevels.set('ManualProvider', 5);
+
+      let activeCount = 0;
+      let maxSeenActive = 0;
+
+      const task = async () => {
+        activeCount++;
+        maxSeenActive = Math.max(maxSeenActive, activeCount);
+        await sleep(20);
+        activeCount--;
+      };
+
+      const promises = Array.from({ length: 3 }, () => manager.executeWithRateLimit('ManualProvider', task));
+      await Promise.all(promises);
+
+      expect(maxSeenActive).toBe(1);
     });
   });
 
