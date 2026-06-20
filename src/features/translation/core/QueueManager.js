@@ -212,6 +212,10 @@ export class QueueManager {
       logger.debug(`Initialized queue for provider: ${providerName}`);
     }
   }
+
+  _isParallelQueue(providerName) {
+    return typeof providerName === 'string' && providerName.endsWith('::parallel');
+  }
   
   /**
    * Add item to queue with automatic execution
@@ -253,8 +257,26 @@ export class QueueManager {
     
     this.processing.set(providerName, true);
     const queue = this.queues.get(providerName);
+    const parallelQueue = this._isParallelQueue(providerName);
     
     try {
+      if (parallelQueue) {
+        let dispatchedCount = 0;
+        while (queue.length > 0) {
+          const item = queue.find(item => item.status === QueueStatus.PENDING);
+          
+          if (!item) {
+            break;
+          }
+          
+          dispatchedCount++;
+          this._processItem(item);
+        }
+
+        logger.debug(`Dispatched ${dispatchedCount} items for parallel queue ${providerName}; inflight requests are tracked per item status`);
+        return;
+      }
+
       while (queue.length > 0) {
         const item = queue.find(item => 
           item.status === QueueStatus.PENDING
@@ -297,6 +319,7 @@ export class QueueManager {
   async _processItem(item) {
     // Check for cancellation before processing
     if (item.status === QueueStatus.FAILED) {
+      this._removeItemFromQueue(item);
       return; // Already cancelled/failed
     }
 
@@ -323,6 +346,7 @@ export class QueueManager {
       // Re-check status: it might have been changed to FAILED by an external cancellation during the request
       if (item.status === QueueStatus.FAILED) {
         logger.debug(`Item ${item.id} request failed but was already cancelled externally`);
+        this._removeItemFromQueue(item);
         return;
       }
 
@@ -375,6 +399,18 @@ export class QueueManager {
           logger.debug(`Item ${item.id} failed permanently after ${item.attempts} attempts:`, error);
         }
       }
+    }
+
+    this._removeItemFromQueue(item);
+  }
+
+  _removeItemFromQueue(item) {
+    const queue = this.queues.get(item.providerName);
+    if (!queue) return;
+
+    const index = queue.indexOf(item);
+    if (index > -1 && (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED)) {
+      queue.splice(index, 1);
     }
   }
   
@@ -433,12 +469,12 @@ export class QueueManager {
     const queue = this.queues.get(providerName);
     let cancelledCount = 0;
     
-    queue.forEach(item => {
+    for (const item of [...queue]) {
       if (item.status === QueueStatus.PENDING || item.status === QueueStatus.RETRYING || item.status === QueueStatus.PROCESSING) {
         this._cancelItemInternal(item);
         cancelledCount++;
       }
-    });
+    }
     
     logger.debug(`Cancelled ${cancelledCount} items for provider ${providerName}`);
     return cancelledCount;
@@ -468,12 +504,12 @@ export class QueueManager {
     let cancelledCount = 0;
 
     for (const [, queue] of this.queues) {
-      queue.forEach(item => {
+      for (const item of [...queue]) {
         if (item.messageId === messageId && (item.status === QueueStatus.PENDING || item.status === QueueStatus.RETRYING || item.status === QueueStatus.PROCESSING)) {
           this._cancelItemInternal(item);
           cancelledCount++;
         }
-      });
+      }
     }
 
     if (cancelledCount > 0) {
@@ -491,13 +527,13 @@ export class QueueManager {
     let cancelledCount = 0;
 
     for (const [providerName, queue] of this.queues) {
-      queue.forEach(item => {
+      for (const item of [...queue]) {
         if (item.uiContext === uiContext && (item.status === QueueStatus.PENDING || item.status === QueueStatus.RETRYING || item.status === QueueStatus.PROCESSING)) {
           logger.debug(`[QueueManager] Found item to cancel in queue for ${providerName}: ${item.id}`);
           this._cancelItemInternal(item);
           cancelledCount++;
         }
-      });
+      }
     }
 
     if (cancelledCount > 0) {
@@ -527,6 +563,8 @@ export class QueueManager {
       clearTimeout(this.retryTimeouts.get(item.id));
       this.retryTimeouts.delete(item.id);
     }
+
+    this._removeItemFromQueue(item);
   }
   
   /**
