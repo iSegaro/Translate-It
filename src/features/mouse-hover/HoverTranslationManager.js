@@ -230,6 +230,16 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Clean up the active hover state only if the request belongs to the current messageId.
+   * @private
+   */
+  _cleanupActiveHoverRequest(messageId) {
+    if (this.currentMessageId === messageId) {
+      this._handleMouseOut();
+    }
+  }
+
+  /**
    * Remove the visual border from the current element
    * @private
    */
@@ -395,8 +405,8 @@ export class HoverTranslationManager extends ResourceTracker {
       }
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
-        if (this.currentMessageId === messageId) this.currentMessageId = null;
         logger.debug('Hover translation skipped: Extension context invalidated');
+        this._cleanupActiveHoverRequest(messageId);
         return;
       }
 
@@ -408,10 +418,6 @@ export class HoverTranslationManager extends ResourceTracker {
         return;
       }
 
-      if (this.currentMessageId === messageId) {
-        this.currentMessageId = null;
-      }
-
       // Standard error handling via the Golden Chain architecture
       ErrorHandler.getInstance().handle(error, {
         context: 'hover',
@@ -419,6 +425,7 @@ export class HoverTranslationManager extends ResourceTracker {
       }).catch(() => {});
 
       this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error });
+      this._cleanupActiveHoverRequest(messageId);
     }
   }
 
