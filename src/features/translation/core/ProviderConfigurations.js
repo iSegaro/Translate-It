@@ -966,18 +966,34 @@ function applyOptimizationLevel(config, level) {
   const aiSizeMultipliers = { 1: 2.5, 2: 1.5, 3: 1, 4: 0.6, 5: 0.3 };
   const sizeMultipliers = { 1: 1.5, 2: 1.2, 3: 1, 4: 0.8, 5: 0.6 };
 
+  // Base-2 providers need a visible step-up at Level 2 so low and medium
+  // optimization modes are not concurrency-identical. Larger base values keep
+  // the standard multiplier curve.
+  const scaleConcurrentLimit = (baseConcurrent, levelValue) => {
+    if (baseConcurrent === 2) {
+      const baseTwoCurve = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4 };
+      return baseTwoCurve[levelValue];
+    }
+
+    if (levelValue < 3) {
+      return Math.max(1, Math.floor(baseConcurrent * concurrentMultipliers[levelValue]));
+    }
+
+    if (levelValue > 3) {
+      return Math.max(baseConcurrent, Math.ceil(baseConcurrent * concurrentMultipliers[levelValue]));
+    }
+
+    return baseConcurrent;
+  };
+
   // 1. Scale Rate Limits
   // Concurrent requests multipliers: Level 1 (0.4), Level 2 (0.7), Level 3 (1.0), Level 4 (1.5), Level 5 (2.0)
-  // We use floor for levels < 3 to be more conservative and ceil for levels > 3 to be more aggressive
+  // We use floor for levels < 3 to be more conservative and ceil for levels > 3 to be more aggressive.
+  // Base-2 providers use a dedicated curve so Level 2 can be distinct from Level 1.
   const baseConcurrent = config.rateLimit.maxConcurrent;
-  
-  if (safeLevel < 3) {
-    result.rateLimit.maxConcurrent = Math.max(1, Math.floor(baseConcurrent * concurrentMultipliers[safeLevel]));
-  } else if (safeLevel > 3) {
-    result.rateLimit.maxConcurrent = Math.max(baseConcurrent, Math.ceil(baseConcurrent * concurrentMultipliers[safeLevel]));
-  }
+  result.rateLimit.maxConcurrent = scaleConcurrentLimit(baseConcurrent, safeLevel);
 
-  // Scale Burst Limit if it exists, using the same logic
+  // Scale Burst Limit if it exists, using the original conservative curve.
   if (config.rateLimit.burstLimit) {
     const baseBurst = config.rateLimit.burstLimit;
     if (safeLevel < 3) {
@@ -1053,12 +1069,7 @@ function applyOptimizationLevel(config, level) {
       const modeConfig = { ...config.rateLimit.modeOverrides[mode] };
       
       if (modeConfig.maxConcurrent) {
-        if (safeLevel < 3) {
-          modeConfig.maxConcurrent = Math.max(1, Math.floor(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
-        } else if (safeLevel > 3) {
-          modeConfig.maxConcurrent = Math.max(modeConfig.maxConcurrent, Math.ceil(modeConfig.maxConcurrent * concurrentMultipliers[safeLevel]));
-        }
-        modeConfig.maxConcurrent = Math.min(modeConfig.maxConcurrent, 12);
+        modeConfig.maxConcurrent = Math.min(scaleConcurrentLimit(modeConfig.maxConcurrent, safeLevel), 12);
       }
       
       if (modeConfig.burstLimit) {
