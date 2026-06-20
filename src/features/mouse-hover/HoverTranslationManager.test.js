@@ -228,5 +228,122 @@ describe('HoverTranslationManager', () => {
         direction: 'rtl'
       }));
     });
+
+    it('should clean up highlight and caches on context invalidation error', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_SCOPE') return 'container';
+        if (key === 'MOUSE_HOVER_SHOW_CONTAINER_BORDER') return true;
+        return def;
+      });
+
+      const element = document.createElement('div');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: element
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValue(
+        new Error('Extension context invalidated')
+      );
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(element.classList.contains('ti-hover-container-highlight')).toBe(false);
+      expect(manager.borderedElement).toBeNull();
+      expect(manager.currentRect).toBeNull();
+      expect(manager.currentText).toBeNull();
+      expect(manager.currentElement).toBeNull();
+    });
+
+    it('should clean up highlight and caches on standard translation error', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_SCOPE') return 'container';
+        if (key === 'MOUSE_HOVER_SHOW_CONTAINER_BORDER') return true;
+        return def;
+      });
+
+      const element = document.createElement('div');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: element
+      });
+
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValue(
+        new Error('Translation failed')
+      );
+
+      await manager._processHover({ clientX: 15, clientY: 15 });
+
+      expect(element.classList.contains('ti-hover-container-highlight')).toBe(false);
+      expect(manager.borderedElement).toBeNull();
+      expect(manager.currentRect).toBeNull();
+      expect(manager.currentText).toBeNull();
+      expect(manager.currentElement).toBeNull();
+    });
+
+    it('should not clean up highlight or caches if a stale failed request finishes after a new hover started', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_SCOPE') return 'container';
+        if (key === 'MOUSE_HOVER_SHOW_CONTAINER_BORDER') return true;
+        return def;
+      });
+
+      const element1 = document.createElement('div');
+      const element2 = document.createElement('div');
+
+      // 1. First hover starts
+      manager.currentElement = element1;
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Text one',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: element1
+      });
+
+      let rejectRequest1;
+      const promise1 = new Promise((_, reject) => {
+        rejectRequest1 = () => reject(new Error('Extension context invalidated'));
+      });
+      contentScriptIntegration.sendTranslationRequest.mockReturnValueOnce(promise1);
+
+      const processPromise1 = manager._processHover({ clientX: 15, clientY: 15 });
+      const firstMessageId = manager.currentMessageId;
+
+      expect(element1.classList.contains('ti-hover-container-highlight')).toBe(true);
+      expect(manager.currentText).toBe('Text one');
+
+      // 2. Second hover starts before first completes, overriding active hover state
+      manager.currentElement = element2;
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Text two',
+        rect: { top: 20, left: 20, bottom: 30, right: 120 },
+        element: element2
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        translatedText: 'Translation two',
+        direction: 'ltr'
+      });
+
+      await manager._processHover({ clientX: 25, clientY: 25 });
+      const secondMessageId = manager.currentMessageId;
+
+      expect(secondMessageId).not.toBe(firstMessageId);
+      expect(element2.classList.contains('ti-hover-container-highlight')).toBe(true);
+      expect(manager.currentText).toBe('Text two');
+
+      // 3. First request fails (e.g. throws context error)
+      rejectRequest1();
+      await processPromise1;
+
+      // 4. Verify stale first request's failure did NOT clear the second hover's state
+      expect(element2.classList.contains('ti-hover-container-highlight')).toBe(true);
+      expect(manager.currentText).toBe('Text two');
+      expect(manager.currentElement).toBe(element2);
+      expect(manager.borderedElement).toBe(element2);
+    });
   });
 });
