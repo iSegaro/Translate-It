@@ -210,4 +210,58 @@ describe('ProviderCoordinator', () => {
       )).rejects.toThrow('FATAL');
     });
   });
+
+  describe('Queue routing', () => {
+    it('should route parallel Select Element work through the parallel queue key', async () => {
+      const result = await providerCoordinator.execute(
+        mockProvider,
+        'Input Text',
+        'en',
+        'fa',
+        {
+          mode: 'select_element',
+          parallelExecution: true,
+          messageId: 'msg-1'
+        }
+      );
+
+      const { queueManager } = await import('./QueueManager.js');
+      expect(queueManager.enqueue).toHaveBeenCalledWith(
+        'TestAI::parallel',
+        expect.any(Function),
+        expect.any(Number),
+        'select_element',
+        expect.objectContaining({
+          messageId: 'msg-1',
+          parallelExecution: true
+        })
+      );
+      expect(result.translatedText).toBe('Translated Text');
+    });
+
+    it('should keep the default provider queue key unchanged when parallelExecution is disabled', async () => {
+      await providerCoordinator.execute(
+        mockProvider,
+        'Input Text',
+        'en',
+        'fa',
+        {
+          mode: 'page',
+          messageId: 'msg-2'
+        }
+      );
+
+      const { queueManager } = await import('./QueueManager.js');
+      expect(queueManager.enqueue).toHaveBeenCalledWith(
+        'TestAI',
+        expect.any(Function),
+        expect.any(Number),
+        'page',
+        expect.objectContaining({
+          messageId: 'msg-2',
+          parallelExecution: false
+        })
+      );
+    });
+  });
 });

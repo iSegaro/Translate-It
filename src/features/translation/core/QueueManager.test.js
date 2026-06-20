@@ -23,6 +23,17 @@ describe('QueueManager', () => {
   let queueManager;
   let ErrorTypes;
 
+  const createDeferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    return { promise, resolve, reject };
+  };
+
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
@@ -180,6 +191,100 @@ describe('QueueManager', () => {
       expect(cancelledCount).toBe(1);
 
       await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+  });
+
+  describe('Parallel queue lane', () => {
+    it('should dispatch all pending parallel-queue requests without serializing them', async () => {
+      const first = createDeferred();
+      const second = createDeferred();
+      const mockRequest1 = vi.fn().mockImplementation(() => first.promise);
+      const mockRequest2 = vi.fn().mockImplementation(() => second.promise);
+
+      const p1 = queueManager.enqueue('test-provider::parallel', mockRequest1, 0, 'select_element', {
+        messageId: 'parallel-msg'
+      });
+      const p2 = queueManager.enqueue('test-provider::parallel', mockRequest2, 0, 'select_element', {
+        messageId: 'parallel-msg'
+      });
+
+      await Promise.resolve();
+
+      expect(mockRequest1).toHaveBeenCalledTimes(1);
+      expect(mockRequest2).toHaveBeenCalledTimes(1);
+
+      first.resolve('R1');
+      second.resolve('R2');
+
+      await expect(p1).resolves.toBe('R1');
+      await expect(p2).resolves.toBe('R2');
+    });
+
+    it('should cancel in-flight parallel-queue requests by messageId', async () => {
+      const first = createDeferred();
+      const second = createDeferred();
+      const mockRequest1 = vi.fn().mockImplementation(() => first.promise);
+      const mockRequest2 = vi.fn().mockImplementation(() => second.promise);
+
+      const p1 = queueManager.enqueue('test-provider::parallel', mockRequest1, 0, 'select_element', {
+        messageId: 'parallel-cancel'
+      });
+      const p2 = queueManager.enqueue('test-provider::parallel', mockRequest2, 0, 'select_element', {
+        messageId: 'parallel-cancel'
+      });
+
+      await Promise.resolve();
+
+      const cancelledCount = queueManager.cancelByMessageId('parallel-cancel');
+      expect(cancelledCount).toBe(2);
+      expect(queueManager.getQueueStatus('test-provider::parallel').total).toBe(0);
+
+      await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      await expect(p2).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+
+      first.resolve('R1');
+      second.resolve('R2');
+      await Promise.resolve();
+    });
+
+    it('should remove cancelled pending parallel-queue items', async () => {
+      const processSpy = vi.spyOn(queueManager, '_processQueue').mockImplementation(() => {});
+      const mockRequest = vi.fn().mockResolvedValue('R1');
+
+      try {
+        const p1 = queueManager.enqueue('pending-provider::parallel', mockRequest, 0, 'select_element', {
+          messageId: 'pending-cancel'
+        });
+
+        expect(queueManager.getQueueStatus('pending-provider::parallel').total).toBe(1);
+
+        const cancelledCount = queueManager.cancelByMessageId('pending-cancel');
+        expect(cancelledCount).toBe(1);
+        expect(queueManager.getQueueStatus('pending-provider::parallel').total).toBe(0);
+
+        await expect(p1).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      } finally {
+        processSpy.mockRestore();
+      }
+    });
+
+    it('should keep retrying parallel-queue items until retry completes', async () => {
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const mockRequest = vi.fn()
+        .mockRejectedValueOnce(mockError)
+        .mockResolvedValueOnce('R1');
+
+      const promise = queueManager.enqueue('retry-parallel::parallel', mockRequest, 0, 'select_element', {
+        messageId: 'retry-parallel'
+      });
+
+      await vi.advanceTimersByTimeAsync(50);
+      expect(queueManager.getQueueStatus('retry-parallel::parallel').status.retrying).toBe(1);
+      expect(queueManager.getQueueStatus('retry-parallel::parallel').total).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(2500);
+      await expect(promise).resolves.toBe('R1');
+      expect(queueManager.getQueueStatus('retry-parallel::parallel').total).toBe(0);
     });
   });
 });

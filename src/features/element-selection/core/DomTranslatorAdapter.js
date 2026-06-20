@@ -371,14 +371,20 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   }
                 });
 
-                // Emit progress update based on batch index if available (OUTSIDE the loop)
-                if (data.batchIndex !== undefined && data.totalBatches !== undefined) {
-                  pageEventBus.emit('select-element-translation-progress', {
-                    completed: data.batchIndex + 1,
-                    total: data.totalBatches,
-                    isRequestProgress: true
-                  });
-                  this.progressEmitted = true; // Mark that progress has been emitted
+                // Emit progress update using completed count when available, with batch index as fallback.
+                if (data.totalBatches !== undefined) {
+                  const completed = typeof data.completedCount === 'number'
+                    ? data.completedCount
+                    : (typeof data.batchIndex === 'number' ? data.batchIndex + 1 : undefined);
+
+                  if (typeof completed === 'number') {
+                    pageEventBus.emit('select-element-translation-progress', {
+                      completed,
+                      total: data.totalBatches,
+                      isRequestProgress: true
+                    });
+                    this.progressEmitted = true; // Mark that progress has been emitted
+                  }
                 }
               }
             } catch (err) {

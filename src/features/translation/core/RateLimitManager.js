@@ -52,7 +52,11 @@ export class RateLimitManager {
     for (const name of Object.keys(PROVIDER_CONFIGURATIONS)) {
       const level = await getProviderOptimizationLevelAsync(name);
       const optimizedConfig = getProviderConfiguration(name, level);
-      this._initializeProvider(name, optimizedConfig.rateLimit);
+      this._initializeProvider(name, optimizedConfig.rateLimit, {
+        isManualConfig: false,
+        optimizationLevel: level,
+        configSource: 'fresh-load'
+      });
     }
   }
 
@@ -68,23 +72,30 @@ export class RateLimitManager {
     const level = await getProviderOptimizationLevelAsync(providerName);
     const optimizedConfig = getProviderConfiguration(providerName, level);
 
-    return this._initializeProvider(providerName, optimizedConfig.rateLimit);
+    return this._initializeProvider(providerName, optimizedConfig.rateLimit, {
+      isManualConfig: false,
+      optimizationLevel: level,
+      configSource: 'fresh-load'
+    });
   }
 
   /**
    * Initialize or get provider state
    */
-  _initializeProvider(providerName, config = {}) {
+  _initializeProvider(providerName, config = {}, options = {}) {
     if (this.providerStates.has(providerName)) {
       return this.providerStates.get(providerName);
     }
     
     // Default safe configuration if none provided
     const safeDefault = { maxConcurrent: 2, delayBetweenRequests: 200 };
+    const isManualConfig = options.isManualConfig ?? (Object.keys(options).length === 0);
     
     const state = {
       config: { ...safeDefault, ...config },
-      isManualConfig: Object.keys(config).length > 0, // Mark as manual if config provided
+      isManualConfig,
+      optimizationLevel: options.optimizationLevel ?? null,
+      configSource: options.configSource || (isManualConfig ? 'manual' : 'fresh-load'),
       activeRequests: 0,
       lastRequestTime: 0,
       queues: {
@@ -130,12 +141,20 @@ export class RateLimitManager {
     // Refresh state and configuration only if it doesn't exist
     const state = await this._initializeProviderWithLevel(name);
     
-    // Only update config if we're not in a manual/test state (or merge intelligently)
-    // For now, let's ensure we don't overwrite if we're already initialized with specific values
+    // Keep runtime limiter aligned with the latest optimization level unless a manual override is active.
     if (!state.isManualConfig) {
       const currentLevel = await getProviderOptimizationLevelAsync(name);
-      const latestConfig = getProviderConfiguration(name, currentLevel);
-      state.config = { ...state.config, ...latestConfig.rateLimit };
+      if (state.optimizationLevel !== currentLevel) {
+        const latestConfig = getProviderConfiguration(name, currentLevel);
+        state.config = { ...state.config, ...latestConfig.rateLimit };
+        state.optimizationLevel = currentLevel;
+        state.configSource = 'fresh-runtime';
+
+        logger.debug(
+          `[RateLimitManager] Refreshed ${name} rate limits ` +
+          `(level=${currentLevel}, maxConcurrent=${state.config.maxConcurrent}, source=${state.configSource})`
+        );
+      }
     }
 
     // Check circuit breaker

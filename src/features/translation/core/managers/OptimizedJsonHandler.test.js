@@ -54,19 +54,30 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
   };
 });
 
-vi.mock('@/shared/config/config.js', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3)
-  };
-});
+vi.mock('@/shared/config/config.js', () => ({
+  TranslationMode: {
+    Select_Element: 'select_element'
+  },
+  getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(false),
+  getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3)
+}));
 
 describe('OptimizedJsonHandler', () => {
   let handler;
   let mockEngine;
   let mockProvider;
   let mockAbortController;
+
+  const createDeferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    return { promise, resolve, reject };
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -161,6 +172,108 @@ describe('OptimizedJsonHandler', () => {
       expect(mockProvider.translate).toHaveBeenCalledTimes(2);
       // Second call should use 'fr'
       expect(mockProvider.translate.mock.calls[1][1]).toBe('fr');
+    });
+
+    it('should keep the history-enabled lane ordered', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-ordered', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+      firstBatch.resolve({ translatedText: ['t1'] });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it('should dispatch history-disabled batches in parallel when source language is explicit', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-parallel', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      firstBatch.resolve({ translatedText: ['t1'] });
+      secondBatch.resolve({ translatedText: ['t2'] });
+
+      await execution;
+    });
+
+    it('should run the first batch before the rest when history is disabled and source is auto', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'auto' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'auto', 'fa', 'msg-auto', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(1));
+
+      firstBatch.resolve({ translatedText: ['t1'], detectedLanguage: 'fr' });
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+      expect(mockProvider.translate.mock.calls[1][1]).toBe('fr');
+
+      secondBatch.resolve({ translatedText: ['t2'] });
+      await execution;
+    });
+
+    it('should ignore late parallel batch completions after response resolution cancellation', async () => {
+      vi.useRealTimers();
+      const { getAIConversationHistoryEnabledAsync } = await import('@/shared/config/config.js');
+      const browser = (await import('webextension-polyfill')).default;
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(false);
+
+      const firstBatch = createDeferred();
+      const secondBatch = createDeferred();
+      const data = { ...mockData, sourceLanguage: 'en' };
+
+      mockProvider.translate
+        .mockImplementationOnce(() => firstBatch.promise)
+        .mockImplementationOnce(() => secondBatch.promise);
+
+      browser.tabs.sendMessage.mockClear();
+
+      const execution = handler.execute(mockEngine, data, mockProvider, 'en', 'fa', 'msg-cancel', mockSender);
+
+      await vi.waitFor(() => expect(mockProvider.translate).toHaveBeenCalledTimes(2));
+
+      firstBatch.resolve({ translatedText: ['t1'] });
+      mockAbortController.signal.aborted = true;
+      secondBatch.resolve({ translatedText: ['t2'] });
+
+      const result = await execution;
+
+      expect(result.success).toBe(false);
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
     });
 
     it('should handle fatal errors by aborting other batches', async () => {

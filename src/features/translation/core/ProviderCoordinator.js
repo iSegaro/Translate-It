@@ -171,10 +171,13 @@ export class ProviderCoordinator {
         }
       };
 
+      const queueProviderName = options.parallelExecution ? `${providerName}::parallel` : providerName;
+
       // Enqueue the task - QueueManager handles retries and prioritization
-      const result = await queueManager.enqueue(providerName, executeTask, numericPriority, translateMode, {
+      const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
         messageId: options.messageId,
-        uiContext: options.uiContext
+        uiContext: options.uiContext,
+        parallelExecution: !!options.parallelExecution
       });
 
       // 7. Post-processing & Normalization

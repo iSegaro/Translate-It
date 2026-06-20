@@ -7,7 +7,7 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { TranslationMode } from "@/shared/config/config.js";
+import { TranslationMode, getAIConversationHistoryEnabledAsync } from "@/shared/config/config.js";
 import browser from "webextension-polyfill";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
@@ -29,6 +29,8 @@ export class OptimizedJsonHandler {
     let hasErrors = false;
     let lastError = null;
     let detectedSourceLanguage = sourceLanguage;
+    const historyEnabled = await getAIConversationHistoryEnabledAsync();
+    const laneLabel = historyEnabled ? 'ordered history lane' : 'stateless parallel lane';
 
     try {
       const segments = typeof text === 'string' ? JSON.parse(text) : text;
@@ -50,19 +52,21 @@ export class OptimizedJsonHandler {
       );
 
       logger.debug(`[JsonHandler] Executing ${batches.length} batches for ${segments.length} segments (Concurrency: ${providerConfig.rateLimit.maxConcurrent})`);
+      logger.debug(`[JsonHandler] Select Element ${laneLabel}`);
 
       const self = this;
+      let completedBatchCount = 0;
       
-      // Determine execution strategy based on concurrency limit
-      if (providerConfig.rateLimit.maxConcurrent <= 1) {
-        // STRATEGY: SEQUENTIAL (Level 1/Stability)
-        // Execute one by one to minimize memory footprint and prevent queue flooding
+      // Preserve the ordered lane when conversation continuity is enabled.
+      if (historyEnabled) {
+        // STRATEGY: SEQUENTIAL
+        // Preserve existing batch ordering and turn continuity semantics.
         for (let i = 0; i < batches.length; i++) {
-          await processBatch(batches[i], i);
+          await processBatch(batches[i], i, { parallelExecution: false });
           if (hasErrors && lastError && isFatalError(lastError)) break;
         }
       } else {
-        // STRATEGY: CONTROLLED PARALLEL (Level 2-5)
+        // STRATEGY: CONTROLLED PARALLEL (stateless lane)
         // Let RateLimitManager handle the actual concurrency and delays.
         
         let startIndex = 0;
@@ -70,7 +74,7 @@ export class OptimizedJsonHandler {
         // This prevents redundant detection calls for all subsequent batches.
         if (detectedSourceLanguage === 'auto' && batches.length > 0) {
           logger.debug(`[JsonHandler] Auto-detection mode: Executing first batch sequentially to resolve source language...`);
-          await processBatch(batches[0], 0);
+          await processBatch(batches[0], 0, { parallelExecution: false });
           
           // If first batch failed fatally, don't continue
           if (hasErrors && lastError && isFatalError(lastError)) {
@@ -88,11 +92,11 @@ export class OptimizedJsonHandler {
         }
 
         // Process remaining batches. They will be queued in RateLimitManager.
-        const batchPromises = batches.slice(startIndex).map((batch, i) => processBatch(batch, i + startIndex));
+        const batchPromises = batches.slice(startIndex).map((batch, i) => processBatch(batch, i + startIndex, { parallelExecution: true }));
         await Promise.all(batchPromises);
       }
 
-      async function processBatch(batch, i) {
+      async function processBatch(batch, i, { parallelExecution = false } = {}) {
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
             const abortError = new Error('Translation task cancelled');
@@ -137,7 +141,8 @@ export class OptimizedJsonHandler {
               engine,
               sender,
               originalSourceLang,
-              originalTargetLang
+              originalTargetLang,
+              parallelExecution
             ),
             timeoutPromise
           ]);
@@ -155,7 +160,20 @@ export class OptimizedJsonHandler {
             : translatedBatchResponse;
 
           const mappedResults = self._mapResults(batch, translatedBatch);
-          await self._streamResults(tabId, messageId, mappedResults, i, batches.length, targetLanguage, detectedSourceLanguage);
+          checkCancellation();
+          completedBatchCount++;
+          await self._streamResults(
+            tabId,
+            messageId,
+            mappedResults,
+            i,
+            batches.length,
+            targetLanguage,
+            detectedSourceLanguage,
+            completedBatchCount,
+            abortController,
+            engine
+          );
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -201,7 +219,19 @@ export class OptimizedJsonHandler {
           lastError = batchError;
           
           // Stream empty/original results on failure to keep progress moving
-          await self._streamResults(tabId, messageId, batch, i, batches.length, targetLanguage);
+          completedBatchCount++;
+          await self._streamResults(
+            tabId,
+            messageId,
+            batch,
+            i,
+            batches.length,
+            targetLanguage,
+            undefined,
+            completedBatchCount,
+            abortController,
+            engine
+          );
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
@@ -245,7 +275,7 @@ export class OptimizedJsonHandler {
     }
   }
 
-  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null) {
+  async _performBatchCall(providerInstance, batch, source, target, mode, abortController, messageId, sessionId, contextMetadata, contextSummary, engine, sender, originalSourceLang = null, originalTargetLang = null, parallelExecution = false) {
     const isArrayInput = Array.isArray(batch);
     const textsToTranslate = isArrayInput 
       ? batch.map(item => typeof item === 'object' ? (item.t || item.text || '') : (item || ''))
@@ -261,7 +291,7 @@ export class OptimizedJsonHandler {
       target,
       {
         mode, abortController, messageId, sessionId, contextMetadata, contextSummary,
-        engine, sender, priority: 'high', rawJsonPayload: true,
+        engine, sender, priority: 'high', rawJsonPayload: true, parallelExecution,
         originalSourceLang, originalTargetLang,
         expectedFormat
       }
@@ -337,8 +367,18 @@ export class OptimizedJsonHandler {
     });
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, completedCount = null, abortController = null, engine = null) {
     if (!tabId) return;
+    const isCancelled = () => {
+      if (abortController?.signal?.aborted) return true;
+      if (messageId && typeof engine?.isCancelled === 'function') {
+        return engine.isCancelled(messageId);
+      }
+      return false;
+    };
+
+    if (isCancelled()) return;
+
     const streamMessage = {
       action: MessageActions.TRANSLATION_STREAM_UPDATE,
       messageId: messageId,
@@ -347,7 +387,8 @@ export class OptimizedJsonHandler {
         data: translatedData,
         batchIndex,
         totalBatches,
-        isComplete: batchIndex === totalBatches - 1,
+        completedCount: typeof completedCount === 'number' ? completedCount : batchIndex + 1,
+        isComplete: typeof completedCount === 'number' ? completedCount === totalBatches : batchIndex === totalBatches - 1,
         sourceLanguage,
         targetLanguage,
         translationMode: TranslationMode.Select_Element,
@@ -355,6 +396,8 @@ export class OptimizedJsonHandler {
       }
     };
     try {
+      await Promise.resolve();
+      if (isCancelled()) return;
       await browser.tabs.sendMessage(tabId, streamMessage);
     } catch (err) {
       logger.warn(`[JsonHandler] Failed to stream to tab ${tabId}:`, err.message);
