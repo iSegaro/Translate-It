@@ -9,6 +9,7 @@
       :can-translate-visible-pages="canTranslateVisiblePages"
       :can-export="canExport"
       :is-partial-export="isPartialExport"
+      :is-block-targeting-active="isBlockTargetingActive"
       :viewer-mode="viewerMode"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
@@ -17,6 +18,7 @@
       @mode-change="setMode"
       @export-txt="handleExportTxt"
       @export-markdown="handleExportMarkdown"
+      @toggle-block-targeting="toggleBlockTargeting"
     />
 
     <main class="pdf-app__content">
@@ -50,7 +52,11 @@
               <PdfViewer
                 :pages="pageMetrics"
                 :session="session"
+                :is-block-targeting-active="isBlockTargetingActive"
+                :highlighted-block-id="highlightedBlockId"
                 @layout-change="handleLayoutChange"
+                @block-pointer-move="handleBlockPointerMove"
+                @block-click="handleBlockClick"
               />
             </template>
 
@@ -60,6 +66,7 @@
             >
               <PdfTranslatedPane
                 :translated-page-data="translatedPageData"
+                :highlighted-block-id="highlightedBlockId"
               />
             </template>
           </PdfViewerLayout>
@@ -86,6 +93,7 @@ import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
+import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 
 const {
   error,
@@ -123,6 +131,14 @@ const {
   exportMarkdown,
   clearExportError
 } = usePdfExport(translationTick)
+
+const {
+  isBlockTargetingActive,
+  highlightedBlockId,
+  toggleBlockTargeting,
+  handleBlockPointerMove,
+  handleBlockClick
+} = usePdfBlockSelection()
 
 const isDragOver = ref(false)
 const viewerWidth = ref(960)

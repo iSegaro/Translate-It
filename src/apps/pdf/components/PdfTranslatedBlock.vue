@@ -50,6 +50,10 @@ const props = defineProps({
       translatedText: '',
       error: null
     })
+  },
+  highlighted: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -77,6 +81,7 @@ const blockClasses = computed(() => ({
   'pdf-translated-block--error': status.value === 'error',
   'pdf-translated-block--translated': status.value === 'translated',
   'pdf-translated-block--idle': status.value === 'idle',
+  'pdf-translated-block--highlighted': props.highlighted,
   [`pdf-translated-block--${props.block.role}`]: !!props.block.role
 }))
 </script>
@@ -101,6 +106,12 @@ const blockClasses = computed(() => ({
 
   &--translated {
     border-left-color: rgba(34, 197, 94, 0.6);
+  }
+
+  &--highlighted {
+    outline: 2px solid rgba(90, 92, 255, 0.7);
+    outline-offset: 2px;
+    background: rgba(90, 92, 255, 0.08);
   }
 
   &--heading {

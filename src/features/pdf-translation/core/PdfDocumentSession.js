@@ -29,6 +29,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.documentIdentity = ''
     this.displayName = ''
     this.translationStates = new Map()
+    this.targetedBlockId = null
     this._pendingCleanup = null
   }
 
@@ -54,6 +55,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
     this.pageSessions.clear()
     this.translationStates.clear()
+    this.targetedBlockId = null
 
     await this._buildPageMetrics(viewerWidth)
 
@@ -234,6 +236,14 @@ export class PdfDocumentSession extends ResourceTracker {
     this.translationStates.clear()
   }
 
+  setTargetedBlock(blockId) {
+    this.targetedBlockId = blockId || null
+  }
+
+  clearTargetedBlock() {
+    this.targetedBlockId = null
+  }
+
   getVisibleTranslationStates() {
     const visibleBlocks = []
     for (const pageSession of this.pageSessions.values()) {
@@ -343,6 +353,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.visiblePageNumbers.clear()
     this.pageSessions.clear()
     this.translationStates.clear()
+    this.targetedBlockId = null
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''

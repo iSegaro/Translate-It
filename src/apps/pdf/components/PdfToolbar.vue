@@ -49,6 +49,16 @@
       </div>
 
       <button
+        v-if="fileName"
+        class="pdf-toolbar__button pdf-toolbar__button--targeting"
+        :class="{ 'pdf-toolbar__button--targeting-active': isBlockTargetingActive }"
+        type="button"
+        @click="$emit('toggle-block-targeting')"
+      >
+        {{ isBlockTargetingActive ? 'Cancel Selection' : 'Select Block' }}
+      </button>
+
+      <button
         class="pdf-toolbar__button"
         type="button"
         :disabled="isLoading"
@@ -118,6 +128,7 @@ const props = defineProps({
   canTranslateVisiblePages: { type: Boolean, default: false },
   canExport: { type: Boolean, default: false },
   isPartialExport: { type: Boolean, default: false },
+  isBlockTargetingActive: { type: Boolean, default: false },
   viewerMode: { type: String, default: 'bilingual' },
   translationSummary: {
     type: Object,
@@ -130,7 +141,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting'])
 const fileInput = ref(null)
 
 const modeOptions = [
@@ -280,6 +291,20 @@ function handleFileInputChange(event) {
 
   &:hover {
     background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+.pdf-toolbar__button--targeting {
+  background: rgba(90, 92, 255, 0.12);
+  color: #c4c6ff;
+
+  &:hover {
+    background: rgba(90, 92, 255, 0.2);
+  }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.3);
+    color: #e6edf7;
   }
 }
 </style>
