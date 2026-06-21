@@ -13,9 +13,9 @@
 
 ## 3. Layout and Logical Blocks
 
-- [ ] 3.1 Implement PDF page session and logical block models.
-- [ ] 3.2 Add layout analysis and logical block construction for visible pages.
-- [ ] 3.3 Define stable block identity and bounding box normalization for cache and export reuse.
+- [x] 3.1 Implement PDF page session and logical block models.
+- [x] 3.2 Add layout analysis and logical block construction for visible pages.
+- [x] 3.3 Define stable block identity and bounding box normalization for cache and export reuse.
 
 ## 4. Translation Pipeline
 

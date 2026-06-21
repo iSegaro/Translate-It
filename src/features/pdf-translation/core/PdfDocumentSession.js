@@ -3,6 +3,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { ensurePdfJsConfigured, getPdfWorkerUrl, loadPdfDocumentFromFile } from './pdfjs.js'
 import { PdfTextLayerRenderer } from './PdfTextLayerRenderer.js'
+import { PdfPageSession } from './PdfPageSession.js'
+import { sha256HexFromArrayBuffer } from './PdfBlockIdentity.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfDocumentSession')
 const PAGE_MARGIN = 24
@@ -22,6 +24,10 @@ export class PdfDocumentSession extends ResourceTracker {
     this.renderTasks = new Map()
     this.pageScale = 1
     this.visiblePageNumbers = new Set()
+    this.pageSessions = new Map()
+    this.pdfFingerprint = ''
+    this.documentIdentity = ''
+    this.displayName = ''
     this._pendingCleanup = null
   }
 
@@ -42,6 +48,10 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfDocument = document
     this.objectUrl = objectUrl
     this.totalPages = document.numPages
+    this.pdfFingerprint = document.fingerprint || ''
+    this.displayName = this.fileName
+    this.documentIdentity = await this._resolveDocumentIdentity(file, document)
+    this.pageSessions.clear()
 
     await this._buildPageMetrics(viewerWidth)
 
@@ -52,6 +62,24 @@ export class PdfDocumentSession extends ResourceTracker {
     })
 
     return this.getState()
+  }
+
+  async _resolveDocumentIdentity(file, document) {
+    if (document?.fingerprint) {
+      return document.fingerprint
+    }
+
+    try {
+      const fileBytes = await file.arrayBuffer()
+      const fileHash = await sha256HexFromArrayBuffer(fileBytes)
+      if (fileHash) {
+        return fileHash
+      }
+    } catch (error) {
+      logger.warn('Failed to compute PDF file hash for document identity:', error)
+    }
+
+    return ''
   }
 
   async _buildPageMetrics(viewerWidth) {
@@ -100,16 +128,66 @@ export class PdfDocumentSession extends ResourceTracker {
   getState() {
     return {
       fileName: this.fileName,
+      displayName: this.displayName,
       totalPages: this.totalPages,
       pageMetrics: this.pageMetrics,
       pageScale: this.pageScale,
-      workerUrl: this.workerUrl
+      workerUrl: this.workerUrl,
+      documentIdentity: this.documentIdentity
     }
   }
 
   updateVisiblePages(pageNumbers) {
     this.visiblePageNumbers = new Set(pageNumbers)
     this._scheduleCleanup()
+  }
+
+  async _getPageSession(pageNumber) {
+    if (!this.pdfDocument) return null
+
+    const metric = this.pageMetrics[pageNumber - 1]
+    if (!metric) return null
+
+    const existingSession = this.pageSessions.get(pageNumber)
+    const pageSession = existingSession || new PdfPageSession({
+      documentIdentity: this.documentIdentity,
+      pageNumber
+    })
+
+    pageSession.updateDocumentIdentity(this.documentIdentity)
+
+    if (pageSession.loaded && pageSession.getLogicalBlocks().length > 0) {
+      this.pageSessions.set(pageNumber, pageSession)
+      return pageSession
+    }
+
+    const page = await this.pdfDocument.getPage(pageNumber)
+    await pageSession.hydrate(page, metric)
+    this.pageSessions.set(pageNumber, pageSession)
+    return pageSession
+  }
+
+  async getVisiblePageSessions() {
+    if (!this.pdfDocument || this.visiblePageNumbers.size === 0) {
+      return []
+    }
+
+    const pageNumbers = [...this.visiblePageNumbers].sort((a, b) => a - b)
+    const sessions = []
+
+    for (const pageNumber of pageNumbers) {
+      const pageSession = await this._getPageSession(pageNumber)
+      if (pageSession) {
+        sessions.push(pageSession)
+      }
+    }
+
+    return sessions
+  }
+
+  async getVisibleLogicalBlocks() {
+    const pageSessions = await this.getVisiblePageSessions()
+    return pageSessions.flatMap((pageSession) => pageSession.getLogicalBlocks())
   }
 
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
@@ -207,6 +285,10 @@ export class PdfDocumentSession extends ResourceTracker {
 
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
+    this.pageSessions.clear()
+    this.pdfFingerprint = ''
+    this.documentIdentity = ''
+    this.displayName = ''
 
     try {
       await this.loadingTask?.destroy?.()

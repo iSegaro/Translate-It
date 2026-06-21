@@ -28,6 +28,17 @@ describe('PdfDocumentSession', () => {
       getPage: vi.fn(async (pageNumber) => ({
         pageNumber,
         cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({
+          items: [
+            {
+              str: `Page ${pageNumber} text`,
+              transform: [1, 0, 0, 14, 40, 650],
+              width: 100,
+              height: 14,
+              dir: 'ltr'
+            }
+          ]
+        }),
         getViewport: ({ scale }) => ({
           width: 100 * pageNumber * scale,
           height: 200 * pageNumber * scale
@@ -55,5 +66,54 @@ describe('PdfDocumentSession', () => {
     expect(state.pageMetrics).toHaveLength(2)
     expect(state.pageMetrics[0].pageNumber).toBe(1)
     expect(state.pageMetrics[1].pageNumber).toBe(2)
+  })
+
+  it('keeps visible logical block identity stable across page metric rebuilds', async () => {
+    session.pageMetrics = [
+      {
+        pageNumber: 1,
+        width: 100,
+        height: 200,
+        naturalWidth: 100,
+        naturalHeight: 200,
+        scale: 1
+      }
+    ]
+    session.totalPages = 1
+    session.documentIdentity = 'fingerprint-1'
+    session.pdfDocument = {
+      numPages: 1,
+      getPage: vi.fn(async () => ({
+        pageNumber: 1,
+        cleanup: vi.fn(),
+        getTextContent: vi.fn().mockResolvedValue({
+          items: [
+            {
+              str: 'Stable page text',
+              transform: [1, 0, 0, 14, 40, 650],
+              width: 120,
+              height: 14,
+              dir: 'ltr'
+            }
+          ]
+        }),
+        getViewport: ({ scale }) => ({
+          width: 100 * scale,
+          height: 200 * scale
+        })
+      }))
+    }
+
+    session.updateVisiblePages([1])
+
+    const firstBlocks = await session.getVisibleLogicalBlocks()
+    await session.rebuildPageMetrics(900)
+    const secondBlocks = await session.getVisibleLogicalBlocks()
+
+    expect(firstBlocks).toHaveLength(1)
+    expect(secondBlocks).toHaveLength(1)
+    expect(firstBlocks[0].id).toBe(secondBlocks[0].id)
+    expect(firstBlocks[0].sourceTextHash).toHaveLength(64)
+    expect(session.pageSessions.get(1)?.loaded).toBe(true)
   })
 })
