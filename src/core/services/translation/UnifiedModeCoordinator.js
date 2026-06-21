@@ -28,6 +28,8 @@ export class UnifiedModeCoordinator {
         return await this.processFieldTranslation(request, { translationEngine });
       case TranslationMode.Page:
         return await this.processPageTranslation(request, { translationEngine });
+      case TranslationMode.PDF:
+        return await this.processPdfTranslation(request, { translationEngine });
       case TranslationMode.Subtitle:
         return await this.processSubtitleTranslation(request, { translationEngine });
       case TranslationMode.Select_Element:
@@ -54,7 +56,7 @@ export class UnifiedModeCoordinator {
       return TranslationPriority.HIGH;
     }
     
-    if ([TranslationMode.Page, TranslationMode.Select_Element].includes(mode)) {
+    if ([TranslationMode.Page, TranslationMode.Select_Element, TranslationMode.PDF].includes(mode)) {
       return TranslationPriority.LOW;
     }
 
@@ -131,6 +133,30 @@ export class UnifiedModeCoordinator {
       action: MessageActions.TRANSLATE,
       messageId: request.messageId,
       context: request.context || 'content', 
+      data: enhancedData
+    }, request.sender);
+  }
+
+  /**
+   * Handler for PDF translation batches.
+   */
+  async processPdfTranslation(request, { translationEngine }) {
+    const enhancedData = {
+      ...request.data,
+      mode: TranslationMode.PDF,
+      enableDictionary: false,
+      options: {
+        ...request.data.options,
+        rawJsonPayload: true,
+        pdfTranslation: true,
+        enableDictionary: false
+      }
+    };
+
+    return await translationEngine.handleTranslateMessage({
+      action: MessageActions.TRANSLATE,
+      messageId: request.messageId,
+      context: request.context || 'pdf-translation',
       data: enhancedData
     }, request.sender);
   }

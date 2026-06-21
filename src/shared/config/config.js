@@ -25,6 +25,7 @@ export const TranslationMode = {
   Mobile_Translate: MessageContexts.MOBILE_TRANSLATE,
   ScreenCapture: MessageContexts.CAPTURE_MANAGER,
   Page: MessageContexts.PAGE_TRANSLATION_BATCH, // Whole page translation
+  PDF: MessageContexts.PDF_TRANSLATION, // Dedicated PDF translation
   MouseHover: 'mouse_hover', // Mouse on hover translation
   Subtitle: MessageContexts.SUBTITLE_TRANSLATION,
   
@@ -297,10 +298,11 @@ export const CONFIG = {
     [TranslationMode.Field]: true,
     [TranslationMode.Selection]: true, // WindowsManager
     [TranslationMode.Page]: false,     // Default disabled for whole page to prevent checkerboarding
+    [TranslationMode.PDF]: false,
     [TranslationMode.Dictionary_Translation]: true,
     [TranslationMode.ScreenCapture]: true,
     [TranslationMode.MouseHover]: true
-    },
+  },
   // --- Whole Page Translation Settings Getters ---
   SMART_CONTEXT_TRANSLATION_ENABLED: true, // Enable/disable smart context and logical batching
   WHOLE_PAGE_TRANSLATION_ENABLED: true, // فعال بودن ترجمه کل صفحه
@@ -1012,6 +1014,7 @@ export const getEffectiveProviderAsync = async (mode) => {
     // Mode-specific requirements
     const needsBulk = [
       TranslationMode.Page, 
+      TranslationMode.PDF,
       TranslationMode.Select_Element, 
       TranslationMode.Field
     ].includes(mode);

@@ -67,7 +67,7 @@ export class UnifiedTranslationService {
     }
 
     const uiContexts = [
-      MessageContexts.POPUP, MessageContexts.SIDEPANEL, MessageContexts.SELECT_ELEMENT,
+      MessageContexts.POPUP, MessageContexts.SIDEPANEL, MessageContexts.SELECT_ELEMENT, MessageContexts.PDF_TRANSLATION,
       MessageContexts.PAGE_TRANSLATION_BATCH, MessageContexts.CONTENT, MessageContexts.MOBILE_TRANSLATE
     ];
     
@@ -113,7 +113,7 @@ export class UnifiedTranslationService {
       charLimit = await getPopupMaxCharsAsync();
     } else if (context === MessageContexts.SIDEPANEL) {
       charLimit = await getSidepanelMaxCharsAsync();
-    } else if (mode === TranslationMode.Select_Element) {
+    } else if (mode === TranslationMode.Select_Element || mode === TranslationMode.PDF) {
       charLimit = await getSelectElementMaxCharsAsync();
     } else if (mode === TranslationMode.Selection || context === MessageContexts.SELECTION_MANAGER) {
       charLimit = await getSelectionMaxCharsAsync();
@@ -206,10 +206,10 @@ export class UnifiedTranslationService {
         batchChars: result.actualCharCount || 0,
         batchOriginalChars: result.originalCharCount || 0
       });
-    } else if (!isMultiBatch || (mode === TranslationMode.Select_Element && !result.streaming)) {
+    } else if (!isMultiBatch || ((mode === TranslationMode.Select_Element || mode === TranslationMode.PDF) && !result.streaming)) {
       statsManager.printSummary(summaryId, { 
         status: 'Session', success: result.success, 
-        clear: mode !== TranslationMode.Select_Element 
+        clear: mode !== TranslationMode.Select_Element && mode !== TranslationMode.PDF 
       });
     }
   }

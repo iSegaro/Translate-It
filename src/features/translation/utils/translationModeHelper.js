@@ -23,6 +23,7 @@ export const ELIGIBLE_DICTIONARY_MODES = [
  * Structural/Bulk modes that MUST NOT be upgraded to dictionary.
  */
 export const STRUCTURAL_MODES = [
+  TranslationMode.PDF,
   TranslationMode.Select_Element,
   TranslationMode.Page,
   TranslationMode.Field

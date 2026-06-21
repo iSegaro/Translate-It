@@ -19,9 +19,9 @@
 
 ## 4. Translation Pipeline
 
-- [ ] 4.1 Add a PDF translation coordinator that batches visible logical blocks through the existing translation system.
-- [ ] 4.2 Extend translation mode and message routing so PDF uses UnifiedTranslationService without a separate provider stack.
-- [ ] 4.3 Persist and restore block translation state through memory and persistent cache layers.
+- [x] 4.1 Add a PDF translation coordinator that batches visible logical blocks through the existing translation system.
+- [x] 4.2 Extend translation mode and message routing so PDF uses UnifiedTranslationService without a separate provider stack.
+- [x] 4.3 Maintain in-memory PDF block translation state for the active document session; defer persistent cache persistence and restore to Phase 9.
 
 ## 5. Bilingual Viewer
 

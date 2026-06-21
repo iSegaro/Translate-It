@@ -290,10 +290,11 @@ export const AIConversationHelper = {
     }
 
     // Determine if we should use AI batch prompt
-    // Use batch prompt for Select_Element mode OR when input is in JSON format
+    // Use batch prompt for structured batch modes OR when input is in JSON format
     const shouldUseBatchPrompt = !isDictionary && (
       translateMode === TranslationMode.Select_Element ||
       translateMode === TranslationMode.Page ||
+      translateMode === TranslationMode.PDF ||
       translateMode === TranslationMode.Subtitle ||
       isJsonMode
     );

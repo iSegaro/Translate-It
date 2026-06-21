@@ -105,7 +105,7 @@ export async function buildPrompt(
     .replace(/\$_{TARGET}/g, targetName);
 
   // Handle AI provider batch translation for select_element or any JSON text
-  if (isAI && (translateMode === TranslationMode.Select_Element || isJsonMode)) {
+  if (isAI && (translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.PDF || isJsonMode)) {
     logger.debug('AI provider in Batch mode. Using AI batch prompt.');
     const batchPromptTemplate = useAutoPrompt
       ? await getPromptBASEAIBatchAutoAsync()
@@ -134,8 +134,8 @@ export async function buildPrompt(
 
   // If mode is Select_Element and text is NOT JSON,
   // it means it's a pre-processed batch of texts. Use the batch prompt.
-  if (translateMode === TranslationMode.Select_Element && !isJsonMode) {
-    logger.debug('AI provider in Select Element mode (batch). Using batch prompt.');
+  if ((translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.PDF) && !isJsonMode) {
+    logger.debug('AI provider in structured batch mode. Using batch prompt.');
     const batchPromptTemplate = await getPromptBASEBatchAsync();
     return batchPromptTemplate
       .replace(/\$_{SOURCE}/g, sourceName)
@@ -147,7 +147,7 @@ export async function buildPrompt(
   // For other cases, select the base prompt accordingly.
   let promptBase;
   if (isJsonMode) {
-    // This handles reliable AI providers in Select_Element mode, as they get raw JSON.
+    // This handles reliable AI providers in structured batch modes, as they get raw JSON.
     promptBase = await getPromptBASESelectAsync();
   } else if (
     translateMode === TranslationMode.Popup_Translate ||

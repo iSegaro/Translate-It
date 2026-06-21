@@ -49,7 +49,8 @@ vi.mock('../../../shared/config/config.js', () => ({
     Field: 'field',
     Selection: 'selection',
     Select_Element: 'select-element',
-    Page: 'page'
+    Page: 'page',
+    PDF: 'pdf-translation'
   },
   getModeProvidersAsync: vi.fn().mockResolvedValue({}),
   getTranslationApiAsync: vi.fn().mockResolvedValue('google'),
@@ -68,6 +69,7 @@ vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
     POPUP: 'popup',
     SIDEPANEL: 'sidepanel',
     SELECT_ELEMENT: 'select-element',
+    PDF_TRANSLATION: 'pdf-translation',
     PAGE_TRANSLATION_BATCH: 'page-translation-batch',
     CONTENT: 'content',
     MOBILE_TRANSLATE: 'mobile-translate',
@@ -215,6 +217,23 @@ describe('UnifiedTranslationService', () => {
 
       await service.handleTranslationRequest(message);
       expect(statsManager.printSummary).toHaveBeenCalledWith('m1', expect.objectContaining({ status: 'Batch' }));
+    });
+
+    it('should treat PDF mode as a dedicated structured translation mode', async () => {
+      const message = {
+        messageId: 'm-pdf',
+        data: { text: JSON.stringify([{ blockId: 'b1', text: 'hello' }]), mode: 'pdf-translation' },
+        context: 'pdf-translation'
+      };
+
+      const mockRequest = { messageId: 'm-pdf', data: message.data, mode: 'pdf-translation' };
+      translationRequestTracker.createRequest.mockReturnValue(mockRequest);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: '[]' });
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result.success).toBe(true);
+      expect(service.modeCoordinator.processRequest).toHaveBeenCalledWith(mockRequest, expect.any(Object));
     });
   });
 

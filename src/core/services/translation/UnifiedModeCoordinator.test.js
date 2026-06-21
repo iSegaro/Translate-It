@@ -54,6 +54,21 @@ describe('UnifiedModeCoordinator', () => {
       expect(request.data.priority).toBe(1); // LOW
     });
 
+    it('should assign LOW priority to PDF mode and dispatch through the PDF path', async () => {
+      const request = {
+        mode: TranslationMode.PDF,
+        data: { text: JSON.stringify([{ text: 'hello' }]), provider: 'google' },
+        messageId: 'm-pdf',
+        context: 'pdf-translation'
+      };
+
+      coordinator.processPdfTranslation = vi.fn().mockResolvedValue({ success: true });
+      await coordinator.processRequest(request, { translationEngine: mockEngine });
+
+      expect(request.data.priority).toBe(1);
+      expect(coordinator.processPdfTranslation).toHaveBeenCalledWith(request, { translationEngine: mockEngine });
+    });
+
     it('should delegate to processFieldTranslation for Field mode', async () => {
       const request = {
         mode: TranslationMode.Field,

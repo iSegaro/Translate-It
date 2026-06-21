@@ -45,7 +45,7 @@ export class BaseTranslateProvider extends BaseProvider {
     if (!this.constructor.supportsStreaming || !messageId || !engine) return false;
     
     // Disable internal streaming for modes that have specialized orchestrators (Page, Select Element)
-    if (translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element) {
+    if (translateMode === TranslationMode.Page || translateMode === TranslationMode.Select_Element || translateMode === TranslationMode.PDF) {
       return false;
     }
     

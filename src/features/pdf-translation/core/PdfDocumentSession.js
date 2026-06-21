@@ -28,6 +28,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''
+    this.translationStates = new Map()
     this._pendingCleanup = null
   }
 
@@ -52,6 +53,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this.displayName = this.fileName
     this.documentIdentity = await this._resolveDocumentIdentity(file, document)
     this.pageSessions.clear()
+    this.translationStates.clear()
 
     await this._buildPageMetrics(viewerWidth)
 
@@ -190,6 +192,60 @@ export class PdfDocumentSession extends ResourceTracker {
     return pageSessions.flatMap((pageSession) => pageSession.getLogicalBlocks())
   }
 
+  getBlockTranslationState(blockId) {
+    return this.translationStates.get(blockId) || {
+      blockId,
+      translatedText: '',
+      status: 'idle',
+      provider: '',
+      sourceLanguage: '',
+      targetLanguage: '',
+      sourceTextHash: '',
+      updatedAt: 0,
+      error: null
+    }
+  }
+
+  setBlockTranslationState(blockId, patch = {}) {
+    if (!blockId) return null
+
+    const current = this.getBlockTranslationState(blockId)
+    const next = {
+      ...current,
+      ...patch,
+      blockId,
+      updatedAt: patch.updatedAt || Date.now()
+    }
+
+    this.translationStates.set(blockId, next)
+    return next
+  }
+
+  updateBlockTranslationStates(blockStates = []) {
+    const updatedStates = []
+    for (const blockState of blockStates) {
+      if (!blockState?.blockId) continue
+      updatedStates.push(this.setBlockTranslationState(blockState.blockId, blockState))
+    }
+    return updatedStates
+  }
+
+  resetTranslationStates() {
+    this.translationStates.clear()
+  }
+
+  getVisibleTranslationStates() {
+    const visibleBlocks = []
+    for (const pageSession of this.pageSessions.values()) {
+      visibleBlocks.push(...pageSession.getLogicalBlocks())
+    }
+
+    return visibleBlocks.map((block) => ({
+      ...block,
+      translationState: this.getBlockTranslationState(block.id)
+    }))
+  }
+
   async renderPage(pageNumber, canvasEl, textLayerRenderer) {
     if (!this.pdfDocument || !canvasEl) return false
 
@@ -286,6 +342,7 @@ export class PdfDocumentSession extends ResourceTracker {
     this._cancelAllRenders()
     this.visiblePageNumbers.clear()
     this.pageSessions.clear()
+    this.translationStates.clear()
     this.pdfFingerprint = ''
     this.documentIdentity = ''
     this.displayName = ''

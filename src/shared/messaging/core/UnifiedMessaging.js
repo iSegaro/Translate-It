@@ -66,7 +66,7 @@ const OPERATION_TIMEOUTS = {
 };
 
 function getTimeoutForAction(action, context = null) {
-  if (action === 'TRANSLATE' && (context === 'select-element' || (typeof context === 'object' && context !== null && context.mode === 'select_element'))) {
+  if (action === 'TRANSLATE' && (context === 'select-element' || context === 'pdf-translation' || context === 'pdf-viewer' || (typeof context === 'object' && context !== null && (context.mode === 'select_element' || context.mode === 'pdf-translation')))) {
     return 300000; 
   }
   

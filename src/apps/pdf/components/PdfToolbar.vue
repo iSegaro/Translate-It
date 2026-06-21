@@ -16,6 +16,12 @@
         <span>{{ fileName }}</span>
         <span>{{ pageCount }} pages</span>
         <span>Worker: {{ workerLabel }}</span>
+        <span
+          v-if="translationSummary.totalCount > 0"
+          class="pdf-toolbar__progress"
+        >
+          {{ translationStatusLabel }}
+        </span>
       </div>
     </div>
 
@@ -27,6 +33,14 @@
         @click="openFilePicker"
       >
         {{ isLoading ? 'Loading...' : 'Open PDF' }}
+      </button>
+      <button
+        class="pdf-toolbar__button pdf-toolbar__button--accent"
+        type="button"
+        :disabled="!canTranslateVisiblePages"
+        @click="$emit('translate-visible')"
+      >
+        {{ isTranslating ? 'Translating...' : 'Translate Visible Pages' }}
       </button>
       <input
         ref="fileInput"
@@ -40,17 +54,43 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
-defineProps({
+const props = defineProps({
   fileName: { type: String, default: '' },
   pageCount: { type: Number, default: 0 },
   workerLabel: { type: String, default: '' },
-  isLoading: { type: Boolean, default: false }
+  isLoading: { type: Boolean, default: false },
+  isTranslating: { type: Boolean, default: false },
+  canTranslateVisiblePages: { type: Boolean, default: false },
+  translationSummary: {
+    type: Object,
+    default: () => ({
+      status: 'idle',
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0
+    })
+  }
 })
 
-const emit = defineEmits(['file-selected'])
+const emit = defineEmits(['file-selected', 'translate-visible'])
 const fileInput = ref(null)
+
+const translationStatusLabel = computed(() => {
+  const { translatedCount, failedCount, totalCount, status } = props.translationSummary
+  if (!totalCount) return ''
+
+  if (status === 'error') {
+    return 'Translation failed'
+  }
+
+  if (failedCount > 0) {
+    return `Translated ${translatedCount}/${totalCount} blocks, ${failedCount} failed`
+  }
+
+  return `Translated ${translatedCount}/${totalCount} blocks`
+})
 
 function openFilePicker() {
   fileInput.value?.click()

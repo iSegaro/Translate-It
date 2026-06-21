@@ -64,6 +64,7 @@ vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
     Page: 'page',
     Select_Element: 'select_element',
+    PDF: 'pdf-translation',
     Popup: 'popup',
   },
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
@@ -151,6 +152,15 @@ describe('BaseTranslateProvider', () => {
       const messageId = 'msg-1';
       
       const shouldStream = provider._shouldUseStreaming(texts, messageId, engine, TranslationMode.Page);
+      expect(shouldStream).toBe(false);
+    });
+
+    it('should NOT use streaming for PDF mode', () => {
+      const texts = ['text1', 'text2'];
+      const engine = { name: 'mockEngine' };
+      const messageId = 'msg-1';
+
+      const shouldStream = provider._shouldUseStreaming(texts, messageId, engine, TranslationMode.PDF);
       expect(shouldStream).toBe(false);
     });
 

@@ -15,7 +15,7 @@ The architecture source of truth is `Proposal-PDF.md`. Its core requirement is t
 - Translate visible pages only in the MVP.
 - Translate logical blocks, not whole pages or individual words/lines.
 - Reuse the existing translation providers and UnifiedTranslationService.
-- Persist PDF translation cache with stable cache identity.
+- Maintain in-memory PDF translation state in Phase 4; persistent cache with stable cache identity remains a later phase.
 - Support text selection in the PDF text layer and PDF-aware Select Element behavior.
 - Support OCR fallback only when the text layer is unusable and the user approves it.
 - Persist a document-level history record for each PDF translation session.

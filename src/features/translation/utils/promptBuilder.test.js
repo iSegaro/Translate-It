@@ -21,6 +21,7 @@ vi.mock('@/shared/config/config.js', () => ({
     Sidepanel_Translate: 'sidepanel',
     Dictionary_Translation: 'dictionary',
     ScreenCapture: 'screen-capture',
+    PDF: 'pdf-translation',
   }
 }));
 
@@ -86,4 +87,5 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('BASE_AUTO: INSTRUCTIONS_AUTO: translate into Persian');
     expect(prompt).not.toContain('BASE:');
   });
+
 });

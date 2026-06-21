@@ -5,7 +5,11 @@
       :page-count="pageCount"
       :worker-label="workerLabel"
       :is-loading="isLoading"
+      :is-translating="isTranslating"
+      :can-translate-visible-pages="canTranslateVisiblePages"
+      :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
+      @translate-visible="handleTranslateVisiblePages"
     />
 
     <main class="pdf-app__content">
@@ -59,12 +63,16 @@ const {
   fileName,
   hasDocument,
   isLoading,
+  isTranslating,
+  canTranslateVisiblePages,
   pageCount,
   pageMetrics,
+  translationSummary,
   workerLabel,
   session,
   loadPdfFile,
   recomputeLayout,
+  translateVisiblePages,
   cleanup
 } = usePdfViewerController()
 
@@ -85,6 +93,10 @@ function handleLayoutChange(width) {
   if (hasDocument.value) {
     void recomputeLayout(width)
   }
+}
+
+function handleTranslateVisiblePages() {
+  void translateVisiblePages()
 }
 
 onBeforeUnmount(() => {

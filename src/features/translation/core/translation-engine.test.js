@@ -86,6 +86,7 @@ vi.mock("@/shared/config/config.js", () => ({
     Page: 'page', 
     Dictionary_Translation: 'dictionary', 
     Select_Element: 'select_element',
+    PDF: 'pdf-translation',
     MouseHover: 'mouse_hover',
     Field: 'field',
     Popup_Translate: 'popup'
@@ -128,6 +129,28 @@ describe('TranslationEngine', () => {
       expect(result.success).toBe(true);
       expect(result.translatedText).toBe('Translated Result');
       expect(result.mode).toBe('selection'); // Not upgraded because multi-word
+    });
+
+    it('should route PDF structured batches through the JSON handler path', async () => {
+      const request = {
+        action: MessageActions.TRANSLATE,
+        messageId: 'pdf-1',
+        data: {
+          text: JSON.stringify([{ blockId: 'b1', text: 'Hello' }]),
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'pdf-translation',
+          options: { rawJsonPayload: true, pdfTranslation: true }
+        }
+      };
+
+      engine.jsonHandler.execute.mockResolvedValue({ success: true, translatedText: '[]' });
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(engine.jsonHandler.execute).toHaveBeenCalled();
+      expect(result.success).toBe(true);
     });
 
     it('should handle errors and return formatted error response', async () => {

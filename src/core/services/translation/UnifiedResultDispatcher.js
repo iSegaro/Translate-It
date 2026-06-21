@@ -21,6 +21,7 @@ export class UnifiedResultDispatcher {
     this.EXCLUDED_MODES = new Set([
       TranslationMode.Page,           // Batch page translation
       TranslationMode.Select_Element,  // Element selection (batch)
+      TranslationMode.PDF,             // Dedicated PDF translation
       TranslationMode.Field           // Real-time field replacement
     ]);
   }

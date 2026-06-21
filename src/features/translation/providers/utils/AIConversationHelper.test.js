@@ -15,6 +15,7 @@ vi.mock('@/shared/config/config.js', () => ({
     Dictionary_Translation: 'dictionary',
     Field: 'content',
     Page: 'page',
+    PDF: 'pdf-translation',
     Subtitle: 'subtitle',
   }
 }));
@@ -68,6 +69,28 @@ describe('AIConversationHelper', () => {
     expect(getPromptBASEAIBatchAutoAsync).not.toHaveBeenCalled();
     expect(systemPrompt).toContain('BATCH: translate from English to Persian');
     expect(systemPrompt).not.toContain('BATCH_AUTO');
+    expect(userText).toContain('"translations"');
+  });
+
+  it('uses the batch prompt for PDF structured translation without select-element coupling', async () => {
+    const { getPromptAsync, getPromptAutoAsync, getPromptBASEAIBatchAsync, getPromptBASEAIBatchAutoAsync } = await import('@/shared/config/config.js');
+
+    getPromptAsync.mockResolvedValue('INSTRUCTIONS: translate from $_{SOURCE} to $_{TARGET}');
+    getPromptAutoAsync.mockResolvedValue('INSTRUCTIONS_AUTO: translate into $_{TARGET}');
+    getPromptBASEAIBatchAsync.mockResolvedValue('PDF_BATCH: translate from _{SOURCE} to _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+    getPromptBASEAIBatchAutoAsync.mockResolvedValue('PDF_BATCH_AUTO: translate into _{TARGET}\n$_{PROMPT_INSTRUCTIONS}\n$_{TEXT}');
+
+    const { systemPrompt, userText } = await AIConversationHelper.preparePromptAndText(
+      [{ i: 'b1', t: 'Hello', blockId: 'b1' }],
+      'auto',
+      'fa',
+      'pdf-translation',
+      'ai'
+    );
+
+    expect(getPromptBASEAIBatchAsync).toHaveBeenCalled();
+    expect(systemPrompt).toContain('PDF_BATCH: translate from English to Persian');
+    expect(systemPrompt).not.toContain('select');
     expect(userText).toContain('"translations"');
   });
 

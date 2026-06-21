@@ -2,8 +2,10 @@ import { computed, ref } from 'vue'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
+import { PdfTranslationCoordinator } from '@/features/pdf-translation/core/PdfTranslationCoordinator.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
+const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
 
 export function usePdfViewerController() {
   const currentFile = ref(null)
@@ -14,8 +16,16 @@ export function usePdfViewerController() {
   const workerLabel = ref('')
   const pageMetrics = ref([])
   const pageScale = ref(1)
+  const isTranslating = ref(false)
+  const translationSummary = ref({
+    status: 'idle',
+    translatedCount: 0,
+    failedCount: 0,
+    totalCount: 0
+  })
 
   const hasDocument = computed(() => pageCount.value > 0 && pageMetrics.value.length > 0)
+  const canTranslateVisiblePages = computed(() => hasDocument.value && !isLoading.value && !isTranslating.value)
   const workerUrl = computed(() => pdfDocumentSession.workerUrl)
 
   function applySessionState(state) {
@@ -33,6 +43,13 @@ export function usePdfViewerController() {
     workerLabel.value = ''
     pageMetrics.value = []
     pageScale.value = 1
+    translationSummary.value = {
+      status: 'idle',
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0
+    }
+    isTranslating.value = false
   }
 
   async function loadPdfFile(file, viewerWidth) {
@@ -46,6 +63,7 @@ export function usePdfViewerController() {
     try {
       isLoading.value = true
       error.value = ''
+      await pdfTranslationCoordinator.cancelActiveTranslation('document-replaced')
       resetLoadedDocument()
       currentFile.value = file
 
@@ -80,11 +98,36 @@ export function usePdfViewerController() {
     }
   }
 
+  async function translateVisiblePages() {
+    if (!canTranslateVisiblePages.value) {
+      return false
+    }
+
+    try {
+      isTranslating.value = true
+      translationSummary.value = await pdfTranslationCoordinator.translateVisibleBlocks()
+      return true
+    } catch (translateError) {
+      logger.error('Failed to translate visible PDF blocks:', translateError)
+      error.value = translateError?.message || 'Failed to translate visible PDF blocks.'
+      translationSummary.value = {
+        status: 'error',
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0
+      }
+      return false
+    } finally {
+      isTranslating.value = false
+    }
+  }
+
   function clearError() {
     error.value = ''
   }
 
   async function cleanup() {
+    await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')
     await pdfDocumentSession.destroy()
     resetLoadedDocument()
     clearError()
@@ -99,11 +142,15 @@ export function usePdfViewerController() {
     pageCount,
     pageMetrics,
     pageScale,
+    isTranslating,
+    canTranslateVisiblePages,
+    translationSummary,
     workerLabel,
     workerUrl,
     session: pdfDocumentSession,
     loadPdfFile,
     recomputeLayout,
+    translateVisiblePages,
     clearError,
     cleanup,
     resetLoadedDocument

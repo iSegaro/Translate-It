@@ -131,10 +131,11 @@ export class TranslationEngine {
       getTargetLanguageAsync()
     ]);
 
-    // 4. Handle Optimized JSON strategy (Select Element)
+    // 4. Handle Optimized JSON strategy (structured batch modes)
     const isSelectJson = mode === TranslationMode.Select_Element && data.options?.rawJsonPayload;
-    if (isSelectJson) {
-      logger.debug('[TranslationEngine] Using optimized SelectElement strategy for provider:', provider);
+    const isPdfJson = mode === TranslationMode.PDF && data.options?.rawJsonPayload;
+    if (isSelectJson || isPdfJson) {
+      logger.debug('[TranslationEngine] Using optimized structured batch strategy for provider:', provider);
       return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext);
     }
 
@@ -187,7 +188,7 @@ export class TranslationEngine {
    * @private
    */
   async _validateTextLength(text, mode, provider) {
-    const isSelectElementMode = mode === TranslationMode.Select_Element;
+    const isSelectElementMode = mode === TranslationMode.Select_Element || mode === TranslationMode.PDF;
     const isSelectionMode = mode === TranslationMode.Selection;
     const isPopupMode = mode === TranslationMode.Popup_Translate;
     const isSidepanelMode = mode === TranslationMode.Sidepanel_Translate;

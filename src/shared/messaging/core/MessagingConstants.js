@@ -17,6 +17,7 @@ export class MessageContexts {
   static SELECTION_MANAGER = "selection-manager";
   static PAGE_TRANSLATION_BATCH = "page-translation-batch";
   static PAGE_TRANSLATION_UI = "page-translation-ui";
+  static PDF_TRANSLATION = "pdf-translation";
   static DICTIONARY = "dictionary";
   static MOBILE_TRANSLATE = "mobile-translate";
   

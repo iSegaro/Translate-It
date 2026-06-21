@@ -348,6 +348,10 @@ export class TranslationRequestTracker {
       return TranslationMode.Field;
     }
 
+    if (data.mode === TranslationMode.PDF || data.translationMode === TranslationMode.PDF || data.context === 'pdf-translation') {
+      return TranslationMode.PDF;
+    }
+
     // Check context
     if (data.context === 'select-element') {
       return 'select-element';
@@ -368,6 +372,10 @@ export class TranslationRequestTracker {
     // Field mode is high priority
     if (data?.mode === TranslationMode.Field || data?.translationMode === TranslationMode.Field) {
       return RequestPriority.HIGH;
+    }
+
+    if (data?.mode === TranslationMode.PDF || data?.translationMode === TranslationMode.PDF || data?.context === 'pdf-translation') {
+      return RequestPriority.LOW;
     }
 
     // User-initiated translations
