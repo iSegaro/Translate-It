@@ -31,7 +31,7 @@ function fixExtensionPaths() {
     await fs.ensureDir(htmlDir);
     
     // Fix paths in HTML files
-    const htmlFiles = ['popup.html', 'sidepanel.html', 'options.html', 'offscreen.html', 'subtitle.html'];
+    const htmlFiles = ['popup.html', 'sidepanel.html', 'options.html', 'offscreen.html', 'subtitle.html', 'pdf.html'];
     
     for (const htmlFile of htmlFiles) {
       const srcPath = resolve(outDir, htmlFile);
@@ -97,7 +97,7 @@ function fixExtensionPaths() {
       
       // Also handle direct HTML file access from root (deprecated, but kept for compatibility)
       server.middlewares.use((req, res, next) => {
-        if (req.url.match(/\/(popup|sidepanel|options)\.html$/)) {
+        if (req.url.match(/\/(popup|sidepanel|options|pdf)\.html$/)) {
           const filename = 'src/html' + req.url;
           const rootPath = resolve(process.cwd(), filename);
           
@@ -209,7 +209,7 @@ export default defineConfig({
     ...(baseConfig.plugins || []),
     fixExtensionPaths(),
     webExtension({
-      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/offscreen.html', 'src/html/subtitle.html'],
+      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/offscreen.html', 'src/html/subtitle.html', 'src/html/pdf.html'],
       manifest: async () => {
           const manifest = generateValidatedManifest('chrome');
           manifest.background = {

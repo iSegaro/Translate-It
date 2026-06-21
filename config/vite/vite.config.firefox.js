@@ -65,7 +65,7 @@ export default defineConfig({
     copyFirefoxAssets(),
     
     webExtension({
-      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/subtitle.html'],
+      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/subtitle.html', 'src/html/pdf.html'],
       // Generate dynamic manifest for Firefox
       manifest: () => {
         const manifest = generateValidatedManifest('firefox');
@@ -173,7 +173,8 @@ export default defineConfig({
           { file: 'popup.html', jsFile: 'popup.js', cssFile: 'popup.css' },
           { file: 'sidepanel.html', jsFile: 'sidepanel.js', cssFile: 'sidepanel.css' },
           { file: 'options.html', jsFile: 'options.js', cssFile: 'options.css' },
-          { file: 'subtitle.html', jsFile: 'subtitle.js', cssFile: 'subtitle.css' }
+          { file: 'subtitle.html', jsFile: 'subtitle.js', cssFile: 'subtitle.css' },
+          { file: 'pdf.html', jsFile: 'pdf.js', cssFile: 'pdf.css' }
         ];
         
         for (const {file, jsFile, cssFile} of htmlFiles) {

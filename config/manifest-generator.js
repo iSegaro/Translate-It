@@ -61,7 +61,7 @@ export function generateManifest(browser = 'chrome') {
           'js/*.js',
           '_locales/*',
           'docs/Changelog.md'
-          // Note: Internal extension pages (options.html, popup.html, sidepanel.html, subtitle.html, offscreen.html)
+          // Note: Internal extension pages (options.html, popup.html, sidepanel.html, subtitle.html, pdf.html, offscreen.html)
           // should NOT be in web_accessible_resources as they are accessed via chrome.runtime.getURL()
           // with stable extension IDs, not dynamic UUIDs.
         ],

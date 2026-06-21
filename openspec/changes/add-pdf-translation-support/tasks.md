@@ -1,9 +1,9 @@
 ## 1. PDF Viewer Foundation
 
-- [ ] 1.1 Add a dedicated `src/apps/pdf` Vue application entry, HTML bootstrap, and viewer shell.
-- [ ] 1.2 Wire the internal PDF viewer page into Vite build inputs, manifest generation, and extension-page routing.
-- [ ] 1.3 Add PDF.js asset handling, packaging, and runtime path resolution for the dedicated viewer.
-- [ ] 1.4 Add manual PDF open/load controls inside the viewer surface only.
+- [x] 1.1 Add a dedicated `src/apps/pdf` Vue application entry, HTML bootstrap, and viewer shell.
+- [x] 1.2 Wire the internal PDF viewer page into Vite build inputs, manifest generation, and extension-page routing.
+- [x] 1.3 Add PDF.js asset handling, packaging, and runtime path resolution for the dedicated viewer.
+- [x] 1.4 Add manual PDF open/load controls inside the viewer surface only.
 
 ## 2. Text Selection Integration
 
