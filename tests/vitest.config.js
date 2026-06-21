@@ -43,7 +43,10 @@ export default defineConfig({
       '@composables': resolve(__dirname, '../src/composables'),
       '@utils': resolve(__dirname, '../src/utils'),
       '@providers': resolve(__dirname, '../src/features/translation/providers'),
-      '@assets': resolve(__dirname, '../src/assets')
+      '@assets': resolve(__dirname, '../src/assets'),
+      '@shared': resolve(__dirname, '../src/shared'),
+      '@features': resolve(__dirname, '../src/features'),
+      '@core': resolve(__dirname, '../src/core')
     }
   }
 })

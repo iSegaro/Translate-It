@@ -60,8 +60,10 @@ export function generateManifest(browser = 'chrome') {
           'src/styles/*.css',
           'js/*.js',
           '_locales/*',
-          'docs/Changelog.md',
-          'src/html/subtitle.html'
+          'docs/Changelog.md'
+          // Note: Internal extension pages (options.html, popup.html, sidepanel.html, subtitle.html, offscreen.html)
+          // should NOT be in web_accessible_resources as they are accessed via chrome.runtime.getURL()
+          // with stable extension IDs, not dynamic UUIDs.
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: true
