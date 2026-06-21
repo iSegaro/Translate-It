@@ -7,9 +7,12 @@
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
+      :viewer-mode="viewerMode"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
+      @cancel-translation="handleCancelTranslation"
+      @mode-change="setMode"
     />
 
     <main class="pdf-app__content">
@@ -31,13 +34,31 @@
         </template>
 
         <template #document>
-          <div class="pdf-app__document">
-            <PdfViewer
-              :pages="pageMetrics"
-              :session="session"
-              @layout-change="handleLayoutChange"
-            />
-          </div>
+          <PdfViewerLayout
+            :viewer-mode="viewerMode"
+            :show-original-pane="showOriginalPane"
+            :show-translated-pane="showTranslatedPane"
+          >
+            <template
+              v-if="showOriginalPane"
+              #original
+            >
+              <PdfViewer
+                :pages="pageMetrics"
+                :session="session"
+                @layout-change="handleLayoutChange"
+              />
+            </template>
+
+            <template
+              v-if="showTranslatedPane"
+              #translated
+            >
+              <PdfTranslatedPane
+                :translated-page-data="translatedPageData"
+              />
+            </template>
+          </PdfViewerLayout>
         </template>
       </PdfDropzone>
 
@@ -56,7 +77,10 @@ import { onBeforeUnmount, ref } from 'vue'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
+import PdfViewerLayout from './components/PdfViewerLayout.vue'
+import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
+import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 
 const {
   error,
@@ -68,13 +92,22 @@ const {
   pageCount,
   pageMetrics,
   translationSummary,
+  translatedPageData,
   workerLabel,
   session,
   loadPdfFile,
   recomputeLayout,
   translateVisiblePages,
+  cancelTranslation,
   cleanup
 } = usePdfViewerController()
+
+const {
+  viewerMode,
+  showOriginalPane,
+  showTranslatedPane,
+  setMode
+} = usePdfBilingualMode()
 
 const isDragOver = ref(false)
 const viewerWidth = ref(960)
@@ -99,6 +132,10 @@ function handleTranslateVisiblePages() {
   void translateVisiblePages()
 }
 
+function handleCancelTranslation() {
+  void cancelTranslation()
+}
+
 onBeforeUnmount(() => {
   void cleanup()
 })
@@ -119,6 +156,7 @@ onBeforeUnmount(() => {
 .pdf-app__content {
   flex: 1;
   padding: 20px 28px 28px;
+  min-height: 0;
 }
 
 .pdf-app__empty {
@@ -138,13 +176,6 @@ onBeforeUnmount(() => {
 .pdf-app__empty-text {
   margin: 0;
   color: rgba(230, 237, 247, 0.7);
-}
-
-.pdf-app__document {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 20px;
 }
 
 .pdf-app__error {

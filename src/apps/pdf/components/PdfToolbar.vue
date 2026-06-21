@@ -26,6 +26,22 @@
     </div>
 
     <div class="pdf-toolbar__actions">
+      <div
+        v-if="fileName"
+        class="pdf-toolbar__mode-group"
+      >
+        <button
+          v-for="modeOption in modeOptions"
+          :key="modeOption.value"
+          class="pdf-toolbar__mode-button"
+          :class="{ 'pdf-toolbar__mode-button--active': viewerMode === modeOption.value }"
+          type="button"
+          @click="$emit('mode-change', modeOption.value)"
+        >
+          {{ modeOption.label }}
+        </button>
+      </div>
+
       <button
         class="pdf-toolbar__button"
         type="button"
@@ -34,6 +50,16 @@
       >
         {{ isLoading ? 'Loading...' : 'Open PDF' }}
       </button>
+
+      <button
+        v-if="isTranslating"
+        class="pdf-toolbar__button pdf-toolbar__button--cancel"
+        type="button"
+        @click="$emit('cancel-translation')"
+      >
+        Cancel
+      </button>
+
       <button
         class="pdf-toolbar__button pdf-toolbar__button--accent"
         type="button"
@@ -42,6 +68,7 @@
       >
         {{ isTranslating ? 'Translating...' : 'Translate Visible Pages' }}
       </button>
+
       <input
         ref="fileInput"
         class="pdf-toolbar__file-input"
@@ -63,6 +90,7 @@ const props = defineProps({
   isLoading: { type: Boolean, default: false },
   isTranslating: { type: Boolean, default: false },
   canTranslateVisiblePages: { type: Boolean, default: false },
+  viewerMode: { type: String, default: 'bilingual' },
   translationSummary: {
     type: Object,
     default: () => ({
@@ -74,8 +102,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation'])
 const fileInput = ref(null)
+
+const modeOptions = [
+  { value: 'original', label: 'Original' },
+  { value: 'bilingual', label: 'Bilingual' },
+  { value: 'translated', label: 'Translated' }
+]
 
 const translationStatusLabel = computed(() => {
   const { translatedCount, failedCount, totalCount, status } = props.translationSummary
@@ -160,5 +194,43 @@ function handleFileInputChange(event) {
 
 .pdf-toolbar__file-input {
   display: none;
+}
+
+.pdf-toolbar__mode-group {
+  display: flex;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pdf-toolbar__mode-button {
+  appearance: none;
+  border: 0;
+  padding: 8px 14px;
+  background: transparent;
+  color: rgba(230, 237, 247, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e6edf7;
+  }
+
+  &--active {
+    background: rgba(90, 92, 255, 0.2);
+    color: #e6edf7;
+  }
+}
+
+.pdf-toolbar__button--cancel {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.25);
+  }
 }
 </style>

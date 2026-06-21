@@ -152,4 +152,42 @@ describe('PdfTranslationCoordinator', () => {
       status: 'translated'
     }))
   })
+
+  it('calls onStateChange after marking blocks loading and after applying batch results', async () => {
+    const onStateChange = vi.fn()
+    const coordinator = new PdfTranslationCoordinator(session, { onStateChange })
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    await coordinator.translateVisibleBlocks()
+
+    expect(onStateChange).toHaveBeenCalledTimes(2)
+    expect(onStateChange).toHaveBeenNthCalledWith(1)
+    expect(onStateChange).toHaveBeenNthCalledWith(2)
+  })
+
+  it('does not throw when onStateChange is not provided', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+    expect(summary.status).toBe('translated')
+  })
 })

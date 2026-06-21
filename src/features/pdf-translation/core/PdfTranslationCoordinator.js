@@ -8,11 +8,13 @@ import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
 export class PdfTranslationCoordinator {
   constructor(session, {
     adapter = new PdfTranslationAdapter(),
-    batchPlanner = new PdfTranslationBatchPlanner(adapter)
+    batchPlanner = new PdfTranslationBatchPlanner(adapter),
+    onStateChange = null
   } = {}) {
     this.session = session
     this.adapter = adapter
     this.batchPlanner = batchPlanner
+    this.onStateChange = typeof onStateChange === 'function' ? onStateChange : null
     this.isTranslating = false
     this.activeRunId = 0
     this.activeRequestIds = new Set()
@@ -170,6 +172,7 @@ export class PdfTranslationCoordinator {
         error: null
       })
     }
+    this._notifyStateChange()
   }
 
   _applyBatchResults(batchResults = []) {
@@ -205,7 +208,14 @@ export class PdfTranslationCoordinator {
       })
     }
 
+    this._notifyStateChange()
     return { translatedCount, failedCount }
+  }
+
+  _notifyStateChange() {
+    if (this.onStateChange) {
+      this.onStateChange()
+    }
   }
 
   async _resolveProvider() {

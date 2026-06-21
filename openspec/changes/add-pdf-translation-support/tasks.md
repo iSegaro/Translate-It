@@ -25,9 +25,17 @@
 
 ## 5. Bilingual Viewer
 
-- [ ] 5.1 Build the side-by-side bilingual viewer with an original pixel-accurate pane and an adaptive translated pane.
-- [ ] 5.2 Add visible-page-only translation controls, loading states, and cancellation behavior.
-- [ ] 5.3 Add page-level navigation and block highlighting for translated results.
+- [x] 5.1 Build the side-by-side bilingual viewer with an original pixel-accurate pane and an adaptive translated pane.
+- [x] 5.2 Add visible-page-only translation controls, loading states, and cancellation behavior.
+- [x] 5.3 Add status-based translated block rendering with idle/loading/translated/error visual states.
+
+### Deferred from Phase 5
+
+The following items are deferred to future phases:
+
+- Scroll synchronization between original and translated panes
+- Cross-pane block highlighting (original ↔ translated block correspondence)
+- Page-level navigation system for translated content
 
 ## 6. Export MVP
 

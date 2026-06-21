@@ -23,10 +23,45 @@ export function usePdfViewerController() {
     failedCount: 0,
     totalCount: 0
   })
+  const translationTick = ref(0)
+
+  pdfTranslationCoordinator.onStateChange = () => {
+    translationTick.value += 1
+  }
 
   const hasDocument = computed(() => pageCount.value > 0 && pageMetrics.value.length > 0)
   const canTranslateVisiblePages = computed(() => hasDocument.value && !isLoading.value && !isTranslating.value)
   const workerUrl = computed(() => pdfDocumentSession.workerUrl)
+
+  const translatedPageData = computed(() => {
+    translationTick.value
+
+    if (!hasDocument.value) return []
+
+    return pageMetrics.value.map((metric) => {
+      const blocks = []
+      const pageSession = pdfDocumentSession.pageSessions.get(metric.pageNumber)
+
+      if (pageSession) {
+        const logicalBlocks = pageSession.getLogicalBlocks()
+        for (const block of logicalBlocks) {
+          blocks.push({
+            ...block,
+            translationState: pdfDocumentSession.getBlockTranslationState(block.id)
+          })
+        }
+
+        blocks.sort((a, b) => (a.readingOrderIndex ?? 0) - (b.readingOrderIndex ?? 0))
+      }
+
+      return {
+        pageNumber: metric.pageNumber,
+        width: metric.width,
+        height: metric.height,
+        blocks
+      }
+    })
+  })
 
   function applySessionState(state) {
     fileName.value = state.fileName
@@ -50,6 +85,7 @@ export function usePdfViewerController() {
       totalCount: 0
     }
     isTranslating.value = false
+    translationTick.value = 0
   }
 
   async function loadPdfFile(file, viewerWidth) {
@@ -126,6 +162,11 @@ export function usePdfViewerController() {
     error.value = ''
   }
 
+  async function cancelTranslation() {
+    await pdfTranslationCoordinator.cancelActiveTranslation('user-cancel')
+    isTranslating.value = false
+  }
+
   async function cleanup() {
     await pdfTranslationCoordinator.cancelActiveTranslation('viewer-cleanup')
     await pdfDocumentSession.destroy()
@@ -145,12 +186,15 @@ export function usePdfViewerController() {
     isTranslating,
     canTranslateVisiblePages,
     translationSummary,
+    translationTick,
+    translatedPageData,
     workerLabel,
     workerUrl,
     session: pdfDocumentSession,
     loadPdfFile,
     recomputeLayout,
     translateVisiblePages,
+    cancelTranslation,
     clearError,
     cleanup,
     resetLoadedDocument
