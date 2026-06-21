@@ -200,6 +200,18 @@ describe('HoverTranslationManager', () => {
     });
   });
 
+  describe('handleMouseLeave', () => {
+    it('should cancel translation request and clear currentMessageId on real mouseleave', async () => {
+      await manager.activate();
+      manager.currentMessageId = 'test-id-123';
+
+      manager.handleMouseLeave();
+
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('test-id-123', expect.any(String));
+      expect(manager.currentMessageId).toBeNull();
+    });
+  });
+
   describe('_processHover', () => {
     it('should send translation request and emit event', async () => {
       await manager.activate();
@@ -229,7 +241,7 @@ describe('HoverTranslationManager', () => {
       }));
     });
 
-    it('should clean up highlight and caches on context invalidation error', async () => {
+    it('should clean up highlight and caches on context invalidation error without sending cancellation to background', async () => {
       await manager.activate();
       settingsManager.get.mockImplementation((key, def) => {
         if (key === 'MOUSE_HOVER_SCOPE') return 'container';
@@ -255,9 +267,10 @@ describe('HoverTranslationManager', () => {
       expect(manager.currentRect).toBeNull();
       expect(manager.currentText).toBeNull();
       expect(manager.currentElement).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
     });
 
-    it('should clean up highlight and caches on standard translation error', async () => {
+    it('should clean up highlight and caches on standard translation error without sending cancellation to background', async () => {
       await manager.activate();
       settingsManager.get.mockImplementation((key, def) => {
         if (key === 'MOUSE_HOVER_SCOPE') return 'container';
@@ -283,6 +296,7 @@ describe('HoverTranslationManager', () => {
       expect(manager.currentRect).toBeNull();
       expect(manager.currentText).toBeNull();
       expect(manager.currentElement).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
     });
 
     it('should not clean up highlight or caches if a stale failed request finishes after a new hover started', async () => {

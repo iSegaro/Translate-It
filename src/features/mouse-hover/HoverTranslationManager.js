@@ -235,7 +235,16 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   _cleanupActiveHoverRequest(messageId) {
     if (this.currentMessageId === messageId) {
-      this._handleMouseOut();
+      this.currentMessageId = null;
+      this.currentText = null;
+      this.currentRect = null;
+      this.currentElement = null;
+      this._removeBorder();
+
+      const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
+      if (autoClose === 'mouseleave') {
+        this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+      }
     }
   }
 
