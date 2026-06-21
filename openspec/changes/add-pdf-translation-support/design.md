@@ -39,6 +39,7 @@ The architecture source of truth is `Proposal-PDF.md`. Its core requirement is t
 - PDF viewer rendering is owned by PDF.js, not the browser native viewer.
 - PDF opening/loading in MVP happens only inside the dedicated viewer surface.
 - The MVP text layer uses the official PDF.js `TextLayerBuilder` path from `web/pdf_viewer.mjs` with the matching `pdf_viewer.css` runtime styles.
+- PDF text selection is bridged into the existing global selection event bus; there is no separate PDF selection system.
 - The translation unit is `Logical Block`.
 - The original pane remains pixel-accurate.
 - The translated pane uses adaptive geometry for readability.

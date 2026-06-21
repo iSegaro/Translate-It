@@ -18,6 +18,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfPageView from './PdfPageView.vue'
 import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
+import { usePdfSelectionBridge } from '../composables/usePdfSelectionBridge.js'
 
 const props = defineProps({
   pages: {
@@ -37,6 +38,8 @@ const visiblePageNumbers = ref(new Set())
 let intersectionObserver = null
 let resizeObserver = null
 let lastWidth = 0
+
+usePdfSelectionBridge(viewerRoot)
 
 function registerPageView(pageNumber, instance) {
   if (!instance) {

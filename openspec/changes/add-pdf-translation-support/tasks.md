@@ -7,9 +7,9 @@
 
 ## 2. Text Selection Integration
 
-- [ ] 2.1 Add PDF text-layer selection support that reuses the existing text selection workflows.
-- [ ] 2.2 Ensure selected PDF text can trigger translation and TTS actions without DOM-page assumptions.
-- [ ] 2.3 Add cleanup and ResourceTracker hooks for PDF text-layer listeners and viewer lifecycles.
+- [x] 2.1 Add PDF text-layer selection support that reuses the existing text selection workflows.
+- [x] 2.2 Ensure selected PDF text can trigger translation and TTS actions without DOM-page assumptions.
+- [x] 2.3 Add cleanup and ResourceTracker hooks for PDF text-layer listeners and viewer lifecycles.
 
 ## 3. Layout and Logical Blocks
 
