@@ -47,6 +47,9 @@ const pageStyle = computed(() => ({
 }))
 
 defineExpose({
+  getRootEl: () => rootEl.value,
+  getCanvasEl: () => canvasEl.value,
+  getTextLayerEl: () => textLayerEl.value,
   rootEl,
   canvasEl,
   textLayerEl

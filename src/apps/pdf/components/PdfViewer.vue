@@ -17,6 +17,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfPageView from './PdfPageView.vue'
+import { getPdfPageRootElement } from '../utils/pageViewInstance.js'
 
 const props = defineProps({
   pages: {
@@ -44,7 +45,7 @@ function registerPageView(pageNumber, instance) {
   }
 
   pageViews.set(pageNumber, instance)
-  const rootEl = instance.rootEl
+  const rootEl = getPdfPageRootElement(instance)
   if (intersectionObserver && rootEl) {
     rootEl.dataset.pageNumber = String(pageNumber)
     intersectionObserver.observe(rootEl)
@@ -62,7 +63,7 @@ function refreshObservationTargets() {
   if (!intersectionObserver) return
 
   for (const [pageNumber, instance] of pageViews.entries()) {
-    const rootEl = instance.rootEl
+    const rootEl = getPdfPageRootElement(instance)
     if (!rootEl) continue
 
     rootEl.dataset.pageNumber = String(pageNumber)
