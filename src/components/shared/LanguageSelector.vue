@@ -161,13 +161,7 @@ import './LanguageSelector.scss'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LanguageSelector')
 
-// Composables
-const { t } = useUnifiedI18n()
-const languages = useLanguages()
-const { handleError } = useErrorHandler()
-const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation()
-
-// Props
+// Props (must be defined first before using props.*)
 const props = defineProps({
   sourceLanguage: {
     type: String,
@@ -253,6 +247,12 @@ const props = defineProps({
   allowAuto: {
     type: Boolean,
     default: true
+  },
+  // Enable select element mode integration (deactivates select mode on dropdown click)
+  // Should be disabled for standalone pages like Subtitle that don't have element selection
+  enableSelectElementIntegration: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -264,6 +264,20 @@ const emit = defineEmits([
   'set-default-source',
   'set-default-target'
 ])
+
+// Composables
+const { t } = useUnifiedI18n()
+const languages = useLanguages()
+const { handleError } = useErrorHandler()
+
+// Conditionally initialize select element integration only when enabled
+// This prevents GET_SELECT_ELEMENT_STATE messages from being sent on pages
+// like Subtitle that don't have element selection capability
+const selectElementIntegration = props.enableSelectElementIntegration
+  ? useSelectElementTranslation()
+  : { isSelectModeActive: { value: false }, deactivateSelectMode: () => {} }
+
+const { isSelectModeActive, deactivateSelectMode } = selectElementIntegration
 
 // Computed
 const sourceLanguage = computed({

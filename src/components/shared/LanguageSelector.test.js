@@ -30,10 +30,10 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 }))
 
 vi.mock('@/features/translation/composables/useTranslationModes.js', () => ({
-  useSelectElementTranslation: () => ({
+  useSelectElementTranslation: vi.fn(() => ({
     isSelectModeActive: ref(false),
     deactivateSelectMode: vi.fn()
-  })
+  }))
 }))
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -159,5 +159,28 @@ describe('LanguageSelector', () => {
     await wrapper.get('button[title="Target default"]').trigger('click')
 
     expect(wrapper.emitted('set-default-target')).toHaveLength(1)
+  })
+
+  describe('enableSelectElementIntegration prop', () => {
+    const { useSelectElementTranslation } = require('@/features/translation/composables/useTranslationModes.js')
+
+    beforeEach(() => {
+      useSelectElementTranslation.mockClear()
+    })
+
+    it('calls useSelectElementTranslation by default (when prop is true or omitted)', () => {
+      mountSelector()
+      expect(useSelectElementTranslation).toHaveBeenCalledTimes(1)
+    })
+
+    it('calls useSelectElementTranslation when prop is explicitly true', () => {
+      mountSelector({ enableSelectElementIntegration: true })
+      expect(useSelectElementTranslation).toHaveBeenCalledTimes(1)
+    })
+
+    it('does NOT call useSelectElementTranslation when prop is false', () => {
+      mountSelector({ enableSelectElementIntegration: false })
+      expect(useSelectElementTranslation).not.toHaveBeenCalled()
+    })
   })
 })
