@@ -22,6 +22,12 @@
         >
           {{ translationStatusLabel }}
         </span>
+        <span
+          v-if="isPartialExport"
+          class="pdf-toolbar__partial-warning"
+        >
+          Partial export — not all blocks are translated
+        </span>
       </div>
     </div>
 
@@ -69,6 +75,26 @@
         {{ isTranslating ? 'Translating...' : 'Translate Visible Pages' }}
       </button>
 
+      <div
+        v-if="fileName && canExport"
+        class="pdf-toolbar__export-group"
+      >
+        <button
+          class="pdf-toolbar__button pdf-toolbar__button--export"
+          type="button"
+          @click="$emit('export-txt')"
+        >
+          Export TXT
+        </button>
+        <button
+          class="pdf-toolbar__button pdf-toolbar__button--export"
+          type="button"
+          @click="$emit('export-markdown')"
+        >
+          Export Markdown
+        </button>
+      </div>
+
       <input
         ref="fileInput"
         class="pdf-toolbar__file-input"
@@ -90,6 +116,8 @@ const props = defineProps({
   isLoading: { type: Boolean, default: false },
   isTranslating: { type: Boolean, default: false },
   canTranslateVisiblePages: { type: Boolean, default: false },
+  canExport: { type: Boolean, default: false },
+  isPartialExport: { type: Boolean, default: false },
   viewerMode: { type: String, default: 'bilingual' },
   translationSummary: {
     type: Object,
@@ -102,7 +130,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown'])
 const fileInput = ref(null)
 
 const modeOptions = [
@@ -170,6 +198,11 @@ function handleFileInputChange(event) {
   font-size: 13px;
 }
 
+.pdf-toolbar__partial-warning {
+  color: #f4b860;
+  font-weight: 600;
+}
+
 .pdf-toolbar__actions {
   display: flex;
   align-items: center;
@@ -231,6 +264,22 @@ function handleFileInputChange(event) {
 
   &:hover {
     background: rgba(239, 68, 68, 0.25);
+  }
+}
+
+.pdf-toolbar__export-group {
+  display: flex;
+  gap: 8px;
+}
+
+.pdf-toolbar__button--export {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6edf7;
+  font-size: 13px;
+  padding: 8px 14px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
   }
 }
 </style>

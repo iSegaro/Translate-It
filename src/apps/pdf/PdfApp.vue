@@ -7,12 +7,16 @@
       :is-loading="isLoading"
       :is-translating="isTranslating"
       :can-translate-visible-pages="canTranslateVisiblePages"
+      :can-export="canExport"
+      :is-partial-export="isPartialExport"
       :viewer-mode="viewerMode"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
       @translate-visible="handleTranslateVisiblePages"
       @cancel-translation="handleCancelTranslation"
       @mode-change="setMode"
+      @export-txt="handleExportTxt"
+      @export-markdown="handleExportMarkdown"
     />
 
     <main class="pdf-app__content">
@@ -63,10 +67,10 @@
       </PdfDropzone>
 
       <section
-        v-if="error"
+        v-if="error || exportError"
         class="pdf-app__error"
       >
-        {{ error }}
+        {{ error || exportError }}
       </section>
     </main>
   </div>
@@ -81,6 +85,7 @@ import PdfViewerLayout from './components/PdfViewerLayout.vue'
 import PdfTranslatedPane from './components/PdfTranslatedPane.vue'
 import { usePdfViewerController } from './composables/usePdfViewerController.js'
 import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
+import { usePdfExport } from './composables/usePdfExport.js'
 
 const {
   error,
@@ -93,6 +98,7 @@ const {
   pageMetrics,
   translationSummary,
   translatedPageData,
+  translationTick,
   workerLabel,
   session,
   loadPdfFile,
@@ -108,6 +114,15 @@ const {
   showTranslatedPane,
   setMode
 } = usePdfBilingualMode()
+
+const {
+  canExport,
+  isPartialExport,
+  exportError,
+  exportTxt,
+  exportMarkdown,
+  clearExportError
+} = usePdfExport(translationTick)
 
 const isDragOver = ref(false)
 const viewerWidth = ref(960)
@@ -134,6 +149,16 @@ function handleTranslateVisiblePages() {
 
 function handleCancelTranslation() {
   void cancelTranslation()
+}
+
+function handleExportTxt() {
+  clearExportError()
+  exportTxt()
+}
+
+function handleExportMarkdown() {
+  clearExportError()
+  exportMarkdown()
 }
 
 onBeforeUnmount(() => {

@@ -39,9 +39,9 @@ The following items are deferred to future phases:
 
 ## 6. Export MVP
 
-- [ ] 6.1 Implement TXT export for already translated PDF content.
-- [ ] 6.2 Implement Markdown export for already translated PDF content.
-- [ ] 6.3 Surface partial-export warnings when only some pages or blocks are translated.
+- [x] 6.1 Implement TXT export for already translated PDF content.
+- [x] 6.2 Implement Markdown export for already translated PDF content.
+- [x] 6.3 Surface partial-export warnings when only some pages or blocks are translated.
 
 ## 7. PDF-aware Select Element
 
