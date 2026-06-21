@@ -51,9 +51,9 @@ The following items are deferred to future phases:
 
 ## 8. OCR Fallback
 
-- [ ] 8.1 Detect missing or unusable text layers and prompt the user before OCR.
-- [ ] 8.2 Reuse the existing OCR engine and cache path for PDF fallback recognition.
-- [ ] 8.3 Add OCR fallback state, approval handling, and cleanup semantics.
+- [x] 8.1 Detect missing or unusable text layers and prompt the user before OCR.
+- [x] 8.2 Reuse the existing OCR engine and cache path for PDF fallback recognition.
+- [x] 8.3 Add OCR fallback state, approval handling, and cleanup semantics.
 
 ## 9. History and Cache UX
 

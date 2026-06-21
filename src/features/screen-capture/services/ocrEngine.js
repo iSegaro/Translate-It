@@ -116,6 +116,40 @@ export async function recognize(image, lang = 'eng', coordinates = null) {
 }
 
 /**
+ * Perform OCR on an image and return structured result with line-level bounding boxes.
+ * @param {string|Blob|File} image Image source
+ * @param {string} lang Tesseract language code
+ * @param {Object} [coordinates] Optional crop coordinates {x, y, width, height}
+ * @returns {Promise<{text: string, lines: Array<{text: string, confidence: number, bbox: {x0: number, y0: number, x1: number, y1: number}}>, confidence: number}>}
+ */
+export async function recognizeStructured(image, lang = 'eng', coordinates = null) {
+  try {
+    const worker = await initWorker(lang);
+    
+    const options = {};
+    if (coordinates) {
+      options.rectangle = {
+        top: Math.round(coordinates.y),
+        left: Math.round(coordinates.x),
+        width: Math.round(coordinates.width),
+        height: Math.round(coordinates.height)
+      };
+    }
+
+    const { data } = await worker.recognize(image, options);
+    lastUsedTime = Date.now();
+    return {
+      text: data.text,
+      lines: data.lines || [],
+      confidence: data.confidence || 0
+    };
+  } catch (error) {
+    logger.error('Structured recognition failed', error);
+    throw error;
+  }
+}
+
+/**
  * Terminate worker if idle
  */
 export async function terminateIfIdle() {

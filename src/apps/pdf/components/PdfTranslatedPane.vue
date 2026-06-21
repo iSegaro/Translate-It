@@ -29,7 +29,12 @@
           v-if="page.blocks.length === 0"
           class="pdf-translated-page__empty"
         >
-          No text blocks on this page
+          <PdfOcrStatus
+            :is-scanned-candidate="page.isScannedCandidate"
+            :is-ocr-complete="page.isOcrComplete"
+            :ocr-error="page.ocrError"
+          />
+          <span v-if="!page.isScannedCandidate && !page.isOcrComplete">No text blocks on this page</span>
         </div>
 
         <div
@@ -52,6 +57,7 @@
 <script setup>
 import { computed } from 'vue'
 import PdfTranslatedBlock from './PdfTranslatedBlock.vue'
+import PdfOcrStatus from './PdfOcrStatus.vue'
 
 const props = defineProps({
   translatedPageData: {

@@ -88,3 +88,95 @@ describe('PdfPageSession', () => {
     expect(secondSession.getLogicalBlocks()[0].normalizedBoundingBox).toEqual(firstSession.getLogicalBlocks()[0].normalizedBoundingBox)
   })
 })
+
+describe('PdfPageSession OCR state', () => {
+  it('initializes OCR state to defaults', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+
+    expect(session.ocrBlocks).toEqual([])
+    expect(session.ocrLanguage).toBeNull()
+    expect(session.ocrCompletedAt).toBe(0)
+    expect(session.ocrError).toBeNull()
+  })
+
+  it('setOcrBlocks stores blocks and metadata', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const blocks = [{ id: 'ocr-1', text: 'Hello' }]
+
+    session.setOcrBlocks(blocks, 'eng')
+
+    expect(session.ocrBlocks).toEqual(blocks)
+    expect(session.ocrLanguage).toBe('eng')
+    expect(session.ocrCompletedAt).toBeGreaterThan(0)
+    expect(session.ocrError).toBeNull()
+  })
+
+  it('clearOcrBlocks resets OCR state', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    session.clearOcrBlocks()
+
+    expect(session.ocrBlocks).toEqual([])
+    expect(session.ocrLanguage).toBeNull()
+    expect(session.ocrCompletedAt).toBe(0)
+    expect(session.ocrError).toBeNull()
+  })
+
+  it('hasOcrForLanguage returns true for matching language', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    expect(session.hasOcrForLanguage('eng')).toBe(true)
+    expect(session.hasOcrForLanguage('fas')).toBe(false)
+  })
+
+  it('hasOcrForLanguage returns false when no OCR blocks', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+
+    expect(session.hasOcrForLanguage('eng')).toBe(false)
+  })
+
+  it('getLogicalBlocks returns OCR blocks when no text-layer blocks', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    const ocrBlocks = [{ id: 'ocr-1', text: 'OCR text' }]
+    session.setOcrBlocks(ocrBlocks, 'eng')
+
+    const blocks = session.getLogicalBlocks()
+
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].id).toBe('ocr-1')
+  })
+
+  it('getLogicalBlocks returns text-layer blocks when they exist', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.logicalBlocks = [{ id: 'text-1', text: 'Text layer' }]
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    const blocks = session.getLogicalBlocks()
+
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].id).toBe('text-1')
+  })
+
+  it('allBlocks returns both text-layer and OCR blocks', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.logicalBlocks = [{ id: 'text-1' }]
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+
+    expect(session.allBlocks).toHaveLength(2)
+  })
+
+  it('reset clears OCR state', () => {
+    const session = new PdfPageSession({ documentIdentity: 'doc-1', pageNumber: 1 })
+    session.setOcrBlocks([{ id: 'ocr-1' }], 'eng')
+    session.ocrError = 'some error'
+
+    session.reset()
+
+    expect(session.ocrBlocks).toEqual([])
+    expect(session.ocrLanguage).toBeNull()
+    expect(session.ocrCompletedAt).toBe(0)
+    expect(session.ocrError).toBeNull()
+  })
+})

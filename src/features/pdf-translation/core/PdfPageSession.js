@@ -23,6 +23,10 @@ export class PdfPageSession {
     this.loadedAt = 0
     this.displayScale = 1
     this.logicalBlockBuilder = new PdfLogicalBlockBuilder()
+    this.ocrBlocks = []
+    this.ocrLanguage = null
+    this.ocrCompletedAt = 0
+    this.ocrError = null
   }
 
   updateDocumentIdentity(documentIdentity) {
@@ -39,6 +43,10 @@ export class PdfPageSession {
     this.displayScale = Number(pageMetric?.scale) || this.displayScale || 1
 
     if (this.loaded && this.textContent && this.logicalBlocks.length) {
+      return this
+    }
+
+    if (this.loaded && !this.textContent) {
       return this
     }
 
@@ -61,7 +69,37 @@ export class PdfPageSession {
   }
 
   getLogicalBlocks() {
-    return [...this.logicalBlocks]
+    if (this.logicalBlocks.length > 0) {
+      return [...this.logicalBlocks]
+    }
+
+    if (this.ocrBlocks.length > 0) {
+      return [...this.ocrBlocks]
+    }
+
+    return []
+  }
+
+  get allBlocks() {
+    return [...this.logicalBlocks, ...this.ocrBlocks]
+  }
+
+  setOcrBlocks(blocks, language) {
+    this.ocrBlocks = blocks || []
+    this.ocrLanguage = language || null
+    this.ocrCompletedAt = Date.now()
+    this.ocrError = null
+  }
+
+  clearOcrBlocks() {
+    this.ocrBlocks = []
+    this.ocrLanguage = null
+    this.ocrCompletedAt = 0
+    this.ocrError = null
+  }
+
+  hasOcrForLanguage(language) {
+    return this.ocrBlocks.length > 0 && this.ocrLanguage === language
   }
 
   getTextLines() {
@@ -76,5 +114,9 @@ export class PdfPageSession {
     this.loaded = false
     this.loadedAt = 0
     this.displayScale = 1
+    this.ocrBlocks = []
+    this.ocrLanguage = null
+    this.ocrCompletedAt = 0
+    this.ocrError = null
   }
 }

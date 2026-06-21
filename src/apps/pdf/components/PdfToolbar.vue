@@ -59,6 +59,22 @@
       </button>
 
       <button
+        v-if="scannedPageCount > 0 && !isOcrProcessing"
+        class="pdf-toolbar__button pdf-toolbar__button--ocr"
+        type="button"
+        @click="$emit('request-ocr')"
+      >
+        OCR Pages ({{ scannedPageCount }})
+      </button>
+
+      <span
+        v-if="isOcrProcessing"
+        class="pdf-toolbar__ocr-status"
+      >
+        OCR processing...
+      </span>
+
+      <button
         class="pdf-toolbar__button"
         type="button"
         :disabled="isLoading"
@@ -129,6 +145,8 @@ const props = defineProps({
   canExport: { type: Boolean, default: false },
   isPartialExport: { type: Boolean, default: false },
   isBlockTargetingActive: { type: Boolean, default: false },
+  scannedPageCount: { type: Number, default: 0 },
+  isOcrProcessing: { type: Boolean, default: false },
   viewerMode: { type: String, default: 'bilingual' },
   translationSummary: {
     type: Object,
@@ -141,7 +159,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting', 'request-ocr'])
 const fileInput = ref(null)
 
 const modeOptions = [
@@ -306,5 +324,20 @@ function handleFileInputChange(event) {
     background: rgba(90, 92, 255, 0.3);
     color: #e6edf7;
   }
+}
+
+.pdf-toolbar__button--ocr {
+  background: rgba(244, 184, 96, 0.12);
+  color: #f4b860;
+
+  &:hover {
+    background: rgba(244, 184, 96, 0.2);
+  }
+}
+
+.pdf-toolbar__ocr-status {
+  color: rgba(230, 237, 247, 0.6);
+  font-size: 13px;
+  font-style: italic;
 }
 </style>
