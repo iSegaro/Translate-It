@@ -1,17 +1,19 @@
 const CSS_CLASS = 'textLayer'
 
-function multiplyMatrices(a, b) {
+const IDENTITY = [1, 0, 0, 1, 0, 0]
+
+const ASCENT_RATIO = 0.8
+
+function multiplyTransform(m1, m2) {
   return [
-    a[0] * b[0] + a[2] * b[1],
-    a[1] * b[0] + a[3] * b[1],
-    a[0] * b[2] + a[2] * b[3],
-    a[1] * b[2] + a[3] * b[3],
-    a[0] * b[4] + a[2] * b[5] + a[4],
-    a[1] * b[4] + a[3] * b[5] + a[5]
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
   ]
 }
-
-const IDENTITY = [1, 0, 0, 1, 0, 0]
 
 export class PdfTextLayerRenderer {
   constructor(container) {
@@ -24,43 +26,100 @@ export class PdfTextLayerRenderer {
 
     this.clear()
 
-    const textContent = await page.getTextContent()
+    const textContent = await page.getTextContent({
+      includeMarkedContent: true,
+      disableNormalization: true
+    })
     if (!textContent?.items?.length) return
 
     const layerDiv = document.createElement('div')
     layerDiv.className = CSS_CLASS
 
-    const viewportMatrix = viewport?.transform || IDENTITY
+    const rawDims = viewport.rawDims || null
+    const pageWidth = rawDims?.pageWidth || (viewport.width / (viewport.scale || 1))
+    const pageHeight = rawDims?.pageHeight || (viewport.height / (viewport.scale || 1))
+    const pageX = rawDims?.pageX || 0
+    const pageY = rawDims?.pageY || 0
+
+    const pageTransform = [1, 0, 0, -1, -pageX, pageY + pageHeight]
+
+    const styles = textContent.styles || {}
+    const textDivs = this.textDivs
+
+    const totalScale = viewport.scale || 1
+    const itemMeta = []
 
     for (const item of textContent.items) {
+      if (item.str === undefined) continue
       if (!item.str || !item.str.trim()) continue
 
+      const itemTransform = item.transform || IDENTITY
+      const tx = multiplyTransform(pageTransform, itemTransform)
+
+      let angle = Math.atan2(tx[1], tx[0])
+      if (item.vertical) {
+        angle += Math.PI / 2
+      }
+
+      const fontHeight = Math.hypot(tx[2], tx[3])
+      const fontAscent = fontHeight * ASCENT_RATIO
+
+      let left, top
+      if (angle === 0) {
+        left = tx[4]
+        top = tx[5] - fontAscent
+      } else {
+        left = tx[4] + fontAscent * Math.sin(angle)
+        top = tx[5] - fontAscent * Math.cos(angle)
+      }
+
+      const fontStyle = styles[item.fontName] || {}
+      const fontFamily = fontStyle.fontFamily || 'sans-serif'
+
       const span = document.createElement('span')
+      span.setAttribute('role', 'presentation')
       span.textContent = item.str
+      span.dir = item.dir || 'ltr'
 
-      const itemMatrix = item.transform || IDENTITY
-      const finalMatrix = multiplyMatrices(viewportMatrix, itemMatrix)
+      const spanStyle = span.style
+      spanStyle.left = `${(100 * (left - pageX) / pageWidth).toFixed(2)}%`
+      spanStyle.top = `${(100 * top / pageHeight).toFixed(2)}%`
+      spanStyle.setProperty('--font-height', `${fontHeight.toFixed(2)}px`)
+      spanStyle.fontFamily = fontFamily
 
-      span.style.transform = `matrix(${finalMatrix[0]}, ${finalMatrix[1]}, ${finalMatrix[2]}, ${finalMatrix[3]}, ${finalMatrix[4]}, ${finalMatrix[5]})`
-
-      if (item.width > 0) {
-        span.style.width = `${item.width * Math.abs(viewportMatrix[0])}px`
+      if (angle !== 0) {
+        spanStyle.setProperty('--rotate', `${(angle * 180 / Math.PI).toFixed(2)}deg`)
       }
 
-      if (item.height > 0) {
-        span.style.height = `${item.height * Math.abs(viewportMatrix[3])}px`
-      }
-
+      textDivs.push(span)
       layerDiv.appendChild(span)
-      this.textDivs.push(span)
+
+      itemMeta.push({
+        pdfWidth: item.width * totalScale,
+        str: item.str
+      })
     }
 
     this.container.appendChild(layerDiv)
+
+    for (let i = 0; i < textDivs.length; i++) {
+      const span = textDivs[i]
+      const { pdfWidth, str } = itemMeta[i]
+      if (pdfWidth <= 0) continue
+      if (str.length <= 1) continue
+
+      const renderedWidth = span.getBoundingClientRect().width
+      if (renderedWidth <= 0) continue
+
+      const scaleX = pdfWidth / renderedWidth
+      if (Math.abs(scaleX - 1) > 0.01) {
+        span.style.transform = `scaleX(${scaleX.toFixed(4)}) ${span.style.transform || ''}`.trim()
+      }
+    }
   }
 
   clear() {
     this.textDivs = []
-
     if (this.container) {
       this.container.replaceChildren()
     }

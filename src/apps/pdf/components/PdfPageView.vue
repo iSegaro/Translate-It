@@ -12,6 +12,7 @@
       <div
         ref="textLayerEl"
         class="pdf-page__text-layer"
+        :style="textLayerStyle"
       />
     </div>
   </article>
@@ -20,6 +21,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
+import './PdfPageView.scss'
 
 const props = defineProps({
   page: {
@@ -44,6 +46,10 @@ let textLayerRenderer = null
 const pageStyle = computed(() => ({
   width: `${props.page.width}px`,
   minHeight: `${props.page.height}px`
+}))
+
+const textLayerStyle = computed(() => ({
+  '--total-scale-factor': String(props.page.scale || 1)
 }))
 
 defineExpose({
@@ -129,26 +135,5 @@ onBeforeUnmount(() => {
   inset: 0;
   overflow: hidden;
   transform-origin: 0 0;
-}
-</style>
-
-<style lang="scss">
-.pdf-page__text-layer .textLayer {
-  position: absolute;
-  inset: 0;
-  overflow: clip;
-  z-index: 0;
-  transform-origin: 0 0;
-  caret-color: CanvasText;
-}
-
-.pdf-page__text-layer .textLayer span {
-  color: transparent;
-  position: absolute;
-  white-space: pre;
-  cursor: text;
-  transform-origin: 0% 0%;
-  -webkit-user-select: text;
-  user-select: text;
 }
 </style>

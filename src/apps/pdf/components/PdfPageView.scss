@@ -1,0 +1,36 @@
+/* PdfPageView.scss – Global text-layer styles for PDF.js text rendering */
+.pdf-page__text-layer .textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    -webkit-user-select: text;
+    user-select: text;
+
+    --font-height: 0;
+    font-size: calc(var(--total-scale-factor, 1) * var(--font-height));
+
+    --rotate: 0deg;
+    transform: rotate(var(--rotate));
+
+    &::selection {
+      background: Highlight;
+      color: transparent;
+    }
+  }
+}
