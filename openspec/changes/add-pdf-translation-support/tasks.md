@@ -60,3 +60,7 @@ The following items are deferred to future phases:
 - [x] 9.1 Add document-level PDF history entries in an isolated PDF history store.
 - [x] 9.2 Implement persistent PDF cache invalidation and reuse keyed by PDF identity, provider, target language, and translation settings.
 - [x] 9.3 Add focused tests for PDF cache, history, coordinator filtering, and OCR cache persistence.
+
+### Deferred Technical Debt
+
+- Text layer span dimensions for rotated/skewed PDFs should be computed from transformed corner bounding boxes rather than viewport diagonal scale factors.
