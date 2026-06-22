@@ -28,6 +28,12 @@
         >
           Partial export — not all blocks are translated
         </span>
+        <span
+          v-if="restoredTranslationCount > 0"
+          class="pdf-toolbar__restore-status"
+        >
+          Restored {{ restoredTranslationCount }} cached translation(s)
+        </span>
       </div>
     </div>
 
@@ -121,6 +127,15 @@
         </button>
       </div>
 
+      <button
+        v-if="fileName"
+        class="pdf-toolbar__button pdf-toolbar__button--clear"
+        type="button"
+        @click="$emit('clear-cache')"
+      >
+        Clear Cache
+      </button>
+
       <input
         ref="fileInput"
         class="pdf-toolbar__file-input"
@@ -147,6 +162,7 @@ const props = defineProps({
   isBlockTargetingActive: { type: Boolean, default: false },
   scannedPageCount: { type: Number, default: 0 },
   isOcrProcessing: { type: Boolean, default: false },
+  restoredTranslationCount: { type: Number, default: 0 },
   viewerMode: { type: String, default: 'bilingual' },
   translationSummary: {
     type: Object,
@@ -159,7 +175,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting', 'request-ocr'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting', 'request-ocr', 'clear-cache'])
 const fileInput = ref(null)
 
 const modeOptions = [
@@ -339,5 +355,22 @@ function handleFileInputChange(event) {
   color: rgba(230, 237, 247, 0.6);
   font-size: 13px;
   font-style: italic;
+}
+
+.pdf-toolbar__button--clear {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgba(254, 202, 202, 0.8);
+  font-size: 13px;
+  padding: 8px 14px;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fecaca;
+  }
+}
+
+.pdf-toolbar__restore-status {
+  color: rgba(34, 197, 94, 0.8);
+  font-weight: 600;
 }
 </style>

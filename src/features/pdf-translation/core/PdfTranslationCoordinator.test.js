@@ -64,7 +64,8 @@ describe('PdfTranslationCoordinator', () => {
 
     session = {
       getVisibleLogicalBlocks: vi.fn(),
-      setBlockTranslationState: vi.fn()
+      setBlockTranslationState: vi.fn(),
+      getBlockTranslationState: vi.fn().mockReturnValue({ status: 'idle' })
     }
   })
 

@@ -12,6 +12,7 @@
       :is-block-targeting-active="isBlockTargetingActive"
       :scanned-page-count="scannedPageCount"
       :is-ocr-processing="isOcrProcessing"
+      :restored-translation-count="restoredTranslationCount"
       :viewer-mode="viewerMode"
       :translation-summary="translationSummary"
       @file-selected="handleFileSelected"
@@ -22,6 +23,7 @@
       @export-markdown="handleExportMarkdown"
       @toggle-block-targeting="toggleBlockTargeting"
       @request-ocr="requestOcr"
+      @clear-cache="handleClearCache"
     />
 
     <main class="pdf-app__content">
@@ -126,12 +128,14 @@ const {
   translationSummary,
   translatedPageData,
   translationTick,
+  restoredTranslationCount,
   workerLabel,
   session,
   loadPdfFile,
   recomputeLayout,
   translateVisiblePages,
   cancelTranslation,
+  clearDocumentCache,
   cleanup
 } = usePdfViewerController()
 
@@ -218,6 +222,10 @@ function handleExportTxt() {
 function handleExportMarkdown() {
   clearExportError()
   exportMarkdown()
+}
+
+function handleClearCache() {
+  void clearDocumentCache()
 }
 
 onBeforeUnmount(() => {

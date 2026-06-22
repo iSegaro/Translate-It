@@ -57,6 +57,6 @@ The following items are deferred to future phases:
 
 ## 9. History and Cache UX
 
-- [ ] 9.1 Add document-level PDF history entries and expose them in the existing history system.
-- [ ] 9.2 Implement persistent PDF cache invalidation and reuse keyed by PDF identity, provider, target language, and translation settings.
-- [ ] 9.3 Add PDF-specific i18n strings and tests for viewer, cache, export, OCR, and history flows.
+- [x] 9.1 Add document-level PDF history entries in an isolated PDF history store.
+- [x] 9.2 Implement persistent PDF cache invalidation and reuse keyed by PDF identity, provider, target language, and translation settings.
+- [x] 9.3 Add focused tests for PDF cache, history, coordinator filtering, and OCR cache persistence.

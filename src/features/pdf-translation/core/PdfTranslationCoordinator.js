@@ -36,13 +36,19 @@ export class PdfTranslationCoordinator {
     this.activeRequestIds.clear()
 
     try {
-      const visibleBlocks = await this.session.getVisibleLogicalBlocks()
+      const allVisibleBlocks = await this.session.getVisibleLogicalBlocks()
+      const visibleBlocks = allVisibleBlocks.filter((block) => {
+        const state = this.session.getBlockTranslationState(block.id)
+        return state.status !== 'translated'
+      })
+
       if (visibleBlocks.length === 0) {
+        const translatedCount = allVisibleBlocks.length
         this.lastSummary = {
-          status: 'idle',
-          translatedCount: 0,
+          status: translatedCount > 0 ? 'translated' : 'idle',
+          translatedCount,
           failedCount: 0,
-          totalCount: 0
+          totalCount: translatedCount
         }
         return this.lastSummary
       }

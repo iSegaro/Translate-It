@@ -5,6 +5,7 @@ import { getSourceLanguageAsync } from '@/shared/config/config.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfOcrDetector } from '@/features/pdf-translation/core/PdfOcrDetector.js'
 import { PdfOcrProcessor } from '@/features/pdf-translation/core/PdfOcrProcessor.js'
+import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfOcr')
 
@@ -55,6 +56,8 @@ export function usePdfOcr({ onOcrComplete } = {}) {
         }
       })
 
+      await saveOcrToCache(pageNumbers)
+
       refreshOcrCandidates()
       onOcrComplete?.()
 
@@ -77,6 +80,23 @@ export function usePdfOcr({ onOcrComplete } = {}) {
 
   function dismissOcrPrompt() {
     isOcrPromptVisible.value = false
+  }
+
+  async function saveOcrToCache(pageNumbers) {
+    const documentIdentity = pdfDocumentSession.documentIdentity
+    if (!documentIdentity) return
+
+    for (const pageNumber of pageNumbers) {
+      const pageSession = pdfDocumentSession.pageSessions.get(pageNumber)
+      if (pageSession && pageSession.ocrBlocks.length > 0) {
+        await pdfCacheManager.saveOcr(documentIdentity, pageNumber, {
+          pageNumber,
+          ocrLanguage: pageSession.ocrLanguage || ocrLanguage.value,
+          ocrBlocks: pageSession.ocrBlocks,
+          ocrCompletedAt: pageSession.ocrCompletedAt || Date.now()
+        })
+      }
+    }
   }
 
   onBeforeUnmount(() => {
