@@ -92,17 +92,27 @@
       </PdfDropzone>
 
       <section
-        v-if="error || exportError || ocrError"
+        v-if="error || exportError || ocrError || selectionTranslationError"
         class="pdf-app__error"
       >
-        {{ error || exportError || ocrError }}
+        {{ error || exportError || ocrError || selectionTranslationError }}
       </section>
     </main>
+
+    <PdfSelectionAction
+      :is-selected="isSelected"
+      :selection-position="selectionPosition"
+      :is-translating="isSelectionTranslating"
+      :translated-text="translatedText"
+      :translation-error="selectionTranslationError"
+      @translate="translateSelection"
+      @dismiss="dismissSelection"
+    />
   </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PdfToolbar from './components/PdfToolbar.vue'
 import PdfDropzone from './components/PdfDropzone.vue'
 import PdfViewer from './components/PdfViewer.vue'
@@ -115,6 +125,8 @@ import { usePdfBilingualMode } from './composables/usePdfBilingualMode.js'
 import { usePdfExport } from './composables/usePdfExport.js'
 import { usePdfBlockSelection } from './composables/usePdfBlockSelection.js'
 import { usePdfOcr } from './composables/usePdfOcr.js'
+import { usePdfSelectionAction } from './composables/usePdfSelectionAction.js'
+import PdfSelectionAction from './components/PdfSelectionAction.vue'
 
 const {
   error,
@@ -228,7 +240,24 @@ function handleClearCache() {
   void clearDocumentCache()
 }
 
+const {
+  isSelected,
+  selectionPosition,
+  isTranslating: isSelectionTranslating,
+  translatedText,
+  translationError: selectionTranslationError,
+  start: startSelectionAction,
+  stop: stopSelectionAction,
+  translateSelection,
+  dismiss: dismissSelection
+} = usePdfSelectionAction()
+
+onMounted(() => {
+  startSelectionAction()
+})
+
 onBeforeUnmount(() => {
+  stopSelectionAction()
   void cleanup()
 })
 </script>

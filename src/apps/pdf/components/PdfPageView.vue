@@ -131,3 +131,24 @@ onBeforeUnmount(() => {
   transform-origin: 0 0;
 }
 </style>
+
+<style lang="scss">
+.pdf-page__text-layer .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  z-index: 0;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+
+.pdf-page__text-layer .textLayer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  -webkit-user-select: text;
+  user-select: text;
+}
+</style>

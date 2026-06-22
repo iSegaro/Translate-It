@@ -330,7 +330,7 @@ export class PdfDocumentSession extends ResourceTracker {
 
   _scheduleCleanup() {
     if (this._pendingCleanup) {
-      this.clearTimeout(this._pendingCleanup)
+      clearTimeout(this._pendingCleanup)
     }
 
     this._pendingCleanup = this.trackTimeout(() => {
