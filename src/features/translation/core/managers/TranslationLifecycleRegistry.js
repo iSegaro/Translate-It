@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { streamingManager } from "../StreamingManager.js";
+import { getTranslationInputPreview } from "../translationInputHelpers.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
 
@@ -29,7 +30,7 @@ export class TranslationLifecycleRegistry {
    */
   registerRequest(messageId, text, context = 'unknown') {
     // Detect duplicates (brief window of 1 second)
-    const requestId = `${messageId}:${text?.substring(0, 50)}`;
+    const requestId = `${messageId}:${getTranslationInputPreview(text)}`;
     if (this.recentRequests.has(requestId)) {
       const existing = this.recentRequests.get(requestId);
       if (Date.now() - existing.time < 1000) {

@@ -8,6 +8,7 @@ import { ProviderFactory } from "@/features/translation/providers/ProviderFactor
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
 import { 
   getSourceLanguageAsync, 
   getTargetLanguageAsync, 
@@ -104,7 +105,7 @@ export class TranslationEngine {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
 
-    if (!text || text.trim().length === 0) {
+    if (isEmptyTranslationInput(text)) {
       throw new Error("Text to translate is required");
     }
 
@@ -188,6 +189,8 @@ export class TranslationEngine {
    * @private
    */
   async _validateTextLength(text, mode, provider) {
+    if (isStructuredBatchInput(text)) return null
+
     const isSelectElementMode = mode === TranslationMode.Select_Element || mode === TranslationMode.PDF;
     const isSelectionMode = mode === TranslationMode.Selection;
     const isPopupMode = mode === TranslationMode.Popup_Translate;

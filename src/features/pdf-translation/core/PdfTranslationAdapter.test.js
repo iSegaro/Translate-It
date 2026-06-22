@@ -97,4 +97,24 @@ describe('PdfTranslationAdapter', () => {
     }))
     expect(request.data.mode).not.toBe('select-element')
   })
+
+  it('sends structured array as data.text, not a string', () => {
+    const adapter = new PdfTranslationAdapter()
+    const items = [
+      { blockId: 'b1', text: 'Hello', sourceTextHash: 'h1' },
+      { blockId: 'b2', text: 'World', sourceTextHash: 'h2' }
+    ]
+
+    const request = adapter.buildTranslationRequest(items, {
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      messageId: 'msg-1',
+      sessionId: 's1'
+    })
+
+    expect(Array.isArray(request.data.text)).toBe(true)
+    expect(request.data.text).toHaveLength(2)
+    expect(typeof request.data.text).not.toBe('string')
+  })
 })
