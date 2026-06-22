@@ -1,13 +1,9 @@
-import { TextLayerBuilder } from 'pdfjs-dist/web/pdf_viewer.mjs'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-
-const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'PdfTextLayerRenderer')
+const CSS_CLASS = 'textLayer'
 
 export class PdfTextLayerRenderer {
   constructor(container) {
     this.container = container
-    this.builder = null
+    this.textDivs = []
   }
 
   async render(page, viewport) {
@@ -15,24 +11,40 @@ export class PdfTextLayerRenderer {
 
     this.clear()
 
-    this.builder = new TextLayerBuilder({
-      pdfPage: page,
-      onAppend: (div) => {
-        this.container.replaceChildren(div)
-      }
-    })
+    const textContent = await page.getTextContent()
+    if (!textContent?.items?.length) return
 
-    try {
-      await this.builder.render({ viewport })
-    } catch (error) {
-      logger.warn('Failed to render PDF text layer:', error)
-      throw error
+    const layerDiv = document.createElement('div')
+    layerDiv.className = CSS_CLASS
+
+    for (const item of textContent.items) {
+      if (!item.str || !item.str.trim()) continue
+
+      const span = document.createElement('span')
+      span.textContent = item.str
+
+      if (item.transform) {
+        const [scaleX, skewX, skewY, scaleY, tx, ty] = item.transform
+        span.style.transform = `matrix(${scaleX}, ${skewY}, ${skewX}, ${scaleY}, ${tx}, ${ty})`
+      }
+
+      if (item.width > 0) {
+        span.style.width = `${item.width}px`
+      }
+
+      if (item.height > 0) {
+        span.style.height = `${item.height}px`
+      }
+
+      layerDiv.appendChild(span)
+      this.textDivs.push(span)
     }
+
+    this.container.appendChild(layerDiv)
   }
 
   clear() {
-    this.builder?.cancel()
-    this.builder = null
+    this.textDivs = []
 
     if (this.container) {
       this.container.replaceChildren()
