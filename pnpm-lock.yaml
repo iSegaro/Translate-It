@@ -89,7 +89,7 @@ importers:
         version: 7.0.0(@babel/core@7.29.0)(rollup@4.60.1)
       '@vitejs/plugin-vue':
         specifier: ^6.0.5
-        version: 6.0.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))(vue@3.5.31)
+        version: 6.0.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))(vue@3.5.31)
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.5(vitest@4.1.5)
@@ -174,15 +174,18 @@ importers:
       stylelint-scss:
         specifier: ^7.0.0
         version: 7.0.0(stylelint@17.6.0)
+      terser:
+        specifier: ^5.48.0
+        version: 5.48.0
       vite:
         specifier: ^8.0.3
-        version: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)
+        version: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)
       vite-plugin-web-extension:
         specifier: ^4.5.0
-        version: 4.5.0(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)
+        version: 4.5.0(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))
+        version: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))
       vue-eslint-parser:
         specifier: ^10.4.0
         version: 10.4.0(eslint@9.39.4)
@@ -1376,6 +1379,9 @@ packages:
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
+
+  '@jridgewell/source-map@0.3.11':
+    resolution: {integrity: sha512-ZMp1V8ZFcPG5dIWnQLr3NSI1MiCU7UETdS/A0G8V/XWHvJv3ZsFqutJn1Y5RPmAPX6F3BiE397OqveU/9NCuIA==}
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
@@ -5012,6 +5018,11 @@ packages:
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
 
+  terser@5.48.0:
+    resolution: {integrity: sha512-J/9An6vs9Us6wKRriSFXBWdRZapREHqFzdNUKk0pmu804EMR6dr6winwo7e5JDxN4xahxQsuysyYFwlwj4XN/Q==}
+    engines: {node: '>=10'}
+    hasBin: true
+
   tesseract.js-core@7.0.0:
     resolution: {integrity: sha512-WnNH518NzmbSq9zgTPeoF8c+xmilS8rFIl1YKbk/ptuuc7p6cLNELNuPAzcmsYw450ca6bLa8j3t0VAtq435Vw==}
 
@@ -6857,6 +6868,11 @@ snapshots:
 
   '@jridgewell/resolve-uri@3.1.2': {}
 
+  '@jridgewell/source-map@0.3.11':
+    dependencies:
+      '@jridgewell/gen-mapping': 0.3.13
+      '@jridgewell/trace-mapping': 0.3.31
+
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
   '@jridgewell/trace-mapping@0.3.31':
@@ -7215,10 +7231,10 @@ snapshots:
     dependencies:
       '@types/node': 25.5.0
 
-  '@vitejs/plugin-vue@6.0.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))(vue@3.5.31)':
+  '@vitejs/plugin-vue@6.0.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))(vue@3.5.31)':
     dependencies:
       '@rolldown/pluginutils': 1.0.0-rc.2
-      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)
+      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)
       vue: 3.5.31
 
   '@vitest/coverage-v8@4.1.5(vitest@4.1.5)':
@@ -7233,7 +7249,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))
+      vitest: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))
 
   '@vitest/expect@4.1.5':
     dependencies:
@@ -7244,13 +7260,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))':
+  '@vitest/mocker@4.1.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))':
     dependencies:
       '@vitest/spy': 4.1.5
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)
+      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)
 
   '@vitest/pretty-format@4.1.5':
     dependencies:
@@ -7279,7 +7295,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))
+      vitest: 4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))
 
   '@vitest/utils@4.1.5':
     dependencies:
@@ -10495,6 +10511,13 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
+  terser@5.48.0:
+    dependencies:
+      '@jridgewell/source-map': 0.3.11
+      acorn: 8.16.0
+      commander: 2.20.3
+      source-map-support: 0.5.21
+
   tesseract.js-core@7.0.0: {}
 
   tesseract.js@7.0.0:
@@ -10643,7 +10666,7 @@ snapshots:
 
   varint@6.0.0: {}
 
-  vite-plugin-web-extension@4.5.0(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0):
+  vite-plugin-web-extension@4.5.0(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0):
     dependencies:
       ajv: 8.18.0
       async-lock: 1.4.1
@@ -10653,7 +10676,7 @@ snapshots:
       lodash.uniq: 4.5.0
       lodash.uniqby: 4.7.0
       md5: 2.3.0
-      vite: 7.3.1(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)
+      vite: 7.3.1(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)
       web-ext-option-types: 8.3.1
       web-ext-run: 0.2.4
       webextension-polyfill: 0.10.0
@@ -10671,7 +10694,7 @@ snapshots:
       - terser
       - tsx
 
-  vite@7.3.1(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3):
+  vite@7.3.1(@types/node@25.5.0)(lightningcss@1.32.0)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3):
     dependencies:
       esbuild: 0.27.4
       fdir: 6.5.0(picomatch@4.0.4)
@@ -10685,9 +10708,10 @@ snapshots:
       lightningcss: 1.32.0
       sass: 1.98.0
       sass-embedded: 1.98.0
+      terser: 5.48.0
       yaml: 2.8.3
 
-  vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3):
+  vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -10700,15 +10724,16 @@ snapshots:
       fsevents: 2.3.3
       sass: 1.98.0
       sass-embedded: 1.98.0
+      terser: 5.48.0
       yaml: 2.8.3
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  vitest@4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)):
+  vitest@4.1.5(@types/node@25.5.0)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.9.0)(jsdom@29.1.0)(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)):
     dependencies:
       '@vitest/expect': 4.1.5
-      '@vitest/mocker': 4.1.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3))
+      '@vitest/mocker': 4.1.5(vite@8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3))
       '@vitest/pretty-format': 4.1.5
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
@@ -10725,7 +10750,7 @@ snapshots:
       tinyexec: 1.0.4
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
-      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(yaml@2.8.3)
+      vite: 8.0.3(@emnapi/core@1.5.0)(@emnapi/runtime@1.5.0)(@types/node@25.5.0)(esbuild@0.27.4)(sass-embedded@1.98.0)(sass@1.98.0)(terser@5.48.0)(yaml@2.8.3)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.5.0
