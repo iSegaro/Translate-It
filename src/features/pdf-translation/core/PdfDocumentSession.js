@@ -289,7 +289,9 @@ export class PdfDocumentSession extends ResourceTracker {
     try {
       await renderTask.promise
       if (textLayerRenderer instanceof PdfTextLayerRenderer) {
-        await textLayerRenderer.render(page, viewport)
+        const cw = Math.floor(viewport.width)
+        const ch = Math.floor(viewport.height)
+        await textLayerRenderer.render(page, viewport, cw, ch)
       }
       return true
     } catch (error) {

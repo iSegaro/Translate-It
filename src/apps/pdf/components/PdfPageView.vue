@@ -44,8 +44,8 @@ const textLayerEl = ref(null)
 let textLayerRenderer = null
 
 const pageStyle = computed(() => ({
-  width: `${props.page.width}px`,
-  minHeight: `${props.page.height}px`
+  width: `${Math.floor(props.page.width)}px`,
+  minHeight: `${Math.floor(props.page.height)}px`
 }))
 
 const textLayerStyle = computed(() => ({
@@ -108,6 +108,7 @@ onBeforeUnmount(() => {
   position: relative;
   border-radius: 16px;
   padding: 16px;
+  box-sizing: content-box;
   background: #f5f7fb;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   color: #11161d;

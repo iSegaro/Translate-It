@@ -21,7 +21,7 @@ export class PdfTextLayerRenderer {
     this.textDivs = []
   }
 
-  async render(page, viewport) {
+  async render(page, viewport, containerWidth, containerHeight) {
     if (!this.container || !page || !viewport) return
 
     this.clear()
@@ -35,18 +35,23 @@ export class PdfTextLayerRenderer {
     const layerDiv = document.createElement('div')
     layerDiv.className = CSS_CLASS
 
+    const totalScale = viewport.scale || 1
     const rawDims = viewport.rawDims || null
-    const pageWidth = rawDims?.pageWidth || (viewport.width / (viewport.scale || 1))
-    const pageHeight = rawDims?.pageHeight || (viewport.height / (viewport.scale || 1))
     const pageX = rawDims?.pageX || 0
     const pageY = rawDims?.pageY || 0
+    const rawPageWidth = rawDims?.pageWidth || (viewport.width / totalScale)
+    const rawPageHeight = rawDims?.pageHeight || (viewport.height / totalScale)
+
+    const refWidth = containerWidth ? containerWidth / totalScale : rawPageWidth
+    const refHeight = containerHeight ? containerHeight / totalScale : rawPageHeight
+
+    const pageHeight = rawPageHeight
 
     const pageTransform = [1, 0, 0, -1, -pageX, pageY + pageHeight]
 
     const styles = textContent.styles || {}
     const textDivs = this.textDivs
 
-    const totalScale = viewport.scale || 1
     const itemMeta = []
 
     for (const item of textContent.items) {
@@ -82,8 +87,8 @@ export class PdfTextLayerRenderer {
       span.dir = item.dir || 'ltr'
 
       const spanStyle = span.style
-      spanStyle.left = `${(100 * (left - pageX) / pageWidth).toFixed(2)}%`
-      spanStyle.top = `${(100 * top / pageHeight).toFixed(2)}%`
+      spanStyle.left = `${(100 * (left - pageX) / refWidth).toFixed(2)}%`
+      spanStyle.top = `${(100 * top / refHeight).toFixed(2)}%`
       spanStyle.setProperty('--font-height', `${fontHeight.toFixed(2)}px`)
       spanStyle.fontFamily = fontFamily
 
