@@ -61,6 +61,8 @@ export class OptimizedJsonHandler {
 
       const self = this;
       let completedBatchCount = 0;
+      const accumulatedResults = [];
+      const skipStreaming = mode === TranslationMode.PDF;
       
       // Preserve the ordered lane when conversation continuity is enabled.
       if (historyEnabled) {
@@ -90,7 +92,8 @@ export class OptimizedJsonHandler {
                 message: lastError.message || String(lastError),
                 type: lastError.type || matchErrorToType(lastError),
                 statusCode: lastError.statusCode
-              } 
+              },
+              results: accumulatedResults
             };
           }
           startIndex = 1;
@@ -166,20 +169,23 @@ export class OptimizedJsonHandler {
 
           const mappedResults = self._mapResults(batch, translatedBatch);
           checkCancellation();
+          accumulatedResults.push(...mappedResults);
           completedBatchCount++;
-          await self._streamResults(
-            tabId,
-            messageId,
-            mappedResults,
-            i,
-            batches.length,
-            targetLanguage,
-            detectedSourceLanguage,
-            mode,
-            completedBatchCount,
-            abortController,
-            engine
-          );
+          if (!skipStreaming) {
+            await self._streamResults(
+              tabId,
+              messageId,
+              mappedResults,
+              i,
+              batches.length,
+              targetLanguage,
+              detectedSourceLanguage,
+              mode,
+              completedBatchCount,
+              abortController,
+              engine
+            );
+          }
           
           const statsAfter = statsManager.getSessionSummary(sessionId);
           if (statsAfter) {
@@ -226,19 +232,21 @@ export class OptimizedJsonHandler {
           
           // Stream empty/original results on failure to keep progress moving
           completedBatchCount++;
-          await self._streamResults(
-            tabId,
-            messageId,
-            batch,
-            i,
-            batches.length,
-            targetLanguage,
-            undefined,
-            mode,
-            completedBatchCount,
-            abortController,
-            engine
-          );
+          if (!skipStreaming) {
+            await self._streamResults(
+              tabId,
+              messageId,
+              batch,
+              i,
+              batches.length,
+              targetLanguage,
+              undefined,
+              mode,
+              completedBatchCount,
+              abortController,
+              engine
+            );
+          }
           
           // Stop all other batches if error is fatal (429, etc.)
           if (isFatalError(batchError)) {
@@ -255,10 +263,12 @@ export class OptimizedJsonHandler {
         return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
       }
 
-      if (hasErrors) {
-        await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode);
-      } else {
-        await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode);
+      if (!skipStreaming) {
+        if (hasErrors) {
+          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode);
+        } else {
+          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode);
+        }
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
@@ -273,6 +283,7 @@ export class OptimizedJsonHandler {
         success: !hasErrors,
         streaming: true,
         error: formattedError,
+        results: accumulatedResults,
         metadata: {
           batchCount: batches.length
         }

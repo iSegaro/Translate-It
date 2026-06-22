@@ -56,7 +56,8 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOr
 
 vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
-    Select_Element: 'select_element'
+    Select_Element: 'select_element',
+    PDF: 'pdf-translation'
   },
   getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(false),
   getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3)
@@ -433,6 +434,45 @@ describe('OptimizedJsonHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockProvider.translate).toHaveBeenCalledTimes(1); // 1 single batch
+    });
+
+    it('should skip tab streaming for PDF mode and return results directly', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockEngine.createIntelligentBatches = vi.fn((segments) => [segments]);
+
+      const pdfData = {
+        text: JSON.stringify([{ t: 'Hello', blockId: 'b1' }, { t: 'World', blockId: 'b2' }]),
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: 'pdf-translation',
+        messageId: 'pdf-msg-1',
+        sessionId: 'pdf-sess-1'
+      };
+
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['سلام', 'دنیا'] });
+
+      const result = await handler.execute(mockEngine, pdfData, mockProvider, 'en', 'fa', 'pdf-msg-1', mockSender);
+
+      expect(result.success).toBe(true);
+      expect(result.results).toBeDefined();
+      expect(result.results).toHaveLength(2);
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should still stream for Select Element mode', async () => {
+      const browser = (await import('webextension-polyfill')).default;
+      browser.tabs.sendMessage.mockClear();
+
+      mockProvider.translate
+        .mockResolvedValueOnce({ translatedText: ['t1'] })
+        .mockResolvedValueOnce({ translatedText: ['t2'] });
+
+      await handler.execute(mockEngine, mockData, mockProvider, 'en', 'fa', 'msg-1', mockSender);
+
+      expect(browser.tabs.sendMessage).toHaveBeenCalled();
     });
   });
 });

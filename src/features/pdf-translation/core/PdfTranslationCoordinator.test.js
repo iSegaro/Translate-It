@@ -191,4 +191,75 @@ describe('PdfTranslationCoordinator', () => {
     const summary = await coordinator.translateVisibleBlocks()
     expect(summary.status).toBe('translated')
   })
+
+  it('applies direct results from OptimizedJsonHandler streaming response', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' },
+      { id: 'block-b', text: 'World', role: 'paragraph', sourceTextHash: 'hash-b' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      streaming: true,
+      error: null,
+      results: [
+        { blockId: 'block-a', t: 'Hola', text: 'Hola', status: 'translated', provider: 'google' },
+        { blockId: 'block-b', t: 'Mundo', text: 'Mundo', status: 'translated', provider: 'google' }
+      ],
+      metadata: { batchCount: 1 }
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'translated',
+      translatedCount: 2,
+      failedCount: 0,
+      totalCount: 2
+    })
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
+      status: 'translated',
+      translatedText: 'Hola'
+    }))
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-b', expect.objectContaining({
+      status: 'translated',
+      translatedText: 'Mundo'
+    }))
+  })
+
+  it('marks blocks with empty translatedText as error, not translated', async () => {
+    const coordinator = new PdfTranslationCoordinator(session)
+    session.getVisibleLogicalBlocks.mockResolvedValue([
+      { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' },
+      { id: 'block-b', text: 'World', role: 'paragraph', sourceTextHash: 'hash-b' }
+    ])
+    sendRegularMessageMock.mockResolvedValue({
+      success: true,
+      streaming: true,
+      error: null,
+      results: [
+        { blockId: 'block-a', t: 'Hola', text: 'Hola', status: 'translated', provider: 'google' },
+        { blockId: 'block-b', t: '', text: '', status: 'translated', provider: 'google' }
+      ],
+      metadata: { batchCount: 1 }
+    })
+
+    const summary = await coordinator.translateVisibleBlocks()
+
+    expect(summary).toEqual({
+      status: 'partial',
+      translatedCount: 1,
+      failedCount: 1,
+      totalCount: 2
+    })
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-a', expect.objectContaining({
+      status: 'translated',
+      translatedText: 'Hola'
+    }))
+    expect(session.setBlockTranslationState).toHaveBeenCalledWith('block-b', expect.objectContaining({
+      status: 'error',
+      translatedText: '',
+      error: 'Empty translation result'
+    }))
+  })
 })

@@ -188,7 +188,7 @@ export class PdfTranslationCoordinator {
     for (const result of batchResults) {
       if (!result?.blockId) continue
 
-      if (result.status === 'error') {
+      if (result.status === 'error' || !result.translatedText) {
         failedCount += 1
         this.session.setBlockTranslationState(result.blockId, {
           translatedText: '',
@@ -204,7 +204,7 @@ export class PdfTranslationCoordinator {
 
       translatedCount += 1
       this.session.setBlockTranslationState(result.blockId, {
-        translatedText: result.translatedText || '',
+        translatedText: result.translatedText,
         status: 'translated',
         provider: result.provider || '',
         sourceLanguage: result.sourceLanguage || '',

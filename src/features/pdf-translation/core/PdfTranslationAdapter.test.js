@@ -117,4 +117,72 @@ describe('PdfTranslationAdapter', () => {
     expect(request.data.text).toHaveLength(2)
     expect(typeof request.data.text).not.toBe('string')
   })
+
+  it('consumes direct results from OptimizedJsonHandler with blockId + t fields', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([
+      { id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' },
+      { id: 'block-b', text: 'World', sourceTextHash: 'hash-b' }
+    ])
+
+    const response = {
+      success: true,
+      streaming: true,
+      results: [
+        { blockId: 'block-a', t: 'Hola', text: 'Hola', status: 'translated', provider: 'google' },
+        { blockId: 'block-b', t: 'Mundo', text: 'Mundo', status: 'translated', provider: 'google' }
+      ],
+      metadata: { batchCount: 1 }
+    }
+
+    const mapped = adapter.mapBatchResponse(batchItems, response, {
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    expect(mapped).toEqual([
+      expect.objectContaining({
+        blockId: 'block-a',
+        translatedText: 'Hola',
+        status: 'translated'
+      }),
+      expect.objectContaining({
+        blockId: 'block-b',
+        translatedText: 'Mundo',
+        status: 'translated'
+      })
+    ])
+  })
+
+  it('marks empty translated text as error in direct results', () => {
+    const adapter = new PdfTranslationAdapter()
+    const batchItems = adapter.toProviderItems([
+      { id: 'block-a', text: 'Hello', sourceTextHash: 'hash-a' }
+    ])
+
+    const response = {
+      success: true,
+      streaming: true,
+      results: [
+        { blockId: 'block-a', t: '', text: '', status: 'translated', provider: 'google' }
+      ],
+      metadata: { batchCount: 1 }
+    }
+
+    const mapped = adapter.mapBatchResponse(batchItems, response, {
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'es'
+    })
+
+    expect(mapped).toEqual([
+      expect.objectContaining({
+        blockId: 'block-a',
+        translatedText: '',
+        status: 'error',
+        error: 'Empty translation result'
+      })
+    ])
+  })
 })

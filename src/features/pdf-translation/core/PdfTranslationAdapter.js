@@ -86,6 +86,13 @@ export class PdfTranslationAdapter {
       }))
     }
 
+    // Direct results from OptimizedJsonHandler (already mapped with blockId + translatedText)
+    if (this._isMappedResults(response.results)) {
+      return this._mergeDirectResults(batchItems, response.results, {
+        provider, sourceLanguage, targetLanguage
+      })
+    }
+
     const translatedPayload = response.translatedText ?? response.results ?? response
     const rawResults = this._normalizeTranslatedPayload(translatedPayload)
 
@@ -123,6 +130,51 @@ export class PdfTranslationAdapter {
       sourceTextHash: entry.sourceTextHash,
       error: entry.error
     }))
+  }
+
+  _isMappedResults(results) {
+    if (!Array.isArray(results) || results.length === 0) return false
+    const first = results[0]
+    return first && typeof first === 'object' && 'blockId' in first
+  }
+
+  _mergeDirectResults(batchItems, mappedResults, {
+    provider,
+    sourceLanguage,
+    targetLanguage
+  } = {}) {
+    const resultByBlockId = new Map()
+    for (const r of mappedResults) {
+      if (r?.blockId) resultByBlockId.set(r.blockId, r)
+    }
+
+    return batchItems.map((item) => {
+      const direct = resultByBlockId.get(item.blockId)
+      if (!direct) {
+        return {
+          blockId: item.blockId,
+          status: 'error',
+          translatedText: '',
+          provider: provider || '',
+          sourceLanguage: sourceLanguage || '',
+          targetLanguage: targetLanguage || '',
+          sourceTextHash: item.sourceTextHash || '',
+          error: 'Missing result for block'
+        }
+      }
+
+      const translatedText = normalizeTranslatedText(direct.t || direct.text || direct.translatedText || '')
+      return {
+        blockId: item.blockId,
+        translatedText,
+        status: translatedText ? 'translated' : 'error',
+        provider: direct.provider || provider || '',
+        sourceLanguage: direct.sourceLanguage || sourceLanguage || '',
+        targetLanguage: direct.targetLanguage || targetLanguage || '',
+        sourceTextHash: item.sourceTextHash || '',
+        error: translatedText ? null : 'Empty translation result'
+      }
+    })
   }
 
   _extractBlockId(translatedItem, originalItem) {
