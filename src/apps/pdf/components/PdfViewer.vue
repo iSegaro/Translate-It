@@ -14,6 +14,8 @@
       :page="page"
       :session="session"
       :visible="visiblePageNumbers.has(page.pageNumber)"
+      :show-overlay="showOverlay"
+      :overlay-blocks="getPageOverlayBlocks(page.pageNumber)"
     />
 
     <PdfBlockHighlightOverlay
@@ -48,6 +50,14 @@ const props = defineProps({
   highlightedBlockId: {
     type: String,
     default: null
+  },
+  showOverlay: {
+    type: Boolean,
+    default: false
+  },
+  overlayPageData: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -61,6 +71,11 @@ let resizeObserver = null
 let lastWidth = 0
 
 usePdfSelectionBridge(viewerRoot)
+
+function getPageOverlayBlocks(pageNumber) {
+  const pageData = props.overlayPageData.find((p) => p.pageNumber === pageNumber)
+  return pageData?.blocks || []
+}
 
 function resolvePageFromPoint(clientX, clientY) {
   if (!viewerRoot.value) return null

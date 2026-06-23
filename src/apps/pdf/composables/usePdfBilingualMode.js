@@ -7,10 +7,11 @@ const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfBilingualMode')
 const VIEWER_MODES = Object.freeze({
   ORIGINAL: 'original',
   BILINGUAL: 'bilingual',
-  TRANSLATED: 'translated'
+  TRANSLATED: 'translated',
+  TRANSLATED_PDF: 'translated-pdf'
 })
 
-const MODE_ORDER = [VIEWER_MODES.ORIGINAL, VIEWER_MODES.BILINGUAL, VIEWER_MODES.TRANSLATED]
+const MODE_ORDER = [VIEWER_MODES.ORIGINAL, VIEWER_MODES.BILINGUAL, VIEWER_MODES.TRANSLATED, VIEWER_MODES.TRANSLATED_PDF]
 
 export function usePdfBilingualMode() {
   const viewerMode = ref(VIEWER_MODES.BILINGUAL)
@@ -18,8 +19,10 @@ export function usePdfBilingualMode() {
   const isOriginalOnly = computed(() => viewerMode.value === VIEWER_MODES.ORIGINAL)
   const isBilingual = computed(() => viewerMode.value === VIEWER_MODES.BILINGUAL)
   const isTranslatedOnly = computed(() => viewerMode.value === VIEWER_MODES.TRANSLATED)
+  const isTranslatedPdf = computed(() => viewerMode.value === VIEWER_MODES.TRANSLATED_PDF)
   const showOriginalPane = computed(() => viewerMode.value !== VIEWER_MODES.TRANSLATED)
-  const showTranslatedPane = computed(() => viewerMode.value !== VIEWER_MODES.ORIGINAL)
+  const showTranslatedPane = computed(() => viewerMode.value !== VIEWER_MODES.ORIGINAL && viewerMode.value !== VIEWER_MODES.TRANSLATED_PDF)
+  const showOverlayLayer = computed(() => viewerMode.value === VIEWER_MODES.TRANSLATED_PDF)
 
   function setMode(mode) {
     if (!MODE_ORDER.includes(mode)) {
@@ -46,8 +49,10 @@ export function usePdfBilingualMode() {
     isOriginalOnly,
     isBilingual,
     isTranslatedOnly,
+    isTranslatedPdf,
     showOriginalPane,
     showTranslatedPane,
+    showOverlayLayer,
     setMode,
     cycleMode,
     reset

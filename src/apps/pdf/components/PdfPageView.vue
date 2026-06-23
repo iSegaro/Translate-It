@@ -14,6 +14,12 @@
         class="pdf-page__text-layer"
         :style="textLayerStyle"
       />
+      <PdfOverlayLayer
+        v-if="showOverlay"
+        :blocks="overlayBlocks"
+        :page-metric="page"
+        :visible="visible"
+      />
     </div>
   </article>
 </template>
@@ -21,6 +27,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { PdfTextLayerRenderer } from '@/features/pdf-translation/core/PdfTextLayerRenderer.js'
+import PdfOverlayLayer from './PdfOverlayLayer.vue'
 import './PdfPageView.scss'
 
 const props = defineProps({
@@ -35,6 +42,14 @@ const props = defineProps({
   visible: {
     type: Boolean,
     default: false
+  },
+  showOverlay: {
+    type: Boolean,
+    default: false
+  },
+  overlayBlocks: {
+    type: Array,
+    default: () => []
   }
 })
 

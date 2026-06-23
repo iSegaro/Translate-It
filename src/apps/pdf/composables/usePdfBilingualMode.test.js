@@ -40,6 +40,8 @@ describe('usePdfBilingualMode', () => {
     cycleMode()
     expect(viewerMode.value).toBe('translated')
     cycleMode()
+    expect(viewerMode.value).toBe('translated-pdf')
+    cycleMode()
     expect(viewerMode.value).toBe('original')
     cycleMode()
     expect(viewerMode.value).toBe('bilingual')
@@ -69,5 +71,29 @@ describe('usePdfBilingualMode', () => {
     setMode('bilingual')
     expect(showOriginalPane.value).toBe(true)
     expect(showTranslatedPane.value).toBe(true)
+
+    setMode('translated-pdf')
+    expect(showOriginalPane.value).toBe(true)
+    expect(showTranslatedPane.value).toBe(false)
+  })
+
+  it('computes isTranslatedPdf and showOverlayLayer', () => {
+    const { setMode, isTranslatedPdf, showOverlayLayer } = usePdfBilingualMode()
+
+    setMode('original')
+    expect(isTranslatedPdf.value).toBe(false)
+    expect(showOverlayLayer.value).toBe(false)
+
+    setMode('bilingual')
+    expect(isTranslatedPdf.value).toBe(false)
+    expect(showOverlayLayer.value).toBe(false)
+
+    setMode('translated')
+    expect(isTranslatedPdf.value).toBe(false)
+    expect(showOverlayLayer.value).toBe(false)
+
+    setMode('translated-pdf')
+    expect(isTranslatedPdf.value).toBe(true)
+    expect(showOverlayLayer.value).toBe(true)
   })
 })

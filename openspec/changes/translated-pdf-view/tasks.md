@@ -1,51 +1,51 @@
 ## 1. Viewer Mode Extension
 
-- [ ] 1.1 Add `TRANSLATED_PDF: 'translated-pdf'` constant to `usePdfBilingualMode.js` VIEWER_MODES and update MODE_ORDER.
-- [ ] 1.2 Add `isTranslatedPdf` computed property and `showOverlayLayer` computed (true only in `translated-pdf` mode) to `usePdfBilingualMode.js`.
-- [ ] 1.3 Add "Translated PDF View" button to `PdfToolbar.vue` modeOptions array.
-- [ ] 1.4 Update `PdfViewerLayout.vue` to handle `translated-pdf` mode class (single pane, no translated slot).
+- [x] 1.1 Add `TRANSLATED_PDF: 'translated-pdf'` constant to `usePdfBilingualMode.js` VIEWER_MODES and update MODE_ORDER.
+- [x] 1.2 Add `isTranslatedPdf` computed property and `showOverlayLayer` computed (true only in `translated-pdf` mode) to `usePdfBilingualMode.js`.
+- [x] 1.3 Add "Translated PDF View" button to `PdfToolbar.vue` modeOptions array.
+- [x] 1.4 Update `PdfViewerLayout.vue` to handle `translated-pdf` mode class (single pane, no translated slot).
 
 ## 2. Overlay Layer Component (Phase 1)
 
-- [ ] 2.1 Create `PdfOverlayLayer.vue` component that renders a positioned container over the page stage, receiving `blocks`, `translationStates`, `pageMetric`, and `visible` props.
-- [ ] 2.2 Create `PdfBlockOverlayItem.vue` component that renders a single translated block overlay with solid background, translated text, and adaptive font sizing.
-- [ ] 2.3 Implement initial adaptive font fitting in `PdfBlockOverlayItem.vue`: measure rendered text, reduce font-size incrementally (proposed: 5% steps, 60% minimum) until text fits or minimum reached.
-- [ ] 2.4 Implement RTL detection and `dir` attribute application in `PdfBlockOverlayItem.vue`.
-- [ ] 2.5 Add unit tests for `PdfBlockOverlayItem.vue` positioning, font shrinking, and RTL behavior.
+- [x] 2.1 Create `PdfOverlayLayer.vue` component that renders a positioned container over the page stage, receiving `blocks`, `translationStates`, `pageMetric`, and `visible` props.
+- [x] 2.2 Create `PdfBlockOverlayItem.vue` component that renders a single translated block overlay with solid background, translated text, and adaptive font sizing.
+- [x] 2.3 Implement initial adaptive font fitting in `PdfBlockOverlayItem.vue`: measure rendered text, reduce font-size incrementally (proposed: 5% steps, 60% minimum) until text fits or minimum reached.
+- [x] 2.4 Implement RTL detection and `dir` attribute application in `PdfBlockOverlayItem.vue`.
+- [x] 2.5 Add unit tests for `PdfBlockOverlayItem.vue` positioning, font shrinking, and RTL behavior.
 
 ## 3. Font Handling (Phase 1)
 
-- [ ] 3.1 Create `pdfFontMap.js` utility with static mapping from common PDF font names to CSS font stacks.
-- [ ] 3.2 Update `PdfBlockOverlayItem.vue` to resolve font-family from the font map with generic fallback (no `textContent.styles` dependency in Phase 1).
-- [ ] 3.3 Add unit tests for font mapping and font-size calculation.
+- [x] 3.1 Create `pdfFontMap.js` utility with static mapping from common PDF font names to CSS font stacks.
+- [x] 3.2 Update `PdfBlockOverlayItem.vue` to resolve font-family from the font map with generic fallback (no `textContent.styles` dependency in Phase 1).
+- [x] 3.3 Add unit tests for font mapping and font-size calculation.
 
 ## 4. Integration (Phase 1)
 
-- [ ] 4.1 Add `PdfOverlayLayer` to `PdfPageView.vue` template, positioned in the stage grid alongside canvas and text layer.
-- [ ] 4.2 Pass `translatedPageData`, `translationStates`, `pageMetric`, and `showOverlay` props from `PdfViewer.vue` through to `PdfPageView.vue`.
-- [ ] 4.3 Wire `usePdfBilingualMode` overlay visibility into `PdfApp.vue` and `PdfViewer.vue`.
-- [ ] 4.4 Ensure `PdfBlockHighlightOverlay` renders above the overlay layer (z-index ordering).
-- [ ] 4.5 Add integration test for overlay rendering in `translated-pdf` mode.
+- [x] 4.1 Add `PdfOverlayLayer` to `PdfPageView.vue` template, positioned in the stage grid alongside canvas and text layer.
+- [x] 4.2 Pass `translatedPageData`, `translationStates`, `pageMetric`, and `showOverlay` props from `PdfViewer.vue` through to `PdfPageView.vue`.
+- [x] 4.3 Wire `usePdfBilingualMode` overlay visibility into `PdfApp.vue` and `PdfViewer.vue`.
+- [x] 4.4 Ensure `PdfBlockHighlightOverlay` renders above the overlay layer (z-index ordering).
+- [x] 4.5 Add integration test for overlay rendering in `translated-pdf` mode.
 
 ## 5. OCR and Edge Cases (Phase 1)
 
-- [ ] 5.1 Verify OCR blocks render correctly in overlay mode (same mechanism as text-content blocks).
-- [ ] 5.2 Handle pages with zero translated blocks (overlay layer renders nothing).
-- [ ] 5.3 Handle pages where all blocks are errors (no overlay rendered, canvas text visible).
-- [ ] 5.4 Test overlay re-rendering on translation state change (loading → translated, loading → error).
+- [x] 5.1 Verify OCR blocks render correctly in overlay mode (same mechanism as text-content blocks).
+- [x] 5.2 Handle pages with zero translated blocks (overlay layer renders nothing).
+- [x] 5.3 Handle pages where all blocks are errors (no overlay rendered, canvas text visible).
+- [x] 5.4 Test overlay re-rendering on translation state change (loading → translated, loading → error).
 
 ## 6. Selection and Interaction (Phase 1)
 
-- [ ] 6.1 Verify native text selection works on overlay DOM elements.
-- [ ] 6.2 Ensure overlay layer does not block pointer events for block targeting (pass-through for non-text areas).
-- [ ] 6.3 Test block targeting highlight renders correctly with overlay layer active.
+- [x] 6.1 Verify native text selection works on overlay DOM elements.
+- [x] 6.2 Ensure overlay layer does not block pointer events for block targeting (pass-through for non-text areas).
+- [x] 6.3 Test block targeting highlight renders correctly with overlay layer active.
 
 ## 7. Performance and Polish (Phase 1)
 
-- [ ] 7.1 Add `will-change: transform` CSS property to overlay elements for compositing optimization.
-- [ ] 7.2 Verify overlay re-rendering on window resize (page scale change).
-- [ ] 7.3 Run ESLint and fix any lint errors.
-- [ ] 7.4 Run full PDF test suite and verify no regressions.
+- [x] 7.1 Add `will-change: transform` CSS property to overlay elements for compositing optimization.
+- [x] 7.2 Verify overlay re-rendering on window resize (page scale change).
+- [x] 7.3 Run ESLint and fix any lint errors.
+- [x] 7.4 Run full PDF test suite and verify no regressions.
 - [ ] 7.5 Manual smoke test: open PDF, switch to overlay mode, translate visible pages, verify text positioning and selection.
 
 ## 8. Font Metadata Propagation (Phase 1.5 — Deferred)

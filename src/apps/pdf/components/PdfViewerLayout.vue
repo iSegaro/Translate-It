@@ -40,7 +40,8 @@ const props = defineProps({
 const layoutClasses = computed(() => ({
   'pdf-viewer-layout--original': props.viewerMode === 'original',
   'pdf-viewer-layout--bilingual': props.viewerMode === 'bilingual',
-  'pdf-viewer-layout--translated': props.viewerMode === 'translated'
+  'pdf-viewer-layout--translated': props.viewerMode === 'translated',
+  'pdf-viewer-layout--translated-pdf': props.viewerMode === 'translated-pdf'
 }))
 </script>
 
@@ -52,7 +53,8 @@ const layoutClasses = computed(() => ({
   min-height: 0;
 
   &--original,
-  &--translated {
+  &--translated,
+  &--translated-pdf {
     grid-template-columns: 1fr;
   }
 

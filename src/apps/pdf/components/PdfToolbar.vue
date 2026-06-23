@@ -181,7 +181,8 @@ const fileInput = ref(null)
 const modeOptions = [
   { value: 'original', label: 'Original' },
   { value: 'bilingual', label: 'Bilingual' },
-  { value: 'translated', label: 'Translated' }
+  { value: 'translated', label: 'Translated' },
+  { value: 'translated-pdf', label: 'Translated PDF View' }
 ]
 
 const translationStatusLabel = computed(() => {

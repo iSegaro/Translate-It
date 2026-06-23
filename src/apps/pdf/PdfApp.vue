@@ -72,6 +72,8 @@
                 :session="session"
                 :is-block-targeting-active="isBlockTargetingActive"
                 :highlighted-block-id="highlightedBlockId"
+                :show-overlay="showOverlayLayer"
+                :overlay-page-data="translatedPageData"
                 @layout-change="handleLayoutChange"
                 @block-pointer-move="handleBlockPointerMove"
                 @block-click="handleBlockClick"
@@ -155,6 +157,7 @@ const {
   viewerMode,
   showOriginalPane,
   showTranslatedPane,
+  showOverlayLayer,
   setMode
 } = usePdfBilingualMode()
 
