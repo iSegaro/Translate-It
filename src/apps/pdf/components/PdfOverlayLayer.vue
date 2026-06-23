@@ -8,6 +8,7 @@
       :key="block.id"
       :block="block"
       :page-metric="pageMetric"
+      :canvas="canvas"
     />
   </div>
 </template>
@@ -28,6 +29,10 @@ const props = defineProps({
   visible: {
     type: Boolean,
     default: false
+  },
+  canvas: {
+    type: Object,
+    default: null
   }
 })
 

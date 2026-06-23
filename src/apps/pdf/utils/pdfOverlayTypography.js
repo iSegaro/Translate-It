@@ -32,11 +32,11 @@ export function detectTextDirection(text) {
   return rtlCount > ltrCount ? 'rtl' : 'ltr'
 }
 
-export function buildOverlayBaseStyle() {
+export function buildOverlayBaseStyle(backgroundColor) {
   return {
     overflow: 'hidden',
     boxSizing: 'border-box',
-    background: OVERLAY_BACKGROUND,
+    background: backgroundColor || OVERLAY_BACKGROUND,
     pointerEvents: 'auto',
     userSelect: 'text',
     willChange: 'transform'

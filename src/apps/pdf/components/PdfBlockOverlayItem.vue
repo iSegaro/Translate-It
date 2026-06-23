@@ -18,6 +18,7 @@
         :font-family="block.roleMetadata?.fontFamily"
         :ascent="block.roleMetadata?.ascent"
         :descent="block.roleMetadata?.descent"
+        :background-color="backgroundColor"
       />
     </template>
   </div>
@@ -36,6 +37,7 @@
       :font-family="block.roleMetadata?.fontFamily"
       :ascent="block.roleMetadata?.ascent"
       :descent="block.roleMetadata?.descent"
+      :background-color="backgroundColor"
     />
   </div>
   <div
@@ -52,13 +54,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle } from '../utils/pdfOverlayTypography.js'
+import { computed, onBeforeUnmount } from 'vue'
+import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
+import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
-
-const OVERLAY_BASE_STYLE = buildOverlayBaseStyle()
 
 const props = defineProps({
   block: {
@@ -68,10 +69,27 @@ const props = defineProps({
   pageMetric: {
     type: Object,
     default: null
+  },
+  canvas: {
+    type: Object,
+    default: null
   }
 })
 
 const scale = computed(() => props.pageMetric?.scale || 1)
+
+const backgroundColor = computed(() => {
+  if (!props.canvas || !props.block.boundingBox) return OVERLAY_BACKGROUND
+
+  return sampleCanvasBackgroundColor(
+    props.canvas,
+    props.block.boundingBox,
+    scale.value,
+    props.block.id
+  )
+})
+
+const overlayBaseStyle = computed(() => buildOverlayBaseStyle(backgroundColor.value))
 
 const translatedText = computed(() => {
   return props.block.translationState?.translatedText || ''
@@ -193,6 +211,10 @@ const { textRef, resolvedFontSize } = usePdfTextFitter({
   watchDeps: [translatedText]
 })
 
+onBeforeUnmount(() => {
+  clearColorCache(props.block.id)
+})
+
 const overlayStyle = computed(() => {
   const bbox = props.block.boundingBox
   if (!bbox) return {}
@@ -206,7 +228,7 @@ const overlayStyle = computed(() => {
     fontSize: `${resolvedFontSize.value}px`,
     fontFamily: fontFamily.value,
     lineHeight: `${computedLineHeight.value}`,
-    ...OVERLAY_BASE_STYLE
+    ...overlayBaseStyle.value
   }
 })
 </script>

@@ -13,10 +13,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import { resolveFontFamily, computeLineHeight, detectTextDirection, buildOverlayBaseStyle, buildOverlayPositionStyle } from '../utils/pdfOverlayTypography.js'
+import { resolveFontFamily, computeLineHeight, detectTextDirection, buildOverlayBaseStyle, buildOverlayPositionStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
-
-const BASE_STYLE = buildOverlayBaseStyle()
 
 const props = defineProps({
   cellText: {
@@ -46,6 +44,10 @@ const props = defineProps({
   descent: {
     type: Number,
     default: null
+  },
+  backgroundColor: {
+    type: String,
+    default: OVERLAY_BACKGROUND
   }
 })
 
@@ -66,7 +68,7 @@ const textDirection = computed(() => detectTextDirection(props.cellText))
 
 const cellStyle = computed(() => ({
   ...buildOverlayPositionStyle(props.item, props.scale),
-  ...BASE_STYLE,
+  ...buildOverlayBaseStyle(props.backgroundColor),
   fontSize: `${resolvedFontSize.value}px`,
   fontFamily: resolveFontFamily(props.fontFamily),
   lineHeight: `${computeLineHeight(props.ascent, props.descent)}`

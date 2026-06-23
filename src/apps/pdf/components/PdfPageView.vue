@@ -19,6 +19,7 @@
         :blocks="overlayBlocks"
         :page-metric="page"
         :visible="visible"
+        :canvas="canvasEl"
       />
     </div>
   </article>
