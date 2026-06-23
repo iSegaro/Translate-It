@@ -1,5 +1,23 @@
 <template>
   <div
+    v-if="useLineOverlay"
+    class="pdf-block-overlay-item"
+    :style="blockContainerStyle"
+  >
+    <PdfLineOverlayItem
+      v-for="(line, index) in lineOverlayData"
+      :key="`line-${index}`"
+      :line-text="line.text"
+      :bounding-box="line.boundingBox"
+      :scale="scale"
+      :font-size="blockFontSize"
+      :font-family="block.roleMetadata?.fontFamily"
+      :ascent="block.roleMetadata?.ascent"
+      :descent="block.roleMetadata?.descent"
+    />
+  </div>
+  <div
+    v-else
     class="pdf-block-overlay-item"
     :style="overlayStyle"
     :dir="textDirection"
@@ -14,6 +32,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { resolvePdfFontFamily } from '../utils/pdfFontMap.js'
+import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
 const MIN_FONT_SCALE = 0.6
 const FIT_DECREMENT = 0.05
@@ -64,6 +83,53 @@ const descent = computed(() => {
 
 const computedLineHeight = computed(() => {
   return ascent.value + descent.value
+})
+
+const sourceLineCount = computed(() => {
+  return props.block.lines?.length || 0
+})
+
+const translatedLines = computed(() => {
+  const text = translatedText.value
+  if (!text) return []
+  return text.split('\n')
+})
+
+const useLineOverlay = computed(() => {
+  if (sourceLineCount.value <= 1) return false
+  if (translatedLines.value.length !== sourceLineCount.value) return false
+  return sourceLineCount.value > 1
+})
+
+const lineOverlayData = computed(() => {
+  if (!useLineOverlay.value) return []
+
+  const blockBbox = props.block.boundingBox
+  return props.block.lines.map((line, index) => {
+    const lineBbox = line.boundingBox || blockBbox
+    return {
+      text: translatedLines.value[index] || '',
+      boundingBox: {
+        x: lineBbox.x - blockBbox.x,
+        y: lineBbox.y - blockBbox.y,
+        width: lineBbox.width,
+        height: lineBbox.height
+      }
+    }
+  })
+})
+
+const blockContainerStyle = computed(() => {
+  const bbox = props.block.boundingBox
+  if (!bbox) return {}
+
+  return {
+    position: 'absolute',
+    left: `${bbox.x * scale.value}px`,
+    top: `${bbox.y * scale.value}px`,
+    width: `${bbox.width * scale.value}px`,
+    height: `${bbox.height * scale.value}px`
+  }
 })
 
 const textDirection = computed(() => {
