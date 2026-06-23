@@ -1,6 +1,28 @@
 <template>
   <div
-    v-if="useLineOverlay"
+    v-if="useCellOverlay"
+    class="pdf-block-overlay-item"
+    :style="blockContainerStyle"
+  >
+    <template
+      v-for="(lineData, lineIdx) in cellOverlayData"
+      :key="`cell-line-${lineIdx}`"
+    >
+      <PdfCellOverlayItem
+        v-for="(cell, cellIdx) in lineData.cells"
+        :key="`cell-${lineIdx}-${cellIdx}`"
+        :cell-text="cell.text"
+        :item="cell.item"
+        :scale="scale"
+        :font-size="blockFontSize"
+        :font-family="block.roleMetadata?.fontFamily"
+        :ascent="block.roleMetadata?.ascent"
+        :descent="block.roleMetadata?.descent"
+      />
+    </template>
+  </div>
+  <div
+    v-else-if="useLineOverlay"
     class="pdf-block-overlay-item"
     :style="blockContainerStyle"
   >
@@ -32,6 +54,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { resolvePdfFontFamily } from '../utils/pdfFontMap.js'
+import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
 const MIN_FONT_SCALE = 0.6
@@ -57,6 +80,10 @@ const scale = computed(() => props.pageMetric?.scale || 1)
 
 const translatedText = computed(() => {
   return props.block.translationState?.translatedText || ''
+})
+
+const translatedCells = computed(() => {
+  return props.block.translationState?.translatedCells || null
 })
 
 const blockFontSize = computed(() => {
@@ -100,6 +127,41 @@ const useLineOverlay = computed(() => {
   if (!props.block.roleMetadata?.isStructured) return false
   if (translatedLines.value.length !== sourceLineCount.value) return false
   return sourceLineCount.value > 1
+})
+
+const useCellOverlay = computed(() => {
+  if (!useLineOverlay.value) return false
+  if (!translatedCells.value) return false
+  return translatedCells.value.some((lc) => lc.cells && lc.cells.length > 1)
+})
+
+const cellOverlayData = computed(() => {
+  if (!useCellOverlay.value) return []
+
+  const blockBbox = props.block.boundingBox
+  const cells = translatedCells.value || []
+
+  return cells.map((lc) => {
+    const line = props.block.lines?.[lc.lineIndex]
+    if (!line) return null
+
+    const lineItems = line.items || []
+    return {
+      cells: lc.cells.map((cellText, cellIdx) => {
+        const item = lineItems[cellIdx]
+        if (!item) return null
+        return {
+          text: cellText,
+          item: {
+            x: item.x - blockBbox.x,
+            y: item.y - blockBbox.y,
+            width: item.width,
+            height: item.height
+          }
+        }
+      }).filter(Boolean)
+    }
+  }).filter(Boolean)
 })
 
 const lineOverlayData = computed(() => {
@@ -163,9 +225,6 @@ const overlayStyle = computed(() => {
     boxSizing: 'border-box',
     background: OVERLAY_BACKGROUND,
     pointerEvents: 'auto',
-    // TODO: When isBlockTargetingActive is propagated to overlay items,
-    // set pointerEvents to 'none' during targeting to prevent selection
-    // from interfering with block hover/click detection.
     userSelect: 'text',
     willChange: 'transform'
   }

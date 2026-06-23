@@ -205,6 +205,7 @@ export class PdfTranslationCoordinator {
       translatedCount += 1
       this.session.setBlockTranslationState(result.blockId, {
         translatedText: result.translatedText,
+        translatedCells: result.translatedCells || null,
         status: 'translated',
         provider: result.provider || '',
         sourceLanguage: result.sourceLanguage || '',

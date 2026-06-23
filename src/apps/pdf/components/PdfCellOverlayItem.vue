@@ -1,10 +1,10 @@
 <template>
   <div
-    class="pdf-line-overlay-item"
-    :style="lineStyle"
+    class="pdf-cell-overlay-item"
+    :style="cellStyle"
     :dir="textDirection"
   >
-    <span class="pdf-line-overlay-item__text">{{ lineText }}</span>
+    <span class="pdf-cell-overlay-item__text">{{ cellText }}</span>
   </div>
 </template>
 
@@ -15,11 +15,11 @@ import { resolveFontFamily, computeLineHeight, detectTextDirection, buildOverlay
 const BASE_STYLE = buildOverlayBaseStyle()
 
 const props = defineProps({
-  lineText: {
+  cellText: {
     type: String,
     required: true
   },
-  boundingBox: {
+  item: {
     type: Object,
     required: true
   },
@@ -45,10 +45,10 @@ const props = defineProps({
   }
 })
 
-const textDirection = computed(() => detectTextDirection(props.lineText))
+const textDirection = computed(() => detectTextDirection(props.cellText))
 
-const lineStyle = computed(() => ({
-  ...buildOverlayPositionStyle(props.boundingBox, props.scale),
+const cellStyle = computed(() => ({
+  ...buildOverlayPositionStyle(props.item, props.scale),
   ...BASE_STYLE,
   fontSize: `${props.fontSize * props.scale}px`,
   fontFamily: resolveFontFamily(props.fontFamily),
@@ -57,7 +57,7 @@ const lineStyle = computed(() => ({
 </script>
 
 <style scoped>
-.pdf-line-overlay-item__text {
+.pdf-cell-overlay-item__text {
   display: block;
   white-space: pre-wrap;
   word-break: break-word;
