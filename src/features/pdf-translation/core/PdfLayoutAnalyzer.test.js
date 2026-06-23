@@ -317,15 +317,71 @@ describe('PdfLayoutAnalyzer', () => {
       expect(blocks[0].roleMetadata.isStructured).toBe(true)
     })
 
-    it('does NOT detect schedule-like when rows are single TextItems (known limitation)', async () => {
+    it('detects schedule-like for single-TextItem rows with 3+ whitespace-separated groups', async () => {
+      const rawItems = [
+        { str: 'Mon 30 Mar  6.00-8.15pm  Classes', transform: [1, 0, 0, 10, 40, 660], width: 300, height: 10 },
+        { str: 'Wed 1 Apr   6.00-8.15pm  Classes', transform: [1, 0, 0, 10, 40, 640], width: 300, height: 10 }
+      ]
+      const lines = buildPdfTextLinesFromItems(rawItems, { width: 500, height: 700 })
+
+      expect(lines).toHaveLength(2)
+      expect(lines[0].items.length).toBe(3)
+      expect(lines[1].items.length).toBe(3)
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('does NOT detect schedule-like when rows are single TextItems without whitespace groups', async () => {
       const lines = [
-        { text: 'Mon 30 Mar  6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
-        { text: 'Wed 1 Apr   6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+        { text: 'Simple paragraph text here', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Another simple paragraph line', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
       ]
 
       const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
       expect(blocks).toHaveLength(1)
       expect(blocks[0].roleMetadata.isStructured).toBe(false)
+    })
+
+    it('does NOT detect schedule-like for single-TextItem with only 2 text groups', async () => {
+      const lines = [
+        { text: 'Column A  Column B', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Value 1   Value 2', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(false)
+    })
+
+    it('creates virtual items from whitespace in single-TextItem lines', async () => {
+      const lines = buildPdfTextLinesFromItems([
+        { str: 'Mon 30 Mar  6.00-8.15pm  Classes', transform: [1, 0, 0, 10, 40, 650], width: 300, height: 10 }
+      ], { width: 500, height: 700 })
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0].items.length).toBe(3)
+      expect(lines[0].items.every((item) => item.virtualFromWhitespace)).toBe(true)
+      expect(lines[0].items[0].text).toBe('Mon 30 Mar')
+      expect(lines[0].items[1].text).toBe('6.00-8.15pm')
+      expect(lines[0].items[2].text).toBe('Classes')
+    })
+
+    it('virtual items preserve font metadata from original item', async () => {
+      const styles = {
+        'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25 }
+      }
+
+      const lines = buildPdfTextLinesFromItems([
+        { str: 'Col A  Col B  Col C', transform: [1, 0, 0, 12, 40, 650], width: 300, height: 12, fontName: 'F1' }
+      ], { width: 500, height: 700 }, styles)
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0].items.length).toBe(3)
+      expect(lines[0].items[0].fontFamily).toBe('Times-Roman')
+      expect(lines[0].items[0].ascent).toBe(0.75)
+      expect(lines[0].items[0].descent).toBe(-0.25)
     })
   })
 })

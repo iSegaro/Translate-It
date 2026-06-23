@@ -1,5 +1,8 @@
 import { normalizePdfBoundingBox, normalizePdfText } from './PdfBlockIdentity.js'
 
+const VIRTUAL_WHITESPACE_PATTERN = /\s{2,}/
+const MIN_VIRTUAL_TEXT_GROUPS = 3
+
 function getNumeric(value, fallback = 0) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : fallback
@@ -105,6 +108,52 @@ function inferLineDirection(items) {
   return rtlCount > items.length / 2 ? 'rtl' : 'ltr'
 }
 
+function buildVirtualItemsFromWhitespace(item) {
+  const rawStr = item.raw?.str
+  if (!rawStr || !VIRTUAL_WHITESPACE_PATTERN.test(rawStr)) return null
+
+  const groups = rawStr.split(VIRTUAL_WHITESPACE_PATTERN)
+  const textGroups = groups.filter((g) => g.trim().length > 0)
+
+  if (textGroups.length < MIN_VIRTUAL_TEXT_GROUPS) return null
+
+  const bboxWidth = getNumeric(item.width, 0)
+  if (bboxWidth <= 0) return null
+
+  const totalChars = rawStr.length
+  if (totalChars <= 0) return null
+
+  const charWidth = bboxWidth / totalChars
+  let charOffset = 0
+
+  return textGroups.map((rawGroup, i) => {
+    const groupStart = rawStr.indexOf(rawGroup, charOffset)
+    charOffset = groupStart >= 0 ? groupStart + rawGroup.length : charOffset + rawGroup.length
+    const startOffset = groupStart >= 0 ? groupStart : 0
+    const text = normalizePdfText(rawGroup)
+    const width = text.length * charWidth
+    const x = item.x + startOffset * charWidth
+
+    return {
+      index: i,
+      raw: item.raw,
+      text,
+      x,
+      y: item.y,
+      right: x + width,
+      bottom: item.bottom,
+      width,
+      height: item.height,
+      fontSize: item.fontSize,
+      fontFamily: item.fontFamily,
+      ascent: item.ascent,
+      descent: item.descent,
+      vertical: item.vertical,
+      virtualFromWhitespace: true
+    }
+  })
+}
+
 function buildLineFromBucket(bucket, pageSize, styles = null) {
   const pageHeight = getNumeric(pageSize?.height, 0)
   const items = bucket
@@ -134,24 +183,32 @@ function buildLineFromBucket(bucket, pageSize, styles = null) {
   const boundingBox = buildLineBoundingBox(items)
   const fontSize = median(items.map((item) => item.fontSize)) || items[0].fontSize || 12
 
-  const dominantFontFamily = mostFrequentValue(items.map((item) => item.fontFamily).filter(Boolean))
-  const medianAscent = medianValue(items.map((item) => item.ascent).filter((v) => v != null))
-  const medianDescent = medianValue(items.map((item) => item.descent).filter((v) => v != null))
-  const hasVertical = items.some((item) => item.vertical)
+  let detectionItems = items
+  if (items.length === 1) {
+    const virtualItems = buildVirtualItemsFromWhitespace(items[0])
+    if (virtualItems) {
+      detectionItems = virtualItems
+    }
+  }
+
+  const dominantFontFamily = mostFrequentValue(detectionItems.map((item) => item.fontFamily).filter(Boolean))
+  const medianAscent = medianValue(detectionItems.map((item) => item.ascent).filter((v) => v != null))
+  const medianDescent = medianValue(detectionItems.map((item) => item.descent).filter((v) => v != null))
+  const hasVertical = detectionItems.some((item) => item.vertical)
 
   return {
     text,
     direction,
-    items,
+    items: detectionItems,
     boundingBox,
     normalizedBoundingBox: normalizePdfBoundingBox(boundingBox, pageSize),
     fontSize,
-    averageItemCount: items.length,
+    averageItemCount: detectionItems.length,
     role: 'paragraph',
     roleMetadata: {
       direction,
       fontSize,
-      itemCount: items.length,
+      itemCount: detectionItems.length,
       ...(dominantFontFamily ? { fontFamily: dominantFontFamily } : {}),
       ...(medianAscent != null ? { ascent: medianAscent } : {}),
       ...(medianDescent != null ? { descent: medianDescent } : {}),
