@@ -52,14 +52,13 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle } from '../utils/pdfOverlayTypography.js'
+import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
 const OVERLAY_BASE_STYLE = buildOverlayBaseStyle()
-const MIN_FONT_SCALE = 0.6
-const FIT_DECREMENT = 0.05
 
 const props = defineProps({
   block: {
@@ -71,9 +70,6 @@ const props = defineProps({
     default: null
   }
 })
-
-const textRef = ref(null)
-const currentFontScale = ref(1)
 
 const scale = computed(() => props.pageMetric?.scale || 1)
 
@@ -87,10 +83,6 @@ const translatedCells = computed(() => {
 
 const blockFontSize = computed(() => {
   return props.block.roleMetadata?.fontSize || 12
-})
-
-const scaledFontSize = computed(() => {
-  return blockFontSize.value * scale.value * currentFontScale.value
 })
 
 const fontFamily = computed(() => {
@@ -190,6 +182,17 @@ const blockContainerStyle = computed(() => {
 
 const textDirection = computed(() => detectTextDirection(translatedText.value))
 
+const bboxWidth = computed(() => props.block.boundingBox?.width || 0)
+const bboxHeight = computed(() => props.block.boundingBox?.height || 0)
+
+const { textRef, resolvedFontSize } = usePdfTextFitter({
+  width: bboxWidth,
+  height: bboxHeight,
+  scale,
+  fontSize: blockFontSize,
+  watchDeps: [translatedText]
+})
+
 const overlayStyle = computed(() => {
   const bbox = props.block.boundingBox
   if (!bbox) return {}
@@ -200,67 +203,12 @@ const overlayStyle = computed(() => {
     top: `${bbox.y * scale.value}px`,
     width: `${bbox.width * scale.value}px`,
     height: `${bbox.height * scale.value}px`,
-    fontSize: `${scaledFontSize.value}px`,
+    fontSize: `${resolvedFontSize.value}px`,
     fontFamily: fontFamily.value,
     lineHeight: `${computedLineHeight.value}`,
     ...OVERLAY_BASE_STYLE
   }
 })
-
-async function fitTextToBox() {
-  await nextTick()
-  if (!textRef.value) return
-
-  const bbox = props.block.boundingBox
-  if (!bbox) return
-
-  const containerWidth = bbox.width * scale.value
-  const containerHeight = bbox.height * scale.value
-
-  if (containerWidth <= 0 || containerHeight <= 0) return
-
-  const el = textRef.value
-  const measured = el.getBoundingClientRect()
-  if (measured.width <= 0 || measured.height <= 0) return
-
-  if (measured.width <= containerWidth && measured.height <= containerHeight) {
-    return
-  }
-
-  let fontScale = 1
-  while (fontScale > MIN_FONT_SCALE) {
-    fontScale -= FIT_DECREMENT
-    currentFontScale.value = fontScale
-    await nextTick()
-
-    const newMeasured = el.getBoundingClientRect()
-    if (newMeasured.width <= containerWidth && newMeasured.height <= containerHeight) {
-      return
-    }
-  }
-
-  currentFontScale.value = MIN_FONT_SCALE
-}
-
-onMounted(() => {
-  fitTextToBox()
-})
-
-watch(
-  () => [
-    translatedText.value,
-    scale.value,
-    props.block.boundingBox?.x,
-    props.block.boundingBox?.y,
-    props.block.boundingBox?.width,
-    props.block.boundingBox?.height,
-    blockFontSize.value
-  ],
-  () => {
-    currentFontScale.value = 1
-    fitTextToBox()
-  }
-)
 </script>
 
 <style scoped>

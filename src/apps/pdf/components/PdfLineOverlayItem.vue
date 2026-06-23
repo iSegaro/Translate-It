@@ -12,12 +12,11 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { resolveFontFamily, computeLineHeight, detectTextDirection, buildOverlayBaseStyle, buildOverlayPositionStyle } from '../utils/pdfOverlayTypography.js'
+import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 
 const BASE_STYLE = buildOverlayBaseStyle()
-const MIN_FONT_SCALE = 0.6
-const FIT_DECREMENT = 0.05
 
 const props = defineProps({
   lineText: {
@@ -50,12 +49,20 @@ const props = defineProps({
   }
 })
 
-const textRef = ref(null)
-const currentFontScale = ref(1)
+const scaleRef = computed(() => props.scale)
+const fontSizeRef = computed(() => props.fontSize)
+const widthRef = computed(() => props.boundingBox?.width || 0)
+const heightRef = computed(() => props.boundingBox?.height || 0)
+
+const { textRef, resolvedFontSize } = usePdfTextFitter({
+  width: widthRef,
+  height: heightRef,
+  scale: scaleRef,
+  fontSize: fontSizeRef,
+  watchDeps: [() => props.lineText]
+})
 
 const textDirection = computed(() => detectTextDirection(props.lineText))
-
-const resolvedFontSize = computed(() => props.fontSize * props.scale * currentFontScale.value)
 
 const lineStyle = computed(() => ({
   ...buildOverlayPositionStyle(props.boundingBox, props.scale),
@@ -64,53 +71,6 @@ const lineStyle = computed(() => ({
   fontFamily: resolveFontFamily(props.fontFamily),
   lineHeight: `${computeLineHeight(props.ascent, props.descent)}`
 }))
-
-async function fitTextToBox() {
-  await nextTick()
-  if (!textRef.value) return
-
-  const bbox = props.boundingBox
-  if (!bbox) return
-
-  const containerWidth = bbox.width * props.scale
-  const containerHeight = bbox.height * props.scale
-
-  if (containerWidth <= 0 || containerHeight <= 0) return
-
-  const el = textRef.value
-  const measured = el.getBoundingClientRect()
-  if (measured.width <= 0 || measured.height <= 0) return
-
-  if (measured.width <= containerWidth && measured.height <= containerHeight) {
-    return
-  }
-
-  let fontScale = 1
-  while (fontScale > MIN_FONT_SCALE) {
-    fontScale -= FIT_DECREMENT
-    currentFontScale.value = fontScale
-    await nextTick()
-
-    const newMeasured = el.getBoundingClientRect()
-    if (newMeasured.width <= containerWidth && newMeasured.height <= containerHeight) {
-      return
-    }
-  }
-
-  currentFontScale.value = MIN_FONT_SCALE
-}
-
-onMounted(() => {
-  fitTextToBox()
-})
-
-watch(
-  () => [props.lineText, props.scale, props.fontSize, props.boundingBox?.width, props.boundingBox?.height],
-  () => {
-    currentFontScale.value = 1
-    fitTextToBox()
-  }
-)
 </script>
 
 <style scoped>
