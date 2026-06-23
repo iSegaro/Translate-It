@@ -39,6 +39,30 @@ function median(values) {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
+function medianValue(values) {
+  if (!values.length) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+function mostFrequentValue(values) {
+  if (!values.length) return null
+  const counts = new Map()
+  for (const v of values) {
+    counts.set(v, (counts.get(v) || 0) + 1)
+  }
+  let best = null
+  let bestCount = 0
+  for (const [value, count] of counts) {
+    if (count > bestCount) {
+      best = value
+      bestCount = count
+    }
+  }
+  return best
+}
+
 function buildLineText(items, rtl = false) {
   const orderedItems = rtl ? [...items].sort((a, b) => b.x - a.x || a.index - b.index) : [...items].sort((a, b) => a.x - b.x || a.index - b.index)
   let text = ''
@@ -81,17 +105,24 @@ function inferLineDirection(items) {
   return rtlCount > items.length / 2 ? 'rtl' : 'ltr'
 }
 
-function buildLineFromBucket(bucket, pageSize) {
+function buildLineFromBucket(bucket, pageSize, styles = null) {
   const pageHeight = getNumeric(pageSize?.height, 0)
   const items = bucket
     .map((item, index) => {
       const geometry = getItemGeometry(item, pageHeight)
+      const fontName = item?.fontName || item?.raw?.fontName || null
+      const fontStyle = fontName && styles ? styles[fontName] : null
+
       return {
         index,
         raw: item,
         text: normalizePdfText(item?.str),
         ...geometry,
-        fontSize: getItemFontSize(item)
+        fontSize: getItemFontSize(item),
+        fontFamily: fontStyle?.fontFamily || null,
+        ascent: fontStyle?.ascent != null ? getNumeric(fontStyle.ascent) : null,
+        descent: fontStyle?.descent != null ? getNumeric(fontStyle.descent) : null,
+        vertical: fontStyle?.vertical === true
       }
     })
     .filter((item) => item.text.length > 0)
@@ -102,6 +133,11 @@ function buildLineFromBucket(bucket, pageSize) {
   const text = buildLineText(items, direction === 'rtl')
   const boundingBox = buildLineBoundingBox(items)
   const fontSize = median(items.map((item) => item.fontSize)) || items[0].fontSize || 12
+
+  const dominantFontFamily = mostFrequentValue(items.map((item) => item.fontFamily).filter(Boolean))
+  const medianAscent = medianValue(items.map((item) => item.ascent).filter((v) => v != null))
+  const medianDescent = medianValue(items.map((item) => item.descent).filter((v) => v != null))
+  const hasVertical = items.some((item) => item.vertical)
 
   return {
     text,
@@ -115,12 +151,16 @@ function buildLineFromBucket(bucket, pageSize) {
     roleMetadata: {
       direction,
       fontSize,
-      itemCount: items.length
+      itemCount: items.length,
+      ...(dominantFontFamily ? { fontFamily: dominantFontFamily } : {}),
+      ...(medianAscent != null ? { ascent: medianAscent } : {}),
+      ...(medianDescent != null ? { descent: medianDescent } : {}),
+      ...(hasVertical ? { vertical: true } : {})
     }
   }
 }
 
-export function buildPdfTextLinesFromItems(textItems = [], pageSize = null) {
+export function buildPdfTextLinesFromItems(textItems = [], pageSize = null, styles = null) {
   const filteredItems = textItems.filter((item) => normalizePdfText(item?.str).length > 0)
   if (!filteredItems.length) return []
 
@@ -139,7 +179,7 @@ export function buildPdfTextLinesFromItems(textItems = [], pageSize = null) {
   })
 
   return [...buckets.values()]
-    .map((bucket) => buildLineFromBucket(bucket, pageSize))
+    .map((bucket) => buildLineFromBucket(bucket, pageSize, styles))
     .filter(Boolean)
     .sort((a, b) => a.boundingBox.y - b.boundingBox.y || a.boundingBox.x - b.boundingBox.x)
     .map((line, index) => ({

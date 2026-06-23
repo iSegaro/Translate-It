@@ -119,4 +119,87 @@ describe('PdfLayoutAnalyzer', () => {
       roleMetadata: {}
     })).toBe('table-cell')
   })
+
+  it('propagates fontFamily from styles into line roleMetadata', () => {
+    const styles = {
+      'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25, vertical: false },
+      'F2': { fontFamily: 'Helvetica', ascent: 0.8, descent: -0.2, vertical: false }
+    }
+
+    const lines = buildPdfTextLinesFromItems([
+      { str: 'Hello', transform: [1, 0, 0, 12, 40, 650], width: 30, height: 12, fontName: 'F1' },
+      { str: 'world', transform: [1, 0, 0, 12, 80, 650], width: 42, height: 12, fontName: 'F1' }
+    ], { width: 500, height: 700 }, styles)
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.fontFamily).toBe('Times-Roman')
+    expect(lines[0].roleMetadata.ascent).toBe(0.75)
+    expect(lines[0].roleMetadata.descent).toBe(-0.25)
+  })
+
+  it('propagates vertical flag from styles', () => {
+    const styles = {
+      'F1': { fontFamily: 'SimSun', ascent: 0.8, descent: -0.2, vertical: true }
+    }
+
+    const lines = buildPdfTextLinesFromItems([
+      { str: '竖排', transform: [1, 0, 0, 12, 40, 650], width: 30, height: 12, fontName: 'F1' }
+    ], { width: 500, height: 700 }, styles)
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.vertical).toBe(true)
+  })
+
+  it('uses dominant font family when items have mixed fonts', () => {
+    const styles = {
+      'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25 },
+      'F2': { fontFamily: 'Helvetica', ascent: 0.8, descent: -0.2 }
+    }
+
+    const lines = buildPdfTextLinesFromItems([
+      { str: 'A', transform: [1, 0, 0, 12, 40, 650], width: 10, height: 12, fontName: 'F1' },
+      { str: 'B', transform: [1, 0, 0, 12, 60, 650], width: 10, height: 12, fontName: 'F1' },
+      { str: 'C', transform: [1, 0, 0, 12, 80, 650], width: 10, height: 12, fontName: 'F2' }
+    ], { width: 500, height: 700 }, styles)
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.fontFamily).toBe('Times-Roman')
+  })
+
+  it('does not add font metadata when styles is null', () => {
+    const lines = buildPdfTextLinesFromItems([
+      { str: 'Hello', transform: [1, 0, 0, 12, 40, 650], width: 30, height: 12, fontName: 'F1' }
+    ], { width: 500, height: 700 }, null)
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.fontFamily).toBeUndefined()
+    expect(lines[0].roleMetadata.ascent).toBeUndefined()
+    expect(lines[0].roleMetadata.descent).toBeUndefined()
+    expect(lines[0].roleMetadata.vertical).toBeUndefined()
+  })
+
+  it('does not add font metadata when styles is omitted', () => {
+    const lines = buildPdfTextLinesFromItems([
+      { str: 'Hello', transform: [1, 0, 0, 12, 40, 650], width: 30, height: 12, fontName: 'F1' }
+    ], { width: 500, height: 700 })
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.fontFamily).toBeUndefined()
+    expect(lines[0].roleMetadata.ascent).toBeUndefined()
+    expect(lines[0].roleMetadata.descent).toBeUndefined()
+  })
+
+  it('handles missing fontName gracefully with styles provided', () => {
+    const styles = {
+      'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25 }
+    }
+
+    const lines = buildPdfTextLinesFromItems([
+      { str: 'Hello', transform: [1, 0, 0, 12, 40, 650], width: 30, height: 12 },
+      { str: 'world', transform: [1, 0, 0, 12, 80, 650], width: 42, height: 12, fontName: 'F1' }
+    ], { width: 500, height: 700 }, styles)
+
+    expect(lines).toHaveLength(1)
+    expect(lines[0].roleMetadata.fontFamily).toBe('Times-Roman')
+  })
 })

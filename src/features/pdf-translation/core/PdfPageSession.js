@@ -55,7 +55,7 @@ export class PdfPageSession {
       disableCombineTextItems: false
     })
 
-    this.lines = buildPdfTextLinesFromItems(this.textContent?.items || [], this.pageSize)
+    this.lines = buildPdfTextLinesFromItems(this.textContent?.items || [], this.pageSize, this.textContent?.styles || null)
     this.logicalBlocks = await this.logicalBlockBuilder.build({
       documentIdentity: this.documentIdentity,
       pageNumber: this.pageNumber,

@@ -18,6 +18,7 @@ import { resolvePdfFontFamily } from '../utils/pdfFontMap.js'
 const MIN_FONT_SCALE = 0.6
 const FIT_DECREMENT = 0.05
 const OVERLAY_BACKGROUND = 'rgb(255, 255, 255)'
+const DEFAULT_ASCENT = 0.8
 
 const props = defineProps({
   block: {
@@ -51,6 +52,20 @@ const fontFamily = computed(() => {
   return resolvePdfFontFamily(props.block.roleMetadata?.fontFamily)
 })
 
+const ascent = computed(() => {
+  const val = props.block.roleMetadata?.ascent
+  return val != null && Number.isFinite(val) ? val : DEFAULT_ASCENT
+})
+
+const descent = computed(() => {
+  const val = props.block.roleMetadata?.descent
+  return val != null && Number.isFinite(val) ? Math.abs(val) : 0.2
+})
+
+const computedLineHeight = computed(() => {
+  return ascent.value + descent.value
+})
+
 const textDirection = computed(() => {
   const text = translatedText.value
   if (!text) return 'ltr'
@@ -76,7 +91,7 @@ const overlayStyle = computed(() => {
     height: `${bbox.height * scale.value}px`,
     fontSize: `${scaledFontSize.value}px`,
     fontFamily: fontFamily.value,
-    lineHeight: '1.2',
+    lineHeight: `${computedLineHeight.value}`,
     overflow: 'hidden',
     boxSizing: 'border-box',
     background: OVERLAY_BACKGROUND,

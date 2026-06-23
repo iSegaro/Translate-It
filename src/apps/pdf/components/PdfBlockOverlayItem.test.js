@@ -210,4 +210,55 @@ describe('PdfBlockOverlayItem', () => {
       Element.prototype.getBoundingClientRect = originalGetBCR
     }
   })
+
+  it('uses propagated ascent/descent for line-height when available', () => {
+    const wrapper = mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-1',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12, ascent: 0.75, descent: -0.25 },
+          translationState: { status: 'translated', translatedText: 'Hello' }
+        },
+        pageMetric: { scale: 1 }
+      }
+    })
+
+    const el = wrapper.find('.pdf-block-overlay-item')
+    expect(el.attributes('style')).toContain('line-height: 1')
+  })
+
+  it('falls back to default ascent when roleMetadata has no ascent', () => {
+    const wrapper = mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-1',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12 },
+          translationState: { status: 'translated', translatedText: 'Hello' }
+        },
+        pageMetric: { scale: 1 }
+      }
+    })
+
+    const el = wrapper.find('.pdf-block-overlay-item')
+    expect(el.attributes('style')).toContain('line-height: 1')
+  })
+
+  it('uses propagated fontFamily from roleMetadata', () => {
+    const wrapper = mount(PdfBlockOverlayItem, {
+      props: {
+        block: {
+          id: 'block-1',
+          boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+          roleMetadata: { fontSize: 12, fontFamily: 'Courier' },
+          translationState: { status: 'translated', translatedText: 'Hello' }
+        },
+        pageMetric: { scale: 1 }
+      }
+    })
+
+    const el = wrapper.find('.pdf-block-overlay-item')
+    expect(el.attributes('style')).toContain('Courier')
+  })
 })
