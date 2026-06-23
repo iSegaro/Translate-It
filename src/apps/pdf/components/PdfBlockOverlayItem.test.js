@@ -263,7 +263,7 @@ describe('PdfBlockOverlayItem', () => {
   })
 
   describe('line-level overlay for multi-line blocks', () => {
-    it('renders one PdfLineOverlayItem per source line when line counts match', () => {
+    it('renders one PdfLineOverlayItem per source line when structured and line counts match', () => {
       const wrapper = mount(PdfBlockOverlayItem, {
         props: {
           block: {
@@ -273,7 +273,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Line 1' },
               { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Line 2' }
             ],
-            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'Translated line 1\nTranslated line 2' }
           },
           pageMetric: { scale: 1 }
@@ -296,7 +296,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Line 1' },
               { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Line 2' }
             ],
-            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'Only one line of translation' }
           },
           pageMetric: { scale: 1 }
@@ -343,7 +343,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'سطر أول' },
               { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'سطر ثاني' }
             ],
-            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'سطر أول\nسطر ثاني' }
           },
           pageMetric: { scale: 1 }
@@ -366,7 +366,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Line 1' },
               { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Line 2' }
             ],
-            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'Line 1\nLine 2' }
           },
           pageMetric: { scale: 2 }
@@ -392,7 +392,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 100, y: 260, width: 300, height: 40 }, text: 'Row 2' },
               { boundingBox: { x: 100, y: 320, width: 300, height: 40 }, text: 'Row 3' }
             ],
-            roleMetadata: { fontSize: 14, lineCount: 3, isMultiLine: true },
+            roleMetadata: { fontSize: 14, lineCount: 3, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'Translated 1\nTranslated 2\nTranslated 3' }
           },
           pageMetric: { scale: 1 }
@@ -430,7 +430,7 @@ describe('PdfBlockOverlayItem', () => {
               { boundingBox: { x: 50, y: 100, width: 200, height: 30 }, text: 'Left col' },
               { boundingBox: { x: 300, y: 100, width: 150, height: 30 }, text: 'Right col' }
             ],
-            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
             translationState: { status: 'translated', translatedText: 'Left\nRight' }
           },
           pageMetric: { scale: 1 }
@@ -480,6 +480,73 @@ describe('PdfBlockOverlayItem', () => {
       const lineItems = wrapper.findAll('.pdf-line-overlay-item')
       expect(lineItems.length).toBe(0)
       expect(wrapper.find('.pdf-block-overlay-item__text').text()).toBe('Hello')
+    })
+
+    it('does NOT enable line overlay for multi-line paragraph without isStructured', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 200, height: 80 },
+            lines: [
+              { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Paragraph line 1' },
+              { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Paragraph line 2' }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true },
+            translationState: { status: 'translated', translatedText: 'Translated para 1\nTranslated para 2' }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const lineItems = wrapper.findAll('.pdf-line-overlay-item')
+      expect(lineItems.length).toBe(0)
+      const blockText = wrapper.find('.pdf-block-overlay-item__text')
+      expect(blockText.exists()).toBe(true)
+    })
+
+    it('enables line overlay when isStructured is true', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 200, height: 80 },
+            lines: [
+              { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Row 1' },
+              { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Row 2' }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: true },
+            translationState: { status: 'translated', translatedText: 'Row 1\nRow 2' }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const lineItems = wrapper.findAll('.pdf-line-overlay-item')
+      expect(lineItems.length).toBe(2)
+    })
+
+    it('does NOT enable line overlay when isStructured is false', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 200, height: 80 },
+            lines: [
+              { boundingBox: { x: 10, y: 20, width: 200, height: 30 }, text: 'Row 1' },
+              { boundingBox: { x: 10, y: 55, width: 200, height: 30 }, text: 'Row 2' }
+            ],
+            roleMetadata: { fontSize: 12, lineCount: 2, isMultiLine: true, isStructured: false },
+            translationState: { status: 'translated', translatedText: 'Row 1\nRow 2' }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const lineItems = wrapper.findAll('.pdf-line-overlay-item')
+      expect(lineItems.length).toBe(0)
+      const blockText = wrapper.find('.pdf-block-overlay-item__text')
+      expect(blockText.exists()).toBe(true)
     })
   })
 })

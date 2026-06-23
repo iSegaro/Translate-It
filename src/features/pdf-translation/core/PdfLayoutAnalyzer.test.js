@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildPdfTextLinesFromItems,
+  buildPdfLogicalBlocksFromLines,
   detectPdfLineRole,
   resolvePdfReadingOrder
 } from './PdfLayoutAnalyzer.js'
@@ -201,5 +202,130 @@ describe('PdfLayoutAnalyzer', () => {
 
     expect(lines).toHaveLength(1)
     expect(lines[0].roleMetadata.fontFamily).toBe('Times-Roman')
+  })
+
+  describe('structured block detection', () => {
+    it('sets isStructured=true for table-region blocks', async () => {
+      const lines = [
+        { text: 'Col A  Col B', fontSize: 10, boundingBox: { x: 20, y: 100, width: 200, height: 14 }, items: [{ x: 20, right: 80, height: 10 }, { x: 120, right: 180, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Val 1  Val 2', fontSize: 10, boundingBox: { x: 20, y: 118, width: 200, height: 14 }, items: [{ x: 20, right: 70, height: 10 }, { x: 120, right: 175, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('sets isStructured=true for table-cell blocks', async () => {
+      const lines = [
+        { text: 'Col A  Col B', fontSize: 10, boundingBox: { x: 20, y: 100, width: 200, height: 14 }, items: [{ x: 20, right: 80, height: 10 }, { x: 120, right: 180, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].role).toBe('table-cell')
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('detects schedule-like blocks and sets isStructured=true', async () => {
+      const lines = [
+        { text: 'Mon 30 Mar  6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 100, height: 10 }, { x: 160, right: 240, height: 10 }, { x: 270, right: 340, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Wed 1 Apr   6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 42, right: 102, height: 10 }, { x: 162, right: 242, height: 10 }, { x: 272, right: 342, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('does NOT set isStructured for normal multi-line paragraphs', async () => {
+      const lines = [
+        { text: 'This is the first paragraph line', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'and this is the second paragraph line', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 310, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(false)
+    })
+
+    it('does NOT detect schedule-like when lines have different item counts', async () => {
+      const lines = [
+        { text: 'Row with two items', fontSize: 10, boundingBox: { x: 40, y: 200, width: 200, height: 14 }, items: [{ x: 40, right: 120, height: 10 }, { x: 160, right: 240, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Single item row', fontSize: 10, boundingBox: { x: 40, y: 260, width: 100, height: 14 }, items: [{ x: 40, right: 100, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+      expect(blocks[1].roleMetadata.isStructured).toBe(false)
+    })
+
+    it('block is structured via table-cell path even when schedule-like font check fails', async () => {
+      const lines = [
+        { text: 'Row with two items', fontSize: 10, boundingBox: { x: 40, y: 200, width: 200, height: 14 }, items: [{ x: 40, right: 120, height: 10 }, { x: 160, right: 240, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Different size row', fontSize: 16, boundingBox: { x: 40, y: 218, width: 200, height: 20 }, items: [{ x: 40, right: 140, height: 16 }, { x: 180, right: 240, height: 16 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('block is structured via table-cell path even when schedule-like x-alignment fails', async () => {
+      const lines = [
+        { text: 'Row with two items', fontSize: 10, boundingBox: { x: 40, y: 200, width: 200, height: 14 }, items: [{ x: 40, right: 120, height: 10 }, { x: 160, right: 240, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Misaligned row', fontSize: 10, boundingBox: { x: 200, y: 218, width: 200, height: 14 }, items: [{ x: 200, right: 280, height: 10 }, { x: 340, right: 420, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+      expect(blocks[1].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('does NOT detect schedule-like for non-table-like lines with font size mismatch', async () => {
+      const lines = [
+        { text: 'First line of schedule with enough text to avoid heading detection', fontSize: 10, boundingBox: { x: 40, y: 200, width: 400, height: 14 }, items: [{ x: 40, right: 100, height: 10 }, { x: 120, right: 180, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Second line with larger font and also enough text to avoid heading detection', fontSize: 18, boundingBox: { x: 40, y: 220, width: 400, height: 22 }, items: [{ x: 40, right: 100, height: 18 }, { x: 120, right: 180, height: 18 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(false)
+    })
+
+    it('block is structured via table-cell path even when schedule-like font check fails for different sizes', async () => {
+      const lines = [
+        { text: 'Small schedule row text here', fontSize: 10, boundingBox: { x: 40, y: 200, width: 200, height: 14 }, items: [{ x: 40, right: 120, height: 10 }, { x: 160, right: 240, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Large schedule row text here', fontSize: 16, boundingBox: { x: 40, y: 218, width: 200, height: 20 }, items: [{ x: 40, right: 140, height: 16 }, { x: 180, right: 240, height: 16 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('detects schedule-like with x-position tolerance of 8', async () => {
+      const lines = [
+        { text: 'Mon 30 Mar  6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 100, height: 10 }, { x: 160, right: 240, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Wed 1 Apr   6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 44, y: 218, width: 300, height: 14 }, items: [{ x: 44, right: 104, height: 10 }, { x: 164, right: 244, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(true)
+    })
+
+    it('does NOT detect schedule-like when rows are single TextItems (known limitation)', async () => {
+      const lines = [
+        { text: 'Mon 30 Mar  6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+        { text: 'Wed 1 Apr   6.00-8.15pm  Classes', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 300, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].roleMetadata.isStructured).toBe(false)
+    })
   })
 })

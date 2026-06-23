@@ -337,6 +337,38 @@ function mergeBoundingBoxes(current, next) {
   }
 }
 
+function isScheduleLikeBlock(block) {
+  if (!block || block.lines.length < 2) return false
+
+  const linesWithItems = block.lines.filter((line) => line.items && line.items.length >= 2)
+  if (linesWithItems.length < 2) return false
+
+  const xPositions = linesWithItems.map((line) => {
+    const sorted = [...line.items].sort((a, b) => a.x - b.x)
+    return sorted.map((item) => Math.round(item.x))
+  })
+
+  if (xPositions.length < 2) return false
+
+  const firstPositions = xPositions[0]
+  if (firstPositions.length < 2) return false
+
+  const tolerance = 8
+  const allAligned = xPositions.every((positions) => {
+    if (positions.length !== firstPositions.length) return false
+    return positions.every((x, i) => Math.abs(x - firstPositions[i]) <= tolerance)
+  })
+
+  if (!allAligned) return false
+
+  const fontSizes = linesWithItems.map((line) => line.fontSize)
+  const minFontSize = Math.min(...fontSizes)
+  const maxFontSize = Math.max(...fontSizes)
+  if (maxFontSize - minFontSize > 3) return false
+
+  return true
+}
+
 function startBlockFromLine(line, context, blockIndex) {
   const role = detectPdfLineRole(line, context)
   return {
@@ -351,7 +383,8 @@ function startBlockFromLine(line, context, blockIndex) {
       ...line.roleMetadata,
       inferredRole: role,
       sourceLineRoles: [role],
-      lineCount: 1
+      lineCount: 1,
+      isStructured: role === 'table-cell'
     }
   }
 }
@@ -360,8 +393,7 @@ function appendLineToBlock(block, line, role) {
   const separator = block.role === 'table-cell' || block.role === 'table-region' || role === 'table-cell' ? '\n' : ' '
   const nextLines = [...block.lines, line]
   const nextRole = block.role === 'table-cell' || role === 'table-cell' ? 'table-region' : block.role
-
-  return {
+  const nextBlock = {
     ...block,
     role: nextRole,
     lines: nextLines,
@@ -373,9 +405,16 @@ function appendLineToBlock(block, line, role) {
       inferredRole: nextRole,
       sourceLineRoles: [...(block.roleMetadata?.sourceLineRoles || []), role],
       lineCount: nextLines.length,
-      isMultiLine: nextLines.length > 1
+      isMultiLine: nextLines.length > 1,
+      isStructured: nextRole === 'table-region' || nextRole === 'table-cell'
     }
   }
+
+  if (!nextBlock.roleMetadata.isStructured && isScheduleLikeBlock(nextBlock)) {
+    nextBlock.roleMetadata.isStructured = true
+  }
+
+  return nextBlock
 }
 
 export function buildPdfLogicalBlocksFromLines(lines = [], context = {}) {

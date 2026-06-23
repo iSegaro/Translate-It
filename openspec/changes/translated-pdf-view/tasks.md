@@ -63,11 +63,11 @@
 
 > **Decision**: Proportional text splitting was rejected. Line-level overlay must NOT activate for plain paragraphs — only for explicitly structured blocks (table-region, table-cell, schedule-like, structured-list). Splitting translated text proportionally across source lines corrupts prose and produces misleading rendering.
 
-- [ ] 9.1 Add `isStructured` flag to `roleMetadata` for blocks detected as table-region, table-cell, schedule-like, or structured-list.
-- [ ] 9.2 Implement schedule-like block detection: identify repeated column-aligned rows with consistent x-positions and inter-column gaps across consecutive lines.
-- [ ] 9.3 Gate line-level overlay in `PdfBlockOverlayItem.vue` behind `roleMetadata.isStructured === true` (in addition to existing line count check).
-- [ ] 9.4 Update `PdfOverlayLayer.vue` to pass structured metadata through to overlay items.
-- [ ] 9.5 Add unit tests for schedule-like detection and structured block flag propagation.
+- [x] 9.1 Add `isStructured` flag to `roleMetadata` for blocks detected as table-region, table-cell, schedule-like, or structured-list.
+- [x] 9.2 Implement schedule-like block detection: identify repeated column-aligned rows with consistent x-positions and inter-column gaps across consecutive lines.
+- [x] 9.3 Gate line-level overlay in `PdfBlockOverlayItem.vue` behind `roleMetadata.isStructured === true` (in addition to existing line count check).
+- [x] 9.4 ~~Update `PdfOverlayLayer.vue` to pass structured metadata through to overlay items.~~ Already complete — `PdfOverlayLayer` passes the full `block` object directly, so `roleMetadata.isStructured` is available without any changes.
+- [x] 9.5 Add unit tests for schedule-like detection and structured block flag propagation.
 - [ ] 9.6 Add integration tests verifying line overlay activates only for structured blocks and stays off for paragraphs.
 
 ## 10. Advanced Table Overlay (Phase 2c — Deferred)

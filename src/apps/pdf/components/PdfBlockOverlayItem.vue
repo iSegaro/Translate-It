@@ -97,6 +97,7 @@ const translatedLines = computed(() => {
 
 const useLineOverlay = computed(() => {
   if (sourceLineCount.value <= 1) return false
+  if (!props.block.roleMetadata?.isStructured) return false
   if (translatedLines.value.length !== sourceLineCount.value) return false
   return sourceLineCount.value > 1
 })
