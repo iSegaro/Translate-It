@@ -163,11 +163,21 @@ The existing mode system is simple (ref + computed properties). Adding a fourth 
 - Use `style.ascent`/`style.descent` in overlay for precise vertical positioning
 - Use resolved `fontFamily` in overlay for better font matching
 
-### Phase 2: Advanced Table Overlay
+### Phase 2a: Line-Level Overlay (Implemented)
 
-- Cell-aware table rendering using `line.items[]` geometry
-- Per-cell positioning and font shrinking
-- Table-specific gap detection for translated text parsing
+- Render each source line as a positioned overlay when block has multiple lines
+- Block container positioned at `block.boundingBox`; each line positioned relative to block origin
+- Requires `block.lines.length > 1` and `translatedText.split('\n').length === sourceLineCount`
+
+**Rejected approach — Proportional text splitting**: Do NOT split translated text proportionally across source lines as a generic fallback. This was considered during Phase 2a implementation and rejected because it can corrupt translated prose (e.g., splitting mid-word or mid-phrase) and produce misleading line-level rendering for normal multi-line paragraphs. Line-level overlay should only activate for explicitly structured content.
+
+### Phase 2b: Structured Block Detection (Upcoming)
+
+- Detect schedule-like, table-region, table-cell, and structured-list blocks
+- Gate line-level overlay behind structured metadata/role — line overlay should NOT activate for plain paragraphs
+- Add `isStructured` or similar flag to `roleMetadata` to distinguish structured blocks from prose paragraphs
+- Schedule-like detection: repeated column-aligned rows with consistent x-positions and gaps
+- Structured-list detection: numbered/bulleted lists with consistent indentation
 
 ### Phase 3: Intelligent Masking
 

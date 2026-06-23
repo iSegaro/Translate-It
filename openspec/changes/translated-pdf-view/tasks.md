@@ -59,23 +59,34 @@
 - [ ] 8.7 Add unit tests for font metadata propagation through the layout analyzer pipeline.
 - [ ] 8.8 Add integration test verifying overlay uses propagated font metrics when available.
 
-## 9. Advanced Table Overlay (Phase 2 — Deferred)
+## 9. Structured Block Detection (Phase 2b)
 
-- [ ] 9.1 Create `PdfTableOverlayItem.vue` component that parses `\n`-separated translated text into rows, splits rows into cells using gap detection, and renders per-cell overlays at original `item.x`, `item.y` positions.
-- [ ] 9.2 Implement cell text overflow handling with independent adaptive font shrinking per cell.
-- [ ] 9.3 Handle mismatched cell counts between translated and original rows.
-- [ ] 9.4 Add unit tests for `PdfTableOverlayItem.vue` row/cell parsing and positioning.
-- [ ] 9.5 Integrate table overlay component into `PdfOverlayLayer.vue` for `table-region` blocks.
+> **Decision**: Proportional text splitting was rejected. Line-level overlay must NOT activate for plain paragraphs — only for explicitly structured blocks (table-region, table-cell, schedule-like, structured-list). Splitting translated text proportionally across source lines corrupts prose and produces misleading rendering.
 
-## 10. Intelligent Masking (Phase 3 — Deferred)
+- [ ] 9.1 Add `isStructured` flag to `roleMetadata` for blocks detected as table-region, table-cell, schedule-like, or structured-list.
+- [ ] 9.2 Implement schedule-like block detection: identify repeated column-aligned rows with consistent x-positions and inter-column gaps across consecutive lines.
+- [ ] 9.3 Gate line-level overlay in `PdfBlockOverlayItem.vue` behind `roleMetadata.isStructured === true` (in addition to existing line count check).
+- [ ] 9.4 Update `PdfOverlayLayer.vue` to pass structured metadata through to overlay items.
+- [ ] 9.5 Add unit tests for schedule-like detection and structured block flag propagation.
+- [ ] 9.6 Add integration tests verifying line overlay activates only for structured blocks and stays off for paragraphs.
 
-- [ ] 10.1 Implement background detection for text regions (plain vs. image/chart).
-- [ ] 10.2 Apply selective masking only to plain-background regions.
-- [ ] 10.3 Add contrast-enhancing techniques (text-shadow, outline) for readability without full occlusion.
-- [ ] 10.4 Test with PDFs containing images, charts, and colored backgrounds behind text.
+## 10. Advanced Table Overlay (Phase 2c — Deferred)
 
-## 11. Export (Phase 4 — Deferred)
+- [ ] 10.1 Create `PdfTableOverlayItem.vue` component that parses `\n`-separated translated text into rows, splits rows into cells using gap detection, and renders per-cell overlays at original `item.x`, `item.y` positions.
+- [ ] 10.2 Implement cell text overflow handling with independent adaptive font shrinking per cell.
+- [ ] 10.3 Handle mismatched cell counts between translated and original rows.
+- [ ] 10.4 Add unit tests for `PdfTableOverlayItem.vue` row/cell parsing and positioning.
+- [ ] 10.5 Integrate table overlay component into `PdfOverlayLayer.vue` for `table-region` blocks.
 
-- [ ] 11.1 Implement translated PDF export with overlay content baked into output.
-- [ ] 11.2 Add export format options (PDF, HTML).
-- [ ] 11.3 Surface export progress and completion states.
+## 11. Intelligent Masking (Phase 3 — Deferred)
+
+- [ ] 11.1 Implement background detection for text regions (plain vs. image/chart).
+- [ ] 11.2 Apply selective masking only to plain-background regions.
+- [ ] 11.3 Add contrast-enhancing techniques (text-shadow, outline) for readability without full occlusion.
+- [ ] 11.4 Test with PDFs containing images, charts, and colored backgrounds behind text.
+
+## 12. Export (Phase 4 — Deferred)
+
+- [ ] 12.1 Implement translated PDF export with overlay content baked into output.
+- [ ] 12.2 Add export format options (PDF, HTML).
+- [ ] 12.3 Surface export progress and completion states.
