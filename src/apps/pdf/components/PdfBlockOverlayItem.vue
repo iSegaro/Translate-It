@@ -53,14 +53,13 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { resolvePdfFontFamily } from '../utils/pdfFontMap.js'
+import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle } from '../utils/pdfOverlayTypography.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
+const OVERLAY_BASE_STYLE = buildOverlayBaseStyle()
 const MIN_FONT_SCALE = 0.6
 const FIT_DECREMENT = 0.05
-const OVERLAY_BACKGROUND = 'rgb(255, 255, 255)'
-const DEFAULT_ASCENT = 0.8
 
 const props = defineProps({
   block: {
@@ -95,18 +94,12 @@ const scaledFontSize = computed(() => {
 })
 
 const fontFamily = computed(() => {
-  return resolvePdfFontFamily(props.block.roleMetadata?.fontFamily)
+  return resolveFontFamily(props.block.roleMetadata?.fontFamily)
 })
 
-const ascent = computed(() => {
-  const val = props.block.roleMetadata?.ascent
-  return val != null && Number.isFinite(val) ? val : DEFAULT_ASCENT
-})
+const ascent = computed(() => resolveAscent(props.block.roleMetadata?.ascent))
 
-const descent = computed(() => {
-  const val = props.block.roleMetadata?.descent
-  return val != null && Number.isFinite(val) ? Math.abs(val) : 0.2
-})
+const descent = computed(() => resolveDescent(props.block.roleMetadata?.descent))
 
 const computedLineHeight = computed(() => {
   return ascent.value + descent.value
@@ -195,18 +188,7 @@ const blockContainerStyle = computed(() => {
   }
 })
 
-const textDirection = computed(() => {
-  const text = translatedText.value
-  if (!text) return 'ltr'
-
-  const rtlChars = text.match(/[\u0591-\u05FF\u0600-\u06FF\u0700-\u074F]/g)
-  const ltrChars = text.match(/[a-zA-Z\u00C0-\u024F]/g)
-
-  const rtlCount = rtlChars?.length || 0
-  const ltrCount = ltrChars?.length || 0
-
-  return rtlCount > ltrCount ? 'rtl' : 'ltr'
-})
+const textDirection = computed(() => detectTextDirection(translatedText.value))
 
 const overlayStyle = computed(() => {
   const bbox = props.block.boundingBox
@@ -221,12 +203,7 @@ const overlayStyle = computed(() => {
     fontSize: `${scaledFontSize.value}px`,
     fontFamily: fontFamily.value,
     lineHeight: `${computedLineHeight.value}`,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    background: OVERLAY_BACKGROUND,
-    pointerEvents: 'auto',
-    userSelect: 'text',
-    willChange: 'transform'
+    ...OVERLAY_BASE_STYLE
   }
 })
 
