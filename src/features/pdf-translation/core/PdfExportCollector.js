@@ -90,6 +90,54 @@ export class PdfExportCollector {
     }
   }
 
+  collectSpatialBlocks(canvasDataUrls = new Map()) {
+    const pages = []
+    const pageSessions = this.session.pageSessions
+    const sortedPageNumbers = [...pageSessions.keys()].sort((a, b) => a - b)
+
+    for (const pageNumber of sortedPageNumbers) {
+      const pageSession = pageSessions.get(pageNumber)
+      if (!pageSession) continue
+
+      const metric = this.session.pageMetrics?.find((m) => m.pageNumber === pageNumber)
+      const blocks = []
+      const logicalBlocks = pageSession.getLogicalBlocks()
+
+      for (const block of logicalBlocks) {
+        const state = this.session.getBlockTranslationState(block.id)
+
+        if (state.status !== 'translated' || !state.translatedText) continue
+
+        blocks.push({
+          blockId: block.id,
+          role: block.role || 'paragraph',
+          readingOrderIndex: block.readingOrderIndex ?? 0,
+          boundingBox: block.boundingBox || null,
+          fontSize: block.roleMetadata?.fontSize || 12,
+          fontFamily: block.roleMetadata?.fontFamily || null,
+          translatedText: state.translatedText
+        })
+      }
+
+      blocks.sort((a, b) => a.readingOrderIndex - b.readingOrderIndex)
+
+      if (blocks.length === 0) continue
+
+      pages.push({
+        pageNumber,
+        width: metric?.naturalWidth || 0,
+        height: metric?.naturalHeight || 0,
+        displayWidth: metric?.width || 0,
+        displayHeight: metric?.height || 0,
+        scale: metric?.scale || 1,
+        canvasDataUrl: canvasDataUrls.get(pageNumber) || null,
+        blocks
+      })
+    }
+
+    return pages
+  }
+
   getDocumentTitle() {
     return this.session.displayName || this.session.fileName || 'document'
   }

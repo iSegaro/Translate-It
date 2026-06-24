@@ -155,4 +155,68 @@ describe('PdfExportCollector', () => {
     const collector = new PdfExportCollector(session)
     expect(collector.getDocumentTitle()).toBe('test-doc.pdf')
   })
+
+  describe('collectSpatialBlocks', () => {
+    it('includes geometry and skips untranslated blocks', () => {
+      session.pageMetrics = [
+        { pageNumber: 1, naturalWidth: 612, naturalHeight: 792, width: 600, height: 774, scale: 0.98 }
+      ]
+      setupPageSession(1, [
+        {
+          id: 'b1', text: 'Hello', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0,
+          boundingBox: { x: 72, y: 100, width: 400, height: 20 },
+          roleMetadata: { fontSize: 12, fontFamily: 'serif' }
+        },
+        {
+          id: 'b2', text: 'World', role: 'heading', pageNumber: 1, readingOrderIndex: 1,
+          boundingBox: { x: 72, y: 140, width: 300, height: 16 },
+          roleMetadata: { fontSize: 14 }
+        }
+      ])
+      setTranslated('b1', 'Hola')
+      // b2 is NOT translated
+
+      const collector = new PdfExportCollector(session)
+      const pages = collector.collectSpatialBlocks()
+
+      expect(pages).toHaveLength(1)
+      expect(pages[0].pageNumber).toBe(1)
+      expect(pages[0].width).toBe(612)
+      expect(pages[0].height).toBe(792)
+      expect(pages[0].scale).toBe(0.98)
+      expect(pages[0].blocks).toHaveLength(1)
+      expect(pages[0].blocks[0].blockId).toBe('b1')
+      expect(pages[0].blocks[0].boundingBox).toEqual({ x: 72, y: 100, width: 400, height: 20 })
+      expect(pages[0].blocks[0].fontSize).toBe(12)
+      expect(pages[0].blocks[0].fontFamily).toBe('serif')
+      expect(pages[0].blocks[0].translatedText).toBe('Hola')
+    })
+
+    it('includes canvasDataUrl when provided', () => {
+      session.pageMetrics = [
+        { pageNumber: 1, naturalWidth: 612, naturalHeight: 792, width: 600, height: 774, scale: 1 }
+      ]
+      setupPageSession(1, [
+        { id: 'b1', text: 'Hello', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0, boundingBox: { x: 72, y: 100, width: 400, height: 20 }, roleMetadata: { fontSize: 12 } }
+      ])
+      setTranslated('b1', 'Hola')
+
+      const canvasUrls = new Map([[1, 'data:image/jpeg;base64,abc123']])
+      const collector = new PdfExportCollector(session)
+      const pages = collector.collectSpatialBlocks(canvasUrls)
+
+      expect(pages[0].canvasDataUrl).toBe('data:image/jpeg;base64,abc123')
+    })
+
+    it('returns empty array when no translations', () => {
+      session.pageMetrics = [{ pageNumber: 1, naturalWidth: 612, naturalHeight: 792, width: 600, height: 774, scale: 1 }]
+      setupPageSession(1, [
+        { id: 'b1', text: 'Hello', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0, boundingBox: null, roleMetadata: { fontSize: 12 } }
+      ])
+
+      const collector = new PdfExportCollector(session)
+      const pages = collector.collectSpatialBlocks()
+      expect(pages).toHaveLength(0)
+    })
+  })
 })

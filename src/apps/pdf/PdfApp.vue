@@ -21,6 +21,7 @@
       @mode-change="setMode"
       @export-txt="handleExportTxt"
       @export-markdown="handleExportMarkdown"
+      @export-html="handleExportHtml"
       @toggle-block-targeting="toggleBlockTargeting"
       @request-ocr="requestOcr"
       @clear-cache="handleClearCache"
@@ -68,6 +69,7 @@
               #original
             >
               <PdfViewer
+                ref="pdfViewerRef"
                 :pages="pageMetrics"
                 :session="session"
                 :is-block-targeting-active="isBlockTargetingActive"
@@ -167,8 +169,11 @@ const {
   exportError,
   exportTxt,
   exportMarkdown,
+  exportHtml,
   clearExportError
 } = usePdfExport(translationTick)
+
+const pdfViewerRef = ref(null)
 
 const {
   isBlockTargetingActive,
@@ -237,6 +242,12 @@ function handleExportTxt() {
 function handleExportMarkdown() {
   clearExportError()
   exportMarkdown()
+}
+
+function handleExportHtml() {
+  clearExportError()
+  const canvasDataUrls = pdfViewerRef.value?.collectCanvasDataUrls?.() || new Map()
+  exportHtml(canvasDataUrls)
 }
 
 function handleClearCache() {

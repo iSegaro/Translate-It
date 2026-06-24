@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTxtOutput, buildMarkdownOutput } from './PdfExportFormatter.js'
+import { buildTxtOutput, buildMarkdownOutput, buildHtmlOutput } from './PdfExportFormatter.js'
 
 describe('PdfExportFormatter', () => {
   const sampleBlocks = [
@@ -114,6 +114,146 @@ describe('PdfExportFormatter', () => {
       const output = buildMarkdownOutput({ documentTitle: '', blocks: [] })
 
       expect(output).toBe('')
+    })
+  })
+
+  describe('buildHtmlOutput', () => {
+    const samplePages = [
+      {
+        pageNumber: 1,
+        width: 612,
+        height: 792,
+        displayWidth: 600,
+        displayHeight: 774,
+        scale: 1,
+        canvasDataUrl: 'data:image/jpeg;base64,abc123',
+        blocks: [
+          { blockId: 'b1', role: 'paragraph', readingOrderIndex: 0, boundingBox: { x: 72, y: 100, width: 400, height: 20 }, fontSize: 12, fontFamily: null, translatedText: 'Hello World' },
+          { blockId: 'b2', role: 'heading', readingOrderIndex: 1, boundingBox: { x: 72, y: 140, width: 300, height: 16 }, fontSize: 14, fontFamily: 'serif', translatedText: 'Section Title' }
+        ]
+      }
+    ]
+
+    it('returns empty string for empty pages', () => {
+      expect(buildHtmlOutput({ documentTitle: '', pages: [] })).toBe('')
+      expect(buildHtmlOutput({ documentTitle: '', pages: null })).toBe('')
+    })
+
+    it('includes document title', () => {
+      const output = buildHtmlOutput({ documentTitle: 'My Doc', pages: samplePages })
+
+      expect(output).toContain('<title>My Doc</title>')
+      expect(output).toContain('My Doc</h1>')
+    })
+
+    it('includes page container with correct dimensions', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('width: 600px')
+      expect(output).toContain('height: 774px')
+    })
+
+    it('includes background canvas image', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('data:image/jpeg;base64,abc123')
+      expect(output).toContain('class="page-bg"')
+    })
+
+    it('positions translated blocks absolutely', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('position: absolute')
+      expect(output).toContain('left: 72px')
+      expect(output).toContain('top: 100px')
+      expect(output).toContain('width: 400px')
+    })
+
+    it('includes translated text content', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('Hello World')
+      expect(output).toContain('Section Title')
+    })
+
+    it('escapes HTML in translated text', () => {
+      const pages = [{
+        ...samplePages[0],
+        blocks: [{ ...samplePages[0].blocks[0], translatedText: '<script>alert("xss")</script>' }]
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).not.toContain('<script>')
+      expect(output).toContain('&lt;script&gt;')
+    })
+
+    it('applies dir="rtl" for RTL text', () => {
+      const pages = [{
+        ...samplePages[0],
+        blocks: [{ ...samplePages[0].blocks[0], translatedText: 'مرحبا بالعالم' }]
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).toContain('dir="rtl"')
+    })
+
+    it('does not add dir="rtl" for LTR text', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      const rtlCount = (output.match(/dir="rtl"/g) || []).length
+      expect(rtlCount).toBe(0)
+    })
+
+    it('does not get dir="rtl" for mostly-English text with one Arabic word', () => {
+      const pages = [{
+        ...samplePages[0],
+        blocks: [{ ...samplePages[0].blocks[0], translatedText: 'The report was published by ESMA in cooperation with مرحبا officials last quarter.' }]
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).not.toContain('dir="rtl"')
+    })
+
+    it('gets dir="rtl" for mostly Arabic/Farsi text with a small English token', () => {
+      const pages = [{
+        ...samplePages[0],
+        blocks: [{ ...samplePages[0].blocks[0], translatedText: 'شاخص‌های کلیدی عملکرد ESMA در سال ۲۰۲۵ منتشر شد.' }]
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).toContain('dir="rtl"')
+    })
+
+    it('omits page background image when no canvasDataUrl', () => {
+      const pages = [{
+        ...samplePages[0],
+        canvasDataUrl: null
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).not.toContain('class="page-bg"')
+    })
+
+    it('includes deferred layout note', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('deferred')
+    })
+
+    it('skips blocks without boundingBox', () => {
+      const pages = [{
+        ...samplePages[0],
+        blocks: [{ ...samplePages[0].blocks[0], boundingBox: null }]
+      }]
+      const output = buildHtmlOutput({ documentTitle: '', pages })
+
+      expect(output).not.toContain('Hello World')
+    })
+
+    it('applies fontFamily from block metadata', () => {
+      const output = buildHtmlOutput({ documentTitle: '', pages: samplePages })
+
+      expect(output).toContain('font-family: serif')
     })
   })
 })

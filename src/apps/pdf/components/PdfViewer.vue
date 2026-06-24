@@ -269,6 +269,23 @@ onBeforeUnmount(() => {
   visiblePageNumbers.value = new Set()
   props.session.updateVisiblePages(new Set())
 })
+
+function collectCanvasDataUrls() {
+  const dataUrls = new Map()
+  for (const [pageNumber, instance] of pageViews.entries()) {
+    try {
+      const canvasEl = instance.getCanvasEl?.()
+      if (canvasEl && canvasEl.width > 0 && canvasEl.height > 0) {
+        dataUrls.set(pageNumber, canvasEl.toDataURL('image/jpeg', 0.85))
+      }
+    } catch {
+      // Canvas may be tainted or unavailable — skip silently
+    }
+  }
+  return dataUrls
+}
+
+defineExpose({ collectCanvasDataUrls })
 </script>
 
 <style scoped lang="scss">

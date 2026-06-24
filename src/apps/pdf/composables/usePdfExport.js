@@ -3,7 +3,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { pdfDocumentSession } from '@/features/pdf-translation/core/PdfDocumentSession.js'
 import { PdfExportCollector } from '@/features/pdf-translation/core/PdfExportCollector.js'
-import { buildTxtOutput, buildMarkdownOutput } from '@/features/pdf-translation/core/PdfExportFormatter.js'
+import { buildTxtOutput, buildMarkdownOutput, buildHtmlOutput } from '@/features/pdf-translation/core/PdfExportFormatter.js'
 import { downloadFile, buildExportFilename } from '@/features/pdf-translation/core/PdfFileDownloader.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfExport')
@@ -72,6 +72,30 @@ export function usePdfExport(translationTick) {
     exportError.value = ''
   }
 
+  function exportHtml(canvasDataUrls = new Map()) {
+    try {
+      exportError.value = ''
+
+      const pages = collector.collectSpatialBlocks(canvasDataUrls)
+      if (pages.length === 0) {
+        exportError.value = 'No translated blocks to export.'
+        return false
+      }
+
+      const title = collector.getDocumentTitle()
+      const content = buildHtmlOutput({ documentTitle: title, pages })
+      const filename = buildExportFilename(title, 'html')
+
+      downloadFile(content, filename, 'text/html')
+      logger.info('PDF exported as HTML:', { filename, pageCount: pages.length })
+      return true
+    } catch (error) {
+      logger.error('Failed to export PDF as HTML:', error)
+      exportError.value = error?.message || 'Failed to export as HTML.'
+      return false
+    }
+  }
+
   return {
     exportStats,
     canExport,
@@ -79,6 +103,7 @@ export function usePdfExport(translationTick) {
     exportError,
     exportTxt,
     exportMarkdown,
+    exportHtml,
     clearExportError
   }
 }

@@ -125,6 +125,13 @@
         >
           Export Markdown
         </button>
+        <button
+          class="pdf-toolbar__button pdf-toolbar__button--export"
+          type="button"
+          @click="$emit('export-html')"
+        >
+          Export HTML
+        </button>
       </div>
 
       <button
@@ -175,7 +182,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'toggle-block-targeting', 'request-ocr', 'clear-cache'])
+const emit = defineEmits(['file-selected', 'translate-visible', 'mode-change', 'cancel-translation', 'export-txt', 'export-markdown', 'export-html', 'toggle-block-targeting', 'request-ocr', 'clear-cache'])
 const fileInput = ref(null)
 
 const modeOptions = [
