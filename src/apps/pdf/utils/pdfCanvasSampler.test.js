@@ -82,7 +82,7 @@ describe('pdfCanvasSampler', () => {
   })
 
   it('clamps out-of-bounds sample points to canvas edges', () => {
-    const getImageData = vi.fn(() => ({ data: [100, 150, 200, 255] }))
+    const getImageData = vi.fn(() => ({ data: [200, 200, 200, 255] }))
     const canvas = {
       width: 100,
       height: 100,
@@ -92,7 +92,7 @@ describe('pdfCanvasSampler', () => {
 
     const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-oob')
     expect(getImageData).toHaveBeenCalled()
-    expect(color).toBe('rgb(100, 150, 200)')
+    expect(color).toBe('rgb(200, 200, 200)')
   })
 
   it('returns sampled color for a uniform light background', () => {
@@ -241,5 +241,51 @@ describe('pdfCanvasSampler', () => {
     const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-avg')
     const expected = Math.round((200 + 210 + 190) / 3)
     expect(color).toBe(`rgb(${expected}, ${expected}, ${expected})`)
+  })
+
+  it('returns white fallback when all samples are dark', () => {
+    const canvas = createUniformMockCanvas(20, 20, 20)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-alldark')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('lightens sampled color when luminance is below minimum', () => {
+    const canvas = createUniformMockCanvas(140, 140, 140)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-dim')
+    const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/)
+    expect(match).not.toBeNull()
+    const luminance = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
+    expect(luminance).toBeGreaterThanOrEqual(200)
+  })
+
+  it('preserves light backgrounds without modification', () => {
+    const canvas = createUniformMockCanvas(240, 240, 240)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-lightok')
+    expect(color).toBe('rgb(240, 240, 240)')
+  })
+
+  it('mixed dark text and light background still returns readable light color', () => {
+    let callCount = 0
+    const canvas = {
+      width: 200,
+      height: 200,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn(() => {
+          callCount++
+          if (callCount <= 4) return { data: [30, 30, 30, 255] }
+          return { data: [230, 230, 230, 255] }
+        })
+      }))
+    }
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-mixed')
+    expect(color).not.toBe('rgb(255, 255, 255)')
+    const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/)
+    expect(match).not.toBeNull()
+    const lum = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
+    expect(lum).toBeGreaterThanOrEqual(200)
   })
 })

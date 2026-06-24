@@ -69,16 +69,21 @@ const textDirection = computed(() => detectTextDirection(props.cellText))
 const cellStyle = computed(() => ({
   ...buildOverlayPositionStyle(props.item, props.scale),
   ...buildOverlayBaseStyle(props.backgroundColor),
+  contain: 'paint',
   fontSize: `${resolvedFontSize.value}px`,
   fontFamily: resolveFontFamily(props.fontFamily),
-  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`
+  lineHeight: `${computeLineHeight(props.ascent, props.descent)}`,
+  textAlign: 'left',
+  padding: '0 1px'
 }))
 </script>
 
 <style scoped>
 .pdf-cell-overlay-item__text {
   display: block;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 </style>

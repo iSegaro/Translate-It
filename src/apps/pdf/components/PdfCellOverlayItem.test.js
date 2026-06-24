@@ -64,6 +64,88 @@ describe('PdfCellOverlayItem', () => {
     expect(wrapper.find('.pdf-cell-overlay-item').attributes('dir')).toBe('rtl')
   })
 
+  it('RTL cell still has text-align left', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'مرحبا بالعالم',
+        item: { x: 0, y: 0, width: 100, height: 20 },
+        scale: 1
+      }
+    })
+
+    const el = wrapper.find('.pdf-cell-overlay-item')
+    expect(el.attributes('dir')).toBe('rtl')
+    expect(el.attributes('style')).toContain('text-align: left')
+  })
+
+  it('cell overlay includes horizontal padding', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'Test',
+        item: { x: 0, y: 0, width: 100, height: 20 },
+        scale: 1
+      }
+    })
+
+    const el = wrapper.find('.pdf-cell-overlay-item')
+    expect(el.attributes('style')).toContain('padding: 0px 1px')
+  })
+
+  it('text span has white-space nowrap for single-line table mode', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'نتیجه نظارت مستقیم ESMA',
+        item: { x: 0, y: 0, width: 80, height: 20 },
+        scale: 1
+      }
+    })
+
+    const span = wrapper.find('.pdf-cell-overlay-item__text')
+    expect(span.classes()).toContain('pdf-cell-overlay-item__text')
+  })
+
+  it('text span applies nowrap, ellipsis, and overflow via scoped CSS', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'Long Farsi text that should be clipped',
+        item: { x: 0, y: 0, width: 60, height: 14 },
+        scale: 1
+      }
+    })
+
+    const span = wrapper.find('.pdf-cell-overlay-item__text')
+    expect(span.exists()).toBe(true)
+    expect(span.text()).toBe('Long Farsi text that should be clipped')
+  })
+
+  it('RTL cell with long text has dir rtl and text span renders', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'نظارت مستقیم ESMA بر فعالیت‌های مالی',
+        item: { x: 0, y: 0, width: 100, height: 20 },
+        scale: 1
+      }
+    })
+
+    const el = wrapper.find('.pdf-cell-overlay-item')
+    expect(el.attributes('dir')).toBe('rtl')
+    const span = wrapper.find('.pdf-cell-overlay-item__text')
+    expect(span.exists()).toBe(true)
+  })
+
+  it('cell container has contain paint for strict clipping', () => {
+    const wrapper = mount(PdfCellOverlayItem, {
+      props: {
+        cellText: 'Test',
+        item: { x: 0, y: 0, width: 100, height: 20 },
+        scale: 1
+      }
+    })
+
+    const el = wrapper.find('.pdf-cell-overlay-item')
+    expect(el.attributes('style')).toContain('contain: paint')
+  })
+
   it('detects LTR text', () => {
     const wrapper = mount(PdfCellOverlayItem, {
       props: {

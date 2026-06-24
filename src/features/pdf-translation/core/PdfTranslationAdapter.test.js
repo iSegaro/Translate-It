@@ -468,5 +468,107 @@ describe('PdfTranslationAdapter', () => {
       expect(mapped).toHaveLength(1)
       expect(mapped[0].translatedCells).toBeUndefined()
     })
+
+    it('emits per-cell items for single-line multi-item table-cell blocks', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('tc-1', ['Key performance indicator  Annual target'], [
+        [
+          { text: 'Key performance indicator', x: 116.48, y: 676.9, width: 114.03, height: 9 },
+          { text: 'Annual target', x: 432.6, y: 676.9, width: 58.01, height: 9 }
+        ]
+      ])
+      block.role = 'table-cell'
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(2)
+      expect(items[0]).toMatchObject({ blockId: 'tc-1', lineIndex: 0, cellIndex: 0, t: 'Key performance indicator', isStructured: true })
+      expect(items[1]).toMatchObject({ blockId: 'tc-1', lineIndex: 0, cellIndex: 1, t: 'Annual target', isStructured: true })
+    })
+
+    it('maps single-line multi-item table-cell response to translatedCells', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('tc-2', ['Objective  Target'], [
+        [
+          { text: 'Objective', x: 217.34, y: 323, width: 45.05, height: 10 },
+          { text: 'Target', x: 483.12, y: 323, width: 30.58, height: 10 }
+        ]
+      ])
+      block.role = 'table-cell'
+
+      const items = adapter.toProviderItems([block])
+      expect(items).toHaveLength(2)
+
+      const response = {
+        success: true,
+        streaming: true,
+        results: [
+          { blockId: 'tc-2', t: 'هدف' },
+          { blockId: 'tc-2', t: 'هدف سالانه' }
+        ]
+      }
+
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped).toHaveLength(1)
+      expect(mapped[0].translatedCells).toBeDefined()
+      expect(mapped[0].translatedCells).toHaveLength(1)
+      expect(mapped[0].translatedCells[0]).toEqual({ lineIndex: 0, cells: ['هدف', 'هدف سالانه'] })
+      expect(mapped[0].translatedText).toBe('هدف هدف سالانه')
+    })
+
+    it('still emits flat text for single-line paragraph blocks with single item', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeParagraphBlock('p-single', 'Just a paragraph')
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(1)
+      expect(items[0].cellIndex).toBeUndefined()
+      expect(items[0].isStructured).toBeUndefined()
+    })
+
+    it('still emits per-cell items for multi-line structured blocks', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('sched-7', ['Header', 'A  B'], [
+        [{ text: 'Header', x: 40, y: 200, width: 300, height: 14 }],
+        [
+          { text: 'A', x: 40, y: 218, width: 130, height: 14 },
+          { text: 'B', x: 180, y: 218, width: 130, height: 14 }
+        ]
+      ])
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(3)
+      expect(items[0]).toMatchObject({ lineIndex: 0, isStructured: true })
+      expect(items[0].cellIndex).toBeUndefined()
+      expect(items[1]).toMatchObject({ lineIndex: 1, cellIndex: 0, isStructured: true })
+      expect(items[2]).toMatchObject({ lineIndex: 1, cellIndex: 1, isStructured: true })
+    })
+
+    it('line cap still applies to single-line multi-item blocks exceeding max', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlock('big-single', ['Just one line'])
+      block.roleMetadata.isStructured = true
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(1)
+      expect(items[0].cellIndex).toBeUndefined()
+    })
+
+    it('max cells per line cap applies to single-line blocks', () => {
+      const adapter = new PdfTranslationAdapter()
+      const manyItems = Array.from({ length: 12 }, (_, i) => ({
+        text: `Cell${i}`, x: 40 + i * 25, y: 200, width: 25, height: 14
+      }))
+      const block = makeStructuredBlockWithCells('tc-many', ['Wide row'], [manyItems])
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items).toHaveLength(1)
+      expect(items[0].cellIndex).toBeUndefined()
+    })
   })
 })

@@ -346,9 +346,9 @@ export function detectPdfLineRole(line, context = {}) {
   const text = normalizePdfText(line?.text)
   if (!text) return 'paragraph'
 
+  if (isTableLikeLine(line, context)) return 'table-cell'
   if (isListItemText(text)) return 'list-item'
   if (isCaptionText(text)) return 'caption'
-  if (isTableLikeLine(line, context)) return 'table-cell'
   if (isHeadingLikeLine(line, context)) return 'heading'
 
   return 'paragraph'

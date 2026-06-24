@@ -1,4 +1,5 @@
 const FALLBACK_COLOR = 'rgb(255, 255, 255)'
+const MIN_READABLE_LUMINANCE = 200
 
 const colorCache = new Map()
 
@@ -35,6 +36,20 @@ function isTextPixel(r, g, b, neighborLight) {
   return luminance < 80
 }
 
+function luminance(r, g, b) {
+  return 0.299 * r + 0.587 * g + 0.114 * b
+}
+
+function ensureReadableLuminance(r, g, b) {
+  const lum = luminance(r, g, b)
+  if (lum >= MIN_READABLE_LUMINANCE) return rgbaToRgb(r, g, b)
+  const blend = (MIN_READABLE_LUMINANCE - lum) / (255 - lum)
+  const nr = Math.round(r + (255 - r) * blend)
+  const ng = Math.round(g + (255 - g) * blend)
+  const nb = Math.round(b + (255 - b) * blend)
+  return rgbaToRgb(nr, ng, nb)
+}
+
 function chooseBackgroundColor(samples, neighbors) {
   const lightSamples = []
 
@@ -53,8 +68,7 @@ function chooseBackgroundColor(samples, neighbors) {
   }
 
   if (lightSamples.length === 0 && samples.length > 0) {
-    const first = samples.find(Boolean)
-    if (first) return rgbaToRgb(first.r, first.g, first.b)
+    return FALLBACK_COLOR
   }
 
   if (lightSamples.length === 0) return FALLBACK_COLOR
@@ -69,7 +83,7 @@ function chooseBackgroundColor(samples, neighbors) {
   }
 
   const count = lightSamples.length
-  return rgbaToRgb(
+  return ensureReadableLuminance(
     Math.round(rSum / count),
     Math.round(gSum / count),
     Math.round(bSum / count)

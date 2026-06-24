@@ -582,7 +582,7 @@ describe('PdfBlockOverlayItem', () => {
       expect(cellItems[2].text()).toBe('مقدار ۲')
     })
 
-    it('positions cells at relative item coordinates within block', () => {
+    it('positions cells using inferred column widths from neighbor positions', () => {
       const wrapper = mount(PdfBlockOverlayItem, {
         props: {
           block: {
@@ -620,12 +620,180 @@ describe('PdfBlockOverlayItem', () => {
       const cell1Style = cellItems[0].attributes('style')
       expect(cell1Style).toContain('left: 0px')
       expect(cell1Style).toContain('top: 0px')
-      expect(cell1Style).toContain('width: 180px')
+      expect(cell1Style).toContain('width: 184px')
 
       const cell2Style = cellItems[1].attributes('style')
       expect(cell2Style).toContain('left: 190px')
       expect(cell2Style).toContain('top: 0px')
-      expect(cell2Style).toContain('width: 120px')
+      expect(cell2Style).toContain('width: 210px')
+    })
+
+    it('last cell extends to line right edge', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 0, y: 0, width: 500, height: 80 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 500, height: 30 },
+                items: [{ x: 0, y: 0, width: 100, height: 30 }, { x: 150, y: 0, width: 100, height: 30 }, { x: 300, y: 0, width: 100, height: 30 }],
+                text: 'A  B  C'
+              },
+              {
+                boundingBox: { x: 0, y: 35, width: 500, height: 30 },
+                items: [{ x: 0, y: 35, width: 100, height: 30 }, { x: 150, y: 35, width: 100, height: 30 }, { x: 300, y: 35, width: 100, height: 30 }],
+                text: 'D  E  F'
+              }
+            ],
+            roleMetadata: { fontSize: 10, lineCount: 2, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y', 'Z'] },
+                { lineIndex: 1, cells: ['P', 'Q', 'R'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(6)
+
+      const cell3Style = cellItems[2].attributes('style')
+      expect(cell3Style).toContain('width: 200px')
+
+      const cell6Style = cellItems[5].attributes('style')
+      expect(cell6Style).toContain('width: 200px')
+    })
+
+    it('gaps between columns are included in preceding cell width', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 0, y: 0, width: 400, height: 80 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 400, height: 30 },
+                items: [{ x: 10, y: 0, width: 80, height: 30 }, { x: 200, y: 0, width: 100, height: 30 }],
+                text: 'Wide  gap'
+              },
+              {
+                boundingBox: { x: 0, y: 35, width: 400, height: 30 },
+                items: [{ x: 10, y: 35, width: 80, height: 30 }, { x: 200, y: 35, width: 100, height: 30 }],
+                text: 'Col 1  Col 2'
+              }
+            ],
+            roleMetadata: { fontSize: 10, lineCount: 2, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['Left', 'Right'] },
+                { lineIndex: 1, cells: ['A', 'B'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(4)
+
+      const cell1Style = cellItems[0].attributes('style')
+      expect(cell1Style).toContain('width: 124px')
+
+      const cell2Style = cellItems[1].attributes('style')
+      expect(cell2Style).toContain('width: 200px')
+    })
+
+    it('single-cell line extends to line right edge', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 0, y: 0, width: 400, height: 90 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 400, height: 25 },
+                items: [{ x: 20, y: 0, width: 50, height: 25 }, { x: 150, y: 0, width: 50, height: 25 }],
+                text: 'Multi cells'
+              },
+              {
+                boundingBox: { x: 0, y: 30, width: 400, height: 25 },
+                items: [{ x: 20, y: 30, width: 50, height: 25 }],
+                text: 'Single item'
+              },
+              {
+                boundingBox: { x: 0, y: 60, width: 400, height: 25 },
+                items: [{ x: 20, y: 60, width: 50, height: 25 }, { x: 150, y: 60, width: 50, height: 25 }],
+                text: 'More cells'
+              }
+            ],
+            roleMetadata: { fontSize: 10, lineCount: 3, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'A\nB\nC',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] },
+                { lineIndex: 1, cells: ['Z'] },
+                { lineIndex: 2, cells: ['P', 'Q'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(5)
+
+      const cell2Style = cellItems[2].attributes('style')
+      expect(cell2Style).toContain('width: 380px')
+    })
+
+    it('falls back to item.width when inferred width is invalid', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'block-1',
+            boundingBox: { x: 0, y: 0, width: 300, height: 60 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 300, height: 25 },
+                items: [{ x: 100, y: 0, width: 80, height: 25 }, { x: 80, y: 0, width: 80, height: 25 }],
+                text: 'A  B'
+              },
+              {
+                boundingBox: { x: 0, y: 30, width: 300, height: 25 },
+                items: [{ x: 100, y: 30, width: 80, height: 25 }, { x: 80, y: 30, width: 80, height: 25 }],
+                text: 'C  D'
+              }
+            ],
+            roleMetadata: { fontSize: 10, lineCount: 2, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] },
+                { lineIndex: 1, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(4)
+
+      const cell1Style = cellItems[0].attributes('style')
+      expect(cell1Style).toContain('width: 80px')
     })
 
     it('detects RTL direction per cell', () => {
@@ -792,6 +960,244 @@ describe('PdfBlockOverlayItem', () => {
       const style = cellItems[0].attributes('style')
       expect(style).toContain('Times New Roman')
       expect(style).toContain('line-height: 1')
+    })
+
+    it('renders cell overlay for single-line multi-item table-cell block', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'tc-1',
+            boundingBox: { x: 77.66, y: 407.68, width: 430.84, height: 11.76 },
+            lines: [
+              {
+                boundingBox: { x: 77.66, y: 407.68, width: 430.84, height: 11.76 },
+                items: [
+                  { text: 'by ESMA direct supervision < 3 years.', x: 77.66, y: 407.68, width: 169.31, height: 10.02, right: 246.97 },
+                  { text: '78 %', x: 428.04, y: 409.42, width: 22.83, height: 10.02, right: 450.87 },
+                  { text: 'TBD', x: 488.46, y: 407.68, width: 20.04, height: 10.02, right: 508.5 }
+                ],
+                text: 'by ESMA direct supervision < 3 years. 78 % TBD'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'نتیجه نظارت مستقیم ESMA < 3 سال. 78 % TBD',
+              translatedCells: [
+                { lineIndex: 0, cells: ['نتیجه نظارت مستقیم ESMA < 3 سال.', '78 %', 'TBD'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(3)
+      expect(cellItems[0].text()).toBe('نتیجه نظارت مستقیم ESMA < 3 سال.')
+      expect(cellItems[1].text()).toBe('78 %')
+      expect(cellItems[2].text()).toBe('TBD')
+    })
+
+    it('renders cell overlay for single-line two-item table-cell block', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'tc-2',
+            boundingBox: { x: 217.34, y: 323, width: 296.361, height: 10.02 },
+            lines: [
+              {
+                boundingBox: { x: 217.34, y: 323, width: 296.361, height: 10.02 },
+                items: [
+                  { text: 'Objective', x: 217.34, y: 323, width: 45.05, height: 10.02, right: 262.39 },
+                  { text: 'Target', x: 483.12, y: 323, width: 30.58, height: 10.02, right: 513.7 }
+                ],
+                text: 'Objective Target'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'هدف هدف سالانه',
+              translatedCells: [
+                { lineIndex: 0, cells: ['هدف', 'هدف سالانه'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      expect(cellItems[0].text()).toBe('هدف')
+      expect(cellItems[1].text()).toBe('هدف سالانه')
+    })
+
+    it('falls back to block text for single-line block without translatedCells', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'tc-no-cells',
+            boundingBox: { x: 10, y: 20, width: 200, height: 40 },
+            lines: [
+              { boundingBox: { x: 10, y: 20, width: 200, height: 40 }, items: [{ text: 'A', x: 10, y: 20, width: 100, height: 40 }], text: 'A' }
+            ],
+            roleMetadata: { fontSize: 12, isStructured: true },
+            translationState: { status: 'translated', translatedText: 'ترجمه A' }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(0)
+      const blockText = wrapper.find('.pdf-block-overlay-item__text')
+      expect(blockText.exists()).toBe(true)
+      expect(blockText.text()).toBe('ترجمه A')
+    })
+
+    it('non-last cell width uses gap expansion ratio', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'gutter-1',
+            boundingBox: { x: 0, y: 0, width: 400, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 400, height: 20 },
+                items: [
+                  { text: 'A', x: 0, y: 0, width: 50, height: 14 },
+                  { text: 'B', x: 150, y: 0, width: 50, height: 14 },
+                  { text: 'C', x: 300, y: 0, width: 50, height: 14 }
+                ],
+                text: 'A  B  C'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY\nZ',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y', 'Z'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(3)
+      const style0 = cellItems[0].attributes('style')
+      const style1 = cellItems[1].attributes('style')
+      expect(style0).toContain('width: 90px')
+      expect(style1).toContain('width: 90px')
+    })
+
+    it('last cell width extends to lineRight without expansion', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'gutter-last',
+            boundingBox: { x: 0, y: 0, width: 400, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 400, height: 20 },
+                items: [
+                  { text: 'A', x: 0, y: 0, width: 50, height: 14 },
+                  { text: 'B', x: 300, y: 0, width: 50, height: 14 }
+                ],
+                text: 'A  B'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const lastStyle = cellItems[1].attributes('style')
+      expect(lastStyle).toContain('width: 100px')
+    })
+
+    it('large gap only gives 40 percent expansion, not full gap', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'ratio-1',
+            boundingBox: { x: 0, y: 0, width: 500, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 500, height: 20 },
+                items: [
+                  { text: 'First', x: 0, y: 0, width: 100, height: 14 },
+                  { text: 'Second', x: 400, y: 0, width: 80, height: 14 }
+                ],
+                text: 'First  Second'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'اول\nدوم',
+              translatedCells: [
+                { lineIndex: 0, cells: ['اول', 'دوم'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const firstStyle = cellItems[0].attributes('style')
+      expect(firstStyle).toContain('width: 220px')
+    })
+
+    it('cell width never drops below original item.width even with tiny gap', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'gutter-min',
+            boundingBox: { x: 0, y: 0, width: 100, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 100, height: 20 },
+                items: [
+                  { text: 'Wide', x: 0, y: 0, width: 80, height: 14 },
+                  { text: 'Narrow', x: 82, y: 0, width: 18, height: 14 }
+                ],
+                text: 'Wide Narrow'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const firstStyle = cellItems[0].attributes('style')
+      expect(firstStyle).toContain('width: 80.8px')
     })
   })
 })

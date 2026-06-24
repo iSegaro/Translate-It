@@ -121,6 +121,70 @@ describe('PdfLayoutAnalyzer', () => {
     })).toBe('table-cell')
   })
 
+  it('classifies numbered row with multiple items and wide gaps as table-cell', () => {
+    expect(detectPdfLineRole({
+      text: '1 Financial Stability 95% Active',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 300, height: 16 },
+      items: [
+        { x: 20, right: 100, height: 10 },
+        { x: 200, right: 250, height: 10 },
+        { x: 300, right: 380, height: 10 }
+      ],
+      roleMetadata: {}
+    })).toBe('table-cell')
+  })
+
+  it('classifies numbered row with one item as list-item', () => {
+    expect(detectPdfLineRole({
+      text: '1 Financial Stability overview',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 200, height: 16 },
+      items: [
+        { x: 20, right: 200, height: 10 }
+      ],
+      roleMetadata: {}
+    })).toBe('list-item')
+  })
+
+  it('classifies lettered row with multiple items and wide gaps as table-cell', () => {
+    expect(detectPdfLineRole({
+      text: 'a) Metric  80%  Target',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 300, height: 16 },
+      items: [
+        { x: 20, right: 80, height: 10 },
+        { x: 180, right: 230, height: 10 },
+        { x: 300, right: 370, height: 10 }
+      ],
+      roleMetadata: {}
+    })).toBe('table-cell')
+  })
+
+  it('classifies normal bullet list item as list-item', () => {
+    expect(detectPdfLineRole({
+      text: '• First item in the list',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 200, height: 16 },
+      items: [
+        { x: 20, right: 200, height: 10 }
+      ],
+      roleMetadata: {}
+    })).toBe('list-item')
+  })
+
+  it('builds KPI-like numbered rows as table-cell blocks with isStructured', async () => {
+    const lines = [
+      { text: '1 Financial Stability  95%  Active', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 100, height: 10 }, { x: 200, right: 240, height: 10 }, { x: 300, right: 340, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+      { text: '2 Effective Supervision  80%  Active', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 110, height: 10 }, { x: 200, right: 240, height: 10 }, { x: 300, right: 340, height: 10 }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+    ]
+
+    const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].role).toBe('table-region')
+    expect(blocks[0].roleMetadata.isStructured).toBe(true)
+  })
+
   it('propagates fontFamily from styles into line roleMetadata', () => {
     const styles = {
       'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25, vertical: false },

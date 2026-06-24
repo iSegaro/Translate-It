@@ -3,6 +3,8 @@
     v-if="useCellOverlay"
     class="pdf-block-overlay-item"
     :style="blockContainerStyle"
+    data-pdf-overlay-mode="cell"
+    :data-pdf-block-id="block.id"
   >
     <template
       v-for="(lineData, lineIdx) in cellOverlayData"
@@ -19,6 +21,8 @@
         :ascent="block.roleMetadata?.ascent"
         :descent="block.roleMetadata?.descent"
         :background-color="backgroundColor"
+        :data-pdf-line-index="lineIdx"
+        :data-pdf-cell-index="cellIdx"
       />
     </template>
   </div>
@@ -26,6 +30,8 @@
     v-else-if="useLineOverlay"
     class="pdf-block-overlay-item"
     :style="blockContainerStyle"
+    data-pdf-overlay-mode="line"
+    :data-pdf-block-id="block.id"
   >
     <PdfLineOverlayItem
       v-for="(line, index) in lineOverlayData"
@@ -38,6 +44,7 @@
       :ascent="block.roleMetadata?.ascent"
       :descent="block.roleMetadata?.descent"
       :background-color="backgroundColor"
+      :data-pdf-line-index="index"
     />
   </div>
   <div
@@ -45,6 +52,8 @@
     class="pdf-block-overlay-item"
     :style="overlayStyle"
     :dir="textDirection"
+    data-pdf-overlay-mode="block"
+    :data-pdf-block-id="block.id"
   >
     <span
       ref="textRef"
@@ -133,10 +142,14 @@ const useLineOverlay = computed(() => {
 })
 
 const useCellOverlay = computed(() => {
-  if (!useLineOverlay.value) return false
   if (!translatedCells.value) return false
-  return translatedCells.value.some((lc) => lc.cells && lc.cells.length > 1)
+  const hasMultiCellLine = translatedCells.value.some((lc) => lc.cells && lc.cells.length > 1)
+  if (!hasMultiCellLine) return false
+  if (sourceLineCount.value <= 1) return true
+  return useLineOverlay.value
 })
+
+const CELL_GAP_EXPANSION_RATIO = 0.4
 
 const cellOverlayData = computed(() => {
   if (!useCellOverlay.value) return []
@@ -149,16 +162,33 @@ const cellOverlayData = computed(() => {
     if (!line) return null
 
     const lineItems = line.items || []
+    const lineRight = (line.boundingBox?.x || 0) + (line.boundingBox?.width || 0)
     return {
       cells: lc.cells.map((cellText, cellIdx) => {
         const item = lineItems[cellIdx]
         if (!item) return null
+
+        const isLastCell = cellIdx === lc.cells.length - 1
+        let cellWidth
+
+        if (isLastCell) {
+          cellWidth = lineRight - item.x
+        } else {
+          const nextItem = lineItems[cellIdx + 1]
+          const itemRight = item.right ?? (item.x + item.width)
+          const gap = nextItem ? nextItem.x - itemRight : 0
+          const expansion = Math.max(0, gap * CELL_GAP_EXPANSION_RATIO)
+          cellWidth = item.width + expansion
+        }
+
+        cellWidth = Math.max(item.width, cellWidth)
+
         return {
           text: cellText,
           item: {
             x: item.x - blockBbox.x,
             y: item.y - blockBbox.y,
-            width: item.width,
+            width: cellWidth,
             height: item.height
           }
         }
