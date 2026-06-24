@@ -1,18 +1,22 @@
 ## Context
 
-The PDF viewer currently supports three modes: Original (raw PDF rendering), Bilingual (side-by-side original + translated text panel), and Translated (translated text panel only, no PDF canvas). All three are implemented via `usePdfBilingualMode.js` (3 mode constants) and `PdfViewerLayout.vue` (CSS grid layout switching).
+The PDF viewer currently supports four modes: Original (raw PDF rendering), Bilingual (side-by-side original + translated text panel), Translated (translated text panel only, no PDF canvas), and Translated PDF View (original PDF canvas with translated text overlays). All four are implemented via `usePdfBilingualMode.js` (4 mode constants) and `PdfViewerLayout.vue` (CSS grid layout switching).
 
 The existing infrastructure provides:
-- `PdfLogicalBlock` with `boundingBox` (page coordinates), `normalizedBoundingBox` (0-1), `roleMetadata.fontSize`, `lines[]` with per-line bounding boxes.
-- `PdfDocumentSession.translationStates` storing translated text per block ID.
+- `PdfLogicalBlock` with `boundingBox` (page coordinates), `normalizedBoundingBox` (0-1), `roleMetadata.fontSize`, `roleMetadata.fontFamily`, `roleMetadata.ascent`, `roleMetadata.descent`, `roleMetadata.isStructured`, `lines[]` with per-line bounding boxes and item geometry.
+- `PdfDocumentSession.translationStates` storing `translatedText` and `translatedCells` per block ID.
+- `PdfTranslationAdapter` emitting per-cell provider items for structured blocks with `translatedCells` in the response.
 - `PdfBlockHighlightOverlay` demonstrating coordinate-based positioning over the canvas.
-- `PdfTextLayerRenderer` showing how to position elements at page coordinates using percentage-based CSS.
+- `PdfTextLayerRenderer` showing how to position elements at page coordinates.
 - `PdfCacheManager` with block-based translation cache reusable across modes.
 - Table detection via `isTableLikeLine()` producing `table-cell` and `table-region` roles.
+- Font metadata propagation from `textContent.styles` through `PdfLayoutAnalyzer` into block `roleMetadata`.
+- Canvas background sampling via `pdfCanvasSampler.js` for per-block background color detection.
+- DEV-only diagnostics harness tracing the full extraction-to-render pipeline.
 
 The canvas renders at `Math.floor(viewport.width) × Math.floor(viewport.height)` CSS pixels. The text layer and overlay must share this coordinate space.
 
-**Critical architectural fact**: The text layer spans have `color: transparent` (`PdfPageView.scss:17`). The visual text users see comes entirely from the canvas rendering (`page.render()`). The text layer exists only for selection hit-testing. This means original text cannot be "hidden" by manipulating the text layer — it lives on the canvas.
+**Critical architectural fact**: The text layer spans have `color: transparent`. The visual text users see comes entirely from the canvas rendering (`page.render()`). The text layer exists only for selection hit-testing. Original text cannot be "hidden" by manipulating the text layer — it lives on the canvas.
 
 ## Goals / Non-Goals
 
@@ -27,17 +31,18 @@ The canvas renders at `Math.floor(viewport.width) × Math.floor(viewport.height)
 - Allow selection of translated overlay text.
 - Reuse existing translation cache, translation pipeline, and translation state.
 - Keep existing Original, Bilingual, and Translated modes unchanged.
+- Support line-level and cell-level overlay for structured (table) blocks.
+- Sample actual canvas background color per block for accurate overlay masking.
+- Export translated content as TXT, Markdown, or self-contained HTML.
 
-**Non-Goals (Phase 1):**
+**Non-Goals (deferred):**
 
-- Do not regenerate or modify the PDF file.
-- Do not modify the canvas rendering.
-- Do not introduce a new translation architecture or provider system.
-- Do not implement translated-text search.
-- Do not implement PDF export.
-- Do not implement cell-level table overlay rendering (Phase 2).
-- Do not implement intelligent background-aware masking (Phase 3).
-- Do not guarantee pixel-perfect font matching between PDF embedded fonts and browser system fonts.
+- True PDF export via pdf-lib (deferred to future phase).
+- Print-to-PDF automation (deferred).
+- Complex KPI/table reconstruction for perfect column alignment (deferred — see Phase 2d).
+- Intelligent full-page background masking beyond per-block canvas sampling (deferred).
+- Export progress indicator and large document streaming (deferred).
+- Do not guarantee pixel-perfect font matching between PDF embedded fonts and browser system fonts (known limitation).
 
 ## Decisions
 
@@ -47,106 +52,88 @@ The canvas renders at `Math.floor(viewport.width) × Math.floor(viewport.height)
 
 **Rationale**: PDF regeneration requires re-rendering the entire page (images, vectors, fonts) which is computationally expensive, requires access to the full PDF rendering pipeline, and produces a static output that cannot adapt to window resizing. Overlay rendering reuses the existing canvas (unchanged) and adds lightweight DOM elements only where translations exist. This is faster, reversible, and maintains the original visual fidelity for non-text elements.
 
-**Alternatives considered**:
-- PDF regeneration (rejected: too expensive, loses interactive features, requires full rendering pipeline access).
-- Canvas-based text rendering (rejected: loses text selection, accessibility, and requires manual font rendering).
-- CSS `mix-blend-mode` masking (rejected: unreliable cross-browser, cannot selectively hide text regions).
+### D2: Sampled background masking (Phase 3 MVP)
 
-### D2: No background masking in Phase 1 — solid background per overlay block
+**Decision**: Sample canvas pixels at block bounding-box positions to determine actual PDF background color instead of always using solid white.
 
-**Decision**: Do NOT attempt to mask or hide original canvas text in Phase 1. Each overlay block renders with a solid background (matching page background color) behind the translated text, improving readability against the canvas without occluding non-text content.
+**Implementation**: `pdfCanvasSampler.js` performs 7-point multi-sampling (center, 4 corners at 20% inset, mid-left, mid-right), applies neighbor-based text-pixel filtering (dark sample + light neighbor → text pixel, excluded), averages remaining light samples, and falls back to white. Per-block color cache keyed by `${blockId}:${scale}`.
 
-**Rationale**: The original text lives on the canvas (`page.render()`), not the text layer. A masking approach that draws rectangles over text regions would also occlude images, charts, colored backgrounds, and any visual content behind the text. This is a significant visual regression for PDFs with figures or styled content. A solid background per overlay block achieves readable translated text without the occlusion risk.
+**Known limitation**: Canvas `getContext('2d')` may throw `SecurityError` on tainted canvases — handled with try/catch fallback to white.
 
-**Known limitation**: Original canvas text remains partially visible underneath the overlay. The solid background of each overlay block covers the text directly behind it, but gaps between blocks may show original text. This is acceptable for MVP.
-
-**Future (Phase 3)**: Intelligent masking that detects plain-background regions and applies selective occlusion, or uses contrast-enhancing techniques (text-shadow, outline) without full background fills.
+**Future**: Full intelligent masking that detects plain-background regions and applies selective occlusion, or uses contrast-enhancing techniques (text-shadow, outline) without full background fills.
 
 ### D3: Block-level overlay, not span-level
 
-**Decision**: Render one overlay per `LogicalBlock`, not per text span or per line.
+**Decision**: Render one overlay per `LogicalBlock`, not per text span or per line (for non-structured blocks).
 
 **Rationale**: The translation pipeline operates at the block level. Each block has a single translated text result. Splitting into per-line or per-span overlays would require re-parsing the translated text and introducing rendering complexity without translation-level benefit. Block-level overlays align with the translation unit and keep the rendering model simple.
 
-**Trade-off**: Multi-line blocks may have text that wraps differently in the overlay than in the original. Adaptive font shrinking mitigates this.
+### D4: Cell-level overlay for structured blocks
 
-### D4: Table-region translation with simple overlay in Phase 1
+**Decision**: For structured blocks (`isStructured === true`), render per-cell overlays using `translatedCells` from the adapter, with source-text fallback for untranslated lines.
 
-**Decision**: In Phase 1, render `table-region` blocks as single overlay blocks (same as paragraphs). Cell-aware rendering is deferred to Phase 2.
+**Implementation**: `PdfBlockOverlayItem.vue` selects between three modes:
+- `cell` — when `translatedCells` has multi-cell lines and block is structured
+- `line` — when `translatedLines.length === sourceLineCount` and block is structured
+- `block` — fallback for all other cases
 
-**Rationale**: Reverse-parsing translated `\n`-separated text back into cells is unreliable because:
-- Translation providers may normalize whitespace (collapse spaces, add/remove newlines)
-- RTL languages may reorder content
-- Some providers add introductory text or reformat
-- The gap detection threshold used for original items may not apply to translated text
+Cell positioning uses `CELL_GAP_EXPANSION_RATIO = 0.4` to extend cells 40% into inter-column gaps. Minimum cell height is enforced as `fontSize * 0.8` for zero-height pdf.js items.
 
-The cell-aware rendering approach (parsing translated text back into cells using gap detection) is fragile and should only be attempted after the basic overlay is proven stable.
-
-**Phase 2 addition**: Cell-aware table overlay using `line.items[]` geometry, with the same gap-detection parsing used in `isTableLikeLine()` applied to translated text.
+**Known limitation**: Complex KPI/table PDFs with irregular column layouts, spanning cells, or mixed role lines within a table-region may still have imperfect column reconstruction. This is deferred to Phase 2d.
 
 ### D5: Adaptive font fitting via iterative measurement
 
 **Decision**: When translated text overflows a block's bounding box, iteratively reduce font-size until the text fits.
 
-**Proposed initial implementation**: Reduce font-size by 5% increments (minimum 60% of original). This is an implementation choice, not a formal requirement — the spec mandates adaptive fitting strategy, not specific parameters.
+**Implementation**: `usePdfTextFitter` composable measures rendered text via `getBoundingClientRect()` and reduces font-size in 5% decrements (minimum 60% of original). Applied to block, line, and cell overlay items.
 
-**Implementation**: After rendering the overlay text, measure its rendered width/height via `getBoundingClientRect()`. If it exceeds the block bounds, reduce font-size incrementally and re-measure. Stop when text fits or minimum is reached.
+### D6: Font metadata propagation (Phase 1.5)
 
-**Rationale**: This is the simplest approach that handles variable-length translations across languages. More sophisticated approaches (line-break analysis, hyphenation) add complexity without proportional benefit for MVP.
+**Decision**: Pass `textContent.styles` from `PdfPageSession.hydrate()` through `buildPdfTextLinesFromItems()` into `buildLineFromBucket()`, look up `ascent`/`descent`/`fontFamily` per item by `fontName`, and propagate into block `roleMetadata`.
 
-**Known limitation**: Very long translations may shrink to near-unreadable sizes. This is documented as expected behavior for extreme cases.
-
-### D6: Font handling — Phase 1 uses existing fontSize with fallback, exact metrics deferred
-
-**Decision (Phase 1)**: Use `roleMetadata.fontSize` (already available in `PdfLogicalBlock`) as the overlay font-size. Use hardcoded 0.8 ascent ratio for vertical positioning. Use a static font-family mapping table with generic fallback. Accept that browser fallback fonts will differ from PDF embedded fonts.
-
-**Rationale**: pdf.js `textContent.styles` provides `ascent`, `descent`, and `fontFamily` per font name. However, these values are NOT currently propagated through `PdfLayoutAnalyzer` into `PdfLogicalBlock` metadata. The propagation is straightforward (~15 lines across 4 files) but touches the shared `buildPdfTextLinesFromItems()` → `buildLineFromBucket()` code path used by all block-building. Shipping this change in Phase 1 adds regression risk to the layout analyzer without proportional benefit for initial overlay rendering.
-
-**Phase 1 font approach**:
-- Font-size: `roleMetadata.fontSize × pageMetric.scale` (already available)
-- Vertical positioning: `fontHeight × 0.8` (hardcoded, matches existing text layer behavior)
-- Font family: static mapping table (`"Times-Roman"` → `"Times New Roman", Times, serif`, etc.) with generic fallback
-- Horizontal correction: `scaleX` per block (measured post-render)
-
-**Font metadata propagation (deferred to Phase 1.5)**: Add optional `styles` parameter to `buildPdfTextLinesFromItems()`, look up `styles[item.fontName]` per item, propagate `fontFamily`/`ascent`/`descent` into line and block metadata. This is additive (new optional parameter with `= null` default), backward-compatible, and testable in isolation.
-
-**Known limitation**: Font drift of 1-3px per block is expected and acceptable for MVP. Vertical positioning uses 0.8 fallback instead of exact ascent — this is adequate for most standard PDFs and will be improved when font metadata propagation ships.
+**Rationale**: The propagation is additive (new optional parameter with `= null` default), backward-compatible, and enables precise vertical positioning and better font matching in overlay rendering.
 
 ### D7: OCR blocks use same overlay mechanism
 
-**Decision**: OCR blocks (`source: 'ocr'`) use the same overlay rendering as text-content blocks.
-
-**Rationale**: OCR blocks already have `boundingBox` in page coordinates and are stored in `pageSession.ocrBlocks[]`. They integrate with `getLogicalBlocks()` and the translation pipeline. No special handling is needed — the overlay renders them identically to text-content blocks.
+**Decision**: OCR blocks (`source: 'ocr'`) use the same overlay rendering as text-content blocks. No special handling needed.
 
 ### D8: Selection via native browser selection on overlay DOM
 
-**Decision**: Translated overlay text is selectable via native browser text selection (the overlay spans are regular DOM elements with `user-select: text`).
-
-**Rationale**: The overlay layer is a regular DOM tree positioned over the canvas. Browser text selection works on DOM elements natively. No custom selection logic is needed for the overlay layer itself.
-
-**Known limitation**: Selection may include both overlay text and underlying canvas text if the masking is incomplete. This is acceptable for MVP.
+**Decision**: Translated overlay text is selectable via native browser text selection (`user-select: text`). No custom selection logic needed.
 
 ### D9: Mode architecture — 4 modes, clean extension
 
 **Decision**: Add `'translated-pdf'` as a fourth mode value in `usePdfBilingualMode.js`, alongside existing `original`, `bilingual`, `translated`.
 
-**Rationale**: The existing `translated` mode is a real user-visible mode (in the toolbar, clickable by users) that shows ONLY the `PdfTranslatedPane` (flat text panel), NOT the PDF canvas. The new `translated-pdf` mode shows the PDF canvas with overlay. These are fundamentally different rendering strategies and should be separate modes.
+### D10: HTML export (Phase 4a MVP)
 
-The existing mode system is simple (ref + computed properties). Adding a fourth mode value requires minimal changes: new constant, new computed property for overlay visibility, and new layout class in `PdfViewerLayout.vue`.
+**Decision**: Export translated PDF as self-contained HTML with embedded canvas page images (`canvas.toDataURL('image/jpeg', 0.85)`) and absolutely-positioned translated block divs.
+
+**Rationale**: Zero new dependencies. Canvas is not tainted (local File object). HTML preserves spatial layout, text selection, and RTL direction. Users can print-to-PDF from browser for a true PDF output.
+
+**Known limitation**: Large multi-page documents may produce sizeable HTML files due to embedded base64 images.
+
+### D11: HTML export RTL detection
+
+**Decision**: Detect RTL in `buildHtmlOutput()` by counting RTL Unicode characters vs LTR characters with global regex matching. Apply `dir="rtl"` on block divs where RTL character count exceeds LTR.
+
+### D12: Partial translatedCells rendering
+
+**Decision**: Structured blocks with partial `translatedCells` (only some lines translated) render in cell mode. Lines without translations fall back to source `item.text`. This prevents silent block-fallback for partially-translated table-region blocks.
 
 ## Risks / Trade-offs
 
-- **Font fidelity**: Browser fallback fonts will not match PDF embedded fonts exactly. Horizontal drift of 1-3px per block is expected. Mitigated by `scaleX` correction per block. Vertical positioning uses 0.8 fallback ratio — adequate for MVP, improved in Phase 1.5 when font metadata propagation ships.
-- **Table detection accuracy**: Current detection relies on horizontal gaps. Tables with tight spacing or visual-only borders may not be detected. Mitigated by fallback to paragraph-level overlay for undetected tables.
-- **OCR block positioning**: OCR blocks may have less precise bounding boxes than text-content blocks. Mitigated by same overlay mechanism — no special case needed.
-- **Performance**: Each visible page renders N overlay divs (N = translated block count). For dense pages, this could be 50+ elements. Mitigated by only overlaying translated blocks (not all blocks) and using `will-change: transform` for compositing.
-- **Overflow handling**: Very long translations may shrink to near-unreadable sizes. Documented as expected behavior for extreme cases.
-- **Original text visibility**: In Phase 1, original canvas text remains partially visible between overlay blocks. The solid background per block covers text directly behind it, but gaps may show original text. Acceptable for MVP; Phase 3 adds intelligent masking.
-- **Mixed-direction text**: Blocks containing both RTL and LTR text may render incorrectly. Mitigated by per-block direction detection (existing `roleMetadata.direction`).
+- **Font fidelity**: Browser fallback fonts will not match PDF embedded fonts exactly. Mitigated by font metadata propagation and static font-family mapping.
+- **Complex table alignment**: Irregular KPI/table PDFs with spanning cells, mixed roles, or non-uniform column spacing may render imperfectly. Documented as deferred Phase 2d.
+- **OCR block positioning**: OCR blocks may have less precise bounding boxes. Mitigated by same overlay mechanism — no special case.
+- **Performance**: Dense pages may render 50+ overlay divs. Mitigated by only overlaying translated blocks and using `will-change: transform`.
+- **Canvas sampling SecurityError**: Tainted canvases (future cross-origin PDF sources) may fail `getContext('2d')`. Mitigated by try/catch fallback to white.
+- **HTML export size**: Multi-page documents with embedded JPEG canvas images can produce large files. Acceptable for MVP.
+- **Partial translation rendering**: Table-region blocks where only some lines are translated render a mix of translated cells and source text. This is visually imperfect but prevents full block-fallback.
 
 ## Phased Rollout
 
-### Phase 1 (MVP): Basic Block Overlay
+### Phase 1 (MVP): Basic Block Overlay — COMPLETE
 
 - Paragraph, heading, list, caption, and OCR block overlay
 - Adaptive font shrinking
@@ -155,37 +142,48 @@ The existing mode system is simple (ref + computed properties). Adding a fourth 
 - 4th viewer mode
 - Font-size from `roleMetadata.fontSize`, hardcoded 0.8 ascent ratio, static font-family mapping
 
-### Phase 1.5: Font Metadata Propagation
+### Phase 1.5: Font Metadata Propagation — COMPLETE
 
-- Pass `textContent.styles` from `PdfPageSession.hydrate()` through `buildPdfTextLinesFromItems()` into `buildLineFromBucket()`
-- Look up `ascent`/`descent`/`fontFamily` per item by `fontName`
-- Propagate font metadata into line and block `roleMetadata`
-- Use `style.ascent`/`style.descent` in overlay for precise vertical positioning
-- Use resolved `fontFamily` in overlay for better font matching
+- Pass `textContent.styles` from `PdfPageSession.hydrate()` through layout analyzer
+- Propagate `fontFamily`/`ascent`/`descent` into line and block `roleMetadata`
+- Use precise font metrics in overlay rendering
 
-### Phase 2a: Line-Level Overlay (Implemented)
+### Phase 2a: Line-Level Overlay — COMPLETE
 
-- Render each source line as a positioned overlay when block has multiple lines
+- Render each source line as a positioned overlay for structured blocks
 - Block container positioned at `block.boundingBox`; each line positioned relative to block origin
-- Requires `block.lines.length > 1` and `translatedText.split('\n').length === sourceLineCount`
 
-**Rejected approach — Proportional text splitting**: Do NOT split translated text proportionally across source lines as a generic fallback. This was considered during Phase 2a implementation and rejected because it can corrupt translated prose (e.g., splitting mid-word or mid-phrase) and produce misleading line-level rendering for normal multi-line paragraphs. Line-level overlay should only activate for explicitly structured content.
+### Phase 2b: Structured Block Detection — COMPLETE
 
-### Phase 2b: Structured Block Detection (Upcoming)
+- Detect schedule-like, table-region, table-cell blocks via `isTableLikeLine()` and `isScheduleLikeBlock()`
+- Gate line/cell overlay behind `roleMetadata.isStructured === true`
 
-- Detect schedule-like, table-region, table-cell, and structured-list blocks
-- Gate line-level overlay behind structured metadata/role — line overlay should NOT activate for plain paragraphs
-- Add `isStructured` or similar flag to `roleMetadata` to distinguish structured blocks from prose paragraphs
-- Schedule-like detection: repeated column-aligned rows with consistent x-positions and gaps
-- Structured-list detection: numbered/bulleted lists with consistent indentation
+### Phase 2c: Cell-Level Overlay — COMPLETE
 
-### Phase 3: Intelligent Masking
+- Per-cell overlay via `translatedCells` from adapter
+- `PdfCellOverlayItem` and `PdfLineOverlayItem` components
+- `CELL_GAP_EXPANSION_RATIO = 0.4` for inter-cell gap handling
+- Minimum cell height floor for zero-height pdf.js items
+- Partial translatedCells fallback
 
-- Background-aware masking that detects plain-background regions
-- Selective occlusion without image/chart interference
-- Contrast-enhancing techniques (text-shadow, outline)
+### Phase 2d: Complex Table Reconstruction — DEFERRED
 
-### Phase 4: Export
+- Perfect column alignment for KPI/table PDFs with irregular layouts
+- Spanning cells, mixed role lines within table-region blocks
+- Non-uniform column spacing
 
-- Translated PDF export
-- Overlay-aware export formatting
+### Phase 3: Intelligent Masking — MVP COMPLETE (Full Deferred)
+
+- **MVP**: Canvas pixel sampling per block via `pdfCanvasSampler.js`
+- **Deferred**: Full-page intelligent masking, text-shadow/outline contrast enhancement
+
+### Phase 4: Export — HTML MVP COMPLETE (PDF Deferred)
+
+- **Complete**: TXT export, Markdown export, HTML export MVP
+- **Deferred**: True PDF export via pdf-lib, print-to-PDF helper, export progress/streaming
+
+### Phase 5: Diagnostics — COMPLETE
+
+- DEV-only diagnostics harness (`pdfOverlayDiagnostics.js`)
+- `window.__PDF_OVERLAY_DIAGNOSTICS__.dumpCurrentPage()` console API
+- Full pipeline trace: extraction → adapter → translation → overlay render

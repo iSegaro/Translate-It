@@ -46,47 +46,70 @@
 - [x] 7.2 Verify overlay re-rendering on window resize (page scale change).
 - [x] 7.3 Run ESLint and fix any lint errors.
 - [x] 7.4 Run full PDF test suite and verify no regressions.
-- [ ] 7.5 Manual smoke test: open PDF, switch to overlay mode, translate visible pages, verify text positioning and selection.
+- [x] 7.5 Manual smoke test: open PDF, switch to overlay mode, translate visible pages, verify text positioning and selection.
 
-## 8. Font Metadata Propagation (Phase 1.5 — Deferred)
+## 8. Font Metadata Propagation (Phase 1.5)
 
-- [ ] 8.1 Pass `textContent.styles` from `PdfPageSession.hydrate()` to `buildPdfTextLinesFromItems()` as optional third parameter.
-- [ ] 8.2 Add optional `styles` parameter to `buildPdfTextLinesFromItems()` and forward to `buildLineFromBucket()`.
-- [ ] 8.3 In `buildLineFromBucket()`, look up `styles[item.raw.fontName]` per item to get `ascent`, `descent`, `fontFamily`.
-- [ ] 8.4 Propagate `fontFamily`, `ascent`, `descent` into line output and block `roleMetadata`.
-- [ ] 8.5 Update `PdfBlockOverlayItem.vue` to use `style.ascent`/`style.descent` for vertical positioning when available, falling back to 0.8.
-- [ ] 8.6 Update `PdfBlockOverlayItem.vue` to use resolved `fontFamily` from block metadata when available.
-- [ ] 8.7 Add unit tests for font metadata propagation through the layout analyzer pipeline.
-- [ ] 8.8 Add integration test verifying overlay uses propagated font metrics when available.
+- [x] 8.1 Pass `textContent.styles` from `PdfPageSession.hydrate()` to `buildPdfTextLinesFromItems()` as optional third parameter.
+- [x] 8.2 Add optional `styles` parameter to `buildPdfTextLinesFromItems()` and forward to `buildLineFromBucket()`.
+- [x] 8.3 In `buildLineFromBucket()`, look up `styles[item.raw.fontName]` per item to get `ascent`, `descent`, `fontFamily`.
+- [x] 8.4 Propagate `fontFamily`, `ascent`, `descent` into line output and block `roleMetadata`.
+- [x] 8.5 Update `PdfBlockOverlayItem.vue` to use `style.ascent`/`style.descent` for vertical positioning when available, falling back to 0.8.
+- [x] 8.6 Update `PdfBlockOverlayItem.vue` to use resolved `fontFamily` from block metadata when available.
+- [x] 8.7 Add unit tests for font metadata propagation through the layout analyzer pipeline.
+- [x] 8.8 Add integration test verifying overlay uses propagated font metrics when available.
 
 ## 9. Structured Block Detection (Phase 2b)
-
-> **Decision**: Proportional text splitting was rejected. Line-level overlay must NOT activate for plain paragraphs — only for explicitly structured blocks (table-region, table-cell, schedule-like, structured-list). Splitting translated text proportionally across source lines corrupts prose and produces misleading rendering.
 
 - [x] 9.1 Add `isStructured` flag to `roleMetadata` for blocks detected as table-region, table-cell, schedule-like, or structured-list.
 - [x] 9.2 Implement schedule-like block detection: identify repeated column-aligned rows with consistent x-positions and inter-column gaps across consecutive lines.
 - [x] 9.3 Gate line-level overlay in `PdfBlockOverlayItem.vue` behind `roleMetadata.isStructured === true` (in addition to existing line count check).
-- [x] 9.4 ~~Update `PdfOverlayLayer.vue` to pass structured metadata through to overlay items.~~ Already complete — `PdfOverlayLayer` passes the full `block` object directly, so `roleMetadata.isStructured` is available without any changes.
+- [x] 9.4 `PdfOverlayLayer` passes the full `block` object directly, so `roleMetadata.isStructured` is available without changes.
 - [x] 9.5 Add unit tests for schedule-like detection and structured block flag propagation.
-- [ ] 9.6 Add integration tests verifying line overlay activates only for structured blocks and stays off for paragraphs.
+- [x] 9.6 Add integration tests verifying line overlay activates only for structured blocks and stays off for paragraphs.
 
-## 10. Advanced Table Overlay (Phase 2c — Deferred)
+## 10. Cell-Level Overlay (Phase 2c)
 
-- [ ] 10.1 Create `PdfTableOverlayItem.vue` component that parses `\n`-separated translated text into rows, splits rows into cells using gap detection, and renders per-cell overlays at original `item.x`, `item.y` positions.
-- [ ] 10.2 Implement cell text overflow handling with independent adaptive font shrinking per cell.
-- [ ] 10.3 Handle mismatched cell counts between translated and original rows.
-- [ ] 10.4 Add unit tests for `PdfTableOverlayItem.vue` row/cell parsing and positioning.
-- [ ] 10.5 Integrate table overlay component into `PdfOverlayLayer.vue` for `table-region` blocks.
+> **Decision**: Proportional text splitting was rejected. Cell overlay uses per-cell provider items from `PdfTranslationAdapter`, with `translatedCells` passed through the coordinator to session state.
 
-## 11. Intelligent Masking (Phase 3 — Deferred)
+- [x] 10.1 Create `PdfCellOverlayItem.vue` component that renders individual cells at original item positions with independent font fitting.
+- [x] 10.2 Create `PdfLineOverlayItem.vue` component for line-level overlay of structured blocks without multi-cell data.
+- [x] 10.3 Implement `useCellOverlay` / `useLineOverlay` mode selection in `PdfBlockOverlayItem.vue` based on `translatedCells`, `isStructured`, and line count.
+- [x] 10.4 Implement `cellOverlayData` computation with `CELL_GAP_EXPANSION_RATIO = 0.4` for inter-cell gap expansion.
+- [x] 10.5 Implement minimum cell height floor using `fontSize * 0.8` for zero-height pdf.js items.
+- [x] 10.6 Implement partial `translatedCells` fallback: structured blocks with partial translations render cell mode for translated lines, source text fallback for untranslated lines.
+- [x] 10.7 Add unit tests for cell overlay positioning, cell height floor, and partial translatedCells fallback.
+- [ ] 10.8 Complex KPI/table reconstruction for perfect column alignment (deferred — see Phase 2d).
 
-- [ ] 11.1 Implement background detection for text regions (plain vs. image/chart).
-- [ ] 11.2 Apply selective masking only to plain-background regions.
-- [ ] 11.3 Add contrast-enhancing techniques (text-shadow, outline) for readability without full occlusion.
-- [ ] 11.4 Test with PDFs containing images, charts, and colored backgrounds behind text.
+## 11. Sampled Background Masking (Phase 3 MVP)
 
-## 12. Export (Phase 4 — Deferred)
+> **Decision**: Full intelligent masking deferred. MVP uses canvas pixel sampling to determine actual background color per block, replacing hardcoded white with sampled color.
 
-- [ ] 12.1 Implement translated PDF export with overlay content baked into output.
-- [ ] 12.2 Add export format options (PDF, HTML).
-- [ ] 12.3 Surface export progress and completion states.
+- [x] 11.1 Create `pdfCanvasSampler.js` with multi-point canvas pixel sampling (7-point: center, 4 corners at 20% inset, mid-left, mid-right).
+- [x] 11.2 Implement neighbor-based text-pixel filtering (dark sample + light neighbor → text pixel, excluded from average).
+- [x] 11.3 Implement per-block color cache keyed by `${blockId}:${scale}`, cleaned on `onBeforeUnmount`.
+- [x] 11.4 Integrate canvas sampling into `PdfBlockOverlayItem.vue` via `sampleCanvasBackgroundColor()`.
+- [x] 11.5 Wrap `canvas.getContext('2d')` in try/catch for SecurityError on tainted canvases.
+- [ ] 11.6 Full intelligent masking for plain-background regions (deferred).
+- [ ] 11.7 Contrast-enhancing techniques — text-shadow, outline (deferred).
+
+## 12. Export (Phase 4)
+
+- [x] 12.1 Implement TXT export with page separators and role-aware formatting (existing — `PdfExportCollector` + `PdfExportFormatter`).
+- [x] 12.2 Implement Markdown export with headings, lists, and captions (existing).
+- [x] 12.3 Implement HTML export MVP: self-contained HTML with embedded canvas page images + positioned translated block overlays (`buildHtmlOutput`, `exportHtml`).
+- [x] 12.4 Add "Export HTML" button to toolbar with event wiring through `PdfApp.vue`.
+- [x] 12.5 Implement canvas dataURL collection via `PdfViewer.collectCanvasDataUrls()` with JPEG compression (quality 0.85) and try/catch for tainted canvases.
+- [x] 12.6 RTL detection in HTML export with `dir="rtl"` on RTL text blocks.
+- [x] 12.7 HTML escape for XSS prevention in translated text.
+- [ ] 12.8 True PDF export via pdf-lib with selectable text (deferred).
+- [ ] 12.9 Print-to-PDF helper (deferred).
+- [ ] 12.10 Export progress indicator and large document streaming (deferred).
+
+## 13. Diagnostics Harness (DEV-only)
+
+- [x] 13.1 Create `src/apps/pdf/debug/pdfOverlayDiagnostics.js` with `buildPageReport()`, `dumpCurrentPage()`, `dumpAllPages()`.
+- [x] 13.2 Register on `globalThis.__PDF_OVERLAY_DIAGNOSTICS__` for console access.
+- [x] 13.3 Dynamic import in `PdfApp.vue` in dev mode only (`import.meta.env.DEV`).
+- [x] 13.4 Trace extraction → adapter → translation → overlay render pipeline per block with warning detection.
+- [x] 13.5 Add tests for diagnostics report structure, cell mode detection, and partial translatedCells warnings.

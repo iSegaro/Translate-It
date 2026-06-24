@@ -78,3 +78,12 @@ The system SHALL support block targeting (hover/click highlighting) in overlay m
 
 - **WHEN** the user activates block targeting in `translated-pdf` mode and hovers over a block
 - **THEN** the block highlight SHALL appear over both the canvas and overlay layers
+
+### Requirement: Export buttons available in all modes with translations
+
+The system SHALL display export buttons (TXT, Markdown, HTML) in the toolbar regardless of viewer mode, when translations exist.
+
+#### Scenario: Export in bilingual mode
+
+- **WHEN** the viewer mode is `bilingual` and translations exist
+- **THEN** export buttons SHALL be visible and functional
