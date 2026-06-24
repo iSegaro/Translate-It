@@ -330,6 +330,16 @@ function isHeadingLikeLine(line, context) {
 function isTableLikeLine(line) {
   if (line.items.length < 2) return false
 
+  if (line.items.some((item) => item.virtualFromWhitespace)) return true
+
+  const hasWhitespaceGroups = line.items.some((item) => {
+    const rawStr = item.raw?.str
+    if (!rawStr || !VIRTUAL_WHITESPACE_PATTERN.test(rawStr)) return false
+    const groups = rawStr.split(VIRTUAL_WHITESPACE_PATTERN).filter((g) => g.trim().length > 0)
+    return groups.length >= MIN_VIRTUAL_TEXT_GROUPS
+  })
+  if (hasWhitespaceGroups) return true
+
   const gaps = [...line.items]
     .sort((a, b) => a.x - b.x || a.index - b.index)
     .map((item, index, items) => {

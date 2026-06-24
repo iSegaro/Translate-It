@@ -1199,5 +1199,235 @@ describe('PdfBlockOverlayItem', () => {
       const firstStyle = cellItems[0].attributes('style')
       expect(firstStyle).toContain('width: 80.8px')
     })
+
+    it('zero-height cell item still renders with minimum height', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'min-h-1',
+            boundingBox: { x: 0, y: 0, width: 300, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 300, height: 20 },
+                items: [
+                  { text: 'A', x: 0, y: 0, width: 100, height: 0, right: 100 },
+                  { text: 'B', x: 150, y: 0, width: 100, height: 0, right: 250 }
+                ],
+                text: 'A  B',
+                fontSize: 10
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const style = cellItems[0].attributes('style')
+      expect(style).toContain('height: 8px')
+    })
+
+    it('missing item.height uses blockFontSize fallback', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'min-h-2',
+            boundingBox: { x: 0, y: 0, width: 300, height: 20 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 300, height: 20 },
+                items: [
+                  { text: 'A', x: 0, y: 0, width: 100, right: 100 },
+                  { text: 'B', x: 150, y: 0, width: 100, right: 250 }
+                ],
+                text: 'A  B'
+              }
+            ],
+            roleMetadata: { fontSize: 12, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const style = cellItems[0].attributes('style')
+      expect(style).toContain('height: 9.6px')
+    })
+
+    it('normal height items are unchanged', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'min-h-3',
+            boundingBox: { x: 0, y: 0, width: 300, height: 40 },
+            lines: [
+              {
+                boundingBox: { x: 0, y: 0, width: 300, height: 30 },
+                items: [
+                  { text: 'A', x: 0, y: 0, width: 100, height: 20, right: 100 },
+                  { text: 'B', x: 150, y: 0, width: 100, height: 20, right: 250 }
+                ],
+                text: 'A  B'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'X\nY',
+              translatedCells: [
+                { lineIndex: 0, cells: ['X', 'Y'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const cellItems = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(cellItems.length).toBe(2)
+      const style = cellItems[0].attributes('style')
+      expect(style).toContain('height: 20px')
+    })
+  })
+
+  describe('partial translatedCells fallback', () => {
+    it('table-region with 9 source lines and translatedCells for only line 8 renders cell mode', () => {
+      const lines = Array.from({ length: 9 }, (_, i) => ({
+        boundingBox: { x: 78, y: 408 + i * 12, width: 430, height: 10 },
+        items: [
+          { text: `line${i}-col0`, x: 78, y: 408 + i * 12, width: 300, height: 10, right: 378 },
+          { text: `line${i}-col1`, x: 428, y: 408 + i * 12, width: 20, height: 10, right: 448 }
+        ],
+        text: `line${i}-col0 line${i}-col1`
+      }))
+
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'table-region-9',
+            boundingBox: { x: 78, y: 408, width: 430, height: 108 },
+            lines,
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'translated only last line',
+              translatedCells: [
+                { lineIndex: 8, cells: ['translated-col0', 'translated-col1'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      expect(wrapper.attributes('data-pdf-overlay-mode')).toBe('cell')
+      const allCells = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(allCells.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('missing translated cell falls back per-cell using source item text', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'partial-cells',
+            boundingBox: { x: 78, y: 400, width: 430, height: 30 },
+            lines: [
+              {
+                boundingBox: { x: 78, y: 400, width: 430, height: 10 },
+                items: [
+                  { text: 'src-A', x: 78, y: 400, width: 300, height: 10, right: 378 },
+                  { text: 'src-B', x: 428, y: 400, width: 20, height: 10, right: 448 }
+                ],
+                text: 'src-A src-B'
+              },
+              {
+                boundingBox: { x: 78, y: 412, width: 430, height: 10 },
+                items: [
+                  { text: 'src-C', x: 78, y: 412, width: 300, height: 10, right: 378 },
+                  { text: 'src-D', x: 428, y: 412, width: 20, height: 10, right: 448 }
+                ],
+                text: 'src-C src-D'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'translated only one line',
+              translatedCells: [
+                { lineIndex: 0, cells: ['translated-A', 'translated-B'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const allCells = wrapper.findAll('.pdf-cell-overlay-item')
+      expect(allCells.length).toBe(4)
+
+      const texts = allCells.map((c) => c.text())
+      expect(texts).toContain('translated-A')
+      expect(texts).toContain('translated-B')
+      expect(texts).toContain('src-C')
+      expect(texts).toContain('src-D')
+    })
+
+    it('structured block with line/item geometry never falls back to block mode when translatedCells exists', () => {
+      const wrapper = mount(PdfBlockOverlayItem, {
+        props: {
+          block: {
+            id: 'structured-partial',
+            boundingBox: { x: 78, y: 400, width: 430, height: 24 },
+            lines: [
+              {
+                boundingBox: { x: 78, y: 400, width: 430, height: 10 },
+                items: [
+                  { text: 'X', x: 78, y: 400, width: 200, height: 10, right: 278 },
+                  { text: 'Y', x: 328, y: 400, width: 50, height: 10, right: 378 }
+                ],
+                text: 'X Y'
+              },
+              {
+                boundingBox: { x: 78, y: 412, width: 430, height: 10 },
+                items: [
+                  { text: 'Z', x: 78, y: 412, width: 200, height: 10, right: 278 },
+                  { text: 'W', x: 328, y: 412, width: 50, height: 10, right: 378 }
+                ],
+                text: 'Z W'
+              }
+            ],
+            roleMetadata: { fontSize: 10, isStructured: true },
+            translationState: {
+              status: 'translated',
+              translatedText: 'partial',
+              translatedCells: [
+                { lineIndex: 0, cells: ['tr-A', 'tr-B'] }
+              ]
+            }
+          },
+          pageMetric: { scale: 1 }
+        }
+      })
+
+      const mode = wrapper.find('.pdf-block-overlay-item')
+      expect(mode.attributes('data-pdf-overlay-mode')).toBe('cell')
+    })
   })
 })

@@ -141,11 +141,16 @@ const useLineOverlay = computed(() => {
   return sourceLineCount.value > 1
 })
 
+const isStructuredBlock = computed(() => {
+  return props.block.roleMetadata?.isStructured === true
+})
+
 const useCellOverlay = computed(() => {
   if (!translatedCells.value) return false
   const hasMultiCellLine = translatedCells.value.some((lc) => lc.cells && lc.cells.length > 1)
   if (!hasMultiCellLine) return false
   if (sourceLineCount.value <= 1) return true
+  if (isStructuredBlock.value) return true
   return useLineOverlay.value
 })
 
@@ -155,20 +160,25 @@ const cellOverlayData = computed(() => {
   if (!useCellOverlay.value) return []
 
   const blockBbox = props.block.boundingBox
-  const cells = translatedCells.value || []
+  const translatedCellMap = new Map()
+  for (const lc of (translatedCells.value || [])) {
+    translatedCellMap.set(lc.lineIndex, lc.cells)
+  }
 
-  return cells.map((lc) => {
-    const line = props.block.lines?.[lc.lineIndex]
-    if (!line) return null
-
+  return (props.block.lines || []).map((line, lineIndex) => {
     const lineItems = line.items || []
-    const lineRight = (line.boundingBox?.x || 0) + (line.boundingBox?.width || 0)
+    if (lineItems.length === 0) return null
+
+    const translatedCellTexts = translatedCellMap.get(lineIndex)
+    const cellTexts = translatedCellTexts || lineItems.map((item) => item.text || '')
+
     return {
-      cells: lc.cells.map((cellText, cellIdx) => {
+      cells: cellTexts.map((cellText, cellIdx) => {
         const item = lineItems[cellIdx]
         if (!item) return null
 
-        const isLastCell = cellIdx === lc.cells.length - 1
+        const lineRight = (line.boundingBox?.x || 0) + (line.boundingBox?.width || 0)
+        const isLastCell = cellIdx === cellTexts.length - 1
         let cellWidth
 
         if (isLastCell) {
@@ -183,13 +193,15 @@ const cellOverlayData = computed(() => {
 
         cellWidth = Math.max(item.width, cellWidth)
 
+        const cellHeight = Math.round(Math.max(item.height || 0, item.fontSize ? item.fontSize * 0.8 : blockFontSize.value * 0.8) * 10) / 10
+
         return {
           text: cellText,
           item: {
             x: item.x - blockBbox.x,
             y: item.y - blockBbox.y,
             width: cellWidth,
-            height: item.height
+            height: cellHeight
           }
         }
       }).filter(Boolean)

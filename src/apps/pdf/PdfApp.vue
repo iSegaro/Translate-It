@@ -257,6 +257,9 @@ const {
 
 onMounted(() => {
   startSelectionAction()
+  if (import.meta.env.DEV) {
+    import('./debug/pdfOverlayDiagnostics.js')
+  }
 })
 
 onBeforeUnmount(() => {

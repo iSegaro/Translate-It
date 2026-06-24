@@ -185,6 +185,56 @@ describe('PdfLayoutAnalyzer', () => {
     expect(blocks[0].roleMetadata.isStructured).toBe(true)
   })
 
+  it('classifies single-TextItem with virtual whitespace groups as table-cell', () => {
+    expect(detectPdfLineRole({
+      text: '1 Financial Stability 95% Active',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 300, height: 14 },
+      items: [
+        { x: 20, right: 100, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } },
+        { x: 200, right: 240, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } },
+        { x: 300, right: 340, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } }
+      ],
+      roleMetadata: {}
+    })).toBe('table-cell')
+  })
+
+  it('classifies single-TextItem with one group as list-item', () => {
+    expect(detectPdfLineRole({
+      text: '1 Financial Stability overview',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 200, height: 16 },
+      items: [
+        { x: 20, right: 200, height: 10, raw: { str: '1 Financial Stability overview' } }
+      ],
+      roleMetadata: {}
+    })).toBe('list-item')
+  })
+
+  it('does not classify single-TextItem with only 2 whitespace groups as table-cell', () => {
+    expect(detectPdfLineRole({
+      text: 'Hello World',
+      fontSize: 10,
+      boundingBox: { x: 20, y: 140, width: 200, height: 14 },
+      items: [
+        { x: 20, right: 60, height: 10, raw: { str: 'Hello  World' } },
+        { x: 65, right: 100, height: 10, raw: { str: 'Hello  World' } }
+      ],
+      roleMetadata: {}
+    })).toBe('paragraph')
+  })
+
+  it('builds virtual whitespace row with leading number as table-region with isStructured', async () => {
+    const lines = [
+      { text: '1 Financial Stability 95% Active', fontSize: 10, boundingBox: { x: 40, y: 200, width: 300, height: 14 }, items: [{ x: 40, right: 120, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } }, { x: 200, right: 240, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } }, { x: 300, right: 340, height: 10, virtualFromWhitespace: true, raw: { str: '1 Financial Stability  95%  Active' } }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 0 },
+      { text: '2 Effective Supervision 80% Active', fontSize: 10, boundingBox: { x: 40, y: 218, width: 300, height: 14 }, items: [{ x: 40, right: 110, height: 10, virtualFromWhitespace: true, raw: { str: '2 Effective Supervision  80%  Active' } }, { x: 200, right: 240, height: 10, virtualFromWhitespace: true, raw: { str: '2 Effective Supervision  80%  Active' } }, { x: 300, right: 340, height: 10, virtualFromWhitespace: true, raw: { str: '2 Effective Supervision  80%  Active' } }], direction: 'ltr', roleMetadata: {}, columnIndex: 0, readingOrderIndex: 1 }
+    ]
+
+    const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].roleMetadata.isStructured).toBe(true)
+  })
+
   it('propagates fontFamily from styles into line roleMetadata', () => {
     const styles = {
       'F1': { fontFamily: 'Times-Roman', ascent: 0.75, descent: -0.25, vertical: false },
