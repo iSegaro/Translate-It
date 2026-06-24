@@ -273,7 +273,7 @@ export class PdfDocumentSession extends ResourceTracker {
     canvasEl.style.width = `${Math.floor(viewport.width)}px`
     canvasEl.style.height = `${Math.floor(viewport.height)}px`
 
-    const context = canvasEl.getContext('2d', { alpha: false })
+    const context = canvasEl.getContext('2d', { alpha: false, willReadFrequently: true })
     if (!context) {
       throw new Error('Canvas 2D context not available')
     }
