@@ -309,8 +309,17 @@ export function resolvePdfReadingOrder(lines = [], pageSize = null) {
   })
 }
 
+function isNumericListMarker(text) {
+  const match = text.match(/^\(?(\d+(?:\.\d+)*)[.)]?\s/)
+  if (!match) return false
+  const mainDigits = match[1].split('.')[0]
+  if (mainDigits.length <= 3) return true
+  const afterNum = text.substring(match[1].length)
+  return /^[.)]/.test(afterNum) || /^\(.*\)/.test(text.substring(0, match[1].length + 2))
+}
+
 function isListItemText(text) {
-  return /^(?:[•‣◦·*-]|\(?\d+(?:\.\d+)*[.)]?|[a-zA-Z][.)])\s+\S/.test(text)
+  return /^(?:[•‣◦·*-]|[a-zA-Z][.)])\s+\S/.test(text) || isNumericListMarker(text)
 }
 
 function isCaptionText(text) {

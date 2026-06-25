@@ -625,5 +625,88 @@ describe('PdfLayoutAnalyzer', () => {
       expect(blocks[0].role).toBe('paragraph')
       expect(blocks[0].lines).toHaveLength(2)
     })
+
+    it('paragraph followed by year line merges into one paragraph', () => {
+      const lines = [
+        makeLine({
+          text: 'The main effects expected to materialise from',
+          boundingBox: { x: 72, y: 700, width: 400, height: 14 },
+          items: [{ x: 72, right: 472, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: '2029 onwards.',
+          boundingBox: { x: 72, y: 716, width: 80, height: 14 },
+          items: [{ x: 72, right: 152, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].role).toBe('paragraph')
+      expect(blocks[0].lines).toHaveLength(2)
+      expect(blocks[0].text).toContain('2029 onwards.')
+    })
+  })
+
+  describe('isListItemText numeric marker detection', () => {
+    function lineWith(text) {
+      return {
+        text,
+        fontSize: 10,
+        boundingBox: { x: 40, y: 140, width: 300, height: 16 },
+        items: [{ x: 40, right: 340, height: 10 }],
+        roleMetadata: {}
+      }
+    }
+
+    it('does not classify generic 4-digit number as list-item', () => {
+      expect(detectPdfLineRole(lineWith('2029 onwards.'))).toBe('paragraph')
+    })
+
+    it('does not classify 4-digit year as list-item', () => {
+      expect(detectPdfLineRole(lineWith('2025 target'))).toBe('paragraph')
+    })
+
+    it('does not classify 4-digit year as list-item', () => {
+      expect(detectPdfLineRole(lineWith('1999 baseline'))).toBe('paragraph')
+    })
+
+    it('does not classify bare 4-digit number as list-item', () => {
+      expect(detectPdfLineRole(lineWith('1234 Item text'))).toBe('paragraph')
+    })
+
+    it('classifies 1-digit item as list-item', () => {
+      expect(detectPdfLineRole(lineWith('1 Item'))).toBe('list-item')
+    })
+
+    it('classifies 3-digit item as list-item', () => {
+      expect(detectPdfLineRole(lineWith('123 Item'))).toBe('list-item')
+    })
+
+    it('classifies sub-numbered item as list-item', () => {
+      expect(detectPdfLineRole(lineWith('12.3.4 Item'))).toBe('list-item')
+    })
+
+    it('classifies parenthesized number as list-item', () => {
+      expect(detectPdfLineRole(lineWith('(4) Item'))).toBe('list-item')
+    })
+
+    it('classifies 4-digit number with trailing dot as list-item', () => {
+      expect(detectPdfLineRole(lineWith('1234. Item'))).toBe('list-item')
+    })
+
+    it('classifies 4-digit number with trailing paren as list-item', () => {
+      expect(detectPdfLineRole(lineWith('1234) Item'))).toBe('list-item')
+    })
+
+    it('classifies parenthesized 4-digit number as list-item', () => {
+      expect(detectPdfLineRole(lineWith('(1234) Item'))).toBe('list-item')
+    })
+
+    it('classifies bullet item as list-item', () => {
+      expect(detectPdfLineRole(lineWith('• bullet item'))).toBe('list-item')
+    })
   })
 })
