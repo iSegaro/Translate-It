@@ -498,4 +498,132 @@ describe('PdfLayoutAnalyzer', () => {
       expect(lines[0].items[0].descent).toBe(-0.25)
     })
   })
+
+  describe('list-item continuation merging', () => {
+    function makeLine(overrides) {
+      return {
+        text: 'default',
+        fontSize: 10,
+        boundingBox: { x: 40, y: 100, width: 200, height: 14 },
+        items: [{ x: 40, right: 240, height: 10 }],
+        direction: 'ltr',
+        roleMetadata: {},
+        columnIndex: 0,
+        readingOrderIndex: 0,
+        ...overrides
+      }
+    }
+
+    it('merges indented continuation paragraph into list-item block', () => {
+      const lines = [
+        makeLine({
+          text: '• First bullet item',
+          boundingBox: { x: 40, y: 200, width: 400, height: 14 },
+          items: [{ x: 40, right: 440, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: 'continuation of the bullet item',
+          boundingBox: { x: 58, y: 216, width: 380, height: 14 },
+          items: [{ x: 58, right: 438, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].role).toBe('list-item')
+      expect(blocks[0].lines).toHaveLength(2)
+      expect(blocks[0].text).toContain('• First bullet item')
+      expect(blocks[0].text).toContain('continuation of the bullet item')
+    })
+
+    it('does not merge when vertical gap is too large', () => {
+      const lines = [
+        makeLine({
+          text: '• First bullet item',
+          boundingBox: { x: 40, y: 200, width: 400, height: 14 },
+          items: [{ x: 40, right: 440, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: 'continuation far away',
+          boundingBox: { x: 58, y: 250, width: 380, height: 14 },
+          items: [{ x: 58, right: 438, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].role).toBe('list-item')
+      expect(blocks[1].role).toBe('paragraph')
+    })
+
+    it('does not merge when continuation is too far right', () => {
+      const lines = [
+        makeLine({
+          text: '• First bullet item',
+          boundingBox: { x: 40, y: 200, width: 200, height: 14 },
+          items: [{ x: 40, right: 240, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: 'text in different column',
+          boundingBox: { x: 300, y: 216, width: 180, height: 14 },
+          items: [{ x: 300, right: 480, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].role).toBe('list-item')
+      expect(blocks[1].role).toBe('paragraph')
+    })
+
+    it('keeps separate bullet items as separate blocks', () => {
+      const lines = [
+        makeLine({
+          text: '• First bullet',
+          boundingBox: { x: 40, y: 200, width: 200, height: 14 },
+          items: [{ x: 40, right: 240, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: '• Second bullet',
+          boundingBox: { x: 40, y: 230, width: 200, height: 14 },
+          items: [{ x: 40, right: 240, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(2)
+      expect(blocks[0].role).toBe('list-item')
+      expect(blocks[1].role).toBe('list-item')
+    })
+
+    it('preserves existing paragraph-to-paragraph merging', () => {
+      const lines = [
+        makeLine({
+          text: 'First paragraph line',
+          boundingBox: { x: 40, y: 200, width: 400, height: 14 },
+          items: [{ x: 40, right: 440, height: 10 }],
+          readingOrderIndex: 0
+        }),
+        makeLine({
+          text: 'Second paragraph line',
+          boundingBox: { x: 40, y: 216, width: 400, height: 14 },
+          items: [{ x: 40, right: 440, height: 10 }],
+          readingOrderIndex: 1
+        })
+      ]
+
+      const blocks = buildPdfLogicalBlocksFromLines(lines, { pageSize: { width: 500, height: 700 } })
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].role).toBe('paragraph')
+      expect(blocks[0].lines).toHaveLength(2)
+    })
+  })
 })

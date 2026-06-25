@@ -367,7 +367,7 @@ export function detectPdfLineRole(line, context = {}) {
 function canAppendLineToBlock(block, line, role, context) {
   if (!block) return false
 
-  if (block.role === 'heading' || block.role === 'caption' || block.role === 'list-item') {
+  if (block.role === 'heading' || block.role === 'caption') {
     return false
   }
 
@@ -381,6 +381,14 @@ function canAppendLineToBlock(block, line, role, context) {
 
   const blockBottom = block.boundingBox.y + block.boundingBox.height
   const gap = line.boundingBox.y - blockBottom
+
+  if (block.role === 'list-item') {
+    const maxGap = Math.max(block.roleMetadata?.fontSize * 1.1 || 10, 10)
+    if (gap > maxGap) return false
+    const xInRange = line.boundingBox.x >= block.boundingBox.x &&
+      line.boundingBox.x <= block.boundingBox.x + block.boundingBox.width * 0.5
+    return xInRange
+  }
 
   if (role === 'table-cell' || block.role === 'table-cell' || block.role === 'table-region') {
     const xDelta = Math.abs(line.boundingBox.x - block.boundingBox.x)
