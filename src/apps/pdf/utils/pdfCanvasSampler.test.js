@@ -288,4 +288,176 @@ describe('pdfCanvasSampler', () => {
     const lum = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
     expect(lum).toBeGreaterThanOrEqual(200)
   })
+
+  it('uses 30% inset for sample points', () => {
+    const coords = []
+    const canvas = {
+      width: 400,
+      height: 400,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn((x, y) => {
+          coords.push({ x, y })
+          return { data: [255, 255, 255, 255] }
+        })
+      }))
+    }
+    const bbox = { x: 0, y: 0, width: 100, height: 100 }
+    sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-inset')
+    const inset = 100 * 0.3
+    const expectedPoints = [
+      { x: 50, y: 50 },
+      { x: inset, y: inset },
+      { x: 100 - inset, y: inset },
+      { x: inset, y: 100 - inset },
+      { x: 100 - inset, y: 100 - inset },
+      { x: inset, y: 50 },
+      { x: 100 - inset, y: 50 }
+    ]
+    const sampleCoords = coords.filter((_, i) => i % 2 === 0)
+    for (let i = 0; i < expectedPoints.length; i++) {
+      expect(sampleCoords[i].x).toBe(expectedPoints[i].x)
+      expect(sampleCoords[i].y).toBe(expectedPoints[i].y)
+    }
+  })
+
+  it('gray edge pixels do not affect white center sampling', () => {
+    const canvas = {
+      width: 400,
+      height: 400,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn((x, y) => {
+          if (x < 130 || x > 270 || y < 130 || y > 270) {
+            return { data: [180, 180, 180, 255] }
+          }
+          return { data: [255, 255, 255, 255] }
+        })
+      }))
+    }
+    const bbox = { x: 100, y: 100, width: 200, height: 200 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-edge-gray')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('returns white for uniform white background', () => {
+    const canvas = createUniformMockCanvas(255, 255, 255)
+    const bbox = { x: 50, y: 50, width: 80, height: 20 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-white-30')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('returns white when near-white samples are majority (3 white + 2 gray)', () => {
+    let callCount = 0
+    const pixels = [
+      [10, 10, 10], [10, 10, 10],
+      [255, 255, 255], [255, 255, 255],
+      [180, 180, 180], [255, 255, 255],
+      [156, 156, 156]
+    ]
+    const canvas = {
+      width: 200,
+      height: 200,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn(() => {
+          const idx = callCount % pixels.length
+          callCount++
+          return { data: [...pixels[idx], 255] }
+        })
+      }))
+    }
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-nearwhite-maj')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('returns white when near-white samples are majority (4 white + 1 gray)', () => {
+    let callCount = 0
+    const pixels = [
+      [255, 255, 255], [255, 255, 255],
+      [255, 255, 255], [255, 255, 255],
+      [180, 180, 180]
+    ]
+    const canvas = {
+      width: 200,
+      height: 200,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn(() => {
+          const idx = callCount % pixels.length
+          callCount++
+          return { data: [...pixels[idx], 255] }
+        })
+      }))
+    }
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-nearwhite-4to1')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('returns actual off-white for uniform rgb(230,230,230) background', () => {
+    const canvas = createUniformMockCanvas(230, 230, 230)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-offwhite')
+    expect(color).toBe('rgb(230, 230, 230)')
+  })
+
+  it('averages mixed non-white samples when near-white is not majority', () => {
+    const canvas = createUniformMockCanvas(180, 180, 180)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-nearwhite-min')
+    const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/)
+    expect(match).not.toBeNull()
+    const lum = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
+    expect(lum).toBeGreaterThanOrEqual(200)
+  })
+
+  it('returns white when 2 near-white samples exist (2 white + 4 gray)', () => {
+    let callCount = 0
+    const pixels = [
+      [255, 255, 255], [255, 255, 255],
+      [180, 180, 180], [180, 180, 180],
+      [160, 160, 160], [160, 160, 160]
+    ]
+    const canvas = {
+      width: 200,
+      height: 200,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn(() => {
+          const idx = callCount % pixels.length
+          callCount++
+          return { data: [...pixels[idx], 255] }
+        })
+      }))
+    }
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-nearwhite-2')
+    expect(color).toBe('rgb(255, 255, 255)')
+  })
+
+  it('uniform 230 background with nearWhiteCount=0 still returns 230', () => {
+    const canvas = createUniformMockCanvas(230, 230, 230)
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-offwhite-2')
+    expect(color).toBe('rgb(230, 230, 230)')
+  })
+
+  it('averages when nearWhiteCount < 2 (single near-white sample)', () => {
+    let callCount = 0
+    const canvas = {
+      width: 200,
+      height: 200,
+      getContext: vi.fn(() => ({
+        getImageData: vi.fn(() => {
+          callCount++
+          if (callCount === 1) return { data: [255, 255, 255, 255] }
+          return { data: [180, 180, 180, 255] }
+        })
+      }))
+    }
+    const bbox = { x: 10, y: 10, width: 100, height: 100 }
+    const color = sampleCanvasBackgroundColor(canvas, bbox, 1, 'block-nearwhite-1')
+    expect(color).not.toBe('rgb(255, 255, 255)')
+    const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/)
+    expect(match).not.toBeNull()
+    const lum = 0.299 * Number(match[1]) + 0.587 * Number(match[2]) + 0.114 * Number(match[3])
+    expect(lum).toBeGreaterThanOrEqual(200)
+  })
 })

@@ -1,5 +1,6 @@
 const FALLBACK_COLOR = 'rgb(255, 255, 255)'
 const MIN_READABLE_LUMINANCE = 200
+const NEAR_WHITE_LUMINANCE = 245
 
 const colorCache = new Map()
 
@@ -73,6 +74,14 @@ function chooseBackgroundColor(samples, neighbors) {
 
   if (lightSamples.length === 0) return FALLBACK_COLOR
 
+  const nearWhiteCount = lightSamples.filter(
+    (s) => luminance(s.r, s.g, s.b) >= NEAR_WHITE_LUMINANCE
+  ).length
+
+  if (nearWhiteCount >= 2) {
+    return 'rgb(255, 255, 255)'
+  }
+
   let rSum = 0
   let gSum = 0
   let bSum = 0
@@ -91,8 +100,8 @@ function chooseBackgroundColor(samples, neighbors) {
 }
 
 function buildSamplePoints(bboxX, bboxY, bboxW, bboxH, canvasW, canvasH) {
-  const insetX = bboxW * 0.2
-  const insetY = bboxH * 0.2
+  const insetX = bboxW * 0.3
+  const insetY = bboxH * 0.3
 
   const points = [
     { x: bboxX + bboxW / 2, y: bboxY + bboxH / 2 },
