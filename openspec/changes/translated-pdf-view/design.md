@@ -12,7 +12,6 @@ The existing infrastructure provides:
 - Table detection via `isTableLikeLine()` producing `table-cell` and `table-region` roles.
 - Font metadata propagation from `textContent.styles` through `PdfLayoutAnalyzer` into block `roleMetadata`.
 - Canvas background sampling via `pdfCanvasSampler.js` for per-block background color detection.
-- DEV-only diagnostics harness tracing the full extraction-to-render pipeline.
 
 The canvas renders at `Math.floor(viewport.width) × Math.floor(viewport.height)` CSS pixels. The text layer and overlay must share this coordinate space.
 
@@ -56,7 +55,7 @@ The canvas renders at `Math.floor(viewport.width) × Math.floor(viewport.height)
 
 **Decision**: Sample canvas pixels at block bounding-box positions to determine actual PDF background color instead of always using solid white.
 
-**Implementation**: `pdfCanvasSampler.js` performs 7-point multi-sampling (center, 4 corners at 20% inset, mid-left, mid-right), applies neighbor-based text-pixel filtering (dark sample + light neighbor → text pixel, excluded), averages remaining light samples, and falls back to white. Per-block color cache keyed by `${blockId}:${scale}`.
+**Implementation**: `pdfCanvasSampler.js` performs 7-point multi-sampling (center, 4 corners at 30% inset, mid-left, mid-right), applies neighbor-based text-pixel filtering (dark sample + light neighbor → text pixel, excluded), averages remaining light samples, and falls back to white. Near-white bias correction: when ≥ 2 sampled pixels have luminance ≥ 245, the background is forced to white to prevent gray anti-aliased edge pixels from corrupting white-background detection. Per-block color cache keyed by `${blockId}:${scale}`.
 
 **Known limitation**: Canvas `getContext('2d')` may throw `SecurityError` on tainted canvases — handled with try/catch fallback to white.
 
@@ -121,6 +120,22 @@ Cell positioning uses `CELL_GAP_EXPANSION_RATIO = 0.4` to extend cells 40% into 
 
 **Decision**: Structured blocks with partial `translatedCells` (only some lines translated) render in cell mode. Lines without translations fall back to source `item.text`. This prevents silent block-fallback for partially-translated table-region blocks.
 
+### D13: List-item continuation merging
+
+**Decision**: Allow paragraph lines to merge into active list-item blocks in `canAppendLineToBlock()` when they represent wrapped continuation text.
+
+**Implementation**: In `PdfLayoutAnalyzer.js`, the list-item branch of `canAppendLineToBlock()` permits appending when: (1) vertical gap ≤ fontSize × 1.1, and (2) line x is within the list-item's first 50% width range. Heading and caption singleton behavior unchanged.
+
+**Rationale**: Without this, wrapped bullet items get split into a list-item block followed by separate paragraph blocks for continuation lines, producing fragmented translation output.
+
+### D14: Numeric list-marker year guard
+
+**Decision**: Prevent 4+ digit leading numbers (e.g., years) from being classified as list items unless they have explicit list punctuation.
+
+**Implementation**: `isListItemText()` delegates to `isNumericListMarker()` helper. Rule: 1-3 digit main number → always list marker. 4+ digits → only if followed by `.` or `)`, or wrapped in parentheses.
+
+**Rationale**: PDFs frequently contain year-like text ("2029 onwards") that should be paragraph, not list-item. Without this guard, year-starting lines produce spurious bullet formatting in the bilingual viewer.
+
 ## Risks / Trade-offs
 
 - **Font fidelity**: Browser fallback fonts will not match PDF embedded fonts exactly. Mitigated by font metadata propagation and static font-family mapping.
@@ -174,7 +189,7 @@ Cell positioning uses `CELL_GAP_EXPANSION_RATIO = 0.4` to extend cells 40% into 
 
 ### Phase 3: Intelligent Masking — MVP COMPLETE (Full Deferred)
 
-- **MVP**: Canvas pixel sampling per block via `pdfCanvasSampler.js`
+- **MVP**: Canvas pixel sampling per block via `pdfCanvasSampler.js` with 30% inset sampling, near-white bias correction (≥ 2 luminance ≥ 245 → white), and text-pixel exclusion
 - **Deferred**: Full-page intelligent masking, text-shadow/outline contrast enhancement
 
 ### Phase 4: Export — HTML MVP COMPLETE (PDF Deferred)

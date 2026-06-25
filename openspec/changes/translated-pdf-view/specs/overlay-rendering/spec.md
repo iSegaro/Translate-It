@@ -21,7 +21,7 @@ The system SHALL render a positioned overlay layer over the PDF canvas for each 
 
 ### Requirement: Overlay blocks render with sampled background for readability
 
-Each overlay block SHALL render with a background color determined by canvas pixel sampling at the block's bounding-box position. The system samples 7 points (center, 4 corners at 20% inset, mid-left, mid-right), filters text-pixel outliers, and averages remaining light samples. Falls back to white when sampling fails.
+Each overlay block SHALL render with a background color determined by canvas pixel sampling at the block's bounding-box position. The system samples 7 points (center, 4 corners at 30% inset, mid-left, mid-right), filters text-pixel outliers, and averages remaining light samples. Falls back to white when sampling fails.
 
 #### Scenario: Standard white-background PDF
 
@@ -32,6 +32,16 @@ Each overlay block SHALL render with a background color determined by canvas pix
 
 - **WHEN** a translated block overlays a region with a non-white background (e.g., gray header, colored band)
 - **THEN** the overlay background SHALL match the sampled background color, not hardcoded white
+
+#### Scenario: Near-white background bias correction
+
+- **WHEN** the lightSamples contain at least 2 near-white pixels (luminance ≥ 245)
+- **THEN** the overlay background SHALL be `rgb(255, 255, 255)` regardless of gray anti-aliased edge pixels in the remaining samples
+
+#### Scenario: Uniform off-white background preserved
+
+- **WHEN** all sampled pixels are uniformly off-white (e.g., rgb(230, 230, 230)) with no near-white samples
+- **THEN** the overlay background SHALL be the averaged sampled color, not forced to white
 
 #### Scenario: Tainted canvas fallback
 

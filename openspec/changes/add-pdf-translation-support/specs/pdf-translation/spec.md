@@ -35,6 +35,33 @@ The translation unit for PDF MUST be Logical Block, not page, line, or word.
 - **THEN** the feature splits visible text into logical blocks
 - **AND** each block is translated independently through the existing translation pipeline
 
+### Requirement: List-Item Continuation Merging
+Paragraph lines MUST be allowed to merge into active list-item blocks when they represent wrapped continuation text.
+
+#### Scenario: Wrapped bullet item continuation
+- **WHEN** a paragraph line follows a list-item block with vertical gap ≤ fontSize × 1.1 AND the line's x-coordinate is within the list-item's first 50% width range
+- **THEN** the paragraph line SHALL be appended to the list-item block as a continuation line
+- **AND** the block's bounding box SHALL expand to encompass the continuation
+
+#### Scenario: Tight list items remain separate
+- **WHEN** a paragraph line follows a list-item block but the vertical gap exceeds fontSize × 1.1 OR the line's x-coordinate is outside the list-item's first 50% width
+- **THEN** the paragraph line SHALL start a new block, not merge into the list-item
+
+### Requirement: Numeric List-Marker Year Guard
+The layout analyzer MUST NOT classify 4+ digit leading numbers as list items unless they have explicit list punctuation.
+
+#### Scenario: Year-like number not classified as list item
+- **WHEN** a line starts with a 4+ digit number without `.`, `)`, or parentheses (e.g., "2029 onwards.")
+- **THEN** the line role SHALL NOT be `list-item`
+
+#### Scenario: 4-digit number with list punctuation is a list item
+- **WHEN** a line starts with a 4+ digit number followed by `.` or `)` (e.g., "1234. Item") or wrapped in parentheses (e.g., "(1234) Item")
+- **THEN** the line role SHALL be `list-item`
+
+#### Scenario: Short numeric markers are always list items
+- **WHEN** a line starts with a 1-3 digit number (with or without punctuation)
+- **THEN** the line role SHALL be `list-item`
+
 ### Requirement: Stable Block Identity
 PDF block cache keys MUST use stable identifiers that do not rely only on block index or page number.
 
