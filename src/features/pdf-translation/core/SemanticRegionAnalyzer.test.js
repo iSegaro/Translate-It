@@ -335,4 +335,200 @@ describe('SemanticRegionAnalyzer', () => {
       expect(result[0].metadata.semantic.metrics[0].labelLineIndex).toBe(2)
     })
   })
+
+  describe('key-value candidate detection', () => {
+    it('detects colon pair', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs).toHaveLength(2)
+      expect(result[0].metadata.semantic.pairs[0].label).toBe('Revenue')
+      expect(result[0].metadata.semantic.pairs[0].value).toBe('$12.3B')
+      expect(result[0].metadata.semantic.pairs[0].separator).toBe('colon')
+    })
+
+    it('detects dotted leader pair', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue .......... $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets .......... 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs).toHaveLength(2)
+      expect(result[0].metadata.semantic.pairs[0].separator).toBe('dot-leader')
+    })
+
+    it('detects repeated pairs', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Employees: 1,542', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs).toHaveLength(3)
+      expect(result[0].metadata.semantic.confidence).toBeGreaterThan(0.55)
+    })
+
+    it('single weak pair is ignored', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 40 }
+      })
+      const lines = [
+        makeLine(100, { text: 'A: B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+    })
+
+    it('explicit colon pairs are accepted with 2+ pairs', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs).toHaveLength(2)
+    })
+
+    it('single colon pair alone does not reach confidence threshold', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+    })
+
+    it('normal paragraph false positive', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, { text: 'This is a normal paragraph with text.', fontSize: 12 }),
+        makeLine(120, { text: 'Another line of regular text.', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+    })
+
+    it('table/heading/list skipped', () => {
+      const tableRegion = makeRegion('table', { boundingBox: { x: 40, y: 100, width: 300, height: 60 } })
+      const headingRegion = makeRegion('heading', { boundingBox: { x: 40, y: 200, width: 300, height: 30 } })
+      const listRegion = makeRegion('list', { boundingBox: { x: 40, y: 300, width: 300, height: 60 } })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([tableRegion, headingRegion, listRegion], lines, [])
+
+      expect(result[0].metadata.semantic).toBeUndefined()
+      expect(result[1].metadata.semantic).toBeUndefined()
+      expect(result[2].metadata.semantic).toBeUndefined()
+    })
+
+    it('KPI vertical single metric remains kpi-candidate', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic).toBeDefined()
+      expect(result[0].metadata.semantic.type).toBe('kpi-candidate')
+    })
+
+    it('multi-pair key-value beats KPI', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 }),
+        makeLine(140, { text: 'Employees: 1,542', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+    })
+
+    it('source line indices are original indices', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(50, { text: 'Unrelated', fontSize: 12 }),
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 }),
+        makeLine(200, { text: 'End', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.pairs[0].labelLineIndex).toBe(1)
+      expect(result[0].metadata.semantic.pairs[0].valueLineIndex).toBe(1)
+      expect(result[0].metadata.semantic.pairs[1].labelLineIndex).toBe(2)
+      expect(result[0].metadata.semantic.pairs[1].valueLineIndex).toBe(2)
+    })
+
+    it('key-value objects are frozen', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(Object.isFrozen(result[0].metadata.semantic)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.signals)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.pairs)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.pairs[0])).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.pairs[0].labelBbox)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.semantic.pairs[0].valueBbox)).toBe(true)
+    })
+  })
 })

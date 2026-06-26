@@ -1,9 +1,9 @@
 /**
  * SemanticRegionAnalyzer — diagnostic-only semantic metadata enrichment.
  *
- * Phase L6a: Adds KPI candidate detection for non-table regions.
- * Detects regions with numeric/currency/percentage content and short lines.
- * This is diagnostic-only — no rendering, translation, or adapter changes.
+ * Phase L6a-L6b: Adds KPI candidate and key-value candidate detection
+ * for non-table regions. This is diagnostic-only — no rendering, translation,
+ * or adapter changes.
  *
  * Pipeline position: after analyzeTableRegions, before buildMetadata.
  */
@@ -13,17 +13,24 @@ const REGION_TYPE_HEADING = 'heading'
 const REGION_TYPE_LIST = 'list'
 
 const KPI_CONFIDENCE_THRESHOLD = 0.55
+const KV_CONFIDENCE_THRESHOLD = 0.55
+const KV_MIN_PAIRS = 2
 
 const CURRENCY_PATTERN = /[$€£¥₹]/
 const PERCENTAGE_PATTERN = /%/
 const NUMERIC_PATTERN = /^[\d.,\s+\-–—$€£¥₹BMKbmk%]+$/
 const SHORT_LINE_THRESHOLD = 20
+const DOT_LEADER_PATTERN = /\.{3,}|…/
 
 const WEIGHT_NUMERIC_RATIO = 0.3
 const WEIGHT_SHORT_LINE_RATIO = 0.2
 const WEIGHT_FONT_HIERARCHY = 0.2
 const WEIGHT_CURRENCY_SIGNAL = 0.15
 const WEIGHT_LABEL_SIGNAL = 0.15
+
+const KV_WEIGHT_COLON_PAIR = 0.3
+const KV_WEIGHT_CONSISTENT_ALIGNMENT = 0.2
+const KV_WEIGHT_PAIR_COUNT = 0.2
 
 function isNumericDominant(text) {
   if (!text) return false
@@ -49,6 +56,154 @@ function isLabelLine(text) {
   if (trimmed.length > 25) return false
   if (isNumericDominant(trimmed)) return false
   return true
+}
+
+function getRegionLineEntries(region, lines) {
+  const entries = []
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx]
+    if (!line.boundingBox) continue
+    const bb = line.boundingBox
+    const rbb = region.boundingBox
+    const centerX = bb.x + bb.width / 2
+    const centerY = bb.y + bb.height / 2
+    if (
+      centerX >= rbb.x &&
+      centerX <= rbb.x + rbb.width &&
+      centerY >= rbb.y &&
+      centerY <= rbb.y + rbb.height
+    ) {
+      entries.push({ line, sourceIndex: idx })
+    }
+  }
+  return entries
+}
+
+function detectKeyValuePairs(region, lines) {
+  const regionLineEntries = getRegionLineEntries(region, lines)
+  if (regionLineEntries.length < 2) return null
+
+  const pairs = []
+  let horizontalPairCount = 0
+  let colonPairCount = 0
+  let dotLeaderCount = 0
+
+  for (let i = 0; i < regionLineEntries.length; i++) {
+    const { line, sourceIndex } = regionLineEntries[i]
+    const text = (line.text || '').trim()
+    if (!text) continue
+
+    const colonMatch = text.match(/^(.+?):\s*(.+)$/)
+    if (colonMatch) {
+      const label = colonMatch[1].trim()
+      const value = colonMatch[2].trim()
+      if (label && value) {
+        pairs.push(Object.freeze({
+          label,
+          value,
+          separator: 'colon',
+          labelLineIndex: sourceIndex,
+          valueLineIndex: sourceIndex,
+          labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.4, height: line.boundingBox.height }),
+          valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.45, y: line.boundingBox.y, width: line.boundingBox.width * 0.55, height: line.boundingBox.height })
+        }))
+        colonPairCount++
+        continue
+      }
+    }
+
+    if (DOT_LEADER_PATTERN.test(text)) {
+      const dotMatch = text.match(/^(.+?)[.…]{2,}\s*(.+)$/)
+      if (dotMatch) {
+        const label = dotMatch[1].trim()
+        const value = dotMatch[2].trim()
+        if (label && value) {
+          pairs.push(Object.freeze({
+            label,
+            value,
+            separator: 'dot-leader',
+            labelLineIndex: sourceIndex,
+            valueLineIndex: sourceIndex,
+            labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.5, height: line.boundingBox.height }),
+            valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.55, y: line.boundingBox.y, width: line.boundingBox.width * 0.45, height: line.boundingBox.height })
+          }))
+          dotLeaderCount++
+          continue
+        }
+      }
+    }
+
+    if (line.items && line.items.length >= 2) {
+      const sorted = [...line.items].sort((a, b) => a.x - b.x)
+      const gap = sorted[1].x - (sorted[0].right || sorted[0].x + sorted[0].width)
+      if (gap > (sorted[0].width || 20) * 0.5) {
+        const label = (sorted[0].text || '').trim()
+        const value = (sorted[1].text || '').trim()
+        if (label && value && isLabelLine(label)) {
+          pairs.push(Object.freeze({
+            label,
+            value,
+            separator: 'space',
+            labelLineIndex: sourceIndex,
+            valueLineIndex: sourceIndex,
+            labelBbox: Object.freeze({ x: sorted[0].x, y: sorted[0].y || line.boundingBox.y, width: sorted[0].width || 60, height: sorted[0].height || line.boundingBox.height }),
+            valueBbox: Object.freeze({ x: sorted[1].x, y: sorted[1].y || line.boundingBox.y, width: sorted[1].width || 60, height: sorted[1].height || line.boundingBox.height })
+          }))
+          horizontalPairCount++
+        }
+      }
+    }
+  }
+
+  if (pairs.length === 0) return null
+
+  return { pairs, horizontalPairCount, colonPairCount, dotLeaderCount }
+}
+
+function computeKeyValueConfidence(kvResult, lineCount) {
+  if (!kvResult) return 0
+  const { pairs, horizontalPairCount, colonPairCount, dotLeaderCount } = kvResult
+
+  const hasExplicitPair = colonPairCount > 0 || dotLeaderCount > 0
+  const pairCount = pairs.length
+
+  if (pairCount < 1) return 0
+  if (pairCount < KV_MIN_PAIRS && !hasExplicitPair) return 0
+
+  const pairScore = Math.min(pairCount / 3, 1)
+  const explicitScore = hasExplicitPair ? 0.9 : 0.3
+  const alignmentScore = horizontalPairCount > 0 ? 0.8 : 0.4
+  const lineScore = lineCount >= 2 && lineCount <= 8 ? 0.7 : 0.3
+
+  return (
+    pairScore * KV_WEIGHT_PAIR_COUNT +
+    explicitScore * KV_WEIGHT_COLON_PAIR +
+    alignmentScore * KV_WEIGHT_CONSISTENT_ALIGNMENT +
+    lineScore * 0.2
+  )
+}
+
+function buildKeyValueSemantic(region, lines) {
+  const kvResult = detectKeyValuePairs(region, lines)
+  if (!kvResult) return null
+
+  const regionLineEntries = getRegionLineEntries(region, lines)
+  const confidence = computeKeyValueConfidence(kvResult, regionLineEntries.length)
+
+  if (confidence < KV_CONFIDENCE_THRESHOLD) return null
+
+  return Object.freeze({
+    type: 'key-value-candidate',
+    confidence: Math.round(confidence * 100) / 100,
+    signals: Object.freeze({
+      horizontalPairRatio: regionLineEntries.length > 0 ? Math.round((kvResult.horizontalPairCount / regionLineEntries.length) * 100) / 100 : 0,
+      colonPairRatio: regionLineEntries.length > 0 ? Math.round((kvResult.colonPairCount / regionLineEntries.length) * 100) / 100 : 0,
+      dottedLeaderRatio: regionLineEntries.length > 0 ? Math.round((kvResult.dotLeaderCount / regionLineEntries.length) * 100) / 100 : 0,
+      pairCount: kvResult.pairs.length,
+      consistentAlignment: kvResult.horizontalPairCount > 0
+    }),
+    pairs: Object.freeze(kvResult.pairs)
+  })
 }
 
 function computeSignals(region, lines) {
@@ -180,25 +335,53 @@ function buildSemanticMetadata(region, lines) {
     return null
   }
 
-  const signals = computeSignals(region, lines)
-  const confidence = computeConfidence(signals)
+  const kpiSignals = computeSignals(region, lines)
+  const kpiConfidence = computeConfidence(kpiSignals)
 
-  if (confidence < KPI_CONFIDENCE_THRESHOLD) return null
+  const kvSemantic = buildKeyValueSemantic(region, lines)
+  const kvConfidence = kvSemantic ? kvSemantic.confidence : 0
 
-  const metrics = detectMetrics(region, lines)
+  if (kpiConfidence >= KPI_CONFIDENCE_THRESHOLD && kpiConfidence >= kvConfidence) {
+    const metrics = detectMetrics(region, lines)
+    return Object.freeze({
+      type: 'kpi-candidate',
+      confidence: Math.round(kpiConfidence * 100) / 100,
+      signals: Object.freeze({
+        numericLineRatio: Math.round(kpiSignals.numericLineRatio * 100) / 100,
+        shortLineRatio: Math.round(kpiSignals.shortLineRatio * 100) / 100,
+        fontHierarchyRatio: Math.round(kpiSignals.fontHierarchyRatio * 100) / 100,
+        currencyOrPercentSignal: Math.round(kpiSignals.currencyOrPercentSignal * 100) / 100,
+        lineCount: kpiSignals.lineCount
+      }),
+      metrics: Object.freeze(metrics)
+    })
+  }
 
-  return Object.freeze({
-    type: 'kpi-candidate',
-    confidence: Math.round(confidence * 100) / 100,
-    signals: Object.freeze({
-      numericLineRatio: Math.round(signals.numericLineRatio * 100) / 100,
-      shortLineRatio: Math.round(signals.shortLineRatio * 100) / 100,
-      fontHierarchyRatio: Math.round(signals.fontHierarchyRatio * 100) / 100,
-      currencyOrPercentSignal: Math.round(signals.currencyOrPercentSignal * 100) / 100,
-      lineCount: signals.lineCount
-    }),
-    metrics: Object.freeze(metrics)
-  })
+  if (kvConfidence >= KV_CONFIDENCE_THRESHOLD && kvConfidence > kpiConfidence) {
+    return kvSemantic
+  }
+
+  if (kpiConfidence >= KPI_CONFIDENCE_THRESHOLD) {
+    const metrics = detectMetrics(region, lines)
+    return Object.freeze({
+      type: 'kpi-candidate',
+      confidence: Math.round(kpiConfidence * 100) / 100,
+      signals: Object.freeze({
+        numericLineRatio: Math.round(kpiSignals.numericLineRatio * 100) / 100,
+        shortLineRatio: Math.round(kpiSignals.shortLineRatio * 100) / 100,
+        fontHierarchyRatio: Math.round(kpiSignals.fontHierarchyRatio * 100) / 100,
+        currencyOrPercentSignal: Math.round(kpiSignals.currencyOrPercentSignal * 100) / 100,
+        lineCount: kpiSignals.lineCount
+      }),
+      metrics: Object.freeze(metrics)
+    })
+  }
+
+  if (kvConfidence >= KV_CONFIDENCE_THRESHOLD) {
+    return kvSemantic
+  }
+
+  return null
 }
 
 /**
