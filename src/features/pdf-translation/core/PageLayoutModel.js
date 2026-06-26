@@ -55,6 +55,7 @@
 import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { classifyLayoutRegions } from './LayoutRegionClassifier.js'
 import { analyzeTableRegions } from './TableRegionAnalyzer.js'
+import { analyzeSemanticRegions } from './SemanticRegionAnalyzer.js'
 
 const REGION_TYPE_UNKNOWN = 'unknown'
 
@@ -91,8 +92,9 @@ function buildMetadata(lines, blocks, regions) {
  * Build a PageLayoutModel from existing lines and blocks.
  *
  * Populates regions via conservative vertical-gap grouping (Phase L2),
- * classifies them via block-role heuristics (Phase L3), and enriches
- * table regions with minimal table metadata (Phase L5a).
+ * classifies them via block-role heuristics (Phase L3), enriches
+ * table regions with minimal table metadata (Phase L5a), and detects
+ * KPI candidates in non-table regions (Phase L6a).
  * Does NOT modify block building, rendering, or translation behavior.
  *
  * @param {Object} options
@@ -116,7 +118,8 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const frozenBlocks = Object.freeze([...blocks])
   const detectedRegions = regions || detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
   const classifiedRegions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
-  const enrichedRegions = analyzeTableRegions(classifiedRegions)
+  const tableEnrichedRegions = analyzeTableRegions(classifiedRegions)
+  const enrichedRegions = analyzeSemanticRegions(tableEnrichedRegions, frozenLines, frozenBlocks)
   const metadata = buildMetadata(frozenLines, frozenBlocks, enrichedRegions)
 
   return Object.freeze({
