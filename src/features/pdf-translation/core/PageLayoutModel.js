@@ -30,6 +30,16 @@
  *   and columnIndex. Future phases may evolve this into ordering of generic layout
  *   objects (regions, blocks, or mixed). Consumers should treat this as an
  *   implementation detail and avoid assuming it will always represent only blocks.
+ * @property {PageLayoutMetadata} metadata — read-only statistics derived from lines and blocks
+ */
+
+/**
+ * @typedef {Object} PageLayoutMetadata
+ * @property {number} lineCount — total text lines on the page
+ * @property {number} blockCount — total logical blocks on the page
+ * @property {number} regionCount — total layout regions (0 in Phase L0)
+ * @property {boolean} hasStructuredBlocks — true if any block has roleMetadata.isStructured === true
+ * @property {number} structuredBlockCount — number of blocks with roleMetadata.isStructured === true
  */
 
 /**
@@ -56,6 +66,23 @@ function buildReadingOrder(blocks) {
     .map((block) => block.id)
 }
 
+function buildMetadata(lines, blocks, regions) {
+  let structuredBlockCount = 0
+  for (const block of blocks) {
+    if (block.roleMetadata?.isStructured === true) {
+      structuredBlockCount++
+    }
+  }
+
+  return Object.freeze({
+    lineCount: lines.length,
+    blockCount: blocks.length,
+    regionCount: regions.length,
+    hasStructuredBlocks: structuredBlockCount > 0,
+    structuredBlockCount
+  })
+}
+
 /**
  * Build a PageLayoutModel from existing lines and blocks.
  *
@@ -78,14 +105,19 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
     : null
 
   const readingOrder = buildReadingOrder(blocks)
+  const frozenLines = Object.freeze([...lines])
+  const frozenBlocks = Object.freeze([...blocks])
+  const frozenRegions = Object.freeze([])
+  const metadata = buildMetadata(frozenLines, frozenBlocks, frozenRegions)
 
   return Object.freeze({
     pageNumber,
     pageSize: normalizedPageSize,
-    lines: Object.freeze([...lines]),
-    blocks: Object.freeze([...blocks]),
-    regions: Object.freeze([]),
-    readingOrder: Object.freeze(readingOrder)
+    lines: frozenLines,
+    blocks: frozenBlocks,
+    regions: frozenRegions,
+    readingOrder: Object.freeze(readingOrder),
+    metadata
   })
 }
 
@@ -102,7 +134,13 @@ export function isPageLayoutModel(value) {
     Array.isArray(value.lines) &&
     Array.isArray(value.blocks) &&
     Array.isArray(value.regions) &&
-    Array.isArray(value.readingOrder)
+    Array.isArray(value.readingOrder) &&
+    value.metadata != null &&
+    typeof value.metadata.lineCount === 'number' &&
+    typeof value.metadata.blockCount === 'number' &&
+    typeof value.metadata.regionCount === 'number' &&
+    typeof value.metadata.hasStructuredBlocks === 'boolean' &&
+    typeof value.metadata.structuredBlockCount === 'number'
   )
 }
 

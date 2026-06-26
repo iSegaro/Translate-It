@@ -20,6 +20,13 @@ describe('PageLayoutModel', () => {
       expect(model.blocks).toHaveLength(1)
       expect(model.regions).toEqual([])
       expect(model.readingOrder).toEqual(['block-1'])
+      expect(model.metadata).toEqual({
+        lineCount: 2,
+        blockCount: 1,
+        regionCount: 0,
+        hasStructuredBlocks: false,
+        structuredBlockCount: 0
+      })
     })
 
     it('sorts reading order by pageNumber then readingOrderIndex then columnIndex', () => {
@@ -108,6 +115,48 @@ describe('PageLayoutModel', () => {
 
       expect(model.lines[0]).toEqual(line)
     })
+
+    it('computes structuredBlockCount from roleMetadata.isStructured', () => {
+      const blocks = [
+        { id: 'b1', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0, columnIndex: 0, roleMetadata: {} },
+        { id: 'b2', role: 'table-region', pageNumber: 1, readingOrderIndex: 1, columnIndex: 0, roleMetadata: { isStructured: true } },
+        { id: 'b3', role: 'table-region', pageNumber: 1, readingOrderIndex: 2, columnIndex: 0, roleMetadata: { isStructured: true } }
+      ]
+
+      const model = buildPageLayoutModel({ pageNumber: 1, pageSize: null, lines: [], blocks })
+
+      expect(model.metadata.structuredBlockCount).toBe(2)
+      expect(model.metadata.hasStructuredBlocks).toBe(true)
+      expect(model.metadata.blockCount).toBe(3)
+    })
+
+    it('hasStructuredBlocks is false when no blocks are structured', () => {
+      const blocks = [
+        { id: 'b1', role: 'paragraph', pageNumber: 1, readingOrderIndex: 0, columnIndex: 0, roleMetadata: {} },
+        { id: 'b2', role: 'heading', pageNumber: 1, readingOrderIndex: 1, columnIndex: 0, roleMetadata: {} }
+      ]
+
+      const model = buildPageLayoutModel({ pageNumber: 1, pageSize: null, lines: [], blocks })
+
+      expect(model.metadata.hasStructuredBlocks).toBe(false)
+      expect(model.metadata.structuredBlockCount).toBe(0)
+    })
+
+    it('metadata is frozen', () => {
+      const model = buildPageLayoutModel({ pageNumber: 1, pageSize: null, lines: [], blocks: [] })
+
+      expect(Object.isFrozen(model.metadata)).toBe(true)
+    })
+
+    it('metadata counts match input lengths for empty model', () => {
+      const model = createEmptyPageLayoutModel(1)
+
+      expect(model.metadata.lineCount).toBe(0)
+      expect(model.metadata.blockCount).toBe(0)
+      expect(model.metadata.regionCount).toBe(0)
+      expect(model.metadata.hasStructuredBlocks).toBe(false)
+      expect(model.metadata.structuredBlockCount).toBe(0)
+    })
   })
 
   describe('isPageLayoutModel', () => {
@@ -133,7 +182,11 @@ describe('PageLayoutModel', () => {
     })
 
     it('returns false for object with wrong types', () => {
-      expect(isPageLayoutModel({ pageNumber: '1', lines: [], blocks: [], regions: [], readingOrder: [] })).toBe(false)
+      expect(isPageLayoutModel({ pageNumber: '1', lines: [], blocks: [], regions: [], readingOrder: [], metadata: {} })).toBe(false)
+    })
+
+    it('returns false for object missing metadata', () => {
+      expect(isPageLayoutModel({ pageNumber: 1, lines: [], blocks: [], regions: [], readingOrder: [] })).toBe(false)
     })
   })
 
