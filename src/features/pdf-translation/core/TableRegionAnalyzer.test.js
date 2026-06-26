@@ -945,6 +945,237 @@ describe('TableRegionAnalyzer', () => {
       expect(typeof cell.sourceLineIndex).toBe('number')
       expect(typeof cell.sourceItemIndex).toBe('number')
       expect(typeof cell.spanCandidate).toBe('boolean')
+      expect(typeof cell.colSpanCandidate).toBe('boolean')
+      expect(typeof cell.estimatedColSpan).toBe('number')
+    })
+  })
+
+  describe('colSpan candidate detection', () => {
+    it('normal cells have colSpanCandidate false and estimatedColSpan 1', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.cells.every((c) => c.colSpanCandidate === false)).toBe(true)
+      expect(result[0].metadata.table.cells.every((c) => c.estimatedColSpan === 1)).toBe(true)
+    })
+
+    it('wide header crossing next column with missing neighbor sets colSpanCandidate true', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Personal Info', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const headerCell = result[0].metadata.table.cells.find((c) => c.text === 'Personal Info')
+      expect(headerCell).toBeDefined()
+      expect(headerCell.colSpanCandidate).toBe(true)
+      expect(headerCell.estimatedColSpan).toBe(2)
+      expect(result[0].metadata.table.hasSpanCandidates).toBe(true)
+    })
+
+    it('wide cell with neighbor present sets colSpanCandidate false', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Wide', 40, 180), makeItem('Neighbor', 200, 60)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const wideCell = result[0].metadata.table.cells.find((c) => c.text === 'Wide')
+      expect(wideCell).toBeDefined()
+      expect(wideCell.colSpanCandidate).toBe(false)
+      expect(result[0].metadata.table.hasSpanCandidates).toBe(false)
+    })
+
+    it('wide cell not crossing next column sets colSpanCandidate false', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Wide', 40, 120), makeItem('B', 200, 60)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const wideCell = result[0].metadata.table.cells.find((c) => c.text === 'Wide')
+      expect(wideCell).toBeDefined()
+      expect(wideCell.colSpanCandidate).toBe(false)
+    })
+
+    it('missing neighbor but normal width sets colSpanCandidate false', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 40, 60), makeItem('F', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const cellC = result[0].metadata.table.cells.find((c) => c.text === 'C')
+      expect(cellC).toBeDefined()
+      expect(cellC.colSpanCandidate).toBe(false)
+    })
+
+    it('RTL table uses same x-based visual column logic', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          direction: 'rtl',
+          items: [makeItem('כותרת רחבה', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          direction: 'rtl',
+          items: [makeItem('שם', 40, 60), makeItem('גיל', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          direction: 'rtl',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const headerCell = result[0].metadata.table.cells.find((c) => c.text === 'כותרת רחבה')
+      expect(headerCell).toBeDefined()
+      expect(headerCell.colSpanCandidate).toBe(true)
+      expect(headerCell.estimatedColSpan).toBe(2)
+    })
+
+    it('table.hasSpanCandidates true only when candidate exists', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.hasSpanCandidates).toBe(false)
+    })
+
+    it('table.hasMergedCells remains false', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.hasMergedCells).toBe(false)
+    })
+
+    it('colSpanCandidate and estimatedColSpan are frozen', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(Object.isFrozen(result[0].metadata.table.cells)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.table.cells[0])).toBe(true)
     })
   })
 })

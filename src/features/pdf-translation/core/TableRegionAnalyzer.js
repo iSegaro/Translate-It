@@ -1,9 +1,10 @@
 /**
  * TableRegionAnalyzer — diagnostic-only table metadata enrichment.
  *
- * Phase L5d: Adds cell-to-grid mapping for regions classified as 'table'.
- * Cells are mapped by item-to-column proximity using x-position.
- * This is diagnostic-only — no rendering, translation, or adapter changes.
+ * Phase L5e: Adds colSpan candidate detection for regions classified as 'table'.
+ * ColSpan candidates are detected by checking if cell width crosses column
+ * boundaries and neighbor cells are missing. This is diagnostic-only — no
+ * rendering, translation, or adapter changes.
  *
  * Pipeline position: after classifyLayoutRegions, before buildMetadata.
  */
@@ -203,6 +204,7 @@ function detectTableCells(region, lines, columns, rows) {
   const tolerance = Math.max(medianFontSize * 0.75, 6)
 
   const cells = []
+  const cellsByPosition = new Map()
 
   for (const row of rows) {
     for (const lineIndex of row.lineIndices) {
@@ -236,6 +238,9 @@ function detectTableCells(region, lines, columns, rows) {
           height: Math.round(item.height * 100) / 100
         }
 
+        const cellKey = `${row.index}:${bestColumn.index}`
+        cellsByPosition.set(cellKey, { rowIndex: row.index, columnIndex: bestColumn.index })
+
         cells.push(Object.freeze({
           rowIndex: row.index,
           columnIndex: bestColumn.index,
@@ -243,13 +248,55 @@ function detectTableCells(region, lines, columns, rows) {
           boundingBox: Object.freeze(bb),
           sourceLineIndex: lineIndex,
           sourceItemIndex: itemIndex,
-          spanCandidate
+          spanCandidate,
+          colSpanCandidate: false,
+          estimatedColSpan: 1
         }))
       }
     }
   }
 
-  return Object.freeze(cells)
+  const enrichedCells = cells.map((cell) => {
+    if (!cell.spanCandidate) {
+      return cell
+    }
+
+    const matchedColumn = columns[cell.columnIndex]
+    if (!matchedColumn) return cell
+
+    const cellRight = cell.boundingBox.x + cell.boundingBox.width
+    let estimatedColSpan = 1
+
+    for (let i = cell.columnIndex + 1; i < columns.length; i++) {
+      const nextColumn = columns[i]
+      if (cellRight > nextColumn.x) {
+        estimatedColSpan++
+      } else {
+        break
+      }
+    }
+
+    if (estimatedColSpan <= 1) return cell
+
+    let hasMissingNeighbor = false
+    for (let i = cell.columnIndex + 1; i < cell.columnIndex + estimatedColSpan; i++) {
+      const neighborKey = `${cell.rowIndex}:${i}`
+      if (!cellsByPosition.has(neighborKey)) {
+        hasMissingNeighbor = true
+        break
+      }
+    }
+
+    if (!hasMissingNeighbor) return cell
+
+    return Object.freeze({
+      ...cell,
+      colSpanCandidate: true,
+      estimatedColSpan
+    })
+  })
+
+  return Object.freeze(enrichedCells)
 }
 
 function buildTableMetadata(region, lines) {
@@ -257,10 +304,13 @@ function buildTableMetadata(region, lines) {
   const rows = detectTableRows(region, lines)
   const cells = detectTableCells(region, lines, columns, rows)
 
+  const hasSpanCandidates = cells.some((cell) => cell.colSpanCandidate === true)
+
   return Object.freeze({
     columnCount: columns.length,
     rowCount: rows.length,
     hasMergedCells: false,
+    hasSpanCandidates,
     hasMultiLevelHeaders: false,
     columns,
     rows,
