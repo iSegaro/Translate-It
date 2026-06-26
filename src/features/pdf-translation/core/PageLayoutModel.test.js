@@ -18,12 +18,15 @@ describe('PageLayoutModel', () => {
       expect(model.pageSize).toEqual({ width: 500, height: 700 })
       expect(model.lines).toHaveLength(2)
       expect(model.blocks).toHaveLength(1)
-      expect(model.regions).toEqual([])
+      expect(model.regions).toHaveLength(1)
+      expect(model.regions[0].type).toBe('unknown')
+      expect(model.regions[0].id).toBe('p1-r0')
+      expect(model.regions[0].blockIds).toEqual(['block-1'])
       expect(model.readingOrder).toEqual(['block-1'])
       expect(model.metadata).toEqual({
         lineCount: 2,
         blockCount: 1,
-        regionCount: 0,
+        regionCount: 1,
         hasStructuredBlocks: false,
         structuredBlockCount: 0
       })
@@ -51,14 +54,28 @@ describe('PageLayoutModel', () => {
       expect(Object.isFrozen(model.readingOrder)).toBe(true)
     })
 
+    it('regions contain frozen region objects', () => {
+      const lines = [
+        { text: 'A', boundingBox: { x: 40, y: 100, width: 100, height: 14 }, fontSize: 12, items: [] }
+      ]
+
+      const model = buildPageLayoutModel({ pageNumber: 1, pageSize: null, lines, blocks: [] })
+
+      expect(model.regions).toHaveLength(1)
+      expect(Object.isFrozen(model.regions[0])).toBe(true)
+      expect(Object.isFrozen(model.regions[0].blockIds)).toBe(true)
+      expect(Object.isFrozen(model.regions[0].childRegionIds)).toBe(true)
+      expect(Object.isFrozen(model.regions[0].metadata)).toBe(true)
+    })
+
     it('does not mutate input arrays', () => {
-      const lines = [{ text: 'A' }]
-      const blocks = [{ id: 'b1' }]
+      const lines = [{ text: 'A', boundingBox: { x: 40, y: 100, width: 100, height: 14 }, fontSize: 12, items: [] }]
+      const blocks = [{ id: 'b1', pageNumber: 1, readingOrderIndex: 0, columnIndex: 0, boundingBox: { x: 40, y: 100, width: 100, height: 14 } }]
 
       const model = buildPageLayoutModel({ pageNumber: 1, pageSize: null, lines, blocks })
 
-      lines.push({ text: 'B' })
-      blocks.push({ id: 'b2' })
+      lines.push({ text: 'B', boundingBox: { x: 40, y: 200, width: 100, height: 14 }, fontSize: 12, items: [] })
+      blocks.push({ id: 'b2', pageNumber: 1, readingOrderIndex: 1, columnIndex: 0, boundingBox: { x: 40, y: 200, width: 100, height: 14 } })
 
       expect(model.lines).toHaveLength(1)
       expect(model.blocks).toHaveLength(1)
@@ -81,7 +98,9 @@ describe('PageLayoutModel', () => {
 
       expect(model.lines).toEqual([])
       expect(model.blocks).toEqual([])
+      expect(model.regions).toEqual([])
       expect(model.readingOrder).toEqual([])
+      expect(model.metadata.regionCount).toBe(0)
     })
 
     it('preserves block data exactly', () => {
@@ -199,6 +218,7 @@ describe('PageLayoutModel', () => {
       expect(model.blocks).toEqual([])
       expect(model.regions).toEqual([])
       expect(model.readingOrder).toEqual([])
+      expect(model.metadata.regionCount).toBe(0)
     })
 
     it('creates empty model with default pageNumber', () => {

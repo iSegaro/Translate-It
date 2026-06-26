@@ -2,12 +2,12 @@
  * PageLayoutModel — canonical page structure for the PDF translation pipeline.
  *
  * This is a read-only data model that captures the spatial layout of a PDF page.
- * It wraps existing lines and blocks, adding a `regions` array for future
- * spatial grouping and a `readingOrder` for deterministic element traversal.
+ * It wraps existing lines and blocks, adding a `regions` array for spatial grouping
+ * and a `readingOrder` for deterministic element traversal.
  *
- * Phase L0: Infrastructure only. `regions` is always empty. No new analysis.
- * Future phases will populate regions and use them for block building, rendering,
- * masking, and export.
+ * Phase L2: Diagnostic-only region detection. Regions are populated via
+ * conservative vertical-gap grouping. No consumer uses regions for building,
+ * rendering, or translation yet. Region type is always 'unknown'.
  */
 
 /**
@@ -24,33 +24,35 @@
  * @property {BoundingBox} pageSize
  * @property {Object[]} lines — text lines from the page (built by PdfLayoutAnalyzer)
  * @property {Object[]} blocks — logical blocks for translation (built by PdfLogicalBlockBuilder)
- * @property {LayoutRegion[]} regions — spatial groupings (empty in Phase L0)
+ * @property {LayoutRegion[]} regions — spatial groupings from vertical-gap clustering
  * @property {string[]} readingOrder — ordered identifiers for deterministic traversal.
  *   Phase L0 representation: contains block IDs sorted by page, readingOrderIndex,
  *   and columnIndex. Future phases may evolve this into ordering of generic layout
  *   objects (regions, blocks, or mixed). Consumers should treat this as an
  *   implementation detail and avoid assuming it will always represent only blocks.
- * @property {PageLayoutMetadata} metadata — read-only statistics derived from lines and blocks
+ * @property {PageLayoutMetadata} metadata — read-only statistics derived from lines, blocks, and regions
  */
 
 /**
  * @typedef {Object} PageLayoutMetadata
  * @property {number} lineCount — total text lines on the page
  * @property {number} blockCount — total logical blocks on the page
- * @property {number} regionCount — total layout regions (0 in Phase L0)
+ * @property {number} regionCount — total layout regions detected
  * @property {boolean} hasStructuredBlocks — true if any block has roleMetadata.isStructured === true
  * @property {number} structuredBlockCount — number of blocks with roleMetadata.isStructured === true
  */
 
 /**
  * @typedef {Object} LayoutRegion
- * @property {string} id
- * @property {string} type — 'unknown' in Phase L0
- * @property {BoundingBox} boundingBox
- * @property {string[]} childRegionIds
- * @property {string[]} blockIds
- * @property {Object} metadata
+ * @property {string} id — deterministic, e.g. 'p1-r0'
+ * @property {string} type — 'unknown' in Phase L2
+ * @property {BoundingBox} boundingBox — union of member line bounding boxes
+ * @property {string[]} childRegionIds — empty in Phase L2
+ * @property {string[]} blockIds — block IDs whose center falls within this region
+ * @property {Object} metadata — lineCount, fontSize, gapThreshold
  */
+
+import { detectLayoutRegions } from './LayoutRegionDetector.js'
 
 const REGION_TYPE_UNKNOWN = 'unknown'
 
@@ -86,8 +88,8 @@ function buildMetadata(lines, blocks, regions) {
 /**
  * Build a PageLayoutModel from existing lines and blocks.
  *
- * This function does NOT perform any new analysis. It wraps existing data
- * into the canonical model structure. All fields are populated from inputs.
+ * Populates regions via conservative vertical-gap grouping (Phase L2).
+ * Does NOT modify block building, rendering, or translation behavior.
  *
  * @param {Object} options
  * @param {number} options.pageNumber
@@ -107,15 +109,15 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const readingOrder = buildReadingOrder(blocks)
   const frozenLines = Object.freeze([...lines])
   const frozenBlocks = Object.freeze([...blocks])
-  const frozenRegions = Object.freeze([])
-  const metadata = buildMetadata(frozenLines, frozenBlocks, frozenRegions)
+  const regions = detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
+  const metadata = buildMetadata(frozenLines, frozenBlocks, regions)
 
   return Object.freeze({
     pageNumber,
     pageSize: normalizedPageSize,
     lines: frozenLines,
     blocks: frozenBlocks,
-    regions: frozenRegions,
+    regions,
     readingOrder: Object.freeze(readingOrder),
     metadata
   })
