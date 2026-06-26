@@ -241,7 +241,10 @@ function detectTableCells(region, lines, columns, rows) {
         const cellKey = `${row.index}:${bestColumn.index}`
         cellsByPosition.set(cellKey, { rowIndex: row.index, columnIndex: bestColumn.index })
 
+        const cellId = `${region.id}-r${row.index}-c${bestColumn.index}-i${itemIndex}`
+
         cells.push(Object.freeze({
+          cellId,
           rowIndex: row.index,
           columnIndex: bestColumn.index,
           text: item.text,
