@@ -417,4 +417,261 @@ describe('TableRegionAnalyzer', () => {
       expect(result[0].metadata.table).toBeUndefined()
     })
   })
+
+  describe('row detection', () => {
+    it('detects 2-row table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Value', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('30', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(2)
+      expect(result[0].metadata.table.rows).toHaveLength(2)
+      expect(result[0].metadata.table.rows[0].y).toBe(100)
+      expect(result[0].metadata.table.rows[1].y).toBe(120)
+    })
+
+    it('detects 3-row table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Age', 160)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('30', 160)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('Bob', 40), makeItem('25', 160)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(3)
+      expect(result[0].metadata.table.rows).toHaveLength(3)
+    })
+
+    it('handles irregular row heights', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          fontSize: 14,
+          items: [makeItem('Header', 40)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          fontSize: 12,
+          items: [makeItem('Data', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(2)
+      expect(result[0].metadata.table.rows[0].height).toBe(14)
+      expect(result[0].metadata.table.rows[1].height).toBe(12)
+    })
+
+    it('close but non-overlapping lines remain separate rows', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 50 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40)]
+        }),
+        makeLine(115, {
+          regionId: 'p1-r0',
+          items: [makeItem('B', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(2)
+      expect(result[0].metadata.table.rows[0].lineIndices).toEqual([0])
+      expect(result[0].metadata.table.rows[1].lineIndices).toEqual([1])
+    })
+
+    it('falls back to empty rows for single-line table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 30 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Value', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(0)
+      expect(result[0].metadata.table.rows).toEqual([])
+    })
+
+    it('falls back to empty rows when all lines same y', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 30 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(0)
+      expect(result[0].metadata.table.rows).toEqual([])
+    })
+
+    it('falls back to empty rows for empty region', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+
+      const result = analyzeTableRegions([region], [], [])
+
+      expect(result[0].metadata.table.rowCount).toBe(0)
+      expect(result[0].metadata.table.rows).toEqual([])
+    })
+
+    it('rows and columns both present', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Age', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('30', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(2)
+      expect(result[0].metadata.table.rowCount).toBe(2)
+      expect(result[0].metadata.table.columns).toHaveLength(2)
+      expect(result[0].metadata.table.rows).toHaveLength(2)
+    })
+
+    it('non-table regions are unchanged for rows', () => {
+      const region = makeRegion('paragraph')
+      const lines = [
+        makeLine(100, {
+          items: [makeItem('Text', 40)]
+        }),
+        makeLine(120, {
+          items: [makeItem('More', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table).toBeUndefined()
+    })
+
+    it('row objects are frozen', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(Object.isFrozen(result[0].metadata.table.rows)).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.table.rows[0])).toBe(true)
+      expect(Object.isFrozen(result[0].metadata.table.rows[0].lineIndices)).toBe(true)
+    })
+
+    it('rows have correct structure', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('B', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      const row = result[0].metadata.table.rows[0]
+      expect(typeof row.index).toBe('number')
+      expect(typeof row.y).toBe('number')
+      expect(typeof row.height).toBe('number')
+      expect(Array.isArray(row.lineIndices)).toBe(true)
+      expect(typeof row.lineCount).toBe('number')
+    })
+
+    it('row.index is visual order, row.lineIndices is original input index', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(999, { items: [makeItem('skip', 40)] }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Second', 40)]
+        }),
+        makeLine(999, { items: [makeItem('skip', 40)] }),
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('First', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.rowCount).toBe(2)
+      expect(result[0].metadata.table.rows[0].index).toBe(0)
+      expect(result[0].metadata.table.rows[0].lineIndices).toEqual([3])
+      expect(result[0].metadata.table.rows[1].index).toBe(1)
+      expect(result[0].metadata.table.rows[1].lineIndices).toEqual([1])
+    })
+  })
 })

@@ -1,8 +1,8 @@
 /**
  * TableRegionAnalyzer — diagnostic-only table metadata enrichment.
  *
- * Phase L5b: Adds column detection for regions classified as 'table'.
- * Columns are detected by clustering item x-positions with tolerance.
+ * Phase L5c: Adds row detection for regions classified as 'table'.
+ * Rows are detected by mapping lines to rows based on y-position.
  * This is diagnostic-only — no rendering, translation, or adapter changes.
  *
  * Pipeline position: after classifyLayoutRegions, before buildMetadata.
@@ -51,32 +51,16 @@ function clusterXPositions(positions, tolerance) {
 }
 
 function detectTableColumns(region, lines) {
-  const regionLines = lines.filter((line) => {
-    if (!line.boundingBox) return false
+  const regionLineEntries = getRegionLines(region, lines)
 
-    if (line.regionId === region.id) return true
-
-    const bb = line.boundingBox
-    const rbb = region.boundingBox
-    const centerX = bb.x + bb.width / 2
-    const centerY = bb.y + bb.height / 2
-
-    return (
-      centerX >= rbb.x &&
-      centerX <= rbb.x + rbb.width &&
-      centerY >= rbb.y &&
-      centerY <= rbb.y + rbb.height
-    )
-  })
-
-  if (regionLines.length < MIN_TABLE_LINES) {
+  if (regionLineEntries.length < MIN_TABLE_LINES) {
     return Object.freeze([])
   }
 
   const allItems = []
-  for (const line of regionLines) {
-    if (!line.items || !line.items.length) continue
-    for (const item of line.items) {
+  for (const entry of regionLineEntries) {
+    if (!entry.line.items || !entry.line.items.length) continue
+    for (const item of entry.line.items) {
       if (item.text && item.text.trim().length > 0) {
         allItems.push(item)
       }
@@ -87,6 +71,7 @@ function detectTableColumns(region, lines) {
     return Object.freeze([])
   }
 
+  const regionLines = regionLineEntries.map((e) => e.line)
   const medianFontSize = getMedianFontSize(regionLines)
   const tolerance = Math.max(medianFontSize * 0.75, 6)
 
@@ -135,16 +120,84 @@ function detectTableColumns(region, lines) {
   return Object.freeze(sortedColumns)
 }
 
+function getRegionLines(region, lines) {
+  const regionLines = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line.boundingBox) continue
+
+    if (line.regionId === region.id) {
+      regionLines.push({ line, originalIndex: i })
+      continue
+    }
+
+    const bb = line.boundingBox
+    const rbb = region.boundingBox
+    const centerX = bb.x + bb.width / 2
+    const centerY = bb.y + bb.height / 2
+
+    if (
+      centerX >= rbb.x &&
+      centerX <= rbb.x + rbb.width &&
+      centerY >= rbb.y &&
+      centerY <= rbb.y + rbb.height
+    ) {
+      regionLines.push({ line, originalIndex: i })
+    }
+  }
+  return regionLines
+}
+
+function detectTableRows(region, lines) {
+  const regionLineEntries = getRegionLines(region, lines)
+
+  if (regionLineEntries.length < MIN_TABLE_LINES) {
+    return Object.freeze([])
+  }
+
+  const sortedEntries = [...regionLineEntries].sort(
+    (a, b) => a.line.boundingBox.y - b.line.boundingBox.y
+  )
+
+  const allSameY = sortedEntries.every((entry) => {
+    const firstY = sortedEntries[0].line.boundingBox.y
+    return Math.abs(entry.line.boundingBox.y - firstY) < 1
+  })
+
+  if (allSameY) {
+    return Object.freeze([])
+  }
+
+  const rows = sortedEntries.map((entry, rowIndex) => {
+    const bb = entry.line.boundingBox
+    return {
+      index: rowIndex,
+      y: Math.round(bb.y * 100) / 100,
+      height: Math.round(bb.height * 100) / 100,
+      lineIndices: Object.freeze([entry.originalIndex]),
+      lineCount: 1
+    }
+  })
+
+  const frozenRows = rows.map((row) => Object.freeze({
+    ...row,
+    lineIndices: row.lineIndices
+  }))
+
+  return Object.freeze(frozenRows)
+}
+
 function buildTableMetadata(region, lines) {
   const columns = detectTableColumns(region, lines)
+  const rows = detectTableRows(region, lines)
 
   return Object.freeze({
     columnCount: columns.length,
-    rowCount: 0,
+    rowCount: rows.length,
     hasMergedCells: false,
     hasMultiLevelHeaders: false,
     columns,
-    rows: Object.freeze([]),
+    rows,
     cells: Object.freeze([])
   })
 }
