@@ -571,4 +571,158 @@ describe('PdfTranslationAdapter', () => {
       expect(items[0].cellIndex).toBeUndefined()
     })
   })
+
+  describe('translatedCells metadata arrays', () => {
+    it('includes cellIds when metadata exists', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = {
+        id: 'blk-1',
+        text: 'Header Value',
+        role: 'table-region',
+        sourceTextHash: 'h1',
+        pageNumber: 1,
+        columnIndex: 0,
+        readingOrderIndex: 0,
+        roleMetadata: { isStructured: true, fontSize: 10 },
+        lines: [
+          {
+            text: 'Header Value',
+            boundingBox: { x: 40, y: 200, width: 300, height: 14 },
+            fontSize: 10,
+            direction: 'ltr',
+            items: [
+              { text: 'Header', x: 40, y: 200, width: 60, height: 14, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0 },
+              { text: 'Value', x: 180, y: 200, width: 60, height: 14, cellId: 'p1-r0-r0-c1-i1', rowIndex: 0, columnIndex: 1 }
+            ],
+            roleMetadata: {}
+          }
+        ]
+      }
+
+      const items = adapter.toProviderItems([block])
+
+      expect(items[0].cellId).toBe('p1-r0-r0-c0-i0')
+      expect(items[0].tableRowIndex).toBe(0)
+      expect(items[0].tableColumnIndex).toBe(0)
+      expect(items[1].cellId).toBe('p1-r0-r0-c1-i1')
+      expect(items[1].tableColumnIndex).toBe(1)
+
+      const response = {
+        success: true,
+        translatedText: JSON.stringify(['تمرين', 'قيمة'])
+      }
+
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped[0].translatedCells).toBeDefined()
+      expect(mapped[0].translatedCells[0].cellIds).toEqual(['p1-r0-r0-c0-i0', 'p1-r0-r0-c1-i1'])
+      expect(mapped[0].translatedCells[0].columnIndices).toEqual([0, 1])
+      expect(mapped[0].translatedCells[0].rowIndices).toEqual([0, 0])
+    })
+
+    it('metadata arrays align with cells array', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = {
+        id: 'blk-1',
+        text: 'A B',
+        role: 'table-region',
+        sourceTextHash: 'h1',
+        pageNumber: 1,
+        columnIndex: 0,
+        readingOrderIndex: 0,
+        roleMetadata: { isStructured: true, fontSize: 10 },
+        lines: [
+          {
+            text: 'A B',
+            boundingBox: { x: 40, y: 200, width: 300, height: 14 },
+            fontSize: 10,
+            direction: 'ltr',
+            items: [
+              { text: 'A', x: 40, y: 200, width: 60, height: 14, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0 },
+              { text: 'B', x: 180, y: 200, width: 60, height: 14, cellId: 'p1-r0-r0-c1-i1', rowIndex: 0, columnIndex: 1 }
+            ],
+            roleMetadata: {}
+          }
+        ]
+      }
+
+      const items = adapter.toProviderItems([block])
+      const response = { success: true, translatedText: JSON.stringify(['X', 'Y']) }
+      const mapped = adapter.mapBatchResponse(items, response)
+      const tc = mapped[0].translatedCells[0]
+
+      expect(tc.cells).toHaveLength(2)
+      expect(tc.cellIds).toHaveLength(2)
+      expect(tc.columnIndices).toHaveLength(2)
+      expect(tc.rowIndices).toHaveLength(2)
+    })
+
+    it('missing metadata falls back to old shape', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('blk-no-meta', ['A B'], [[
+        { text: 'A', x: 40, y: 200, width: 60, height: 14 },
+        { text: 'B', x: 180, y: 200, width: 60, height: 14 }
+      ]])
+
+      const items = adapter.toProviderItems([block])
+      const response = { success: true, translatedText: JSON.stringify(['X', 'Y']) }
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped[0].translatedCells).toBeDefined()
+      expect(mapped[0].translatedCells[0].cells).toEqual(['X', 'Y'])
+      expect(mapped[0].translatedCells[0].cellIds).toBeUndefined()
+      expect(mapped[0].translatedCells[0].columnIndices).toBeUndefined()
+    })
+
+    it('colSpanCandidate and estimatedColSpan are preserved', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = {
+        id: 'blk-span',
+        text: 'Wide Header Normal',
+        role: 'table-region',
+        sourceTextHash: 'h1',
+        pageNumber: 1,
+        columnIndex: 0,
+        readingOrderIndex: 0,
+        roleMetadata: { isStructured: true, fontSize: 10 },
+        lines: [
+          {
+            text: 'Wide Header Normal',
+            boundingBox: { x: 40, y: 200, width: 300, height: 14 },
+            fontSize: 10,
+            direction: 'ltr',
+            items: [
+              { text: 'Wide Header', x: 40, y: 200, width: 180, height: 14, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0, colSpanCandidate: true, estimatedColSpan: 2 },
+              { text: 'Normal', x: 240, y: 200, width: 60, height: 14, cellId: 'p1-r0-r0-c1-i1', rowIndex: 0, columnIndex: 1, colSpanCandidate: false, estimatedColSpan: 1 }
+            ],
+            roleMetadata: {}
+          }
+        ]
+      }
+
+      const items = adapter.toProviderItems([block])
+      const response = { success: true, translatedText: JSON.stringify(['عنوان واسع', 'عادي']) }
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped[0].translatedCells[0].colSpanCandidates).toEqual([true, false])
+      expect(mapped[0].translatedCells[0].estimatedColSpans).toEqual([2, 1])
+    })
+
+    it('existing overlay-compatible format unchanged', () => {
+      const adapter = new PdfTranslationAdapter()
+      const block = makeStructuredBlockWithCells('blk-compat', ['Name Age'], [[
+        { text: 'Name', x: 40, y: 200, width: 60, height: 14 },
+        { text: 'Age', x: 180, y: 200, width: 60, height: 14 }
+      ]])
+
+      const items = adapter.toProviderItems([block])
+      const response = { success: true, translatedText: JSON.stringify(['اسم', 'عمر']) }
+      const mapped = adapter.mapBatchResponse(items, response)
+
+      expect(mapped[0].translatedCells).toHaveLength(1)
+      expect(mapped[0].translatedCells[0].lineIndex).toBe(0)
+      expect(mapped[0].translatedCells[0].cells).toEqual(['اسم', 'عمر'])
+      expect(mapped[0].translatedText).toBe('اسم عمر')
+    })
+  })
 })

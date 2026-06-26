@@ -4,6 +4,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import { PdfTranslationAdapter } from './PdfTranslationAdapter.js'
 import { PdfTranslationBatchPlanner } from './PdfTranslationBatchPlanner.js'
+import { enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
 
 export class PdfTranslationCoordinator {
   constructor(session, {
@@ -53,11 +54,14 @@ export class PdfTranslationCoordinator {
         return this.lastSummary
       }
 
+      const pageLayout = this.session.getPageLayout?.() || null
+      const enrichedBlocks = enrichBlocksWithTableMetadata(visibleBlocks, pageLayout)
+
       const provider = await this._resolveProvider()
       const sourceLanguage = await getSourceLanguageAsync()
       const targetLanguage = await getTargetLanguageAsync()
       const optimizationLevel = await getProviderOptimizationLevelAsync(provider)
-      const batches = this.batchPlanner.plan(visibleBlocks, {
+      const batches = this.batchPlanner.plan(enrichedBlocks, {
         providerName: provider,
         optimizationLevel
       })

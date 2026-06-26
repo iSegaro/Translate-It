@@ -359,3 +359,89 @@ export function analyzeTableRegions(regions = [], lines = [], blocks = []) { // 
 
   return Object.freeze(enrichedRegions)
 }
+
+/**
+ * Enrich block line items with table metadata from page layout regions.
+ *
+ * This bridges the gap between diagnostic table metadata (in pageLayout.regions)
+ * and translation adapter input (block line items). Items that match a table cell
+ * by source line index and item position get cellId, rowIndex, columnIndex,
+ * colSpanCandidate, and estimatedColSpan attached.
+ *
+ * Returns new blocks — does not mutate input blocks.
+ *
+ * @param {Object[]} blocks — logical blocks from PdfLogicalBlockBuilder
+ * @param {Object} pageLayout — PageLayoutModel with table metadata
+ * @returns {Object[]} new blocks with enriched line items
+ */
+export function enrichBlocksWithTableMetadata(blocks = [], pageLayout = null) {
+  if (!pageLayout || !pageLayout.regions) return blocks
+
+  const tableCellsBySourceKey = new Map()
+  for (const region of pageLayout.regions) {
+    const table = region.metadata?.table
+    if (!table || !table.cells) continue
+
+    for (const cell of table.cells) {
+      const key = `${cell.sourceLineIndex}:${cell.sourceItemIndex}`
+      tableCellsBySourceKey.set(key, cell)
+    }
+  }
+
+  if (tableCellsBySourceKey.size === 0) return blocks
+
+  const pageLines = pageLayout.lines || []
+  const pageIndexByGeometry = new Map()
+  for (let i = 0; i < pageLines.length; i++) {
+    const pl = pageLines[i]
+    if (!pl.boundingBox) continue
+    const bb = pl.boundingBox
+    const geomKey = `${pl.text}|${Math.round(bb.x * 100)}|${Math.round(bb.y * 100)}|${Math.round(bb.width * 100)}|${Math.round(bb.height * 100)}`
+    if (!pageIndexByGeometry.has(geomKey)) {
+      pageIndexByGeometry.set(geomKey, i)
+    }
+  }
+
+  return blocks.map((block) => {
+    if (!block.lines || !block.lines.length) return block
+
+    let changed = false
+    const enrichedLines = block.lines.map((line) => {
+      if (!line.items || !line.items.length) return line
+
+      const bb = line.boundingBox
+      const geomKey = bb
+        ? `${line.text}|${Math.round(bb.x * 100)}|${Math.round(bb.y * 100)}|${Math.round(bb.width * 100)}|${Math.round(bb.height * 100)}`
+        : null
+      const resolvedSourceLineIndex = geomKey ? pageIndexByGeometry.get(geomKey) : undefined
+
+      if (resolvedSourceLineIndex == null) return line
+
+      let itemsChanged = false
+      const enrichedItems = line.items.map((item, itemIndex) => {
+        const key = `${resolvedSourceLineIndex}:${itemIndex}`
+        const cellMeta = tableCellsBySourceKey.get(key)
+
+        if (!cellMeta) return item
+        if (item.cellId === cellMeta.cellId) return item
+
+        itemsChanged = true
+        return {
+          ...item,
+          cellId: cellMeta.cellId,
+          rowIndex: cellMeta.rowIndex,
+          columnIndex: cellMeta.columnIndex,
+          colSpanCandidate: cellMeta.colSpanCandidate,
+          estimatedColSpan: cellMeta.estimatedColSpan
+        }
+      })
+
+      if (!itemsChanged) return line
+      changed = true
+      return { ...line, items: enrichedItems }
+    })
+
+    if (!changed) return block
+    return { ...block, lines: enrichedLines }
+  })
+}

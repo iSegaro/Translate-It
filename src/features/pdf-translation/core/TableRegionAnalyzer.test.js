@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeTableRegions } from './TableRegionAnalyzer.js'
+import { analyzeTableRegions, enrichBlocksWithTableMetadata } from './TableRegionAnalyzer.js'
 
 function makeRegion(type, { id = 'p1-r0', blockIds = [], boundingBox = { x: 40, y: 100, width: 300, height: 100 }, metadata = {} } = {}) {
   return {
@@ -1441,6 +1441,150 @@ describe('TableRegionAnalyzer', () => {
       expect(table.cells).toHaveLength(0)
       expect(table.hasSpanCandidates).toBe(false)
       expect(table.hasMergedCells).toBe(false)
+    })
+  })
+
+  describe('enrichBlocksWithTableMetadata', () => {
+    it('enriches block items when pageLayout lines match', () => {
+      const pageLines = [
+        { text: 'Name Age', boundingBox: { x: 40, y: 100, width: 200, height: 14 }, fontSize: 12, items: [] },
+        { text: 'Alice 30', boundingBox: { x: 40, y: 120, width: 200, height: 14 }, fontSize: 12, items: [] }
+      ]
+      const pageLayout = {
+        lines: pageLines,
+        regions: [{
+          id: 'p1-r0',
+          type: 'table',
+          boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+          metadata: {
+            table: {
+              cells: [
+                { sourceLineIndex: 0, sourceItemIndex: 0, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0, colSpanCandidate: false, estimatedColSpan: 1 },
+                { sourceLineIndex: 0, sourceItemIndex: 1, cellId: 'p1-r0-r0-c1-i1', rowIndex: 0, columnIndex: 1, colSpanCandidate: false, estimatedColSpan: 1 }
+              ]
+            }
+          }
+        }]
+      }
+
+      const blocks = [{
+        id: 'blk-1',
+        lines: [
+          {
+            text: 'Name Age',
+            boundingBox: { x: 40, y: 100, width: 200, height: 14 },
+            items: [
+              { text: 'Name', x: 40, y: 100, width: 60, height: 14 },
+              { text: 'Age', x: 120, y: 100, width: 60, height: 14 }
+            ]
+          }
+        ]
+      }]
+
+      const result = enrichBlocksWithTableMetadata(blocks, pageLayout)
+
+      expect(result[0].lines[0].items[0].cellId).toBe('p1-r0-r0-c0-i0')
+      expect(result[0].lines[0].items[0].rowIndex).toBe(0)
+      expect(result[0].lines[0].items[0].columnIndex).toBe(0)
+      expect(result[0].lines[0].items[1].cellId).toBe('p1-r0-r0-c1-i1')
+      expect(result[0].lines[0].items[1].columnIndex).toBe(1)
+    })
+
+    it('handles block line order different from pageLayout line order', () => {
+      const pageLines = [
+        { text: 'Alice 30', boundingBox: { x: 40, y: 120, width: 200, height: 14 }, fontSize: 12, items: [] },
+        { text: 'Name Age', boundingBox: { x: 40, y: 100, width: 200, height: 14 }, fontSize: 12, items: [] }
+      ]
+      const pageLayout = {
+        lines: pageLines,
+        regions: [{
+          id: 'p1-r0',
+          type: 'table',
+          boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+          metadata: {
+            table: {
+              cells: [
+                { sourceLineIndex: 1, sourceItemIndex: 0, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0, colSpanCandidate: false, estimatedColSpan: 1 }
+              ]
+            }
+          }
+        }]
+      }
+
+      const blocks = [{
+        id: 'blk-1',
+        lines: [
+          {
+            text: 'Name Age',
+            boundingBox: { x: 40, y: 100, width: 200, height: 14 },
+            items: [
+              { text: 'Name', x: 40, y: 100, width: 60, height: 14 }
+            ]
+          }
+        ]
+      }]
+
+      const result = enrichBlocksWithTableMetadata(blocks, pageLayout)
+
+      expect(result[0].lines[0].items[0].cellId).toBe('p1-r0-r0-c0-i0')
+    })
+
+    it('unresolved block line does not throw and is not enriched', () => {
+      const pageLines = [
+        { text: 'Other line', boundingBox: { x: 40, y: 200, width: 200, height: 14 }, fontSize: 12, items: [] }
+      ]
+      const pageLayout = {
+        lines: pageLines,
+        regions: [{
+          id: 'p1-r0',
+          type: 'table',
+          boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+          metadata: {
+            table: {
+              cells: [
+                { sourceLineIndex: 0, sourceItemIndex: 0, cellId: 'p1-r0-r0-c0-i0', rowIndex: 0, columnIndex: 0, colSpanCandidate: false, estimatedColSpan: 1 }
+              ]
+            }
+          }
+        }]
+      }
+
+      const blocks = [{
+        id: 'blk-1',
+        lines: [
+          {
+            text: 'Unmatched line',
+            boundingBox: { x: 40, y: 100, width: 200, height: 14 },
+            items: [
+              { text: 'Text', x: 40, y: 100, width: 60, height: 14 }
+            ]
+          }
+        ]
+      }]
+
+      const result = enrichBlocksWithTableMetadata(blocks, pageLayout)
+
+      expect(result[0].lines[0].items[0].cellId).toBeUndefined()
+    })
+
+    it('returns original blocks when pageLayout is null', () => {
+      const blocks = [{ id: 'blk-1', lines: [] }]
+      const result = enrichBlocksWithTableMetadata(blocks, null)
+      expect(result).toBe(blocks)
+    })
+
+    it('returns original blocks when no table regions exist', () => {
+      const pageLayout = {
+        lines: [],
+        regions: [{
+          id: 'p1-r0',
+          type: 'paragraph',
+          metadata: {}
+        }]
+      }
+      const blocks = [{ id: 'blk-1', lines: [] }]
+      const result = enrichBlocksWithTableMetadata(blocks, pageLayout)
+      expect(result).toBe(blocks)
     })
   })
 })

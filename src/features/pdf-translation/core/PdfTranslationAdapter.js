@@ -83,7 +83,12 @@ export class PdfTranslationAdapter {
                 pageNumber: block.pageNumber,
                 columnIndex: block.columnIndex,
                 readingOrderIndex: block.readingOrderIndex,
-                position: items.length
+                position: items.length,
+                cellId: cell.cellId || null,
+                tableRowIndex: cell.rowIndex ?? null,
+                tableColumnIndex: cell.columnIndex ?? null,
+                colSpanCandidate: cell.colSpanCandidate || false,
+                estimatedColSpan: cell.estimatedColSpan || 1
               })
             }
           } else {
@@ -218,12 +223,17 @@ export class PdfTranslationAdapter {
 
       if (group.isStructured && lineIndex != null) {
         if (!group.lineResults.has(lineIndex)) {
-          group.lineResults.set(lineIndex, { cells: [], lineText: '' })
+          group.lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], lineText: '' })
         }
         const lineResult = group.lineResults.get(lineIndex)
 
         if (cellIndex != null) {
           lineResult.cells[cellIndex] = translatedText
+          if (originalItem.cellId) lineResult.cellIds[cellIndex] = originalItem.cellId
+          if (originalItem.tableColumnIndex != null) lineResult.columnIndices[cellIndex] = originalItem.tableColumnIndex
+          if (originalItem.tableRowIndex != null) lineResult.rowIndices[cellIndex] = originalItem.tableRowIndex
+          if (originalItem.colSpanCandidate != null) lineResult.colSpanCandidates[cellIndex] = originalItem.colSpanCandidate
+          if (originalItem.estimatedColSpan != null) lineResult.estimatedColSpans[cellIndex] = originalItem.estimatedColSpan
         } else {
           lineResult.lineText = translatedText
         }
@@ -276,12 +286,38 @@ export class PdfTranslationAdapter {
     const sortedIndices = [...entry.lineResults.keys()].sort((a, b) => a - b)
     return sortedIndices.map((lineIndex) => {
       const lr = entry.lineResults.get(lineIndex)
-      return {
-        lineIndex,
-        cells: lr.cells.length > 0
-          ? lr.cells.map((c) => normalizeCellText(c || ''))
-          : [normalizeCellText(lr.lineText || '')]
+      const cells = lr.cells.length > 0
+        ? lr.cells.map((c) => normalizeCellText(c || ''))
+        : [normalizeCellText(lr.lineText || '')]
+
+      const result = { lineIndex, cells }
+
+      const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
+      if (hasCellIds) {
+        result.cellIds = lr.cellIds.map((id) => id || null)
       }
+
+      const hasColumnIndices = lr.columnIndices && lr.columnIndices.some((idx) => idx != null)
+      if (hasColumnIndices) {
+        result.columnIndices = lr.columnIndices.map((idx) => idx ?? null)
+      }
+
+      const hasRowIndices = lr.rowIndices && lr.rowIndices.some((idx) => idx != null)
+      if (hasRowIndices) {
+        result.rowIndices = lr.rowIndices.map((idx) => idx ?? null)
+      }
+
+      const hasColSpanCandidates = lr.colSpanCandidates && lr.colSpanCandidates.some((v) => v)
+      if (hasColSpanCandidates) {
+        result.colSpanCandidates = lr.colSpanCandidates.map((v) => v || false)
+      }
+
+      const hasEstimatedColSpans = lr.estimatedColSpans && lr.estimatedColSpans.some((v) => v && v > 1)
+      if (hasEstimatedColSpans) {
+        result.estimatedColSpans = lr.estimatedColSpans.map((v) => v || 1)
+      }
+
+      return result
     })
   }
 
@@ -369,13 +405,18 @@ export class PdfTranslationAdapter {
       if (lineIndex == null) continue
 
       if (!lineResults.has(lineIndex)) {
-        lineResults.set(lineIndex, { cells: [], lineText: '' })
+        lineResults.set(lineIndex, { cells: [], cellIds: [], columnIndices: [], rowIndices: [], colSpanCandidates: [], estimatedColSpans: [], lineText: '' })
       }
       const lr = lineResults.get(lineIndex)
       const text = results[i] ? extractTranslatedString(results[i].t || results[i].text || results[i].translatedText) : ''
 
       if (item.cellIndex != null) {
         lr.cells[item.cellIndex] = text
+        if (item.cellId) lr.cellIds[item.cellIndex] = item.cellId
+        if (item.tableColumnIndex != null) lr.columnIndices[item.cellIndex] = item.tableColumnIndex
+        if (item.tableRowIndex != null) lr.rowIndices[item.cellIndex] = item.tableRowIndex
+        if (item.colSpanCandidate != null) lr.colSpanCandidates[item.cellIndex] = item.colSpanCandidate
+        if (item.estimatedColSpan != null) lr.estimatedColSpans[item.cellIndex] = item.estimatedColSpan
       } else if (!lr.lineText) {
         lr.lineText = text
       }
@@ -394,12 +435,38 @@ export class PdfTranslationAdapter {
     const translatedCells = hasAnyCells
       ? sortedIndices.map((idx) => {
         const lr = lineResults.get(idx)
-        return {
-          lineIndex: idx,
-          cells: lr.cells.length > 0
-            ? lr.cells.map((c) => normalizeCellText(c || ''))
-            : [normalizeCellText(lr.lineText || '')]
+        const cells = lr.cells.length > 0
+          ? lr.cells.map((c) => normalizeCellText(c || ''))
+          : [normalizeCellText(lr.lineText || '')]
+
+        const result = { lineIndex: idx, cells }
+
+        const hasCellIds = lr.cellIds && lr.cellIds.some((id) => id != null)
+        if (hasCellIds) {
+          result.cellIds = lr.cellIds.map((id) => id || null)
         }
+
+        const hasColumnIndices = lr.columnIndices && lr.columnIndices.some((ci) => ci != null)
+        if (hasColumnIndices) {
+          result.columnIndices = lr.columnIndices.map((ci) => ci ?? null)
+        }
+
+        const hasRowIndices = lr.rowIndices && lr.rowIndices.some((ri) => ri != null)
+        if (hasRowIndices) {
+          result.rowIndices = lr.rowIndices.map((ri) => ri ?? null)
+        }
+
+        const hasColSpanCandidates = lr.colSpanCandidates && lr.colSpanCandidates.some((v) => v)
+        if (hasColSpanCandidates) {
+          result.colSpanCandidates = lr.colSpanCandidates.map((v) => v || false)
+        }
+
+        const hasEstimatedColSpans = lr.estimatedColSpans && lr.estimatedColSpans.some((v) => v && v > 1)
+        if (hasEstimatedColSpans) {
+          result.estimatedColSpans = lr.estimatedColSpans.map((v) => v || 1)
+        }
+
+        return result
       })
       : undefined
 
