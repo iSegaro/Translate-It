@@ -235,6 +235,7 @@ function collectOverlayRenderPlan(blocks, results, pageMetric, session) {
     let renderedMode = 'block'
     let items = []
     const warnings = []
+    const spanDiagnostics = []
 
     if (useCellOverlay) {
       renderedMode = 'cell'
@@ -258,6 +259,21 @@ function collectOverlayRenderPlan(blocks, results, pageMetric, session) {
           })
           if (cell.rawHeight <= 0) {
             warnings.push(`cell height <= 0 at line${ld.lineIndex}`)
+          }
+        }
+      }
+
+      for (const lc of translatedCells) {
+        if (lc.colSpanCandidates) {
+          for (let i = 0; i < lc.colSpanCandidates.length; i++) {
+            if (lc.colSpanCandidates[i]) {
+              spanDiagnostics.push({
+                lineIndex: lc.lineIndex,
+                cellIndex: i,
+                estimatedColSpan: lc.estimatedColSpans?.[i] || 1,
+                cellId: lc.cellIds?.[i] || null
+              })
+            }
           }
         }
       }
@@ -352,7 +368,8 @@ function collectOverlayRenderPlan(blocks, results, pageMetric, session) {
       renderedMode,
       itemCount: items.length,
       items,
-      warnings
+      warnings,
+      spanDiagnostics: spanDiagnostics.length > 0 ? spanDiagnostics : undefined
     }
   })
 }
