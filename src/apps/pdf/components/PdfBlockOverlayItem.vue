@@ -67,6 +67,7 @@ import { computed, onBeforeUnmount } from 'vue'
 import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
 import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
+import { resolvePdfCellOverlayWidth } from '@features/pdf-translation/core/PdfCellSpanLayout.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
@@ -161,8 +162,16 @@ const cellOverlayData = computed(() => {
 
   const blockBbox = props.block.boundingBox
   const translatedCellMap = new Map()
+  const translatedCellMetaMap = new Map()
   for (const lc of (translatedCells.value || [])) {
     translatedCellMap.set(lc.lineIndex, lc.cells)
+    translatedCellMetaMap.set(lc.lineIndex, {
+      cellIds: lc.cellIds,
+      columnIndices: lc.columnIndices,
+      rowIndices: lc.rowIndices,
+      colSpanCandidates: lc.colSpanCandidates,
+      estimatedColSpans: lc.estimatedColSpans
+    })
   }
 
   return (props.block.lines || []).map((line, lineIndex) => {
@@ -171,6 +180,7 @@ const cellOverlayData = computed(() => {
 
     const translatedCellTexts = translatedCellMap.get(lineIndex)
     const cellTexts = translatedCellTexts || lineItems.map((item) => item.text || '')
+    const cellMeta = translatedCellMetaMap.get(lineIndex) || null
 
     return {
       cells: cellTexts.map((cellText, cellIdx) => {
@@ -179,19 +189,28 @@ const cellOverlayData = computed(() => {
 
         const lineRight = (line.boundingBox?.x || 0) + (line.boundingBox?.width || 0)
         const isLastCell = cellIdx === cellTexts.length - 1
-        let cellWidth
+        let fallbackWidth
 
         if (isLastCell) {
-          cellWidth = lineRight - item.x
+          fallbackWidth = lineRight - item.x
         } else {
           const nextItem = lineItems[cellIdx + 1]
           const itemRight = item.right ?? (item.x + item.width)
           const gap = nextItem ? nextItem.x - itemRight : 0
           const expansion = Math.max(0, gap * CELL_GAP_EXPANSION_RATIO)
-          cellWidth = item.width + expansion
+          fallbackWidth = item.width + expansion
         }
 
-        cellWidth = Math.max(item.width, cellWidth)
+        fallbackWidth = Math.max(item.width, fallbackWidth)
+
+        const cellWidth = resolvePdfCellOverlayWidth({
+          item,
+          nextItem: isLastCell ? null : lineItems[cellIdx + 1],
+          line,
+          translatedCellMetadata: cellMeta,
+          cellIndex: cellIdx,
+          fallbackWidth
+        })
 
         const cellHeight = Math.round(Math.max(item.height || 0, item.fontSize ? item.fontSize * 0.8 : blockFontSize.value * 0.8) * 10) / 10
 
