@@ -5,10 +5,9 @@
  * It wraps existing lines and blocks, adding a `regions` array for spatial grouping
  * and a `readingOrder` for deterministic element traversal.
  *
- * Phase L3: Diagnostic-only region classification. Regions are classified via
- * conservative heuristics based on block roles and line-level signals. No consumer
- * uses regions for building, rendering, or translation yet. Classification is
- * metadata-only.
+ * Phase L5a: Diagnostic-only table metadata enrichment. Table regions receive
+ * minimal table metadata structure. No consumer uses table metadata for
+ * building, rendering, or translation yet.
  */
 
 /**
@@ -46,15 +45,16 @@
 /**
  * @typedef {Object} LayoutRegion
  * @property {string} id — deterministic, e.g. 'p1-r0'
- * @property {string} type — 'paragraph' | 'heading' | 'list' | 'table' | 'unknown' (Phase L3)
+ * @property {string} type — 'paragraph' | 'heading' | 'list' | 'table' | 'unknown'
  * @property {BoundingBox} boundingBox — union of member line bounding boxes
- * @property {string[]} childRegionIds — empty in Phase L3
+ * @property {string[]} childRegionIds — empty in Phase L5a
  * @property {string[]} blockIds — block IDs whose center falls within this region
- * @property {Object} metadata — lineCount, fontSize, gapThreshold + classification signals
+ * @property {Object} metadata — lineCount, fontSize, gapThreshold + classification signals + table metadata
  */
 
 import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { classifyLayoutRegions } from './LayoutRegionClassifier.js'
+import { analyzeTableRegions } from './TableRegionAnalyzer.js'
 
 const REGION_TYPE_UNKNOWN = 'unknown'
 
@@ -90,8 +90,9 @@ function buildMetadata(lines, blocks, regions) {
 /**
  * Build a PageLayoutModel from existing lines and blocks.
  *
- * Populates regions via conservative vertical-gap grouping (Phase L2)
- * and classifies them via block-role heuristics (Phase L3).
+ * Populates regions via conservative vertical-gap grouping (Phase L2),
+ * classifies them via block-role heuristics (Phase L3), and enriches
+ * table regions with minimal table metadata (Phase L5a).
  * Does NOT modify block building, rendering, or translation behavior.
  *
  * @param {Object} options
@@ -115,14 +116,15 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const frozenBlocks = Object.freeze([...blocks])
   const detectedRegions = regions || detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
   const classifiedRegions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
-  const metadata = buildMetadata(frozenLines, frozenBlocks, classifiedRegions)
+  const enrichedRegions = analyzeTableRegions(classifiedRegions)
+  const metadata = buildMetadata(frozenLines, frozenBlocks, enrichedRegions)
 
   return Object.freeze({
     pageNumber,
     pageSize: normalizedPageSize,
     lines: frozenLines,
     blocks: frozenBlocks,
-    regions: classifiedRegions,
+    regions: enrichedRegions,
     readingOrder: Object.freeze(readingOrder),
     metadata
   })
