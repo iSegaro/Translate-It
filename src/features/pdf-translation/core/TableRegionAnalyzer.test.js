@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeTableRegions } from './TableRegionAnalyzer.js'
 
-function makeRegion(type, { id = 'p1-r0', blockIds = [], metadata = {} } = {}) {
+function makeRegion(type, { id = 'p1-r0', blockIds = [], boundingBox = { x: 40, y: 100, width: 300, height: 100 }, metadata = {} } = {}) {
   return {
     id,
     type,
-    boundingBox: { x: 40, y: 100, width: 200, height: 60 },
+    boundingBox,
     childRegionIds: [],
     blockIds,
     metadata: {
@@ -14,6 +14,28 @@ function makeRegion(type, { id = 'p1-r0', blockIds = [], metadata = {} } = {}) {
       gapThreshold: 36,
       ...metadata
     }
+  }
+}
+
+function makeLine(y, { regionId = null, items = [], fontSize = 12, direction = 'ltr', x = 40, width = 200 } = {}) {
+  return {
+    text: items.map((i) => i.text).join(' '),
+    boundingBox: { x, y, width, height: fontSize },
+    fontSize,
+    direction,
+    items,
+    regionId
+  }
+}
+
+function makeItem(text, x, width = 60) {
+  return {
+    text,
+    x,
+    right: x + width,
+    width,
+    height: 12,
+    fontSize: 12
   }
 }
 
@@ -182,6 +204,217 @@ describe('TableRegionAnalyzer', () => {
       expect(Array.isArray(table.columns)).toBe(true)
       expect(Array.isArray(table.rows)).toBe(true)
       expect(Array.isArray(table.cells)).toBe(true)
+    })
+  })
+
+  describe('column detection', () => {
+    it('detects 2-column table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Value', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Age', 40), makeItem('25', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(2)
+      expect(result[0].metadata.table.columns).toHaveLength(2)
+      expect(result[0].metadata.table.columns[0].x).toBe(40)
+      expect(result[0].metadata.table.columns[1].x).toBe(180)
+    })
+
+    it('detects 3-column table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 400, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Age', 160), makeItem('City', 280)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('30', 160), makeItem('NYC', 280)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('Bob', 40), makeItem('25', 160), makeItem('LA', 280)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(3)
+      expect(result[0].metadata.table.columns).toHaveLength(3)
+    })
+
+    it('detects columns from irregular rows with missing cells', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Age', 160), makeItem('City', 280)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('NYC', 280)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(3)
+      expect(result[0].metadata.table.columns).toHaveLength(3)
+    })
+
+    it('detects columns from merged header', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Personal Info', 40, 120)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Age', 180)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40), makeItem('30', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(2)
+      expect(result[0].metadata.table.columns).toHaveLength(2)
+    })
+
+    it('falls back to empty columns when all items same x', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Line 1', 40), makeItem('text', 40)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Line 2', 40), makeItem('text', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(0)
+      expect(result[0].metadata.table.columns).toEqual([])
+    })
+
+    it('falls back to empty columns for single-line table', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 30 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Value', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(0)
+      expect(result[0].metadata.table.columns).toEqual([])
+    })
+
+    it('RTL table detects visual columns left-to-right', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          direction: 'rtl',
+          items: [makeItem('שם', 40), makeItem('ערך', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          direction: 'rtl',
+          items: [makeItem('Alice', 40), makeItem('30', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columnCount).toBe(2)
+      expect(result[0].metadata.table.columns[0].x).toBe(40)
+      expect(result[0].metadata.table.columns[1].x).toBe(180)
+    })
+
+    it('numeric column align becomes right', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('123', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Age', 40), makeItem('456', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columns[1].align).toBe('right')
+    })
+
+    it('non-numeric column align becomes left', () => {
+      const region = makeRegion('table', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40), makeItem('Alice', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Age', 40), makeItem('Bob', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table.columns[1].align).toBe('left')
+    })
+
+    it('non-table regions are unchanged', () => {
+      const region = makeRegion('paragraph')
+      const lines = [
+        makeLine(100, {
+          items: [makeItem('Text', 40), makeItem('here', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+
+      expect(result[0].metadata.table).toBeUndefined()
     })
   })
 })
