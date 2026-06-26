@@ -1,8 +1,8 @@
 /**
  * TableRegionAnalyzer — diagnostic-only table metadata enrichment.
  *
- * Phase L5c: Adds row detection for regions classified as 'table'.
- * Rows are detected by mapping lines to rows based on y-position.
+ * Phase L5d: Adds cell-to-grid mapping for regions classified as 'table'.
+ * Cells are mapped by item-to-column proximity using x-position.
  * This is diagnostic-only — no rendering, translation, or adapter changes.
  *
  * Pipeline position: after classifyLayoutRegions, before buildMetadata.
@@ -187,9 +187,75 @@ function detectTableRows(region, lines) {
   return Object.freeze(frozenRows)
 }
 
+function detectTableCells(region, lines, columns, rows) {
+  if (columns.length < 2 || rows.length < 2) {
+    return Object.freeze([])
+  }
+
+  const regionLineEntries = getRegionLines(region, lines)
+  const linesByOriginalIndex = new Map()
+  for (const entry of regionLineEntries) {
+    linesByOriginalIndex.set(entry.originalIndex, entry.line)
+  }
+
+  const regionLines = regionLineEntries.map((e) => e.line)
+  const medianFontSize = getMedianFontSize(regionLines)
+  const tolerance = Math.max(medianFontSize * 0.75, 6)
+
+  const cells = []
+
+  for (const row of rows) {
+    for (const lineIndex of row.lineIndices) {
+      const line = linesByOriginalIndex.get(lineIndex)
+      if (!line || !line.items) continue
+
+      for (let itemIndex = 0; itemIndex < line.items.length; itemIndex++) {
+        const item = line.items[itemIndex]
+        if (!item.text || !item.text.trim()) continue
+
+        let bestColumn = null
+        let bestDistance = Infinity
+
+        for (const column of columns) {
+          const dist = Math.abs(item.x - column.x)
+          if (dist < bestDistance) {
+            bestDistance = dist
+            bestColumn = column
+          }
+        }
+
+        if (!bestColumn || bestDistance > tolerance) continue
+
+        const itemWidth = item.right - item.x
+        const spanCandidate = itemWidth > bestColumn.averageWidth * 1.5
+
+        const bb = {
+          x: Math.round(item.x * 100) / 100,
+          y: Math.round(item.y * 100) / 100,
+          width: Math.round(itemWidth * 100) / 100,
+          height: Math.round(item.height * 100) / 100
+        }
+
+        cells.push(Object.freeze({
+          rowIndex: row.index,
+          columnIndex: bestColumn.index,
+          text: item.text,
+          boundingBox: Object.freeze(bb),
+          sourceLineIndex: lineIndex,
+          sourceItemIndex: itemIndex,
+          spanCandidate
+        }))
+      }
+    }
+  }
+
+  return Object.freeze(cells)
+}
+
 function buildTableMetadata(region, lines) {
   const columns = detectTableColumns(region, lines)
   const rows = detectTableRows(region, lines)
+  const cells = detectTableCells(region, lines, columns, rows)
 
   return Object.freeze({
     columnCount: columns.length,
@@ -198,7 +264,7 @@ function buildTableMetadata(region, lines) {
     hasMultiLevelHeaders: false,
     columns,
     rows,
-    cells: Object.freeze([])
+    cells
   })
 }
 
