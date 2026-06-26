@@ -6,12 +6,14 @@ export class PdfLogicalBlockBuilder {
     documentIdentity = '',
     pageNumber = 0,
     pageSize = null,
-    lines = []
+    lines = [],
+    regions = null
   } = {}) {
     const rawBlocks = buildPdfLogicalBlocksFromLines(lines, {
       documentIdentity,
       pageNumber,
-      pageSize
+      pageSize,
+      regions: regions || []
     })
 
     const resolvedBlocks = []

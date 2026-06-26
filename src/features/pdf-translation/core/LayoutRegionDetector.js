@@ -1,9 +1,9 @@
 /**
  * LayoutRegionDetector — conservative spatial grouping of text lines into regions.
  *
- * Phase L2: Diagnostic-only. Populates regions for inspection but no consumer
- * uses them yet. Region type is always 'unknown'. No block building, rendering,
- * or translation changes.
+ * Phase L4a: Added `assignRegionIdsToLines()` for region-aware block building.
+ * Lines are assigned to regions based on bounding box containment.
+ * Used by `buildPdfLogicalBlocksFromLines()` to prevent cross-region merges.
  *
  * Strategy: group consecutive vertically-close lines into regions. A large
  * vertical gap (> medianFontSize × 3) between two lines breaks the region.
@@ -116,4 +116,42 @@ export function detectLayoutRegions(lines = [], pageNumber = 0, blocks = []) {
   })
 
   return Object.freeze(regions)
+}
+
+/**
+ * Assign region IDs to lines based on bounding box containment.
+ *
+ * A line is assigned to a region if its center point falls within the region's
+ * bounding box. Lines that don't match any region get `regionId: null`.
+ *
+ * @param {Object[]} lines — text lines with boundingBox
+ * @param {Object[]} regions — layout regions from detectLayoutRegions
+ * @returns {Object[]} new array of lines with `regionId` property added
+ */
+export function assignRegionIdsToLines(lines = [], regions = []) {
+  if (!lines.length || !regions.length) {
+    return lines.map((line) => ({ ...line, regionId: null }))
+  }
+
+  return lines.map((line) => {
+    const bb = line.boundingBox
+    if (!bb) return { ...line, regionId: null }
+
+    const centerX = bb.x + bb.width / 2
+    const centerY = bb.y + bb.height / 2
+
+    for (const region of regions) {
+      const rbb = region.boundingBox
+      if (
+        centerX >= rbb.x &&
+        centerX <= rbb.x + rbb.width &&
+        centerY >= rbb.y &&
+        centerY <= rbb.y + rbb.height
+      ) {
+        return { ...line, regionId: region.id }
+      }
+    }
+
+    return { ...line, regionId: null }
+  })
 }

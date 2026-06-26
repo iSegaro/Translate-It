@@ -99,9 +99,10 @@ function buildMetadata(lines, blocks, regions) {
  * @param {Object} options.pageSize — { width, height }
  * @param {Object[]} options.lines — text lines from buildPdfTextLinesFromItems
  * @param {Object[]} options.blocks — logical blocks from PdfLogicalBlockBuilder
+ * @param {Object[]} [options.regions] — pre-detected regions (avoids duplicate detection)
  * @returns {PageLayoutModel}
  */
-export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = [], blocks = [] }) {
+export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = [], blocks = [], regions = null }) {
   const normalizedPageSize = pageSize
     ? {
       width: Number(pageSize.width) || 0,
@@ -112,16 +113,16 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const readingOrder = buildReadingOrder(blocks)
   const frozenLines = Object.freeze([...lines])
   const frozenBlocks = Object.freeze([...blocks])
-  const detectedRegions = detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
-  const regions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
-  const metadata = buildMetadata(frozenLines, frozenBlocks, regions)
+  const detectedRegions = regions || detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
+  const classifiedRegions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
+  const metadata = buildMetadata(frozenLines, frozenBlocks, classifiedRegions)
 
   return Object.freeze({
     pageNumber,
     pageSize: normalizedPageSize,
     lines: frozenLines,
     blocks: frozenBlocks,
-    regions,
+    regions: classifiedRegions,
     readingOrder: Object.freeze(readingOrder),
     metadata
   })

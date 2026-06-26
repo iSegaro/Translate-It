@@ -1,5 +1,6 @@
 import { PdfLogicalBlockBuilder } from './PdfLogicalBlockBuilder.js'
 import { buildPdfTextLinesFromItems } from './PdfLayoutAnalyzer.js'
+import { detectLayoutRegions } from './LayoutRegionDetector.js'
 import { buildPageLayoutModel, createEmptyPageLayoutModel } from './PageLayoutModel.js'
 
 function normalizePageSize(pageMetric = null) {
@@ -58,17 +59,20 @@ export class PdfPageSession {
     })
 
     this.lines = buildPdfTextLinesFromItems(this.textContent?.items || [], this.pageSize, this.textContent?.styles || null)
+    const detectedRegions = detectLayoutRegions(this.lines, this.pageNumber)
     this.logicalBlocks = await this.logicalBlockBuilder.build({
       documentIdentity: this.documentIdentity,
       pageNumber: this.pageNumber,
       pageSize: this.pageSize,
-      lines: this.lines
+      lines: this.lines,
+      regions: detectedRegions
     })
     this.pageLayout = buildPageLayoutModel({
       pageNumber: this.pageNumber,
       pageSize: this.pageSize,
       lines: this.lines,
-      blocks: this.logicalBlocks
+      blocks: this.logicalBlocks,
+      regions: detectedRegions
     })
     this.loaded = true
     this.loadedAt = Date.now()

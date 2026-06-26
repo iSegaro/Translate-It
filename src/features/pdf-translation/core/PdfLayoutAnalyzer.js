@@ -1,4 +1,5 @@
 import { normalizePdfBoundingBox, normalizePdfText } from './PdfBlockIdentity.js'
+import { assignRegionIdsToLines } from './LayoutRegionDetector.js'
 
 const VIRTUAL_WHITESPACE_PATTERN = /\s{2,}/
 const MIN_VIRTUAL_TEXT_GROUPS = 3
@@ -388,6 +389,10 @@ function canAppendLineToBlock(block, line, role, context) {
     return false
   }
 
+  if (block.regionId && line.regionId && block.regionId !== line.regionId) {
+    return false
+  }
+
   const blockBottom = block.boundingBox.y + block.boundingBox.height
   const gap = line.boundingBox.y - blockBottom
 
@@ -463,12 +468,14 @@ function startBlockFromLine(line, context, blockIndex) {
     boundingBox: { ...line.boundingBox },
     columnIndex: line.columnIndex,
     readingOrderIndex: line.readingOrderIndex,
+    regionId: line.regionId || null,
     roleMetadata: {
       ...line.roleMetadata,
       inferredRole: role,
       sourceLineRoles: [role],
       lineCount: 1,
-      isStructured: role === 'table-cell'
+      isStructured: role === 'table-cell',
+      regionId: line.regionId || null
     }
   }
 }
@@ -484,13 +491,15 @@ function appendLineToBlock(block, line, role) {
     text: normalizePdfText([block.text, line.text].filter(Boolean).join(separator)),
     boundingBox: mergeBoundingBoxes(block.boundingBox, line.boundingBox),
     readingOrderIndex: Math.min(block.readingOrderIndex, line.readingOrderIndex),
+    regionId: block.regionId || line.regionId || null,
     roleMetadata: {
       ...block.roleMetadata,
       inferredRole: nextRole,
       sourceLineRoles: [...(block.roleMetadata?.sourceLineRoles || []), role],
       lineCount: nextLines.length,
       isMultiLine: nextLines.length > 1,
-      isStructured: nextRole === 'table-region' || nextRole === 'table-cell'
+      isStructured: nextRole === 'table-region' || nextRole === 'table-cell',
+      regionId: block.regionId || line.regionId || null
     }
   }
 
@@ -504,7 +513,9 @@ function appendLineToBlock(block, line, role) {
 export function buildPdfLogicalBlocksFromLines(lines = [], context = {}) {
   if (!lines.length) return []
 
-  const orderedLines = resolvePdfReadingOrder(lines, context.pageSize)
+  const regions = context.regions || []
+  const linesWithRegionIds = assignRegionIdsToLines(lines, regions)
+  const orderedLines = resolvePdfReadingOrder(linesWithRegionIds, context.pageSize)
   const enrichedContext = {
     ...context,
     medianFontSize: median(orderedLines.map((line) => line.fontSize)),
