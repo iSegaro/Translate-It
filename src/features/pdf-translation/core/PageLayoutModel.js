@@ -5,9 +5,10 @@
  * It wraps existing lines and blocks, adding a `regions` array for spatial grouping
  * and a `readingOrder` for deterministic element traversal.
  *
- * Phase L2: Diagnostic-only region detection. Regions are populated via
- * conservative vertical-gap grouping. No consumer uses regions for building,
- * rendering, or translation yet. Region type is always 'unknown'.
+ * Phase L3: Diagnostic-only region classification. Regions are classified via
+ * conservative heuristics based on block roles and line-level signals. No consumer
+ * uses regions for building, rendering, or translation yet. Classification is
+ * metadata-only.
  */
 
 /**
@@ -45,14 +46,15 @@
 /**
  * @typedef {Object} LayoutRegion
  * @property {string} id — deterministic, e.g. 'p1-r0'
- * @property {string} type — 'unknown' in Phase L2
+ * @property {string} type — 'paragraph' | 'heading' | 'list' | 'table' | 'unknown' (Phase L3)
  * @property {BoundingBox} boundingBox — union of member line bounding boxes
- * @property {string[]} childRegionIds — empty in Phase L2
+ * @property {string[]} childRegionIds — empty in Phase L3
  * @property {string[]} blockIds — block IDs whose center falls within this region
- * @property {Object} metadata — lineCount, fontSize, gapThreshold
+ * @property {Object} metadata — lineCount, fontSize, gapThreshold + classification signals
  */
 
 import { detectLayoutRegions } from './LayoutRegionDetector.js'
+import { classifyLayoutRegions } from './LayoutRegionClassifier.js'
 
 const REGION_TYPE_UNKNOWN = 'unknown'
 
@@ -88,7 +90,8 @@ function buildMetadata(lines, blocks, regions) {
 /**
  * Build a PageLayoutModel from existing lines and blocks.
  *
- * Populates regions via conservative vertical-gap grouping (Phase L2).
+ * Populates regions via conservative vertical-gap grouping (Phase L2)
+ * and classifies them via block-role heuristics (Phase L3).
  * Does NOT modify block building, rendering, or translation behavior.
  *
  * @param {Object} options
@@ -109,7 +112,8 @@ export function buildPageLayoutModel({ pageNumber = 0, pageSize = null, lines = 
   const readingOrder = buildReadingOrder(blocks)
   const frozenLines = Object.freeze([...lines])
   const frozenBlocks = Object.freeze([...blocks])
-  const regions = detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
+  const detectedRegions = detectLayoutRegions(frozenLines, pageNumber, frozenBlocks)
+  const regions = classifyLayoutRegions(detectedRegions, frozenLines, frozenBlocks)
   const metadata = buildMetadata(frozenLines, frozenBlocks, regions)
 
   return Object.freeze({

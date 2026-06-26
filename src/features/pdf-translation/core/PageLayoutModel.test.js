@@ -19,7 +19,7 @@ describe('PageLayoutModel', () => {
       expect(model.lines).toHaveLength(2)
       expect(model.blocks).toHaveLength(1)
       expect(model.regions).toHaveLength(1)
-      expect(model.regions[0].type).toBe('unknown')
+      expect(model.regions[0].type).toBe('paragraph')
       expect(model.regions[0].id).toBe('p1-r0')
       expect(model.regions[0].blockIds).toEqual(['block-1'])
       expect(model.readingOrder).toEqual(['block-1'])
