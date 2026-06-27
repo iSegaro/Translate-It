@@ -1209,4 +1209,232 @@ describe('SemanticRegionAnalyzer', () => {
       expect(metrics[0].deltaLineIndex).toBe(2)
     })
   })
+
+  describe('financial subtype classification', () => {
+    it('metric-with-delta subtype on metric with period', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.subtype).toBe('metric-with-delta')
+      expect(financial.subtypes).toContain('metric-with-delta')
+    })
+
+    it('summary-row subtype on financial key-value pair', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.type).toBe('key-value-candidate')
+      expect(result[0].metadata.semantic.pairs[0].financial.subtype).toBe('summary-row')
+      expect(result[0].metadata.semantic.pairs[0].financial.subtypes).toContain('summary-row')
+    })
+
+    it('total-row subtype on total assets label', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Total Assets: 20.0B', fontSize: 12 }),
+        makeLine(120, { text: 'Revenue: 12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const totalPair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Total Assets')
+      expect(totalPair.financial.subtype).toBe('total-row')
+      expect(totalPair.financial.subtypes).toContain('total-row')
+      expect(totalPair.financial.subtypes).toContain('summary-row')
+    })
+
+    it('total-row subtype on net income label', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Net Income: $3.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Revenue: 12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const pair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Net Income')
+      expect(pair.financial.subtype).toBe('total-row')
+    })
+
+    it('negative-value subtype on parenthesized value', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Write-down', fontSize: 12 }),
+        makeLine(120, { text: '($1.2B)', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.subtypes).toContain('negative-value')
+    })
+
+    it('multiple subtypes: total-row + summary-row', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Total Revenue: $12.3B', fontSize: 12 }),
+        makeLine(120, { text: 'Assets: 4.2B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const pair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Total Revenue')
+      expect(pair.financial.subtype).toBe('total-row')
+      expect(pair.financial.subtypes).toContain('total-row')
+      expect(pair.financial.subtypes).toContain('summary-row')
+    })
+
+    it('multiple subtypes: total-row + negative-value', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Total Loss: ($5.2B)', fontSize: 12 }),
+        makeLine(120, { text: 'Revenue: 12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const pair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Total Loss')
+      expect(pair.financial.subtype).toBe('total-row')
+      expect(pair.financial.subtypes).toContain('total-row')
+      expect(pair.financial.subtypes).toContain('negative-value')
+      expect(pair.financial.subtypes).toContain('summary-row')
+    })
+
+    it('priority: total-row beats negative-value as primary', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Total Loss: ($5.2B)', fontSize: 12 }),
+        makeLine(120, { text: 'Revenue: 12.3B', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const pair = result[0].metadata.semantic.pairs.find((p) => p.label === 'Total Loss')
+      expect(pair.financial.subtype).toBe('total-row')
+    })
+
+    it('non-financial pair keeps financial null', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Name: Alice', fontSize: 12 }),
+        makeLine(120, { text: 'Age: 30', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.pairs[0].financial).toBeNull()
+      expect(result[0].metadata.semantic.pairs[1].financial).toBeNull()
+    })
+
+    it('delta without period but explicit sign gets metric-with-delta', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4%', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.subtype).toBe('metric-with-delta')
+    })
+
+    it('negative delta with hyphen gets metric-with-delta and negative polarity', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '-18.4%', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.subtype).toBe('metric-with-delta')
+      expect(financial.subtypes).toContain('metric-with-delta')
+      expect(financial.polarity).toBe('negative')
+    })
+
+    it('financial object and subtypes array are frozen', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(Object.isFrozen(financial)).toBe(true)
+      expect(Object.isFrozen(financial.subtypes)).toBe(true)
+    })
+
+    it('metric without financial signals has subtype null', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Count', fontSize: 12 }),
+        makeLine(120, { text: '1,234', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics[0].financial).toBeNull()
+    })
+
+    it('summary-row subtype on metric with currency', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.5B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.subtype).toBe('summary-row')
+      expect(financial.subtypes).toContain('summary-row')
+    })
+  })
 })

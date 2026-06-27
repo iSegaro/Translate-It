@@ -32,6 +32,7 @@ const PERIOD_PATTERN = /\b(YoY|QoQ|MoM|YTD|FY|TTM|CAGR|vs\s*LY|vs\s*Last\s*Year|
 const FINANCIAL_VOCABULARY_PATTERN = /\b(?:revenue|income|expense|asset|liabilit|equity|margin|profit|loss|cash.?flow|EBITDA|EPS|dividend|depreciation|amortization|working.?capital|retained|operating|net.?income|gross.?profit|total|subtotal|current|non.?current|earnings|BITDA|ROI|ROE|ROA)\b/i
 const PAREN_VALUE_PATTERN = /^\([\d.,\s+\-–—$€£¥₹BMKbmk%]+\)$/
 const DELTA_VALUE_PATTERN = /^[+\-–—]?\s*[\d.,]+\s*%\s*(?:YoY|QoQ|MoM|YTD|FY|TTM|CAGR|vs\s*LY|vs\s*Last\s*Year|vs\s*Prior\s*Year)?$/i
+const TOTAL_LABEL_PATTERN = /\b(?:total|subtotal|net\s+(?:income|loss|revenue|profit)|gross\s+(?:profit|margin)|operating\s+(?:income|profit|expense|margin)|total\s+(?:assets|liabilit|equity|revenue|expense)|earnings|BITDA)\b/i
 
 const WEIGHT_NUMERIC_RATIO = 0.3
 const WEIGHT_SHORT_LINE_RATIO = 0.2
@@ -150,6 +151,43 @@ function buildFinancialMetadata(valueText, labelText) {
   })
 }
 
+const SUBTYPE_PRIORITY = ['total-row', 'metric-with-delta', 'summary-row', 'negative-value']
+
+function classifyFinancialSubtypes({ label, value, financial, kind, delta }) {
+  if (!financial) return null
+
+  const matched = []
+
+  if (kind === 'metric' && delta != null) {
+    const hasPeriod = financial.period != null
+    const hasExplicitSign = /^[-\u002B\u2013\u2014]/.test(delta)
+    if (hasPeriod || hasExplicitSign) {
+      matched.push('metric-with-delta')
+    }
+  }
+
+  if (financial.magnitude != null || CURRENCY_PATTERN.test(value || '')) {
+    matched.push('summary-row')
+  }
+
+  if (TOTAL_LABEL_PATTERN.test(label || '')) {
+    matched.push('total-row')
+  }
+
+  if (financial.polarity === 'negative') {
+    matched.push('negative-value')
+  }
+
+  if (matched.length === 0) return null
+
+  const sorted = SUBTYPE_PRIORITY.filter((s) => matched.includes(s))
+
+  return Object.freeze({
+    subtype: sorted[0],
+    subtypes: Object.freeze(sorted)
+  })
+}
+
 function getRegionLineEntries(region, lines) {
   const entries = []
   for (let idx = 0; idx < lines.length; idx++) {
@@ -169,6 +207,13 @@ function getRegionLineEntries(region, lines) {
     }
   }
   return entries
+}
+
+function buildPairFinancial(label, value) {
+  const financial = buildFinancialMetadata(value, label)
+  if (!financial) return null
+  const subtypes = classifyFinancialSubtypes({ label, value, financial, kind: 'pair', delta: null })
+  return subtypes ? Object.freeze({ ...financial, ...subtypes }) : Object.freeze({ ...financial, subtype: null })
 }
 
 function detectKeyValuePairs(region, lines) {
@@ -198,7 +243,7 @@ function detectKeyValuePairs(region, lines) {
           valueLineIndex: sourceIndex,
           labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.4, height: line.boundingBox.height }),
           valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.45, y: line.boundingBox.y, width: line.boundingBox.width * 0.55, height: line.boundingBox.height }),
-          financial: buildFinancialMetadata(value, label)
+          financial: buildPairFinancial(label, value)
         }))
         colonPairCount++
         continue
@@ -219,7 +264,7 @@ function detectKeyValuePairs(region, lines) {
             valueLineIndex: sourceIndex,
             labelBbox: Object.freeze({ x: line.boundingBox.x, y: line.boundingBox.y, width: line.boundingBox.width * 0.5, height: line.boundingBox.height }),
             valueBbox: Object.freeze({ x: line.boundingBox.x + line.boundingBox.width * 0.55, y: line.boundingBox.y, width: line.boundingBox.width * 0.45, height: line.boundingBox.height }),
-            financial: buildFinancialMetadata(value, label)
+            financial: buildPairFinancial(label, value)
           }))
           dotLeaderCount++
           continue
@@ -242,7 +287,7 @@ function detectKeyValuePairs(region, lines) {
             valueLineIndex: sourceIndex,
             labelBbox: Object.freeze({ x: sorted[0].x, y: sorted[0].y || line.boundingBox.y, width: sorted[0].width || 60, height: sorted[0].height || line.boundingBox.height }),
             valueBbox: Object.freeze({ x: sorted[1].x, y: sorted[1].y || line.boundingBox.y, width: sorted[1].width || 60, height: sorted[1].height || line.boundingBox.height }),
-            financial: buildFinancialMetadata(value, label)
+            financial: buildPairFinancial(label, value)
           }))
           horizontalPairCount++
         }
@@ -506,7 +551,21 @@ function detectMetrics(region, lines) {
     }
   }
 
-  return metrics.map((m) => Object.freeze(m))
+  return metrics.map((m) => {
+    const financial = m.financial || null
+    if (!financial) return Object.freeze({ ...m, financial: null })
+    const subtypes = classifyFinancialSubtypes({
+      label: m.label,
+      value: m.value,
+      financial,
+      kind: 'metric',
+      delta: m.delta
+    })
+    return Object.freeze({
+      ...m,
+      financial: subtypes ? Object.freeze({ ...financial, ...subtypes }) : Object.freeze({ ...financial, subtype: null })
+    })
+  })
 }
 
 function computeConfidence(signals) {
