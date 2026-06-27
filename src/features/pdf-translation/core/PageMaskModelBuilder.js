@@ -11,7 +11,9 @@
 
 const CELL_PADDING = Object.freeze({ top: 1, right: 2, bottom: 1, left: 2 })
 const BLOCK_PADDING = Object.freeze({ top: 1, right: 1, bottom: 1, left: 1 })
+const ROW_PADDING = Object.freeze({ top: 1, right: 2, bottom: 1, left: 2 })
 const NUMERIC_PATTERN = /^[\d.,\s+\-–—$€£¥₹BMKbmk%()]+$/
+const ROW_MIN_OCCUPIED_CELLS = 3
 
 function clampBBox(bbox, pageSize) {
   if (!pageSize) return bbox
@@ -84,6 +86,75 @@ function buildCellMasks(pageLayout) {
   return masks
 }
 
+function isRowComplex(row) {
+  let occupiedCount = 0
+  let hasColSpan = false
+  let hasNonOccupied = false
+
+  for (const cell of row) {
+    if (cell.state === 'occupied') {
+      occupiedCount++
+      if (cell.colSpan > 1) hasColSpan = true
+    } else {
+      hasNonOccupied = true
+    }
+  }
+
+  return hasColSpan || occupiedCount >= ROW_MIN_OCCUPIED_CELLS || hasNonOccupied
+}
+
+function buildRowMasks(pageLayout) {
+  const masks = []
+
+  for (const region of pageLayout.regions) {
+    const table = region.metadata?.table
+    if (!table?.grid?.occupancy) continue
+
+    for (const row of table.grid.occupancy) {
+      if (!isRowComplex(row)) continue
+
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+
+      for (const cell of row) {
+        const bb = cell.boundingBox
+        if (!bb) continue
+        minX = Math.min(minX, bb.x)
+        minY = Math.min(minY, bb.y)
+        maxX = Math.max(maxX, bb.x + bb.width)
+        maxY = Math.max(maxY, bb.y + bb.height)
+      }
+
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) continue
+
+      const rowIndex = row[0]?.rowIndex ?? 0
+      const bbox = clampBBox({
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      }, pageLayout.pageSize)
+      if (!bbox) continue
+
+      masks.push(Object.freeze({
+        id: `mask-${pageLayout.pageNumber}-${region.id}-row${rowIndex}`,
+        type: 'row',
+        source: 'table-row',
+        boundingBox: bbox,
+        padding: capPadding(ROW_PADDING, bbox.width, bbox.height),
+        backgroundStrategy: 'sample',
+        priority: 80,
+        contentHint: 'text',
+        ownerId: `table-row:${region.id}:${rowIndex}`
+      }))
+    }
+  }
+
+  return masks
+}
+
 function buildBlockMasks(pageLayout, tableRegionIds) {
   const masks = []
 
@@ -125,7 +196,7 @@ export function buildPageMaskModel(pageLayout) {
   if (!pageLayout || !pageLayout.regions) {
     return Object.freeze({
       masks: Object.freeze([]),
-      metadata: Object.freeze({ totalMasks: 0, cellMasks: 0, blockMasks: 0, regionMasks: 0 })
+      metadata: Object.freeze({ totalMasks: 0, cellMasks: 0, blockMasks: 0, regionMasks: 0, rowMasks: 0 })
     })
   }
 
@@ -138,9 +209,10 @@ export function buildPageMaskModel(pageLayout) {
 
   const cellMasks = buildCellMasks(pageLayout)
   const blockMasks = buildBlockMasks(pageLayout, tableRegionIds)
+  const rowMasks = buildRowMasks(pageLayout)
   const regionMasks = []
 
-  const masks = [...cellMasks, ...blockMasks, ...regionMasks]
+  const masks = [...cellMasks, ...rowMasks, ...blockMasks, ...regionMasks]
 
   return Object.freeze({
     masks: Object.freeze(masks),
@@ -148,7 +220,8 @@ export function buildPageMaskModel(pageLayout) {
       totalMasks: masks.length,
       cellMasks: cellMasks.length,
       blockMasks: blockMasks.length,
-      regionMasks: regionMasks.length
+      regionMasks: regionMasks.length,
+      rowMasks: rowMasks.length
     })
   })
 }

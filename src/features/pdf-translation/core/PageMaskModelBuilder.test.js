@@ -193,7 +193,7 @@ describe('PageMaskModelBuilder', () => {
   })
 
   describe('covered cells produce no mask', () => {
-    it('skips covered occupancy entries', () => {
+    it('skips covered occupancy entries but adds row mask for complex row', () => {
       const occupancy = [
         [
           makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 140, height: 14 } }),
@@ -216,12 +216,15 @@ describe('PageMaskModelBuilder', () => {
 
       const coveredMask = result.masks.find((m) => m.ownerId === null)
       expect(coveredMask).toBeUndefined()
-      expect(result.masks).toHaveLength(3)
+      const cellMasks = result.masks.filter((m) => m.type === 'cell')
+      const rowMasks = result.masks.filter((m) => m.type === 'row')
+      expect(cellMasks).toHaveLength(3)
+      expect(rowMasks.length).toBeGreaterThanOrEqual(1)
     })
   })
 
   describe('missing cells produce no mask', () => {
-    it('skips missing occupancy entries', () => {
+    it('skips missing occupancy entries but adds row mask for complex row', () => {
       const occupancy = [
         [
           makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 60, height: 14 } }),
@@ -242,7 +245,10 @@ describe('PageMaskModelBuilder', () => {
         regions: [region]
       })
 
-      expect(result.masks).toHaveLength(3)
+      const cellMasks = result.masks.filter((m) => m.type === 'cell')
+      const rowMasks = result.masks.filter((m) => m.type === 'row')
+      expect(cellMasks).toHaveLength(3)
+      expect(rowMasks.length).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -274,6 +280,163 @@ describe('PageMaskModelBuilder', () => {
 
       const headerMask = result.masks.find((m) => m.ownerId === 'c00')
       expect(headerMask.boundingBox.width).toBe(200)
+    })
+  })
+
+  describe('row masks', () => {
+    it('simple 2x2 table does not produce row masks', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 60, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 180, y: 100, width: 60, height: 14 } })
+        ],
+        [
+          makeOccupancyCell(1, 0, 'occupied', { cellId: 'c10', boundingBox: { x: 40, y: 120, width: 60, height: 14 } }),
+          makeOccupancyCell(1, 1, 'occupied', { cellId: 'c11', boundingBox: { x: 180, y: 120, width: 60, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+
+      const result = buildPageMaskModel({
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      })
+
+      const rowMasks = result.masks.filter((m) => m.type === 'row')
+      expect(rowMasks).toHaveLength(0)
+      expect(result.metadata.rowMasks).toBe(0)
+    })
+
+    it('row with 3+ occupied cells produces row mask', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 120, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 2, 'occupied', { cellId: 'c02', boundingBox: { x: 200, y: 100, width: 50, height: 14 } })
+        ],
+        [
+          makeOccupancyCell(1, 0, 'occupied', { cellId: 'c10', boundingBox: { x: 40, y: 120, width: 60, height: 14 } }),
+          makeOccupancyCell(1, 1, 'occupied', { cellId: 'c11', boundingBox: { x: 180, y: 120, width: 60, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+
+      const result = buildPageMaskModel({
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      })
+
+      const rowMasks = result.masks.filter((m) => m.type === 'row')
+      expect(rowMasks).toHaveLength(1)
+      expect(rowMasks[0].ownerId).toBe('table-row:p1-r0:0')
+    })
+
+    it('row mask boundingBox spans full row', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 120, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 2, 'occupied', { cellId: 'c02', boundingBox: { x: 200, y: 100, width: 50, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+
+      const result = buildPageMaskModel({
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      })
+
+      const rowMask = result.masks.find((m) => m.type === 'row')
+      expect(rowMask.boundingBox.x).toBe(40)
+      expect(rowMask.boundingBox.y).toBe(100)
+      expect(rowMask.boundingBox.width).toBe(210)
+      expect(rowMask.boundingBox.height).toBe(14)
+    })
+
+    it('row mask ownerId is deterministic', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 120, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 2, 'occupied', { cellId: 'c02', boundingBox: { x: 200, y: 100, width: 50, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+      const input = {
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      }
+
+      const r1 = buildPageMaskModel(input)
+      const r2 = buildPageMaskModel(input)
+      const row1 = r1.masks.find((m) => m.type === 'row')
+      const row2 = r2.masks.find((m) => m.type === 'row')
+
+      expect(row1.ownerId).toBe(row2.ownerId)
+      expect(row1.ownerId).toMatch(/^table-row:p1-r0:\d+$/)
+    })
+
+    it('metadata.rowMasks count is correct', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 120, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 2, 'occupied', { cellId: 'c02', boundingBox: { x: 200, y: 100, width: 50, height: 14 } })
+        ],
+        [
+          makeOccupancyCell(1, 0, 'occupied', { cellId: 'c10', boundingBox: { x: 40, y: 120, width: 50, height: 14 } }),
+          makeOccupancyCell(1, 1, 'occupied', { cellId: 'c11', boundingBox: { x: 120, y: 120, width: 50, height: 14 } }),
+          makeOccupancyCell(1, 2, 'occupied', { cellId: 'c12', boundingBox: { x: 200, y: 120, width: 50, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+
+      const result = buildPageMaskModel({
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      })
+
+      expect(result.metadata.rowMasks).toBe(2)
+      expect(result.metadata.totalMasks).toBe(result.metadata.cellMasks + result.metadata.rowMasks + result.metadata.blockMasks)
+    })
+
+    it('row mask object, boundingBox, and padding are frozen', () => {
+      const occupancy = [
+        [
+          makeOccupancyCell(0, 0, 'occupied', { cellId: 'c00', boundingBox: { x: 40, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 1, 'occupied', { cellId: 'c01', boundingBox: { x: 120, y: 100, width: 50, height: 14 } }),
+          makeOccupancyCell(0, 2, 'occupied', { cellId: 'c02', boundingBox: { x: 200, y: 100, width: 50, height: 14 } })
+        ]
+      ]
+      const region = makeTableRegion('p1-r0', { occupancy })
+
+      const result = buildPageMaskModel({
+        pageNumber: 1,
+        pageSize: makePageSize(),
+        lines: [],
+        blocks: [],
+        regions: [region]
+      })
+
+      const rowMask = result.masks.find((m) => m.type === 'row')
+      expect(Object.isFrozen(rowMask)).toBe(true)
+      expect(Object.isFrozen(rowMask.boundingBox)).toBe(true)
+      expect(Object.isFrozen(rowMask.padding)).toBe(true)
     })
   })
 
