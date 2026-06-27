@@ -103,7 +103,7 @@
       </section>
     </main>
 
-    <PdfWindowsHost />
+    <PdfWindowsHost :pdf-fingerprint="pdfFingerprint" />
   </div>
 </template>
 
@@ -136,6 +136,7 @@ const {
   translatedPageData,
   translationTick,
   restoredTranslationCount,
+  pdfFingerprint,
   workerLabel,
   session,
   loadPdfFile,

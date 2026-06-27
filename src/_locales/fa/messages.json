@@ -2231,6 +2231,15 @@
   "pdf_windows_host_copy_failed": {
     "message": "کپی ناموفق بود"
   },
+  "pdf_windows_host_dock_left": {
+    "message": "اتصال به چپ"
+  },
+  "pdf_windows_host_dock_right": {
+    "message": "اتصال به راست"
+  },
+  "pdf_windows_host_undock": {
+    "message": "جدا کردن"
+  },
   "window_tts_no_text": {
     "message": "متنی برای خواندن موجود نیست"
   },

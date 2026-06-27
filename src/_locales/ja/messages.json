@@ -2231,6 +2231,15 @@
   "pdf_windows_host_copy_failed": {
     "message": "コピーに失敗しました"
   },
+  "pdf_windows_host_dock_left": {
+    "message": "左にドック"
+  },
+  "pdf_windows_host_dock_right": {
+    "message": "右にドック"
+  },
+  "pdf_windows_host_undock": {
+    "message": "ドック解除"
+  },
   "window_tts_no_text": {
     "message": "読み上げるテキストがありません"
   },

@@ -12,9 +12,31 @@
   color: #e6edf7;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(14px);
-  transform: translateX(-50%);
+  transform: none;
   max-width: min(420px, calc(100vw - 24px));
   pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.pdf-windows-host--docked {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+.pdf-windows-host--dock-left {
+  left: 12px;
+  right: auto;
+}
+
+.pdf-windows-host--dock-right {
+  right: 12px;
+  left: auto;
+}
+
+.pdf-windows-host--dragging,
+.pdf-windows-host--resizing {
+  user-select: none;
 }
 
 .pdf-windows-host__header {
@@ -22,6 +44,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  cursor: grab;
+}
+
+.pdf-windows-host--dragging .pdf-windows-host__header {
+  cursor: grabbing;
 }
 
 .pdf-windows-host__title-group {
@@ -36,6 +63,13 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   color: rgba(230, 237, 247, 0.92);
+}
+
+.pdf-windows-host__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .pdf-windows-host__status {
@@ -55,19 +89,39 @@
   color: #fca5a5;
 }
 
+.pdf-windows-host__action-button,
 .pdf-windows-host__icon-button {
   appearance: none;
   border: 0;
-  background: transparent;
-  color: rgba(230, 237, 247, 0.72);
-  font-size: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(230, 237, 247, 0.84);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
   line-height: 1;
-  padding: 0 2px;
   cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
 
-  &:hover {
-    color: #ffffff;
-  }
+.pdf-windows-host__action-button:hover,
+.pdf-windows-host__icon-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.pdf-windows-host__action-button.is-active {
+  background: rgba(107, 124, 255, 0.22);
+  color: #ffffff;
+}
+
+.pdf-windows-host__action-button--pin {
+  min-width: 92px;
+}
+
+.pdf-windows-host__icon-button {
+  font-size: 20px;
+  padding: 7px 10px;
 }
 
 .pdf-windows-host__body {
@@ -185,6 +239,25 @@
 .pdf-windows-host__spinner--button {
   width: 12px;
   height: 12px;
+}
+
+.pdf-windows-host__dock-resize-handle {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(107, 124, 255, 0.18), rgba(107, 124, 255, 0.34));
+  cursor: ew-resize;
+  opacity: 0.85;
+}
+
+.pdf-windows-host--dock-left .pdf-windows-host__dock-resize-handle {
+  right: -4px;
+}
+
+.pdf-windows-host--dock-right .pdf-windows-host__dock-resize-handle {
+  left: -4px;
 }
 
 @keyframes pdf-windows-host-spin {

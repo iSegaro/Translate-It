@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, unref, watch } from 'vue'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js'
@@ -8,11 +8,12 @@ import { TranslationMode } from '@/shared/config/config.js'
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { loadPdfWindowLayout, savePdfWindowLayout, savePdfWindowPosition } from './usePdfWindowPersistence.js'
+import { usePdfWindowDocking } from './usePdfWindowDocking.js'
+import { usePdfWindowDrag } from './usePdfWindowDrag.js'
+import { usePdfWindowPlacement } from './usePdfWindowPlacement.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfWindowsHost')
-const PANEL_MARGIN = 12
-const DEFAULT_PANEL_WIDTH = 380
-const DEFAULT_PANEL_HEIGHT = 240
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
 
 function isPdfSelectionContext(context) {
@@ -23,58 +24,6 @@ function isPdfSelectionContext(context) {
   }
 
   return context.source === 'pdf-viewer' || context.isPdf === true
-}
-
-function getViewportPosition(position) {
-  if (!position) return null
-
-  if (position._isViewportRelative) {
-    return {
-      x: Number(position.x ?? position.left ?? 0),
-      y: Number(position.y ?? position.top ?? 0),
-      width: Number(position.width ?? 0),
-      height: Number(position.height ?? 0)
-    }
-  }
-
-  return {
-    x: Number(position.x ?? position.left ?? 0) - (window.scrollX || 0),
-    y: Number(position.y ?? position.top ?? 0) - (window.scrollY || 0),
-    width: Number(position.width ?? 0),
-    height: Number(position.height ?? 0)
-  }
-}
-
-function buildPanelStyle(position, isExpanded) {
-  if (!position) return {}
-
-  const viewportPosition = getViewportPosition(position)
-  if (!viewportPosition) return {}
-
-  const viewportWidth = document.documentElement?.clientWidth || window.innerWidth || 0
-  const viewportHeight = window.innerHeight || 0
-  const panelWidth = Math.min(DEFAULT_PANEL_WIDTH, Math.max(280, viewportWidth - PANEL_MARGIN * 2))
-  const panelHeight = isExpanded ? 300 : DEFAULT_PANEL_HEIGHT
-  const anchorX = viewportPosition.x + (viewportPosition.width / 2)
-  const anchorBelowY = viewportPosition.y + viewportPosition.height + 12
-  const anchorAboveY = viewportPosition.y - panelHeight - 12
-
-  let left = anchorX
-  let top = anchorBelowY
-
-  const halfWidth = panelWidth / 2
-  const maxLeft = Math.max(halfWidth + PANEL_MARGIN, viewportWidth - halfWidth - PANEL_MARGIN)
-  left = Math.max(halfWidth + PANEL_MARGIN, Math.min(left, maxLeft))
-
-  if (top + panelHeight + PANEL_MARGIN > viewportHeight) {
-    top = Math.max(PANEL_MARGIN, anchorAboveY)
-  }
-
-  return {
-    left: `${left}px`,
-    top: `${Math.max(PANEL_MARGIN, top)}px`,
-    width: `${panelWidth}px`
-  }
 }
 
 async function copyTextToClipboard(text) {
@@ -98,8 +47,9 @@ async function copyTextToClipboard(text) {
   return !!success
 }
 
-export function usePdfWindowsHost() {
+export function usePdfWindowsHost(options = {}) {
   const tracker = useResourceTracker('pdf-windows-host')
+  const pdfFingerprintSource = options.pdfFingerprint ?? ref('')
 
   const hostRef = ref(null)
   const isVisible = ref(false)
@@ -113,6 +63,13 @@ export function usePdfWindowsHost() {
   const selectionSessionId = ref(0)
   const hostStyle = ref({})
 
+  const placement = usePdfWindowPlacement()
+  const docking = usePdfWindowDocking({
+    initialPinned: false,
+    initialDockMode: 'none',
+    initialDockedWidth: 420
+  })
+
   let cleanupRegistered = false
   let activeRequestSessionId = 0
   let listenerId = 0
@@ -124,13 +81,9 @@ export function usePdfWindowsHost() {
   const speakableText = computed(() => translatedText.value || selectedText.value)
   const hasSpeakableText = computed(() => !!speakableText.value?.trim())
 
-  function refreshHostStyle() {
-    if (!isVisible.value || !selectionPosition.value) {
-      hostStyle.value = {}
-      return
-    }
-
-    hostStyle.value = buildPanelStyle(selectionPosition.value, hasTranslatedResult.value || hasError.value)
+  function resolvePdfFingerprint() {
+    const fingerprint = unref(pdfFingerprintSource)
+    return typeof fingerprint === 'string' ? fingerprint.trim() : ''
   }
 
   function clearCopyFeedback() {
@@ -138,6 +91,7 @@ export function usePdfWindowsHost() {
       tracker.clearTimer(copyFeedbackTimeoutId)
       copyFeedbackTimeoutId = null
     }
+
     copyStatus.value = ''
   }
 
@@ -159,6 +113,24 @@ export function usePdfWindowsHost() {
     }, COPY_FEEDBACK_TIMEOUT_MS)
   }
 
+  function refreshHostStyle() {
+    if (!isVisible.value) {
+      hostStyle.value = {}
+      return
+    }
+
+    placement.measureHostSize(hostRef.value)
+    hostStyle.value = placement.buildCurrentStyle({
+      dockMode: docking.dockMode.value,
+      dockedWidth: docking.dockedWidth.value
+    })
+  }
+
+  async function scheduleHostStyleRefresh() {
+    await nextTick()
+    refreshHostStyle()
+  }
+
   function resetVisibleState() {
     isVisible.value = false
     selectedText.value = ''
@@ -169,16 +141,99 @@ export function usePdfWindowsHost() {
     isCopying.value = false
     clearCopyFeedback()
     hostStyle.value = {}
+    activeRequestSessionId = 0
+  }
+
+  async function persistGlobalPreferences() {
+    const fingerprint = resolvePdfFingerprint()
+    await savePdfWindowLayout({
+      pdfFingerprint: fingerprint,
+      isPinned: docking.isPinned.value,
+      dockMode: docking.dockMode.value,
+      dockedWidth: docking.dockedWidth.value
+    })
+  }
+
+  async function persistCurrentPosition() {
+    if (docking.dockMode.value !== 'none') {
+      return
+    }
+
+    const fingerprint = resolvePdfFingerprint()
+    await savePdfWindowPosition(fingerprint, placement.position.value)
+  }
+
+  async function hydrateLayoutState() {
+    const fingerprint = resolvePdfFingerprint()
+    const layout = await loadPdfWindowLayout(fingerprint)
+
+    docking.setPinned(layout.isPinned)
+    docking.setDockMode(layout.dockMode)
+    docking.setDockedWidth(layout.dockedWidth)
+
+    placement.setFloatingPosition(layout.position, { markManual: false })
+    if (layout.hasDocumentPosition || !fingerprint) {
+      placement.markManualPosition()
+    } else {
+      placement.resetManualPosition()
+    }
+
+    await scheduleHostStyleRefresh()
   }
 
   function dismissHost() {
     selectionSessionId.value += 1
     activeRequestSessionId = 0
+
+    if (isVisible.value && docking.dockMode.value === 'none') {
+      void persistCurrentPosition()
+    }
+
     resetVisibleState()
   }
 
   function isPdfSelectionEvent(detail) {
     return isPdfSelectionContext(detail?.context)
+  }
+
+  async function handleDockModeChange(nextMode) {
+    docking.setDockMode(nextMode)
+    placement.markManualPosition()
+    await persistGlobalPreferences()
+    await scheduleHostStyleRefresh()
+  }
+
+  async function handlePinToggle() {
+    docking.togglePin()
+    placement.markManualPosition()
+    await persistGlobalPreferences()
+    await scheduleHostStyleRefresh()
+  }
+
+  async function handleDockLeft() {
+    await handleDockModeChange(docking.dockMode.value === 'left' ? 'none' : 'left')
+  }
+
+  async function handleDockRight() {
+    await handleDockModeChange(docking.dockMode.value === 'right' ? 'none' : 'right')
+  }
+
+  async function handleDockResize(event) {
+    const started = docking.startResize(event, {
+      onResize: () => {
+        void scheduleHostStyleRefresh()
+      },
+      onResizeEnd: async () => {
+        await persistGlobalPreferences()
+        await scheduleHostStyleRefresh()
+      }
+    })
+
+    if (started) {
+      placement.markManualPosition()
+    }
+
+    return started
   }
 
   function handleSelectionChange(detail) {
@@ -190,6 +245,10 @@ export function usePdfWindowsHost() {
     const position = detail?.position || null
 
     if (!text || !position) {
+      if (docking.isPinned.value) {
+        return
+      }
+
       dismissHost()
       return
     }
@@ -205,11 +264,18 @@ export function usePdfWindowsHost() {
     isTranslating.value = false
     clearCopyFeedback()
 
-    refreshHostStyle()
+    const followSelection = !docking.isPinned.value && !docking.isDocked.value && !placement.manualPosition.value
+    placement.setSelectionPosition(position, { followSelection })
+
+    void scheduleHostStyleRefresh()
   }
 
   function handleSelectionClear(detail) {
     if (!isPdfSelectionContext(detail?.context)) {
+      return
+    }
+
+    if (docking.isPinned.value) {
       return
     }
 
@@ -325,7 +391,7 @@ export function usePdfWindowsHost() {
   }
 
   function handleDocumentPointerDown(event) {
-    if (!isVisible.value) {
+    if (!isVisible.value || docking.isPinned.value) {
       return
     }
 
@@ -337,9 +403,68 @@ export function usePdfWindowsHost() {
 
   function handleViewportChange() {
     if (isVisible.value) {
-      refreshHostStyle()
+      placement.ensurePositionWithinViewport()
+      void scheduleHostStyleRefresh()
     }
   }
+
+  const drag = usePdfWindowDrag({
+    tracker,
+    hostRef,
+    position: placement.position,
+    hostSize: placement.hostSize,
+    dockMode: docking.dockMode,
+    manualPosition: placement.manualPosition,
+    onDockModeChange: async (mode) => {
+      docking.setDockMode(mode)
+      placement.markManualPosition()
+      await persistGlobalPreferences()
+      await scheduleHostStyleRefresh()
+    },
+    onPositionChange: () => {
+      void scheduleHostStyleRefresh()
+    },
+    onPersistPosition: async (nextPosition) => {
+      placement.setFloatingPosition(nextPosition, { markManual: true })
+      await persistCurrentPosition()
+    },
+    onDragStart: () => {
+      placement.markManualPosition()
+    },
+    onDragEnd: () => {
+      void scheduleHostStyleRefresh()
+    }
+  })
+
+  watch(
+    () => resolvePdfFingerprint(),
+    async (newFingerprint, oldFingerprint) => {
+      if (newFingerprint === oldFingerprint) {
+        return
+      }
+
+      dismissHost()
+      await hydrateLayoutState()
+    },
+    { immediate: true }
+  )
+
+  watch(
+    [
+      isVisible,
+      selectionPosition,
+      translatedText,
+      translationError,
+      () => docking.isPinned.value,
+      () => docking.dockMode.value,
+      () => docking.dockedWidth.value,
+      () => placement.manualPosition.value
+    ],
+    () => {
+      void scheduleHostStyleRefresh()
+    },
+    { deep: true }
+  )
 
   onMounted(() => {
     if (cleanupRegistered) {
@@ -354,14 +479,6 @@ export function usePdfWindowsHost() {
     registerListener(window, 'scroll', handleViewportChange, { capture: true })
     registerListener(window, 'resize', handleViewportChange)
   })
-
-  watch(
-    [isVisible, selectionPosition, translatedText, translationError],
-    () => {
-      refreshHostStyle()
-    },
-    { deep: true }
-  )
 
   return {
     hostRef,
@@ -378,9 +495,22 @@ export function usePdfWindowsHost() {
     hasError,
     speakableText,
     hasSpeakableText,
+    isPinned: docking.isPinned,
+    dockMode: docking.dockMode,
+    dockedWidth: docking.dockedWidth,
+    isDocked: docking.isDocked,
+    isResizing: docking.isResizing,
+    isDragging: drag.isDragging,
     translateSelection,
     retryTranslation,
     copyTranslation,
-    dismissHost
+    dismissHost,
+    handlePinToggle,
+    handleDockLeft,
+    handleDockRight,
+    handleDockResize,
+    startDrag: drag.startDrag,
+    refreshHostStyle,
+    scheduleHostStyleRefresh
   }
 }

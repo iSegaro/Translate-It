@@ -16,6 +16,7 @@ export function usePdfViewerController() {
   const fileName = ref('')
   const pageCount = ref(0)
   const workerLabel = ref('')
+  const pdfFingerprint = ref('')
   const pageMetrics = ref([])
   const pageScale = ref(1)
   const isTranslating = ref(false)
@@ -72,6 +73,7 @@ export function usePdfViewerController() {
     pageCount.value = state.totalPages
     pageMetrics.value = state.pageMetrics
     pageScale.value = state.pageScale
+    pdfFingerprint.value = state.pdfFingerprint || ''
     workerLabel.value = state.workerUrl ? 'configured' : 'pending'
   }
 
@@ -80,6 +82,7 @@ export function usePdfViewerController() {
     fileName.value = ''
     pageCount.value = 0
     workerLabel.value = ''
+    pdfFingerprint.value = ''
     pageMetrics.value = []
     pageScale.value = 1
     translationSummary.value = {
@@ -293,6 +296,7 @@ export function usePdfViewerController() {
     pageScale,
     isTranslating,
     canTranslateVisiblePages,
+    pdfFingerprint,
     translationSummary,
     translationTick,
     translatedPageData,

@@ -2231,6 +2231,15 @@
   "pdf_windows_host_copy_failed": {
     "message": "Copy failed"
   },
+  "pdf_windows_host_dock_left": {
+    "message": "Dock Left"
+  },
+  "pdf_windows_host_dock_right": {
+    "message": "Dock Right"
+  },
+  "pdf_windows_host_undock": {
+    "message": "Undock"
+  },
   "window_tts_no_text": {
     "message": "No text available for speech"
   },

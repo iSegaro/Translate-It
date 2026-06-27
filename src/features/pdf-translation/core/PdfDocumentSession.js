@@ -137,7 +137,8 @@ export class PdfDocumentSession extends ResourceTracker {
       pageMetrics: this.pageMetrics,
       pageScale: this.pageScale,
       workerUrl: this.workerUrl,
-      documentIdentity: this.documentIdentity
+      documentIdentity: this.documentIdentity,
+      pdfFingerprint: this.pdfFingerprint
     }
   }
 

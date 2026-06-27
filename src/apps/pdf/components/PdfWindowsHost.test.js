@@ -9,6 +9,42 @@ let windowsManagerImported = false
 
 const sendRegularMessageMock = vi.fn()
 
+vi.mock('@/shared/storage/core/StorageCore.js', () => ({
+  storageCore: {
+    get: vi.fn(async (keys) => {
+      const state = globalThis.__pdfWindowsHostStorageState || {}
+
+      if (typeof keys === 'string') {
+        return { [keys]: state[keys] }
+      }
+
+      if (Array.isArray(keys)) {
+        return Object.fromEntries(keys.map((key) => [key, state[key]]))
+      }
+
+      if (keys && typeof keys === 'object') {
+        return Object.fromEntries(
+          Object.entries(keys).map(([key, fallback]) => [
+            key,
+            state[key] ?? fallback
+          ])
+        )
+      }
+
+      return { ...state }
+    }),
+    set: vi.fn(async (data) => {
+      globalThis.__pdfWindowsHostStorageState = {
+        ...(globalThis.__pdfWindowsHostStorageState || {}),
+        ...data
+      }
+      return true
+    }),
+    on: vi.fn(),
+    off: vi.fn()
+  }
+}))
+
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: {
     on: vi.fn((event, handler) => {
@@ -57,6 +93,14 @@ function emitSelectionClear(detail = {}) {
   eventHandlers['global-selection-clear']?.(detail)
 }
 
+function dispatchPointerEvent(target, type, options = {}) {
+  target.dispatchEvent(new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    ...options
+  }))
+}
+
 describe('PdfWindowsHost', () => {
   let wrapper
   let addEventListenerSpy
@@ -67,6 +111,18 @@ describe('PdfWindowsHost', () => {
 
   beforeEach(async () => {
     windowsManagerImported = false
+    globalThis.__pdfWindowsHostStorageState = {
+      pdfWindowsHostLayout: {
+        version: 1,
+        global: {
+          isPinned: false,
+          dockMode: 'none',
+          dockedWidth: 420,
+          defaultPosition: { x: 72, y: 72 }
+        },
+        documents: {}
+      }
+    }
     sendRegularMessageMock.mockReset()
     sendRegularMessageMock.mockResolvedValue({ success: true, translatedText: 'Translated text' })
 
@@ -89,6 +145,9 @@ describe('PdfWindowsHost', () => {
     windowRemoveEventListenerSpy = vi.spyOn(window, 'removeEventListener')
 
     wrapper = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1'
+      },
       attachTo: document.body
     })
     await flushPromises()
@@ -217,6 +276,133 @@ describe('PdfWindowsHost', () => {
 
     expect(clipboardWriteTextMock).toHaveBeenCalledWith('Translated text')
     expect(wrapper.text()).toContain('pdf_windows_host_copied')
+  })
+
+  it('pins the window so outside clicks and clear events do not dismiss it until unpinned', async () => {
+    emitSelection({
+      text: 'Pin me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await flushPromises()
+
+    document.body.dispatchEvent(new MouseEvent('pointerdown', {
+      bubbles: true,
+      clientX: 4,
+      clientY: 4
+    }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+    emitSelectionClear({
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="pdf-windows-host-pin"]').trigger('click')
+    await flushPromises()
+
+    document.body.dispatchEvent(new MouseEvent('pointerdown', {
+      bubbles: true,
+      clientX: 4,
+      clientY: 4
+    }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(false)
+  })
+
+  it('docks left and right and clamps dock resize width', async () => {
+    emitSelection({
+      text: 'Dock me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="pdf-windows-host-dock-left"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-left')
+    expect(wrapper.find('[data-testid="pdf-windows-host-resize-handle"]').exists()).toBe(true)
+
+    const resizeHandle = wrapper.get('[data-testid="pdf-windows-host-resize-handle"]')
+    dispatchPointerEvent(resizeHandle.element, 'pointerdown', { clientX: 420, clientY: 40 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 2000, clientY: 40 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 2000, clientY: 40 })
+    await flushPromises()
+
+    const dockedWidth = Number.parseInt(wrapper.get('[data-testid="pdf-windows-host"]').element.style.width, 10)
+    const expectedMaxDockedWidth = Math.max(280, Math.floor((document.documentElement.clientWidth || window.innerWidth || 0) * 0.8))
+    expect(dockedWidth).toBeLessThanOrEqual(expectedMaxDockedWidth)
+    expect(dockedWidth).toBeGreaterThanOrEqual(280)
+
+    await wrapper.get('[data-testid="pdf-windows-host-dock-right"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="pdf-windows-host"]').classes()).toContain('pdf-windows-host--dock-right')
+  })
+
+  it('drags the floating window and restores persisted positions by fingerprint and global fallback', async () => {
+    emitSelection({
+      text: 'Drag me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    const header = wrapper.get('.pdf-windows-host__header')
+    dispatchPointerEvent(header.element, 'pointerdown', { clientX: 180, clientY: 210 })
+    dispatchPointerEvent(document, 'pointermove', { clientX: 260, clientY: 260 })
+    dispatchPointerEvent(document, 'pointerup', { clientX: 260, clientY: 260 })
+    await flushPromises()
+
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1']).toBeDefined()
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.x).toBeGreaterThanOrEqual(12)
+    expect(globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.y).toBeGreaterThanOrEqual(12)
+
+    wrapper.unmount()
+    wrapper = null
+
+    globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.global.defaultPosition = { x: 88, y: 96 }
+    const fingerprintRestored = mount(PdfWindowsHost, {
+      props: {
+        pdfFingerprint: 'pdf-doc-1'
+      },
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    emitSelection({
+      text: 'Doc restore',
+      position: { x: 20, y: 20, width: 80, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.left).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.x}px`)
+    expect(fingerprintRestored.get('[data-testid="pdf-windows-host"]').element.style.top).toBe(`${globalThis.__pdfWindowsHostStorageState.pdfWindowsHostLayout.documents['pdf-doc-1'].position.y}px`)
+
+    fingerprintRestored.unmount()
+
+    const globalFallback = mount(PdfWindowsHost, {
+      attachTo: document.body
+    })
+    await flushPromises()
+
+    emitSelection({
+      text: 'Global fallback',
+      position: { x: 20, y: 20, width: 80, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.left).toBe('88px')
+    expect(globalFallback.get('[data-testid="pdf-windows-host"]').element.style.top).toBe('96px')
+
+    globalFallback.unmount()
   })
 
   it('ignores stale results after a newer PDF selection arrives', async () => {

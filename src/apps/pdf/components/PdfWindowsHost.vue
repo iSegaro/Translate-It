@@ -3,13 +3,24 @@
     v-if="isVisible"
     ref="hostRef"
     class="pdf-windows-host"
+    :class="{
+      'pdf-windows-host--docked': isDocked,
+      'pdf-windows-host--dock-left': dockMode === 'left',
+      'pdf-windows-host--dock-right': dockMode === 'right',
+      'pdf-windows-host--pinned': isPinned,
+      'pdf-windows-host--dragging': isDragging,
+      'pdf-windows-host--resizing': isResizing
+    }"
     :style="hostStyle"
     role="dialog"
     :aria-label="t('pdf_windows_host_aria_label')"
     data-testid="pdf-windows-host"
     @click.stop
   >
-    <header class="pdf-windows-host__header">
+    <header
+      class="pdf-windows-host__header"
+      @pointerdown.stop="startDrag"
+    >
       <div class="pdf-windows-host__title-group">
         <span class="pdf-windows-host__title">
           {{ t('translateSelectedText') }}
@@ -23,15 +34,58 @@
         </span>
       </div>
 
-      <button
-        class="pdf-windows-host__icon-button"
-        type="button"
-        :title="t('window_close')"
-        data-testid="pdf-windows-host-close"
-        @click.stop="dismissHost"
-      >
-        ×
-      </button>
+      <div class="pdf-windows-host__header-actions">
+        <button
+          class="pdf-windows-host__action-button pdf-windows-host__action-button--pin"
+          type="button"
+          :class="{ 'is-active': isPinned }"
+          :title="isPinned ? t('window_unpin') : t('window_pin')"
+          :aria-label="isPinned ? t('window_unpin') : t('window_pin')"
+          data-testid="pdf-windows-host-pin"
+          @click.stop="handlePinToggle"
+          @pointerdown.stop
+        >
+          {{ isPinned ? t('window_unpin') : t('window_pin') }}
+        </button>
+
+        <button
+          class="pdf-windows-host__action-button"
+          type="button"
+          :class="{ 'is-active': dockMode === 'left' }"
+          :title="dockMode === 'left' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_left')"
+          :aria-label="dockMode === 'left' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_left')"
+          data-testid="pdf-windows-host-dock-left"
+          @click.stop="handleDockLeft"
+          @pointerdown.stop
+        >
+          {{ t('pdf_windows_host_dock_left') }}
+        </button>
+
+        <button
+          class="pdf-windows-host__action-button"
+          type="button"
+          :class="{ 'is-active': dockMode === 'right' }"
+          :title="dockMode === 'right' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_right')"
+          :aria-label="dockMode === 'right' ? t('pdf_windows_host_undock') : t('pdf_windows_host_dock_right')"
+          data-testid="pdf-windows-host-dock-right"
+          @click.stop="handleDockRight"
+          @pointerdown.stop
+        >
+          {{ t('pdf_windows_host_dock_right') }}
+        </button>
+
+        <button
+          class="pdf-windows-host__icon-button"
+          type="button"
+          :title="t('window_close')"
+          :aria-label="t('window_close')"
+          data-testid="pdf-windows-host-close"
+          @click.stop="dismissHost"
+          @pointerdown.stop
+        >
+          ×
+        </button>
+      </div>
     </header>
 
     <div class="pdf-windows-host__body">
@@ -118,16 +172,32 @@
         />
       </div>
     </div>
+
+    <div
+      v-if="isDocked"
+      class="pdf-windows-host__dock-resize-handle"
+      data-testid="pdf-windows-host-resize-handle"
+      @pointerdown.stop="handleDockResize"
+    />
   </section>
 </template>
 
 <script setup>
+import { toRef } from 'vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
 import TTSButton from '@/components/shared/TTSButton.vue'
 import './PdfWindowsHost.scss'
 
+const props = defineProps({
+  pdfFingerprint: {
+    type: String,
+    default: ''
+  }
+})
+
 const { t } = useUnifiedI18n()
+const pdfFingerprint = toRef(props, 'pdfFingerprint')
 
 const {
   hostRef,
@@ -144,9 +214,21 @@ const {
   hasError,
   speakableText,
   hasSpeakableText,
+  isPinned,
+  dockMode,
+  isDocked,
+  isResizing,
+  isDragging,
   translateSelection,
   retryTranslation,
   copyTranslation,
-  dismissHost
-} = usePdfWindowsHost()
+  dismissHost,
+  handlePinToggle,
+  handleDockLeft,
+  handleDockRight,
+  handleDockResize,
+  startDrag
+} = usePdfWindowsHost({
+  pdfFingerprint
+})
 </script>
