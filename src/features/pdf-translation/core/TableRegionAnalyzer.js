@@ -309,6 +309,24 @@ function median(values) {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
 }
 
+function iqrFilteredMedian(values) {
+  if (!values.length) return 0
+  if (values.length <= 3) return median(values)
+
+  const sorted = [...values].sort((a, b) => a - b)
+  const q1Idx = Math.floor(sorted.length / 4)
+  const q3Idx = Math.floor(sorted.length * 3 / 4)
+  const q1 = sorted[q1Idx]
+  const q3 = sorted[q3Idx]
+  const iqr = q3 - q1
+  const fence = iqr * 1.5
+  const lo = q1 - fence
+  const hi = q3 + fence
+
+  const filtered = values.filter((v) => v >= lo && v <= hi)
+  return filtered.length >= 2 ? median(filtered) : median(values)
+}
+
 function buildCanonicalGrid(cells, rowCount, columnCount) {
   if (!cells.length || rowCount < 2 || columnCount < 2) {
     return Object.freeze({ rows: Object.freeze([]), columns: Object.freeze([]) })
@@ -329,8 +347,8 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
     const widthValues = colCells.map((c) => c.boundingBox.width)
     gridColumns.push(Object.freeze({
       columnIndex: colIdx,
-      x: Math.round(median(xValues) * 100) / 100,
-      width: Math.round(median(widthValues) * 100) / 100
+      x: Math.round(iqrFilteredMedian(xValues) * 100) / 100,
+      width: Math.round(iqrFilteredMedian(widthValues) * 100) / 100
     }))
   }
   gridColumns.sort((a, b) => a.columnIndex - b.columnIndex)

@@ -1591,6 +1591,213 @@ describe('TableRegionAnalyzer', () => {
       expect(grid.columns[2].x).toBe(350)
     })
 
+    it('outlier row does not shift canonical x position', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 120 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 50), makeItem('B', 180, 50)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 42, 50), makeItem('D', 182, 50)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 41, 50), makeItem('F', 181, 50)]
+        }),
+        makeLine(160, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 43, 50), makeItem('H', 183, 50)]
+        }),
+        makeLine(180, {
+          regionId: 'p1-r0',
+          items: [makeItem('I', 48, 50), makeItem('J', 175, 50)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].x).toBe(41.5)
+      expect(grid.columns[1].x).toBe(181.5)
+    })
+
+    it('one noisy column does not affect neighboring columns', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 500, height: 120 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 50), makeItem('B', 180, 50), makeItem('C', 320, 50)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('D', 42, 50), makeItem('E', 182, 50), makeItem('F', 322, 50)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 41, 50), makeItem('H', 181, 50), makeItem('I', 321, 50)]
+        }),
+        makeLine(160, {
+          regionId: 'p1-r0',
+          items: [makeItem('J', 43, 50), makeItem('K', 183, 50), makeItem('L', 323, 50)]
+        }),
+        makeLine(180, {
+          regionId: 'p1-r0',
+          items: [makeItem('M', 44, 50), makeItem('N', 176, 50), makeItem('O', 324, 50)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].x).toBe(42)
+      expect(grid.columns[1].x).toBe(181.5)
+      expect(grid.columns[2].x).toBe(322)
+    })
+
+    it('multiple noisy rows still produce stable columns', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 140 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 50), makeItem('B', 180, 50)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 42, 50), makeItem('D', 182, 50)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 41, 50), makeItem('F', 181, 50)]
+        }),
+        makeLine(160, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 43, 50), makeItem('H', 183, 50)]
+        }),
+        makeLine(180, {
+          regionId: 'p1-r0',
+          items: [makeItem('I', 48, 50), makeItem('J', 175, 50)]
+        }),
+        makeLine(200, {
+          regionId: 'p1-r0',
+          items: [makeItem('K', 36, 50), makeItem('L', 176, 50)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].x).toBe(41)
+      expect(grid.columns[1].x).toBe(180.5)
+    })
+
+    it('missing intermediate rows do not shift column boundaries', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 120 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 50), makeItem('B', 180, 50)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 50)]
+        }),
+        makeLine(160, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 40, 50), makeItem('F', 180, 50)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].x).toBe(40)
+      expect(grid.columns[1].x).toBe(180)
+    })
+
+    it('merged header row does not shift canonical boundaries', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 120 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Personal Info', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 180, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 42, 60), makeItem('30', 182, 60)]
+        }),
+        makeLine(170, {
+          regionId: 'p1-r0',
+          items: [makeItem('Bob', 41, 60), makeItem('25', 181, 60)]
+        }),
+        makeLine(190, {
+          regionId: 'p1-r0',
+          items: [makeItem('Carol', 43, 60), makeItem('28', 183, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].x).toBe(41)
+      expect(grid.columns[1].x).toBe(181.5)
+    })
+
+    it('deterministic repeated reconstruction produces identical columns', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 43, 50), makeItem('B', 183, 50)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 50), makeItem('D', 180, 50)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 41, 50), makeItem('F', 181, 50)]
+        }),
+        makeLine(160, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 90, 50), makeItem('H', 280, 50)]
+        })
+      ]
+
+      const run1 = analyzeTableRegions([region], lines, [])
+      const run2 = analyzeTableRegions([region], lines, [])
+      const cols1 = run1[0].metadata.table.grid.columns
+      const cols2 = run2[0].metadata.table.grid.columns
+
+      expect(cols1[0].x).toBe(cols2[0].x)
+      expect(cols1[0].width).toBe(cols2[0].width)
+      expect(cols1[1].x).toBe(cols2[1].x)
+      expect(cols1[1].width).toBe(cols2[1].width)
+    })
+
     it('stable column ordering by columnIndex', () => {
       const region = makeRegion('table', {
         id: 'p1-r0',
