@@ -9,6 +9,7 @@
       :block="block"
       :page-metric="pageMetric"
       :canvas="canvas"
+      :mask-map="maskMap"
     />
   </div>
 </template>
@@ -33,6 +34,10 @@ const props = defineProps({
   canvas: {
     type: Object,
     default: null
+  },
+  pageMaskModel: {
+    type: Object,
+    default: null
   }
 })
 
@@ -41,6 +46,19 @@ const translatedBlocks = computed(() => {
     const state = block.translationState
     return state && state.status === 'translated' && state.translatedText
   })
+})
+
+const maskMap = computed(() => {
+  const masks = props.pageMaskModel?.masks
+  if (!masks || !masks.length) return null
+
+  const map = new Map()
+  for (const mask of masks) {
+    if (!map.has(mask.ownerId)) {
+      map.set(mask.ownerId, mask)
+    }
+  }
+  return map
 })
 </script>
 

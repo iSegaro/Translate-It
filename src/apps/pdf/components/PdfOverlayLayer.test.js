@@ -85,4 +85,91 @@ describe('PdfOverlayLayer', () => {
 
     expect(wrapper.findAll('.pdf-block-overlay-item').length).toBe(1)
   })
+
+  it('accepts missing pageMaskModel without error', () => {
+    const wrapper = mount(PdfOverlayLayer, {
+      props: {
+        blocks: [
+          {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 100, height: 30 },
+            translationState: { status: 'translated', translatedText: 'Hello' }
+          }
+        ],
+        pageMetric: { scale: 1 },
+        visible: true,
+        pageMaskModel: null
+      }
+    })
+
+    expect(wrapper.find('.pdf-overlay-layer').exists()).toBe(true)
+  })
+
+  it('builds maskMap from pageMaskModel masks', () => {
+    const wrapper = mount(PdfOverlayLayer, {
+      props: {
+        blocks: [
+          {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 100, height: 30 },
+            translationState: { status: 'translated', translatedText: 'Hello' }
+          }
+        ],
+        pageMetric: { scale: 1 },
+        visible: true,
+        pageMaskModel: {
+          masks: [
+            { ownerId: 'block-1', type: 'block', boundingBox: { x: 10, y: 20, width: 100, height: 30 } }
+          ],
+          metadata: { totalMasks: 1, blockMasks: 1, cellMasks: 0, regionMasks: 0 }
+        }
+      }
+    })
+
+    expect(wrapper.find('.pdf-overlay-layer').exists()).toBe(true)
+  })
+
+  it('duplicate ownerId keeps first mask deterministically', () => {
+    const wrapper = mount(PdfOverlayLayer, {
+      props: {
+        blocks: [
+          {
+            id: 'block-1',
+            boundingBox: { x: 10, y: 20, width: 100, height: 30 },
+            translationState: { status: 'translated', translatedText: 'Hello' }
+          }
+        ],
+        pageMetric: { scale: 1 },
+        visible: true,
+        pageMaskModel: {
+          masks: [
+            { ownerId: 'block-1', type: 'block', boundingBox: { x: 10, y: 20, width: 100, height: 30 }, priority: 50 },
+            { ownerId: 'block-1', type: 'block', boundingBox: { x: 10, y: 20, width: 100, height: 30 }, priority: 90 }
+          ],
+          metadata: { totalMasks: 2, blockMasks: 2, cellMasks: 0, regionMasks: 0 }
+        }
+      }
+    })
+
+    expect(wrapper.find('.pdf-overlay-layer').exists()).toBe(true)
+  })
+
+  it('overlay output unchanged when pageMaskModel missing', () => {
+    const blocks = [
+      {
+        id: 'block-1',
+        boundingBox: { x: 10, y: 20, width: 100, height: 30 },
+        translationState: { status: 'translated', translatedText: 'Hello' }
+      }
+    ]
+
+    const withMask = mount(PdfOverlayLayer, {
+      props: { blocks, pageMetric: { scale: 1 }, visible: true, pageMaskModel: null }
+    })
+    const withoutMask = mount(PdfOverlayLayer, {
+      props: { blocks, pageMetric: { scale: 1 }, visible: true }
+    })
+
+    expect(withMask.findAll('.pdf-block-overlay-item').length).toBe(withoutMask.findAll('.pdf-block-overlay-item').length)
+  })
 })

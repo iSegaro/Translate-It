@@ -83,6 +83,10 @@ const props = defineProps({
   canvas: {
     type: Object,
     default: null
+  },
+  maskMap: {
+    type: Object,
+    default: null
   }
 })
 

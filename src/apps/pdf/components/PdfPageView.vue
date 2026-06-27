@@ -20,6 +20,7 @@
         :page-metric="page"
         :visible="visible"
         :canvas="canvasEl"
+        :page-mask-model="pageMaskModel"
       />
     </div>
   </article>
@@ -67,6 +68,10 @@ const pageStyle = computed(() => ({
 const textLayerStyle = computed(() => ({
   '--total-scale-factor': String(props.page.scale || 1)
 }))
+
+const pageMaskModel = computed(() => {
+  return props.session?.getPageMaskModel?.() || null
+})
 
 defineExpose({
   getRootEl: () => rootEl.value,
