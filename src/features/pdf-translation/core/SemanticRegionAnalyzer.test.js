@@ -976,4 +976,237 @@ describe('SemanticRegionAnalyzer', () => {
       expect(result[0].metadata.semantic.metrics[0].financial).toBeNull()
     })
   })
+
+  describe('three-line metric delta parsing', () => {
+    it('label/value/delta produces one metric with deltaLineIndex', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].label).toBe('Revenue')
+      expect(metrics[0].value).toBe('$12.3B')
+      expect(metrics[0].delta).toBe('+18.4% YoY')
+      expect(metrics[0].deltaLineIndex).toBe(2)
+      expect(metrics[0].valueLineIndex).toBe(1)
+      expect(metrics[0].labelLineIndex).toBe(0)
+    })
+
+    it('label/delta/value produces one metric with deltaLineIndex', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '+18.4% YoY', fontSize: 14 }),
+        makeLine(140, { text: '$12.3B', fontSize: 24 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].label).toBe('Revenue')
+      expect(metrics[0].value).toBe('$12.3B')
+      expect(metrics[0].delta).toBe('+18.4% YoY')
+      expect(metrics[0].deltaLineIndex).toBe(1)
+    })
+
+    it('value/label/delta produces one metric if safe', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: '$12.3B', fontSize: 24 }),
+        makeLine(120, { text: 'Revenue', fontSize: 12 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].value).toBe('$12.3B')
+      expect(metrics[0].label).toBe('Revenue')
+      expect(metrics[0].delta).toBe('+18.4% YoY')
+      expect(metrics[0].deltaLineIndex).toBe(2)
+    })
+
+    it('delta line no longer becomes standalone metric when value exists', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      expect(result[0].metadata.semantic.metrics).toHaveLength(1)
+    })
+
+    it('standalone percentage without period/sign remains value metric', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Growth', fontSize: 12 }),
+        makeLine(120, { text: '18.4%', fontSize: 20 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].value).toBe('18.4%')
+      expect(metrics[0].delta).toBeNull()
+    })
+
+    it('delta at region start without label is skipped', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: '+18.4% YoY', fontSize: 14 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+5% QoQ', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].value).toBe('$12.3B')
+      expect(metrics[0].delta).toBe('+5% QoQ')
+      expect(metrics[0].deltaLineIndex).toBe(2)
+    })
+
+    it('two stacked metrics each get own delta', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 120 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(115, { text: '$12.3B', fontSize: 24 }),
+        makeLine(130, { text: '+18.4% YoY', fontSize: 14 }),
+        makeLine(155, { text: '$8.1B', fontSize: 24 }),
+        makeLine(170, { text: '-2% QoQ', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(2)
+      expect(metrics[0].value).toBe('$12.3B')
+      expect(metrics[0].delta).toBe('+18.4% YoY')
+      expect(metrics[0].deltaLineIndex).toBe(2)
+      expect(metrics[1].value).toBe('$8.1B')
+      expect(metrics[1].delta).toBe('-2% QoQ')
+      expect(metrics[1].deltaLineIndex).toBe(4)
+    })
+
+    it('deltaLineIndex uses original source line index', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(50, { text: 'Before', fontSize: 12 }),
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 }),
+        makeLine(200, { text: 'After', fontSize: 12 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metric = result[0].metadata.semantic.metrics[0]
+      expect(metric.valueLineIndex).toBe(2)
+      expect(metric.labelLineIndex).toBe(1)
+      expect(metric.deltaLineIndex).toBe(3)
+    })
+
+    it('financial.magnitude from value is preserved when delta attaches', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const financial = result[0].metadata.semantic.metrics[0].financial
+      expect(financial.magnitude).toBe('B')
+      expect(financial.hasEnglishFinancialVocabularySignal).toBe(true)
+      expect(financial.period).toBe('YoY')
+      expect(financial.delta).toBe('+18.4%')
+      expect(financial.polarity).toBe('positive')
+    })
+
+    it('metric and financial metadata remain frozen after delta attach', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4% YoY', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metric = result[0].metadata.semantic.metrics[0]
+      expect(Object.isFrozen(metric)).toBe(true)
+      expect(Object.isFrozen(metric.financial)).toBe(true)
+    })
+
+    it('delta without period marker but with +/- near value still attaches', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 90 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(120, { text: '$12.3B', fontSize: 24 }),
+        makeLine(140, { text: '+18.4%', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].delta).toBe('+18.4%')
+      expect(metrics[0].financial.polarity).toBe('positive')
+    })
+
+    it('multiple delta lines near one metric attaches closest only', () => {
+      const region = makeRegion('paragraph', {
+        boundingBox: { x: 40, y: 100, width: 200, height: 110 }
+      })
+      const lines = [
+        makeLine(100, { text: 'Revenue', fontSize: 12 }),
+        makeLine(115, { text: '$12.3B', fontSize: 24 }),
+        makeLine(130, { text: '+18.4% YoY', fontSize: 14 }),
+        makeLine(145, { text: '+5% QoQ', fontSize: 14 })
+      ]
+
+      const result = analyzeSemanticRegions([region], lines, [])
+
+      const metrics = result[0].metadata.semantic.metrics
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].delta).toBe('+18.4% YoY')
+      expect(metrics[0].deltaLineIndex).toBe(2)
+    })
+  })
 })

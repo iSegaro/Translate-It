@@ -4,6 +4,8 @@
  * Phase L6a-L6b: Adds KPI candidate and key-value candidate detection
  * for non-table regions. Phase L6d-a adds financial signal enrichment
  * (delta, polarity, magnitude, period) to metrics and pairs.
+ * Phase L6d-b adds three-line metric parsing: delta lines attach to
+ * the nearest value metric instead of becoming standalone metrics.
  * All diagnostic-only — no rendering, translation, or adapter changes.
  *
  * Pipeline position: after analyzeTableRegions, before buildMetadata.
@@ -75,6 +77,18 @@ function isFinancialValue(text) {
   if (PAREN_VALUE_PATTERN.test(trimmed)) return true
   if (DELTA_VALUE_PATTERN.test(trimmed)) return true
   return false
+}
+
+function isStandaloneDeltaLine(text) {
+  if (!text) return false
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (!PERCENTAGE_PATTERN.test(trimmed)) return false
+  if (CURRENCY_PATTERN.test(trimmed)) return false
+  if (extractMagnitude(trimmed)) return false
+  const hasPeriod = PERIOD_PATTERN.test(trimmed)
+  const hasExplicitSign = /^[+\u002B]/.test(trimmed) || /^[-\u2013\u2014]/.test(trimmed)
+  return hasPeriod || hasExplicitSign
 }
 
 function extractMagnitude(text) {
@@ -349,49 +363,150 @@ function detectMetrics(region, lines) {
     }
   }
 
-  const metrics = []
-  for (let i = 0; i < regionLineEntries.length; i++) {
-    const { line, sourceIndex } = regionLineEntries[i]
+  const entries = regionLineEntries.map(({ line, sourceIndex }) => {
     const text = (line.text || '').trim()
-    if (!text) continue
-
+    if (!text) return { line, sourceIndex, text, role: 'other' }
     if (isFinancialValue(text)) {
-      let unit = null
-      if (CURRENCY_PATTERN.test(text)) unit = 'currency'
-      else if (PERCENTAGE_PATTERN.test(text)) unit = 'percentage'
+      if (isStandaloneDeltaLine(text)) return { line, sourceIndex, text, role: 'delta' }
+      return { line, sourceIndex, text, role: 'value' }
+    }
+    if (isLabelLine(text)) return { line, sourceIndex, text, role: 'label' }
+    return { line, sourceIndex, text, role: 'other' }
+  })
 
-      let label = null
-      let labelSourceIndex = null
-      for (let j = i - 1; j >= 0; j--) {
-        if (isLabelLine(regionLineEntries[j].line.text)) {
-          label = regionLineEntries[j].line.text.trim()
-          labelSourceIndex = regionLineEntries[j].sourceIndex
-          break
-        }
-      }
-      if (!label) {
-        for (let j = i + 1; j < regionLineEntries.length; j++) {
-          if (isLabelLine(regionLineEntries[j].line.text)) {
-            label = regionLineEntries[j].line.text.trim()
-            labelSourceIndex = regionLineEntries[j].sourceIndex
-            break
-          }
-        }
-      }
-
-      metrics.push(Object.freeze({
-        label: label || '',
-        value: text,
-        unit,
-        delta: null,
-        valueLineIndex: sourceIndex,
-        labelLineIndex: labelSourceIndex,
-        financial: buildFinancialMetadata(text, label)
-      }))
+  const hasValueLines = entries.some((e) => e.role === 'value')
+  if (!hasValueLines) {
+    for (const entry of entries) {
+      if (entry.role === 'delta') entry.role = 'value'
     }
   }
 
-  return metrics
+  const metrics = []
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]
+    if (entry.role !== 'value') continue
+
+    let unit = null
+    if (CURRENCY_PATTERN.test(entry.text)) unit = 'currency'
+    else if (PERCENTAGE_PATTERN.test(entry.text)) unit = 'percentage'
+
+    let label = null
+    let labelSourceIndex = null
+    for (let j = i - 1; j >= 0; j--) {
+      if (entries[j].role === 'label') {
+        label = entries[j].text
+        labelSourceIndex = entries[j].sourceIndex
+        break
+      }
+    }
+    if (!label) {
+      for (let j = i + 1; j < entries.length; j++) {
+        if (entries[j].role === 'label') {
+          label = entries[j].text
+          labelSourceIndex = entries[j].sourceIndex
+          break
+        }
+      }
+    }
+
+    metrics.push({
+      label: label || '',
+      value: entry.text,
+      unit,
+      delta: null,
+      valueLineIndex: entry.sourceIndex,
+      labelLineIndex: labelSourceIndex,
+      deltaLineIndex: null,
+      financial: buildFinancialMetadata(entry.text, label)
+    })
+  }
+
+  const deltaAttachedMetrics = new Set()
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]
+    if (entry.role !== 'delta') continue
+
+    const deltaText = entry.text
+    const { delta: deltaValue, period } = extractDeltaAndPeriod(deltaText)
+    const deltaPolarity = detectPolarity(deltaText)
+
+    let attached = false
+
+    for (let m = metrics.length - 1; m >= 0; m--) {
+      if (deltaAttachedMetrics.has(m)) continue
+      if (metrics[m].valueLineIndex < entry.sourceIndex) {
+        let hasInterveningValue = false
+        for (let j = i - 1; j >= 0; j--) {
+          if (entries[j].role === 'value' && entries[j].sourceIndex > metrics[m].valueLineIndex) {
+            hasInterveningValue = true
+            break
+          }
+        }
+        if (!hasInterveningValue) {
+          const existingFinancial = metrics[m].financial || {}
+          metrics[m] = Object.freeze({
+            ...metrics[m],
+            delta: deltaText,
+            deltaLineIndex: entry.sourceIndex,
+            financial: Object.freeze({
+              ...existingFinancial,
+              ...(deltaValue && { delta: deltaValue }),
+              ...(period && { period }),
+              ...(deltaPolarity !== 'neutral' && existingFinancial.polarity === 'neutral' && { polarity: deltaPolarity })
+            })
+          })
+          deltaAttachedMetrics.add(m)
+          attached = true
+          break
+        }
+      }
+    }
+
+    if (!attached) {
+      let hasPriorLabel = false
+      for (let j = i - 1; j >= 0; j--) {
+        if (entries[j].role === 'label') {
+          hasPriorLabel = true
+          break
+        }
+      }
+
+      if (hasPriorLabel) {
+        for (let m = 0; m < metrics.length; m++) {
+          if (deltaAttachedMetrics.has(m)) continue
+          if (metrics[m].valueLineIndex > entry.sourceIndex) {
+            let hasInterveningValue = false
+            for (let j = i + 1; j < entries.length; j++) {
+              if (entries[j].role === 'value' && entries[j].sourceIndex < metrics[m].valueLineIndex) {
+                hasInterveningValue = true
+                break
+              }
+            }
+            if (!hasInterveningValue) {
+              const existingFinancial = metrics[m].financial || {}
+              metrics[m] = Object.freeze({
+                ...metrics[m],
+                delta: deltaText,
+                deltaLineIndex: entry.sourceIndex,
+                financial: Object.freeze({
+                  ...existingFinancial,
+                  ...(deltaValue && { delta: deltaValue }),
+                  ...(period && { period }),
+                  ...(deltaPolarity !== 'neutral' && existingFinancial.polarity === 'neutral' && { polarity: deltaPolarity })
+                })
+              })
+              deltaAttachedMetrics.add(m)
+              attached = true
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return metrics.map((m) => Object.freeze(m))
 }
 
 function computeConfidence(signals) {
