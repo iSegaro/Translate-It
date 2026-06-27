@@ -70,6 +70,7 @@ import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvas
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
 import { resolvePdfCellOverlayWidth } from '@/features/pdf-translation/core/PdfCellSpanLayout.js'
 import { resolveCellOverlayGeometry } from '../utils/pdfMaskGeometry.js'
+import { PDF_OVERLAY_USE_CELL_MASKS } from '../constants/pdfFeatureFlags.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
@@ -93,7 +94,6 @@ const props = defineProps({
 })
 
 const CELL_GAP_EXPANSION_RATIO = 0.4
-const PDF_OVERLAY_USE_CELL_MASKS = false
 
 const scale = computed(() => props.pageMetric?.scale || 1)
 
