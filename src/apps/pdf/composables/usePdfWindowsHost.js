@@ -121,6 +121,8 @@ export function usePdfWindowsHost() {
   const hasTranslatedResult = computed(() => !!translatedText.value)
   const hasError = computed(() => !!translationError.value)
   const canTranslate = computed(() => isVisible.value && !!selectedText.value && !isTranslating.value)
+  const speakableText = computed(() => translatedText.value || selectedText.value)
+  const hasSpeakableText = computed(() => !!speakableText.value?.trim())
 
   function refreshHostStyle() {
     if (!isVisible.value || !selectionPosition.value) {
@@ -374,6 +376,8 @@ export function usePdfWindowsHost() {
     canTranslate,
     hasTranslatedResult,
     hasError,
+    speakableText,
+    hasSpeakableText,
     translateSelection,
     retryTranslation,
     copyTranslation,

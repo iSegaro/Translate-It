@@ -32,6 +32,14 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }))
 
+vi.mock('@/components/shared/TTSButton.vue', () => ({
+  default: {
+    name: 'TTSButton',
+    props: ['text', 'language', 'disabled'],
+    template: '<button data-testid="pdf-windows-host-tts" :data-text="text" :disabled="disabled">{{ text }}</button>'
+  }
+}))
+
 vi.mock('@/features/windows/composables/useWindowsManager.js', () => {
   windowsManagerImported = true
   return {
@@ -111,6 +119,22 @@ describe('PdfWindowsHost', () => {
 
     expect(wrapper.find('[data-testid="pdf-windows-host"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('PDF text')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('PDF text')
+  })
+
+  it('renders TTS for selected source text before translation and hides it when there is no speakable text', async () => {
+    expect(wrapper.find('[data-testid="pdf-windows-host-tts"]').exists()).toBe(false)
+
+    emitSelection({
+      text: 'Speak me',
+      position: { x: 120, y: 180, width: 90, height: 18 },
+      context: { source: 'pdf-viewer', isPdf: true }
+    })
+    await flushPromises()
+
+    const ttsButton = wrapper.get('[data-testid="pdf-windows-host-tts"]')
+    expect(ttsButton.exists()).toBe(true)
+    expect(ttsButton.attributes('data-text')).toBe('Speak me')
   })
 
   it('translates selected text, renders success, and maps the PDF request correctly', async () => {
@@ -135,6 +159,7 @@ describe('PdfWindowsHost', () => {
     }))
     expect(wrapper.find('[data-testid="pdf-windows-host-loading"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pdf-windows-host-result"]').text()).toContain('Translated text')
+    expect(wrapper.get('[data-testid="pdf-windows-host-tts"]').attributes('data-text')).toBe('Translated text')
   })
 
   it('renders errors and retries using the current selected text', async () => {

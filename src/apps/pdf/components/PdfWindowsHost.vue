@@ -106,6 +106,16 @@
         >
           {{ t('action_retry') }}
         </button>
+
+        <TTSButton
+          v-if="hasSpeakableText"
+          class="pdf-windows-host__tts-button"
+          :text="speakableText"
+          language="auto"
+          size="sm"
+          variant="secondary"
+          :disabled="isTranslating"
+        />
       </div>
     </div>
   </section>
@@ -114,6 +124,7 @@
 <script setup>
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { usePdfWindowsHost } from '../composables/usePdfWindowsHost.js'
+import TTSButton from '@/components/shared/TTSButton.vue'
 import './PdfWindowsHost.scss'
 
 const { t } = useUnifiedI18n()
@@ -131,6 +142,8 @@ const {
   canTranslate,
   hasTranslatedResult,
   hasError,
+  speakableText,
+  hasSpeakableText,
   translateSelection,
   retryTranslation,
   copyTranslation,
