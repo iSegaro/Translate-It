@@ -67,7 +67,7 @@ import { computed, onBeforeUnmount } from 'vue'
 import { resolveFontFamily, resolveAscent, resolveDescent, detectTextDirection, buildOverlayBaseStyle, OVERLAY_BACKGROUND } from '../utils/pdfOverlayTypography.js'
 import { sampleCanvasBackgroundColor, clearColorCache } from '../utils/pdfCanvasSampler.js'
 import { usePdfTextFitter } from '../composables/usePdfTextFitter.js'
-import { resolvePdfCellOverlayWidth } from '@features/pdf-translation/core/PdfCellSpanLayout.js'
+import { resolvePdfCellOverlayWidth } from '@/features/pdf-translation/core/PdfCellSpanLayout.js'
 import PdfCellOverlayItem from './PdfCellOverlayItem.vue'
 import PdfLineOverlayItem from './PdfLineOverlayItem.vue'
 
