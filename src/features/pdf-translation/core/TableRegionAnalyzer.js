@@ -329,7 +329,7 @@ function iqrFilteredMedian(values) {
 
 function buildCanonicalGrid(cells, rowCount, columnCount) {
   if (!cells.length || rowCount < 2 || columnCount < 2) {
-    return Object.freeze({ rows: Object.freeze([]), columns: Object.freeze([]) })
+    return Object.freeze({ rows: Object.freeze([]), columns: Object.freeze([]), occupancy: Object.freeze([]) })
   }
 
   const cellsByColumn = new Map()
@@ -407,9 +407,66 @@ function buildCanonicalGrid(cells, rowCount, columnCount) {
     gridRows.push(Object.freeze(frozenCells))
   }
 
+  const occupancy = []
+  for (let r = 0; r < rowCount; r++) {
+    const rowCells = gridRows[r]
+    const coveredBy = new Map()
+
+    if (rowCells.length) {
+      for (const gc of rowCells) {
+        if (gc.colSpan > 1) {
+          for (let col = gc.columnIndex + 1; col < gc.columnIndex + gc.colSpan; col++) {
+            coveredBy.set(col, gc.cellId)
+          }
+        }
+      }
+    }
+
+    const rowCellByColumn = rowCells ? new Map(rowCells.map((gc) => [gc.columnIndex, gc])) : null
+
+    const row = []
+    for (let c = 0; c < columnCount; c++) {
+      const gridCell = rowCellByColumn ? rowCellByColumn.get(c) : null
+
+      if (gridCell) {
+        row.push(Object.freeze({
+          rowIndex: r,
+          columnIndex: c,
+          state: 'occupied',
+          cellId: gridCell.cellId,
+          ownerCellId: gridCell.cellId,
+          colSpan: gridCell.colSpan,
+          rowSpan: 1
+        }))
+      } else if (coveredBy.has(c)) {
+        row.push(Object.freeze({
+          rowIndex: r,
+          columnIndex: c,
+          state: 'covered',
+          cellId: null,
+          ownerCellId: coveredBy.get(c),
+          colSpan: 1,
+          rowSpan: 1
+        }))
+      } else {
+        row.push(Object.freeze({
+          rowIndex: r,
+          columnIndex: c,
+          state: 'missing',
+          cellId: null,
+          ownerCellId: null,
+          colSpan: 1,
+          rowSpan: 1
+        }))
+      }
+    }
+    occupancy.push(Object.freeze(row))
+  }
+
   return Object.freeze({
     rows: Object.freeze(gridRows),
-    columns: Object.freeze(gridColumns)
+    columns: Object.freeze(gridColumns),
+    occupancy: Object.freeze(occupancy)
   })
 }
 

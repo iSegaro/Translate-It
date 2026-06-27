@@ -207,6 +207,7 @@ describe('TableRegionAnalyzer', () => {
       expect(table.grid).toBeDefined()
       expect(Array.isArray(table.grid.rows)).toBe(true)
       expect(Array.isArray(table.grid.columns)).toBe(true)
+      expect(Array.isArray(table.grid.occupancy)).toBe(true)
     })
   })
 
@@ -2142,6 +2143,260 @@ describe('TableRegionAnalyzer', () => {
         makeLine(150, {
           regionId: 'p1-r0',
           items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const cells = result[0].metadata.table.cells
+      const headerCell = cells.find((c) => c.text === 'Header')
+
+      expect(headerCell.colSpanCandidate).toBe(true)
+      expect(headerCell.estimatedColSpan).toBe(2)
+      expect(headerCell.text).toBe('Header')
+    })
+
+    it('simple 2x2 occupancy all occupied', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ).toHaveLength(2)
+      expect(occ[0]).toHaveLength(2)
+      expect(occ[1]).toHaveLength(2)
+      expect(occ[0][0].state).toBe('occupied')
+      expect(occ[0][1].state).toBe('occupied')
+      expect(occ[1][0].state).toBe('occupied')
+      expect(occ[1][1].state).toBe('occupied')
+    })
+
+    it('irregular row creates missing cells', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ[0][0].state).toBe('occupied')
+      expect(occ[0][1].state).toBe('occupied')
+      expect(occ[1][0].state).toBe('occupied')
+      expect(occ[1][1].state).toBe('missing')
+    })
+
+    it('colspan creates covered cells', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ[0][0].state).toBe('occupied')
+      expect(occ[0][1].state).toBe('covered')
+    })
+
+    it('covered cell points to ownerCellId', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ[0][0].cellId).toBe(occ[0][1].ownerCellId)
+      expect(occ[0][1].cellId).toBeNull()
+    })
+
+    it('occupancy dimensions equal rowCount x columnCount', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60), makeItem('C', 320, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('D', 40, 60), makeItem('E', 180, 60), makeItem('F', 320, 60)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 40, 60), makeItem('H', 180, 60), makeItem('I', 320, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const table = result[0].metadata.table
+      const occ = table.grid.occupancy
+
+      expect(occ).toHaveLength(table.rowCount)
+      for (const row of occ) {
+        expect(row).toHaveLength(table.columnCount)
+      }
+    })
+
+    it('sparse grid.rows unchanged', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows[0]).toHaveLength(2)
+      expect(grid.rows[1]).toHaveLength(1)
+      expect(grid.occupancy[1]).toHaveLength(2)
+    })
+
+    it('empty grid has empty occupancy', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 200, height: 30 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(occ).toHaveLength(0)
+    })
+
+    it('all occupancy rows and cells frozen', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const occ = result[0].metadata.table.grid.occupancy
+
+      expect(Object.isFrozen(occ)).toBe(true)
+      expect(Object.isFrozen(occ[0])).toBe(true)
+      expect(Object.isFrozen(occ[0][0])).toBe(true)
+    })
+
+    it('rowSpan is always 1 in occupancy', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40, 60), makeItem('D', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const allCells = result[0].metadata.table.grid.occupancy.flat()
+
+      expect(allCells.every((c) => c.rowSpan === 1)).toBe(true)
+    })
+
+    it('existing table.cells unchanged with occupancy', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Header', 40, 200)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40, 60), makeItem('B', 200, 60)]
         })
       ]
 
