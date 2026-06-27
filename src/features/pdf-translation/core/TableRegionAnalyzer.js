@@ -302,12 +302,77 @@ function detectTableCells(region, lines, columns, rows) {
   return Object.freeze(enrichedCells)
 }
 
+function median(values) {
+  if (!values.length) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+function buildCanonicalGrid(cells, rowCount, columnCount) {
+  if (!cells.length || rowCount < 2 || columnCount < 2) {
+    return Object.freeze({ rows: Object.freeze([]), columns: Object.freeze([]) })
+  }
+
+  const cellsByColumn = new Map()
+  for (const cell of cells) {
+    const colIdx = cell.columnIndex
+    if (!cellsByColumn.has(colIdx)) {
+      cellsByColumn.set(colIdx, [])
+    }
+    cellsByColumn.get(colIdx).push(cell)
+  }
+
+  const gridColumns = []
+  for (const [colIdx, colCells] of cellsByColumn) {
+    const xValues = colCells.map((c) => c.boundingBox.x)
+    const widthValues = colCells.map((c) => c.boundingBox.width)
+    gridColumns.push(Object.freeze({
+      columnIndex: colIdx,
+      x: Math.round(median(xValues) * 100) / 100,
+      width: Math.round(median(widthValues) * 100) / 100
+    }))
+  }
+  gridColumns.sort((a, b) => a.columnIndex - b.columnIndex)
+
+  const cellsByRow = new Map()
+  for (const cell of cells) {
+    const rowIdx = cell.rowIndex
+    if (!cellsByRow.has(rowIdx)) {
+      cellsByRow.set(rowIdx, [])
+    }
+    cellsByRow.get(rowIdx).push(cell)
+  }
+
+  const gridRows = []
+  for (let r = 0; r < rowCount; r++) {
+    const rowCells = cellsByRow.get(r)
+    if (!rowCells) {
+      gridRows.push(Object.freeze([]))
+      continue
+    }
+    const sorted = [...rowCells].sort((a, b) => a.columnIndex - b.columnIndex)
+    const frozenCells = sorted.map((c) => Object.freeze({
+      cellId: c.cellId,
+      rowIndex: c.rowIndex,
+      columnIndex: c.columnIndex
+    }))
+    gridRows.push(Object.freeze(frozenCells))
+  }
+
+  return Object.freeze({
+    rows: Object.freeze(gridRows),
+    columns: Object.freeze(gridColumns)
+  })
+}
+
 function buildTableMetadata(region, lines) {
   const columns = detectTableColumns(region, lines)
   const rows = detectTableRows(region, lines)
   const cells = detectTableCells(region, lines, columns, rows)
 
   const hasSpanCandidates = cells.some((cell) => cell.colSpanCandidate === true)
+  const grid = buildCanonicalGrid(cells, rows.length, columns.length)
 
   return Object.freeze({
     columnCount: columns.length,
@@ -317,7 +382,8 @@ function buildTableMetadata(region, lines) {
     hasMultiLevelHeaders: false,
     columns,
     rows,
-    cells
+    cells,
+    grid
   })
 }
 

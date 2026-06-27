@@ -204,6 +204,9 @@ describe('TableRegionAnalyzer', () => {
       expect(Array.isArray(table.columns)).toBe(true)
       expect(Array.isArray(table.rows)).toBe(true)
       expect(Array.isArray(table.cells)).toBe(true)
+      expect(table.grid).toBeDefined()
+      expect(Array.isArray(table.grid.rows)).toBe(true)
+      expect(Array.isArray(table.grid.columns)).toBe(true)
     })
   })
 
@@ -1441,6 +1444,321 @@ describe('TableRegionAnalyzer', () => {
       expect(table.cells).toHaveLength(0)
       expect(table.hasSpanCandidates).toBe(false)
       expect(table.hasMergedCells).toBe(false)
+    })
+  })
+
+  describe('canonical grid', () => {
+    it('produces 2x2 grid for simple table', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(2)
+      expect(grid.columns).toHaveLength(2)
+      expect(grid.rows[0]).toHaveLength(2)
+      expect(grid.rows[1]).toHaveLength(2)
+      expect(grid.rows[0][0].cellId).toBe('p1-r0-r0-c0-i0')
+      expect(grid.rows[0][1].cellId).toBe('p1-r0-r0-c1-i1')
+      expect(grid.rows[1][0].cellId).toBe('p1-r0-r1-c0-i0')
+      expect(grid.rows[1][1].cellId).toBe('p1-r0-r1-c1-i1')
+    })
+
+    it('derives column boundaries from all cells via median', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 42, 58), makeItem('Age', 182, 58)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 39, 62), makeItem('30', 179, 61)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('Bob', 41, 59), makeItem('25', 181, 59)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns).toHaveLength(2)
+      expect(grid.columns[0].columnIndex).toBe(0)
+      expect(grid.columns[1].columnIndex).toBe(1)
+      expect(grid.columns[0].x).toBe(41)
+      expect(grid.columns[1].x).toBe(181)
+    })
+
+    it('handles irregular rows with missing cells', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(2)
+      expect(grid.rows[0]).toHaveLength(2)
+      expect(grid.rows[1]).toHaveLength(1)
+      expect(grid.rows[1][0].columnIndex).toBe(0)
+    })
+
+    it('handles merged-cell placeholder (colSpanCandidate)', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Personal Info', 40, 180)]
+        }),
+        makeLine(130, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 200, 60)]
+        }),
+        makeLine(150, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 200, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(3)
+      expect(grid.rows[0]).toHaveLength(1)
+      expect(grid.rows[0][0].cellId).toBe('p1-r0-r0-c0-i0')
+      expect(grid.rows[1]).toHaveLength(2)
+      expect(grid.rows[2]).toHaveLength(2)
+    })
+
+    it('handles noisy column positions with median stabilization', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 100 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 50, 40), makeItem('B', 200, 40), makeItem('C', 350, 40)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('D', 42, 42), makeItem('E', 198, 42), makeItem('F', 348, 42)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('G', 55, 38), makeItem('H', 205, 38), makeItem('I', 355, 38)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns).toHaveLength(3)
+      expect(grid.columns[0].x).toBe(50)
+      expect(grid.columns[1].x).toBe(200)
+      expect(grid.columns[2].x).toBe(350)
+    })
+
+    it('stable column ordering by columnIndex', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 400, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 300, 60), makeItem('A', 40, 60), makeItem('B', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('X', 300, 60), makeItem('Y', 40, 60), makeItem('Z', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.columns[0].columnIndex).toBeLessThan(grid.columns[1].columnIndex)
+      expect(grid.columns[1].columnIndex).toBeLessThan(grid.columns[2].columnIndex)
+    })
+
+    it('empty grid for table with fewer than 2 rows', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 200, height: 30 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(0)
+      expect(grid.columns).toHaveLength(0)
+    })
+
+    it('empty grid for table with fewer than 2 columns', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 200, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('B', 40)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(0)
+      expect(grid.columns).toHaveLength(0)
+    })
+
+    it('grid is frozen', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(Object.isFrozen(grid)).toBe(true)
+      expect(Object.isFrozen(grid.rows)).toBe(true)
+      expect(Object.isFrozen(grid.columns)).toBe(true)
+      expect(Object.isFrozen(grid.rows[0])).toBe(true)
+      expect(Object.isFrozen(grid.rows[0][0])).toBe(true)
+      expect(Object.isFrozen(grid.columns[0])).toBe(true)
+    })
+
+    it('grid column structure is { columnIndex, x, width }', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('Name', 40, 60), makeItem('Age', 180, 60)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('Alice', 40, 60), makeItem('30', 180, 60)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const col = result[0].metadata.table.grid.columns[0]
+
+      expect(typeof col.columnIndex).toBe('number')
+      expect(typeof col.x).toBe('number')
+      expect(typeof col.width).toBe('number')
+    })
+
+    it('grid row cell structure is { cellId, rowIndex, columnIndex }', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 60 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40), makeItem('D', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const cell = result[0].metadata.table.grid.rows[0][0]
+
+      expect(typeof cell.cellId).toBe('string')
+      expect(typeof cell.rowIndex).toBe('number')
+      expect(typeof cell.columnIndex).toBe('number')
+      expect(Object.keys(cell)).toEqual(['cellId', 'rowIndex', 'columnIndex'])
+    })
+
+    it('sparse row is preserved when row has fewer cells', () => {
+      const region = makeRegion('table', {
+        id: 'p1-r0',
+        boundingBox: { x: 40, y: 100, width: 300, height: 80 }
+      })
+      const lines = [
+        makeLine(100, {
+          regionId: 'p1-r0',
+          items: [makeItem('A', 40), makeItem('B', 180)]
+        }),
+        makeLine(120, {
+          regionId: 'p1-r0',
+          items: [makeItem('C', 40)]
+        }),
+        makeLine(140, {
+          regionId: 'p1-r0',
+          items: [makeItem('E', 40), makeItem('F', 180)]
+        })
+      ]
+
+      const result = analyzeTableRegions([region], lines, [])
+      const grid = result[0].metadata.table.grid
+
+      expect(grid.rows).toHaveLength(3)
+      expect(grid.rows[0]).toHaveLength(2)
+      expect(grid.rows[1]).toHaveLength(1)
+      expect(grid.rows[2]).toHaveLength(2)
     })
   })
 
