@@ -20,6 +20,7 @@ import {
 } from '@/shared/config/config.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 import { shouldUseAutoPromptAsync } from '@/features/translation/utils/bilingualPromptHelper.js';
+import { buildSemanticInstructions } from './SemanticPromptBuilder.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIConversationHelper');
 
@@ -346,6 +347,14 @@ export const AIConversationHelper = {
       promptInstructions = promptInstructionsWithoutText
         .replace(/\$_{SOURCE}/g, sourceName)
         .replace(/\$_{TARGET}/g, targetName);
+    }
+
+    // Append semantic translation context when available (PDF mode only)
+    if (translateMode === TranslationMode.PDF && metadata?.semanticHint) {
+      const semanticInstructions = buildSemanticInstructions(metadata.semanticHint)
+      if (semanticInstructions) {
+        promptInstructions += '\n' + semanticInstructions
+      }
     }
 
     const textsArray = Array.isArray(text) ? text : [text];
